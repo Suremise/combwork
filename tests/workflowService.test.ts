@@ -151,6 +151,67 @@ describe("None: the kept runtime's hashes follow the watcher (#1263)", () => {
   })
 })
 
+// HR2's round 2: the hash sync waits (for the folder to settle); a workspace closed or switched meanwhile is refused,
+// never handed back as a runtime whose board has gone, for the call waiting and for one queued behind it.
+describe('None: a workspace closed or switched while its hashes sync (#1263)', () => {
+  /** A workspace with a None project; the watcher's answer held until `release`. */
+  async function held(): Promise<{ ws: string; w: WS; folder: string; hold: () => () => void }> {
+    const ws = join(base, `ws-${++n}`)
+    const folder = join(ws, 'n')
+    mkdirSync(join(folder, '.hive'), { recursive: true })
+    writeFileSync(join(folder, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const real = observer.changedBetween.bind(observer)
+    const hold = (): (() => void) => {
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      const spy = vi.spyOn(observer, 'changedBetween').mockImplementation(async (...args) => {
+        await gate
+        return real(...args)
+      })
+      return () => {
+        release()
+        spy.mockRestore()
+      }
+    }
+    return { ws, w, folder, hold }
+  }
+
+  it('closed while the sync waits: both calls refuse', async () => {
+    const { w, folder, hold } = await held()
+    expect(await workflowFor(w, folder)).not.toBeNull()
+    const release = hold()
+    const first = workflowFor(w, folder)
+    const second = workflowFor(w, folder)
+    await vi.waitFor(() => expect(observer.changedBetween).toHaveBeenCalled(), { timeout: HUNG_MS })
+    await w.close()
+    release()
+    await expect(first).rejects.toThrow(/closed/)
+    await expect(second).rejects.toThrow(/closed/)
+  })
+
+  it('switched to another workspace while the sync waits: refused, and the new workspace gets its own', async () => {
+    const { w, folder, hold } = await held()
+    const old = (await workflowFor(w, folder))!
+    const release = hold()
+    const first = workflowFor(w, folder)
+    const second = workflowFor(w, folder)
+    await vi.waitFor(() => expect(observer.changedBetween).toHaveBeenCalled(), { timeout: HUNG_MS })
+    const other = join(base, `ws-${++n}`)
+    mkdirSync(join(other, 'n', '.hive'), { recursive: true })
+    writeFileSync(join(other, 'n', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    await w.open(other)
+    release()
+    await expect(first).rejects.toThrow(/closed/)
+    await expect(second).rejects.toThrow(/closed/)
+    const now = await workflowFor(w, join(other, 'n'))
+    expect(now).not.toBeNull()
+    expect(now).not.toBe(old)
+  })
+})
+
 describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
   it('global → workspace → project, each level inheriting what it leaves unset, with each origin', () => {
     const r = resolveOptions('git', {

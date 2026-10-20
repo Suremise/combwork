@@ -65,16 +65,18 @@ async function resolve(ws: WorkspaceService, project: { path: string; name: stri
 /**
  * The project's runtime in a workspace (made once per workspace and project, and again once that workspace has closed),
  * with its options resolved again; null for a path that isn't one of its projects with a platform. Throws when the
- * workspace isn't open.
+ * workspace isn't open, also when it closed or its window opened another while this call waited (for its options, or
+ * None's hashes to sync: HR2's #1263 round 2), so a caller never reads through a runtime whose workspace has gone.
  */
 export async function workflowFor(ws: WorkspaceService, projectPath: string): Promise<Workflow | null> {
   const wsPath = ws.path
   const life = ws.lifetime
-  if (!wsPath || life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  const open = (): boolean => !!wsPath && !life.aborted && ws.lifetime === life && ws.path === wsPath
+  if (!wsPath || !open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
   const project = projectOf(ws, projectPath)
   if (!project) return null
   const resolved = await resolve(ws, project)
-  if (life.aborted || ws.lifetime !== life || ws.path !== wsPath) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
   let byProject = instances.get(ws)
   if (!byProject) instances.set(ws, (byProject = new Map()))
   const key = keyOf(project.path)
@@ -88,7 +90,10 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   }
   inst.resolved = resolved
   inst.wf.none.setExcluded(resolved.options.excluded)
-  if (resolved.options.platform === 'none') await syncHashes(inst, project.path)
+  if (resolved.options.platform === 'none') {
+    await syncHashes(inst, project.path)
+    if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  }
   return inst.wf
 }
 
