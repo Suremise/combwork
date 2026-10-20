@@ -130,10 +130,9 @@ const versionOf = (file: string): number => {
 }
 
 describe('the cards step (#1209)', () => {
-  it('is in the 1.0 group, its last step so far', () => {
+  it("is in the 1.0 group, after #1212's stores step", () => {
     const step = store.BOARD_MIGRATIONS.find((m) => m.name === 'cards in tables')
     expect(step).toMatchObject({ version: 5, group: '1.0' })
-    expect(Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version))).toBe(5)
   })
 
   it("moves a 0.9 board's cards into the tables: every reader gives the same bytes after as before", async () => {

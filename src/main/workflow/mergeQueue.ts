@@ -76,16 +76,15 @@ export class MergeQueue {
   }
 
   paused(target: string): { reason: PauseReason; card: string; files?: string[] } | null {
-    const v = this.wf.store.meta(`queue:paused:${target}`)
-    return v ? JSON.parse(v) : null
+    return this.wf.store.queuePause(target) as { reason: PauseReason; card: string; files?: string[] } | null
   }
 
   resume(target: string): void {
-    this.wf.store.setMeta(`queue:paused:${target}`, '')
+    this.wf.store.setQueuePause(target, null)
   }
 
   private pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): QueueOutcome {
-    this.wf.store.setMeta(`queue:paused:${target}`, JSON.stringify({ reason, card: card.key, ...(files ? { files } : {}) }))
+    this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) })
     return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
   }
 

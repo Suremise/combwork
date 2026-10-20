@@ -34,7 +34,7 @@ async function queued(e: Env, title: string, file: string) {
 
 /** Another Hive (a restart): its own store connection, Workflow and queue on the same files. */
 function restarted(e: Env): { wf: Workflow; q: MergeQueue } {
-  const store = new FactStore(join(e.home, 'workflow.db'))
+  const store = e.reopen()
   extra.push(store)
   const wf = new Workflow({ ...e.wf.cfg, store })
   return { wf, q: new MergeQueue(wf, { folder: join(e.home, 'queue'), runCheck: async () => ({ ok: true, output: '' }) }) }

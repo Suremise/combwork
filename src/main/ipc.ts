@@ -93,6 +93,7 @@ import { benchContext, importBenchmark, keepReport, listBenchmarks, pinBenchmark
 import { capturedText, HiveError, hiveError, windowError } from './hiveError'
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
+import { runActions } from './workflow/actionWorker'
 import { msg, tr } from '../shared/i18n'
 
 /**
@@ -288,6 +289,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
       .then(() => tasks.archiveOldDone(ws))
       .catch((e) => log.warn('archiving old Done cards', e))
+    // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
+    void runActions(contextWorkspace()!)
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
