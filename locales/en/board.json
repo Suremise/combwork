@@ -1287,6 +1287,10 @@
     "defaultMessage": "#{card} · not on the board",
     "description": "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its number."
   },
+  "board.lane.openForMore": {
+    "defaultMessage": "Click to open the card for the rest",
+    "description": "The last line of a lane segment's hover (Progress panel), under what its facts say: clicking the segment opens the card, which shows everything."
+  },
   "board.lane.reviewFailed": {
     "defaultMessage": "#{card}: review failed (round {round}): waiting for round {next}",
     "description": "A lane segment's note in the Progress panel (its hover, under a red underline): the card's review round {round} failed and the next round ({next}) hasn't started. {card} is its number."
@@ -1306,6 +1310,22 @@
   "board.lane.unrecordedUntitled": {
     "defaultMessage": "#{card} · not recorded: the lane ended before Hive kept where its cards were",
     "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card's number."
+  },
+  "board.lane.workChecks": {
+    "defaultMessage": "Checks on it: {passed, number} passed, {failed, number} failed",
+    "description": "A line in a lane segment's hover (Progress panel): how many of the checks on the card's revision passed and failed (each check's latest run that counted)."
+  },
+  "board.lane.workMerged": {
+    "defaultMessage": "Merged as {commit}",
+    "description": "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)."
+  },
+  "board.lane.workRevision": {
+    "defaultMessage": "{review, select, yes {Under review: {revision}} other {Revision: {revision}}}",
+    "description": "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review."
+  },
+  "board.lane.workVerdict": {
+    "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
+    "description": "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are."
   },
   "board.lanes.alreadyEnd": {
     "defaultMessage": "{where, select, first {{lane} is already the first running lane} other {{lane} is already the last running lane}}",
