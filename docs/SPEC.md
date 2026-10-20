@@ -2244,14 +2244,17 @@ deliveries keep their in-memory store (published after each transaction), the ta
   data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
   back." [the Assistant for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards'
   documents, which 0.9 reads]). Until the user agrees, the board opens read-only, as for a newer
-  file (writes refused with "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0"; the board's
-  add-card buttons off, saying why), with a banner at the top of the window offering **Upgrade…**; **Not Now** holds
+  file (writes refused with "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0"; what would
+  change a card is off, saying why in its tooltip: the board's add-card buttons, dragging cards, a card's menu but Open, the
+  card dialog's fields, Save, Start…, Archive, Delete, comments and decisions, with the reason as a banner in the dialog
+  [#1230]; for a newer file too), with a banner at the top of the window offering **Upgrade…**; **Not Now** holds
   until Hive starts again. A test copy (unpackaged, `HIVE_TEST_BOARD_UPGRADE=yes|no`) answers before it is asked
   [#1207]. **Meanwhile nothing that hive.db must record starts** [HR1's #1207 round 1 finding 1]: the whole file is
   read-only, so an agent's or the Assistant's start (every path: a click, Resume All, the Agent API, the Assistant) is
   refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
   reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
-  stays open for reading; the banner says the board is read-only and agents can't start. **When the file is replaced
+  stays open for reading; the banner says the board is read-only and agents can't start, and New Session and Resume in
+  the session view and the agent's menus are off with that as their tooltip [#1230]. **When the file is replaced
   under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
   card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
   (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's
