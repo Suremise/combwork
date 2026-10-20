@@ -40,7 +40,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { exportBoard } from './boardStore'
+import { boardState, exportBoard, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -586,6 +586,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:restore': (name) => removal.restoreProject(name),
     'project:forget': (name) => removal.forgetHidden(name),
     'project:takeRemovedData': (p, keep) => removal.takeRemovedData(p, keep),
+    'board:state': () => boardState(currentWorkspace()),
+    'board:upgrade': () => upgradeBoard(currentWorkspace()),
+    'board:restore09': () => {
+      const ws = currentWorkspace()
+      return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
+    },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:export': async () => {
       // The board as this window shows it now; the files go in a folder of their own inside the one chosen.

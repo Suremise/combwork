@@ -2212,10 +2212,29 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 
 [#1112 plan, #1122 c, #1123 tpl, #704, #1025; P1, answering HB3's round 1 findings 1, 7 and 9]
 
-**The migration.** One schema step, backed up first (`db.ts`, `.hive/backups`): card tables, keys and aliases, the
-fact log, actions, rulesets, typed tables for sessions, lanes, watches and deliveries.
-- **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? A 0.9 Hive can then open it read-only. A
-  backup is kept.").
+**The migration.** One upgrade, backed up first (`db.ts`, `.hive/backups`): card tables, keys and aliases, the fact
+log, actions, rulesets, typed tables for sessions, lanes, watches and deliveries. **Built as several steps that run as
+one** [Darren, 20 Oct, #1119 decision 3]: each part is its own step in the board's **1.0 group** (`Migration.group:
+'1.0'`, `BOARD_MIGRATIONS`; P3's steps each take the next version as they merge), and a file that needs any step of the
+group runs **all of its pending steps in one transaction**, after one ask, one backup and one exclusive lock: to the
+user it is one upgrade, and a crash leaves the file at 0.9. The group's first step (#1207, v3) records
+`board_meta.format = 1.0`. A new file has nothing to upgrade: it takes every step unasked.
+- **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? Hive 1.0 needs to upgrade this workspace's
+  data. A 0.9 Hive can then only open it read-only; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
+  back." [the Assistant for Darren, #1207 20 Oct]). Until the user agrees, the board opens read-only, as for a newer
+  file (writes refused with "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0"; the board's
+  add-card buttons off, saying why), with a banner at the top of the window offering **Upgrade…**; **Not Now** holds
+  until Hive starts again. A test copy (unpackaged, `HIVE_TEST_BOARD_UPGRADE=yes|no`) answers before it is asked
+  [#1207]. **Meanwhile nothing that hive.db must record starts** [HR1's #1207 round 1 finding 1]: the whole file is
+  read-only, so an agent's or the Assistant's start (every path: a click, Resume All, the Agent API, the Assistant) is
+  refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
+  reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
+  stays open for reading; the banner says the board is read-only and agents can't start. **When the file is replaced
+  under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
+  card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
+  (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's
+  **generation** (`dbGeneration`) moves on, and a save made from something read in an older generation is refused
+  (`saveStore`'s guard), never written over the file.
 - **No other Hive may have the workspace open while it runs** [HB3's round 2 finding D, HR2's round 2 finding 10].
   0.9.x writes no workspace presence marker, and its single-instance lock is per profile (`index.ts:115`), so the dev
   and installed Hive can't see each other that way. What every running Hive does hold is a connection to the
@@ -2227,11 +2246,23 @@ fact log, actions, rulesets, typed tables for sessions, lanes, watches and deliv
   proves this with a two-process test (a 0.9 build holding the workspace, a 1.0 build migrating; and a 0.9 build
   started *during* the migration, recording what it shows the user, which the RC notes then describe) before relying
   on it; if SQLite's lock can't be relied on for the WAL setup Hive uses, the fallback is a presence marker added to
-  0.9.3 while it is still in RC, which is outside this lane and needs Darren's say (OP-41).
+  0.9.x (now a 0.9.4 patch, 0.9.3 being released), which is outside this lane and needs Darren's say (OP-41).
+  **The group's copy is kept for good** (`hive-before-1.0-v<n>-<time>.db`, a family of its own that `BACKUPS_KEPT`
+  never prunes) [#1207].
 - From 1.0 on, every Hive also writes a **workspace presence marker** (`.hive/open/<profile>.json`, pid and a
-  heartbeat), so later migrations and the queue's lock have a second signal.
-- **A way back:** Help → **Restore the 0.9 board backup…** puts the pre-migration backup back (after its own backup of
-  the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted.
+  heartbeat), so later migrations and the queue's lock have a second signal. [#1207] `<profile>` is the profile
+  folder's name and a hash of its path; the heartbeat is renewed every 30 s while the board is open, the file removed as
+  it closes, and a marker is stale once its heartbeat is 90 s old or its process is gone. The upgrade refuses, as for
+  SQLite's lock, while another profile's fresh marker exists.
+- **A way back:** Help → **Restore the 0.9 Board Backup…** puts the pre-migration backup back (after its own backup of
+  the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted. [#1207] The 1.0 file is
+  copied first by a connection holding the file's exclusive lock (refused, as the upgrade is, while another Hive has it
+  open), kept for good as `hive-before-restore-v<n>-<time>.db`; the board is closed, the 0.9 copy put in its place,
+  and the board opened again: read-only in the 1.0 build (its upgrade waiting again), writable for 0.9. The copy put
+  back is the newest of the group's family **made before the group's first step**, its file checked to be a 0.9 board
+  (a schema before the group); the copy before a later step of the group, on a board in the group already, is an
+  ordinary one of the file's three [HR1's round 1 finding 2]. Refused while any of the workspace's agents (or its
+  Assistant) runs or starts: the board put back takes no writes here, so they would go on unrecorded.
 - **Two Hives on one workspace** (the dev and the installed one, after the migration): both observe the platform, so
   an observation is deduplicated as **the same transition**, not the same value [HR2's round 2 finding 7, HB3's G]:
   every observed fact names the observed fact it follows for that card and kind (`prev`: its seq, or the cycle's

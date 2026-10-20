@@ -112,7 +112,7 @@ const MENUS: MenuDef[] = [
   {
     id: 'help',
     label: msg({ id: 'shell.menu.help', defaultMessage: 'Help', description: "A menu of the title bar's menu bar." }),
-    items: ['help.docs', 'help.api', 'help.shortcuts', 'help.tips', 'help.releaseNotes', 'help.improveTranslation', '-', 'help.agentSetup', 'help.checkProviders', '-', 'view.devTools', 'help.devConsole', 'view.reload', 'help.logs', 'help.diagnostics', '-', 'help.checkUpdates', 'help.about']
+    items: ['help.docs', 'help.api', 'help.shortcuts', 'help.tips', 'help.releaseNotes', 'help.improveTranslation', '-', 'help.agentSetup', 'help.checkProviders', '-', 'view.devTools', 'help.devConsole', 'view.reload', 'help.logs', 'help.diagnostics', 'help.restoreBoard09', '-', 'help.checkUpdates', 'help.about']
   }
 ]
 

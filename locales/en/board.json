@@ -1023,6 +1023,10 @@
     "defaultMessage": "Could not change the card",
     "description": "An error toast's title: changing a card failed."
   },
+  "board.error.inUse": {
+    "defaultMessage": "Another Hive has this workspace open: close it first.",
+    "description": "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Hive (an older version, or another profile) has the workspace open. Nothing was changed."
+  },
   "board.error.move": {
     "defaultMessage": "Could not move the card",
     "description": "An error toast's title: moving a card to another column failed."
@@ -1031,9 +1035,17 @@
     "defaultMessage": "This board was saved by a newer version of Hive. It is shown read-only: update Hive to change it.",
     "description": "An error: the workspace's task board was saved by a newer Hive, whose format this version doesn't know; cards can be read but not changed."
   },
+  "board.error.noBackup": {
+    "defaultMessage": "There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.",
+    "description": "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to Hive 1.0 is kept in the workspace."
+  },
   "board.error.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error: the task board needs an open workspace, and there is none."
+  },
+  "board.error.stopAgentsFirst": {
+    "defaultMessage": "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Hive can't record them.",
+    "description": "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Hive, so their sessions couldn't be recorded. Nothing was changed."
   },
   "board.error.unarchive": {
     "defaultMessage": "Could not bring the card back",
@@ -1042,6 +1054,14 @@
   "board.error.unavailable": {
     "defaultMessage": "The board couldn't be opened: {error}",
     "description": "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were."
+  },
+  "board.error.upgradeFirst": {
+    "defaultMessage": "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
+    "description": "An error: the workspace's task board hasn't been upgraded to Hive 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board."
+  },
+  "board.error.upgradeFirstStart": {
+    "defaultMessage": "This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
+    "description": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Hive couldn't record its session. Upgrade… is the button on the banner at the top of the window."
   },
   "board.export.command": {
     "defaultMessage": "Export Board to JSON…",
@@ -1635,6 +1655,38 @@
     "defaultMessage": "waiting",
     "description": "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)."
   },
+  "board.readOnly.newer": {
+    "defaultMessage": "This board was saved by a newer version of Hive: it is read-only here.",
+    "description": "Tooltip on the board's add-card buttons, disabled while the board was saved by a newer Hive (whose format this one can't change)."
+  },
+  "board.restore09.done": {
+    "defaultMessage": "The 0.9 board is back",
+    "description": "A notification after the 0.9 board backup was put back."
+  },
+  "board.restore09.doneDetail": {
+    "defaultMessage": "The 1.0 board is kept as {file}.",
+    "description": "Under \"The 0.9 board is back\": {file} is the file the board as it was before the restore was saved to."
+  },
+  "board.restore09.message": {
+    "defaultMessage": "Hive keeps a copy of the board as it is now, then puts back the copy made before its upgrade to 1.0 ({when}). Changes made since are only in the kept copy. The board is then read-only here: quit this Hive and open the workspace in Hive 0.9 to carry on.",
+    "description": "The confirmation before restoring the 0.9 board backup. {when} is when the backup was made (a date and time)."
+  },
+  "board.restore09.none": {
+    "defaultMessage": "There is no 0.9 board backup to restore",
+    "description": "A notification from Help → Restore the 0.9 Board Backup… when the workspace has no copy of its board from before an upgrade to 1.0."
+  },
+  "board.restore09.restore": {
+    "defaultMessage": "Restore",
+    "description": "The button of the confirmation: puts the 0.9 board backup back."
+  },
+  "board.restore09.restoring": {
+    "defaultMessage": "Restoring…",
+    "description": "The Restore button while the 0.9 board backup is put back."
+  },
+  "board.restore09.title": {
+    "defaultMessage": "Restore the 0.9 board backup?",
+    "description": "Title of the confirmation before Help → Restore the 0.9 Board Backup… puts back the copy of the board Hive kept when it upgraded it to 1.0."
+  },
   "board.review.line": {
     "defaultMessage": "Reviewing: {agent} · {ago}",
     "description": "A card's reviewer line on the board: who is reviewing it and since when ({ago}: \"5 min ago\")."
@@ -2062,6 +2114,50 @@
   "board.toolbar.search": {
     "defaultMessage": "Search cards (#12, words, labels)",
     "description": "Placeholder of the board's search box: finds cards by number (#12), words or labels."
+  },
+  "board.upgrade.askDetail": {
+    "defaultMessage": "Close every other Hive that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",
+    "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Hive has the workspace open; declining leaves the board readable but not changeable in this Hive, and no agent (nor the Assistant) can start."
+  },
+  "board.upgrade.askMessage": {
+    "defaultMessage": "Hive 1.0 needs to upgrade this workspace's data. A 0.9 Hive can then only open it read-only; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it back.",
+    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: an older Hive (0.9) shows the board without letting it be changed, and a copy of the board as it was is kept. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it."
+  },
+  "board.upgrade.askTitle": {
+    "defaultMessage": "Upgrade this workspace's board to 1.0?",
+    "description": "Title of the dialog Hive shows on opening a workspace whose task board was saved by Hive 0.9: Hive 1.0 keeps the board in a new format, and asks before converting it."
+  },
+  "board.upgrade.banner": {
+    "defaultMessage": "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
+    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of the board's disabled add-card buttons."
+  },
+  "board.upgrade.bannerButton": {
+    "defaultMessage": "Upgrade…",
+    "description": "A button on the banner above a read-only 0.9 board: asks to upgrade it to 1.0. The … says it asks first: keep it."
+  },
+  "board.upgrade.done": {
+    "defaultMessage": "Board upgraded to 1.0",
+    "description": "A notification after the workspace's board was converted to Hive 1.0's format."
+  },
+  "board.upgrade.doneDetail": {
+    "defaultMessage": "The 0.9 board is kept: Help → Restore the 0.9 Board Backup… puts it back.",
+    "description": "Under \"Board upgraded to 1.0\". Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it."
+  },
+  "board.upgrade.learnMore": {
+    "defaultMessage": "Learn more",
+    "description": "A button on the banner above a read-only 0.9 board: opens the user guide's section about upgrading to 1.0."
+  },
+  "board.upgrade.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "The upgrade dialog's other button: leaves the board as it is, read-only in this Hive, with a banner offering the upgrade."
+  },
+  "board.upgrade.upgrade": {
+    "defaultMessage": "Upgrade",
+    "description": "The upgrade dialog's button: converts the board to Hive 1.0's format."
+  },
+  "board.upgrade.upgrading": {
+    "defaultMessage": "Upgrading…",
+    "description": "The Upgrade button while the board is converted."
   },
   "board.view.intro": {
     "defaultMessage": "Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.",

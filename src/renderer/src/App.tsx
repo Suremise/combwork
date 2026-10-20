@@ -7,6 +7,7 @@ import { playChime } from './chime'
 import { matchKeybinding, runCommand } from './commands'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
+import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
@@ -441,6 +442,7 @@ export function App() {
           <QuitPendingBanner />
           <ProvidersBanner />
           <MovedBanner />
+          <BoardUpgradeBanner />
           {workspace && <ProjectView visible={activity === 'projects'} />}
           {main && (
             <div className="tab-body">
@@ -473,6 +475,7 @@ export function App() {
       <CompactDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
+      <BoardUpgradeAsk />
       <AddAgentDialog />
       <AgentSettingsDialog />
       <TemplateAgentDialog />

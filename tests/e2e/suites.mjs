@@ -47,6 +47,7 @@ export const SUITES = [
   { name: 'boardfold' },
   { name: 'boardscope' },
   { name: 'boardscroll' },
+  { name: 'boardupgrade' },
   { name: 'bridgereport' },
   { name: 'bursts' },
   { name: 'busy' },
