@@ -247,13 +247,19 @@ proposals the builders may change, keeping the boundaries.
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
 **The one path.** An intent (Agent API route or hive tool) or a user move (IPC) calls `runtime.move(card, request,
-actor)`. Inside one `boardWrite` transaction it: reads the card, its facts and its ruleset; asks the platform adapter
-for the facts the guards need (outside the transaction where it's slow: adapter reads happen first, then the
-transaction re-checks the revision it was given, so a commit landing in between refuses rather than races); runs the
-guards in the ruleset's order; on a refusal writes `Refused` (agents and the Assistant) and returns the refusal; else
-writes the facts and `Moved`, updates the card's `column`/`stage` cache, and queues the actions that touch the outside
-world (wakes, notifications, the queue, slot work) with `afterBoardWrite`, so nothing outside happens for a write that
-rolled back.
+actor)`. It asks the platform adapter for the facts the guards need first, outside the transaction (keys, files,
+containment, check facts: slow reads). Then, inside one `boardWrite` transaction, it reads the card, its facts and
+its ruleset, **re-reads the cheap folder state the guards depend on** (head and dirty for Git; for None the stored
+hash against the watcher's write log since it was computed), refusing if it differs from what the slow reads used
+rather than racing; runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
+the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
+runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
+happens for a write that rolled back, and nothing is lost to a crash after the commit (SPEC §16.4.5).
+
+**Change keys.** The Git adapter computes, per change, the exact key (SHA-256 of the zero-context diff without
+positions, modes and binary blob ids) and the candidate key (`git patch-id --stable`) once, from the endpoints stored
+with `Submitted`, and never recomputes a submitted change from the target's current state (SPEC §16.3.2).
 
 **Facts and derived state.** `facts.ts` folds a card's facts into its derived state (stage, revision under review,
 last verdict, stale, overrides, For you). The same fold runs in the spike (P2), main and tests. The card's stored
@@ -267,19 +273,24 @@ It also runs when a gate reads a card and once at start.
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
 
-**Merge queue.** One worker per repository, holding `repoLock`. Entries come from `IntegrationRequested` facts; the
-order is rebuilt from facts at start. The test merge happens in the queue's own worktree on `refs/hive/queue/<card>`;
-merge checks are progress runs attributed to Hive; the target advances by compare-and-swap (`update-ref` with the
-expected old value), or by `merge --ff-only` inside the folder fence when the target is checked out in a folder.
+**Merge queue.** One worker per repository, holding `repoLock`. Entries come from `IntegrationRequested` facts (each
+with an entry id; cancelled, failed and integrated entries are skipped); the order is rebuilt from facts at start,
+after reconciling any entry with `IntegrationStarted` and no outcome. The test merge happens in the queue's own
+worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Hive; the target advances by
+compare-and-swap (`update-ref` with the expected old value), and when the target is checked out in a folder, by the
+read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence (never `merge --ff-only`, which has no expected
+value).
 
-**Slots and sessions.** `slots.ts` owns the worktrees under `<Workspace>.worktrees/<Project>/`, lends them to cards
-and lanes, and records which agent session writes in each. Sessions keep their recorded folder (`sessions.ts` resumes
-only there, as today), so an agent stays in its slot for a lane; another slot means a fresh conversation. `AgentDef`
-loses `worktree`. Review copies are detached worktrees from a small warm pool.
+**Slots and sessions.** `slots.ts` owns the worktrees under `<Workspace>.worktrees/<Project>/` and lends them by
+**lease** (a `slot_leases` row: slot, card or lane, builder, from, to), one open lease per slot, taken under the slot's
+lock. Sessions record their folder and lease; `sessions.ts` resumes a session only in its folder (as today) and only
+while its lease is open or the slot is free at its last revision, so a reused slot never resumes the wrong work, and
+Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detached worktrees from a small warm pool,
+leased to one reviewer for one submission; reviewers' sessions live in the project folder.
 
 **Storage (P3's one migration, #1025).** New tables: card columns typed; `card_comments`, `card_history`,
-`card_decisions`, `card_links`, `card_holds`, `card_facts`, `card_aliases` (old `#N` → key), `project_keys`,
-`rulesets`; typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
+`card_decisions`, `card_links`, `card_holds`, `card_facts`, `card_actions`, `card_aliases` (old `#N` → key),
+`project_keys`, `rulesets`, `slot_leases` (P7); typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
 is rebuilt from rows, identical or versioned. One schema step, backed up first; a newer file opens read-only.
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes

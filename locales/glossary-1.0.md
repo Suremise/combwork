@@ -30,8 +30,9 @@ and the 19 Oct decisions on #1117. Reviewers fail a string that breaks one.
    (`{n, plural, one {# card} other {# cards}}`); sizes, durations, dates and percentages go through `fmt`,
    `shared/units.ts` and `shared/dates.ts`. Never `n === 1 ? '' : 's'`.
 3. **No sentences glued from pieces.** One message per sentence, with placeholders. Lists use `fmt.list`, never "and"
-   written around a placeholder. A refusal is one message with its rule, next step and where to change it as
-   placeholders or parts of the same message (SPEC §16.8.3), never three strings concatenated.
+   written around a placeholder. A refusal has three parts, what was refused, the next step, and where the rule is
+   changed, and **each part is a whole sentence of its own message** (`workflow.refused.<rule>.message`, `.next`,
+   `.change`), shown as separate lines; never one sentence built from them (SPEC §16.8.3).
 4. **No names after prepositions.** "Added by {by}" reads badly in Polish, German and Japanese. Put a noun in front
    ("Added by agent {agent}") or use a colon ("{agent}: added"), or rephrase so the name is the subject. The same goes
    for a name a past-tense verb would agree with (the style pages' *Names have no known gender*).
@@ -52,6 +53,11 @@ and the 19 Oct decisions on #1117. Reviewers fail a string that breaks one.
    language from the same message (SPEC §16.8.3).
 10. **The user's name.** Where a string means the user, it says *you* ("Waiting for you"), never "the user" or a
     person's name written into the message.
+11. **The runtime rules are AGENTS.md's** (Translations), not repeated here: text is `msg({ id, defaultMessage,
+    description })`, kept as data and shown with `tr()` (`tRich()` for markup) when rendered or sent, never at module
+    scope; every message has a description for translators (for a 1.0 term, name it: "Stage name (glossary 2.2)");
+    after adding messages, `npm run i18n:extract` and commit `locales/en/` and `src/shared/i18n/values/`; each phase
+    adds its translations in all 7 locales in the same change, and `npm run i18n:coverage -- --record <code>`.
 
 ## 2. The terms
 
@@ -147,6 +153,50 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **builder** / **reviewer** / **either** (workflow role) | Which side of the workflow an agent takes. | Bearbeiter / Reviewer / beides | autor / revisor / ambos | auteur / relecteur / les deux | ビルダー / レビュアー / どちらも | wykonawca / recenzent / dowolna | executor / revisor / ambos | 构建者 / 评审者 / 均可 |
 | **lane** | Hive's record of a card loop (existing term). | Lane | carril | couloir | レーン | tor | raia | 通道 |
 | **Start lane…** | Start a card loop from the board or the Progress panel, without the Assistant. | Lane starten… | Iniciar carril… | Démarrer un couloir… | レーンを開始… | Uruchom tor… | Iniciar raia… | 启动通道… |
+
+### 2.6 The Version Control tab's options and values
+
+The labels of SPEC §16.6.1 (None, N1–N7) and §16.6.2 (Git, G1–G17), worded as outcomes [#1117, Darren 19 Oct], with
+their values. **Pending Darren's agreement on the English (OP-2):** once he agrees or changes a label, its row here is
+updated first and then copied into the messages; the translations below are drafts made from the proposed English, so
+the phases don't start from nothing. N7 (File locks) and the Card loops settings keep their existing messages.
+`{target}` is the target branch's name (`main`), a placeholder kept as written. The form of address is each style
+page's (*du*, *tú*, *tu*, *ty*, *você*, 你; Japanese leaves the reader out and says 自分 for "you" as a choice).
+
+| Id | English (proposed) | de | es | fr | ja | pl | pt-BR | zh-CN |
+|---|---|---|---|---|---|---|---|---|
+| N1 | Who checks the work before it's done | Wer die Arbeit prüft, bevor sie erledigt ist | Quién revisa el trabajo antes de terminarlo | Qui vérifie le travail avant qu’il soit terminé | 完了前に作業を確認する人 | Kto sprawdza pracę, zanim będzie gotowa | Quem verifica o trabalho antes de concluí-lo | 完成前由谁检查工作 |
+| N1 values | No one · A reviewer agent · You · A reviewer agent, then you | Niemand · Ein Reviewer-Agent · Du · Ein Reviewer-Agent, dann du | Nadie · Un agente revisor · Tú · Un agente revisor y después tú | Personne · Un agent relecteur · Toi · Un agent relecteur, puis toi | なし · レビュアーエージェント · 自分 · レビュアーエージェント、その後に自分 | Nikt · Agent recenzent · Ty · Agent recenzent, potem Ty | Ninguém · Um agente revisor · Você · Um agente revisor e depois você | 无人 · 评审者智能体 · 你 · 评审者智能体，然后是你 |
+| N2, G2 | Nobody reviews their own work | Niemand reviewt die eigene Arbeit | Nadie revisa su propio trabajo | Personne ne relit son propre travail | 作業した本人はレビューしない | Nikt nie recenzuje własnej pracy | Ninguém revisa o próprio trabalho | 任何人都不评审自己的工作 |
+| N3, G3 | Checks pass before review | Checks bestehen vor dem Review | Las comprobaciones pasan antes de la revisión | Les vérifications passent avant la relecture | レビュー前にチェックに合格する | Sprawdzenia przechodzą przed recenzją | As verificações passam antes da revisão | 评审前检查通过 |
+| N4 | What the work is | Was die Arbeit umfasst | Qué es el trabajo | Ce qui constitue le travail | 作業の対象 | Co jest wynikiem pracy | O que é o trabalho | 工作包含哪些内容 |
+| N5 | Stage names | Namen der Phasen | Nombres de las etapas | Noms des étapes | ステージ名 | Nazwy etapów | Nomes das etapas | 阶段名称 |
+| N6 | Cards start only when the cards they wait for are done | Karten starten erst, wenn die Karten, auf die sie warten, erledigt sind | Las tarjetas empiezan solo cuando las tarjetas que esperan están hechas | Une carte ne démarre que lorsque les cartes qu’elle attend sont terminées | 待っているカードが完了してから開始する | Karta startuje dopiero, gdy karty, na które czeka, są gotowe | Os cartões só começam quando os cartões que aguardam estão concluídos | 卡片仅在所等待的卡片完成后开始 |
+| G1 | Work is reviewed before it's merged | Arbeit wird vor dem Merge reviewt | El trabajo se revisa antes de fusionarlo | Le travail est relu avant d’être fusionné | マージ前に作業をレビューする | Praca jest recenzowana przed scaleniem | O trabalho é revisado antes do merge | 合并前评审工作 |
+| G1 (shared folder) | Work is reviewed before it's done | Arbeit wird reviewt, bevor sie erledigt ist | El trabajo se revisa antes de darlo por hecho | Le travail est relu avant d’être terminé | 完了前に作業をレビューする | Praca jest recenzowana, zanim będzie gotowa | O trabalho é revisado antes de ser concluído | 完成前评审工作 |
+| G1 values | No review · A reviewer agent · A reviewer agent, then you · You | Kein Review · Ein Reviewer-Agent · Ein Reviewer-Agent, dann du · Du | Sin revisión · Un agente revisor · Un agente revisor y después tú · Tú | Pas de relecture · Un agent relecteur · Un agent relecteur, puis toi · Toi | レビューなし · レビュアーエージェント · レビュアーエージェント、その後に自分 · 自分 | Bez recenzji · Agent recenzent · Agent recenzent, potem Ty · Ty | Sem revisão · Um agente revisor · Um agente revisor e depois você · Você | 不评审 · 评审者智能体 · 评审者智能体，然后是你 · 你 |
+| G1b | Reviewers per card | Reviewer pro Karte | Revisores por tarjeta | Relecteurs par carte | カードごとのレビュアー数 | Recenzenci na kartę | Revisores por cartão | 每张卡片的评审者数量 |
+| G4 | An approval survives a clean rebase | Eine Freigabe übersteht einen sauberen Rebase | Una aprobación se mantiene tras un rebase limpio | Une approbation reste valable après un rebase propre | クリーンなリベース後も承認を引き継ぐ | Zgoda zostaje po czystym rebase | Uma aprovação continua valendo após um rebase limpo | 干净变基后批准仍然有效 |
+| G4 values | Same change · Exact revision only | Dieselbe Änderung · Nur exakt dieselbe Revision | El mismo cambio · Solo la versión exacta | La même modification · Uniquement la révision exacte | 同じ変更 · 完全に同じリビジョンのみ | Ta sama zmiana · Tylko dokładnie ta rewizja | A mesma alteração · Somente a versão exata | 相同的变更 · 仅限完全相同的修订版本 |
+| G5 | Who merges | Wer mergt | Quién fusiona | Qui fusionne | マージする人 | Kto scala | Quem faz o merge | 由谁合并 |
+| G5 values | Hive merges · The agent merges, Hive checks · Committed is done · Not checked | Hive mergt · Der Agent mergt, Hive prüft · Committet ist erledigt · Nicht geprüft | Hive fusiona · El agente fusiona y Hive comprueba · Hacer commit es terminar · Sin comprobar | Hive fusionne · L’agent fusionne, Hive vérifie · Un commit suffit · Non vérifié | Hive がマージ · エージェントがマージし Hive が確認 · コミットで完了 · 確認しない | Hive scala · Agent scala, Hive sprawdza · Commit oznacza gotowe · Bez sprawdzania | O Hive faz o merge · O agente faz o merge e o Hive verifica · Commit é concluir · Sem verificação | Hive 合并 · 智能体合并，Hive 检查 · 提交即完成 · 不检查 |
+| G6 | Merge style | Merge-Art | Tipo de fusión | Type de fusion | マージ方法 | Sposób scalania | Tipo de merge | 合并方式 |
+| G6 values | Merge commit · Squash | Merge-Commit · Squash | Commit de fusión · Squash | Commit de fusion · Squash | マージコミット · スカッシュ | Commit scalający · Squash | Commit de merge · Squash | 合并提交 · 压缩合并 |
+| G7 | Work merges into | Arbeit wird gemergt in | El trabajo se fusiona en | Le travail est fusionné dans | マージ先 | Praca jest scalana do | O trabalho é mesclado em | 工作合并到 |
+| G8 | Work is up to date with {target} before it merges | Arbeit ist vor dem Merge auf dem Stand von {target} | El trabajo está al día con {target} antes de fusionarse | Le travail est à jour avec {target} avant d’être fusionné | マージ前に {target} の最新状態を取り込む | Praca jest aktualna względem {target} przed scaleniem | O trabalho está atualizado com {target} antes do merge | 合并前工作与 {target} 保持同步 |
+| G9 | Checks pass on the merged result | Checks bestehen auf dem gemergten Ergebnis | Las comprobaciones pasan en el resultado fusionado | Les vérifications passent sur le résultat fusionné | マージ結果でチェックに合格する | Sprawdzenia przechodzą na scalonym wyniku | As verificações passam no resultado mesclado | 合并结果的检查通过 |
+| G10 | Your OK before merging | Deine Freigabe vor dem Merge | Tu aprobación antes de fusionar | Ton accord avant la fusion | マージ前の自分の承認 | Twoja zgoda przed scaleniem | Sua aprovação antes do merge | 合并前需要你批准 |
+| G10 values | Never · Cards with these labels · Every card | Nie · Karten mit diesen Labels · Jede Karte | Nunca · Tarjetas con estas etiquetas · Todas las tarjetas | Jamais · Cartes avec ces étiquettes · Toutes les cartes | なし · これらのラベルのカード · すべてのカード | Nigdy · Karty z tymi etykietami · Każda karta | Nunca · Cartões com estes rótulos · Todos os cartões | 从不 · 带有这些标签的卡片 · 每张卡片 |
+| G11 | Where cards are built | Wo Karten bearbeitet werden | Dónde se trabaja cada tarjeta | Où les cartes sont réalisées | カードの作業場所 | Gdzie powstają karty | Onde os cartões são feitos | 卡片在哪里完成 |
+| G11 values | Each card in its own folder · Everyone in the project folder | Jede Karte in ihrem eigenen Ordner · Alle im Projektordner | Cada tarjeta en su propia carpeta · Todos en la carpeta del proyecto | Chaque carte dans son propre dossier · Tout le monde dans le dossier du projet | カードごとに専用フォルダー · 全員がプロジェクトフォルダー | Każda karta we własnym folderze · Wszyscy w folderze projektu | Cada cartão em sua própria pasta · Todos na pasta do projeto | 每张卡片使用自己的文件夹 · 所有人都在项目文件夹中 |
+| G12 | Commits use the project's identity | Commits verwenden die Identität des Projekts | Los commits usan la identidad del proyecto | Les commits utilisent l’identité du projet | コミットにプロジェクトの ID を使う | Commity używają tożsamości projektu | Os commits usam a identidade do projeto | 提交使用项目的身份 |
+| G13 | Agents stop what they started before review | Agenten stoppen vor dem Review, was sie gestartet haben | Los agentes detienen lo que iniciaron antes de la revisión | Les agents arrêtent ce qu’ils ont lancé avant la relecture | レビュー前にエージェントが開始したものを停止する | Agenci zatrzymują przed recenzją to, co uruchomili | Os agentes param o que iniciaram antes da revisão | 评审前智能体停止自己启动的任务 |
+| G14 | Cards start only when the cards they wait for are merged | Karten starten erst, wenn die Karten, auf die sie warten, gemergt sind | Las tarjetas empiezan solo cuando las tarjetas que esperan están fusionadas | Une carte ne démarre que lorsque les cartes qu’elle attend sont fusionnées | 待っているカードがマージされてから開始する | Karta startuje dopiero, gdy karty, na które czeka, są scalone | Os cartões só começam quando os cartões que aguardam estão mesclados | 卡片仅在所等待的卡片合并后开始 |
+| G15 | Slots are brought up to date before each card | Slots werden vor jeder Karte aktualisiert | Los slots se actualizan antes de cada tarjeta | Les emplacements sont mis à jour avant chaque carte | カードごとにスロットを最新にする | Sloty są aktualizowane przed każdą kartą | Os slots são atualizados antes de cada cartão | 每张卡片开始前更新槽位 |
+| G15 value | Install when the lock file changed | Installieren, wenn sich die Lock-Datei geändert hat | Instalar cuando cambie el archivo de bloqueo | Installer quand le fichier de verrouillage change | ロックファイルが変わったらインストール | Instaluj, gdy zmieni się plik blokady | Instalar quando o arquivo de lock mudar | 锁文件变化时安装 |
+| G16 | Warn when a commit includes another agent's files | Warnen, wenn ein Commit Dateien eines anderen Agenten enthält | Avisar cuando un commit incluye archivos de otro agente | Avertir quand un commit inclut des fichiers d’un autre agent | コミットに他のエージェントのファイルが含まれていたら警告 | Ostrzegaj, gdy commit zawiera pliki innego agenta | Avisar quando um commit inclui arquivos de outro agente | 提交包含其他智能体的文件时发出警告 |
+| G17 | Reviewers | Reviewer | Revisores | Relecteurs | レビュアー | Recenzenci | Revisores | 评审者 |
+| G17 values | One per lane · A shared pool | Einer pro Lane · Ein gemeinsamer Pool | Uno por carril · Un grupo compartido | Un par couloir · Un groupe partagé | レーンごとに 1 人 · 共有プール | Jeden na tor · Wspólna pula | Um por raia · Um grupo compartilhado | 每个通道一个 · 共享池 |
 
 ## 3. Internal terms and their user words
 
