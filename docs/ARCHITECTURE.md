@@ -429,7 +429,7 @@ few fields of many cards (`archivedSummaryDocs`, `holdDocs`, `cardPlaces`) read 
 fields need (`readCardRows`' `columns` and `parts`) and take each field with `cardField`, which honours `extra` and
 `layout`, so they give what the 0.9 queries over the documents gave. The query columns keep what 0.9's index held where
 readers picked cards by it: `archived` is 1 for `true` or `1`, `ord` is the order as a REAL column held it (a number
-literal in a string as its number). `putCard` replaces the card's child rows for now (row-level writes are #1210);
+literal in a string as its number). `putCard` writes only what changed (#1210: `writeCardChanges`, against the card's rows read in the same transaction: its own row when a column changed, each list and list of entries compared place by place, so a comment is one insert and an edit one update; the rows end as a whole rewrite would leave them); `costDocs` gives costs only a card's title, project, column, holds and history;
 `deleteCard` deletes the card and its rows go with it. Every read is one SQLite snapshot (`readSnapshot`, and
 `readCardRows` on its own): a card's row and its child rows are separate statements, and another process committing
 between them would otherwise give a card neither version saved (HR4, #1209 round 1). A board waiting for its upgrade (`Board.legacy`: a `doc`

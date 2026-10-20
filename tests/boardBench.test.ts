@@ -36,6 +36,8 @@ describe('the board on a real board’s copy', () => {
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     const raw = new DatabaseSync(file)
     const numbers = (raw.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number)
+    // The largest card (its document, as 0.9 keeps it), for a comment on it.
+    const largest = raw.prepare('SELECT number, length(doc) AS bytes FROM cards ORDER BY length(doc) DESC LIMIT 1').get() as { number: number; bytes: number }
     raw.close()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = createWorkspaceService()
@@ -63,6 +65,25 @@ describe('the board on a real board’s copy', () => {
       await tasks.updateTask(card, { column: 'doing' }, user)
     }
     const agent = { projectPath: join(ws, 'hive'), agentId: 'bench' }
+    // A comment on the largest card (#1210), and that change written whole (before) and by what changed (after), each in a
+    // transaction undone, on the writer.
+    const rows = await import('../src/main/schema/cardRows')
+    const writer = store.workspaceDb(ws).writer
+    const big = (await inWorkspace(w, () => tasks.getTask(largest.number, w)))!
+    const withComment = { ...store.cardDoc(w, largest.number)!, comments: [...big.comments, { at: new Date().toISOString(), by: 'You', text: 'A comment', id: 'bench-c' }] }
+    const writeOnce = (write: (db: DatabaseSync) => void): number => {
+      writer.exec('BEGIN IMMEDIATE')
+      try {
+        const t = performance.now()
+        write(writer)
+        return performance.now() - t
+      } finally {
+        writer.exec('ROLLBACK')
+      }
+    }
+    const medianSync = (fn: () => number, times: number): number => Array.from({ length: times }, fn).sort((a, b) => a - b)[Math.floor(times / 2)]
+    const held = (await inWorkspace(w, () => tasks.cardHolds(w))).filter((c) => c.held?.length).map((c) => c.number)
+    const costCards = (tasks as { costCards?: (ws: unknown, n: number[]) => Promise<unknown> }).costCards
     const results: Record<string, number> = {
       'allTasks (the whole board)': await median(() => tasks.allTasks(w), 7),
       'allTasks, live cards only': await median(() => tasks.allTasks(w, { archived: false }), 7),
@@ -72,7 +93,12 @@ describe('the board on a real board’s copy', () => {
       boardPlaces: await median(() => tasks.boardPlaces(w), 7),
       // The board told of a change first, so its notices read the board again rather than their cache.
       'decision notices after a change': await median(async () => { store.boardChanged(w); await newDecisionsOn(w, agent, 'Bench') }, 7),
-      'a lane round (4 changes, a read)': await median(round, 11)
+      'a lane round (4 changes, a read)': await median(round, 11),
+      [`a comment on the largest card (#${largest.number}, ${Math.round(largest.bytes / 1024)} KB)`]: await median(() => tasks.commentTask(largest.number, 'A comment', user), 11),
+      'that change written whole (writeCardRows)': medianSync(() => writeOnce((db) => rows.writeCardRows(db, rows.decomposeCard(largest.number, withComment))), 11),
+      ...('writeCardChanges' in rows ? { 'that change by what changed (writeCardChanges, its read included)': medianSync(() => writeOnce((db) => rows.writeCardChanges(db, rows.readCardRows(db, { numbers: [largest.number] })[0], rows.decomposeCard(largest.number, withComment))), 11) } : {}),
+      [`the held cards for their costs, in full (allTasks, ${held.length} cards)`]: await median(() => tasks.allTasks(w, { numbers: held }), 7),
+      ...(costCards ? { 'the held cards for their costs, what they need (costCards)': await median(() => costCards(w, held), 7) } : {})
     }
     console.log(`bench: ${numbers.length} cards; opened (and upgraded) with the first read in ${Math.round(openMs)} ms`)
     for (const [k, ms] of Object.entries(results)) console.log(`  ${k}: ${ms.toFixed(1)} ms`)
