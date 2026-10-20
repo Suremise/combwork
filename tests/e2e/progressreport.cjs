@@ -65,6 +65,35 @@ const check = (name, ok, extra = '') => {
     }
   }
   const shell = async (id, cmd, ms) => (await startShell(id, cmd, ms))()
+  // A screenshot in a theme (#1250): taken again until the image shows the Progress panel's background as the page has
+  // it (just inside its left edge), so a frame still painted in the other theme never passes for this one's.
+  const pixelAt = (png, x, y) =>
+    page.evaluate(
+      async ([b64, px, py]) => {
+        const img = new Image()
+        img.src = `data:image/png;base64,${b64}`
+        await img.decode()
+        const c = document.createElement('canvas')
+        c.width = img.width
+        c.height = img.height
+        const g = c.getContext('2d')
+        g.drawImage(img, 0, 0)
+        return `rgb(${[...g.getImageData(px, py, 1, 1).data.slice(0, 3)].join(', ')})`
+      },
+      [png.toString('base64'), x, y]
+    )
+  const themedShot = async (theme, name) => {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    const at = await page.evaluate(() => {
+      const el = document.querySelector('.progress-panel')
+      const r = el.getBoundingClientRect()
+      return { x: Math.round((r.left + 3) * devicePixelRatio), y: Math.round((r.top + r.height / 2) * devicePixelRatio), bg: getComputedStyle(el).backgroundColor }
+    })
+    let shown = ''
+    const ok = await until(async () => (shown = await pixelAt(await page.screenshot({ path: path.join(lib.WORK, name) }), at.x, at.y)) === at.bg, HUNG_MS)
+    check(`${name} shows the ${theme} theme`, !!ok, `the panel is ${at.bg} in the page, ${shown} in the image`)
+  }
   const runs = () => inv('progress:list')
   const newRun = async (known, match) => until(async () => (await runs()).find((r) => !known.includes(r.id) && match(r)), 60000)
 
@@ -151,11 +180,7 @@ const check = (name, ok, extra = '') => {
   const details = cardRow.locator('.progress-details')
   const detailsText = async () => (await details.textContent().catch(() => '')) ?? ''
   check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card#${card.number}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
-  for (const theme of ['light', 'dark']) {
-    await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 10000)
-    await page.screenshot({ path: path.join(lib.WORK, `progressreport-card-${theme}.png`) })
-  }
+  for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-card-${theme}.png`)
   await cardRow.locator('.progress-run-card').click()
   // The dialog has the card's title in its title box.
   check('…and its card opens the card', !!(await until(() => page.locator('[role="dialog"] input').evaluateAll((els) => els.some((e) => e.value === 'Run for a card')), 10000)))
@@ -195,11 +220,7 @@ const check = (name, ok, extra = '') => {
   await editRow.locator('.progress-title').click()
   const editDetails = async () => (await editRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
   check('…and its details say why', !!(await until(async () => (await editDetails()).includes("Doesn't count as check edit: files changed in the folder while it ran"), 10000)), await editDetails())
-  for (const theme of ['light', 'dark']) {
-    await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 10000)
-    await page.screenshot({ path: path.join(lib.WORK, `progressreport-check-${theme}.png`) })
-  }
+  for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-check-${theme}.png`)
 
   const unknown = await shell(builder.id, 'hive-progress --check lint')
   check('…and with no command for the name, runs nothing and says so', unknown?.code === 2 && /no command configured for the check "lint"/.test(unknown?.stderr ?? ''), JSON.stringify(unknown))
