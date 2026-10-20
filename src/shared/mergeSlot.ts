@@ -1,4 +1,5 @@
 import type { MergeSlotInfo } from './types'
+import { cardRef } from './projectKeys'
 
 /** How the merge slot (#350) is put in words, the same in the window, the agents' status and the hive tools' replies. */
 
@@ -6,7 +7,7 @@ import type { MergeSlotInfo } from './types'
 export const CLAIM_WAIT_SECONDS = 240
 export const CLAIM_WAIT_MAX_SECONDS = 290
 
-const cardsText = (cards: number[]): string => cards.map((n) => `#${n}`).join(', ')
+const cardsText = (cards: number[]): string => cards.map((n) => `${cardRef(n)}`).join(', ')
 
 /** A length of time in whole minutes ("under a minute", "1 min", "48 min"). */
 export function minutes(ms: number): string {

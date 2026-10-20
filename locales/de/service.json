@@ -102,6 +102,7 @@
   "service.hiveVcs.exitCode": "Exitcode {code}",
   "service.hiveVcs.noRepo": "Kein Git-Repository enthält dieses Projekt.",
   "service.hiveVcs.rmFailed": "git rm --cached fehlgeschlagen: {why}",
+  "service.keys.closed": "Der Arbeitsbereich wurde geschlossen oder das Fenster hat einen anderen geöffnet, bevor der Schlüssel geändert wurde: Nichts wurde geändert.",
   "service.keys.form": "Ein Projektschlüssel besteht aus 2 bis 4 Buchstaben, A bis Z.",
   "service.keys.notice": "Karten werden nach dem Schlüssel ihres Projekts benannt: {keys}. Ändere einen Schlüssel in den Projekteinstellungen; der alte funktioniert weiter.",
   "service.keys.noticeTitle": "Projekte haben jetzt Schlüssel",

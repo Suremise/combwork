@@ -28,6 +28,7 @@ import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
+import { withCardNames } from './projectKeys'
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
@@ -249,6 +250,14 @@ const MAX_FILE_BYTES = 1024 * 1024
 const MAX_LINE_BYTES = WAKE_MAX_BYTES
 const jsonBytes = (s: string): number => Buffer.byteLength(JSON.stringify(s))
 /** A line cut to fit MAX_LINE_BYTES as saved. */
+/**
+ * A watch's line, made with its cards named by key (#1219: "HI-12 (#40)"), as its watcher may see them: a project agent
+ * its own project's cards (another's, or one moved there, by number), the Assistant every card.
+ */
+function lineFor(store: Store, rec: WatchRecord, make: () => string): string {
+  return fitLine(withCardNames(store.ws, make, rec.scope))
+}
+
 function fitLine(line: string): string {
   if (jsonBytes(line) <= MAX_LINE_BYTES) return line
   let s = line
@@ -1226,7 +1235,7 @@ async function evaluateAgents(store: Store): Promise<void> {
       if (!rec.agents || rec.fired) continue
       const hits = agentHits(rec)
       if (!hits.length) continue
-      rec.fired = { line: fitLine(agentWakeLine(hits, userName())), at: new Date().toISOString(), cards: [], agents: hits.map((h) => agentKey(h.agent.projectPath, h.agent.agentId)), ...(hits.some((h) => h.reply !== undefined) ? { replies: true as const } : {}) }
+      rec.fired = { line: lineFor(store, rec, () => agentWakeLine(hits, userName())), at: new Date().toISOString(), cards: [], agents: hits.map((h) => agentKey(h.agent.projectPath, h.agent.agentId)), ...(hits.some((h) => h.reply !== undefined) ? { replies: true as const } : {}) }
       changed = true
     }
     if (changed) await saveQuietly(store)
@@ -1395,7 +1404,7 @@ async function waitsSince(store: Store, rec: WatchRecord, board: LaneBoard, name
 }
 
 /** A lane watch's line from its round (#726: its cards and the waiting agents with its lanes). */
-const laneLine = (rec: WatchRecord, r: LaneRound): string => fitLine(laneWakeLine(r.hits, { cards: r.cards, waits: r.waits, watching: rec.cond.cards.length > 0 }))
+const laneLine = (store: Store, rec: WatchRecord, r: LaneRound): string => lineFor(store, rec, () => laneWakeLine(r.hits, { cards: r.cards, waits: r.waits, watching: rec.cond.cards.length > 0 }))
 const roundTells = (r: LaneRound): boolean => r.hits.length > 0 || r.cards.length > 0 || r.waits.length > 0
 
 /**
@@ -1416,7 +1425,7 @@ async function evaluateLanes(store: Store): Promise<void> {
         if (roundTells(r)) {
           // Fired: its marks stay where they were, so the line typed later is worked out again from there with
           // whatever else happened meanwhile (one batch, round 1 finding), and becomes what the wake told.
-          rec.fired = { line: laneLine(rec, r), at: new Date().toISOString(), cards: r.cards.filter((h) => h.changes !== 'gone').map((h) => h.number), lanes: true }
+          rec.fired = { line: laneLine(store, rec, r), at: new Date().toISOString(), cards: r.cards.filter((h) => h.changes !== 'gone').map((h) => h.number), lanes: true }
           changed = true
         } else if (JSON.stringify(r.next) !== JSON.stringify(rec.laneMarks) || r.waitSeq !== rec.waitSeq) {
           rec.laneMarks = r.next
@@ -1831,7 +1840,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
       // handed over with are what the wake told. Fired by its limit, its line stays.
       const r = rec.fired.lanes ? await laneRound(store, rec).catch(() => null) : null
       if (r && roundTells(r)) {
-        line = laneLine(rec, r)
+        line = laneLine(store, rec, r)
         laneTold = r.next
         laneToldAt = new Date().toISOString()
         waitTold = r.waitSeq
@@ -1860,7 +1869,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
         sessions.watchChanged(rec.projectPath, rec.agentId)
       }
       if (r.released.length && !left) {
-        line = fitLine(releasedLine(rec.released!))
+        line = lineFor(store, rec, () => releasedLine(rec.released!))
         telling = false
       } else if (r.released.length && !r.hits.length && !r.replies.length) {
         // What fired it was a card since released, and the rest haven't changed: not given; the watch waits on for the
@@ -1870,7 +1879,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
         sessions.watchChanged(rec.projectPath, rec.agentId)
         return
       } else if (r.hits.length || r.replies.length) {
-        const made = cardWakeLine(r.hits, r.replies.map((x) => x.note), rec.released ?? [], userName())
+        const made = withCardNames(store.ws, () => cardWakeLine(r.hits, r.replies.map((x) => x.note), rec.released ?? [], userName()), rec.scope)
         line = fitLine(made.line)
         telling = r.replies.length > 0
         toldOfCards = Object.fromEntries(r.hits.filter((h) => h.changes !== 'gone' && r.told[h.number]).map((h) => [h.number, r.told[h.number]]))
@@ -1887,7 +1896,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
       // given work again since is still told what it did (and that it is working again).
       const hits = agentHits(rec)
       if (hits.length) {
-        line = fitLine(agentWakeLine(hits, userName()))
+        line = lineFor(store, rec, () => agentWakeLine(hits, userName()))
         telling = hits.some((h) => h.reply !== undefined)
         for (const h of hits) toldAgents.set(agentKey(h.agent.projectPath, h.agent.agentId), h.seq)
       } else if (rec.fired.replies) {
@@ -2198,7 +2207,7 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
           // Released cards leave the watch (#420), told with its next line; when none is left, it is woken now.
           changed = true
           if (!applyRelease(rec, r.released, ended)) {
-            rec.fired = { line: fitLine(releasedLine(rec.released!)), at: new Date().toISOString(), cards: [] }
+            rec.fired = { line: lineFor(store, rec, () => releasedLine(rec.released!)), at: new Date().toISOString(), cards: [] }
             continue
           }
           narrowed.push(rec)
@@ -2206,7 +2215,7 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
         const hits = r.hits
         if (!hits.length && !r.replies.length) continue
         const cards = [...new Set([...hits.filter((h) => h.changes !== 'gone').map((h) => h.number), ...r.replies.flatMap((x) => x.note.cards)])]
-        rec.fired = { line: fitLine(cardWakeLine(hits, r.replies.map((x) => x.note), rec.released ?? [], userName()).line), at: new Date().toISOString(), cards, ...(r.replies.length ? { replies: true as const } : {}) }
+        rec.fired = { line: lineFor(store, rec, () => cardWakeLine(hits, r.replies.map((x) => x.note), rec.released ?? [], userName()).line), at: new Date().toISOString(), cards, ...(r.replies.length ? { replies: true as const } : {}) }
         changed = true
       } catch (e) {
         if (!alive(store)) throw e
@@ -2237,7 +2246,7 @@ export async function tick(now = Date.now()): Promise<void> {
       let changed = store.dirty
       for (const rec of store.list) {
         if (!rec.fired && Date.parse(rec.limitAt) <= now) {
-          rec.fired = { line: fitLine(rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? [])), at: new Date(now).toISOString(), cards: [] }
+          rec.fired = { line: lineFor(store, rec, () => (rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? []))), at: new Date(now).toISOString(), cards: [] }
           changed = true
         }
       }

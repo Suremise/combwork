@@ -156,6 +156,7 @@ export const SUITES = [
   { name: 'progresslanes' },
   { name: 'progressreport' },
   { name: 'progressstates' },
+  { name: 'projectkeys' },
   { name: 'projectrename' },
   { name: 'providerdetect' },
   { name: 'providers' },

@@ -411,6 +411,10 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.keys.closed": {
+    "defaultMessage": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
+    "description": "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed."
+  },
   "service.keys.form": {
     "defaultMessage": "A project key is 2 to 4 letters, A to Z.",
     "description": "An error changing a project's key (Project Settings): the key typed isn't 2–4 letters A–Z."

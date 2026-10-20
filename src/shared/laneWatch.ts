@@ -1,6 +1,7 @@
 import type { LaneState, SessionStatus, TaskCard, TaskColumn } from './types'
 import { columnLabel } from './tasks'
 import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
+import { cardRef } from './projectKeys'
 
 /**
  * Lane watches (#531): a watch on whole lanes (main/lanes.ts), not cards. On 10 Oct the Assistant, with seven lanes and
@@ -141,11 +142,11 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     const is = now.mark.cards[c.number]
     const was = before.cards[c.number] ?? (since && is ? { c: is.c, b: false, s: false, f: since, p: since } : undefined)
     if (!was || !is || is.c === 'gone') continue
-    if (on.has('failed') && is.f > was.f) parts.push({ n: c.number, event: 'failed', text: `#${c.number} failed review${c.failedBy ? ` (${c.failedBy})` : ''}` })
-    if (on.has('passed') && is.p > was.p) parts.push({ n: c.number, event: 'passed', text: `#${c.number} passed review${c.passedBy ? ` (${c.passedBy})` : ''}` })
-    if (on.has('blocked') && is.b && !was.b) parts.push({ n: c.number, event: 'blocked', text: `#${c.number} is blocked`, ...(c.blocked ? { detail: c.blocked } : {}) })
-    if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: `#${c.number} is stalled`, ...(c.stalled ? { detail: c.stalled } : {}) })
-    if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: `#${c.number} is in ${columnLabel(is.c)}` })
+    if (on.has('failed') && is.f > was.f) parts.push({ n: c.number, event: 'failed', text: `${cardRef(c.number)} failed review${c.failedBy ? ` (${c.failedBy})` : ''}` })
+    if (on.has('passed') && is.p > was.p) parts.push({ n: c.number, event: 'passed', text: `${cardRef(c.number)} passed review${c.passedBy ? ` (${c.passedBy})` : ''}` })
+    if (on.has('blocked') && is.b && !was.b) parts.push({ n: c.number, event: 'blocked', text: `${cardRef(c.number)} is blocked`, ...(c.blocked ? { detail: c.blocked } : {}) })
+    if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: `${cardRef(c.number)} is stalled`, ...(c.stalled ? { detail: c.stalled } : {}) })
+    if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: `${cardRef(c.number)} is in ${columnLabel(is.c)}` })
   }
   if (on.has('merge-due') && now.mark.mergeDue && !before.mergeDue && now.mark.state !== 'ended' && now.mark.state !== 'abandoned') parts.push({ n: null, event: 'merge-due', text: 'all its cards passed: its merge is due' })
   if (on.has('stalled') && now.mark.ms && !before.ms) parts.push({ n: null, event: 'stalled', text: 'its merge is stalled', ...(now.mergeStall ? { detail: now.mergeStall } : {}) })
@@ -175,7 +176,7 @@ export interface WaitHit {
   what: string | null
 }
 
-const waitPart = (w: WaitHit, detail: number): string => `${w.name} (${w.project}) is waiting for the user${w.card ? ` on #${w.card}` : ''}${w.what && detail ? `: "${clip(w.what, detail)}"` : ''}`
+const waitPart = (w: WaitHit, detail: number): string => `${w.name} (${w.project}) is waiting for the user${w.card ? ` on ${cardRef(w.card)}` : ''}${w.what && detail ? `: "${clip(w.what, detail)}"` : ''}`
 
 /** What a lane watch's line ends with: what to do, with the waits and the cards beside its lanes when it tells or keeps them. */
 const tailOf = (waits: boolean, cards: boolean): string =>
@@ -200,14 +201,14 @@ export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly 
       if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
     }
   }
-  const lanes = hits.length ? [`${hits.length} lane${hits.length === 1 ? '' : 's'} changed: ${hits.map((h) => `${h.id} (${h.parts.map((p) => (p.n ? `#${p.n} ${p.event}` : p.event)).join(', ')})`).join(', ')}`] : []
+  const lanes = hits.length ? [`${hits.length} lane${hits.length === 1 ? '' : 's'} changed: ${hits.map((h) => `${h.id} (${h.parts.map((p) => (p.n ? `${cardRef(p.n)} ${p.event}` : p.event)).join(', ')})`).join(', ')}`] : []
   const counts = `[Hive] ${join(lanes, cards.map(brief), waits.length ? [`waiting for the user: ${waits.map((w) => `${w.name} (${w.project})`).join(', ')}`] : [])}`
   if (jsonBytes(counts + `.${TAIL}`) <= WAKE_MAX_BYTES) return `${counts}.${TAIL}`
   const what = [hits.length ? `${hits.length} lane${hits.length === 1 ? '' : 's'} changed` : '', cards.length ? `${cards.length} of your cards changed` : '', waits.length ? `${waits.length} agent${waits.length === 1 ? ' is' : 's are'} waiting for the user` : ''].filter(Boolean).join(', ')
   return `[Hive] ${what}: list them (hive_lane list, hive_list_projects) and read their cards.${TAIL}`
 }
 
-const cardList = (cards: readonly number[]): string => cards.map((n) => `#${n}`).join(', ')
+const cardList = (cards: readonly number[]): string => cards.map((n) => `${cardRef(n)}`).join(', ')
 
 /** A lane watch's label (its status, the pane): "Waiting on all running lanes", "Waiting on 3 lanes", with its cards (#726) "… and #720". */
 export const laneWatchLabel = (cond: LaneWatchCondition, cards: readonly number[] = []): string =>

@@ -974,6 +974,16 @@ export function cardKeys(ws: WorkspaceService, numbers?: readonly number[]): Map
   return readSnapshot(ws, (b, db) => (b.legacy ? new Map() : keysOfCards(db, numbers)))
 }
 
+/** A card's key and its project's folder name, or null when it has no key. */
+export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; project: string } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const key = keysOfCards(db, [n]).get(n)
+    const r = key ? (db.prepare('SELECT project FROM cards WHERE number = ?').get(n) as { project: string } | undefined) : undefined // i18n-ignore: SQL
+    return key && r ? { key, project: r.project } : null
+  })
+}
+
 /** The card a key names (`HI-12`, any case, an old key or a card's old number in another project too), or null. */
 export function cardNamed(ws: WorkspaceService, key: string, number: number): number | null {
   return readSnapshot(ws, (b, db) => (b.legacy ? null : cardOfKey(db, key, number)))

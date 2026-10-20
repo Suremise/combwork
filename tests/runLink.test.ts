@@ -37,7 +37,7 @@ const agent: ProgressCaller = { source: 'agent', workspacePath: base, projectPat
 const script: ProgressCaller = { source: 'api', workspacePath: base }
 
 /** The board and the options as a stand-in: cards by number, an agent's Doing cards, the check commands per project. */
-function deps(o: { cards?: Record<number, { project: string; column?: TaskColumn; agent?: string | null }>; doing?: number[]; commands?: Record<string, Record<string, string>> } = {}): RunLinkDeps {
+function deps(o: { cards?: Record<number, { project: string; column?: TaskColumn; agent?: string | null }>; doing?: number[]; commands?: Record<string, Record<string, string>>; keys?: Record<string, number> } = {}): RunLinkDeps {
   return {
     card: async (num) => {
       const c = o.cards?.[num]
@@ -47,6 +47,11 @@ function deps(o: { cards?: Record<number, { project: string; column?: TaskColumn
     head: folderHead,
     commitOf: commitIn,
     projectName: (p) => p.split(/[\\/]/).pop()!,
+    // A key's card, only within the scope given (as the board's cardOfRef: another project's is none).
+    keyCard: (key, scope) => {
+      const card = o.keys?.[key.toUpperCase()]
+      return card !== undefined && (scope === null || o.cards?.[card]?.project.toLowerCase() === scope.toLowerCase()) ? card : null
+    },
     checkCommand: async (project, name) => o.commands?.[project]?.[name] ?? null
   }
 }
@@ -78,7 +83,12 @@ describe("a run's card, revision and check (#1220)", () => {
     expect((await resolveRunLink(script, { card: '#40' }, d)).card).toBe(40)
     await expect(resolveRunLink(agent, { card: '12' }, d)).rejects.toThrow(/a plain number isn't taken/)
     await expect(resolveRunLink(agent, { card: 12 }, d)).rejects.toThrow(/a plain number isn't taken/)
-    await expect(resolveRunLink(agent, { card: 'HI-12' }, d)).rejects.toThrow(/Project keys aren't in use yet/)
+    // Keys (#1219): its own project's, any case; another project's, or one nobody has, as unknown, in the words it used.
+    const k = deps({ cards: { 12: { project: 'hive' }, 40: { project: 'website' } }, keys: { 'HI-12': 12, 'WE-1': 40 } })
+    expect((await resolveRunLink(agent, { card: 'hi-12' }, k)).card).toBe(12)
+    await expect(resolveRunLink(agent, { card: 'WE-1' }, k)).rejects.toThrow('Unknown card WE-1')
+    await expect(resolveRunLink(agent, { card: 'HI-99' }, k)).rejects.toThrow('Unknown card HI-99')
+    expect((await resolveRunLink(script, { card: 'WE-1' }, k)).card).toBe(40)
   })
 
   it('takes a revision that is what is checked out (by id, short id or name) and refuses one that is not, before anything runs', async () => {

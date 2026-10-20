@@ -3,13 +3,17 @@
 // new cards numbered per project, a key changed (the old one an alias), a card moved to another project (its old key an
 // alias, its number there again when it comes back), a counter after a change undone part way, and references for the
 // Agent API (`HI-12`, `hi-12`, `#12`, 12). HIVE_KEYS_LIVE_DB=<a hive.db> runs the step on a copy of that board.
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 import { cardName, keyProblem, suggestKey, type KeyHeld } from '../src/shared/projectKeys'
+import { cardChange, limitLine, releasedLine, wakeLine } from '../src/shared/watch'
+import { inboxText } from '../src/shared/deliveries'
+import { taskPrompt } from '../src/shared/tasks'
+import { taskRow, taskRowText } from '../src/shared/toolReplies'
 
 const base = tempDir('hive-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -20,6 +24,7 @@ const store = await import('../src/main/boardStore')
 const keys = await import('../src/main/projectKeys')
 const keysStep = await import('../src/main/schema/keysStep')
 const { openDb } = await import('../src/main/db')
+const { staleWhy } = await import('../src/main/deliveries')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -173,6 +178,88 @@ describe('key changes, and cards moved between projects', () => {
     store.boardTestHooks.failPut = null
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'hive' }, user))).key).toBe('HI-2')
     await close(w)
+  })
+})
+
+describe("key writes stay in the workspace they began in (round 1, finding 1)", () => {
+  it('a key given or changed while the window opens another workspace is written in neither', async () => {
+    const a = workspace()
+    const b = workspace(['other'])
+    const w = await open(a)
+    const idsOfA = await w.projectIds()
+    // The projects' ids are read, and held there while the window opens the other workspace.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const read = w.projectIds.bind(w)
+    w.projectIds = (async () => (await held, idsOfA)) as typeof w.projectIds
+    const giving = keys.keyProjects(w)
+    const changing = keys.changeProjectKey(w, join(a, 'hive'), 'HV')
+    // Both have asked (each reads the ids first); the window's own reads are as usual from here.
+    w.projectIds = read
+    await w.open(b)
+    release()
+    expect(await giving).toEqual([])
+    await expect(changing).rejects.toThrow(/workspace was closed/)
+    // The workspace open now has none of A's projects' keys; A has none either.
+    expect(store.projectKeys(w)).toEqual([])
+    const wa = await open(a)
+    expect(store.projectKeys(wa)).toEqual([])
+    await close(wa)
+    await close(w)
+  })
+})
+
+describe("another project's card, for an agent confined to its own (round 1, finding 4)", () => {
+  it('its key resolves as a key no card has, before and after a key change and a move; and is never named by key', async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const [h, a] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'H', project: 'hive' }, user), await tasks.createTask({ title: 'A', project: 'amberlight' }, user)])
+    const asHive = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
+    expect([asHive('HI-1'), asHive('AM-1'), asHive('AM-99')]).toEqual([h.number, null, null])
+    await keys.changeProjectKey(w, join(ws, 'amberlight'), 'AMB')
+    expect([asHive('AM-1'), asHive('AMB-1')]).toEqual([null, null])
+    // Moved to hive: now its; its old keys find it for hive's agents, as they do for the Assistant.
+    await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hive' }, user))
+    expect([asHive('AMB-1'), asHive('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
+    // Names: by key only within the scope.
+    expect(keys.cardNamesOf(w, 'amberlight')(h.number)).toBe(`#${h.number}`)
+    expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe(`HI-1 (#${h.number})`)
+    expect(keys.cardNamesOf(w)(h.number)).toBe(`HI-1 (#${h.number})`)
+    await close(w)
+  })
+})
+
+describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', () => {
+  it('lines made for a workspace say "HI-1 (#N)"; without one, #N as before', async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hive' }, user))
+    const name = `HI-1 (#${c.number})`
+    const named = <T>(fn: () => T): T => keys.withCardNames(w, fn)
+    expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).toContain(`[Hive] ${name} is in Todo`)
+    expect(named(() => limitLine({ cards: [c.number], changes: ['column'] }, 60))).toContain(`No change on ${name}`)
+    expect(named(() => releasedLine([{ number: c.number, why: 'reassigned', detail: 'B1' }]))).toContain(`${name} was reassigned`)
+    expect(named(() => inboxText([{ ids: ['m1'], from: 'Hive', card: c.number, text: 'changed', at: '', state: 'received' } as never], []))).toContain(`· ${name}:`)
+    expect(named(() => staleWhy(null, c.number, 1))).toBe(`${name} is gone`)
+    expect(named(() => taskPrompt(c, true))).toContain(`Work on task ${name}`)
+    // Outside any workspace's names (the window, the hive MCP server without names): as before.
+    expect(wakeLine(cardChange(c.number, c, ['column']))).toContain(`[Hive] #${c.number} is in Todo`)
+    // A text the hive MCP server words gets the names with its JSON.
+    const row = named(() => taskRow({ ...c, agent: null, stalled: null, blockedBy: [c.number] } as never))
+    expect(taskRowText(row)).toContain(`after ${name}`)
+    expect(taskRowText({ ...row, names: undefined })).toContain(`after #${c.number}`)
+    await close(w)
+  })
+
+  it("every card argument of the hive tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
+    const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    // No card argument is a number alone: a card is cardArg or cardsArg, or a number-or-string `before`.
+    for (const m of src.matchAll(/(\w+): \{ type: 'number'[^}]*\}/g)) expect({ arg: m[1], card: /card|before/i.test(m[1]) }).toEqual({ arg: m[1], card: false })
+    expect(src).toContain("items: { type: ['number', 'string'] }")
+    expect(src.match(/number: cardArg/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(src).toContain('card: cardArg')
   })
 })
 

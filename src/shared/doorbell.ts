@@ -7,6 +7,7 @@
  * text must stay code-owned. No imports beyond shared types: hive-mcp.js runs outside the app bundle.
  */
 import type { DeliveryKind } from './deliveries'
+import { cardRef } from './projectKeys'
 
 /** Where the agent is told: a checkpoint (a tool call ended), before its turn ends (Stop), or typed while it is idle. */
 export type NoticeAt = 'checkpoint' | 'drain' | 'doorbell'
@@ -41,7 +42,7 @@ export function noticeCounts(items: readonly NoticeItem[]): string {
     const of = items.filter((i) => i.kind === kind)
     if (!of.length) continue
     const cards = [...new Set(of.map((i) => i.card).filter((c): c is number => Number.isInteger(c) && c! > 0))].sort((a, b) => a - b)
-    parts.push(`${of.length} ${NOUN[kind][of.length === 1 ? 0 : 1]}${cards.length ? ` (${cards.map((c) => `#${c}`).join(', ')})` : ''}`)
+    parts.push(`${of.length} ${NOUN[kind][of.length === 1 ? 0 : 1]}${cards.length ? ` (${cards.map((c) => `${cardRef(c)}`).join(', ')})` : ''}`)
   }
   return parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
 }

@@ -73,4 +73,52 @@ export const cardKey = (projectKey: string, projectNumber: number): string => `$
  * A card as agents read it until P8 switches the tools to keys (#1119, Darren 20 Oct): its key with the number the tools
  * take, "HI-1230 (#1240)"; `#1240` for a card with no key (a workspace card, a project with no key yet).
  */
-export const cardName = (c: { number: number; key?: string }): string => (c.key ? `${c.key} (#${c.number})` : `#${c.number}`)
+export const nameWithKey = (n: number, key: string | undefined | null): string => (key ? `${key} (#${n})` : `#${n}`)
+export const cardName = (c: { number: number; key?: string }): string => (c.key ? nameWithKey(c.number, c.key) : cardRef(c.number))
+
+/** How a text names a card by its number: "HI-1230 (#1240)" where its workspace is known, `#1240` where it isn't. */
+export type CardNames = (n: number) => string
+const plain: CardNames = (n) => `#${n}`
+let naming: () => CardNames | null = () => null
+let scoped: CardNames | null = null
+
+/**
+ * Where the texts agents read get their card names (#1219): main sets it once (the namer of the request, wake or
+ * delivery being made, for its own workspace); elsewhere (the window, the hive MCP server) there is none, and a text
+ * names a card `#N` unless it runs in namedBy.
+ */
+export function setCardNaming(get: () => CardNames | null): void {
+  naming = get
+}
+
+/** Runs `fn` (synchronous) with these names for the cards its texts name; null or undefined: as it would without. */
+export function namedBy<T>(names: CardNames | null | undefined, fn: () => T): T {
+  if (!names) return fn()
+  const was = scoped
+  scoped = names
+  try {
+    return fn()
+  } finally {
+    scoped = was
+  }
+}
+
+/** A card as a text names it, by its number (see CardNames). */
+export const cardRef = (n: number): string => (scoped ?? naming() ?? plain)(n)
+
+/** Names for some cards, by number, as a text's JSON carries them (`names`): what the hive MCP server words a reply with. */
+export function namesOf(numbers: Iterable<number>): Record<string, string> | undefined {
+  const out: Record<string, string> = {}
+  let any = false
+  for (const n of numbers) {
+    const name = cardRef(n)
+    if (name !== `#${n}`) {
+      out[String(n)] = name
+      any = true
+    }
+  }
+  return any ? out : undefined
+}
+
+/** The names a text's JSON carries (namesOf), for namedBy; null when it carries none. */
+export const namesFrom = (names: Record<string, string> | undefined | null): CardNames | null => (names ? (n) => names[String(n)] ?? `#${n}` : null)

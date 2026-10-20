@@ -23,6 +23,7 @@ import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import { laneChangeText, laneEndText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
+import { cardName, namedBy, namesFrom } from '../../shared/projectKeys'
 
 const VERSION = '1.0.0'
 const API = (process.env.HIVE_API_URL || 'http://127.0.0.1:47821').replace(/\/$/, '')
@@ -99,6 +100,8 @@ const projectArg = {
   description: `Project name. Defaults to the current project${PROJECT ? ` ("${PROJECT}")` : ''}.`
 }
 /** A card (#1219: tools take a key string too, Darren 20 Oct): its number, or its key. */
+/** A reply worded with the card names the API sent with it (#1219: its `names`). */
+const named = <T>(r: T, text: (r: T) => string): string => namedBy(namesFrom((r as { names?: Record<string, string> } | null)?.names), () => text(r))
 const cardArg = { type: ['number', 'string'], description: 'The card: its number (#12 is 12) or its key ("HI-12").' }
 const agentArg = { type: 'string', description: "The agent's name (e.g. \"Agent 2\") or id. Optional when the project has one agent." }
 const settingsArgs = {
@@ -112,7 +115,9 @@ const settingsArgs = {
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
-const cardsArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
+const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its number (#12 is 12) or key ("HI-12").` })
+/** Numbers that aren't cards (a console's events). */
+const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
 
 interface Tool {
   name: string
@@ -261,7 +266,7 @@ const tools: Tool[] = [
         return ackText(r.acked, r.unknown, r.unread ?? [])
       }
       const r = (await api('POST', '/v1/inbox', {})) as { items: InboxItem[]; unacked: string[] }
-      return inboxText(r.items, r.unacked)
+      return namedBy(namesFrom((r as { names?: Record<string, string> }).names), () => inboxText(r.items, r.unacked))
     }
   },
   {
@@ -376,12 +381,13 @@ const tools: Tool[] = [
     name: 'hive_message_agent',
     description:
       "Leave a running agent a message it can't take as a prompt now: one that is watching (a card loop), working, waiting on background tasks or for the user, or where the user just typed. Saved in its inbox, and Hive tells it (its id, never its text): at its next tool call or before its turn ends while it works, else with a short line typed once it is idle or watching (a watching agent is woken by it, and its watch carries on). It reads it with hive_inbox, labelled as yours (at most 5 waiting, 4000 characters each; kept if it stops; refused if your Control is turned down or your session ends meanwhile). For what it already works on (a re-brief, the user's answer); a new task is still hive_prompt_agent or hive_start_task. Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. card: the card in Doing or Review it is about; tied to that card's round, it is dropped as stale, never given, once the card passes, leaves Doing and Review or starts a new round. Replies with its id; hive_agent_activity shows its state: offered once its line is typed, received once it reads it with hive_inbox, acked once it says it acted on it, stale. cancel=true cancels the messages it hasn't read yet.",
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: { type: 'number' }, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: cardArg, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
     run: async (a) => {
       const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; cancelled?: number; round?: number }
       const who = String(a.agent || 'the agent')
       if (a.cancel === true) return r.cancelled ? `Cancelled ${r.cancelled === 1 ? 'the message' : `${r.cancelled} messages`} waiting for ${who}.` : `No message was waiting for ${who}.`
-      const tied = r.round ? `, for #${a.card} round ${r.round}` : ''
+      // The card as the agent named it: its number (#12) or its key (HI-12).
+      const tied = r.round ? `, for ${/^\d+$/.test(String(a.card)) ? `#${a.card}` : String(a.card)} round ${r.round}` : ''
       if (r.typed) return `Told ${who} now (${r.id}${tied}): it reads it with hive_inbox${r.status === 'watching' ? '; its watch carries on' : ''}.`
       return `Queued for ${who} (${r.id}${tied}, ${r.status}): Hive tells it at its next tool call or turn's end, or once it is idle; ${r.queued} waiting. hive_agent_activity says when it is received and acked.`
     }
@@ -419,7 +425,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        cards: { type: 'array', items: { type: 'number' }, description: 'Card numbers (#12 is 12).' },
+        cards: cardsArg('Cards.'),
         changes: { type: 'array', items: { type: 'string', enum: ['column', 'comment', 'verdict', 'agent'] }, description: 'What counts (default: any).' },
         column: columnArg,
         fresh: { type: 'boolean', description: "Only the next move into column (a reviewer waiting for a failed card's next round)." },
@@ -448,7 +454,7 @@ const tools: Tool[] = [
       properties: {
         action: { type: 'string', enum: ['claim', 'release', 'status'] },
         branch: { type: 'string' },
-        cards: { type: 'array', items: { type: 'number' } },
+        cards: cardsArg('The cards it merges.'),
         timeoutSeconds: { type: 'number' }
       },
       required: ['action']
@@ -456,10 +462,10 @@ const tools: Tool[] = [
     run: async (a) => {
       const base = `/v1/projects/${enc(PROJECT)}/merge-slot`
       const branch = a.branch !== undefined ? { branch: a.branch } : {}
-      if (a.action === 'status') return mergeSlotText((await api('GET', `${base}${a.branch !== undefined ? `?branch=${enc(String(a.branch))}` : ''}`)) as MergeSlotInfo, Date.now())
-      if (a.action === 'release') return releaseText((await api('POST', `${base}/release`, branch)) as Parameters<typeof releaseText>[0])
+      if (a.action === 'status') return named((await api('GET', `${base}${a.branch !== undefined ? `?branch=${enc(String(a.branch))}` : ''}`)) as MergeSlotInfo, (r) => mergeSlotText(r, Date.now()))
+      if (a.action === 'release') return named((await api('POST', `${base}/release`, branch)) as Parameters<typeof releaseText>[0], releaseText)
       if (a.action !== 'claim') throw new Error('action must be claim, release or status')
-      return claimText((await api('POST', `${base}/claim`, { ...branch, ...(a.cards !== undefined ? { cards: a.cards } : {}), ...(a.timeoutSeconds !== undefined ? { timeoutSeconds: a.timeoutSeconds } : {}) }, waitReplyMs(a.timeoutSeconds, CLAIM_WAIT_SECONDS, CLAIM_WAIT_MAX_SECONDS))) as Parameters<typeof claimText>[0], Date.now())
+      return named((await api('POST', `${base}/claim`, { ...branch, ...(a.cards !== undefined ? { cards: a.cards } : {}), ...(a.timeoutSeconds !== undefined ? { timeoutSeconds: a.timeoutSeconds } : {}) }, waitReplyMs(a.timeoutSeconds, CLAIM_WAIT_SECONDS, CLAIM_WAIT_MAX_SECONDS))) as Parameters<typeof claimText>[0], (r) => claimText(r, Date.now()))
     }
   },
   {
@@ -554,7 +560,7 @@ const tools: Tool[] = [
         comment: { type: 'string', description: 'Added to its comments.' },
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: ASSISTANT ? 'The top (highest priority) or bottom of its column.' : "The top (highest priority) or bottom of your project's cards in its column." },
-        before: { type: 'number', description: 'Just above this card, which must be in the column the card ends up in.' },
+        before: { type: ['number', 'string'], description: 'Just above this card (its number or key), which must be in the column the card ends up in.' },
         blocked: { type: 'string' },
         title: { type: 'string' },
         description: { type: 'string' },
@@ -626,7 +632,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, worktree: a.worktree, name: a.name, provider: a.provider, reply: 'short' })) as { agent: string; added: boolean; card: TaskRow }
-      return `Started #${r.card.number} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
+      return `Started ${cardName(r.card)} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
     }
   },
   {
@@ -762,7 +768,7 @@ const tools: Tool[] = [
         limit: { type: 'number', description: 'At most this many lines (default 30, at most 100).' },
         offset: { type: 'number', description: 'sources: skip this many (the reply says where to carry on).' },
         kinds: { type: 'array', items: { type: 'string', enum: ['hook', 'statusline', 'transcript', 'terminal', 'input', 'launch', 'exit', 'api', 'hook-server', 'watch', 'merge-slot', 'progress', 'trigger'] } },
-        seq: cardsArg('Events to give in full (their numbers, at most 3).')
+        seq: numbersArg('Events to give in full (their numbers, at most 3).')
       }
     },
     run: async (a) => {

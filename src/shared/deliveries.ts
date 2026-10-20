@@ -7,6 +7,7 @@
  */
 import type { InboxBrief, InboxSummary } from './types'
 import { inboxNotice } from './doorbell'
+import { cardRef } from './projectKeys'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
 export const DELIVERY_KINDS = ['task', 'rebrief', 'card-event', 'answer', 'handover', 'control'] as const
@@ -213,7 +214,7 @@ export function offerLine(records: readonly DeliveryRecord[], watchLabel: string
 export function inboxText(items: readonly InboxItem[], unacked: readonly string[]): string {
   const older = unacked.length ? `Received before, not acked yet: ${idList(unacked)}.` : ''
   if (!items.length) return `Nothing new.${older ? ` ${older}` : ''}`
-  const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · #${i.card}` : ''}: ${i.text}`)
+  const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · ${cardRef(i.card)}` : ''}: ${i.text}`)
   return [`${items.length} new:`, ...rows, ...(older ? [older] : []), 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
 }
 
@@ -234,7 +235,7 @@ export function inboxSummary(records: readonly DeliveryRecord[], now: number, ov
   const unread: InboxBrief[] = records
     .filter(isUnread)
     .sort((a, b) => a.seq - b.seq)
-    .map((r) => ({ id: r.id, from: r.from.name, text: clip(r.body || (r.card ? `#${r.card} changed` : ''), 120), at: r.created, state: r.state, ...(r.card ? { card: r.card } : {}) }))
+    .map((r) => ({ id: r.id, from: r.from.name, text: clip(r.body || (r.card ? `${cardRef(r.card)} changed` : ''), 120), at: r.created, state: r.state, ...(r.card ? { card: r.card } : {}) }))
   const overdue = records.filter((r) => isOverdue(r, now, overdueMs)).length
   return unread.length || overdue ? { unread, overdue } : undefined
 }

@@ -17,7 +17,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
-import { cardOfRef, isCardRef } from './projectKeys'
+import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
@@ -80,6 +80,7 @@ import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
 import { englishError, HiveError, shownError } from './hiveError'
 import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
+import { cardName, cardRef, namesOf } from '../shared/projectKeys'
 
 const log = createLogger('servers')
 const MAX_BODY = 2 * 1024 * 1024
@@ -1079,8 +1080,8 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
   if (!text) throw new HttpError(400, 'text is required')
   if (text.length > MESSAGE_MAX_CHARS) throw new HttpError(400, `text is at most ${MESSAGE_MAX_CHARS} characters (this has ${text.length})`)
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
-  const card = body?.card === undefined || body?.card === null ? undefined : Number(body.card)
-  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card number')
+  const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
+  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card: its number or key (12 or HI-12)')
   return assistantChange<{ id: string; typed: boolean; queued: number; status: string; round?: number }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the message as its task instead (hive_start_agent with prompt).`)
@@ -1091,7 +1092,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     })
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, `The message wasn't typed into ${a.name}: ${r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}`}.`)
     const typed = r.fate === 'typed'
-    const tied = r.round ? ` for #${card} round ${r.round}` : ''
+    const tied = r.round && card !== undefined ? ` for ${cardRef(card)} round ${r.round}` : ''
     return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(r.round ? { round: r.round } : {}) } }
   })
 })
@@ -1178,7 +1179,9 @@ route('POST', '/v1/inbox', async ({ body }) => {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, 'ack is a list of delivery ids ("m12"), at most 200')
     return ackDeliveries(host, agentId, (body.ack as string[]).map((x) => x.trim()))
   }
-  return readInbox(host, agentId)
+  // Its rows name cards by key, for the hive tools' words (#1219).
+  const inbox = await readInbox(host, agentId)
+  return { ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) }
 })
 
 // An agent's deliveries with their states and times (#647): the newest `limit` (default 20, at most 200).
@@ -1390,7 +1393,8 @@ async function slotBranchFor(p: string, v: unknown): Promise<string> {
 
 const slotCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
-    return await fn()
+    // The cards the slot's holders merge, named by key for the hive tools' words (#1219).
+    return withCardsNamed(await fn())
   } catch (e) {
     throw e instanceof MergeSlotError ? new HttpError(e.status, e.message) : e
   }
@@ -1526,7 +1530,7 @@ route('POST', '/v1/lanes', async ({ body }) =>
       const followed = !!w?.lanes && (w.lanes.includes('all') || w.lanes.includes(r.lane.id))
       const nudge = followed ? '' : 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.'
       const result = nudge ? { ...r, note: [r.note, nudge].filter(Boolean).join(' ') } : r
-      return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => `#${c.number}`).join(', ')}`, act: laneAct(r.lane), result }
+      return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}`, act: laneAct(r.lane), result }
     })
   })
 )
@@ -1834,7 +1838,7 @@ function changeRow(c: TaskCard, changes: string[], list: TaskCard[]): TaskChange
 const taskNumber = (v: string): number => {
   const ref = decodeURIComponent(v).trim()
   if (/^[A-Za-z]{2,4}-\d+$/.test(ref)) {
-    const n = cardOfRef(requireWorkspace(), ref)
+    const n = cardOfRef(requireWorkspace(), ref, callerScope())
     if (n === null) throw new HttpError(404, `Unknown card ${ref}`)
     return n
   }
@@ -1849,11 +1853,31 @@ const taskNumber = (v: string): number => {
  */
 function cardRefIn(v: unknown): unknown {
   if (typeof v !== 'string' || !isCardRef(v) || /^\d+$/.test(v.trim())) return v
-  const n = cardOfRef(requireWorkspace(), v)
+  const n = cardOfRef(requireWorkspace(), v, callerScope())
   if (n === null) throw new HttpError(404, `Unknown card ${v.trim()}`)
   return n
 }
 const cardRefsIn = <T>(v: T): T => (Array.isArray(v) ? (v.map(cardRefIn) as T) : v)
+
+/** A reply with `names` for every card its `cards` lists hold, anywhere in it (#1219): the merge slot's holders and line. */
+function withCardsNamed<T>(reply: T): T {
+  const found: number[] = []
+  const walk = (v: unknown, depth: number): void => {
+    if (!v || typeof v !== 'object' || depth > 6) return
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'cards' && Array.isArray(x)) found.push(...x.filter((n): n is number => typeof n === 'number'))
+      else walk(x, depth + 1)
+    }
+  }
+  walk(reply, 0)
+  return reply && typeof reply === 'object' && !Array.isArray(reply) && found.length ? { ...reply, ...withNames(found) } : reply
+}
+
+/** How a reply's text names these cards (#1219), for the hive MCP server that words it: `names`, or nothing. */
+const withNames = (numbers: number[]): { names?: Record<string, string> } => {
+  const names = namesOf(numbers)
+  return names ? { names } : {}
+}
 
 function columnParam(v: unknown): TaskColumn | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -1921,7 +1945,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   const given = await knownAgent(project, input.agent)
   return assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
     const c = await tasks.createTask(input, actor)
-    return { done: `Added #${c.number} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
+    return { done: `Added ${cardName(c)} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   })
 })
 
@@ -1961,7 +1985,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     ]
       .filter(Boolean)
       .join(', ')
-    return { done: `#${n} ${clip(c.title, 60)}: ${what || 'no change'}`, act: { column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
+    return { done: `${cardName(c)} ${clip(c.title, 60)}: ${what || 'no change'}`, act: { column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   })
 })
 
@@ -1970,10 +1994,26 @@ route('POST', '/v1/tasks/batch', async ({ body }) => {
   requireWorkspace()
   const short = shortReply(body)
   return asRefused(async () => {
-    const { numbers, patch } = taskBatch.batchRequest(body)
+    // Cards named by key too (#1219): one no card has (or, for a project agent, another project's) is refused as that
+    // card, the others changed, as a number no card has is.
+    const unknown: string[] = []
+    const refs = body && typeof body === 'object' && Array.isArray((body as { numbers?: unknown }).numbers) ? (body as { numbers: unknown[] }).numbers : null
+    const given = refs
+      ? {
+          ...(body as object),
+          numbers: refs.flatMap((v) => {
+            if (typeof v !== 'string' || !/^[A-Za-z]{2,4}-\d+$/.test(v.trim())) return [cardRefIn(v)]
+            const n = cardOfRef(requireWorkspace(), v, callerScope())
+            if (n === null) unknown.push(v.trim())
+            return n === null ? [] : [n]
+          })
+        }
+      : body
+    if (unknown.length && !(given as { numbers: unknown[] }).numbers.length) return batchReply([], short, unknown)
+    const { numbers, patch } = taskBatch.batchRequest(given)
     const actor = await taskActor()
-    if (actor.kind !== 'assistant') return batchReply(await tasks.updateTasks(numbers, patch, actor), short)
-    return batchReply(await taskBatch.assistantBatch(assistantCaller() ?? '', assistantCallerToken() ?? '', numbers, patch, actor), short)
+    const items = actor.kind !== 'assistant' ? await tasks.updateTasks(numbers, patch, actor) : await taskBatch.assistantBatch(assistantCaller() ?? '', assistantCallerToken() ?? '', numbers, patch, actor)
+    return batchReply(items, short, unknown)
   })
 })
 
@@ -1981,8 +2021,8 @@ route('POST', '/v1/tasks/batch', async ({ body }) => {
  * The reply to a batch: each card changed (its change, short; the whole card otherwise), and each card refused with
  * why. A short reply reads each column's list once, after every change, so a card's place is where it ends up.
  */
-async function batchReply(items: tasks.BatchItem[], short: boolean): Promise<unknown> {
-  const refused = items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused' }))
+async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: string[] = []): Promise<unknown> {
+  const refused: { number: number; ref?: string; error: string }[] = [...unknown.map((ref) => ({ number: 0, ref, error: `Unknown card ${ref}` })), ...items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused' }))]
   const done = items.filter((i): i is tasks.BatchItem & { card: TaskCard } => !!i.card)
   if (!short) {
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
@@ -1995,7 +2035,7 @@ async function batchReply(items: tasks.BatchItem[], short: boolean): Promise<unk
     if (!lists.has(c.column)) lists.set(c.column, c.archived ? [] : await tasks.listTasks({ column: c.column, scope: callerScope() }))
     changed.push(changeRow(c, i.said, lists.get(c.column)!))
   }
-  return { changed, refused }
+  return { changed, refused, ...withNames(refused.map((r) => r.number)) }
 }
 
 route('POST', '/v1/tasks/reorder', async ({ body }) => {
@@ -2006,7 +2046,10 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   const actor = await taskActor()
   const view = async (list: TaskCard[]): Promise<TaskView[] | TaskReorder> => {
     // Short: the agent chose the cards and their order; it only needs to know it worked.
-    if (shortReply(body)) return { column, top: (cards as unknown[]).map((x) => Number(String(x).replace(/^#/, ''))), count: list.length }
+    if (shortReply(body)) {
+      const top = (cards as unknown[]).map((x) => Number(String(x).replace(/^#/, '')))
+      return { column, top, count: list.length, ...withNames(top) }
+    }
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
     return Promise.all(list.map((c) => taskView(c, agents)))
   }
@@ -2015,7 +2058,7 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   const ordered = Array.isArray(cards) ? cards.map((x) => Number(String(x).replace(/^#/, ''))).filter((x) => Number.isInteger(x) && x > 0) : []
   return assistantChange('agents', `put ${count} card${count === 1 ? '' : 's'} in order in ${columnLabel(column)}`, { kind: 'reorder-tasks', column, cards: ordered }, async () => {
     const list = await tasks.reorderTasks(column, cards, actor)
-    const top = (cards as unknown[]).map((x) => `#${String(x).replace(/^#/, '')}`).join(', ')
+    const top = (cards as unknown[]).map((x) => cardRef(Number(String(x).replace(/^#/, '')))).join(', ')
     return { done: `Put ${top} at the top of ${columnLabel(column)}`, result: await view(list) }
   })
 })
@@ -2036,7 +2079,7 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented']) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.commentTask(n, text, actor))
-  return assistantChange('agents', `comment on #${n}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on #${n}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
+  return assistantChange('agents', `comment on #${n}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */
@@ -2089,7 +2132,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, extra).catch((e: Error) => {
       throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : 409, e.message)
     })
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards } : {}) }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}) }
   }
   const cond = readCondition(body ?? {})
   if (typeof cond === 'string') throw new HttpError(400, cond)
@@ -2104,7 +2147,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
-    if ('already' in r) return { already: r.already }
+    if ('already' in r) return { already: r.already, ...withNames([r.already.number]) }
     return { watching: r.watching.label, limitAt: r.watching.limitAt }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
@@ -2196,7 +2239,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       life.addEventListener('abort', onClose, { once: true })
       run()
     })
-    return result.changes.length ? { changes: result.changes, timedOut: false, since: encodeSince(result.now) } : { timedOut: true, since: encodeSince(result.now) }
+    return result.changes.length ? { changes: result.changes, timedOut: false, since: encodeSince(result.now), ...withNames(result.changes.map((c) => c.number)) } : { timedOut: true, since: encodeSince(result.now) }
   } finally {
     const left = (taskWaits.get(callerKey) ?? 1) - 1
     if (left > 0) taskWaits.set(callerKey, left)
@@ -2217,7 +2260,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     if (target.kind === 'new-agent' && body?.provider && !isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
     const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
     return {
-      done: `Started #${n} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
+      done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },
       result: { ok: true, agent: r.agentName, added: r.added, card: shortReply(body) ? taskRow(await taskView(r.card)) : await taskView(r.card) }
     }
@@ -2522,6 +2565,7 @@ const runLinkDeps: RunLinkDeps = {
   head: folderHead,
   commitOf: commitIn,
   projectName: (projectPath) => basename(projectPath),
+  keyCard: (key, scope) => cardOfRef(requireWorkspace(), key, scope),
   // The options' check commands (SPEC §16.6.6: project.json's `workflow.options`), until #1218 resolves them with defaults.
   checkCommand: async (project, name) => {
     const cfg = (await workspace.projectConfig(join(requireWorkspace().path!, project)).catch(() => null)) as { workflow?: { options?: { commands?: Record<string, unknown> } } } | null
@@ -2700,7 +2744,8 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     res.on('close', () => {
       if (!res.writableEnded) gone.abort()
     })
-    const run = (): Promise<unknown> => r.handler({ params, query: url.searchParams, body, signal: gone.signal })
+    // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
+    const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
     // the hive tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
@@ -2709,7 +2754,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     const began = Date.now()
     const before = flagged ? await decisionsNew(ws) : null
     const result = ws ? await inWorkspace(ws, run) : await run()
-    const notice = flagged ? await decisionsNotice(ws, before, began) : null
+    const notice = flagged ? await withCardNames(ws, () => decisionsNotice(ws, before, began), callerScope()) : null
     send(res, 200, result ?? null, notice ? { 'X-Hive-Notice': encodeURIComponent(notice) } : {})
   } catch (e) {
     const { status, body } = apiErrorReply(e)

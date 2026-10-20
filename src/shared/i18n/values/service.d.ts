@@ -104,6 +104,7 @@ interface HiveMessageValues {
   'service.hiveVcs.exitCode': { code: string | number }
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
+  'service.keys.closed': undefined
   'service.keys.form': undefined
   'service.keys.notice': { keys: string | number }
   'service.keys.noticeTitle': undefined

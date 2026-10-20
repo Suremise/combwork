@@ -40,6 +40,8 @@ export interface RunLinkDeps {
   commitOf: (folder: string, revision: string) => Promise<string | null>
   /** A project's folder name, by its path. */
   projectName: (projectPath: string) => string
+  /** The card a key names (`HI-12`: #1219), or null; with a scope (a project's folder name), only that project's. */
+  keyCard: (key: string, scope: string | null) => number | null
   /** The command a project (by its folder name) has configured for a named check, or null. */
   checkCommand: (project: string, name: string) => Promise<string | null>
 }
@@ -52,15 +54,18 @@ const REVISION = /^[\w./@^~{}-]+$/
 
 const refused = (message: string): ProgressError => new ProgressError(400, message)
 
-/** A card reference from a request: `#1061`; a plain number is refused with the forms to use (SPEC §16.12). */
-function cardNumber(v: unknown): number {
+/**
+ * A card reference from a request: its key (`HI-12`, any case, an old key too: #1219) or `#1061`; a plain number is refused
+ * with the forms to use (SPEC §16.12). Its number, or null for a key no card has (or another project's, for an agent).
+ */
+function cardNumber(v: unknown, deps: RunLinkDeps, scope: string | null): number | null {
   if (typeof v === 'string') {
     const t = v.trim()
     const alias = /^#(\d{1,9})$/.exec(t)
     if (alias) return Number(alias[1])
-    if (/^[A-Za-z]{2,4}-\d+$/.test(t)) throw refused(`Project keys aren't in use yet: name the card as #N (its number), such as #1061`)
+    if (/^[A-Za-z]{2,4}-\d{1,9}$/.test(t)) return deps.keyCard(t, scope)
   }
-  throw refused(`card is a card reference such as "#1061": a plain number isn't taken (in a shell, quote it: an unquoted # starts a comment)`)
+  throw refused(`card is a card reference such as "HI-12" or "#1061": a plain number isn't taken (in a shell, quote "#1061": an unquoted # starts a comment)`)
 }
 
 /**
@@ -80,10 +85,13 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
   let card: number | null = null
   let cardProject: string | null = null
   if (asked.card !== undefined && asked.card !== null) {
-    card = cardNumber(asked.card)
+    const named = typeof asked.card === 'string' ? asked.card.trim() : String(asked.card)
+    const n = cardNumber(asked.card, deps, caller.source === 'agent' ? deps.projectName(caller.projectPath) : null)
+    if (n === null) throw refused(`Unknown card ${named}`)
+    card = n
     const c = await deps.card(card)
-    // A project agent sees only its own project's cards: another's answers as an unknown one does.
-    if (!c || (own !== null && c.project.toLowerCase() !== own)) throw refused(`Unknown card ${cardRefText(card)}`)
+    // A project agent sees only its own project's cards: another's answers as an unknown one does (in the words it used).
+    if (!c || (own !== null && c.project.toLowerCase() !== own)) throw refused(`Unknown card ${named}`)
     cardProject = c.project
   } else if (asked.card === undefined && caller.source === 'agent') {
     const doing = await deps.doing(caller.projectPath, caller.agentId)

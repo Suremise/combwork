@@ -12,6 +12,7 @@
  */
 import type { TaskCard, TaskColumn } from './types'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel } from './tasks'
+import { cardRef } from './projectKeys'
 
 /**
  * What counts as a change: a column move, a new comment, a review verdict, a change of agent. Default: any. `blocked` (a
@@ -424,7 +425,7 @@ export function loopWakeLine(change: CardChange, kind: 'review' | 'verdict'): st
 }
 
 function lineOf(change: CardChange, tail: string): string {
-  const head = `[Hive] #${change.number}${whereNow(change)}`
+  const head = `[Hive] ${cardRef(change.number)}${whereNow(change)}`
   if (!change.comment) return head + tail
   // The card, its state and what to do always fit (names are short); the comment's first line gives way, cut with "…".
   const by = shortName(change.comment.by)
@@ -465,7 +466,7 @@ const MANY_TAIL = '. Your card watch has ended: carry on (hive_read_task with la
  * `max` characters (0: left out). A lane watch's line tells its cards with it.
  */
 export function cardPart(c: CardChange, max: number): string {
-  const head = `#${c.number}${whereNow(c, max)}`
+  const head = `${cardRef(c.number)}${whereNow(c, max)}`
   if (!c.comment || max <= 0 || c.changes === 'gone') return head
   const t = [...c.comment.firstLine]
   return `${head} (latest comment by ${shortName(c.comment.by)}: "${t.length > max ? `${t.slice(0, max - 1).join('')}…` : t.join('')}")`
@@ -482,12 +483,12 @@ export function wakeLines(changes: CardChange[]): string {
   const short = '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) before you carry on.'
   const compact = `[Hive] ${changes.map(brief).join('; ')}${short}`
   if (jsonBytes(compact) <= WAKE_MAX_BYTES) return compact
-  const numbers = `[Hive] ${changes.map((c) => `#${c.number}`).join(', ')} changed${short}`
+  const numbers = `[Hive] ${changes.map((c) => `${cardRef(c.number)}`).join(', ')} changed${short}`
   if (jsonBytes(numbers) <= WAKE_MAX_BYTES) return numbers
   // More cards than a watch can have (WATCH_MAX_CARDS): as many numbers as fit, the rest counted.
   for (let shown = changes.length - 1; shown >= 1; shown--) {
     const more = changes.length - shown
-    const line = `[Hive] ${changes.slice(0, shown).map((c) => `#${c.number}`).join(', ')} and ${more} more watched card${more === 1 ? '' : 's'} changed${short}`
+    const line = `[Hive] ${changes.slice(0, shown).map((c) => `${cardRef(c.number)}`).join(', ')} and ${more} more watched card${more === 1 ? '' : 's'} changed${short}`
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
   return `[Hive] ${changes.length} watched cards changed${short}`
@@ -495,10 +496,10 @@ export function wakeLines(changes: CardChange[]): string {
 
 /** A card in a few words, for a wake line too long to tell each in full: where it is, its verdict, nothing else. */
 export function brief(c: CardChange): string {
-  if (c.changes === 'gone' || c.column === 'gone') return `#${c.number} ${c.archived ? 'archived' : 'gone'}`
+  if (c.changes === 'gone' || c.column === 'gone') return `${cardRef(c.number)} ${c.archived ? 'archived' : 'gone'}`
   const a = c.about
-  if (a?.returned) return `#${c.number} returned for review (round ${a.returned})`
-  return `#${c.number} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}`
+  if (a?.returned) return `${cardRef(c.number)} returned for review (round ${a.returned})`
+  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}`
 }
 
 /**
@@ -543,7 +544,7 @@ export function cardWakeLine(changes: CardChange[], replies: ReplyNote[], releas
   const compact = `[Hive] ${[...released.map((r) => releasedPart(r, false)), ...replies.map((r) => replyNote(r, 0, user)), ...changes.map(brief)].join('; ')}${short}`
   if (fits(compact)) return { line: compact, repliesTold: true }
   const who = [...new Set(replies.map((r) => shortName(r.agentName)))].join(', ')
-  const numbers = `[Hive] ${[released.length ? `${cards(released.map((r) => r.number))} left your watch` : '', replies.length ? `${user} replied to ${who}` : '', changes.length ? `${changes.map((c) => `#${c.number}`).join(', ')} changed` : ''].filter(Boolean).join('; ')}${short}`
+  const numbers = `[Hive] ${[released.length ? `${cards(released.map((r) => r.number))} left your watch` : '', replies.length ? `${user} replied to ${who}` : '', changes.length ? `${changes.map((c) => `${cardRef(c.number)}`).join(', ')} changed` : ''].filter(Boolean).join('; ')}${short}`
   if (fits(numbers)) return { line: numbers, repliesTold: true }
   // Never past the limit: the cards as a card line tells them; the replies are told by a later wake.
   return { line: wakeLines(changes) || `[Hive] ${user} replied to agents of your watched cards${short}`, repliesTold: !changes.length }
@@ -565,12 +566,12 @@ export interface Released {
 function releasedPart(r: Released, full: boolean): string {
   const head =
     r.why === 'blocked'
-      ? `#${r.number} is blocked${full && r.detail ? `: "${[...r.detail].length > 120 ? `${[...r.detail].slice(0, 119).join('')}…` : r.detail}"` : ''}`
+      ? `${cardRef(r.number)} is blocked${full && r.detail ? `: "${[...r.detail].length > 120 ? `${[...r.detail].slice(0, 119).join('')}…` : r.detail}"` : ''}`
       : r.why === 'reviewer'
         ? r.detail
-          ? `#${r.number} is reviewed by ${shortName(r.detail)}`
-          : `#${r.number}'s review was taken from you`
-        : `#${r.number} was reassigned${r.detail ? ` to ${shortName(r.detail)}` : ' (it has no agent now)'}`
+          ? `${cardRef(r.number)} is reviewed by ${shortName(r.detail)}`
+          : `${cardRef(r.number)}'s review was taken from you`
+        : `${cardRef(r.number)} was reassigned${r.detail ? ` to ${shortName(r.detail)}` : ' (it has no agent now)'}`
   return `${head} (your watch on it ended)`
 }
 
@@ -599,7 +600,7 @@ export function limitLine(cond: WatchCondition, minutes: number, released: Relea
   return `[Hive] ${cards(released.map((r) => r.number))} left your watch (reassigned, or reviewed by another)${tail}`
 }
 
-const cards = (ns: number[]): string => ns.map((n) => `#${n}`).join(', ')
+const cards = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
 
 /** What a watching agent shows (its header, tab, the Agent API): "Waiting for #12 → Review", "Waiting for #12, #13". */
 export function watchLabel(cond: Pick<WatchCondition, 'cards' | 'column'>): string {
