@@ -1271,7 +1271,9 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
 #### 16.4.4 Reconciliation
 
 [#1112 C] Observed facts are reconciled against recorded ones, never refused. Reconciliation runs on an observe event,
-on window focus, when a card is read for a rule, and once at start. Its rules:
+on window focus, when a card is read for a rule, and once at start. **In P3 it only records** [#1217]: the observed
+facts below are written (each once across Hives, by its dedupe key), and the table's moves, queue cancellations and
+wakes wait for P4; a card merged by hand stays where it is, with its `Integrated` fact. Its rules:
 
 | Observed | Then |
 |---|---|

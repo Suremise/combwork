@@ -368,6 +368,23 @@ once), each repository and folder watched once however many projects share it:
 target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.
 It also runs when a gate reads a card and once at start.
 
+**In the app, record-only (#1217, P3).** `workflow/reconciler.ts` follows the open workspaces' projects (as
+`platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
+reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
+runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
+when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run builds the project's
+runtime on the board's store (`FactStore.forBoard`) with its writes as changes of the board (`cfg.locked`:
+`boardWrite`, with the run's workspace lifetime as `alive`), its options from `project.json` (else the platform's
+defaults), and **`reconcileActs` off**: `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
+MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone) and the table's moves, queue cancellations,
+actions and wakes run only with that switch, which the P4 runtime turns on (the P2 scenarios run with it). It
+reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
+fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
+revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
+(`observeHead`). Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own
+transaction (`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window
+opens another; its watch goes as the workspace closes.
+
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
 

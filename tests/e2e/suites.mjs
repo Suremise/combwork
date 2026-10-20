@@ -164,6 +164,7 @@ export const SUITES = [
   { name: 'quitwait' },
   { name: 'rail' },
   { name: 'recent' },
+  { name: 'reconcile' },
   { name: 'removeall' },
   { name: 'rendercrash' },
   { name: 'reorder' },

@@ -3,14 +3,17 @@
 // observed fact they follow (their dedupe key), so two Hives observing one workspace write each transition once, and
 // a writer that loses the race reads the platform again and writes only what is true now (§16.17).
 //
-// P2 spike (#1118): called by the tests where P3's watcher (refs, HEAD, packed-refs, the deliverables) will call it.
+// Called by the app's reconciler (reconciler.ts, #1217) on the watcher's events, and by the runtime's tests. **P3 is
+// record-only**: the table's moves (Done when integrated outside, a stale card moved back), queue cancellations and wakes
+// run only with the runtime's `reconcileActs`, which P4 turns on; without it, what is observed is recorded and nothing
+// else changes. Every write goes through the runtime's lock (`wf.locked`: the board's change, in the app).
 
-import { foldCard, openEntry, passingReviewers, type CardState, type Fact } from '../../shared/workflow/facts'
+import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
 import { hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { CardRecord } from './factStore'
-import type { Workflow } from './runtime'
+import type { Workflow, Write } from './runtime'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -42,7 +45,7 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     // The first look: from the earliest base of the folder's unfinished cards.
     const bases = cards.map((c) => wf.state(c).started?.base).filter((b): b is string => !!b)
     if (!bases.length) {
-      wf.store.setMeta(seenKey, head)
+      await wf.locked(() => wf.store.setMeta(seenKey, head))
       return
     }
     from = bases[0]
@@ -56,7 +59,7 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
     const how = byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed'
     // The folder's record, the card's facts and the cursor in one transaction: a crash keeps all or none of them.
-    wf.store.tx((tx) => {
+    await wf.locked(() => wf.store.tx((tx) => {
       if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return
       if (card) {
         const s = foldCard(tx.facts(card.id))
@@ -65,9 +68,9 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
         if (UNFINISHED.includes(card.stage) || card.stage === 'todo') tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
       }
       tx.setMeta(seenKey, c.commit)
-    })
+    }))
   }
-  wf.store.setMeta(seenKey, head)
+  await wf.locked(() => wf.store.setMeta(seenKey, head))
 }
 
 /**
@@ -84,7 +87,8 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
   for (let tries = 0; tries < 5; tries++) {
     if (isUnknown(now)) return
     if (now === from) return
-    const wrote = wf.store.tx((tx) => tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to: now as string | null } }))
+    const to = now as string | null
+    const wrote = await wf.locked(() => wf.store.tx((tx) => tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to } })))
     if (wrote) return
     // Lost the race: read the winner and the platform now.
     s = wf.state(card)
@@ -145,11 +149,14 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await G.sameChange(project, approved, { base: b2, revision: s.head }))
       const head = s.head
       await wf.write(card, r, 'hive', (w) => {
+        // Observed once per cycle and revision (§16.17): two Hives seeing the same new revision write one fact.
         if (same) {
-          w.fact('CarriedOver', { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
+          observed(w, 'CarriedOver', `carried:${s.cycle}:${head}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
           return
         }
-        w.fact('Stale', { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' })
+        if (!observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' })) return
+        // P4: what follows from it (#1217: P3 records only).
+        if (!wf.cfg.reconcileActs) return
         if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' })
         w.move('approved', 'derived')
         wf.wake(w, s.started?.builder, `${card.key}: stale, submit again`)
@@ -216,6 +223,8 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } })
     if (!f) return
     w.written.push(f as Fact)
+    // P4: the card Done, its queue entry and slot released, its lane told (#1217: P3 records only; the card stays).
+    if (!wf.cfg.reconcileActs) return
     if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'integratedOutside' })
     w.move('done', 'derived')
     w.action('endLaneIfDone', {})
@@ -230,8 +239,20 @@ export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState
   if (isUnknown(now) || now.revision === s.approved?.revision) return
   const r = wf.rulesetOf(card, s)
   await wf.write(card, r, 'outside', (w) => {
-    w.fact('Stale', { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })
+    if (!observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })) return
+    // P4: what follows from it (#1217: P3 records only).
+    if (!wf.cfg.reconcileActs) return
     if (!hasStage(r, 'review')) w.move('active', 'derived')
     wf.wake(w, s.started?.builder, `${card.key}: your paths changed since the pass, submit again`)
   })
+}
+
+/**
+ * An observed fact of a write, once (its dedupe key, unique per card and kind): null when another Hive already wrote it,
+ * else the fact, counted as the write's. Under the write's ruleset, as its recorded facts are.
+ */
+function observed<K extends 'Stale' | 'CarriedOver'>(w: Write, kind: K, dedupe: string, data: FactData[K]): Fact<K> | null {
+  const f = w.tx.appendObserved(w.card.id, { kind, actor: 'outside', source: 'observed', dedupe, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data })
+  if (f) w.written.push(f as Fact)
+  return f
 }
