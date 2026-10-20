@@ -529,7 +529,7 @@
   "board.toolbar.more": "Tablica: więcej",
   "board.toolbar.search": "Szukaj kart (#12, słowa, etykiety)",
   "board.upgrade.askDetail": "Najpierw zamknij każdy inny Hive, który ma otwarty ten obszar roboczy. Dopóki nie zostanie uaktualniony, jego tablica jest tu tylko do odczytu, a jego agenci nie mogą się uruchomić.",
-  "board.upgrade.askMessage": "Hive 1.0 musi uaktualnić dane tego obszaru roboczego. Hive 0.9 będzie mógł go potem otworzyć tylko do odczytu; kopia zapasowa zostaje zachowana, a Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją.",
+  "board.upgrade.askMessage": "Hive 1.0 musi uaktualnić dane tego obszaru roboczego. Hive 0.9 nie będzie mógł go potem otworzyć; kopia zapasowa zostaje zachowana, a Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją.",
   "board.upgrade.askTitle": "Uaktualnić tablicę tego obszaru roboczego do 1.0?",
   "board.upgrade.banner": "Ten obszar roboczy pochodzi z Hive 0.9: dopóki nie zostanie uaktualniony do 1.0, jego tablica jest tu tylko do odczytu, a jego agenci nie mogą się uruchomić.",
   "board.upgrade.bannerButton": "Uaktualnij…",

@@ -8,24 +8,29 @@ import { app } from 'electron'
 import { HIVE_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
+import { cardField, composeCard, decomposeCard, readCardRows, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
+import { moveCardsIntoTables } from './schema/cardsStep'
+import { CARDS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
-import { moveStoreRows } from './schema/storeTables'
+import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('board')
 
 /**
- * The workspace's task board in SQLite (#1017, design on the card): `.hive/hive.db`, one row a card. Each row keeps the
- * card as the JSON document its file held (`doc`), so every reader builds the same card from it as before (the Agent
- * API's JSON unchanged), with columns generated from the document for queries. Every write goes through `boardWrite`:
- * the board's lock, one transaction, and one `tasks-changed` after it commits. A later migration can move comments,
- * history, decisions and links into tables of their own: only this module reads or writes rows.
+ * The workspace's task board in SQLite (#1017, design on the card): `.hive/hive.db`. Since 1.0's cards step (#1209) a
+ * card is a row of typed columns in `cards` with its lists in child tables (labels, links, context, comments, history,
+ * decisions, holds; schema/v1_0.ts), and every reader is given the card's JSON document composed from them, byte for
+ * byte the document it was saved as (schema/cardRows.ts), so the Agent API's JSON is unchanged. Before the upgrade (a
+ * 0.9 board, read-only) a row is the card's document. Every write goes through `boardWrite`: the board's lock, one
+ * transaction, and one `tasks-changed` after it commits. Only this module reads or writes cards' rows.
  */
 
 export const DB_FILE = 'hive.db'
@@ -93,8 +98,24 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => db.prepare("INSERT INTO board_meta (key, value) VALUES ('format', '1.0') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run() // i18n-ignore: SQL
   },
   {
-    // #1211: sessions and deliveries out of store_rows, into their typed tables (schema/storeTables.ts).
+    // #1212: lanes, watches and metrics out of `store_rows` into their typed tables (schema/storeCodec.ts, storeTables.ts),
+    // their values into board_meta.
     version: 4,
+    name: STORES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => moveStores(db)
+  },
+  {
+    // #1209: cards out of their JSON document into typed columns and child tables (#1208's schema, cardRows.ts's contract).
+    version: 5,
+    name: CARDS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: moveCardsIntoTables
+  },
+  {
+    // #1211: sessions and deliveries out of store_rows, into their typed tables (schema/sessionDeliveryTables.ts); the last of
+    // store_rows' stores, so store_rows goes with it (store_meta stays: sessions' and deliveries' values).
+    version: 6,
     name: 'sessions and deliveries in tables', // i18n-ignore: a schema step's name, recorded in schema_version
     group: UPGRADE_GROUP_ID,
     up: (db) => {
@@ -120,9 +141,9 @@ interface Board {
   /** The workspace folder, as the workspace has it. */
   path: string
   db: Db
+  /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
+  legacy: boolean
   /** Statements made once. */
-  get: StatementSync
-  put: StatementSync
   version: StatementSync
   /** The writer's data_version when last looked at: another process's commit changes it (#1017's poll). */
   dataVersion: number
@@ -274,20 +295,18 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, hiveVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
   db.exec('BEGIN IMMEDIATE')
   try {
-    const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)') // i18n-ignore: SQL
-    for (const c of cards) put.run(c.n, JSON.stringify(c.doc))
+    for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
     // Past every card file's number, a damaged one's too (it is kept, and may be mended): as the old allocator was.
     setMeta(db, 'next', String(Math.max(Number(board.next) || 1, highestName(names) + 1)))
     const ins = db.prepare('INSERT OR IGNORE INTO archive_batches (id, doc) VALUES (?, ?)') // i18n-ignore: SQL
     if (Array.isArray(batches.batches)) for (const x of batches.batches) if (x && typeof x === 'object' && typeof (x as ArchiveBatch).id === 'string') ins.run((x as ArchiveBatch).id, JSON.stringify(x))
-    // Checked before it commits: every card read is there, as its file had it.
-    const rows = db.prepare('SELECT number, col, archived FROM cards').all() as { number: number; col: unknown; archived: number }[] // i18n-ignore: SQL
+    // Checked before it commits: every card read is there, its document as its file had it.
+    const rows = readCardRows(db)
     if (rows.length !== cards.length) throw new Error(`${rows.length} cards in the database, ${cards.length} card files read`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
-    const byN = new Map(rows.map((r) => [r.number, r]))
+    const byN = new Map(rows.map((r) => [r.card.number, r]))
     for (const c of cards) {
       const r = byN.get(c.n)
-      const col = typeof c.doc.column === 'string' ? c.doc.column : null
-      if (!r || (r.col ?? null) !== col || r.archived !== (c.doc.archived === true ? 1 : 0)) throw new Error(`card #${c.n} isn't in the database as its file has it`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
+      if (!r || JSON.stringify(composeCard(r)) !== JSON.stringify(c.doc)) throw new Error(`card #${c.n} isn't in the database as its file has it`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
     }
     setMeta(db, 'imported', JSON.stringify(record))
     db.exec('COMMIT')
@@ -493,8 +512,7 @@ function openBoard(path: string, upgrade: boolean): Board {
     const b: Board = {
       path,
       db,
-      get: db.reader.prepare('SELECT doc FROM cards WHERE number = ?'), // i18n-ignore: SQL
-      put: w.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc'), // i18n-ignore: SQL
+      legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
       dataVersion: 0,
       poll: setInterval(() => pollOther(key), POLL_MS),
@@ -743,6 +761,27 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 }
 
 /**
+ * A read of several statements on one snapshot of the board (#1209 round 1, HR4's finding): a card is its row and its
+ * child rows, read by separate statements, and another process (another Hive, a script) committing between them must
+ * never give a card neither of them saved, nor a child query that picks other cards than its parent's. Inside a change
+ * (or a read already holding one) it runs on that transaction; else it opens a read transaction on the reader, whose
+ * snapshot every statement of `fn` sees, and ends it after. `fn` is synchronous: nothing else uses the reader meanwhile.
+ */
+function readSnapshot<T>(ws: WorkspaceService, fn: (b: Board, db: Db['reader']) => T): T {
+  const { b, db } = readConn(ws)
+  if (db.isTransaction) return fn(b, db)
+  db.exec('BEGIN')
+  try {
+    const out = fn(b, db)
+    db.exec('COMMIT')
+    return out
+  } catch (e) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
  * A write to the board, inside boardWrite only, and only while its transaction is live: once SQLite has undone it (an
  * error that rolls back the whole transaction), every later write of the change fails too, never going on in autocommit,
  * and the change fails whole as it ends.
@@ -766,11 +805,16 @@ function writeOp<T>(ws: WorkspaceService, op: (b: Board) => T): T {
 // Reads and writes of cards (tasks.ts keeps every rule; this keeps the rows).
 // ---------------------------------------------------------------------------
 
-/** A card's document as saved, parsed; null when there is no such card. */
+/** A card's document as saved; null when there is no such card. */
 export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown> | null {
-  const { b, db } = readConn(ws)
-  const row = (db === b.db.reader ? b.get : db.prepare('SELECT doc FROM cards WHERE number = ?')).get(n) as { doc: string } | undefined // i18n-ignore: SQL
-  return row ? (JSON.parse(row.doc) as Record<string, unknown>) : null
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) {
+      const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n) as { doc: string } | undefined // i18n-ignore: SQL
+      return row ? (JSON.parse(row.doc) as Record<string, unknown>) : null
+    }
+    const [r] = readCardRows(db, { numbers: [n] })
+    return r ? composeCard(r) : null
+  })
 }
 
 /** Whether there is a card of that number. */
@@ -787,7 +831,7 @@ export function cardNumbers(ws: WorkspaceService): Set<number> {
 
 /**
  * Which cards a query asks for: archived or not (both when left out), these numbers, given to one of these agents, being
- * reviewed by one of these agents (#1107: picked in the query, so no other card's document is parsed).
+ * reviewed by one of these agents (#1107: picked in the query, so no other card is read).
  */
 export interface CardQuery {
   archived?: boolean
@@ -798,7 +842,10 @@ export interface CardQuery {
 
 /** Cards' documents, by number, as the query asks; in number order. */
 export function cardDocs(ws: WorkspaceService, q: CardQuery = {}): { number: number; doc: Record<string, unknown> }[] {
-  const { db } = readConn(ws)
+  return readSnapshot(ws, (b, db) => docsOf(b, db, q))
+}
+
+function docsOf(b: Board, db: Db['reader'], q: CardQuery): { number: number; doc: Record<string, unknown> }[] {
   const where: string[] = []
   const args: (number | string)[] = []
   if (q.archived !== undefined) where.push(`archived = ${q.archived ? 1 : 0}`)
@@ -814,40 +861,88 @@ export function cardDocs(ws: WorkspaceService, q: CardQuery = {}): { number: num
   }
   if (q.reviewers) {
     if (!q.reviewers.length) return []
-    where.push(`doc ->> '$.review.agent' IN (SELECT value FROM json_each(?))`) // i18n-ignore: SQL
+    where.push(`${b.legacy ? "doc ->> '$.review.agent'" : 'review_agent'} IN (SELECT value FROM json_each(?))`) // i18n-ignore: SQL
     args.push(JSON.stringify(q.reviewers))
   }
+  if (!b.legacy) return readCardRows(db, { where: where.join(' AND ') || undefined, args }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
   const rows = db.prepare(`SELECT number, doc FROM cards${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY number`).all(...args) as { number: number; doc: string }[] // i18n-ignore: SQL
   return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
 }
 
+/** The `cards` columns each document field is read from (the lists are child tables: readCardRows' parts). */
+const FIELD_COLUMNS: Record<string, (keyof CardRow)[]> = {
+  title: ['title'], // i18n-ignore: a column's name
+  description: ['description'], // i18n-ignore: a column's name
+  project: ['project'],
+  projectId: ['project_id'],
+  agent: ['agent'],
+  agentName: ['agent_name'],
+  review: ['review_agent', 'review_agent_name', 'review_since'],
+  column: ['col'],
+  order: ['ord'],
+  blocked: ['blocked'],
+  archived: ['archived'],
+  archivedFor: ['archived_for'],
+  archivedBatch: ['archived_batch'],
+  contextProblems: ['context_problems'],
+  createdAt: ['created_at'],
+  createdBy: ['created_by'],
+  updatedAt: ['updated_at']
+}
+
 /**
- * The archived cards in short, for the window's board (#1017): title, place, agent, labels and dates, made in the query
- * (no document parsed here). The Archived view and a card's dialog read them in full.
+ * Some fields of each card a condition picks (every card without one), each as its document has it (null when it hasn't
+ * the field), read from only the columns and child tables they need: nothing else of a card (its description, comments…).
+ */
+function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; parts: CardPart[] }): { r: CardRows; fields: Record<string, unknown> }[] {
+  const columns = [...new Set(keys.flatMap((k) => FIELD_COLUMNS[k] ?? []))]
+  return readCardRows(db, { where: sel.where, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
+}
+
+/** The fields of an archived card's summary (archivedSummaryDocs), in its order. */
+const SUMMARY = ['title', 'project', 'projectId', 'agent', 'agentName', 'column', 'order', 'labels', 'blocked', 'archivedFor', 'archivedBatch', 'createdAt', 'createdBy', 'updatedAt']
+
+/**
+ * The archived cards in short, for the window's board (#1017): title, place, agent, labels and dates, each as the card's
+ * document has it (null when it hasn't the field), read from their columns and labels alone. The Archived view and a
+ * card's dialog read them in full.
  */
 export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
-  const { db } = readConn(ws)
-  const field = (k: string): string => `'${k}', doc -> '$.${k}'`
-  const fields = ['title', 'project', 'projectId', 'agent', 'agentName', 'column', 'order', 'labels', 'blocked', 'archivedFor', 'archivedBatch', 'createdAt', 'createdBy', 'updatedAt'].map(field).join(', ')
-  const rows = db.prepare(`SELECT number, json_object(${fields}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
+    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
+    const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
 }
 
 /**
- * Each card's holds (#602), archived cards too, made in the query (#1107: what costs need of every card, without its
- * comments): its project, agent, reviewer and holds, and its history only for a card that keeps no holds (holdsFromHistory).
+ * Each card's holds (#602), archived cards too (#1107: what costs need of every card, without its comments): its
+ * project, agent, reviewer and holds (null for a field the card hasn't), and its history only for a card that keeps no
+ * holds (holdsFromHistory), read for those cards alone.
  */
 export function holdDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
-  const { db } = readConn(ws)
-  const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  // One snapshot for both reads: the history read for the cards without holds sees the cards the first read saw.
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) {
+      const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'] })
+      const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
+      const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
+      return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
+    }
+    const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
 }
 
-/** Each card's place fields, from the index (no document parsed): what placing a card needs (#458). */
+/** Each card's place fields, from their columns (nothing else of a card read): what placing a card needs (#458). */
 export function cardPlaces(ws: WorkspaceService): { number: number; raw: { column: unknown; order: unknown; archived: boolean; project: unknown; projectId: unknown } }[] {
-  const { db } = readConn(ws)
-  const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  return readSnapshot(ws, (b, db) => {
+    // Order and archived as the 0.9 index gave them (cardRows.ts): its order a number where the document's was one in another form.
+    if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
+    const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  })
 }
 
 /** How many archived cards each project has (the board's Archived count, without reading them). */
@@ -856,16 +951,15 @@ export function archivedCounts(ws: WorkspaceService): { project: string; count: 
   return (db.prepare("SELECT coalesce(project, '') AS project, count(*) AS count FROM cards WHERE archived = 1 GROUP BY project").all() as { project: string; count: number }[]).map((r) => ({ project: String(r.project), count: Number(r.count) })) // i18n-ignore: SQL
 }
 
-
-/** Saves a card's document (inside boardWrite). */
+/** Saves a card's document (inside boardWrite): its rows replaced by the document's (cardRows.ts). */
 export function putCard(ws: WorkspaceService, n: number, doc: Record<string, unknown>): void {
   writeOp(ws, (b) => {
     if (boardTestHooks.failPut?.(n)) throw new Error(`SQLITE_FULL: database or disk is full (test, card #${n})`) // i18n-ignore: a test's stand-in for SQLite's error
-    b.put.run(n, JSON.stringify(doc))
+    writeCardRows(b.db.writer, decomposeCard(n, doc))
   })
 }
 
-/** Removes a card (inside boardWrite); false when there was none. */
+/** Removes a card (inside boardWrite), and its child rows with it (ON DELETE CASCADE); false when there was none. */
 export function deleteCard(ws: WorkspaceService, n: number): boolean {
   return writeOp(ws, (b) => Number(b.db.writer.prepare('DELETE FROM cards WHERE number = ?').run(n).changes) > 0) // i18n-ignore: SQL
 }
@@ -1087,10 +1181,8 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
  * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
  */
 export async function exportBoard(ws: WorkspaceService, dir: string): Promise<number> {
-  const docs = cardDocs(ws)
-  const { db } = readConn(ws)
-  const next = nextOf(db)
-  const batches = archiveBatchDocs(ws)
+  // Its cards, next number and batches as one snapshot of the board.
+  const { docs, next, batches } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws) }))
   await mkdir(dir, { recursive: true })
   for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(doc, null, 2) + '\n', 'utf8')
   await writeFile(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n', 'utf8')

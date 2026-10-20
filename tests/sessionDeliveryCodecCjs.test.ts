@@ -1,10 +1,10 @@
-// The suites' copy of the sessions' and deliveries' codec (tests/e2e/storeCodec.cjs, plain JS) agrees with Hive's
-// (src/main/schema/storeCodec.ts, #1211): the same field maps, and each one's rows read by the other as they were written.
+// The suites' copy of the sessions' and deliveries' codec (tests/e2e/sessionDeliveryCodec.cjs, plain JS) agrees with Hive's
+// (src/main/schema/sessionDeliveryCodec.ts, #1211): the same field maps, and each one's rows read by the other as they were written.
 import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
-import * as ts from '../src/main/schema/storeCodec'
+import * as ts from '../src/main/schema/sessionDeliveryCodec'
 
-const cjs = createRequire(import.meta.url)('./e2e/storeCodec.cjs') as typeof ts & { STORE_FIELDS: typeof ts.STORE_FIELDS }
+const cjs = createRequire(import.meta.url)('./e2e/sessionDeliveryCodec.cjs') as typeof ts & { STORE_FIELDS: typeof ts.STORE_FIELDS }
 
 const at = '2026-10-20T10:00:00.000Z'
 const sessions: Record<string, unknown>[] = [

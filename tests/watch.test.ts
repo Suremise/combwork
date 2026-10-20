@@ -379,7 +379,7 @@ describe('watches (main/watches.ts)', async () => {
     await watches.settled()
   }
   const { sessions } = await import('../src/main/sessions')
-  const { storeTestHooks } = await import('../src/main/storeRows')
+  const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
   // oxlint-disable-next-line typescript/no-explicit-any -- saved entries read as JSON, as the file's were
   const savedOf = (path: string): any[] => storeDocs(path, 'watches')

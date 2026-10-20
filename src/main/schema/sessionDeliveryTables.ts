@@ -1,11 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, rowText, sessionFromRows, sessionToRows, type Row } from './storeCodec'
+import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, rowText, sessionFromRows, sessionToRows, type Row } from './sessionDeliveryCodec'
 import { V1_0_STEPS } from './v1_0'
 
 /**
  * Sessions' and deliveries' typed tables (#1211, v1_0.ts's "sessions and deliveries in tables"): a host's records read
  * and written in them, and the 1.0 step that moves `store_rows`' rows into them. A host is the store's scope (a
- * project's id, `assistant`, deliveries also `folder:<name>`). What isn't of Hive's form (storeCodec.ts) is kept aside
+ * project's id, `assistant`, deliveries also `folder:<name>`). What isn't of Hive's form (sessionDeliveryCodec.ts) is kept aside
  * as it was, under the scope's `setAside` value in `store_meta` (sessions) or with deliveries' `invalid` entries, never
  * lost and never in the table.
  */
@@ -338,5 +338,10 @@ export function moveStoreRows(db: Db): { sessions: number; deliveries: number } 
     keepAside(db, 'deliveries', host, 'invalid', unread)
   }
   db.prepare("DELETE FROM store_rows WHERE store IN ('sessions', 'deliveries')").run() // i18n-ignore: SQL
+  // The last of its stores (#1212's step moved lanes, watches and metrics before this one): the table goes. Rows of
+  // another store still in it would be lost, so they refuse the step instead, and the whole group with it.
+  const left = db.prepare('SELECT store, count(*) AS n FROM store_rows GROUP BY store').all() as { store: string; n: number }[] // i18n-ignore: SQL
+  if (left.length) throw new Error(`store_rows still has rows of ${left.map((r) => `${r.store} (${r.n})`).join(', ')}: not dropped, nothing upgraded`) // i18n-ignore: an internal check's error, logged
+  db.exec('DROP TABLE store_rows')
   return counts
 }

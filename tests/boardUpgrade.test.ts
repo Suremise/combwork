@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { as09 } from './boardDb'
 
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -240,18 +241,14 @@ async function board09(): Promise<string> {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
   writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
-  // As 0.9 makes it: its steps only, its cards moved in from files (none here), and card #1 saved as 0.9 saves one.
-  const db = openDb(store.boardFile(ws), { migrations: store.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' })
-  try {
-    const at = '2026-10-20T10:00:00.000Z'
-    const doc = { number: 1, title: 'From 0.9', description: '', project: 'p', projectId: null, agent: null, column: 'todo', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at, by: 'You', what: 'Created in Todo' }], archived: false, createdAt: at, createdBy: 'You', updatedAt: at }
-    db.writer.prepare('INSERT INTO cards (number, doc) VALUES (1, ?)').run(JSON.stringify(doc))
-    db.writer.prepare("INSERT INTO board_meta (key, value) VALUES ('imported', ?), ('next', '2')").run(JSON.stringify({ at, cards: 0, damaged: [], hiveVersion: '0.9.3', folder: 'tasks.imported-2026-10-20' }))
-  } finally {
-    db.close()
-  }
+  const w = await open(ws)
+  await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
+  await close(w)
+  // As 0.9 left it: its cards as documents, none of the 1.0 group's steps.
+  as09(store.boardFile(ws))
   return ws
 }
+
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
 
 describe("the board's upgrade to 1.0 (#1207)", () => {
@@ -397,9 +394,9 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     // A store's open the same way: nothing moved, nothing marked.
     const probe = join(ws, '.hive', 'never-a-store.json')
     writeFileSync(probe, '[]')
-    const data = await storeRows.openStore(ws, 'watches', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
-    expect(data.rows).toEqual([])
-    expect(data.meta.has('imported')).toBe(false)
+    let put = 0
+    await storeRows.openTable(ws, 'sessions', 'probe', probe, async () => ({ rows: 1 }), { count: () => 0, put: () => ++put })
+    expect(put).toBe(0)
     expect(existsSync(probe)).toBe(true)
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect((await inWorkspace(w, () => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['s1'])
@@ -532,10 +529,12 @@ describe("what services read before the database was replaced is read again (#12
       expect(told).toEqual([ws])
       // A save planned in the generation before: its guard refuses it, nothing written.
       const gen = before
-      await expect(storeRows.saveStore(ws, 'watches', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
+      let wrote = false
+      await expect(storeRows.saveTable(ws, 'sessions', 'probe', () => (wrote = true), { probe: '1' }, () => {
         if (gen !== store.dbGeneration(ws)) throw new Error('stale')
       })).rejects.toThrow('stale')
-      expect(storeRows.readStore(ws, 'watches', 'probe').rows).toEqual([])
+      expect(wrote).toBe(false)
+      expect(storeRows.storeValue(store.workspaceDb(ws).reader, 'sessions', 'probe', 'probe')).toBeNull()
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
       expect(store.dbGeneration(ws)).toBe(before + 2)
     } finally {

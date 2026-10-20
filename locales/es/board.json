@@ -529,7 +529,7 @@
   "board.toolbar.more": "Tablero: más",
   "board.toolbar.search": "Buscar tarjetas (#12, palabras, etiquetas)",
   "board.upgrade.askDetail": "Cierra antes cualquier otro Hive que tenga abierto este espacio de trabajo. Hasta que se actualice, su tablero está en solo lectura aquí y sus agentes no pueden iniciarse.",
-  "board.upgrade.askMessage": "Hive 1.0 necesita actualizar los datos de este espacio de trabajo. Después, un Hive 0.9 solo podrá abrirlo en solo lectura; se guarda una copia de seguridad, y Ayuda → Restaurar la copia de seguridad del tablero 0.9… la devuelve.",
+  "board.upgrade.askMessage": "Hive 1.0 necesita actualizar los datos de este espacio de trabajo. Después, un Hive 0.9 ya no podrá abrirlo; se guarda una copia de seguridad, y Ayuda → Restaurar la copia de seguridad del tablero 0.9… la devuelve.",
   "board.upgrade.askTitle": "¿Actualizar el tablero de este espacio de trabajo a 1.0?",
   "board.upgrade.banner": "Este espacio de trabajo es de Hive 0.9: hasta que se actualice a 1.0, su tablero está en solo lectura aquí y sus agentes no pueden iniciarse.",
   "board.upgrade.bannerButton": "Actualizar…",

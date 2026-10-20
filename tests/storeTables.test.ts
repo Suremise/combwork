@@ -1,330 +1,459 @@
-// Sessions and deliveries in their 1.0 tables (#1211, schema/storeTables.ts and storeCodec.ts): every record reads back
-// equal as JSON (odd ones too: a field Hive doesn't know, a null, a lone surrogate, one missing), a change writes only
-// the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Hive's form, and
-// the queries use their indexes. HIVE_STORE_ROUNDTRIP_DB=<a hive.db> runs the step over a copy of that board made in
-// tempDir() (the file itself is never opened): counts equal, every session and delivery equal as JSON.
-import { copyFileSync, existsSync } from 'fs'
+// Lanes, watches and metrics in hive.db's typed tables (#1212): each entry written in columns and read back equal as
+// JSON, an odd one kept whole, the 1.0 step moving 0.9's store_rows in (order, values, entries no row can hold kept aside),
+// saves that write only what changed and are all or nothing, 0.8's lanes.json moved in once, and a copy of a live board
+// migrated with every lane, watch and metric equal (HIVE_STORE_MIGRATION_DB names its hive.db).
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
-import { BOARD_MIGRATIONS } from '../src/main/boardStore'
-import { openDb, schemaVersion } from '../src/main/db'
-import { readDelivery } from '../src/shared/deliveries'
-import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/storeCodec'
-import { addDeliveries, moveStoreRows, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/storeTables'
-import { V1_0_STEPS } from '../src/main/schema/v1_0'
+import { canonical, entryOfRows, moveStores, readEntries, rowsOfEntry, STORES_STEP, TABLE_DEFS, TABLE_STORES, type TableStore } from '../src/main/schema/storeCodec'
 
 const base = tempDir('hive-store-tables-')
-let n = 0
-type Rec = Record<string, unknown>
+;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+afterAll(() => rmSync(base, { recursive: true, force: true }))
 
-/** A database (in memory) with the sessions and deliveries tables, and store_meta as 0.9's step 2 makes it. */
-function tables(): DatabaseSync {
-  const db = new DatabaseSync(':memory:')
+const tables = await import('../src/main/storeTables')
+const board = await import('../src/main/boardStore')
+const lanes = await import('../src/main/lanes')
+const { openDb } = await import('../src/main/db')
+
+let n = 0
+/** A new workspace folder (its board made at the first use: every step, the 1.0 group's included). */
+const workspace = (): string => {
+  const ws = join(base, `ws-${++n}`)
+  mkdirSync(join(ws, '.hive'), { recursive: true })
+  return ws
+}
+const files = (ws: string): string[] => readdirSync(join(ws, '.hive')).sort()
+
+afterEach(() => {
+  tables.tableTestHooks.failSave = null
+})
+afterAll(() => board.closeAllBoards())
+
+const LANE = {
+  id: 'lane-1',
+  project: 'hive',
+  projectId: 'p-abc',
+  name: 'P3 D',
+  builder: { id: 'a-b6', name: 'HB6' },
+  reviewer: { id: 'a-r6', name: 'HR6' },
+  cards: [1220, 1212],
+  rounds: 10,
+  waitMinutes: 360,
+  state: 'ended',
+  startedBy: 'HB6',
+  startedAt: '2026-10-20T14:00:00.000Z',
+  updatedAt: '2026-10-20T15:00:00.000Z',
+  endedAt: '2026-10-20T15:00:00.000Z',
+  mergeCommit: '5831d5c6',
+  frozen: [
+    { number: 1220, title: 'Runs', column: 'done', blocked: null, round: 3, reviewing: false },
+    { number: 1212, title: 'Stores', column: 'doing', blocked: 'waits', round: 1, reviewing: true }
+  ]
+}
+const WATCH = {
+  id: 'w-1',
+  projectPath: 'D:\\ws\\hive',
+  projectId: 'p-abc',
+  agentId: 'a-b6',
+  cond: { cards: [1220, 1220, 1212], changes: ['verdict', 'column'], column: 'passed' },
+  marks: { '1220': { column: 'review', verdicts: 1 } },
+  since: '2026-10-20T14:00:00.000Z',
+  seen: { '1220': { history: 3, comments: 2 } },
+  limitMinutes: 360,
+  limitAt: '2026-10-20T20:00:00.000Z',
+  waitSeq: 4,
+  on: { '1220': 'agent' },
+  watcherName: 'HB6 (hive)',
+  fired: { line: '[Hive] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
+}
+/** A bucket with a project named like Object's own properties, as the store keeps them (maps with no prototype). */
+const bucket = (start: number) => {
+  const d = <T>(o: Record<string, T>): Record<string, T> => Object.assign(Object.create(null) as Record<string, T>, o)
+  const part = (key: string) => ({ api: d({ [key]: { count: 2, ms: [1, 2] } }), mcp: d({}), guidance: d({ claude: { launches: 1 } }), catalog: d({}) })
+  const projects = Object.create(null) as Record<string, unknown>
+  Object.defineProperty(projects, '__proto__', { value: part('GET /v1/tasks'), enumerable: true, writable: true, configurable: true })
+  projects.hive = part('POST /v1/progress')
+  return { start, span: 'hour', projects, workspace: part('GET /v1/projects'), skills: { scans: { count: 0 }, hits: 1 }, dropped: 2, droppedBy: { hive: 2 }, series: 5 }
+}
+const roundTrip = (store: TableStore, doc: unknown) => {
+  const def = TABLE_DEFS[store]
+  const e = rowsOfEntry(def, doc, store === 'metrics' ? 'hour:0' : (doc as { id: string }).id, 0)
+  return { back: entryOfRows(def, e.main, e.children), whole: typeof e.main.extra === 'string' && e.main.extra.startsWith('['), e }
+}
+
+describe('entries as rows, and back (#1212)', () => {
+  it('a lane, a watch and a metrics bucket go in columns and read back equal as JSON', () => {
+    for (const [store, doc] of [['lanes', LANE], ['lanes', { ...LANE, reviewer: null, frozen: undefined, projectId: undefined, endedAt: null, state: 'active', mergeCommit: null }], ['watches', WATCH], ['watches', { ...WATCH, fired: null, projectId: undefined }], ['metrics', bucket(3_600_000)]] as [TableStore, unknown][]) {
+      const plain = JSON.parse(JSON.stringify(doc))
+      const r = roundTrip(store, plain)
+      expect({ store, whole: r.whole }).toEqual({ store, whole: false })
+      expect(canonical(r.back)).toBe(canonical(plain))
+    }
+    // The columns hold what is queried: a lane's builder and state, its cards; a watch's agent, limit and delivery, its cards once each.
+    expect(roundTrip('lanes', LANE).e.main).toMatchObject({ builder_id: 'a-b6', state: 'ended', extra: null })
+    expect(roundTrip('lanes', LANE).e.children.lane_cards.map((r) => r.card)).toEqual([1220, 1212])
+    expect(roundTrip('watches', WATCH).e.main).toMatchObject({ agent_id: 'a-b6', limit_at: WATCH.limitAt, fired_delivery: 'm12' })
+    expect(roundTrip('watches', WATCH).e.children.watch_cards.map((r) => r.card)).toEqual([1220, 1212])
+    expect(roundTrip('metrics', JSON.parse(JSON.stringify(bucket(0)))).e.children.metrics_series).toHaveLength(6)
+  })
+
+  it("a project named __proto__ stays a project's name (no prototype is set), as the store's maps keep it", () => {
+    const r = roundTrip('metrics', JSON.parse(JSON.stringify(bucket(0))))
+    const projects = (r.back as { projects: Record<string, unknown> }).projects
+    expect(Object.keys(projects).sort()).toEqual(['__proto__', 'hive'])
+    expect(Object.getPrototypeOf(projects)).toBeNull()
+  })
+
+  it('fields this build has no column for go in extra; an entry its columns would change is kept whole, unchanged', () => {
+    const newer = { ...LANE, laterField: { x: 1 } }
+    expect(roundTrip('lanes', newer)).toMatchObject({ whole: false, back: newer })
+    expect(roundTrip('lanes', newer).e.main.extra).toBe('{"laterField":{"x":1}}')
+    // A state no column takes, a builder with more to it, a number that isn't whole, a field the store never writes as null.
+    for (const odd of [{ ...LANE, state: 'running' }, { ...LANE, builder: { id: 'a', name: 'b', more: 1 } }, { ...LANE, rounds: 1.5 }, { ...LANE, projectId: null }, { id: 'x' }, { ...WATCH, cond: undefined }, { ...WATCH, waitSeq: 'four' }]) {
+      const store: TableStore = 'cond' in odd || 'agentId' in odd ? 'watches' : 'lanes'
+      const r = roundTrip(store, JSON.parse(JSON.stringify(odd)))
+      expect(r.whole).toBe(true)
+      expect(canonical(r.back)).toBe(canonical(JSON.parse(JSON.stringify(odd))))
+    }
+    // A bucket with a family Hive doesn't know, or a project named '' (the workspace's own part).
+    for (const odd of [{ ...bucket(0), workspace: { api: {}, mcp: {}, guidance: {}, catalog: {}, later: {} } }, { ...bucket(0), projects: { '': { api: {}, mcp: {}, guidance: {}, catalog: {} } } }]) {
+      const plain = JSON.parse(JSON.stringify(odd))
+      expect(roundTrip('metrics', plain)).toMatchObject({ whole: true })
+      expect(canonical(roundTrip('metrics', plain).back)).toBe(canonical(plain))
+    }
+  })
+})
+
+/** A 0.9 board's file (every step before the 1.0 group) with these store_rows rows and store_meta values. */
+function board09(rows: [string, string, string, number, string][], meta: [string, string, string][] = []): DatabaseSync {
+  const file = join(base, `board-09-${++n}.db`)
+  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
+  const db = new DatabaseSync(file)
   db.exec('PRAGMA foreign_keys = ON')
-  for (const sql of V1_0_STEPS.find((s) => s.name === 'sessions and deliveries in tables')!.ddl) db.exec(sql)
-  db.exec('CREATE TABLE store_meta (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID')
+  for (const r of rows) db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)').run(...r)
+  for (const m of meta) db.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES (?, '', ?, ?)").run(...m)
   return db
 }
-const meta = (db: DatabaseSync, store: string, scope: string, key: string): unknown => {
-  const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key) as { value: string } | undefined
-  return r ? JSON.parse(r.value) : undefined
-}
-const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v))
 
-const at = '2026-10-20T10:00:00.000Z'
-/** A session record with every field Hive writes. */
-const fullSession = (id: string, over: Rec = {}): Rec => ({
-  id,
-  agent: 'claude-code',
-  name: `Session ${id}`,
-  createdAt: at,
-  lastActiveAt: at,
-  archived: false,
-  agentId: 'a1',
-  agentName: 'Coder',
-  cwd: 'D:\\w\\p',
-  branch: 'hive/a1',
-  transcriptPath: 'C:\\t.jsonl',
-  handedOverFrom: 'older',
-  cards: [{ number: 5, title: 'Five' }, { number: 6, title: 'Six', review: true }],
-  titleAtRename: null,
-  keptUsage: { inputTokens: 10, outputTokens: 20 },
-  screenStops: [{ at, kind: 'stop' }],
-  sub: { parentId: null, kind: 'guardian review' },
-  mode: 'planner',
-  ...over
-})
-const fullDelivery = (id: string, seq: number, over: Rec = {}): Rec => ({
-  id,
-  seq,
-  agentId: 'a1',
-  agentName: 'Coder',
-  conversation: null,
-  kind: 'task',
-  from: { kind: 'assistant', name: 'Assistant' },
-  card: 12,
-  round: 2,
-  body: 'Do the thing',
-  state: 'received',
-  created: at,
-  expires: at,
-  offered: at,
-  offers: 2,
-  received: at,
-  receivedVia: 'inbox',
-  offerRun: 'run-1',
-  detail: 'why',
-  again: 'once more',
-  source: 'watch',
-  ref: 'w1',
-  meta: { cards: '12', n: 3, yes: true },
-  need: 'free',
-  forRun: 'run-2',
-  ...over
-})
-
-describe('records through their rows (storeCodec.ts)', () => {
-  const session = (rec: Rec): Rec => {
-    const r = sessionToRows('p1', 0, rec)!
-    return sessionFromRows(r.row, r.cards)
-  }
-  it('a session with every field reads back equal, its cards, sub and JSON columns typed', () => {
-    const rec = fullSession('s1')
-    const r = sessionToRows('p1', 0, rec)!
-    expect(r.cards).toHaveLength(2)
-    expect(r.row.sub_kind).toBe('guardian review')
-    expect(JSON.parse(String(r.row.extra))).toEqual({ titleAtRename: null })
-    expect(session(rec)).toEqual(rec)
-    expect(session(fullSession('s2', { sub: { parentId: 's1', kind: 'sub-agent' } }))).toEqual(fullSession('s2', { sub: { parentId: 's1', kind: 'sub-agent' } }))
-  })
-
-  it('a minimal session, and odd ones, read back equal: fields Hive doesn\'t know, other types, a lone surrogate, one missing', () => {
-    const min = { id: 'm', agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: true }
-    expect(session(min)).toEqual(min)
-    const odd = { ...min, agentId: 42, extraField: { nested: [1, 2] }, name: 'lone \ud800 surrogate', cards: [{ number: 'x', title: 'bad' }], sub: { parentId: 1, kind: 'k' } }
-    expect(session(odd)).toEqual(odd)
-    // A record without a name (a hand edit): kept, read back without it.
-    const { name: _n, ...noName } = min
-    expect(session(noName)).toEqual(noName)
-    // Without an id it has no key: not of Hive's form.
-    const { id: _i, ...noId } = min
-    expect(sessionToRows('p1', 0, noId)).toBeNull()
-  })
-
-  it("a deleted session's usage, and a delivery with every field, read back equal", () => {
-    const k = { id: 'g', provider: 'claude-code', agentId: 'a1', agentName: 'Coder', cwd: 'D:\\w', name: 'gone', usage: { inputTokens: 1 } }
-    expect(keptUsageFromRow(keptUsageToRow('p1', 0, k)!)).toEqual(k)
-    const { name: _n, ...kNoName } = k
-    expect(keptUsageFromRow(keptUsageToRow('p1', 0, kNoName)!)).toEqual(kNoName)
-    const d = fullDelivery('m1', 1)
-    expect(deliveryFromRow(deliveryToRow('p1', d)!)).toEqual(d)
-    const odd = { ...fullDelivery('m2', 2, { conversation: 'c-1' }), unknown: 'kept', offers: 'two' }
-    expect(deliveryFromRow(deliveryToRow('p1', odd)!)).toEqual(odd)
-    // Missing a field its row needs: kept (deliveries.ts's readDelivery sets it aside as it loads), read back as it was.
-    const { state: _s, ...noState } = d
-    expect(deliveryFromRow(deliveryToRow('p1', noState)!)).toEqual(noState)
-    // Without an id it has no key: not of Hive's form.
-    const { id: _i, ...noId } = d
-    expect(deliveryToRow('p1', noId)).toBeNull()
-  })
-
-  it('JSON\'s edges read back as they were (#1211 round 1): an empty list, an own __proto__, keys starting with $, a lone surrogate', () => {
-    const own = (o: Rec, k: string, v: unknown): Rec => (Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true }), o)
-    const min = { id: 'm', agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: false }
-    const cases: Rec[] = [
-      { ...min, cards: [] },
-      own({ ...min }, '__proto__', { polluted: true }),
-      { ...min, $absent: ['name'], $$x: 1, $: 'dollar' },
-      { ...min, $absent: ['id', 'agent'] }
-    ]
-    for (const rec of cases) {
-      const back = session(rec)
-      expect(JSON.stringify(back)).toBe(JSON.stringify(rec))
-      expect(Object.getPrototypeOf(back)).toBe(Object.prototype)
-    }
-    // A delivery whose body has a lone surrogate: deliveries.ts reads it, so it keeps its row.
-    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
-    expect(readDelivery(json(lone))).not.toBeNull()
-    expect(deliveryFromRow(deliveryToRow('p1', lone)!)).toEqual(lone)
-    const prot = own(fullDelivery('m8', 8), '__proto__', 1)
-    expect(JSON.stringify(deliveryFromRow(deliveryToRow('p1', prot)!))).toBe(JSON.stringify(prot))
-  })
-})
-
-describe("a host's records in the tables (storeTables.ts)", () => {
-  it('written and read in order; a change writes only the rows it changed; the deleted lists apart', () => {
-    const db = tables()
-    db.exec('BEGIN')
-    writeSessionRecords(db, 'p1', { sessions: [fullSession('a'), fullSession('b'), fullSession('c')], deleted: ['g1', 'g2'], deletedUsage: [{ id: 'g1', provider: 'codex', name: 'g', usage: {} }] })
-    db.exec('COMMIT')
-    expect(readSessionRecords(db, 'p1')).toEqual([fullSession('a'), fullSession('b'), fullSession('c')])
-    expect(readDeleted(db, 'p1')).toEqual(['g1', 'g2'])
-    expect(readDeletedUsage(db, 'p1')).toEqual([{ id: 'g1', provider: 'codex', name: 'g', usage: {} }])
-    expect(readSessionRecord(db, 'p1', 'b')).toEqual(fullSession('b'))
-    expect(readSessionRecord(db, 'p1', 'none')).toBeNull()
-    // Counted from here: each row written.
-    db.exec('CREATE TEMP TABLE w (t TEXT)')
-    for (const t of ['sessions', 'session_cards', 'sessions_deleted', 'sessions_deleted_usage']) for (const op of ['INSERT', 'UPDATE', 'DELETE']) db.exec(`CREATE TEMP TRIGGER w_${t}_${op} AFTER ${op} ON ${t} BEGIN INSERT INTO w VALUES ('${t} ${op}'); END`)
-    const written = (): string[] => (db.prepare('SELECT t FROM w').all() as { t: string }[]).map((r) => r.t)
-    db.exec('BEGIN')
-    // b's last activity, c removed, a new one, the deleted lists left as they were (not given).
-    writeSessionRecords(db, 'p1', { sessions: [fullSession('a'), fullSession('b', { lastActiveAt: '2026-10-21T00:00:00.000Z' }), fullSession('d')] })
-    db.exec('COMMIT')
-    expect(written().sort()).toEqual(['session_cards DELETE', 'session_cards DELETE', 'session_cards INSERT', 'session_cards INSERT', 'sessions DELETE', 'sessions INSERT', 'sessions UPDATE'])
-    expect(readSessionRecords(db, 'p1').map((r) => r.id)).toEqual(['a', 'b', 'd'])
-    expect(readDeleted(db, 'p1')).toEqual(['g1', 'g2'])
-  })
-
-  it('a record without the fields Hive keeps, or two with one id, throw: nothing written', () => {
-    const db = tables()
-    db.exec('BEGIN')
-    expect(() => writeSessionRecords(db, 'p1', { sessions: [fullSession('a'), fullSession('a')] })).toThrow('two session records with the id a')
-    db.exec('ROLLBACK')
-    expect(readSessionRecords(db, 'p1')).toEqual([])
-    const d = fullDelivery('m1', 1)
-    db.exec('BEGIN')
-    expect(() => writeDeliveries(db, 'p1', [d, d])).toThrow('two deliveries with the id m1')
-    db.exec('ROLLBACK')
-  })
-
-  it("deliveries: in their seq's order; a change writes only what changed; the expired ones deleted by their key", () => {
-    const db = tables()
-    db.exec('BEGIN')
-    writeDeliveries(db, 'p1', [fullDelivery('m2', 2), fullDelivery('m1', 1), fullDelivery('m3', 3)])
-    db.exec('COMMIT')
-    expect(readDeliveries(db, 'p1').map((d) => d.id)).toEqual(['m1', 'm2', 'm3'])
-    db.exec('CREATE TEMP TABLE w (t TEXT)')
-    for (const op of ['INSERT', 'UPDATE', 'DELETE']) db.exec(`CREATE TEMP TRIGGER w_${op} AFTER ${op} ON deliveries BEGIN INSERT INTO w VALUES ('${op} ' || ${op === 'DELETE' ? 'old' : 'new'}.id); END`)
-    db.exec('BEGIN')
-    // m1 expired (pruned), m2 acked, m3 as it was.
-    writeDeliveries(db, 'p1', [fullDelivery('m2', 2, { state: 'acked', acked: at }), fullDelivery('m3', 3)])
-    db.exec('COMMIT')
-    expect((db.prepare('SELECT t FROM w').all() as { t: string }[]).map((r) => r.t).sort()).toEqual(['DELETE m1', 'UPDATE m2'])
-    expect(readDeliveries(db, 'p1')).toEqual([fullDelivery('m2', 2, { state: 'acked', acked: at }), fullDelivery('m3', 3)])
-    // Another host's are its own.
-    expect(readDeliveries(db, 'p2')).toEqual([])
-  })
-
-  it("deliveries moved in that aren't of Hive's form, or repeat an id, go with those kept aside", () => {
-    const db = tables()
-    db.exec('BEGIN')
-    // One with an id but little else keeps its row (deliveries.ts's readDelivery sets it aside as it loads).
-    expect(addDeliveries(db, 'p1', [fullDelivery('m1', 1), { id: 'nope' }, fullDelivery('m1', 1, { body: 'again' }), 'text', { seq: 3 }])).toBe(2)
-    db.exec('COMMIT')
-    expect(readDeliveries(db, 'p1')).toEqual([{ id: 'nope' }, json(fullDelivery('m1', 1))])
-    expect(meta(db, 'deliveries', 'p1', 'invalid')).toEqual([json(fullDelivery('m1', 1, { body: 'again' })), 'text', { seq: 3 }])
-  })
-})
-
-describe('the 1.0 step: store_rows into the tables', () => {
-  /** A board file at 0.9's schema (and the group's steps before this one), with these store_rows rows. */
-  function board09(rows: { store: string; scope: string; key: string; ord: number; doc: string }[], metas: [string, string, string, string][] = []): string {
-    const file = join(base, `b-${++n}`, 'hive.db')
-    const step = BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), hiveVersion: '0.9.3' })
-    try {
-      const put = db.writer.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)')
-      for (const r of rows) put.run(r.store, r.scope, r.key, r.ord, r.doc)
-      for (const m of metas) db.writer.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?)').run(...m)
-    } finally {
-      db.close()
-    }
-    return file
-  }
-
-  it('every host moves, in order, equal as JSON; the odd ones kept aside; the rows gone and the values kept', () => {
-    const min = (id: string): Rec => ({ id, agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: false })
-    const edges: Rec[] = [{ ...min('e0'), cards: [] }, JSON.parse(`{"id":"e1","agent":"codex","name":"n","createdAt":"${at}","lastActiveAt":"${at}","archived":false,"__proto__":{"x":1}}`) as Rec, { ...min('e2'), $absent: ['name'], $$y: 2 }]
-    const s = (scope: string, key: string, ord: number, v: unknown) => ({ store: 'sessions', scope, key, ord, doc: typeof v === 'string' && key === 'raw' ? v : JSON.stringify(v) })
-    const file = board09(
+describe("the 1.0 step: 0.9's store_rows moved into the tables", () => {
+  it('every entry in its order, the values into board_meta, the old rows gone; other stores left as they were', () => {
+    const lane2 = { ...LANE, id: 'lane-2', state: 'active', endedAt: null, frozen: undefined }
+    const db = board09(
       [
-        s('p1', 's:a', 0, fullSession('a')),
-        s('p1', 's:b', 1, fullSession('b', { cards: undefined })),
-        // The same id twice (a hand edit): the first kept; a row whose JSON is damaged; one without an id.
-        s('p1', 's:#2', 2, fullSession('a', { name: 'second a' })),
-        { store: 'sessions', scope: 'p1', key: 's:x', ord: 3, doc: '{ damaged' },
-        s('p1', 's:#4', 4, { name: 'no id' }),
-        s('p1', 'd:g1', 0, 'g1'),
-        s('p1', 'u:g1', 0, { id: 'g1', provider: 'codex', name: 'g', usage: { inputTokens: 3 } }),
-        s('assistant', 's:as', 0, fullSession('as', { mode: 'coordinator' })),
-        { store: 'deliveries', scope: 'p1', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
-        { store: 'deliveries', scope: 'p1', key: 'm2', ord: 1, doc: JSON.stringify(fullDelivery('m2', 2, { conversation: 'c' })) },
-        { store: 'deliveries', scope: 'p1', key: 'bad', ord: 2, doc: JSON.stringify({ id: 'bad' }) },
-        { store: 'deliveries', scope: 'p1', key: 'm3', ord: 3, doc: JSON.stringify(fullDelivery('m3', 3, { body: 'lone \ud800' })) },
-        { store: 'deliveries', scope: 'p1', key: '#4', ord: 4, doc: JSON.stringify({ noId: true }) },
-        ...edges.map((r, i) => s('edges', `s:e${i}`, i, r)),
-        { store: 'deliveries', scope: 'folder:x', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
-        { store: 'lanes', scope: '', key: 'l1', ord: 0, doc: '{"id":"l1"}' }
+        ['lanes', '', 'lane-2', 0, JSON.stringify(lane2)],
+        ['lanes', '', 'lane-1', 1, JSON.stringify(LANE)],
+        ['watches', '', 'w-1', 0, JSON.stringify(WATCH)],
+        ['metrics', '', 'hour:0', 0, JSON.stringify(bucket(0))],
+        ['metrics', '', 'hour:3600000', 3_600_000, JSON.stringify(bucket(3_600_000))],
+        ['deliveries', 'p-1', 'm1', 0, '{"id":"m1"}']
       ],
       [
-        ['sessions', 'p1', 'imported', '{"rows":7}'],
-        ['deliveries', 'p1', 'next', '3'],
-        ['deliveries', 'p1', 'invalid', '[{"kept":"before"}]']
+        ['metrics', 'observed', '[[0,10]]'],
+        ['metrics', 'imported', '{"rows":2}'],
+        ['watches', 'invalid', '[{"bad":1}]']
       ]
     )
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })
-    try {
-      const w = db.writer
-      expect(readSessionRecords(w, 'p1')).toEqual([json(fullSession('a')), json(fullSession('b', { cards: undefined }))])
-      expect(readDeleted(w, 'p1')).toEqual(['g1'])
-      expect(readDeletedUsage(w, 'p1')).toEqual([{ id: 'g1', provider: 'codex', name: 'g', usage: { inputTokens: 3 } }])
-      expect(readSessionRecords(w, 'assistant')).toEqual([json(fullSession('as', { mode: 'coordinator' }))])
-      expect(meta(w, 'sessions', 'p1', 'setAside')).toEqual([{ name: 'no id' }, json(fullSession('a', { name: 'second a' })), '{ damaged'])
-      expect(readDeliveries(w, 'p1')).toEqual([{ id: 'bad' }, json(fullDelivery('m1', 1)), json(fullDelivery('m2', 2, { conversation: 'c' })), json(fullDelivery('m3', 3, { body: 'lone \ud800' }))])
-      expect(readDeliveries(w, 'folder:x')).toEqual([json(fullDelivery('m1', 1))])
-      expect(meta(w, 'deliveries', 'p1', 'invalid')).toEqual([{ kept: 'before' }, { noId: true }])
-      // JSON's edges, through the step too.
-      expect(readSessionRecords(w, 'edges').map((r) => JSON.stringify(r))).toEqual(edges.map((r) => JSON.stringify(r)))
-      expect(meta(w, 'deliveries', 'p1', 'next')).toBe(3)
-      expect(meta(w, 'sessions', 'p1', 'imported')).toEqual({ rows: 7 })
-      expect(w.prepare("SELECT store, count(*) AS n FROM store_rows GROUP BY store").all()).toEqual([{ store: 'lanes', n: 1 }])
-    } finally {
+    db.exec('BEGIN')
+    moveStores(db)
+    db.exec('COMMIT')
+    expect(readEntries(db, 'lanes').map((e) => canonical(e.doc))).toEqual([canonical(JSON.parse(JSON.stringify(lane2))), canonical(LANE)])
+    expect(readEntries(db, 'watches').map((e) => canonical(e.doc))).toEqual([canonical(WATCH)])
+    expect(readEntries(db, 'metrics').map((e) => canonical(e.doc))).toEqual([canonical(JSON.parse(JSON.stringify(bucket(0)))), canonical(JSON.parse(JSON.stringify(bucket(3_600_000))))])
+    const meta = db.prepare("SELECT key, value FROM board_meta WHERE key LIKE '%.%' ORDER BY key").all()
+    expect(meta.map((r) => ({ ...r }))).toEqual([
+      { key: 'metrics.imported', value: '{"rows":2}' },
+      { key: 'metrics.observed', value: '[[0,10]]' },
+      { key: 'watches.invalid', value: '[{"bad":1}]' }
+    ])
+    expect(db.prepare("SELECT store, key FROM store_rows").all().map((r) => ({ ...r }))).toEqual([{ store: 'deliveries', key: 'm1' }])
+    expect(db.prepare("SELECT count(*) AS n FROM store_meta WHERE store IN ('lanes', 'watches', 'metrics')").get()).toEqual({ n: 0 })
+    db.close()
+  })
+
+  it('an entry no row can hold, or one that is not JSON, is kept aside as it was (watches: with their invalid ones)', () => {
+    const db = board09([
+      ['watches', '', 'w-1', 0, JSON.stringify(WATCH)],
+      // The same agent's second watch (an agent has one).
+      ['watches', '', 'w-2', 1, JSON.stringify({ ...WATCH, id: 'w-2' })],
+      ['metrics', '', 'hour:0', 0, JSON.stringify(bucket(0))],
+      ['metrics', '', 'hour:0#', 0, JSON.stringify({ ...bucket(0), dropped: 9 })],
+      ['lanes', '', 'x', 0, '{ not json']
+    ], [['watches', 'invalid', '[{"bad":1}]']])
+    db.exec('BEGIN')
+    moveStores(db)
+    db.exec('COMMIT')
+    expect(readEntries(db, 'watches').map((e) => e.key)).toEqual(['w-1'])
+    const meta = (k: string): unknown => JSON.parse((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string }).value)
+    expect(meta('watches.invalid')).toEqual([{ bad: 1 }, { ...WATCH, id: 'w-2' }])
+    expect(readEntries(db, 'metrics')).toHaveLength(1)
+    expect((meta('metrics.unmapped') as { dropped: number }[]).map((b) => b.dropped)).toEqual([9])
+    expect(meta('lanes.unmapped')).toEqual(['{ not json'])
+    db.close()
+  })
+
+  it("is the 1.0 group's step after the upgrade's first, and makes #1208's tables", () => {
+    const step = board.BOARD_MIGRATIONS.find((m) => m.name === STORES_STEP.name)!
+    expect(step.group).toBe('1.0')
+    expect(step.version).toBeGreaterThan(board.BOARD_MIGRATIONS.find((m) => m.name === '1.0 upgrade')!.version)
+    const db = board09([])
+    db.exec('BEGIN')
+    moveStores(db)
+    db.exec('COMMIT')
+    const names = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name)
+    for (const t of ['lanes', 'lane_cards', 'lane_frozen', 'watches', 'watch_cards', 'metrics_buckets', 'metrics_series']) expect(names).toContain(t)
+    db.close()
+  })
+})
+
+describe('reads and saves', () => {
+  it('while the tables are not there (a 0.9 file waiting for its upgrade), a store reads its store_rows', async () => {
+    const ws = workspace()
+    const db = board.workspaceDb(ws).writer
+    // As a 0.9 file has them: store_rows' rows, and none of the tables.
+    db.exec('PRAGMA foreign_keys = OFF')
+    for (const t of ['lane_frozen', 'lane_cards', 'lanes']) db.exec(`DROP TABLE ${t}`)
+    // A 1.0 file has no store_rows (#1211's step drops it): made again as 0.9's step 2 makes it.
+    db.exec('CREATE TABLE IF NOT EXISTS store_rows (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, ord INTEGER NOT NULL, doc TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID')
+    db.prepare("INSERT INTO store_rows (store, scope, key, ord, doc) VALUES ('lanes', '', 'lane-1', 0, ?)").run(JSON.stringify(LANE))
+    db.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('lanes', '', 'imported', '{}')").run()
+    const got = tables.readTable(ws, 'lanes')
+    expect([got.docs, got.meta.get('imported')]).toEqual([[LANE], '{}'])
+    board.closeBoard(ws)
+  })
+
+  it('write only the entries that changed, keep the order given, and remove those left out', async () => {
+    const ws = workspace()
+    const lane = (id: string, rounds = 10) => ({ ...LANE, id, rounds })
+    await tables.saveTable(ws, 'lanes', [lane('a'), lane('b'), lane('c')])
+    const db = board.workspaceDb(ws).writer
+    const changes = (): number => (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n
+    let before = changes()
+    await tables.saveTable(ws, 'lanes', [lane('a'), lane('b'), lane('c')])
+    expect(changes() - before).toBe(0)
+    before = changes()
+    await tables.saveTable(ws, 'lanes', [lane('a'), lane('b'), lane('c', 3)])
+    // c: its row out and in again, with its 2 cards and 2 frozen cards each way.
+    expect(changes() - before).toBe(10)
+    await tables.saveTable(ws, 'lanes', [lane('c', 3), lane('a')])
+    expect(tables.readTable(ws, 'lanes').docs.map((l) => (l as { id: string }).id)).toEqual(['c', 'a'])
+    expect(db.prepare('SELECT count(*) AS n FROM lane_cards').get()).toEqual({ n: 4 })
+  })
+
+  it('a watch replacing another of the same agent in one save goes in (the old one leaves first)', async () => {
+    const ws = workspace()
+    await tables.saveTable(ws, 'watches', [WATCH])
+    await tables.saveTable(ws, 'watches', [{ ...WATCH, id: 'w-new' }])
+    expect(tables.readTable(ws, 'watches').docs.map((w) => (w as { id: string }).id)).toEqual(['w-new'])
+  })
+
+  it('are all or nothing: one that fails as it is written leaves the entries and values as they were, and the next save writes it', async () => {
+    const ws = workspace()
+    await tables.saveTable(ws, 'metrics', [bucket(0)], { observed: '[1]' })
+    tables.tableTestHooks.failSave = (store) => store === 'metrics'
+    await expect(tables.saveTable(ws, 'metrics', [bucket(0), bucket(3_600_000)], { observed: '[2]' })).rejects.toThrow(/SQLITE_FULL/)
+    const kept = tables.readTable(ws, 'metrics')
+    expect([kept.docs.length, kept.meta.get('observed')]).toEqual([1, '[1]'])
+    tables.tableTestHooks.failSave = null
+    await tables.saveTable(ws, 'metrics', [bucket(0), bucket(3_600_000)], { observed: '[2]' })
+    expect(tables.readTable(ws, 'metrics').docs).toHaveLength(2)
+  })
+
+  it('a guard that throws stops the save before anything is written; never inside a change of the board', async () => {
+    const ws = workspace()
+    await expect(
+      tables.saveTable(ws, 'lanes', [LANE], {}, () => {
+        throw new Error('The workspace was closed')
+      })
+    ).rejects.toThrow(/closed/)
+    expect(tables.readTable(ws, 'lanes').docs).toEqual([])
+    await expect(board.boardWrite({ path: ws } as never, () => tables.saveTable(ws, 'lanes', []))).rejects.toThrow(/inside a change of the board/)
+  })
+
+  it('a second bucket of one hour is kept aside, never written over the first', async () => {
+    const ws = workspace()
+    await tables.saveTable(ws, 'metrics', [bucket(0), { ...bucket(0), dropped: 9 }])
+    const got = tables.readTable(ws, 'metrics')
+    expect((got.docs as { dropped: number }[]).map((b) => b.dropped)).toEqual([2])
+    expect((JSON.parse(got.meta.get('unmapped')!) as { dropped: number }[]).map((b) => b.dropped)).toEqual([9])
+  })
+})
+
+describe("a field named $doc is just a field (round 1, finding 1)", () => {
+  // Each store's entry with a field called $doc (null, text, an object), in columns and kept whole.
+  const odd = (v: unknown): [TableStore, unknown][] => [
+    ['lanes', { ...LANE, $doc: v }],
+    ['lanes', { ...LANE, state: 'running', $doc: v }],
+    ['watches', { ...WATCH, $doc: v }],
+    // Another agent's (an agent has one watch).
+    ['watches', { ...WATCH, id: 'w-2', agentId: 'a-r6', waitSeq: 'four', $doc: v }],
+    ['metrics', { ...JSON.parse(JSON.stringify(bucket(0))), $doc: v }],
+    ['metrics', { ...JSON.parse(JSON.stringify(bucket(3_600_000))), span: 'week', $doc: v }]
+  ]
+  const VALUES = [null, 'text', { later: 'field' }]
+
+  it('reads back as it was, through the reader a read uses', () => {
+    for (const v of VALUES)
+      for (const [store, doc] of odd(v)) {
+        const r = roundTrip(store, doc)
+        expect({ store, v, back: canonical(r.back) }).toEqual({ store, v, back: canonical(doc) })
+      }
+  })
+
+  it('is moved in by the 1.0 step as it was', () => {
+    for (const v of VALUES) {
+      const entries = odd(v)
+      const db = board09(entries.map(([store, doc], i) => [store, '', `k${i}`, i, JSON.stringify(doc)]))
+      db.exec('BEGIN')
+      moveStores(db)
+      db.exec('COMMIT')
+      for (const store of TABLE_STORES) {
+        const want = entries.filter(([s]) => s === store).map(([, d]) => canonical(d))
+        // Metrics read back by their start: the same two buckets.
+        const got = readEntries(db, store).map((e) => canonical(e.doc))
+        expect({ store, v, got: store === 'metrics' ? got.sort() : got }).toEqual({ store, v, got: store === 'metrics' ? [...want].sort() : want })
+      }
       db.close()
     }
   })
 
-  it('a new file takes the step with nothing to move', () => {
-    const file = join(base, `b-${++n}`, 'hive.db')
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0' })
-    try {
-      expect(schemaVersion(db.writer)).toBe(Math.max(...BOARD_MIGRATIONS.map((m) => m.version)))
-      expect(readSessionRecords(db.writer, 'p1')).toEqual([])
-    } finally {
-      db.close()
+  it('is saved and read back as it was, after the database is closed and opened again', async () => {
+    for (const v of VALUES) {
+      const ws = workspace()
+      const entries = odd(v)
+      for (const store of TABLE_STORES) await tables.saveTable(ws, store, entries.filter(([s]) => s === store).map(([, d]) => d))
+      board.closeBoard(ws)
+      for (const store of TABLE_STORES) {
+        const want = entries.filter(([s]) => s === store).map(([, d]) => canonical(d))
+        const got = tables.readTable(ws, store).docs.map((d) => canonical(d))
+        expect({ store, v, got: store === 'metrics' ? got.sort() : got }).toEqual({ store, v, got: store === 'metrics' ? [...want].sort() : want })
+      }
+      board.closeBoard(ws)
     }
   })
+})
 
-  const live = process.env.HIVE_STORE_ROUNDTRIP_DB
-  it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
-    const copy = join(tempDir('hive-store-roundtrip-'), 'hive.db')
+describe("what saves keep of committed entries is bounded (round 1, finding 2)", () => {
+  it("a closed workspace's last save keeps nothing; one closed since goes at the next save; an open one keeps its own", async () => {
+    const a = workspace()
+    const b = workspace()
+    // Open, as a workspace's are while its window has it.
+    board.workspaceDb(a)
+    board.workspaceDb(b)
+    await tables.saveTable(a, 'lanes', [LANE])
+    expect(tables.committedFor()).toContain(a)
+    // Closed, its stores' last saves open the database for the save and close it again: nothing kept.
+    board.closeBoard(a)
+    await tables.saveTable(a, 'lanes', [{ ...LANE, rounds: 3 }])
+    expect(tables.committedFor()).not.toContain(a)
+    // Kept while open, gone at the next save (anyone's) once closed.
+    board.workspaceDb(a)
+    await tables.saveTable(a, 'watches', [WATCH])
+    expect(tables.committedFor()).toContain(a)
+    board.closeBoard(a)
+    await tables.saveTable(b, 'lanes', [LANE])
+    expect(tables.committedFor()).not.toContain(a)
+    expect(tables.committedFor()).toContain(b)
+    // Still saving only what changed for the open one.
+    const db = board.workspaceDb(b).writer
+    const before = (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n
+    await tables.saveTable(b, 'lanes', [LANE])
+    expect((db.prepare('SELECT total_changes() AS n').get() as { n: number }).n - before).toBe(0)
+  })
+
+  it('at most MAX_COMMITTED stores are kept however many workspaces stay open, the least recently saved going first', async () => {
+    const open: string[] = []
+    for (let i = 0; i < tables.MAX_COMMITTED / 3 + 4; i++) {
+      const ws = workspace()
+      open.push(ws)
+      board.workspaceDb(ws)
+      for (const store of TABLE_STORES) await tables.saveTable(ws, store, [])
+    }
+    expect(tables.committedFor().length).toBeLessThanOrEqual(tables.MAX_COMMITTED / 3)
+    expect(tables.committedFor()).toContain(open[open.length - 1])
+    expect(tables.committedFor()).not.toContain(open[0])
+    for (const ws of open) board.closeBoard(ws)
+  })
+})
+
+describe("0.8's lanes.json moved in (from #1018's tests)", () => {
+  it('once, in order; the file kept as a backup, as it was; not read again', async () => {
+    const ws = workspace()
+    const file = join(ws, '.hive', 'lanes.json')
+    const list = [{ ...LANE, id: 'b' }, { ...LANE, id: 'a' }]
+    const text = JSON.stringify({ version: 1, lanes: list })
+    writeFileSync(file, text)
+    let reads = 0
+    const read = () => (reads++, lanes.readLanesFile(file))
+    const got = await tables.openTable(ws, 'lanes', file, read)
+    expect(got.docs).toEqual(list)
+    expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: 2, file })
+    const backup = files(ws).find((f) => f.startsWith('lanes.json.imported-'))!
+    expect(readFileSync(join(ws, '.hive', backup), 'utf8')).toBe(text)
+    await tables.openTable(ws, 'lanes', file, read)
+    expect(reads).toBe(1)
+  })
+
+  it("a file that can't be read now is not marked moved: it stays, and the next open moves it in", async () => {
+    const ws = workspace()
+    const file = join(ws, '.hive', 'lanes.json')
+    // A folder where the file is: reading it fails as a file Windows holds open would (not "there is none").
+    mkdirSync(file)
+    await expect(tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))).rejects.toThrow(/Could not read the lanes/)
+    expect(tables.readTable(ws, 'lanes').meta.has('imported')).toBe(false)
+    rmSync(file, { recursive: true })
+    writeFileSync(file, JSON.stringify({ version: 1, lanes: [{ id: 'lane-a', state: 'running' }] }))
+    const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
+    // An entry its columns can't hold is kept whole: moved in as it was.
+    expect(got.docs).toEqual([{ id: 'lane-a', state: 'running' }])
+  })
+
+  it('a damaged lanes file is set aside, kept as it was, and none are moved in', async () => {
+    const ws = workspace()
+    const file = join(ws, '.hive', 'lanes.json')
+    writeFileSync(file, '{ not json')
+    const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
+    expect(got.docs).toEqual([])
+    const aside = files(ws).find((f) => f.startsWith('lanes.json.damaged-'))!
+    expect(readFileSync(join(ws, '.hive', aside), 'utf8')).toBe('{ not json')
+  })
+
+  it("every entry moved in has a row of its own, whatever ids the file gives (one another's fallback, the same twice, none)", async () => {
+    const ws = workspace()
+    const file = join(ws, '.hive', 'lanes.json')
+    const list = [{ id: '#1', n: 0 }, { n: 1 }, { id: 'a', n: 2 }, { id: 'a', n: 3 }, { id: '#1', n: 4 }, { id: '#3', n: 5 }]
+    writeFileSync(file, JSON.stringify({ version: 1, lanes: list }))
+    const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
+    expect(got.docs).toEqual(list)
+    expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: list.length })
+  })
+})
+
+const live = process.env.HIVE_STORE_MIGRATION_DB
+describe.skipIf(!live)("a copy of a live board's hive.db (HIVE_STORE_MIGRATION_DB)", () => {
+  it('migrates with every lane, watch and metric equal as JSON, in order, and their values kept', () => {
+    const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const db = new DatabaseSync(copy)
-    try {
-      const before = (store: string): Map<string, unknown[]> => {
-        const out = new Map<string, unknown[]>()
-        for (const r of db.prepare('SELECT scope, key, doc FROM store_rows WHERE store = ? ORDER BY scope, ord, key').all(store) as { scope: string; key: string; doc: string }[]) {
-          if (store === 'sessions' && !r.key.startsWith('s:')) continue
-          out.set(r.scope, [...(out.get(r.scope) ?? []), JSON.parse(r.doc)])
-        }
-        return out
-      }
-      const sessions = before('sessions')
-      const deliveries = before('deliveries')
-      const t0 = performance.now()
-      db.exec('BEGIN')
-      const counts = moveStoreRows(db)
-      db.exec('COMMIT')
-      const ms = Math.round(performance.now() - t0)
-      const total = (m: Map<string, unknown[]>): number => [...m.values()].reduce((a, l) => a + l.length, 0)
-      console.log(`moved ${counts.sessions} of ${total(sessions)} sessions and ${counts.deliveries} of ${total(deliveries)} deliveries in ${ms} ms`)
-      for (const [host, list] of sessions) expect(readSessionRecords(db, host)).toEqual(list)
-      for (const [host, list] of deliveries) expect(readDeliveries(db, host)).toEqual([...list].sort((a, b) => (a as Rec).seq as number - ((b as Rec).seq as number)))
-      expect(counts).toEqual({ sessions: total(sessions), deliveries: total(deliveries) })
-    } finally {
-      db.close()
+    db.exec('PRAGMA foreign_keys = ON')
+    const old = Object.fromEntries(TABLE_STORES.map((s) => [s, (db.prepare("SELECT doc FROM store_rows WHERE store = ? AND scope = '' ORDER BY ord, key").all(s) as { doc: string }[]).map((r) => canonical(JSON.parse(r.doc)))]))
+    const oldMeta = (db.prepare("SELECT store, key, value FROM store_meta WHERE store IN ('lanes', 'watches', 'metrics') ORDER BY store, key").all() as { store: string; key: string; value: string }[]).map((r) => [`${r.store}.${r.key}`, r.value])
+    db.exec('BEGIN')
+    moveStores(db)
+    db.exec('COMMIT')
+    for (const s of TABLE_STORES) {
+      const now = readEntries(db, s).map((e) => canonical(e.doc))
+      expect({ store: s, count: now.length }).toEqual({ store: s, count: old[s].length })
+      expect(now).toEqual(old[s])
     }
+    for (const [k, v] of oldMeta) expect((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string }).value).toBe(v)
+    // Kept whole only where columns couldn't hold one exactly: say how many, for the record.
+    const whole = TABLE_STORES.map((s) => `${s}: ${(db.prepare(`SELECT count(*) AS n FROM ${TABLE_DEFS[s].main} WHERE extra LIKE '[%'`).get() as { n: number }).n} kept whole of ${old[s].length}`)
+    console.log(`live copy: ${whole.join('; ')}`)
+    db.close()
   })
 })

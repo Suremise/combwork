@@ -23,7 +23,7 @@ vi.mock('../src/main/fsutil', async (orig) => {
 })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
-const { readStore, storeTestHooks } = await import('../src/main/storeRows')
+const { storeValue, storeTestHooks } = await import('../src/main/storeRows')
 const { sessions } = await import('../src/main/sessions')
 const removal = await import('../src/main/projectRemoval')
 const { workspaceDb } = await import('../src/main/boardStore')
@@ -71,7 +71,7 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     expect(ids('SELECT id FROM sessions WHERE host = ? ORDER BY ord')).toEqual(['s1', 's2', 's3'])
     expect(ids('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord')).toEqual(['gone1', 'gone2'])
     expect(ids('SELECT id FROM sessions_deleted_usage WHERE host = ? ORDER BY ord')).toEqual(['gone1', 'gone2'])
-    expect(JSON.parse(readStore(wsPath, 'sessions', idOf(p)).meta.get('imported')!)).toMatchObject({ rows: 3 })
+    expect(JSON.parse(storeValue(workspaceDb(wsPath).reader, 'sessions', idOf(p), 'imported')!)).toMatchObject({ rows: 3 })
     // Opening the workspace made no new file in its place.
     expect(existsSync(join(wsPath, 'eps', '.hive', 'sessions.json'))).toBe(false)
   })
@@ -83,7 +83,7 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     await expect(run(() => workspace.sessionsFile(p))).rejects.toThrow()
-    expect(readStore(wsPath, 'sessions', idOf(p)).meta.has('imported')).toBe(false)
+    expect(storeValue(workspaceDb(wsPath).reader, 'sessions', idOf(p), 'imported')).toBeNull()
     renameSync(join(p, '.hive', 'sessions.json'), join(p, '.hive', 'held'))
     writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('late')] }))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((s) => s.id)).toEqual(['late'])

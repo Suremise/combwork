@@ -35,7 +35,7 @@ import { onHiveEvent } from './events'
 import { readCapped, readJson, renameRetrying } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
-import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, writeDeliveries } from './schema/storeTables'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, writeDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -1500,11 +1500,15 @@ export async function loadsForTests(): Promise<void> {
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
 export async function savedForTests(host: string): Promise<{ next: number | undefined; deliveries: DeliveryRecord[]; invalid?: unknown[] }> {
   const place = await hostPlace(host)
-  const { rows, meta } = readStore(place.workspace, 'deliveries', place.scope)
-  const invalid = meta.get('invalid')
-  // In their table since 1.0 (#1211); 0.9's rows while the workspace's upgrade waits.
-  const deliveries = upgradeWaiting(place.workspace) ? rows.map((r) => JSON.parse(r.doc) as DeliveryRecord) : (readDeliveryRows(workspaceDb(place.workspace).reader, place.scope) as unknown as DeliveryRecord[])
-  return { next: meta.has('next') ? (JSON.parse(meta.get('next')!) as number) : undefined, deliveries, ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }
+  // In their table since 1.0 (#1211, store_rows gone); 0.9's rows while the workspace's upgrade waits.
+  const waiting = upgradeWaiting(place.workspace)
+  const old = waiting ? readStore(place.workspace, 'deliveries', place.scope) : null
+  const db = workspaceDb(place.workspace).reader
+  const value = (key: string): string | null => (old ? (old.meta.get(key) ?? null) : storeValue(db, 'deliveries', place.scope, key))
+  const deliveries = old ? old.rows.map((r) => JSON.parse(r.doc) as DeliveryRecord) : (readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[])
+  const next = value('next')
+  const invalid = value('invalid')
+  return { next: next !== null ? (JSON.parse(next) as number) : undefined, deliveries, ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }
 }
 
 export async function forgetDeliveriesForTests(): Promise<void> {

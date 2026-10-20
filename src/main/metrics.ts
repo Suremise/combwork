@@ -3,7 +3,8 @@ import { join, resolve } from 'path'
 import { createHash } from 'crypto'
 import { config } from './config'
 import { createLogger, userText } from './logger'
-import { keepAsBackup, readStore, saveStore } from './storeRows'
+import { keepAsBackup } from './storeBackup'
+import { readTable, saveTable } from './storeTables'
 import { dbGeneration, onDbReplaced } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
@@ -37,7 +38,7 @@ import {
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
  * map updates into the current hour's bucket; nothing is read from disk on the request path. Buckets are hourly for 7
  * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.hive/hive.db`,
- * a row a bucket through storeRows.ts, so a save writes the buckets that changed, the hour under way, and appends a new
+ * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
  * one; `.hive/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file
  * has a size cap: what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
@@ -434,10 +435,10 @@ class Store {
    */
   private load(): void {
     try {
-      const saved = readStore(this.workspace, 'metrics')
+      const saved = readTable(this.workspace, 'metrics')
       if (saved.meta.has('imported')) {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
-        this.fromSaved({ buckets: saved.rows.map((r) => JSON.parse(r.doc) as unknown), observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
+        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
           log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
           keepAsBackup(this.file)
@@ -585,20 +586,14 @@ class Store {
         else this.observed.shift()
         text = json()
       }
-      // A row a bucket, placed by its start: one leaving the front moves no other (#1019).
-      const keys = new Set<string>()
-      const rows = this.buckets.map((b) => {
-        let key = `${b.span}:${b.start}`
-        while (keys.has(key)) key += '#'
-        keys.add(key)
-        return { key, ord: b.start, doc: JSON.stringify(b) }
-      })
+      // A row a bucket, by its span and start: one leaving the front moves no other (#1019, #1212).
+      const rows = this.buckets
       const importing = this.importing
       const gen = this.gen
       const replaced = (): void => {
         if (gen !== dbGeneration(this.workspace)) throw new Error("the workspace's database was replaced since these metrics were read: not saved over it") // i18n-ignore: logged
       }
-      await saveStore(this.workspace, 'metrics', '', rows, {
+      await saveTable(this.workspace, 'metrics', rows, {
         observed: JSON.stringify(this.observed),
         evictedThrough: this.evictedThrough ? String(this.evictedThrough) : null,
         renamesApplied: this.renamesApplied ? String(this.renamesApplied) : null,
