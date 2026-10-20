@@ -6,7 +6,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -23,6 +23,7 @@ const { reconcile } = await import('../src/main/workflow/reconcile')
 const { Workflow } = await import('../src/main/workflow/runtime')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
+const G = await import('../src/main/platform/git')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -257,5 +258,53 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     opened.push(again)
     await reconcileNow(again, repo)
     expect(FactStore.forBoard(again, { project: 'p', key: 'p' }).facts(card).find((f) => f.kind === 'LeftTarget')).toMatchObject({ data: { revision: head, target: 'main' } })
+  })
+})
+
+// HR4's #1217 round 2: a Done target's checkpoint moves only past cards reconciled to the end, and a target deleted
+// (and restored) is recorded.
+describe('reconciliation in the app, round 3 (#1217)', () => {
+  it("a Done card whose check couldn't be read is checked again at the next run, with no event: LeftTarget then", async () => {
+    const { w, repo, wt } = await workspace()
+    const { card, head } = await passedCard(w, wt)
+    const before = git(repo, 'rev-parse', 'main')
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await reconcileNow(w, repo)
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+    await reconcileNow(w, repo)
+    git(repo, 'reset', '-q', '--hard', before)
+    // This run can't tell whether the change is still in main (git unreadable for that one read).
+    const unreadable = vi.spyOn(G, 'contains').mockResolvedValueOnce({ unknown: true, what: 'the target (test)' })
+    try {
+      await reconcileNow(w, repo, ['main'])
+    } finally {
+      unreadable.mockRestore()
+    }
+    expect(kinds(w, card)).not.toContain('LeftTarget')
+    // The next run, no event, git readable again: the Done card is checked again, and marked.
+    await reconcileNow(w, repo)
+    expect(factsOf(w, card).find((f) => f.kind === 'LeftTarget')).toMatchObject({ data: { revision: head, target: 'main' } })
+  })
+
+  it('a target deleted is recorded (X→null), and its return (null→Y); a run with nothing new adds nothing', async () => {
+    const { w, repo, wt } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Target gone', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    await reconcileNow(w, repo)
+    const x = git(repo, 'rev-parse', 'main')
+    // The project folder off main, and main deleted; the card's own branch stays.
+    git(repo, 'checkout', '-q', '--detach')
+    git(repo, 'branch', '-q', '-D', 'main')
+    await reconcileNow(w, repo, ['main'])
+    await reconcileNow(w, repo, ['main'])
+    git(repo, 'branch', '-q', 'main', x)
+    await reconcileNow(w, repo, ['main'])
+    const moves = factsOf(w, card).filter((f) => f.kind === 'TargetMoved').map((f) => f.data)
+    expect(moves).toEqual([
+      { target: 'main', from: null, to: x },
+      { target: 'main', from: x, to: null },
+      { target: 'main', from: null, to: x }
+    ])
+    expect(git(wt, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('card')
   })
 })

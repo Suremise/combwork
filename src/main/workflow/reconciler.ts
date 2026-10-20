@@ -175,27 +175,38 @@ async function reconcileProject(f: Followed): Promise<void> {
   if (f.platform === 'git') {
     for (const t of new Set(cards.flatMap(({ card, s }) => (card.stage === 'done' && s.started?.target ? [s.started.target] : [])))) {
       const th = await G.lineHead(f.path, t)
-      if (isUnknown(th) || !th) continue
-      if (wf.store.meta(`target:${t}`) !== th) moved.add(t)
-      checked.set(t, th)
+      // Unreadable: neither checked nor moved on (its Done cards are looked at once it reads again). A target that
+      // doesn't exist is a head of its own ('': deleted), so a deletion is a move too.
+      if (isUnknown(th)) continue
+      const head = th ?? ''
+      if (wf.store.meta(`target:${t}`) !== head) moved.add(t)
+      checked.set(t, head)
     }
   }
+  // Targets whose Done cards weren't all reconciled this run (a read unknown, a failure): their checkpoint stays.
+  const unsettled = new Set<string>()
   for (const { card, s } of cards) {
     if (!f.alive()) return
     if (!s.started) continue
     const target = s.started.target
     const wanted = UNFINISHED.includes(card.stage) || asked.includes(card.id) || (card.stage === 'done' && !!target && moved.has(target))
     if (!wanted) continue
+    const settle = (): void => {
+      if (card.stage === 'done' && target) unsettled.add(target)
+    }
     try {
-      await reconcile(wf, card)
+      await reconcile(wf, card, { unknown: settle })
     } catch (e) {
+      settle()
       if (!f.alive()) return
       log.warn(`reconciling #${card.id}`, e)
     }
   }
-  // What the Done cards were checked against, for the next run.
+  // What the Done cards were checked against, for the next run: only for a target all of whose Done cards were
+  // reconciled to the end against it (HR4's #1217 round 2), so one undecided is looked at again next time.
   for (const [t, th] of checked) {
     if (!f.alive()) return
+    if (unsettled.has(t)) continue
     if (wf.store.meta(`target:${t}`) !== th) await wf.locked(() => wf.store.setMeta(`target:${t}`, th))
   }
 }

@@ -386,11 +386,14 @@ revision), so two Hives write each once, and a writer that lost the race reads a
 write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
 never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the
 folder's cards changed since it read them. `TargetMoved` records the card's target from the last head recorded this
-cycle to the head now, read again under the lock from the ref files. `Gone` is recorded for a line, the card's own
+cycle to the head now, read again under the lock from the ref files; a target that doesn't exist (git says so) is
+recorded as null, so its deletion and its return are moves too, and an unreadable one records nothing. `Gone` is recorded for a line, the card's own
 folder and the repository, only for what doesn't exist (`presence`: ENOENT; anything else is unknown). Done cards are
 reconciled when their target moved: an event's line, or a target whose head isn't the one stored as last checked
-(`board_meta` `workflow:<project>:target:<line>`), so a reset while Hive was closed is found at the next open or focus,
-with one read per target. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
+(`board_meta` `workflow:<project>:target:<line>`; '' for a deleted target), so a reset while Hive was closed is found at
+the next open or focus, with one read per target. The checkpoint moves only once all of that target's Done cards were
+reconciled to the end (`ReconcileHooks.unknown` tells of a read that couldn't be made, and a failure counts too): one
+left undecided is looked at again at the next run. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
 Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
 (`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
 watch goes as the workspace closes.

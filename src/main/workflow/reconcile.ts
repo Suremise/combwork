@@ -20,6 +20,11 @@ import type { Workflow, Write } from './runtime'
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
   afterRead?: () => void | Promise<void>
+  /**
+   * Told when a read this reconciliation needed couldn't be made (unknown): what it would have recorded is undecided, so
+   * a caller keeping a checkpoint (the app's Done targets) doesn't move it past this card (HR4's #1217 round 2).
+   */
+  unknown?: (what: string) => void
 }
 
 const UNFINISHED = ['active', 'review', 'approved', 'merging']
@@ -149,7 +154,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone') {
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } }))
   }
-  await observeTarget(wf, card, s)
+  await observeTarget(wf, card, s, hooks)
 
   if (!wf.ownLine(s)) {
     // A shared folder: attribution; its commits are working revisions, never an integration (§16.4.4).
@@ -229,11 +234,13 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // without moving the card (§16.8.4). Its change: the submitted endpoints, else its line's head from its base.
     // (A Done card's head isn't observed any more, so an unsubmitted one is read from its line now, if it still exists.)
     const lineNow = s.latest?.revision ? null : await G.lineHead(project, s.started!.line!)
+    if (isUnknown(lineNow)) hooks.unknown?.(lineNow.what)
     const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
     const from = s.latest?.base ?? base
     if (!revision || !from || revision === from) return
     const c = await G.contains(project, target, { base: from, revision, key: s.latest?.key })
-    if (isUnknown(c) || !c) return
+    if (isUnknown(c)) return hooks.unknown?.(c.what)
+    if (!c) return
     const th = await G.lineHead(project, target)
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
     return
@@ -243,11 +250,14 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // A Done card's revision no longer in the target (the target was reset): a warning mark; it stays Done.
     const i = s.integrated
     const th = await G.lineHead(project, i.target)
-    if (isUnknown(th) || !th) return
+    if (isUnknown(th)) return hooks.unknown?.(th.what)
+    if (!th) return
     const sub = s.latest
     const c = await G.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key })
     const resultIn = await G.isAncestor(project, i.result, th)
-    if (!isUnknown(c) && !c && resultIn === false && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (isUnknown(c)) return hooks.unknown?.(c.what)
+    if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
+    if (!c && resultIn === false && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
   }
 }
 
@@ -316,18 +326,24 @@ function presence(path: string): 'there' | 'gone' | 'unknown' {
  * newest recorded head to the head now. Keyed by the fact it follows: two Hives write each move once; a run that finds
  * no move writes nothing, and one after a time closed records what changed meanwhile.
  */
-async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState): Promise<void> {
+async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hooks: ReconcileHooks): Promise<void> {
   const target = s0.started?.target
   if (!target) return
   const common = await G.commonDir(wf.cfg.project)
-  if (isUnknown(common)) return
+  if (isUnknown(common)) return hooks.unknown?.(common.what)
+  // Read by git first: an unreadable target is unknown (nothing recorded), where a target that doesn't exist is a value
+  // of its own, null (HR4's round 2: a deleted target is recorded, X→null, and its return, null→Y).
+  const seen = await G.lineHead(wf.cfg.project, target)
+  if (isUnknown(seen)) return hooks.unknown?.(seen.what)
   await wf.locked(() =>
     wf.store.tx((tx) => {
       const facts = tx.facts(card.id)
       const s = foldCard(facts)
       if (s.cycle !== s0.cycle) return
+      // As it is now, under the lock, from the ref files (null: the ref isn't there). Null where git read it just before:
+      // gone meanwhile, or a file this read couldn't open; the next run reads again rather than record a deletion.
       const to = G.refSync(common, `refs/heads/${target}`)
-      if (!to) return
+      if (to === null && seen !== null) return
       const last = facts.filter((f) => f.kind === 'TargetMoved' && f.seq > s.cycle && (f.data as FactData['TargetMoved']).target === target).at(-1)
       const from = last ? (last.data as FactData['TargetMoved']).to : null
       if (from === to) return
