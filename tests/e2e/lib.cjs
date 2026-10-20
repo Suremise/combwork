@@ -568,10 +568,15 @@ _electron.launch = async (...args) => {
     // The suite's empty one is made here (Codex refuses a CODEX_HOME that doesn't exist).
     fs.mkdirSync(env[k], { recursive: true })
   }
+  const packaged = testExecutable(args[0].executablePath ?? ELECTRON) === 'packaged'
   // Its profile on its command line (#614), which Hive ignores: the runner stops what names a suite's folder once the
   // suite ends, and a test Hive's own line names only the checkout, so a suite killed before closing its Hive (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
   if (env.HIVE_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.HIVE_USER_DATA}`] }
+  if (packaged) {
+    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS] }
+    unmaximized(env.HIVE_USER_DATA)
+  }
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
   // V8 interrupt, in the middle of whatever main was doing. A function that calls into Hive (a window event, a setting)
@@ -591,7 +596,123 @@ _electron.launch = async (...args) => {
     )
   apps.add(app)
   app.on('close', () => apps.delete(app))
+  if (packaged) {
+    const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
+    if (!Array.isArray(shown) || shown.length) {
+      await app.close().catch(() => undefined)
+      throw new Error(`A packaged test Hive (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
+    }
+  }
   return app
+}
+
+/** The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app ID). */
+const INSTALLED = [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive'), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Hive')]
+/** A folder's path as compared: real (a junction resolved), lower case, no trailing separator. */
+const comparable = (p) => {
+  let real = path.resolve(p)
+  try {
+    real = fs.realpathSync.native(real)
+  } catch {
+    // Not there (yet): its path as given.
+  }
+  return real.replace(/[\\/]+$/, '').toLowerCase()
+}
+const inside = (file, dir) => {
+  const [f, d] = [comparable(file), comparable(dir)]
+  return f === d || f.startsWith(d + path.sep)
+}
+
+/**
+ * Which Hive a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Hive.exe: this checkout's
+ * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
+ * HIVE_E2E_HIVE09 or HIVE_EXE name). Never the installed Hive, nor one from anywhere else (#1253): it would open the user's
+ * app on their screen. Throws for those.
+ */
+function testExecutable(exe) {
+  if (comparable(exe) === comparable(ELECTRON)) return 'dev'
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Hive (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (HIVE_E2E_HIVE09) (#1253)`)
+  const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
+  const allowed = [ROOT, TEST_ROOT, main && path.join(main, 'dist', 'win-unpacked'), process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
+  if (!allowed.some((d) => inside(exe, d))) throw new Error(`A test starts Hive from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
+  return 'packaged'
+}
+
+/**
+ * What a packaged test Hive starts with (#1253): --hidden (Hive makes its windows but never shows them, as when started at
+ * sign-in: 0.9 too), so nothing is on screen before keepPackagedQuiet reaches it; and Chromium's occlusion tracking off,
+ * so its windows, once shown off screen, still draw (main does that itself for a quiet copy).
+ */
+const PACKAGED_ARGS = ['--hidden', '--disable-features=CalculateNativeWinOcclusion']
+
+/**
+ * A profile saved with its window maximised: Hive would maximise it as it starts, and maximising shows a hidden window.
+ * A packaged test Hive's profile is set not to (#1253). Kept files' copies (.bak) are left: config.json is read first.
+ */
+function unmaximized(profile) {
+  const file = profile && path.join(profile, 'config.json')
+  if (!file || !fs.existsSync(file)) return
+  try {
+    const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!cfg.window?.maximized) return
+    cfg.window.maximized = false
+    fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
+  } catch {
+    // Unreadable: Hive starts with its defaults.
+  }
+}
+
+/**
+ * Run in a packaged test Hive's main process as soon as Playwright reaches it (#1253), making it quiet from outside, as
+ * a dev test copy is from inside (testQuiet): a released build can't be changed, and isn't quiet. Its windows go off
+ * screen (kept there however they're moved), unfocusable and off the taskbar, then are shown without taking the focus
+ * (they draw, for screenshots); a window shown, focused, maximised, raised or flashed later stays off screen; Windows
+ * notifications aren't shown, and its message boxes answer as cancelled. Returns the titles of the windows already shown
+ * when it was reached: none, or the launch fails.
+ */
+function keepPackagedQuiet(electron) {
+  const { app, BrowserWindow, Notification, dialog } = electron
+  const shown = BrowserWindow.getAllWindows().filter((w) => w.isVisible()).map((w) => w.getTitle() || 'untitled')
+  // Electron's screen only once a window is made: Playwright can reach main before the app is ready, when screen isn't
+  // usable yet (it threw inside 0.9's window's constructor, and no window was made).
+  const displays = () => electron.screen.getAllDisplays().map((d) => d.bounds)
+  const onScreen = (b) => displays().some((d) => b.x < d.x + d.width && b.x + b.width > d.x && b.y < d.y + d.height && b.y + b.height > d.y)
+  const proto = BrowserWindow.prototype
+  const showInactive = proto.showInactive
+  const quiet = (win) => {
+    if (win.isDestroyed() || win.hiveTestQuiet) return
+    win.hiveTestQuiet = true
+    const away = () => {
+      if (win.isDestroyed()) return
+      const b = win.getBounds()
+      if (onScreen(b)) win.setPosition(Math.min(...displays().map((d) => d.x)) - b.width - 8000, Math.min(...displays().map((d) => d.y)))
+    }
+    away()
+    win.setFocusable(false)
+    win.setSkipTaskbar(true)
+    win.on('move', away)
+    win.on('resize', away)
+  }
+  proto.show = proto.showInactive = function () {
+    quiet(this)
+    showInactive.call(this)
+  }
+  for (const m of ['focus', 'maximize', 'moveTop', 'flashFrame', 'setAlwaysOnTop']) proto[m] = () => undefined
+  Notification.prototype.show = () => undefined
+  const answer = (a, b) => (b ?? a)?.cancelId ?? 0
+  dialog.showMessageBox = async (a, b) => ({ response: answer(a, b), checkboxChecked: false })
+  dialog.showMessageBoxSync = answer
+  dialog.showErrorBox = () => undefined
+  // One made later, hidden too (--hidden), is shown once it has drawn, as Hive shows its own.
+  app.on('browser-window-created', (_e, win) => {
+    quiet(win)
+    win.once('ready-to-show', () => win.isDestroyed() || showInactive.call(win))
+  })
+  for (const win of BrowserWindow.getAllWindows()) {
+    quiet(win)
+    showInactive.call(win)
+  }
+  return shown
 }
 
 /**
@@ -1105,4 +1226,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { unkey, KEYED, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
