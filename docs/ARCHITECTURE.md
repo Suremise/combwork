@@ -256,7 +256,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 
 | Layer | Shared (pure, unit-tested) | Main |
 |---|---|---|
-| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `gitIndex.ts` (the index read with no process), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
+| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
@@ -275,14 +275,17 @@ tracked file's and folder's size and time (the builder's own paths in a shared f
 the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
 so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
 platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
-intent is refused `evidence.changed`, "try again". **Content, not cached stat data** (#1206, `gitIndex.ts`): the index
-is fingerprinted by its entries (mode, object id, stage, path; a shared folder's, the builder's own paths), and each
-covered tracked file by its content: its index entry's object id while its stat shows it (size and time match, not
-racy), else the object id `prime` had git hash (`hash-object --stdin-paths`, git's own filters), else hashed in the
-fingerprint itself as git stores a blob (with `core.autocrlf`, its CRLF form with LF too). So an outside `git status`
-rewriting the index to refresh its stat data, an editor's git integration, or a file only touched changes nothing,
-while a staged change, an edit, a checkout or an operation under way still refuses. An index it can't read (a split
-index) falls back to the file's stat, the safe side. **The practical guarantee:** git, the files and SQLite can't be
+intent is refused `evidence.changed`, "try again". **Cached stat data alone never refuses** (#1206): the fingerprint stays cheap (sizes and times, no process), and
+`evidenceOf` also takes the platform's own answer by content (`content()`; Git: the same refs, HEAD and operations,
+`ls-files --stage`'s entries, and `hash-object` of each covered file `diff-files` lists whose content isn't its
+entry's, so git applies each path's attributes, filters and line endings, and reads every index version and extension
+itself). Just before the transaction (`revalidate`), if the fingerprint moved, the content answer is asked again
+outside it: the same answer, with the fingerprint steady across the asking and the cards waited for unchanged, means
+only stat data moved (an outside `git status` refreshing the index, an editor's git integration, a file touched), and
+the transaction checks against the fingerprint now. Anything else (an edit, a staged change, a checkout, an operation,
+an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). The Assistant
+suggested letting git answer (#1206 round 1) after HR5 found that reading the index in Hive (an earlier round) got
+attributes, v4 paths and required extensions wrong. **The practical guarantee:** git, the files and SQLite can't be
 one transaction, so the fingerprint proves only that nothing it covers changed between its two reads; a change after
 the transaction's read, or one it doesn't cover, is caught afterwards by the watcher and reconciliation (stale marks,
 observed facts), never claimed excluded); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)

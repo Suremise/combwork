@@ -45,6 +45,8 @@ export type Reply = Moved | Refusal
 export interface Evidence {
   primed: unknown
   value: string | null
+  /** The platform's own answer by content, taken with it (`content`), when it has one. */
+  content: string | null
 }
 
 /** The user's (or the Assistant's) drag running an intent: asking first, or across the rules that refuse, with a reason. */
@@ -297,6 +299,7 @@ export class Workflow {
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     this.store.saveRuleset(r)
     await this.cfg.hooks?.beforeWrite?.('start')
+    await this.revalidate(card, s, o, before)
     const out = await this.write(card, r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, o, before)
       if (changed) return changed
@@ -349,7 +352,31 @@ export class Workflow {
    */
   async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<Evidence> {
     const primed = await this.platform(o).prime(card, s, o)
-    return { primed, value: this.evidenceNow(card, s, o, primed) }
+    const content = await this.platform(o).content(card, s, o, primed)
+    return { primed, value: this.evidenceNow(card, s, o, primed), content }
+  }
+
+  /**
+   * Just before an intent's transaction (#1206): if the fingerprint moved since it was taken, the platform is asked again
+   * by content, outside the transaction. The same answer, with the fingerprint steady across the asking and the cards
+   * waited for unchanged, means only cached stat data moved (an outside `git status`, a file touched): the transaction
+   * then checks against the fingerprint now. Anything else leaves it as it was, and the transaction refuses. Once per
+   * intent: a change after this, before the transaction reads, still refuses (git, the files and SQLite can't be one
+   * transaction; reconciliation settles what comes later).
+   */
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<void> {
+    if (before.value === null || before.content === null) return
+    const a = this.evidenceNow(card, s, o, before.primed)
+    if (a === null || a === before.value || this.depsOf(a) !== this.depsOf(before.value)) return
+    const content = await this.platform(o).content(card, s, o, before.primed)
+    const b = this.evidenceNow(card, s, o, before.primed)
+    if (content !== null && content === before.content && b === a) before.value = a
+  }
+
+  /** The part of a fingerprint that is the cards waited for (`evidenceNow`). */
+  private depsOf(value: string): string {
+    const i = value.indexOf('#')
+    return i < 0 ? '' : value.slice(i)
   }
 
   private evidenceNow(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
@@ -544,6 +571,7 @@ export class Workflow {
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
+        await this.revalidate(card, s, o, evidence)
         const g = await this.write(card, r, actor, (w) => {
           const bad = this.stillAt(w, s, 'submit') ?? this.evidenceChanged(w, o, evidence) ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
@@ -589,6 +617,7 @@ export class Workflow {
 
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     await this.cfg.hooks?.beforeWrite?.('submit')
+    await this.revalidate(card, s, o, before)
     const sAtGather = s
     const out = await this.write(card, r, actor, (w) => {
       const changed = this.stillAt(w, sAtGather, 'submit') ?? this.evidenceChanged(w, o, before)
@@ -665,6 +694,7 @@ export class Workflow {
     const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     await this.cfg.hooks?.beforeWrite?.('verdict')
+    await this.revalidate(card, s, r.options, before)
     const out = await this.write(card, r, actor, (w) => {
       const bad = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'verdict', { agent, submission: args.submission })
       if (bad) return bad
@@ -707,6 +737,7 @@ export class Workflow {
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
     const from = s.stage
     await this.cfg.hooks?.beforeWrite?.('answer')
+    await this.revalidate(card, s, r.options, before)
     const out = await this.write(card, r, 'user', (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
       const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
@@ -762,6 +793,7 @@ export class Workflow {
       }
     }
     const th = await this.platform(r.options).targetHead(target)
+    await this.revalidate(card, s, r.options, before)
     const out = await this.write(card, r, actor, (w) => {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target })
       if (bad) return bad
