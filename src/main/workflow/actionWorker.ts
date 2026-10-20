@@ -108,7 +108,7 @@ async function drain(at: RunOf): Promise<void> {
     const handler = handlers.get(a.kind)
     // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile.
     const first = await change(at, () =>
-      boardWriteOp(ws, (db) => (db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null))
+      boardWriteOp(ws, (db) => (db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null)) // i18n-ignore: SQL
     )
     // Closed or switched while the claim committed (a listener of that commit may close it): no handler runs for it.
     if (!at.alive()) return
@@ -124,7 +124,7 @@ async function drain(at: RunOf): Promise<void> {
     }
     // Closed or switched while the handler ran: its mark waits for the next run there (its delivery is recorded, so it
     // isn't run again).
-    await change(at, () => boardWriteOp(ws, (db) => db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(state, a.id)))
+    await change(at, () => boardWriteOp(ws, (db) => db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(state, a.id))) // i18n-ignore: SQL
   }
 }
 
@@ -133,7 +133,7 @@ onBoardCommitted((ws) => {
   if (!ws.path) return
   let pending = false
   try {
-    pending = boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get())
+    pending = boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get()) // i18n-ignore: SQL
   } catch {
     // A board without the facts step's tables (not upgraded): no actions.
     return

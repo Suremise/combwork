@@ -57,7 +57,7 @@ export class NonePlatform implements PlatformAdapter {
   async submission(card: CardRecord, s: CardState): Promise<SubmitPlan> {
     const paths = card.paths ?? []
     const rev = this.hashing.revision(paths)
-    if (isUnknown(rev)) return { ok: false, refusal: { rule: 'platform.unknown', values: { card: card.key, what: rev.what, rule: 'submit' } } }
+    if (isUnknown(rev)) return { ok: false, refusal: { rule: 'platform.unknown', values: { card: card.key, what: rev.whatText ?? rev.what, rule: 'submit' } } }
     const files = NoneAdapter.diff(s.started!.manifest ?? {}, rev.manifest)
     if (!files.length && rev.revision === s.started!.base) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
     return { ok: true, revision: rev.revision, base: s.started!.base, key: rev.revision, files, paths, inputs: {}, warnings: [] }

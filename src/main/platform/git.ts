@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'original-fs'
 import { isAbsolute, join } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
+import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Change, type Containment, type Maybe } from './types'
 
 /** A commit as attribution reads it: its id, author email and `Hive-Card` trailers. */
@@ -23,7 +24,7 @@ const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
 /** The repository's common git dir (where branch refs live, for every worktree). */
 export async function commonDir(repo: string): Promise<Maybe<string>> {
   const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
-  return r.ok ? r.out.trim() : unknown(`the git folder of ${repo}`)
+  return r.ok ? r.out.trim() : unknown(U.gitFolder, { folder: repo })
 }
 
 /**
@@ -52,7 +53,7 @@ export function refSync(common: string, ref: string, depth = 0): string | null {
 /** The commit HEAD names in a folder. */
 export async function head(folder: string): Promise<Maybe<string>> {
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
-  return r.ok ? r.out.trim() : unknown(`the head of ${folder}`)
+  return r.ok ? r.out.trim() : unknown(U.head, { where: folder })
 }
 
 /** The branch checked out in a folder, or null when HEAD is detached. */
@@ -60,7 +61,7 @@ export async function branch(folder: string): Promise<Maybe<string | null>> {
   const r = await git(folder, ['symbolic-ref', '-q', '--short', 'HEAD'])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
-  return unknown(`the branch of ${folder}`)
+  return unknown(U.branch, { folder })
 }
 
 /** A line's head (refs/heads/<line>), or null when the line doesn't exist. */
@@ -68,7 +69,7 @@ export async function lineHead(repo: string, line: string): Promise<Maybe<string
   const r = await git(repo, ['rev-parse', '--verify', '-q', `refs/heads/${line}`])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
-  return unknown(`the line ${line}`)
+  return unknown(U.line, { branch: line })
 }
 
 /** Any ref or revision, resolved to a commit (or null if there's no such commit). */
@@ -76,12 +77,12 @@ export async function resolve(repo: string, rev: string): Promise<Maybe<string |
   const r = await git(repo, ['rev-parse', '--verify', '-q', `${rev}^{commit}`])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
-  return unknown(`the revision ${rev}`)
+  return unknown(U.revision, { revision: rev })
 }
 
 export async function treeOf(repo: string, rev: string): Promise<Maybe<string>> {
   const r = await git(repo, ['rev-parse', '--verify', '-q', `${rev}^{tree}`])
-  return r.ok ? r.out.trim() : unknown(`the tree of ${rev}`)
+  return r.ok ? r.out.trim() : unknown(U.files, { revision: rev })
 }
 
 /** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
@@ -93,21 +94,21 @@ export async function defaultBranch(repo: string): Promise<Maybe<string>> {
   }
   const b = await branch(repo)
   if (isUnknown(b)) return b
-  return b ?? unknown(`the default branch of ${repo}`)
+  return b ?? unknown(U.defaultBranch, { folder: repo })
 }
 
 export async function isAncestor(repo: string, a: string, b: string): Promise<Maybe<boolean>> {
   const r = await git(repo, ['merge-base', '--is-ancestor', a, b])
   if (r.ok) return true
   if (r.code === 1) return false
-  return unknown(`whether ${a.slice(0, 7)} is in ${b.slice(0, 7)}`)
+  return unknown(U.contains, { revision: a.slice(0, 7), target: b.slice(0, 7) })
 }
 
 export async function mergeBase(repo: string, a: string, b: string): Promise<Maybe<string | null>> {
   const r = await git(repo, ['merge-base', a, b])
   if (r.ok) return r.out.trim()
   if (r.code === 1 && !r.err) return null
-  return unknown(`the merge base of ${a} and ${b}`)
+  return unknown(U.branchedOff, { a, b })
 }
 
 /**
@@ -116,7 +117,7 @@ export async function mergeBase(repo: string, a: string, b: string): Promise<May
  */
 export async function dirty(folder: string, paths?: string[]): Promise<Maybe<string[]>> {
   const r = await git(folder, ['status', '--porcelain=v2', '-z', '--untracked-files=all'])
-  if (!r.ok) return unknown(`the uncommitted changes in ${folder}`)
+  if (!r.ok) return unknown(U.uncommitted, { folder })
   const files: string[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
@@ -131,7 +132,7 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
   }
   for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) {
     const g = await git(folder, ['rev-parse', '--git-path', marker])
-    if (!g.ok) return unknown(`the state of ${folder}`)
+    if (!g.ok) return unknown(U.state, { folder })
     const at = g.out.trim()
     if (existsSync(isAbsolute(at) ? at : join(folder, at))) files.push(`(${marker})`)
   }
@@ -143,7 +144,7 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
 /** Files changed from base to head, as git lists them. */
 export async function filesChanged(repo: string, base: string, headRev: string): Promise<Maybe<FileChange[]>> {
   const r = await git(repo, ['diff', '--name-status', '--no-renames', '-z', base, headRev])
-  if (!r.ok) return unknown(`the files changed from ${base.slice(0, 7)} to ${headRev.slice(0, 7)}`)
+  if (!r.ok) return unknown(U.filesChanged, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
   const parts = r.out.split('\0').filter(Boolean)
   const out: FileChange[] = []
   for (let i = 0; i + 1 < parts.length; i += 2) out.push({ status: parts[i][0], path: parts[i + 1] })
@@ -157,10 +158,10 @@ export async function filesChanged(repo: string, base: string, headRev: string):
  */
 export async function candidateKey(repo: string, base: string, headRev: string): Promise<Maybe<string | null>> {
   const d = await git(repo, ['diff', '--binary', '--no-renames', '-U0', base, headRev], 64 * 1024 * 1024)
-  if (!d.ok) return unknown(`the change from ${base.slice(0, 7)} to ${headRev.slice(0, 7)}`)
+  if (!d.ok) return unknown(U.change, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
   if (!d.out.trim()) return null
   const p = await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, d.out)
-  if (!p.ok) return unknown('the change key')
+  if (!p.ok) return unknown(U.changeFingerprint)
   return p.out.trim().split(/\s+/)[0] || null
 }
 
@@ -179,9 +180,9 @@ export async function change(repo: string, base: string, headRev: string): Promi
  */
 export async function replayTree(repo: string, base: string, onto: string, rev: string): Promise<Maybe<string | null>> {
   const r = await git(repo, ['merge-tree', '--write-tree', '--no-messages', `--merge-base=${base}`, onto, rev])
-  if (r.code === 0) return lines(r.out)[0] ?? unknown('the replayed tree')
+  if (r.code === 0) return lines(r.out)[0] ?? unknown(U.replayedFiles)
   if (r.code === 1) return null
-  return unknown(`a replay of ${rev.slice(0, 7)} onto ${onto.slice(0, 7)}`)
+  return unknown(U.replay, { revision: rev.slice(0, 7), onto: onto.slice(0, 7) })
 }
 
 /**
@@ -213,12 +214,12 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
 export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>> {
   const t = await resolve(repo, target)
   if (isUnknown(t)) return t
-  if (!t) return unknown(`the target ${target}`)
+  if (!t) return unknown(U.target, { target })
   const anc = await isAncestor(repo, c.revision, t)
   if (isUnknown(anc)) return anc
   if (anc) {
     const fp = await git(repo, ['rev-list', '--first-parent', t])
-    if (!fp.ok) return unknown(`the history of ${target}`)
+    if (!fp.ok) return unknown(U.history, { target })
     return { method: lines(fp.out).includes(c.revision) ? 'fastForward' : 'merge' }
   }
   const key = c.key !== undefined ? c.key : await candidateKey(repo, c.base, c.revision)
@@ -226,9 +227,9 @@ export async function contains(repo: string, target: string, c: { base: string; 
   // The target's commits since the change's base (bounded, merges left out: a merge's change is covered above), keyed in
   // one pass (`log -p -U0 | patch-id`); only those with the change's key are replayed, as a squash of it.
   const log = await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--binary', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
-  if (!log.ok) return unknown(`the commits on ${target}`)
+  if (!log.ok) return unknown(U.commitsOn, { target })
   const ids = await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, log.out)
-  if (!ids.ok) return unknown(`the commits on ${target}`)
+  if (!ids.ok) return unknown(U.commitsOn, { target })
   for (const line of lines(ids.out)) {
     const [k, commit] = line.split(/\s+/)
     if (!commit || k !== key) continue
@@ -237,13 +238,13 @@ export async function contains(repo: string, target: string, c: { base: string; 
     if (!parent) continue
     const replayed = await replayTree(repo, c.base, parent, c.revision)
     const tree = await treeOf(repo, commit)
-    if (isUnknown(replayed) || isUnknown(tree)) return unknown(`whether ${commit.slice(0, 7)} holds the change`)
+    if (isUnknown(replayed) || isUnknown(tree)) return unknown(U.holdsChange, { where: commit.slice(0, 7) })
     if (replayed && replayed === tree) return { method: 'squash', commit }
   }
   // The whole target already holds it: replaying the change onto the target changes nothing.
   const whole = await replayTree(repo, c.base, t, c.revision)
   const tt = await treeOf(repo, t)
-  if (isUnknown(whole) || isUnknown(tt)) return unknown(`whether ${target} holds the change`)
+  if (isUnknown(whole) || isUnknown(tt)) return unknown(U.holdsChange, { where: target })
   if (whole && whole === tt) return { method: 'sameTree' }
   return null
 }
@@ -251,13 +252,13 @@ export async function contains(repo: string, target: string, c: { base: string; 
 /** A line's own commits since a base, newest first: its first-parent history (a merge brings others' in beside it). */
 export async function firstParents(repo: string, base: string, headRev: string): Promise<Maybe<string[]>> {
   const r = await git(repo, ['rev-list', '--first-parent', `${base}..${headRev}`])
-  return r.ok ? lines(r.out) : unknown(`the commits of ${headRev.slice(0, 7)} since ${base.slice(0, 7)}`)
+  return r.ok ? lines(r.out) : unknown(U.commitsSince, { revision: headRev.slice(0, 7), base: base.slice(0, 7) })
 }
 
 /** The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. */
 export async function commits(repo: string, range: string): Promise<Maybe<CommitInfo[]>> {
   const r = await git(repo, ['log', '--reverse', '--format=%H%x1f%ae%x1f%(trailers:key=Hive-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
-  if (!r.ok) return unknown(`the commits of ${range}`)
+  if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')
     .map((s) => s.trim())
@@ -271,7 +272,7 @@ export async function commits(repo: string, range: string): Promise<Maybe<Commit
 /** Where each branch is checked out: line → folder (`git worktree list`). */
 export async function checkouts(repo: string): Promise<Maybe<Record<string, string>>> {
   const r = await git(repo, ['worktree', 'list', '--porcelain'])
-  if (!r.ok) return unknown(`the worktrees of ${repo}`)
+  if (!r.ok) return unknown(U.worktrees, { folder: repo })
   const out: Record<string, string> = {}
   let folder = ''
   for (const l of lines(r.out)) {
@@ -288,7 +289,7 @@ export async function isolate(repo: string, folder: string, line: string, base: 
     if (!isUnknown(b) && b === line) return folder
   }
   const r = await git(repo, ['worktree', 'add', '-b', line, folder, base])
-  return r.ok ? folder : unknown(`a folder for ${line}`)
+  return r.ok ? folder : unknown(U.folderFor, { branch: line })
 }
 
 /** Pins a revision by a ref so a deleted line, a force push or garbage collection can't lose it (§16.9.3). */

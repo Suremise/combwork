@@ -13,6 +13,8 @@ import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, 
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
+import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, newLane, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import type { FinishInputs, PlatformAdapter } from '../platform/adapter'
@@ -61,7 +63,8 @@ export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'obje
 /** What happens outside the store: a delivery per action, deduplicated by the action's id (§16.4.5). */
 export interface Effects {
   wake?: (agent: string, card: CardRecord, why: string) => void
-  notify?: (card: CardRecord, text: string) => void
+  /** A notice to the user: its English, and its text as data for the window when Hive wrote it (an agent's words have none). */
+  notify?: (card: CardRecord, text: string, shown?: StoredText) => void
 }
 
 export interface WorkflowConfig {
@@ -128,7 +131,7 @@ export class Write {
 
   move(to: StageId, cause: FactData['Moved']['cause']): void {
     if (to === this.stage) return
-    this.fact('Moved', { from: this.stage, to, cause })
+    this.fact('Moved', { from: this.stage, to, cause }) // i18n-ignore: a fact's kind and codes, not text
     this.tx.setStage(this.card.id, to)
     this.stage = to
   }
@@ -241,10 +244,10 @@ export class Workflow {
   }
 
   /** A refusal: recorded as `Refused` when an agent or the Assistant was refused (the user's refused drags aren't). */
-  async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> {
+  async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
-      this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))
+      this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } })) // i18n-ignore: a fact's kind and codes, not text
     }
     return out
   }
@@ -260,11 +263,11 @@ export class Workflow {
       case 'todo':
         return ['start']
       case 'active':
-        return ['submit', 'put back']
+        return ['submit', 'put back'] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       case 'review':
-        return !o || reviewerAgent(o.review) ? ['start review', 'verdict'] : []
+        return !o || reviewerAgent(o.review) ? ['start review', 'verdict'] : [] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       case 'approved':
-        return [...(s?.stale ? ['submit'] : []), ...(!o || o.finish === 'agentMerges' || o.finish === 'notChecked' ? ['report merge'] : [])]
+        return [...(s?.stale ? ['submit'] : []), ...(!o || o.finish === 'agentMerges' || o.finish === 'notChecked' ? ['report merge'] : [])] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       default:
         return []
     }
@@ -297,7 +300,7 @@ export class Workflow {
     if (!failing.length) return null
     const rules = [...new Set(failing.map((f) => f.rule))]
     if (drag.ask) return { rule: 'move.needsOverride', values: { card: w.card.key, stage: to, rules: rules.join(', ') } }
-    w.fact('Override', { rules, move: `${w.current}→${to}`, by: drag.by, reason: drag.reason })
+    w.fact('Override', { rules, move: `${w.current}→${to}`, by: drag.by, reason: drag.reason }) // i18n-ignore: a fact's kind and codes, not text
     return null
   }
 
@@ -316,7 +319,7 @@ export class Workflow {
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
     const before = await this.evidenceOf(card, s, o)
     const plan = await this.platform(o).start(card, o)
-    if (isUnknown(plan)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: plan.what, rule: 'start' } })
+    if (isUnknown(plan)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } })
     const data: FactData['Started'] = { ...plan, builder, cardKind: card.kind }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
@@ -331,7 +334,7 @@ export class Workflow {
       const g = opts.drag ? this.across(w, 'start', 'active', ins, opts.drag) : this.check(w, 'start', ins)
       if (g) return g
       const overridden = w.written.some((f) => f.kind === 'Override')
-      w.fact('Started', data)
+      w.fact('Started', data) // i18n-ignore: a fact's kind and codes, not text
       w.move('active', overridden ? 'override' : actor === 'user' ? 'user' : 'intent')
       if (data.folder !== 'project') w.action('prepareSlot', { folder: data.folder, line: data.line, base: data.base })
       return null
@@ -345,15 +348,15 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.stage !== 'active') return this.notFrom(card, actor, s, 'put back')
+    if (s.stage !== 'active') return this.notFrom(card, actor, s, 'put back') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, this.rulesetOf(card, s), actor, (w) => {
-      const changed = this.stillAt(w, s, 'put back')
+      const changed = this.stillAt(w, s, 'put back') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       w.move('todo', 'intent')
       w.action('releaseSlot', {})
       return null
     })
-    if (out) return this.refuse(card, actor, 'put back', out)
+    if (out) return this.refuse(card, actor, 'put back', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, 'active', 'todo')
   }
 
@@ -482,12 +485,15 @@ export class Workflow {
   }
 
   /** Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText): string {
     const s = w.state()
+    // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
+    const english = typeof text === 'string' ? text : workflowEnglish(text)
+    const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
-    w.action('notify', { text })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
+    w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
 
@@ -501,9 +507,9 @@ export class Workflow {
     if (!r || !s.latest || s.stale || s.requests.some((x) => x.gate === 'review' || x.gate === 'okBefore')) return
     const o = r.options
     if (w.current === 'review' && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
-      this.askUser(w, 'approve', 'review', `${w.card.key} waits for your review`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: w.card.key }))
     } else if (w.current === 'approved' && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
-      this.askUser(w, 'approve', 'okBefore', `${w.card.key} is approved: OK to merge?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
     }
   }
 
@@ -532,7 +538,7 @@ export class Workflow {
     const o = r.options
     const s = w.state()
     if (w.card.kind === 'no-code') {
-      w.fact('Accepted', { submission: s.latest!.id })
+      w.fact('Accepted', { submission: s.latest!.id }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
       w.action('endLaneIfDone', {})
       return
@@ -541,13 +547,13 @@ export class Workflow {
       // Accepted only if the card's work still has the approved revision (None: its paths still hash to it, §16.3.3).
       const approved = s.approved?.revision ?? null
       if (!isUnknown(fin.currentRevision) && fin.currentRevision === approved) {
-        w.fact('Accepted', { revision: approved! })
+        w.fact('Accepted', { revision: approved! }) // i18n-ignore: a fact's kind and codes, not text
         w.move('done', 'derived')
         w.action('endLaneIfDone', {})
       } else {
-        w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' })
+        w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
-        this.wake(w, s.started?.builder, 'stale: your paths changed since the pass, submit again')
+        this.wake(w, s.started?.builder, 'stale: your paths changed since the pass, submit again') // i18n-ignore: a wake, agent-facing
       }
       return
     }
@@ -556,18 +562,18 @@ export class Workflow {
       case 'hiveMerges':
         if (needOk) {
           w.move('approved', 'derived')
-          this.askUser(w, 'approve', 'okBefore', `${w.card.key} is approved: OK to merge?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+          this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         } else this.enqueue(w)
         return
       case 'agentMerges':
         w.move('approved', 'derived')
-        if (needOk) this.askUser(w, 'approve', 'okBefore', `${w.card.key} is approved: OK to merge?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
-        else this.wake(w, s.started?.builder, 'approved: merge it and report the merge')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
+        else this.wake(w, s.started?.builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
         return
       case 'committed':
         // Its revision is on the folder's line by construction: done.contained.
         if (fin.contained === true) {
-          w.fact('Integrated', { revision: s.approved!.revision!, target: s.started!.target ?? '', result: s.approved!.revision!, method: 'committed', by: 'hive' })
+          w.fact('Integrated', { revision: s.approved!.revision!, target: s.started!.target ?? '', result: s.approved!.revision!, method: 'committed', by: 'hive' }) // i18n-ignore: a fact's kind and codes, not text
           w.move('done', 'derived')
           w.action('endLaneIfDone', {})
         }
@@ -668,7 +674,7 @@ export class Workflow {
       const bad = args.drag ? this.across(w, 'submit', 'review', inputs, args.drag, only) : this.check(w, 'submit', inputs, only)
       if (bad) return bad
       const st = w.state()
-      const sub = w.fact('Submitted', {
+      const sub = w.fact('Submitted', { // i18n-ignore: a fact's kind and codes, not text
         revision,
         base,
         head: revision,
@@ -690,8 +696,8 @@ export class Workflow {
       }
       w.move('review', w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
       w.action('prepareReviewCopy', { revision })
-      if (reviewerAgent(o.review)) this.wake(w, this.reviewerOf(card), `${card.key} is in Review`)
-      else this.askUser(w, 'approve', 'review', `${card.key} waits for your review`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      if (reviewerAgent(o.review)) this.wake(w, this.reviewerOf(card), `${card.key} is in Review`) // i18n-ignore: a wake, agent-facing
+      else this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: card.key }))
       return null
     })
     if (out) return this.refuse(card, actor, 'submit', out)
@@ -703,17 +709,17 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.stage !== 'review') return this.notFrom(card, actor, s, 'start review')
+    if (s.stage !== 'review') return this.notFrom(card, actor, s, 'start review') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const sub = args.submission !== undefined ? s.submissions.find((x) => x.id === args.submission) : s.latest
-    if (!sub) return this.refuse(card, actor, 'start review', { rule: 'review.noSubmission', values: { card: card.key } })
+    if (!sub) return this.refuse(card, actor, 'start review', { rule: 'review.noSubmission', values: { card: card.key } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'start review') ?? this.check(w, 'startReview', { agent: agentOf(actor) })
+      const bad = this.stillAt(w, s, 'start review') ?? this.check(w, 'startReview', { agent: agentOf(actor) }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       w.fact('ReviewStarted', { reviewer: agentOf(actor) ?? 'user', submission: sub.id, revision: sub.revision })
       return null
     })
-    if (out) return this.refuse(card, actor, 'start review', out)
+    if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files })
   }
 
@@ -737,23 +743,23 @@ export class Workflow {
       const bad = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'verdict', { agent, submission: args.submission })
       if (bad) return bad
       const st = w.state()
-      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment })
+      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
       if (!args.pass) {
         w.move('active', 'intent')
-        this.wake(w, st.started?.builder, `${card.key} failed review`)
+        this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing
         return null
       }
       if (moved && !moved.same) {
-        w.fact('Stale', { approved: sub!.revision, current: moved.to, why: r.options.sameness === 'exact' ? 'exact' : 'change' })
+        w.fact('Stale', { approved: sub!.revision, current: moved.to, why: r.options.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
-        this.wake(w, st.started?.builder, 'stale: submit again')
+        this.wake(w, st.started?.builder, 'stale: submit again') // i18n-ignore: a wake, agent-facing
         return null
       }
       if (moved?.same) w.fact('CarriedOver', { from: sub!.revision!, to: moved.to, toBase: moved.base, how: 'replay' })
       const now = w.state()
       if (passingReviewers(now).length < r.options.reviewers) return null
       if (reviewByYou(r.options.review) && !approvedByUser(now, 'review')) {
-        this.askUser(w, 'approve', 'review', `${card.key} passed review: your OK?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+        this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.passedReview, { card: card.key }))
         return null
       }
       this.finish(w, fin)
@@ -782,15 +788,15 @@ export class Workflow {
       if (changed) return changed
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
-      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) })
+      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
       if (answer === 'declined') {
         w.move('active', 'user')
-        this.wake(w, builder, `${card.key}: the user declined it`)
+        this.wake(w, builder, `${card.key}: the user declined it`) // i18n-ignore: a wake, agent-facing
         return null
       }
       if (answer !== 'approved' || req.kind !== 'approve') {
-        this.wake(w, builder, `${card.key}: the user answered`)
+        this.wake(w, builder, `${card.key}: the user answered`) // i18n-ignore: a wake, agent-facing
         return null
       }
       // The gate is evaluated before anything moves on: passes and approvals at the current generation, not stale.
@@ -800,7 +806,7 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (req.gate === 'okBefore' && !missing && st.stage === 'approved') {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
-        else this.wake(w, builder, 'approved: merge it and report the merge')
+        else this.wake(w, builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
       }
       return null
     })
@@ -815,7 +821,7 @@ export class Workflow {
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     // Only where the builder merges (or nothing is checked): under Hive merges the queue merges, never a report.
-    if (s.stage !== 'approved' || (r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge')
+    if (s.stage !== 'approved' || (r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const before = await this.evidenceOf(card, s, r.options)
     const target = s.started?.target ?? ''
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
@@ -833,15 +839,15 @@ export class Workflow {
     const th = await this.platform(r.options).targetHead(target)
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target })
+      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
-      if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' })
+      if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'intent')
       w.action('endLaneIfDone', {})
       w.action('releaseSlot', {})
       return null
     })
-    if (out) return this.refuse(card, actor, 'report merge', out)
+    if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, 'approved', 'done')
   }
 
@@ -877,7 +883,7 @@ export class Workflow {
     const s = this.state(card)
     await this.write(card, this.rulesetOf(card, s), actor, (w) => {
       w.fact('ReviewerRequest', { text })
-      this.wake(w, s.started?.builder, `${card.key}: the reviewer asks: ${text}`)
+      this.wake(w, s.started?.builder, `${card.key}: the reviewer asks: ${text}`) // i18n-ignore: a wake, agent-facing
     })
     return this.ok(card, s.stage, s.stage)
   }
@@ -904,17 +910,17 @@ export class Workflow {
       // Read under the transaction: where the card is now, not where it was when the call began.
       const now = w.state()
       const generation = now.generation + 1
-      w.fact('Decision', { decision: `${card.key}/d${generation}`, generation, text })
-      this.wake(w, now.started?.builder, `${card.key} has a new decision`)
-      if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`)
+      w.fact('Decision', { decision: `${card.key}/d${generation}`, generation, text }) // i18n-ignore: a fact's kind and codes, not text
+      this.wake(w, now.started?.builder, `${card.key} has a new decision`) // i18n-ignore: a wake, agent-facing
+      if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`) // i18n-ignore: a wake, agent-facing
       // The user's own review request was for the old generation (retired by the decision): asked again at once.
-      if (r && now.stage === 'review' && r.options.review === 'you' && now.latest) this.askUser(w, 'approve', 'review', `${card.key} has a new decision: your review again?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      if (r && now.stage === 'review' && r.options.review === 'you' && now.latest) this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.newDecision, { card: card.key }))
       if (!r || (now.stage !== 'approved' && now.stage !== 'merging')) return
       const entry = openEntry(now)
       // After IntegrationStarted it's too late to stop that merge: it completes, then For you (§16.4.6).
       if (entry?.state === 'started') return
-      w.fact('Stale', { approved: now.approved?.revision ?? null, current: now.approved?.revision ?? null, why: 'decision' })
-      if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'decision' })
+      w.fact('Stale', { approved: now.approved?.revision ?? null, current: now.approved?.revision ?? null, why: 'decision' }) // i18n-ignore: a fact's kind and codes, not text
+      if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'decision' }) // i18n-ignore: a fact's kind and codes, not text
       w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
     })
     return this.ok(card, from, this.state(card).stage)
@@ -933,7 +939,7 @@ export class Workflow {
   async block(ref: unknown, actor: Actor, reason: string): Promise<void> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return
-    await this.write(card, null, actor, (w) => (reason ? w.fact('Blocked', { reason }) : w.fact('Unblocked', {})))
+    await this.write(card, null, actor, (w) => (reason ? w.fact('Blocked', { reason }) : w.fact('Unblocked', {}))) // i18n-ignore: a fact's kind and codes, not text
   }
 
   /** The rules a drag from one stage to another would skip (§16.8.4): the guards of the moves it jumps over. */
@@ -973,7 +979,7 @@ export class Workflow {
         const changed = this.stillAt(w, s, 'move')
         if (changed) return changed
         const e = openEntry(s)
-        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'hold' })
+        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'hold' }) // i18n-ignore: a fact's kind and codes, not text
         w.move('hold', 'user')
         return null
       })
@@ -1009,15 +1015,15 @@ export class Workflow {
     const heldFrom = from === 'hold' ? ([...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')?.data.from ?? 'todo') : from
     const skipped = this.skippedRules(card, r, heldFrom, to)
     if (skipped.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules: skipped }
-    if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant')
+    if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
       // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
       const changed = this.stillAt(w, s, 'move')
       if (changed) return changed
-      if (skipped.length) w.fact('Override', { rules: skipped, move: `${from}→${to}`, by, reason: opts.reason ?? '' })
+      if (skipped.length) w.fact('Override', { rules: skipped, move: `${from}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
       // Leaving a stage with a queue entry cancels it (the user moved it out).
       const e = openEntry(s)
-      if (e && to !== 'merging') w.fact('IntegrationCancelled', { entry: e.id, reason: 'user' })
+      if (e && to !== 'merging') w.fact('IntegrationCancelled', { entry: e.id, reason: 'user' }) // i18n-ignore: a fact's kind and codes, not text
       w.move(to, skipped.length ? 'override' : 'user')
       if (to === 'done') w.action('endLaneIfDone', {})
       return null
@@ -1051,11 +1057,11 @@ export class Workflow {
     }
     // Past Review (or the user's OK): the review and approvals are skipped, named, and the change counts as approved.
     const rules = ['integrate.approved']
-    if (asking) return by === 'user' ? { ask: true, card: card.key, rules } : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant')
+    if (asking) return by === 'user' ? { ask: true, card: card.key, rules } : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, rs, by, (w) => {
       const changed = this.stillAt(w, s, 'move')
       if (changed) return changed
-      w.fact('Override', { rules, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })
+      w.fact('Override', { rules, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
       if (to === 'merging' && rs.options.finish === 'hiveMerges') this.enqueue(w)
       else w.move(hasStage(rs, 'approved') ? 'approved' : to, 'override')
       return null
@@ -1068,10 +1074,10 @@ export class Workflow {
    * to P8), translated into that intent through the same guards (§16.17).
    */
   async agentColumnMove(ref: unknown, actor: Actor, column: 'doing' | 'review' | 'passed' | 'done' | 'todo', opts: { translate?: boolean; summary?: string } = {}): Promise<Reply> {
-    const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column]
+    const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     if (!opts.translate) {
       const card = this.resolve(ref, actor)
-      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, { rule: 'move.useIntent', values: { intent } }, null)
+      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     }
     const reply = await (column === 'doing'
       ? this.start(ref, actor)
@@ -1103,18 +1109,18 @@ export class Workflow {
     const s = this.state(card)
     const e = openEntry(s)
     const r = this.rulesetOf(card, s)
-    await this.cfg.hooks?.beforeWrite?.('remove from queue')
+    await this.cfg.hooks?.beforeWrite?.('remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, 'user', (w) => {
-      const changed = this.stillAt(w, s, 'remove from queue')
+      const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       if (!e) return null
-      w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by: 'user', reason })
-      w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' })
+      w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by: 'user', reason }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
       return null
     })
-    if (out) return this.refuse(card, 'user', 'remove from queue', out)
+    if (out) return this.refuse(card, 'user', 'remove from queue', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
@@ -1129,12 +1135,12 @@ export class Workflow {
       const st = w.state()
       const last = st.entries.at(-1)
       const retries = st.entries.filter((x) => x.seq > (st.latest?.id ?? 0) && x.requeue === 'retry').length
-      if (st.stage !== 'active' || last?.state !== 'failed' || st.stale || notApproved(st, r, card.labels) || retries >= 1) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage).join(', ') } } as GuardRefusal
-      w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by: 'user', reason })
+      if (st.stage !== 'active' || last?.state !== 'failed' || st.stale || notApproved(st, r, card.labels) || retries >= 1) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by: 'user', reason }) // i18n-ignore: a fact's kind and codes, not text
       this.enqueue(w, 'retry')
       return null
     })
-    if (out) return this.refuse(card, 'user', 'retry merge', out)
+    if (out) return this.refuse(card, 'user', 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
@@ -1240,7 +1246,7 @@ export class Workflow {
         if (this.store.deliver({ action: id, kind, target: String(payload.agent), payload })) this.cfg.effects?.wake?.(String(payload.agent), card, String(payload.why))
         return
       case 'notify':
-        if (this.store.deliver({ action: id, kind, target: 'user', payload })) this.cfg.effects?.notify?.(card, String(payload.text))
+        if (this.store.deliver({ action: id, kind, target: 'user', payload })) this.cfg.effects?.notify?.(card, String(payload.text), payload.shown as StoredText | undefined)
         return
       case 'prepareSlot':
       case 'pin':

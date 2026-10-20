@@ -148,11 +148,11 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   // card's own folder. Recorded once per cycle.
   const s0 = s
   if (presence(project) === 'gone' || (presence(join(project, '.git')) === 'gone' && isUnknown(await G.commonDir(project)))) {
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
   if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone') {
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
   }
   await observeTarget(wf, card, s, hooks)
 
@@ -165,7 +165,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
     s = wf.state(card)
     const lh = await G.lineHead(project, line)
-    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } }))
+    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
   }
 
   card = wf.store.card(card.id)
@@ -196,12 +196,12 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
           observed(w, 'CarriedOver', `carried:${s.cycle}:${head}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
           return
         }
-        if (!observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' })) return
+        if (!observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' })) return // i18n-ignore: a fact's kind and codes, not text
         // P4: what follows from it (#1217: P3 records only).
         if (!wf.cfg.reconcileActs) return
-        if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' })
+        if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
         w.move('approved', 'derived')
-        wf.wake(w, s.started?.builder, `${card.key}: stale, submit again`)
+        wf.wake(w, s.started?.builder, `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
@@ -242,7 +242,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
     const th = await G.lineHead(project, target)
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
 
@@ -268,12 +268,12 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
     // Unique per cycle: two Hives observing the same merge write one `Integrated` (§16.17).
-    const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } })
+    const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (!f) return
     w.written.push(f as Fact)
     // P4: the card Done, its queue entry and slot released, its lane told (#1217: P3 records only; the card stays).
     if (!wf.cfg.reconcileActs) return
-    if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'integratedOutside' })
+    if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
     w.move('done', 'derived')
     w.action('endLaneIfDone', {})
     w.action('releaseSlot', {})
@@ -288,11 +288,11 @@ export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState
   const r = wf.rulesetOf(card, s)
   await wf.write(card, r, 'outside', (w) => {
     if (!sameCycle(w, s)) return
-    if (!observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })) return
+    if (!observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })) return // i18n-ignore: a fact's kind and codes, not text
     // P4: what follows from it (#1217: P3 records only).
     if (!wf.cfg.reconcileActs) return
     if (!hasStage(r, 'review')) w.move('active', 'derived')
-    wf.wake(w, s.started?.builder, `${card.key}: your paths changed since the pass, submit again`)
+    wf.wake(w, s.started?.builder, `${card.key}: your paths changed since the pass, submit again`) // i18n-ignore: a wake, agent-facing
   })
 }
 
