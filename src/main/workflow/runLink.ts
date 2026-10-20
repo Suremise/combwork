@@ -4,7 +4,7 @@
 // (`POST /v1/progress/resolve`), so a revision that isn't what's checked out is refused before anything runs.
 //
 // P3: the run only shows what it ran for; recording `CheckRan` from it comes next (#1119's item 2). The folder's head is
-// read with git until #1213's platform layer gives it.
+// read with git: the platform adapters (#1213) read a card's revision from its state, which comes with the fact store.
 
 import { randomUUID } from 'crypto'
 import { isAbsolute } from 'path'
@@ -184,7 +184,7 @@ export class IssuedLinks {
   }
 }
 
-/** What's checked out in a folder (git; #1213's platform layer takes this over), or null where nothing is. */
+/** What's checked out in a folder (git, until runs read it through the card's platform adapter), or null where nothing is. */
 export const folderHead = (folder: string): Promise<string | null> => gitReading(folder, ['rev-parse', '--verify', '--quiet', 'HEAD']).then((r) => (r.ok ? r.out.trim() || null : null))
 
 /** The commit a revision names in a folder, in full, or null when it names none there. */
