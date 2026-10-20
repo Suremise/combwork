@@ -20,7 +20,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { onHiveEvent } = await import('../src/main/events')
-const { saveStore } = await import('../src/main/storeRows')
+const { saveTable } = await import('../src/main/storeTables')
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -331,7 +331,7 @@ describe('the lanes service', () => {
     expect(kept?.frozen?.map((c) => c.column)).toEqual(['doing', 'todo'])
     // Without that record (a lane ended before #512, or the record damaged): not recorded, never the board's now.
     delete kept!.frozen
-    await saveStore(wsPath, 'lanes', '', data.map((x) => ({ key: x.id, doc: JSON.stringify(x) })))
+    await saveTable(wsPath, 'lanes', data)
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))
     const legacy = await lanes.getLane(w, l.id)
     expect([legacy.state, legacy.current, legacy.cards.map((c) => [c.title, c.column])]).toEqual(['abandoned', null, [['Z1', 'unrecorded'], ['Z2', 'unrecorded']]])

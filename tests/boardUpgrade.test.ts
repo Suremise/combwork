@@ -243,12 +243,28 @@ async function board09(): Promise<string> {
   const w = await open(ws)
   await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
   await close(w)
-  // As 0.9 left it: none of the 1.0 group's steps.
+  // As 0.9 left it: none of the 1.0 group's steps, and none of the tables they make (#1212's on).
   const raw = new DatabaseSync(store.boardFile(ws))
   raw.prepare(`DELETE FROM schema_version WHERE version >= ?`).run(Math.min(...upgradeSteps.map((m) => m.version)))
   raw.exec("DELETE FROM board_meta WHERE key = 'format'")
+  raw.exec('PRAGMA foreign_keys = OFF')
+  for (const t of tablesOf(raw)) if (!tables09().includes(t)) raw.exec(`DROP TABLE "${t}"`)
   raw.close()
   return ws
+}
+
+/** A database's own tables. */
+const tablesOf = (db: DatabaseSync): string[] => (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((r) => r.name)
+let known09: string[] | null = null
+/** The tables a board 0.9 made has: those of every step before the 1.0 group. */
+function tables09(): string[] {
+  if (known09) return known09
+  const file = join(base, `tables-09-${++n}.db`)
+  openDb(file, { migrations: store.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
+  const db = new DatabaseSync(file, { readOnly: true })
+  known09 = tablesOf(db)
+  db.close()
+  return known09
 }
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
 
@@ -395,7 +411,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     // A store's open the same way: nothing moved, nothing marked.
     const probe = join(ws, '.hive', 'never-a-store.json')
     writeFileSync(probe, '[]')
-    const data = await storeRows.openStore(ws, 'watches', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
+    const data = await storeRows.openStore(ws, 'sessions', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
     expect(data.rows).toEqual([])
     expect(data.meta.has('imported')).toBe(false)
     expect(existsSync(probe)).toBe(true)
@@ -530,10 +546,10 @@ describe("what services read before the database was replaced is read again (#12
       expect(told).toEqual([ws])
       // A save planned in the generation before: its guard refuses it, nothing written.
       const gen = before
-      await expect(storeRows.saveStore(ws, 'watches', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
+      await expect(storeRows.saveStore(ws, 'sessions', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
         if (gen !== store.dbGeneration(ws)) throw new Error('stale')
       })).rejects.toThrow('stale')
-      expect(storeRows.readStore(ws, 'watches', 'probe').rows).toEqual([])
+      expect(storeRows.readStore(ws, 'sessions', 'probe').rows).toEqual([])
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
       expect(store.dbGeneration(ws)).toBe(before + 2)
     } finally {

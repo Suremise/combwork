@@ -1,14 +1,15 @@
-import { existsSync, renameSync } from 'original-fs'
+import { existsSync } from 'original-fs'
 import { resolve } from 'path'
 import { boardLock, boardOpen, closeBoard, inBoardWrite, upgradeWaiting, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
+import { keepAsBackup } from './storeBackup'
 import { createLogger, userText } from './logger'
 
 const log = createLogger('stores')
 
 /**
- * The workspace's small stores in its database (#1018): lanes, watches and deliveries, each a row per entry in
+ * The workspace's small stores in its database (#1018): sessions and deliveries (lanes, watches and metrics until #1212), each a row per entry in
  * `store_rows` (the board's `.hive/hive.db`, migration 2) with a few values of its own in `store_meta`. A store keeps its
  * entries in memory and its own lock as before; only where they are kept changed. A save is one transaction that writes
  * the rows that changed (no temp file, no rename: #990's EPERM class goes), under the board's lock, so it never runs
@@ -18,7 +19,8 @@ const log = createLogger('stores')
  * host); '' where it has one.
  */
 
-export type StoreName = 'lanes' | 'watches' | 'deliveries' | 'metrics' | 'sessions'
+/** The stores still here: lanes, watches and metrics are in their typed tables (#1212, storeTables.ts). */
+export type StoreName = 'deliveries' | 'sessions'
 
 /**
  * A row to save: its key, its JSON document, and its place (`ord`: by default its place in the list; a store whose
@@ -158,27 +160,7 @@ function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName,
   else db.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run(store, scope, key, value) // i18n-ignore: SQL
 }
 
-const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
-
-/** A store's file renamed to its backup name, `<file>.imported-<time>`; false when Windows refused (tried again at the next open). */
-export function keepAsBackup(file: string): boolean {
-  const to = `${file}.imported-${stamp()}`
-  for (let i = 0; i < 5; i++) {
-    try {
-      renameSync(file, to)
-      log.info(`${userText(file)} kept as ${userText(to)}`)
-      return true
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') {
-        log.warn(`keeping ${userText(file)} as a backup`, e)
-        return false
-      }
-    }
-  }
-  log.warn(`couldn't rename ${userText(file)} (held open): tried again at the next open`)
-  return false
-}
+export { keepAsBackup }
 
 /**
  * Opens a store, moving its file in the first time (#1018): `readFile` reads the file as the store always has and gives
