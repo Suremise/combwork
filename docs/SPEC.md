@@ -2224,7 +2224,12 @@ user it is one upgrade, and a crash leaves the file at 0.9. The group's first st
   read-only, so an agent's or the Assistant's start (every path: a click, Resume All, the Agent API, the Assistant) is
   refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
   reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
-  stays open for reading; the banner says the board is read-only and agents can't start.
+  stays open for reading; the banner says the board is read-only and agents can't start. **When the file is replaced
+  under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
+  card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
+  (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's
+  **generation** (`dbGeneration`) moves on, and a save made from something read in an older generation is refused
+  (`saveStore`'s guard), never written over the file.
 - **No other Hive may have the workspace open while it runs** [HB3's round 2 finding D, HR2's round 2 finding 10].
   0.9.x writes no workspace presence marker, and its single-instance lock is per profile (`index.ts:115`), so the dev
   and installed Hive can't see each other that way. What every running Hive does hold is a connection to the

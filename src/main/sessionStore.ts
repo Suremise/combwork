@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
-import { upgradeWaiting, workspaceDb } from './boardStore'
+import { onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
 import { readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openStore, readStore, rowKeys, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
@@ -136,6 +136,12 @@ async function readOldFile(file: string): Promise<SessionsFile | null> {
 /** Hosts whose file was moved in this run (by workspace and scope): asked once, not at every read. */
 const opened = new Set<string>()
 const openedKey = (p: SessionsPlace): string => `${p.workspace.toLowerCase()}\0${p.scope}`
+// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts are looked at again (a
+// sessions.json whose move waited, or one a restore brought back the need for). The records keep no copy in memory.
+onDbReplaced((workspacePath) => {
+  const prefix = `${workspacePath.toLowerCase()}\0`
+  for (const k of [...opened]) if (k.startsWith(prefix)) opened.delete(k)
+})
 
 /** Hosts being removed now (Remove from Hive, by workspace and scope): what they export stays in their folder. */
 const removing = new Set<string>()

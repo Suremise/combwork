@@ -11,6 +11,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { renameRetrying, withFileLock } from './fsutil'
 import { openStore, readStore, rowsOf, saveStore } from './storeRows'
+import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName } from '../shared/projectIds'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
@@ -65,6 +66,7 @@ const readIds = new WeakMap<LaneRecord, string>()
  * (projectNow), and a lane saved before ids has its name only.
  */
 async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
+  const gen = dbGeneration(ws.path!)
   const data = await savedLanes(ws)
   const raw = data && typeof data === 'object' && Array.isArray((data as { lanes?: unknown }).lanes) ? ((data as { lanes: unknown[] }).lanes as Record<string, unknown>[]) : []
   // Listed now: the cards read against these lanes next see the same projects (a lane and its cards agree).
@@ -77,11 +79,17 @@ async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
   }
   const lanes = readLanes(data)
   for (const l of lanes) if (idOf.has(l.id)) readIds.set(l, idOf.get(l.id)!)
+  readGens.set(lanes, gen)
   return lanes
 }
 
+/** The workspace database's generation each list was read in (#1207 round 2): written back only into that one. */
+const readGens = new WeakMap<LaneRecord[], number>()
+
 /** Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Hive started. */
 const opened = new Set<string>()
+// The database replaced (the upgrade to 1.0, a restore): lanes.json is looked for again (its move may have waited).
+onDbReplaced((workspacePath) => opened.delete(workspacePath.toLowerCase()))
 
 /**
  * lanes.json from before #1018, read to move it in (#1018 round 1): null only when there is none. One that can't be read
@@ -127,7 +135,8 @@ async function savedLanes(ws: WorkspaceService): Promise<{ version: 1; lanes: Re
   const data = opened.has(key)
     ? readStore(path, 'lanes')
     : await openStore(path, 'lanes', '', file, () => readLanesFile(file))
-  opened.add(key)
+  // While the upgrade to 1.0 waits nothing was moved in: looked for again once it is upgraded.
+  if (!upgradeWaiting(path)) opened.add(key)
   return { version: 1, lanes: data.rows.map((r) => JSON.parse(r.doc) as Record<string, unknown>) }
 }
 
@@ -151,7 +160,12 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[]): Promise<void> {
     const { id, project: _shown, ...rest } = l
     return { id, project: saved, ...(projectId ? { projectId } : {}), ...rest }
   })
-  await saveStore(ws.path!, 'lanes', '', rowsOf(stamped))
+  // Read from a database since replaced (the upgrade to 1.0, a restore): never written over the file as it is now.
+  const gen = readGens.get(lanes)
+  const path = ws.path!
+  await saveStore(path, 'lanes', '', rowsOf(stamped), {}, () => {
+    if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
+  })
   for (const fn of writtenListeners) fn()
 }
 

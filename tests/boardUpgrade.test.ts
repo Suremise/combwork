@@ -446,3 +446,98 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await close(w)
   })
 })
+
+describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
+  /** A delivery as a 0.9 Hive saves it, straight into the database (another process), with the host's next id. */
+  function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
+    const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    try {
+      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
+      raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))
+      raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run('deliveries', scope, 'next', String(next))
+      raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO NOTHING').run('deliveries', scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: 1, file: null }))
+    } finally {
+      raw.close()
+    }
+  }
+  const bodies = (rs: { id: string; body: string }[]): string[] => rs.map((r) => `${r.id} ${r.body}`).sort()
+
+  it("deliveries loaded while the upgrade waited, and 0.9's saved meanwhile: kept, with its next id, through the first 1.0 save and a restart", async () => {
+    const delivery = await import('../src/main/deliveries')
+    delivery.setReadsInboxForTests(() => true)
+    const ws = await board09()
+    const host = join(ws, 'p')
+    const w = await open(ws)
+    try {
+      // Loaded (cached) while the upgrade waits.
+      expect(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))).toEqual([])
+      const { scope } = await inWorkspace(w, () => w.sessionScope(host))
+      writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'The first in 1.0' }))
+      expect(made.id).toBe('m2')
+      const saved = await inWorkspace(w, () => delivery.savedForTests(host))
+      expect(bodies(saved.deliveries)).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
+      expect(saved.next).toBe(3)
+      // A restart reads the same.
+      await delivery.forgetDeliveriesForTests()
+      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
+    } finally {
+      await delivery.forgetDeliveriesForTests()
+      delivery.setReadsInboxForTests(null)
+      await close(w)
+    }
+  })
+
+  it('Restore and a second upgrade: deliveries read again each time, from the board put back and then upgraded', async () => {
+    const delivery = await import('../src/main/deliveries')
+    delivery.setReadsInboxForTests(() => true)
+    const ws = await board09()
+    const host = join(ws, 'p')
+    const w = await open(ws)
+    try {
+      const { scope } = await inWorkspace(w, () => w.sessionScope(host))
+      writtenBy09(ws, scope, 'm1', 2, 'From 0.9')
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'Only in 1.0' }))
+      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9', 'm2 Only in 1.0'])
+      // Back to the 0.9 board: what it has, not the 1.0 board's cache.
+      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9'])
+      // 0.9 adds one, then it is upgraded again: that one is kept, and the next id follows it.
+      writtenBy09(ws, scope, 'm2', 3, 'From 0.9 after the restore')
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'In 1.0 again' }))
+      expect(made.id).toBe('m3')
+      expect(bodies((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries)).toEqual(['m1 From 0.9', 'm2 From 0.9 after the restore', 'm3 In 1.0 again'])
+    } finally {
+      await delivery.forgetDeliveriesForTests()
+      delivery.setReadsInboxForTests(null)
+      await close(w)
+    }
+  })
+
+  it('each replacement moves the generation on, and a save read in an older one is refused', async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    try {
+      const before = store.dbGeneration(ws)
+      const told: string[] = []
+      store.onDbReplaced((p) => told.push(p))
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(store.dbGeneration(ws)).toBe(before + 1)
+      expect(told).toEqual([ws])
+      // A save planned in the generation before: its guard refuses it, nothing written.
+      const gen = before
+      await expect(storeRows.saveStore(ws, 'watches', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
+        if (gen !== store.dbGeneration(ws)) throw new Error('stale')
+      })).rejects.toThrow('stale')
+      expect(storeRows.readStore(ws, 'watches', 'probe').rows).toEqual([])
+      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+      expect(store.dbGeneration(ws)).toBe(before + 2)
+    } finally {
+      await close(w)
+    }
+  })
+})

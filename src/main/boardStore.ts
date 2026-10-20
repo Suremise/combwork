@@ -934,6 +934,33 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
     .at(-1)
 
 /**
+ * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
+ * services (the upgrade to 1.0, Restore the 0.9 Board Backup), whose caches were read from the file before. What a
+ * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
+ * so nothing written meanwhile (by a 0.9 Hive while the upgrade waited) is overwritten from an old snapshot.
+ */
+const generations = new Map<string, number>()
+export const dbGeneration = (workspacePath: string): number => generations.get(keyOf(workspacePath)) ?? 0
+const replacedListeners = new Set<(workspacePath: string) => void>()
+/**
+ * Called, under the board's lock and with nothing awaited, once a workspace's database file was replaced: a service
+ * drops (or reads again) what it keeps from it. Its saves begun before are refused by their generation.
+ */
+export function onDbReplaced(fn: (workspacePath: string) => void): void {
+  replacedListeners.add(fn)
+}
+function replaced(path: string): void {
+  generations.set(keyOf(path), dbGeneration(path) + 1)
+  for (const fn of replacedListeners) {
+    try {
+      fn(path)
+    } catch (e) {
+      log.warn('a service following the replaced workspace database', e)
+    }
+  }
+}
+
+/**
  * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
  * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
  * all: that is told where it is used.
@@ -988,6 +1015,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
     const kept = from09 ? copy09(path) : undefined
     log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}); ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
+    replaced(path)
     return { backup: kept?.file ?? null }
   })
   emit({ type: 'tasks-changed', workspacePath: path })
@@ -1036,6 +1064,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     failures.delete(keyOf(path))
     boardOf(path)
     log.info(`put the 0.9 board back in ${userText(path)} (${basename(kept.file)}); the 1.0 board is kept as ${basename(saved)}`)
+    replaced(path)
     return { saved, restored: kept.file }
   })
   emit({ type: 'tasks-changed', workspacePath: path })
