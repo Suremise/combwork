@@ -67,6 +67,14 @@
     "defaultMessage": "Merge {revision} into {target}, then report the merge again.",
     "description": "The next step after a refused report of a merge."
   },
+  "workflow.refused.evidence.changed.message": {
+    "defaultMessage": "What Hive read for {card} changed while it decided.",
+    "description": "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key."
+  },
+  "workflow.refused.evidence.changed.next": {
+    "defaultMessage": "Try again: Hive reads it afresh.",
+    "description": "The next step after a refusal because what a rule read changed meanwhile."
+  },
   "workflow.refused.integrate.approved.message": {
     "defaultMessage": "{card} at {revision} isn't approved: {why}",
     "description": "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing."

@@ -6,7 +6,6 @@
 
 import type { CardState } from '../../shared/workflow/facts'
 import type { GuardRefusal } from '../../shared/workflow/guards'
-import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import { reconcileNone, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
@@ -32,6 +31,14 @@ export class NonePlatform implements PlatformAdapter {
     return { folder: 'project', line: null, base: rev.revision, target: null, manifest: rev.manifest, ...(deliverables && !isUnknown(deliverables) ? { deliverables } : {}) }
   }
 
+  async prime(): Promise<void> {}
+
+  /** The card's paths' hash now (the hash cache follows writes, so an edit since shows). */
+  evidence(card: CardRecord): string {
+    const r = this.hashing.revision(this.wf.store.card(card.id).paths ?? [])
+    return isUnknown(r) ? 'unknown' : r.revision
+  }
+
   async revisionNow(card: CardRecord): Promise<Maybe<string | null>> {
     if (card.kind === 'no-code') return null
     const r = this.hashing.revision(card.paths ?? [])
@@ -39,11 +46,8 @@ export class NonePlatform implements PlatformAdapter {
   }
 
   /** None's submission: the card's declared paths (pre-filled from what its agents changed if it has none yet). */
-  async submission(card0: CardRecord, s: CardState, _o: WorkflowOptions, args: { paths?: string[] }): Promise<SubmitPlan> {
-    let card = card0
-    if (args.paths) card = this.wf.store.updateCard(card.id, { paths: args.paths })
-    const paths = card.paths ?? this.wf.prefill(card)
-    if (!card.paths) card = this.wf.store.updateCard(card.id, { paths })
+  async submission(card: CardRecord, s: CardState): Promise<SubmitPlan> {
+    const paths = card.paths ?? []
     const rev = this.hashing.revision(paths)
     if (isUnknown(rev)) return { ok: false, refusal: { rule: 'platform.unknown', values: { card: card.key, what: rev.what, rule: 'submit' } } }
     const files = NoneAdapter.diff(s.started!.manifest ?? {}, rev.manifest)

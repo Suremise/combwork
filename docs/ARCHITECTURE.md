@@ -268,7 +268,9 @@ actor)`. It asks the platform adapter for the facts the guards need first, outsi
 containment, check facts: slow reads). Then, inside one `boardWrite` transaction, it reads the card, its facts and
 its ruleset, **re-reads the cheap folder state the guards depend on** (head and dirty for Git; for None the stored
 hash against the watcher's write log since it was computed), refusing if it differs from what the slow reads used
-rather than racing; runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+rather than racing (P2's protocol: the adapter's `evidence()`, a fingerprint read with no process, refs from their
+files and None's paths' hash, plus the facts of the cards it waits for, taken before the slow reads and again in the
+transaction; if it changed, the intent is refused `evidence.changed`, "try again"); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside

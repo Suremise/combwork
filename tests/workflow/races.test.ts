@@ -51,7 +51,7 @@ describe('superseded and pending requests', () => {
     expect(e.wf.state(card).stage).toBe('merging')
   })
 
-  it('the review gate: a decision recorded while the answer is on its way leaves the old passes short; nothing finishes', async () => {
+  it('the review gate: an answer begun before a decision is refused; after the reviewer confirms, the user is asked afresh', async () => {
     const e = (env = setup({ ...pairOpts, review: 'agentThenYou', finish: 'agentMerges' }))
     const { card } = await startedIn(e, 'A', 'a.txt')
     moved(await e.wf.submit(card.key, B1, { summary: 'A' }))
@@ -64,10 +64,31 @@ describe('superseded and pending requests', () => {
         await e.wf.recordDecision(card.key, 'Changed')
       }
     }
-    moved(await e.wf.answer(card.key, req.request, 'approved'))
-    const s = e.wf.state(card)
+    // The request was for generation 0; the decision retired it before the answer was written.
+    refusedBy(await e.wf.answer(card.key, req.request, 'approved'), 'move.notFromHere')
+    let s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'review', approvals: [] })
+    // The reviewer receives the decision and confirms: the user is asked again, and nothing finishes before they answer.
+    await e.wf.received(card.key, 'R1')
+    await pass(e, card.key)
+    s = e.wf.state(card)
     expect(s.stage).toBe('review')
-    expect(s.approvals.at(-1)).toMatchObject({ generation: 1 })
+    const fresh = s.requests.find((x) => x.gate === 'review')!
+    expect(fresh).toMatchObject({ generation: 1, stage: 'review' })
+    expect(fresh.request).not.toBe(req.request)
+    moved(await e.wf.answer(card.key, fresh.request, 'approved'))
+    expect(e.wf.state(card).stage).toBe('approved')
+  })
+
+  it("You-only review: the request doesn't survive the card leaving Review; an answer to it finishes nothing", async () => {
+    const e = (env = setup({ ...pairOpts, review: 'you', noSelfReview: false, finish: 'agentMerges' }))
+    const { card } = await startedIn(e, 'Yours', 'y.txt')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const req = e.wf.state(card).requests[0]
+    moved(await e.wf.move(card.key, 'active', 'user'))
+    expect(e.wf.state(card).requests).toEqual([])
+    refusedBy(await e.wf.answer(card.key, req.request, 'approved'), 'move.notFromHere')
+    expect(e.wf.state(card).stage).toBe('active')
   })
 })
 

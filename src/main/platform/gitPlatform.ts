@@ -46,6 +46,22 @@ export class GitPlatform implements PlatformAdapter {
     return { folder: 'project', line, base, target: o.finish === 'committed' ? line : card.target || o.target || line }
   }
 
+  private common: string | null = null
+
+  async prime(): Promise<void> {
+    if (this.common) return
+    const c = await G.commonDir(this.project)
+    if (!isUnknown(c)) this.common = c
+  }
+
+  /** The heads a card's guards read: its target's and its line's (or the shared folder's), from the ref files. */
+  evidence(card: CardRecord, s: CardState, o: WorkflowOptions): string {
+    if (!this.common) return 'unknown'
+    const target = s.started?.target ?? card.target ?? o.target
+    const line = s.started?.line
+    return [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : ''].join('|')
+  }
+
   async revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {
     if (card.kind === 'no-code') return null
     if (this.wf.ownLine(s)) return G.head(this.wf.folderOf(s))

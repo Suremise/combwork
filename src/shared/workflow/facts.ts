@@ -109,7 +109,7 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; stage?: StageId; generation?: number }
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
@@ -256,6 +256,9 @@ export const emptyState = (): CardState => ({
 
 const addOnce = (list: string[], x: string): string[] => (list.includes(x) ? list : [...list, x])
 
+/** A request a gate waits on (the user's review, or the OK before merging), bound to its submission, stage and generation. */
+const isGateRequest = (r: FactData['ApprovalRequested']): boolean => r.gate === 'review' || r.gate === 'okBefore'
+
 /** Folds a card's facts (in seq order) into its state. Pure: the stage is the last `Moved`'s, never a claim. */
 export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
   const s = emptyState()
@@ -380,6 +383,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       case 'Moved':
         s.stage = (f.data as FactData['Moved']).to
+        // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
+        s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)
         break
       case 'Override': {
         const d = f.data as FactData['Override']
@@ -395,6 +400,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       case 'Decision':
         s.generation = Math.max(s.generation, (f.data as FactData['Decision']).generation)
+        // A decision makes what was approved before it stale, an override past review included.
+        s.approvalOverridden = false
+        // ...and to the decision generation it was asked at: a newer decision retires it (it is asked again).
+        s.requests = s.requests.filter((r) => !isGateRequest(r) || r.generation === undefined || r.generation === s.generation)
         break
       case 'DecisionsReceived': {
         const d = f.data as FactData['DecisionsReceived']

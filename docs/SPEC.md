@@ -1338,7 +1338,10 @@ these moments).
     decision and submit again;
   - its queue entry is cancelled; a test merge already running finishes its checks but doesn't advance the target.
 - **The last check before the target moves:** the queue re-checks `integrate.approved` (generation included) inside
-  the advance, after the merge checks and before writing `IntegrationStarted` (§16.9.2). A decision recorded after
+  the advance, after the merge checks and before writing `IntegrationStarted` (§16.9.2), **in the transaction that
+  writes it**: the entry still the card's open one, the card in Merging, approved at the current generation and not
+  stale. If it no longer holds, nothing is written and git isn't touched [P2: a decision that landed while the queue
+  read where the target is checked out still advanced it]. A decision recorded after
   `IntegrationStarted` is too late to stop that merge: the merge completes, and the card gets For you (Decide:
   "decided after it merged: does it need a follow-up?").
 - **Content-stale and decision-stale differ** [HB3's round 2 finding G]: a new revision that isn't the same change
@@ -1752,7 +1755,8 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   step refused for something no override can make true (nothing to submit, a fact that couldn't be read) stops the
   drag there, so a card never sits in Active with no start, in Review with nothing to review or in Merging with no
   entry. Done is a plain move (no `Integrated` faked), and a stage the card's ruleset doesn't have isn't a place to
-  drag to.
+  drag to. Out of On Hold, a drag back to where the card was returns it there (queued again if it was queued); a drag
+  past it returns it there first and then runs the intents of a drag from there.
 
 #### 16.8.5 For you
 
@@ -1765,7 +1769,10 @@ checklist (what to try, on which build) [P1]. The field records a person (`for: 
 added later [#439]. **A request belongs to its submission** [P2]: a new submission retires the requests made for an
 earlier one, and an answer is checked under the transaction (the request still open, the card where it was, the
 generation current then), and its gate evaluated before anything moves on, so an old request can never approve
-newer work.
+newer work. A gate's request (the user's review, or the OK before merging) is bound to its submission, the stage it
+was asked in and the decision generation it was asked at: a new submission, the card leaving that stage or a newer
+decision retires it, and an answer begun before that is refused. The user is asked again when the gate is reached
+again: at once under "You" review in Review, after the reviewers' confirmation under "…, then you" [P2].
 
 #### 16.8.6 A refused commit (#907)
 

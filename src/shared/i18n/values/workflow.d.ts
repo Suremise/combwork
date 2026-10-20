@@ -18,6 +18,8 @@ interface HiveMessageValues {
   'workflow.refused.done.contained.change': undefined
   'workflow.refused.done.contained.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.done.contained.next': { revision: string | number; target: string | number }
+  'workflow.refused.evidence.changed.message': { card: string | number }
+  'workflow.refused.evidence.changed.next': undefined
   'workflow.refused.integrate.approved.message': { card: string | number; revision: string | number; why: string | number }
   'workflow.refused.integrate.approved.next': undefined
   'workflow.refused.integrate.checksPassed.change': undefined

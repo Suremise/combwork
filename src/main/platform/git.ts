@@ -4,7 +4,7 @@
 //
 // P2 spike (#1118): not wired into the app yet.
 
-import { existsSync } from 'original-fs'
+import { existsSync, readFileSync } from 'original-fs'
 import { isAbsolute, join } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
@@ -19,6 +19,35 @@ export interface CommitInfo {
 }
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
+
+/** The repository's common git dir (where branch refs live, for every worktree). */
+export async function commonDir(repo: string): Promise<Maybe<string>> {
+  const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  return r.ok ? r.out.trim() : unknown(`the git folder of ${repo}`)
+}
+
+/**
+ * A ref's commit, read synchronously from the ref files (loose, else packed-refs), with no git process: cheap enough to
+ * read again inside a transaction, as the fingerprint of what a guard decided on (ARCHITECTURE "The one path").
+ */
+export function refSync(common: string, ref: string, depth = 0): string | null {
+  try {
+    const v = readFileSync(join(common, ref), 'utf8').trim()
+    if (v.startsWith('ref: ') && depth < 5) return refSync(common, v.slice(5), depth + 1)
+    if (v) return v
+  } catch {
+    // Not a loose ref: packed, or missing.
+  }
+  try {
+    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
+      const [sha, name] = l.split(' ')
+      if (name === ref) return sha
+    }
+  } catch {
+    // No packed refs.
+  }
+  return null
+}
 
 /** The commit HEAD names in a folder. */
 export async function head(folder: string): Promise<Maybe<string>> {

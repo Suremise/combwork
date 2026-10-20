@@ -122,9 +122,27 @@ export class MergeQueue {
     return this.process(next.card, next.entry)
   }
 
-  private async write(card: CardRecord, fn: (w: Write) => void): Promise<void> {
+  private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
     const s = this.wf.state(card)
-    await this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', fn)
+    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', fn)
+  }
+
+  /**
+   * The advance's authority, decided in the transaction that writes `IntegrationStarted` (§16.4.6, §16.9.1 step 6):
+   * the entry still the card's open one, the card in Merging, approved at the current generation and not stale. A
+   * decision, a cancel or a stale pass that landed after the queue's last check stops it here, before git is touched.
+   */
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<boolean> {
+    return this.write(card, (w) => {
+      const s = w.state()
+      const e = s.entries.find((x) => x.id === entry.id)
+      const open = !!e && (e.state === 'open' || (e.state === 'started' && this.rerun.has(e.id)))
+      const r = w.ruleset!
+      const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
+      if (!open || s.stage !== 'merging' || !approved) return false
+      w.fact('IntegrationStarted', data)
+      return true
+    })
   }
 
   /** Is the entry still the card's open one, approved at the current generation and not stale (§16.9.1 step 2)? */
@@ -185,6 +203,7 @@ export class MergeQueue {
         entry = this.wf.state(card).entries.at(-1)!
         continue
       }
+      if (adv === 'denied') return this.skip(card, entry, this.stillApproved(card, entry).cancelled)
       if (typeof adv === 'object') return this.pause(target, card, entry, adv.pause, adv.files)
       await this.integrated(card, entry, revision, target, result, s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge', 'hive')
       return { card: card.key, entry: entry.id, outcome: 'integrated', result, retests }
@@ -274,10 +293,8 @@ export class MergeQueue {
   }
 
   /** The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`). */
-  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<'done' | 'moved'> {
-    await this.write(card, (w) => {
-      w.fact('IntegrationStarted', { entry: entry.id, expected, result, checkedOut: null })
-    })
+  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<'done' | 'moved' | 'denied'> {
+    if (!(await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null }))) return 'denied'
     await this.cfg.hooks?.afterStarted?.(entry.id)
     const u = await git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])
     if (!u.ok) {
@@ -301,7 +318,7 @@ export class MergeQueue {
    * The target checked out in a folder (§16.9.2): conditions checked before anything is touched (else a pause), then
    * a journal: `IntegrationStarted`, phase files, read-tree, phase ref, update-ref, `Integrated`.
    */
-  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<'done' | 'moved' | { pause: PauseReason; files?: string[] }> {
+  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<'done' | 'moved' | 'denied' | { pause: PauseReason; files?: string[] }> {
     if (this.cfg.folderBusy?.(folder)) return { pause: 'folderBusy' }
     const b = await G.branch(folder)
     if (isUnknown(b) || b !== target) return { pause: 'wrongBranch' }
@@ -317,9 +334,7 @@ export class MergeQueue {
     }
     const ref = await G.lineHead(this.project, target)
     if (ref !== expected) return 'moved'
-    await this.write(card, (w) => {
-      w.fact('IntegrationStarted', { entry: entry.id, expected, result, files, checkedOut: folder })
-    })
+    if (!(await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder }))) return 'denied'
     await this.cfg.hooks?.afterStarted?.(entry.id)
     await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'files' }))
     const rt = await git(folder, ['read-tree', '-m', '-u', expected, result])

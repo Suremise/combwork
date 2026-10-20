@@ -57,7 +57,7 @@ export interface PlatformAdapter {
   /** The card's revision now (Git: its folder's head, or its newest attributed commit; None: its paths' hash). */
   revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
   /** Submit's platform side; a refusal for an empty change, a wrong revision or what couldn't be read. */
-  submission(card: CardRecord, s: CardState, o: WorkflowOptions, args: { revision?: string; paths?: string[]; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan>
+  submission(card: CardRecord, s: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan>
   /** What a finish needs (§16.7.2's Finish table). */
   finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs>
   /** The card's work moved on since `from` (a pass's revision): to what, and is it the same change (§16.3.2)? */
@@ -72,6 +72,13 @@ export interface PlatformAdapter {
   checkRun(card: CardRecord, s: CardState, run: { command: string | undefined; revision?: string; isolated?: string; exec: (command: string, folder: string) => Promise<{ ok: boolean }> }): Promise<CheckBracket | GuardRefusal>
   /** A platform's durable action (a card's folder, a pin): false when the kind isn't this platform's. */
   perform(kind: string, payload: Record<string, unknown>): Promise<boolean>
+  /**
+   * The evidence an intent decides on, as a fingerprint read synchronously (refs from their files, None's paths'
+   * hash): read before the slow reads and again inside the transaction; if it changed, the intent is refused, never
+   * written on stale evidence. `prime` does the slow part once (Git: finding the repository's git folder).
+   */
+  prime(): Promise<void>
+  evidence(card: CardRecord, s: CardState, o: WorkflowOptions): string
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
 }

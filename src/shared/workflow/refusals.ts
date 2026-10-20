@@ -9,7 +9,7 @@ import { msg, type Msg, type Values } from '../i18n/msg'
 import type { GuardId } from './pieces'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch'
+export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
 
 export type RuleId = GuardId | MoveRule
 
@@ -152,6 +152,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'submit.sameRevisionNote': r(
     msg({ id: 'workflow.refused.submit.sameRevisionNote.message', defaultMessage: '{revision} was already reviewed.', description: 'A refused submit: the same revision again without a note.' }),
     msg({ id: 'workflow.refused.submit.sameRevisionNote.next', defaultMessage: 'Submit it again with a note saying what changed in your answer, or commit a new revision.', description: 'The next step when submitting a reviewed revision again.' })
+  ),
+  'evidence.changed': r(
+    msg({ id: 'workflow.refused.evidence.changed.message', defaultMessage: 'What Hive read for {card} changed while it decided.', description: "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key." }),
+    msg({ id: 'workflow.refused.evidence.changed.next', defaultMessage: 'Try again: Hive reads it afresh.', description: 'The next step after a refusal because what a rule read changed meanwhile.' })
   ),
   'check.revisionMismatch': r(
     msg({ id: 'workflow.refused.check.revisionMismatch.message', defaultMessage: "{revision} isn't what's checked out here.", description: 'A refused check run: the revision named is not the checked-out one.' }),

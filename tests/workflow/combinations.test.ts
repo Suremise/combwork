@@ -87,12 +87,18 @@ describe('S36: every combination', () => {
     for (let step = 0; step < 10 && e.wf.state(card).stage === 'review'; step++) {
       const s = e.wf.state(card)
       const passes = new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest!.id && v.generation === s.generation).map((v) => v.reviewer))
-      const open = s.requests.find((r) => r.gate === 'review')
+      let open = s.requests.find((r) => r.gate === 'review')
       if (!failed) {
         failed = true
         moved(await e.wf.recordDecision(card.key, 'Keep it small'))
         for (const a of ['B1', 'R1', 'R2']) await e.wf.received(card.key, a)
-        if (open) moved(await e.wf.answer(card.key, open.request, 'declined'))
+        // The decision retired the request made before it; under "you" the user is asked again at once.
+        if (open) {
+          expect(e.wf.state(card).requests.some((r) => r.request === open!.request)).toBe(false)
+          open = e.wf.state(card).requests.find((r) => r.gate === 'review')
+          expect(open, 'asked again after the decision').toBeDefined()
+          moved(await e.wf.answer(card.key, open!.request, 'declined'))
+        }
         else {
           moved(await e.wf.startReview(card.key, R1))
           moved(await e.wf.verdict(card.key, R1, { pass: false, failKind: 'explanation', comment: 'why?' }))
