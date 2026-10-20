@@ -214,9 +214,22 @@ Changes emit `tasks-changed` (routed by workspace path), once a board change com
 
 ## Workflow layer (1.0)
 
-The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch: the modules
-below don't exist yet, and each phase moves its part of this section into the code map when it merges. Names are
-proposals the builders may change, keeping the boundaries.
+The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch, and each phase
+moves its part of this section into the code map when it merges. Names are proposals the builders may change,
+keeping the boundaries.
+
+**The core spike (P2, #1118)** built the core in these places, **isolated: nothing in the app imports it** (no IPC, no
+Agent API route, no `boardWrite`): `src/shared/platform/descriptors.ts`; `src/shared/workflow/` (`facts.ts` with the
+fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as messages, `cardRefs.ts`, `laneList.ts`);
+`src/main/platform/` (`adapter.ts`, `gitPlatform.ts` and `nonePlatform.ts` behind it, `git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
+a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table; `runtime.ts`;
+`reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
+scenarios on real temporary repositories. **Darren decided (#1118, 20 Oct)** that it is P3's base in part: `shared/workflow` and
+the platform adapters as they are, the runtime, reconciliation, queue and checks as P4's and P5's starting point, and
+the fact store replaced by hive.db tables;
+where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), "nothing
+changed during a run" read from stat snapshots and the HEAD reflog (P3's watcher), card folders as plain worktrees
+(P7's slots), no repository lock or signing pauses in the queue (P5), refusal text in English only (P4 translates).
 
 **Today, where it attaches** (read on 20 Oct, 1.0.0 at edbf9b33):
 - Every card write goes through `boardWrite(ws, fn)` (`src/main/boardStore.ts:536`): file lock, `BEGIN IMMEDIATE`,
@@ -233,6 +246,12 @@ proposals the builders may change, keeping the boundaries.
   per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts:430`) auto-commits and doesn't
   return the merge commit; squash detection is `alreadyMerged` (`:417`). The Git view's actions fence the folder
   (`folderFence.ts`, `gitRepo.ts:343`) and take a `.git/hive-merge` lock.
+
+**The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
+(`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a
+moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
+ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
+`nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
 
 **Layers and modules (planned):**
 
@@ -251,14 +270,24 @@ actor)`. It asks the platform adapter for the facts the guards need first, outsi
 containment, check facts: slow reads). Then, inside one `boardWrite` transaction, it reads the card, its facts and
 its ruleset, **re-reads the cheap folder state the guards depend on** (head and dirty for Git; for None the stored
 hash against the watcher's write log since it was computed), refusing if it differs from what the slow reads used
-rather than racing; runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+rather than racing (P2's protocol: the adapter's `evidence()`, a fingerprint read with no process: Git, the target's
+and line's refs from their files, the card folder's own HEAD, its index, an operation under way and each covered
+tracked file's and folder's size and time (the builder's own paths in a shared folder); None, its paths' hash; plus
+the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
+so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
+platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
+intent is refused `evidence.changed`, "try again". It is a best-effort snapshot, not one transaction with git and the
+files: a change after the last read, or one that keeps every size and time, isn't excluded, so P3's watcher and
+reconciliation (stale marks, observed facts) remain what settles those. #1206: an outside `git status` refreshing the
+index's stat data refuses falsely today; fingerprint the index's content, or read once more before refusing); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
 happens for a write that rolled back, and nothing is lost to a crash after the commit (SPEC §16.4.5).
 
 **Same change.** The Git adapter stores each submission's endpoints (base, head), its candidate key
-(`git patch-id --stable`) and its files, and never recomputes a submitted change from the target's current state.
+(`git patch-id --stable` of the diff with no context lines, `-U0`) and its files, and never recomputes a submitted
+change from the target's current state.
 Sameness is a **replay**: `git merge-tree --write-tree --merge-base=<B1> <B2> <R1>` must succeed and give `<R2>`'s
 tree; patch-id only rules out a different change quickly; anything unsettled is not the same (SPEC §16.3.2). In a
 shared folder, `CommitAttributed` facts record which card each commit belongs to when it is seen.
