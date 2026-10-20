@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **Git isn't required.** Each project now has a version control, found when Hive first sees it: Git for a Git repository, or none for any other folder (Mercurial and Jujutsu aren't supported yet, so their projects work without version control). Hive never switches it by itself: when a project's folder changes, say you run `git init` in it or its repository goes, a notice tells you and the project keeps what it had.
+
 ## 0.9.3 — 2026-10-20
 
 - **The Assistant's modes are in `.hive/modes`.** Modes were once called personas, and their files still were: each workspace's are now in `.hive/modes`, where Hive moves its `.hive/personas` folder when the workspace opens, your own modes and edits with it, and the mode you chose stays chosen. If the folder can't be moved yet (a file in it open), Hive uses it where it is and moves it next time (#1084).

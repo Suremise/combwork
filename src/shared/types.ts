@@ -16,6 +16,7 @@ import type { ConsoleEvent, ConsoleRecordingInfo } from './devConsole'
 import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
+import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -925,6 +926,11 @@ export interface ProjectConfig {
    * the only ones Hive takes for this project's. Added when Hive first makes a branch in one; never removed.
    */
   branchSpaces?: string[]
+  /**
+   * The project's version control platform (SPEC §16.3), recorded from detection when Hive makes its project.json and
+   * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
+   */
+  platform?: PlatformId
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
@@ -1489,6 +1495,8 @@ export interface ProjectInfo {
   removedData?: RemovedData | null
   /** Whether its .hive is kept out of version control (#345); absent for the Assistant's home. */
   hiveVcs?: HiveVcs
+  /** Its version control platform, capabilities and detection (SPEC §16.3); absent for the Assistant's home. */
+  platform?: ProjectPlatform
 }
 
 /**
