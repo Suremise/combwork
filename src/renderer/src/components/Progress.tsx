@@ -14,7 +14,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { useMergeSlots } from './MergeSlots'
 import { LanesSection } from './ProgressLanes'
-import { MergeCards } from './ProgressMerge'
+import { MergeCards, usePanelFold } from './ProgressMerge'
 import { useLanes } from '../laneSource'
 import { ShowAllList } from './ShowAllList'
 import { Icon, IconButton, Tooltip } from './ui'
@@ -103,6 +103,8 @@ export function ProgressPanel() {
   const chosen = useProgressFilter()
   const workspace = useStore((s) => s.workspace)
   const focused = useStore((s) => s.windowFocused)
+  // Recent folded to its heading (#1228), as the workspace's user left it.
+  const [recentFolded, toggleRecent] = usePanelFold(workspace ? `progress-recent-fold:${workspace.path.toLowerCase()}` : null)
   const width = usePaneSize('progress', 280)
   // The run whose details are open.
   const [detail, setDetail] = useState<string | null>(null)
@@ -201,16 +203,29 @@ export function ProgressPanel() {
         ))}
         {recent.length > 0 && (
           <>
-            <div className="progress-section">{tr(msg({ id: 'board.progress.recent', defaultMessage: 'Recent', description: 'A section heading in the Progress panel: runs that finished a while ago.' }))}</div>
-            <ShowAllList
-              items={recent}
-              few={RECENT_RUNS}
-              keyOf={(r) => r.id}
-              renderItem={(r) => <RecentRow run={r} now={detail === r.id ? now : 0} open={detail === r.id} onToggle={toggle} />}
-              label={tr(msg({ id: 'board.progress.recentRuns', defaultMessage: 'Recent runs', description: "What the Progress panel's Recent list holds, for its Show all button and accessible name." }))}
-              foldKey={workspace ? `progress-recent-all:${workspace.path.toLowerCase()}` : undefined}
-              className="progress-recent-list"
-            />
+            {/* Its heading folds it away and back (#1228): the chevron and count as the Lanes bar has them. */}
+            <button
+              type="button"
+              className="progress-section progress-section-toggle"
+              aria-expanded={!recentFolded}
+              onClick={toggleRecent}
+              title={recentFolded ? tr(msg({ id: 'board.progress.recentShow', defaultMessage: 'Show the recent runs', description: "Tooltip of the Progress panel's Recent heading while its runs are folded away: shows them." })) : tr(msg({ id: 'board.progress.recentFold', defaultMessage: 'Fold the recent runs', description: "Tooltip of the Progress panel's Recent heading: folds its runs away, leaving the heading." }))}
+            >
+              <Icon name={recentFolded ? 'chevron-right' : 'chevron-down'} />
+              <span>{tr(msg({ id: 'board.progress.recent', defaultMessage: 'Recent', description: 'A section heading in the Progress panel: runs that finished a while ago.' }))}</span>
+              <span className="progress-section-count">{fmt.number(recent.length)}</span>
+            </button>
+            {!recentFolded && (
+              <ShowAllList
+                items={recent}
+                few={RECENT_RUNS}
+                keyOf={(r) => r.id}
+                renderItem={(r) => <RecentRow run={r} now={detail === r.id ? now : 0} open={detail === r.id} onToggle={toggle} />}
+                label={tr(msg({ id: 'board.progress.recentRuns', defaultMessage: 'Recent runs', description: "What the Progress panel's Recent list holds, for its Show all button and accessible name." }))}
+                foldKey={workspace ? `progress-recent-all:${workspace.path.toLowerCase()}` : undefined}
+                className="progress-recent-list"
+              />
+            )}
           </>
         )}
       </div>

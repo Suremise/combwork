@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "Mettre tes couloirs dans l’ordre",
   "tips.progressPanel.text": "Quand des agents lancent des tests ou des builds qui indiquent leur progression, le panneau Progression à droite montre chaque exécution : l’agent, où elle en est et le temps restant, et le bouton de Hive dans la barre des tâches se remplit au fur et à mesure. {key} l’affiche.",
   "tips.progressPanel.title": "Combien de temps avant la fin des tests ?",
+  "tips.progressRecentFold.text": "Clique sur l’en-tête Récentes du panneau Progression pour replier ses exécutions sur cette seule ligne, avec leur nombre à côté ; clique de nouveau pour les afficher. Chaque espace de travail s’en souvient.",
+  "tips.progressRecentFold.title": "Replier Récentes",
   "tips.projectCards.text": "La Vue d’ensemble d’un projet commence par ses cartes : combien il y en a dans chaque colonne, à l’arrêt ou bloquées. Clique sur un nombre pour ouvrir son onglet Tâches.",
   "tips.projectCards.title": "Les cartes d’un projet d’un coup d’œil",
   "tips.projectTabs.text": "Quand la place manque, les onglets d’un projet se réduisent à des icônes, et l’onglet actif garde son nom tant qu’il tient. Survole un onglet pour voir son nom et son raccourci.",

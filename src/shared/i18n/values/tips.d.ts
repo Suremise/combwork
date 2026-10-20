@@ -232,6 +232,8 @@ interface HiveMessageValues {
   'tips.progressLanesOrder.title': undefined
   'tips.progressPanel.text': { key: string | number }
   'tips.progressPanel.title': undefined
+  'tips.progressRecentFold.text': undefined
+  'tips.progressRecentFold.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
   'tips.projectTabs.text': undefined

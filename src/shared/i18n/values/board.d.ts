@@ -404,9 +404,11 @@ interface HiveMessageValues {
   'board.progress.railLabel': undefined
   'board.progress.railShowing': { name: string | number; shown: number; all: number }
   'board.progress.recent': undefined
+  'board.progress.recentFold': undefined
   'board.progress.recentHover': { agent: string | number; run: string | number; state: string | number }
   'board.progress.recentHoverTook': { agent: string | number; run: string | number; state: string | number; took: string | number }
   'board.progress.recentRuns': undefined
+  'board.progress.recentShow': undefined
   'board.progress.region': undefined
   'board.progress.revisionCopied': { revision: string | number }
   'board.progress.revisionCopyFailed': undefined
