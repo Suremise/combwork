@@ -12,6 +12,7 @@ import { snapshot } from '../workflow/checks'
 import type { Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
 import { NoneAdapter } from './none'
+import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
 
 export class NonePlatform implements PlatformAdapter {
@@ -89,15 +90,26 @@ export class NonePlatform implements PlatformAdapter {
     const all = this.hashing.deliverables()
     const files = isUnknown(all) ? [] : all
     const snapA = await snapshot(project, files, null)
+    const t0 = Date.now()
     const ok = run.command ? (await run.exec(run.command, project)).ok : false
+    // The watcher's write log, its deliverables only; where it has no complete record of the run, the stat snapshots.
+    const seen = await observer.changedBetween(project, t0, Date.now(), (written) => written.filter((f) => this.hashing.isDeliverable(f)))
     for (const f of files) this.hashing.invalidate(f)
     const after = this.hashing.revision(paths)
     const snapB = await snapshot(project, files, null)
     let whyNot: CheckBracket['whyNot']
     if (!run.command) whyNot = 'notCheck'
     else if (isUnknown(before) || isUnknown(after) || before.revision !== after.revision) whyNot = 'revisionChanged'
-    else if (snapA !== snapB) whyNot = 'changed'
+    else if (isUnknown(seen) ? snapA !== snapB : seen.changed) whyNot = 'changed'
     return { revision: isUnknown(before) ? '' : before.revision, tested: isUnknown(after) ? '' : after.revision, ok, ...(whyNot ? { whyNot } : {}) }
+  }
+
+  /** The watcher's events; a deliverable written loses its cached hash first (§16.3.3), even if its size and time didn't change. */
+  observe(onChange: (e: ObserveEvent) => void): Disposable {
+    return observer.subscribe(this.wf.cfg.project, (e) => {
+      if (e.kind === 'written') for (const p of e.paths) this.hashing.invalidate(p)
+      onChange(e)
+    })
   }
 
   /** No check copies: no isolation in 1.0 (OP-16); the remedy is running again when the deliverables are quiet. */

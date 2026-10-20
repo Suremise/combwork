@@ -10,6 +10,7 @@ import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
+import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, Maybe } from './types'
 
 /** What a start records of the platform: the card's folder, line, base and target (None: its manifests). */
@@ -83,4 +84,6 @@ export interface PlatformAdapter {
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
+  /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
+  observe(onChange: (e: ObserveEvent) => void): Disposable
 }
