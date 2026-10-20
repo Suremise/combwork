@@ -1,0 +1,443 @@
+// A card's fact log (SPEC §16.4): typed, append-only, recorded by Hive or observed from the platform, and the pure fold
+// that derives the card's state from it. The same fold runs in the spike, main and tests (ARCHITECTURE "Facts and
+// derived state"). Facts carry platform-neutral words (revision, line, target, result); anything only one platform
+// has goes in `data.platform`, which only its adapter reads.
+//
+// P2 spike (#1118): not wired into the app yet.
+
+/** Who caused a fact. */
+export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
+
+export const agentActor = (agent: string): Actor => `agent:${agent}`
+export const agentOf = (a: Actor): string | null => (a.startsWith('agent:') ? a.slice(6) : null)
+
+/** Stage ids (§16.5.2). Stable strings; their names are messages, and the user may rename them (OP-30). */
+export type StageId = 'hold' | 'todo' | 'active' | 'review' | 'approved' | 'merging' | 'done'
+
+/** The six fixed categories, by today's column ids (§16.5.1): Active is `doing`, Approved is `passed`. */
+export type Category = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
+
+export const STAGE_CATEGORY: Record<StageId, Category> = { hold: 'hold', todo: 'todo', active: 'doing', review: 'review', approved: 'passed', merging: 'passed', done: 'done' }
+
+export type CardKind = 'code' | 'no-code'
+
+export interface FileChange {
+  path: string
+  /** git's letter (A, M, D, R…), or None's A / M / D against the card's start. */
+  status: string
+}
+
+/** None: a card's paths with their content hashes (never contents), §16.3.3. */
+export type Manifest = Record<string, string>
+
+export interface StartedData {
+  /** `project`, or the slot's folder. */
+  folder: string
+  /** The line the card works on (Git branch); null for None. */
+  line: string | null
+  /** The revision the card's change starts from: Git, the target's head (slots) or the folder's head; None, the manifest's hash. */
+  base: string | null
+  target: string | null
+  builder: string
+  cardKind: CardKind
+  /** None: the card's paths and their hashes at the start. */
+  manifest?: Manifest
+  /** `Adopted` only: the column it was in at the upgrade (§16.17). */
+  adoptedFrom?: 'doing' | 'review' | 'passed'
+  passedBefore1_0?: boolean
+  platform?: Record<string, unknown>
+}
+
+export interface SubmittedData {
+  /** The revision submitted; null for a no-code card. */
+  revision: string | null
+  /** The change's endpoints, fixed when submitted (§16.3.2). */
+  base: string | null
+  head: string | null
+  /** The candidate key (Git: patch-id). Never decides sameness on its own. */
+  key: string | null
+  files: FileChange[]
+  round: number
+  /** The decision generation the builder had received. */
+  generation: number
+  /** The same revision as a submission that failed review (with a note). */
+  sameRevision: boolean
+  summary: string
+  note?: string
+  /** None: the card's declared paths. */
+  paths?: string[]
+  /** Shared folder: the card's commits, in order. */
+  commits?: string[]
+  adopted?: boolean
+  /** Warnings that didn't refuse (G16). */
+  warnings?: string[]
+  platform?: Record<string, unknown>
+}
+
+export interface CheckRanData {
+  name: string
+  command: string
+  /** The card's revision the run was for. */
+  revision: string
+  /** What was checked out where it ran. */
+  tested: string
+  result: 'passed' | 'failed' | 'stopped'
+  run: string
+  durationMs: number
+  by: string
+  counted: boolean
+  whyNot?: 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
+  isolated?: boolean
+}
+
+export type ForYouKind = 'approve' | 'decide' | 'test' | 'signIn' | 'other'
+
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook'
+
+/** The data of each kind (§16.4.2). */
+export interface FactData {
+  Started: StartedData
+  Adopted: StartedData
+  Submitted: SubmittedData
+  CheckRan: CheckRanData
+  ReviewStarted: { reviewer: string; submission: number; revision: string | null; reviewCopy?: string }
+  Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
+  CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
+  Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
+  LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
+  CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
+  Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string }
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number }
+  IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
+  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
+  IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
+  IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean }
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
+  /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
+  MergedInPart: { revision: string; target: string }
+  /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
+  LeftTarget: { revision: string; target: string }
+  Accepted: { revision?: string; submission?: number }
+  Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' }
+  Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number> }
+  Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
+  Blocked: { reason: string }
+  Unblocked: Record<string, never>
+  Decision: { decision: string; generation: number; text: string }
+  DecisionsReceived: { agent: string; generation: number }
+  CannotWithinRules: { rule: string; why: string; request: string }
+  ReviewerRequest: { text: string }
+  HeadMoved: { line: string | null; from: string | null; to: string | null; key?: string | null }
+  TargetMoved: { target: string; from: string | null; to: string | null }
+  Gone: { what: 'line' | 'folder' | 'repository' | 'deliverables' }
+  LaneChanged: { lane: string; before: number[]; after: number[] }
+  Undone: { fact: number; by: Actor }
+}
+
+export type FactKind = keyof FactData
+
+export interface Fact<K extends FactKind = FactKind> {
+  seq: number
+  card: number
+  kind: K
+  at: string
+  actor: Actor
+  source: 'recorded' | 'observed'
+  /** The ruleset the fact was decided under. */
+  ruleset?: string
+  /** Observed facts: what makes two observers' copies of one transition the same (§16.17), unique per card and kind. */
+  dedupe?: string
+  data: FactData[K]
+}
+
+/** A fact before the store gives it its seq and time. */
+export type NewFact<K extends FactKind = FactKind> = Omit<Fact<K>, 'seq' | 'at' | 'card'>
+
+export const isKind = <K extends FactKind>(f: Fact, k: K): f is Fact<K> => f.kind === k
+
+// --- Derived state (§16.4.3).
+
+export interface Submission extends SubmittedData {
+  id: number
+  by: string | null
+}
+
+export interface QueueEntry {
+  id: string
+  seq: number
+  revision: string
+  target: string
+  requeue?: 'transient' | 'retry'
+  state: 'open' | 'started' | 'cancelled' | 'failed' | 'integrated'
+  failure?: FactData['IntegrationFailed']
+  cancelled?: FactData['IntegrationCancelled']['reason']
+  started?: FactData['IntegrationStarted']
+  phases: FactData['IntegrationPhase']['phase'][]
+}
+
+export interface CardState {
+  stage: StageId
+  /** The seq of the cycle's Started (or Adopted); 0 before the first start. */
+  cycle: number
+  started: (StartedData & { seq: number; adopted: boolean }) | null
+  submissions: Submission[]
+  latest: Submission | null
+  /** Reviewers who started a review, per submission id. */
+  reviewing: Record<number, string[]>
+  verdicts: (FactData['Verdict'] & { seq: number })[]
+  /** The newest decision generation on the card (0: none). */
+  generation: number
+  /** The generation each agent has received. */
+  received: Record<string, number>
+  /** The revision the latest submission's passes now cover (moved by carry-overs and the queue's updates), and its base. */
+  approved: { revision: string | null; base: string | null } | null
+  /** A content-stale pass (a new revision that isn't the same change), until the builder submits again. */
+  stale: FactData['Stale'] | null
+  /** Open requests to the user: For you. */
+  requests: FactData['ApprovalRequested'][]
+  /** Every request made this cycle, by id (answered or not). */
+  made: Record<string, FactData['ApprovalRequested']>
+  approvals: FactData['Approval'][]
+  entries: QueueEntry[]
+  integrated: FactData['Integrated'] | null
+  accepted: FactData['Accepted'] | null
+  /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
+  rounds: number
+  /** Every agent recorded working the card (Started, Submitted): no-self-review reads these, never commit authors. */
+  builders: string[]
+  overrides: FactData['Override'][]
+  /** The last observed head of the card's folder. */
+  head: string | null
+  /** The last observed HeadMoved's seq this cycle (what the next observation follows), else the cycle's start. */
+  lastHeadFact: number
+  attributed: string[]
+  checks: FactData['CheckRan'][]
+  marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
+  blocked: string | null
+  lastSeq: number
+}
+
+export const emptyState = (): CardState => ({
+  stage: 'todo',
+  cycle: 0,
+  started: null,
+  submissions: [],
+  latest: null,
+  reviewing: {},
+  verdicts: [],
+  generation: 0,
+  received: {},
+  approved: null,
+  stale: null,
+  requests: [],
+  made: {},
+  approvals: [],
+  entries: [],
+  integrated: null,
+  accepted: null,
+  rounds: 0,
+  builders: [],
+  overrides: [],
+  head: null,
+  lastHeadFact: 0,
+  attributed: [],
+  checks: [],
+  marks: {},
+  blocked: null,
+  lastSeq: 0
+})
+
+const addOnce = (list: string[], x: string): string[] => (list.includes(x) ? list : [...list, x])
+
+/** Folds a card's facts (in seq order) into its state. Pure: the stage is the last `Moved`'s, never a claim. */
+export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
+  const s = emptyState()
+  s.stage = initial
+  for (const f of facts) {
+    s.lastSeq = Math.max(s.lastSeq, f.seq)
+    const by = agentOf(f.actor)
+    switch (f.kind) {
+      case 'Started':
+      case 'Adopted': {
+        const d = f.data as StartedData
+        // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq })
+        s.cycle = f.seq
+        s.lastHeadFact = f.seq
+        s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
+        s.head = d.base
+        s.builders = addOnce(s.builders, d.builder)
+        break
+      }
+      case 'Submitted': {
+        const d = f.data as SubmittedData
+        const sub: Submission = { ...d, id: f.seq, by }
+        s.submissions.push(sub)
+        s.latest = sub
+        s.approved = { revision: d.revision, base: d.base }
+        s.stale = null
+        if (by) s.builders = addOnce(s.builders, by)
+        break
+      }
+      case 'ReviewStarted': {
+        const d = f.data as FactData['ReviewStarted']
+        s.reviewing[d.submission] = addOnce(s.reviewing[d.submission] ?? [], d.reviewer)
+        break
+      }
+      case 'Verdict': {
+        const d = f.data as FactData['Verdict']
+        s.verdicts.push({ ...d, seq: f.seq })
+        if (!d.pass) s.rounds++
+        break
+      }
+      case 'CarriedOver': {
+        const d = f.data as FactData['CarriedOver']
+        s.approved = { revision: d.to, base: d.toBase }
+        break
+      }
+      case 'Updated': {
+        const d = f.data as FactData['Updated']
+        if (d.carried && s.approved) s.approved = { ...s.approved, revision: d.to }
+        break
+      }
+      case 'Stale': {
+        const d = f.data as FactData['Stale']
+        // A decision makes passes stale by generation; only a content-stale pass waits for the builder (§16.4.6).
+        if (d.why !== 'decision') s.stale = d
+        break
+      }
+      case 'ApprovalRequested': {
+        const d = f.data as FactData['ApprovalRequested']
+        s.requests.push(d)
+        s.made[d.request] = d
+        break
+      }
+      case 'CannotWithinRules':
+        break
+      case 'Approval': {
+        const d = f.data as FactData['Approval']
+        s.approvals.push(d)
+        s.requests = s.requests.filter((r) => r.request !== d.request)
+        if (d.answer === 'declined') s.rounds++
+        break
+      }
+      case 'IntegrationRequested': {
+        const d = f.data as FactData['IntegrationRequested']
+        s.entries.push({ id: d.entry, seq: f.seq, revision: d.revision, target: d.target, ...(d.requeue ? { requeue: d.requeue } : {}), state: 'open', phases: [] })
+        break
+      }
+      case 'IntegrationCancelled': {
+        const d = f.data as FactData['IntegrationCancelled']
+        const e = s.entries.find((x) => x.id === d.entry)
+        if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'cancelled', cancelled: d.reason })
+        break
+      }
+      case 'IntegrationStarted': {
+        const d = f.data as FactData['IntegrationStarted']
+        const e = s.entries.find((x) => x.id === d.entry)
+        if (e) Object.assign(e, { state: 'started', started: d })
+        break
+      }
+      case 'IntegrationPhase': {
+        const d = f.data as FactData['IntegrationPhase']
+        s.entries.find((x) => x.id === d.entry)?.phases.push(d.phase)
+        break
+      }
+      case 'IntegrationFailed': {
+        const d = f.data as FactData['IntegrationFailed']
+        const e = s.entries.find((x) => x.id === d.entry)
+        if (e) Object.assign(e, { state: 'failed', failure: d })
+        break
+      }
+      case 'Integrated': {
+        const d = f.data as FactData['Integrated']
+        s.integrated = d
+        const e = d.entry ? s.entries.find((x) => x.id === d.entry) : undefined
+        if (e) e.state = 'integrated'
+        if (d.outsideRules?.length) s.marks.outsideRules = d.outsideRules
+        delete s.marks.leftTarget
+        break
+      }
+      case 'MergedInPart':
+        s.marks.mergedInPart = f.data as FactData['MergedInPart']
+        break
+      case 'LeftTarget':
+        s.marks.leftTarget = f.data as FactData['LeftTarget']
+        break
+      case 'Accepted':
+        s.accepted = f.data as FactData['Accepted']
+        break
+      case 'Moved':
+        s.stage = (f.data as FactData['Moved']).to
+        break
+      case 'Override':
+        s.overrides.push(f.data as FactData['Override'])
+        break
+      case 'Blocked':
+        s.blocked = (f.data as FactData['Blocked']).reason
+        break
+      case 'Unblocked':
+        s.blocked = null
+        break
+      case 'Decision':
+        s.generation = Math.max(s.generation, (f.data as FactData['Decision']).generation)
+        break
+      case 'DecisionsReceived': {
+        const d = f.data as FactData['DecisionsReceived']
+        s.received[d.agent] = Math.max(s.received[d.agent] ?? 0, d.generation)
+        break
+      }
+      case 'HeadMoved': {
+        const d = f.data as FactData['HeadMoved']
+        s.head = d.to
+        s.lastHeadFact = f.seq
+        break
+      }
+      case 'CommitAttributed':
+        s.attributed.push((f.data as FactData['CommitAttributed']).commit)
+        break
+      case 'CheckRan':
+        s.checks.push(f.data as FactData['CheckRan'])
+        break
+      default:
+        break
+    }
+  }
+  return s
+}
+
+/** The distinct reviewers who passed the latest submission at the current generation (the quorum, G1b). */
+export function passingReviewers(s: CardState): string[] {
+  if (!s.latest) return []
+  const id = s.latest.id
+  return [...new Set(s.verdicts.filter((v) => v.submission === id && v.pass && v.generation === s.generation).map((v) => v.reviewer))]
+}
+
+/** The user's approval of the latest submission at the current generation, for a request of this gate. */
+export function approvedByUser(s: CardState, gate?: string): boolean {
+  if (!s.latest) return false
+  const id = s.latest.id
+  return s.approvals.some((a) => a.answer === 'approved' && a.generation === s.generation && (a.submission === undefined || a.submission === id) && (!gate || s.made[a.request]?.gate === gate))
+}
+
+/** The open queue entry, if any (open or started: not yet with an outcome). */
+export const openEntry = (s: CardState): QueueEntry | undefined => s.entries.find((e) => e.state === 'open' || e.state === 'started')
+
+/**
+ * Unchanged requeues after transient failures since the last new revision (`requeue.allowed`, §16.5.3). A hold or the
+ * user's own cancel resets the count, so holding a card never strands it.
+ */
+export function transientRequeues(s: CardState): number {
+  let n = 0
+  const since = s.latest?.id ?? 0
+  for (const e of s.entries.filter((x) => x.seq > since)) {
+    if (e.requeue === 'transient') n++
+    if (e.state === 'cancelled' && (e.cancelled === 'hold' || e.cancelled === 'user')) n = 0
+  }
+  return n
+}
+
+/** The card's For you, from its open requests (§16.8.5). */
+export const forYou = (s: CardState): FactData['ApprovalRequested'][] => s.requests

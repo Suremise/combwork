@@ -214,9 +214,20 @@ Changes emit `tasks-changed` (routed by workspace path), once a board change com
 
 ## Workflow layer (1.0)
 
-The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch: the modules
-below don't exist yet, and each phase moves its part of this section into the code map when it merges. Names are
-proposals the builders may change, keeping the boundaries.
+The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch, and each phase
+moves its part of this section into the code map when it merges. Names are proposals the builders may change,
+keeping the boundaries.
+
+**The core spike (P2, #1118)** built the core in these places, **isolated: nothing in the app imports it** (no IPC, no
+Agent API route, no `boardWrite`): `src/shared/platform/descriptors.ts`; `src/shared/workflow/` (`facts.ts` with the
+fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as messages, `cardRefs.ts`, `laneList.ts`);
+`src/main/platform/` (`git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
+a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table; `runtime.ts`;
+`reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
+scenarios on real temporary repositories. Whether it becomes P3's base or is rewritten is Darren's decision on #1118;
+where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), "nothing
+changed during a run" read from stat snapshots and the HEAD reflog (P3's watcher), card folders as plain worktrees
+(P7's slots), no repository lock or signing pauses in the queue (P5), refusal text in English only (P4 translates).
 
 **Today, where it attaches** (read on 20 Oct, 1.0.0 at edbf9b33):
 - Every card write goes through `boardWrite(ws, fn)` (`src/main/boardStore.ts:536`): file lock, `BEGIN IMMEDIATE`,
@@ -258,7 +269,8 @@ runs them after the commit (`afterBoardWrite` starts it) and again at start for 
 happens for a write that rolled back, and nothing is lost to a crash after the commit (SPEC §16.4.5).
 
 **Same change.** The Git adapter stores each submission's endpoints (base, head), its candidate key
-(`git patch-id --stable`) and its files, and never recomputes a submitted change from the target's current state.
+(`git patch-id --stable` of the diff with no context lines, `-U0`) and its files, and never recomputes a submitted
+change from the target's current state.
 Sameness is a **replay**: `git merge-tree --write-tree --merge-base=<B1> <B2> <R1>` must succeed and give `<R2>`'s
 tree; patch-id only rules out a different change quickly; anything unsettled is not the same (SPEC §16.3.2). In a
 shared folder, `CommitAttributed` facts record which card each commit belongs to when it is seen.

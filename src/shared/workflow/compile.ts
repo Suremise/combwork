@@ -1,0 +1,140 @@
+// Options → ruleset (SPEC §16.5.4): the stages and, for every move, the ordered guards the ruleset holds. A ruleset is
+// plain data with a content hash as its id; a card keeps the one it started with until it's Done. Pieces are looked up
+// by id, so a ruleset can't run arbitrary code: an unknown id refuses to load.
+//
+// P2 spike (#1118): not wired into the app yet.
+
+import { hasCapability } from '../platform/descriptors'
+import type { Category, StageId } from './facts'
+import { STAGE_CATEGORY } from './facts'
+import { contradictions, reviewerAgent, type Contradiction, type WorkflowOptions } from './options'
+import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
+
+export const RULESET_VERSION = 1
+
+export interface StageDef {
+  id: StageId
+  category: Category
+}
+
+export interface Ruleset {
+  id: string
+  version: number
+  /** The options it was compiled from (the pieces' parameters: check names, target, style…). */
+  options: WorkflowOptions
+  stages: StageDef[]
+  guards: Record<MoveId, GuardId[]>
+}
+
+/** A short, stable hash of a string (FNV-1a, 64 bits, as hex): the ruleset's id. Pure, so the window can compute it too. */
+export function stableHash(text: string): string {
+  let h = 0xcbf29ce484222325n
+  const prime = 0x100000001b3n
+  for (let i = 0; i < text.length; i++) {
+    h ^= BigInt(text.charCodeAt(i))
+    h = (h * prime) & 0xffffffffffffffffn
+  }
+  return h.toString(16).padStart(16, '0')
+}
+
+/** JSON with keys sorted, so equal options hash alike whatever order they were written in. */
+export function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v as object)
+      .sort()
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v)
+}
+
+/** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
+export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git' && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'hiveMerges' || o.finish === 'agentMerges')
+
+/** The stages the options produce (§16.5.2). */
+export function stagesOf(o: WorkflowOptions): StageId[] {
+  const review = o.review !== 'none'
+  const git = o.platform === 'git'
+  const approved = git && (o.finish === 'agentMerges' || (o.finish === 'hiveMerges' && (review || o.okBefore.mode !== 'never')) || (o.finish === 'notChecked' && review))
+  const out: StageId[] = ['hold', 'todo', 'active']
+  if (review) out.push('review')
+  if (approved) out.push('approved')
+  if (git && o.finish === 'hiveMerges') out.push('merging')
+  out.push('done')
+  return out
+}
+
+function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
+  const g = Object.fromEntries(MOVES.map((m) => [m, [] as GuardId[]])) as Record<MoveId, GuardId[]>
+  const review = o.review !== 'none'
+  const agent = reviewerAgent(o.review)
+  if (o.dependenciesDone) g.start.push('start.notBlocked', 'start.dependenciesIntegrated')
+  if (o.folder === 'slots') g.start.push('start.slotAvailable')
+  g.submit.push('submit.notDuplicate')
+  if (needsChange(o)) g.submit.push('submit.ready', 'submit.clean')
+  if (needsChange(o) && o.folder === 'project') g.submit.push('submit.trailer')
+  if (o.identity) g.submit.push('submit.identity')
+  if (o.preChecks.length) g.submit.push('submit.checksPassed')
+  if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
+  if (review) g.submit.push('submit.decisionsReceived')
+  if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []))
+  if (agent) {
+    if (o.noSelfReview) g.startReview.push('review.notAuthor')
+    g.startReview.push('review.decisionsReceived')
+    g.verdict.push('verdict.reviewing', 'verdict.currentSubmission')
+    if (o.noSelfReview) g.verdict.push('review.notAuthor')
+    g.verdict.push('review.decisionsReceived')
+  }
+  if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
+  if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
+  if (o.finish === 'hiveMerges') {
+    if (review) g.integrate.push('integrate.approved')
+    if (o.strict) g.integrate.push('integrate.upToDate')
+    if (o.mergeChecks.length) g.integrate.push('integrate.checksPassed')
+    g.integrate.push('done.contained')
+  }
+  if (o.finish === 'committed') g.finish.push('done.contained')
+  return g
+}
+
+export type CompileResult = { ok: true; ruleset: Ruleset } | { ok: false; contradictions: Contradiction[] }
+
+/** Compiles options into a ruleset, or names the contradictions that stop it (refused when saved). */
+export function compile(o: WorkflowOptions): CompileResult {
+  const bad = contradictions(o)
+  if (bad.length) return { ok: false, contradictions: bad }
+  const guards = guardsOf(o)
+  // A guard whose capability the platform lacks can't be in its rulesets (§16.5.3).
+  for (const m of MOVES) guards[m] = guards[m].filter((id) => !GUARDS[id].needs || hasCapability(o.platform, GUARDS[id].needs))
+  const stages = stagesOf(o).map((id) => ({ id, category: STAGE_CATEGORY[id] }))
+  const body = { version: RULESET_VERSION, options: o, stages, guards }
+  return { ok: true, ruleset: { id: stableHash(canonical(body)), ...body } }
+}
+
+/** compile(), for options already validated: throws on a contradiction. */
+export function mustCompile(o: WorkflowOptions): Ruleset {
+  const r = compile(o)
+  if (!r.ok) throw new Error(`contradictory options: ${r.contradictions.join(', ')}`) // i18n-ignore: a programming error, never shown
+  return r.ruleset
+}
+
+export type LoadResult = { ok: true; ruleset: Ruleset; readOnly: boolean } | { ok: false; error: 'unknownPiece' | 'malformed'; piece?: string }
+
+/**
+ * A stored ruleset, checked before use: every guard must be a piece this Hive has (an unknown id refuses), and one from
+ * a newer Hive opens read-only (§16.5.4).
+ */
+export function loadRuleset(data: unknown): LoadResult {
+  const r = data as Partial<Ruleset> | null
+  if (!r || typeof r !== 'object' || typeof r.id !== 'string' || typeof r.version !== 'number' || !r.guards || !r.options || !Array.isArray(r.stages)) return { ok: false, error: 'malformed' }
+  for (const [move, ids] of Object.entries(r.guards)) {
+    if (!(MOVES as readonly string[]).includes(move)) return { ok: false, error: 'unknownPiece', piece: move }
+    for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
+  }
+  return { ok: true, ruleset: r as Ruleset, readOnly: r.version > RULESET_VERSION }
+}
+
+export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)
+export const holds = (r: Ruleset, move: MoveId, id: GuardId): boolean => r.guards[move].includes(id)

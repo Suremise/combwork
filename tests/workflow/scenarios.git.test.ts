@@ -1,0 +1,470 @@
+// SPEC §16.18's acceptance scenarios at the core, on real temporary Git repositories (#1118): the moves, gates,
+// refusals and reconciliation of a card with its own line, with the Assistant off.
+import { afterEach, describe, expect, it } from 'vitest'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
+import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
+import { preset } from '../../src/shared/workflow/options'
+import { reconcile } from '../../src/main/workflow/reconcile'
+import { runCheck, blocks } from '../../src/main/workflow/checks'
+import { isRefusal } from '../../src/main/workflow/runtime'
+import type { FactData } from '../../src/shared/workflow/facts'
+
+let env: Env | null = null
+afterEach(() => {
+  env?.close()
+  env = null
+})
+
+const pair = (extra: Parameters<typeof setup>[1] = {}, over: Partial<ReturnType<typeof preset>> = {}) => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], ...over }, extra))
+const agentMerges = (over: Partial<ReturnType<typeof preset>> = {}) => pair({}, { finish: 'agentMerges', ...over })
+
+/** A Pair card started by B1, with a commit in its folder: the card and its folder. */
+async function started(e: Env, title = 'Fix the thing', files: Record<string, string> = { 'src/fix.txt': 'fixed\n' }) {
+  const card = e.wf.createCard({ title, reviewer: 'R1' })
+  const s = await e.wf.start(card.key, B1)
+  moved(s)
+  const folder = s.data!.folder as string
+  commit(folder, files, `${card.key}: ${title}`)
+  return { card, folder }
+}
+
+/** Submitted, reviewed and passed by R1. */
+async function approved(e: Env, title?: string, files?: Record<string, string>) {
+  const c = await started(e, title, files)
+  moved(await e.wf.submit(c.card.key, B1, { summary: 'done' }))
+  moved(await e.wf.startReview(c.card.key, R1))
+  moved(await e.wf.verdict(c.card.key, R1, { pass: true, comment: 'good' }))
+  return c
+}
+
+describe('workflow scenarios, Git', () => {
+  it('S1: uncommitted changes refuse submit with the next step; the card stays Active', async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    writeFileSync(join(folder, 'src/fix.txt'), 'more, uncommitted\n')
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'done' }), 'submit.clean')
+    expect(r.message).toContain('uncommitted changes (src/fix.txt)')
+    expect(r.next).toBe('Commit your changes (or remove them), then submit again.')
+    expect(r.override).toBe('the user')
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.kinds(card.id)).toContain('Refused')
+  })
+
+  it('S2: a comment or a message on an Approved card never moves it; only a new submission does', async () => {
+    const e = agentMerges()
+    const { card, folder } = await approved(e)
+    expect(e.wf.state(card).stage).toBe('approved')
+    moved(e.wf.comment(card.key, B1))
+    moved(e.wf.comment(card.key, R1))
+    await e.wf.requestToBuilder(card.key, R1, 'one more thing?')
+    expect(e.wf.state(card).stage).toBe('approved')
+    // A new revision that isn't the same change → stale; the builder's submission is what moves it.
+    commit(folder, { 'src/fix.txt': 'fixed better\n' }, 'more')
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card).stage).toBe('approved')
+    expect(e.wf.state(card).stale).not.toBeNull()
+    moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
+    expect(e.wf.state(card).stage).toBe('review')
+  })
+
+  it('S6: the builder can neither start a review of nor give a verdict on its own card', async () => {
+    const e = pair()
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    refusedBy(await e.wf.startReview(card.key, B1), 'review.notAuthor')
+    refusedBy(await e.wf.verdict(card.key, B1, { pass: true, comment: 'mine is fine' }), 'verdict.reviewing')
+    expect(e.wf.state(card).verdicts).toEqual([])
+  })
+
+  it('S8: an amend with new content after approval → Stale, the queue entry cancelled; the builder submits → Review', async () => {
+    const e = pair()
+    const { card, folder } = await approved(e)
+    expect(e.wf.state(card).stage).toBe('merging')
+    sh(folder, 'commit', '-q', '--amend', '-m', 'amended')
+    writeFileSync(join(folder, 'src/fix.txt'), 'different content\n')
+    sh(folder, 'commit', '-q', '-a', '--amend', '--no-edit')
+    await reconcile(e.wf, card)
+    const s = e.wf.state(card)
+    expect(s.stale?.why).toBe('change')
+    expect(s.stage).toBe('approved')
+    expect(s.entries.at(-1)?.state).toBe('cancelled')
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('stale'))).toBe(true)
+    // Nothing for the queue to merge.
+    expect(await e.queue().runOnce('main')).toBeNull()
+    moved(await e.wf.submit(card.key, B1, { summary: 'amended' }))
+    expect(e.wf.state(card).stage).toBe('review')
+  })
+
+  it('S9: a clean rebase onto a newer target carries the pass over; with "Exact revision only" it goes stale', async () => {
+    for (const sameness of ['change', 'exact'] as const) {
+      const e = agentMerges({ sameness })
+      const { card, folder } = await approved(e)
+      commit(e.project, { 'other.txt': 'target moved\n' }, 'target moves')
+      sh(folder, 'rebase', '-q', 'main')
+      await reconcile(e.wf, card)
+      const s = e.wf.state(card)
+      if (sameness === 'change') {
+        expect(e.kinds(card.id)).toContain('CarriedOver')
+        expect(s.stale).toBeNull()
+        expect(s.approved?.revision).toBe(sh(folder, 'rev-parse', 'HEAD'))
+      } else {
+        expect(s.stale?.why).toBe('exact')
+      }
+      expect(s.stage).toBe('approved')
+      e.close()
+      env = null
+    }
+  })
+
+  it('S10: a rebase whose conflict resolution changes the change goes stale', async () => {
+    const e = agentMerges()
+    const { card, folder } = await approved(e, 'Edit a', { 'src/a.txt': 'one\nCARD\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' })
+    commit(e.project, { 'src/a.txt': 'one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'target edits the next line')
+    // Resolve the rebase by hand, differently.
+    sh(folder, 'reset', '-q', '--hard', 'main')
+    commit(folder, { 'src/a.txt': 'one\nCARD resolved\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'resolved')
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card).stale?.why).toBe('change')
+  })
+
+  it('S10: a rebase that conflicted commit by commit, resolved to exactly the replay of the whole change, carries the pass over', async () => {
+    const e = agentMerges()
+    const card = e.wf.createCard({ title: 'Two commits', reviewer: 'R1' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    // The first commit touches line 2 (beside the target's coming change), the second takes that back and edits line 9.
+    commit(folder, { 'src/a.txt': 'one\nTEMP\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'first')
+    commit(folder, { 'src/a.txt': 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nNINE\nten\n' }, 'second')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    commit(e.project, { 'src/a.txt': 'one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'target edits line 3')
+    // `git rebase` stops on the first commit; the builder resolves it so the result is the whole change on the new base.
+    let conflicted = false
+    try {
+      sh(folder, 'rebase', '-q', 'main')
+    } catch {
+      conflicted = true
+    }
+    expect(conflicted).toBe(true)
+    writeFileSync(join(folder, 'src/a.txt'), 'one\nTEMP\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\nten\n')
+    sh(folder, 'add', '-A')
+    try {
+      sh(folder, '-c', 'core.editor=true', 'rebase', '--continue')
+    } catch {
+      // The second commit conflicts too (it takes line 2 back, beside line 3): resolved to the whole change's replay.
+      writeFileSync(join(folder, 'src/a.txt'), 'one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nNINE\nten\n')
+      sh(folder, 'add', '-A')
+      sh(folder, '-c', 'core.editor=true', 'rebase', '--continue')
+    }
+    expect(sh(folder, 'show', 'HEAD:src/a.txt')).toBe('one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nNINE\nten')
+    await reconcile(e.wf, card)
+    const st = e.wf.state(card)
+    expect(e.kinds(card.id)).toContain('CarriedOver')
+    expect(st).toMatchObject({ stage: 'approved', stale: null })
+  })
+
+  it('S12: a card blocked by an Approved, unmerged card can\'t start', async () => {
+    const e = agentMerges()
+    const { card: first } = await approved(e)
+    const second = e.wf.createCard({ title: 'Needs the first', blockedBy: [first.id] })
+    const r = refusedBy(await e.wf.start(second.key, B2), 'start.dependenciesIntegrated')
+    expect(r.message).toBe(`${second.key} can't start: ${first.key} isn't done yet.`)
+    // The user's drag to Active asks first; moving it anyway records the override and still starts it (Started, a line).
+    expect(await e.wf.move(second.key, 'active', 'user')).toMatchObject({ ask: true, rules: expect.arrayContaining(['start.dependenciesIntegrated']) })
+    moved(await e.wf.move(second.key, 'active', 'user', { confirm: true, reason: 'it only needs the API', builder: 'B2' }))
+    const s = e.wf.state(second)
+    expect(s.stage).toBe('active')
+    expect(s.started).toMatchObject({ builder: 'B2' })
+    expect(s.overrides).toMatchObject([{ rules: ['start.dependenciesIntegrated', 'start.notBlocked', 'start.slotAvailable'], reason: 'it only needs the API' }])
+  })
+
+  it('S15: a commit authored with a personal email refuses submit with the fix', async () => {
+    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const card = e.wf.createCard({ title: 'Identity' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'x.txt': 'x\n' }, 'personal', { email: 'me@example.com' })
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
+    expect(r.next).toContain('git commit --amend --no-edit --reset-author')
+  })
+
+  it('S16: an agent moving a card to Done is refused with the intent; the user drags it with no merge → asked, override recorded', async () => {
+    const e = pair()
+    const { card } = await started(e)
+    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'move.useIntent')
+    expect(r.next).toBe('Use the report merge intent instead.')
+    const ask = await e.wf.move(card.key, 'done', 'user')
+    expect(ask).toMatchObject({ ask: true })
+    expect((ask as { rules: string[] }).rules).toEqual(expect.arrayContaining(['submit.clean', 'integrate.approved', 'done.contained']))
+    expect(e.wf.state(card).stage).toBe('active')
+    moved(await e.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'shipped elsewhere' }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('done')
+    expect(s.overrides).toMatchObject([{ by: 'user', reason: 'shipped elsewhere' }])
+    // Recorded actions still run: no Integrated is faked.
+    expect(s.integrated).toBeNull()
+    // A drag to Review is a submit at the card's revision (across its rules), so the reviewer has something to review.
+    const { card: other } = await started(e, 'Dragged to review')
+    expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ ask: true, rules: expect.arrayContaining(['submit.clean']) })
+    moved(await e.wf.move(other.key, 'review', 'user', { confirm: true, reason: 'have a look' }))
+    expect(e.wf.state(other)).toMatchObject({ stage: 'review', latest: { summary: '' } })
+    moved(await e.wf.startReview(other.key, R1))
+  })
+
+  it('S17: the agent merges, Hive checks: a reported merge not in the target is refused', async () => {
+    const e = agentMerges()
+    const { card, folder } = await approved(e)
+    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'done.contained')
+    expect(r.next).toContain('then report the merge again')
+    // Merging it for real passes.
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'merge', sh(folder, 'rev-parse', 'HEAD'))
+    moved(await e.wf.reportMerge(card.key, B1))
+    expect(e.wf.state(card).integrated).toMatchObject({ by: 'agent', method: 'merge' })
+  })
+
+  it('S25: a no-code card: a summary, a pass, Done; no queue', async () => {
+    const e = pair()
+    const card = e.wf.createCard({ title: 'Decide the names', kind: 'no-code' })
+    moved(await e.wf.start(card.key, B1))
+    moved(await e.wf.submit(card.key, B1, { summary: 'Names decided: see the comment.' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'agreed' }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('done')
+    expect(s.accepted).toEqual({ submission: s.latest!.id })
+    expect(s.entries).toEqual([])
+    expect(s.latest!.revision).toBeNull()
+  })
+
+  it('S26: a failing pre-review check refuses submit; the failing run says it blocks review', async () => {
+    const e = pair({}, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
+    const { card } = await started(e)
+    const run = await runCheck(e.wf, { card, name: 'lint', by: 'B1', exec: async () => ({ ok: false }) })
+    if (isRefusal(run)) throw new Error(run.message)
+    expect(run).toMatchObject({ result: 'failed', counted: true })
+    expect(blocks(e.wf, card, run)).toBe('review')
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.checksPassed')
+    expect(r.message).toMatch(/^Review refused: lint hasn't passed on [0-9a-f]{7}\.$/)
+    expect(r.next).toBe(`Run hive-progress --check lint --card ${card.key}, then submit again.`)
+    const green = await runCheck(e.wf, { card, name: 'lint', by: 'B1', exec: async () => ({ ok: true }) })
+    expect(green).toMatchObject({ counted: true, result: 'passed' })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it('S38: a no-code card with no review → submit with a summary → Done, no revision, no Integrated', async () => {
+    const e = (env = setup({ platform: 'git' }))
+    const card = e.wf.createCard({ title: 'Write it down', kind: 'no-code' })
+    moved(await e.wf.start(card.key, B1))
+    moved(await e.wf.submit(card.key, B1, { summary: 'written' }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('done')
+    expect(s.latest!.revision).toBeNull()
+    expect(s.integrated).toBeNull()
+    expect(s.accepted).not.toBeNull()
+  })
+
+  it('S39: all off: a blocked card starts with a warning, submit → Done with no guard, the user drags anything with no question', async () => {
+    const e = (env = setup({ platform: 'git' }))
+    const card = e.wf.createCard({ title: 'Free flow' })
+    await e.wf.block(card.key, 'user', 'waiting for a reply')
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    expect(s.warnings?.[0]).toContain('blocked')
+    commit(e.project, { 'free.txt': 'x\n' }, 'free')
+    writeFileSync(join(e.project, 'dirty.txt'), 'uncommitted is fine here\n')
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    expect(e.wf.state(card).stage).toBe('done')
+    const other = e.wf.createCard({ title: 'Anything' })
+    for (const to of ['done', 'review', 'todo', 'approved'] as const) {
+      const r = await e.wf.move(other.key, to, 'user')
+      expect(r).toMatchObject({ ok: true })
+    }
+  })
+
+  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', async () => {
+    const e = pair()
+    const fresh = e.wf.createCard({ title: 'Just started' })
+    moved(await e.wf.start(fresh.key, B1))
+    await reconcile(e.wf, fresh)
+    expect(e.wf.state(fresh).stage).toBe('active')
+
+    const { card: partly, folder } = await started(e, 'Two parts', { 'p1.txt': '1\n' })
+    const first = sh(folder, 'rev-parse', 'HEAD')
+    commit(folder, { 'p2.txt': '2\n' }, 'part two')
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'part one by hand', first)
+    await reconcile(e.wf, partly)
+    const p = e.wf.state(partly)
+    expect(p.stage).toBe('active')
+    expect(p.marks.mergedInPart?.revision).toBe(first)
+
+    const { card: reviewed, folder: f2 } = await started(e, 'Reviewed', { 'r.txt': 'r\n' })
+    moved(await e.wf.submit(reviewed.key, B2, { summary: 'x' }))
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(f2, 'rev-parse', 'HEAD'))
+    await reconcile(e.wf, reviewed)
+    const r = e.wf.state(reviewed)
+    expect(r.stage).toBe('done')
+    expect(r.integrated).toMatchObject({ by: 'outside' })
+    expect(r.marks.outsideRules).toEqual(['review'])
+  })
+
+  it('S44: Solo, one agent in the project folder, no trailers: start, commit, submit → Done; the change is base..HEAD', async () => {
+    const e = (env = setup(preset('git', 'solo')))
+    const card = e.wf.createCard({ title: 'Solo work' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const base = s.data!.base as string
+    commit(e.project, { 's1.txt': '1\n' }, 'one')
+    const head = commit(e.project, { 's2.txt': '2\n' }, 'two')
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    const st = e.wf.state(card)
+    expect(st.stage).toBe('done')
+    expect(st.latest).toMatchObject({ base, revision: head })
+    expect(st.latest!.files.map((f) => f.path).sort()).toEqual(['s1.txt', 's2.txt'])
+    expect(st.integrated).toMatchObject({ method: 'committed' })
+  })
+
+  it('S48: a plain number as a card is refused with the forms to use', async () => {
+    const e = pair()
+    e.wf.createCard({ title: 'Any' })
+    const r = refusedBy(await e.wf.start(1061, B1), 'card.plainNumber')
+    expect(r.next).toBe('Name the card as AM-12 or #1061.')
+    refusedBy(await e.wf.start('1061', B1), 'card.plainNumber')
+    moved(await e.wf.start('#1', B1))
+  })
+
+  it('S30: whitespace-only amend after approval → Stale though patch-id is equal; a clean rebase → CarriedOver', async () => {
+    const e = agentMerges()
+    const { card, folder } = await approved(e, 'Python', { 'p.py': 'if x:\n    y = 1\n' })
+    writeFileSync(join(folder, 'p.py'), 'if x:\n  y = 1\n')
+    sh(folder, 'commit', '-q', '-a', '--amend', '--no-edit')
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card).stale?.why).toBe('change')
+  })
+
+  it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', async () => {
+    const e = pair()
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.recordDecision(card.key, 'Use the short name'))
+    expect(e.wakes.filter((w) => w.why.includes('decision')).map((w) => w.agent).sort()).toEqual(['B1', 'R1'])
+    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }), 'review.decisionsReceived')
+    await e.wf.received(card.key, 'R1')
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'meets it' }))
+    expect(e.wf.state(card).stage).toBe('merging')
+    // A decision after the pass: back to Review (stale: decision since), its entry cancelled; the same submission confirmed.
+    moved(await e.wf.recordDecision(card.key, 'And the long one too'))
+    let s = e.wf.state(card)
+    expect(s.stage).toBe('review')
+    expect(s.entries.at(-1)?.state).toBe('cancelled')
+    await e.wf.received(card.key, 'R1')
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'still meets it' }))
+    s = e.wf.state(card)
+    expect(s.stage).toBe('merging')
+    expect(s.submissions).toHaveLength(1)
+
+    // A decision while the builder's submit is on its way: refused until it has received it.
+    const { card: c2 } = await started(e, 'Second')
+    e.wf.cfg.hooks = { beforeWrite: async () => void (await e.wf.recordDecision(c2.key, 'Changed my mind')) }
+    refusedBy(await e.wf.submit(c2.key, B1, { summary: 'x' }), 'submit.decisionsReceived')
+    e.wf.cfg.hooks = {}
+    await e.wf.received(c2.key, 'B1')
+    moved(await e.wf.submit(c2.key, B1, { summary: 'x' }))
+  })
+
+  it('S57: approvals are not decisions; passes and approvals count at the current generation only; a quorum needs distinct reviewers', async () => {
+    // (a)(b) A reviewer agent, then you.
+    const e = pair({}, { review: 'agentThenYou', finish: 'agentMerges' })
+    const { card } = await approved(e)
+    let s = e.wf.state(card)
+    expect(s.stage).toBe('review')
+    const ask = s.requests[0]
+    expect(ask).toMatchObject({ kind: 'approve', gate: 'review' })
+    moved(await e.wf.answer(card.key, ask.request, 'approved'))
+    s = e.wf.state(card)
+    expect(s.generation).toBe(0)
+    expect(s.stale).toBeNull()
+    expect(s.stage).toBe('approved')
+    moved(await e.wf.recordDecision(card.key, 'A real decision'))
+    s = e.wf.state(card)
+    expect(s.stage).toBe('review')
+    await e.wf.received(card.key, 'R1')
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'confirmed' }))
+    s = e.wf.state(card)
+    expect(s.stage).toBe('review') // asked again: the old approval no longer counts
+    expect(s.requests.at(-1)).toMatchObject({ gate: 'review' })
+    e.close()
+
+    // (c) Two passes from one reviewer don't make a quorum of 2.
+    const q = (env = setup({ ...preset('git', 'pair'), reviewers: 2, finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
+    const c = await started(q, 'Quorum')
+    moved(await q.wf.submit(c.card.key, B1, { summary: 'x' }))
+    moved(await q.wf.startReview(c.card.key, R1))
+    moved(await q.wf.verdict(c.card.key, R1, { pass: true, comment: '1' }))
+    expect(q.wf.state(c.card).stage).toBe('review')
+    moved(await q.wf.startReview(c.card.key, R1))
+    moved(await q.wf.verdict(c.card.key, R1, { pass: true, comment: '1 again' }))
+    expect(q.wf.state(c.card).stage).toBe('review')
+    moved(await q.wf.startReview(c.card.key, R2))
+    moved(await q.wf.verdict(c.card.key, R2, { pass: true, comment: '2' }))
+    expect(q.wf.state(c.card).stage).toBe('approved')
+  })
+
+  it('S57 (d): You-only review and G10 count only an approval at the current generation', async () => {
+    const e = pair({}, { review: 'you', noSelfReview: false, finish: 'agentMerges' })
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const req = e.wf.state(card).requests[0]
+    expect(req).toMatchObject({ gate: 'review' })
+    moved(await e.wf.answer(card.key, req.request, 'approved'))
+    expect(e.wf.state(card).stage).toBe('approved')
+    e.close()
+    const g = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui'] } }))
+    const c = g.wf.createCard({ title: 'UI', labels: ['ui'] })
+    const s = await g.wf.start(c.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'ui.txt': 'ui\n' }, 'ui')
+    moved(await g.wf.submit(c.key, B1, { summary: 'x' }))
+    moved(await g.wf.startReview(c.key, R1))
+    moved(await g.wf.verdict(c.key, R1, { pass: true, comment: 'ok' }))
+    const ok = g.wf.state(c).requests[0]
+    expect(ok).toMatchObject({ gate: 'okBefore' })
+    moved(await g.wf.recordDecision(c.key, 'later'))
+    expect(g.wf.state(c).stage).toBe('review')
+  })
+
+  it('S2 (round): a review that fails for an explanation is a round; the same revision comes back only with a note', async () => {
+    const e = agentMerges()
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, failKind: 'explanation', comment: 'why?' }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'active', rounds: 1 })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'same' }), 'submit.sameRevisionNote')
+    moved(await e.wf.submit(card.key, B1, { summary: 'same', note: 'Because the API needs it.' }))
+    const s = e.wf.state(card)
+    expect(s.latest).toMatchObject({ sameRevision: true, note: 'Because the API needs it.', round: 2 })
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'fair' }))
+    expect(e.wf.state(card).stage).toBe('approved')
+  })
+
+  it('a refused verdict on an older submission names the latest; a verdict is always recorded and a moved head makes the pass stale at once', async () => {
+    const e = agentMerges()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const first = e.wf.state(card).latest!.id
+    moved(await e.wf.startReview(card.key, R1))
+    // The builder commits more while the review runs.
+    commit(folder, { 'late.txt': 'late\n' }, 'late')
+    moved(await e.wf.verdict(card.key, R1, { submission: first, pass: true, comment: 'good' }))
+    const s = e.wf.state(card)
+    expect(s.verdicts).toHaveLength(1)
+    expect(s.stale?.why).toBe('change')
+    expect(s.stage).toBe('approved')
+    expect((e.store.facts(card.id).find((f) => f.kind === 'Verdict')!.data as FactData['Verdict']).revision).toBe(s.latest!.revision)
+  })
+})

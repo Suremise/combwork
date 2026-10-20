@@ -99,9 +99,9 @@ describe('the suites a change needs (affected.mjs)', () => {
     for (const p of [...areas.flatMap((a) => a.paths), ...(EVERYTHING as string[])]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
   })
 
-  it('covers every source file: in an area, or one every suite needs', () => {
+  it('covers every source file: in an area, one every suite needs, or one only the unit tests load', () => {
     const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
-    for (const f of src) expect(under(f, EVERYTHING) || areas.some((a) => under(f, a.paths)), `${f} is in no area`).toBe(true)
+    for (const f of src) expect(under(f, EVERYTHING) || unitTest(f) || areas.some((a) => under(f, a.paths)), `${f} is in no area`).toBe(true)
   })
 
   it('picks an area’s suites, a suite’s own file, and about for docs the app bundles', () => {
