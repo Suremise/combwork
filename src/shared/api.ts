@@ -255,7 +255,7 @@ export interface HiveRequests {
   /** Locate…: a folder picker for an agent's worktree that wasn't found; the folder, or null when cancelled. */
   'workspace:moveLocate': (projectPath: string, agentId: string) => string | null
 
-  'project:create': (name: string) => WorkspaceInfo | null
+  'project:create': (name: string, key?: string | null) => WorkspaceInfo | null
   'project:setActive': (projectPath: string, active: boolean) => WorkspaceInfo | null
   /** Each project's key and old keys (#1219, #704), by its folder (projects with no id yet have none). */
   'project:keys': () => { projectPath: string; key: string; aliases: string[] }[]

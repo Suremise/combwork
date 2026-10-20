@@ -36,6 +36,7 @@ import { addSkill, deleteSkill, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, Sk
 import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
 import { agentProviderOf, confirm, notify, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
+import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
 import { InitRepoButton } from '../components/InitRepo'
 import { MergeSlotList, projectSlots, useMergeSlots } from '../components/MergeSlots'
@@ -254,6 +255,13 @@ const C = {
 const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 
 const S = {
+  keyLabel: msg({ id: 'project.key.label', defaultMessage: 'Project key', description: "Accessible name of the project key box (Project Settings): 2–4 letters such as AM that the project's cards are named by." }),
+  keyChange: msg({ id: 'project.key.change', defaultMessage: 'Change', description: 'Button beside the project key box (Project Settings): makes the key typed the project’s.' }),
+  keyFailed: msg({ id: 'project.key.failed', defaultMessage: 'Could not change the project key', description: "An error's title: changing a project's key failed." }),
+  keyChanged: msg({ id: 'project.key.changed', defaultMessage: 'Its cards are named {key} now; {old} still finds them.', description: "A notification after a project's key changed. {key} and {old}: the new and the old key (letters such as AM)." }),
+  keyWillAlias: msg({ id: 'project.key.willAlias', defaultMessage: 'Its cards will be named {key}-12; {old}-12 will still find them.', description: 'Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names.' }),
+  keyAliases: msg({ id: 'project.key.aliases', defaultMessage: 'Its old keys, which still find its cards: {keys}', description: "Under the project key box (Project Settings): the project's earlier keys, joined (AM and AMB), which still name its cards." }),
+  keyNone: msg({ id: 'project.key.none', defaultMessage: 'Hive gives it a key once its board is open.', description: "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)." }),
   overrides: msg({ id: 'project.settings.overrides', defaultMessage: 'Overrides the global default', description: 'Tooltip on the mark beside a project setting that is not Inherit.' }),
   now: msg({ id: 'project.settings.now', defaultMessage: '{desc} Now: {current}', description: "A setting's description followed by what the value in use does. {desc} is the description; {current} what is in use." }),
   turnedOff: msg({ id: 'project.agents.turnedOff', defaultMessage: '{provider} is turned off in Settings → Providers', description: "Tooltip on an agent's provider icon when the provider is turned off." }),
@@ -1667,6 +1675,53 @@ function AgentList({ project }: { project: ProjectInfo }) {
   )
 }
 
+/**
+ * The project's key (#1221): typed and checked as it changes, saved with Enter, Change or leaving the box; its old keys
+ * under it, which still find its cards. A board that can't be changed (read-only, waiting for its upgrade) shows it only.
+ */
+function ProjectKeyField({ project }: { project: ProjectInfo }) {
+  const keys = useStore((s) => s.projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase()) ?? null)
+  const readOnly = useStore((s) => !!s.boardState?.readOnly)
+  const [draft, setDraft] = useState(keys?.key ?? '')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setDraft(keys?.key ?? ''), [keys?.key])
+  const k = draft.trim().toUpperCase()
+  const changed = !!k && k !== keys?.key
+  const problem = changed ? keyProblemText(k, project.path) : null
+  const save = async (): Promise<void> => {
+    if (!changed || problem || busy) return
+    setBusy(true)
+    const done = await actions.attempt(tr(S.keyFailed), () => call('project:setKey', project.path, k))
+    setBusy(false)
+    if (done) notify('success', tr(S.keyChanged, { key: done, old: keys?.key ?? '' }))
+  }
+  if (!keys) return <span className="faint">{tr(S.keyNone)}</span>
+  return (
+    <div className="project-key-field">
+      <div className="flex">
+        <input
+          className={cx('input', 'mono', problem && 'invalid')}
+          value={draft}
+          maxLength={4}
+          spellCheck={false}
+          disabled={readOnly || busy}
+          aria-label={tr(S.keyLabel)}
+          aria-invalid={!!problem}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save()
+            if (e.key === 'Escape') setDraft(keys.key)
+          }}
+        />
+        <button className="btn" disabled={!changed || !!problem || busy || readOnly} onClick={() => void save()}>
+          {tr(S.keyChange)}
+        </button>
+      </div>
+      {problem ? <div className="field-error">{problem}</div> : changed ? <div className="field-hint">{tr(S.keyWillAlias, { old: keys.key, key: k })}</div> : keys.aliases.length > 0 && <div className="field-hint">{tr(S.keyAliases, { keys: fmt.list(keys.aliases) })}</div>}
+    </div>
+  )
+}
+
 export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // Its sections and rows are formatted here: a change of language shows them in it at once.
   useLanguage()
@@ -1784,6 +1839,12 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   }
 
   const defs: ProjectSettingDef[] = [
+    {
+      section: 'agents',
+      key: 'key',
+      ...rowText('project.key'),
+      render: () => <ProjectKeyField project={project} />
+    },
     {
       section: 'agents',
       key: 'defaultProvider',

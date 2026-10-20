@@ -51,9 +51,10 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
+  // The wakes as their checks read them: cards by number (they name them by key too, #1219: checked once below).
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => lib.unkey(w.text))
   }
   const say = async (id, text) => {
     await inv('pty:write', lib.ptyKey(alpha, id), text)
@@ -89,6 +90,7 @@ const check = (name, ok, extra = '') => {
   // Into Review, no watches: the reviewer is woken, the builder (who moved it) isn't.
   await say(builder.id, `boardmove ${c1} review`)
   check('a card arriving in Review wakes its reviewer', !!(await until(async () => wakes('Reviewer').length === 1, 20000)) && wakes('Reviewer')[0] === `[Hive] #${c1} (Builder's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`, JSON.stringify(wakes('Reviewer')))
+  check('…naming the card by key, with the number the tools take (#1219)', fs.readFileSync(path.join(claudeHome, 'fake-wakes.jsonl'), 'utf8').split('\n').some((l) => lib.KEYED.test(l)))
   check('…noted on the card', !!(await until(async () => (await said(c1)).includes('Hive: Woke Reviewer (alpha) to review it (a loop wake)'), 10000)), JSON.stringify(await said(c1)))
   check("…and the builder isn't woken by its own move", wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)

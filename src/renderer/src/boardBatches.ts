@@ -1,11 +1,11 @@
 import { msg, tr } from '@shared/i18n'
 import type { ArchiveResult } from '@shared/types'
 import { call, errorMessage } from './api'
-import { loadTasks, notify, pushToast } from './store'
+import { cardLabelOf, get, loadTasks, notify, pushToast } from './store'
 
-/** "#3, #4, #5", or the first six and how many more. */
+/** "AM-3, AM-4, #5" (by key where they have one), or the first six and how many more. */
 function numbers(ns: number[]): string {
-  const shown = ns.slice(0, 6).map((n) => `#${n}`).join(', ')
+  const shown = ns.slice(0, 6).map((n) => cardLabelOf(get(), n)).join(', ')
   return ns.length > 6 ? tr(msg({ id: 'board.batch.andMore', defaultMessage: '{cards} and {n, number} more', description: 'Cards that could not be brought back from an archive, cut short: the first six card numbers ({cards}: "#3, #4") and how many more ({n}).' }), { cards: shown, n: ns.length - 6 }) : shown
 }
 
@@ -19,7 +19,7 @@ export function reportArchived(r: ArchiveResult): void {
         n: r.skipped.length,
         why: `${r.skipped
           .slice(0, 4)
-          .map((s) => `#${s.number} ${s.why}`)
+          .map((s) => `${cardLabelOf(get(), s.number)} ${s.why}`)
           .join('; ')}${r.skipped.length > 4 ? '; …' : ''}`
       })
     : undefined

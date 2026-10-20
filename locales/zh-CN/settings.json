@@ -589,6 +589,8 @@
   "settings.project.fileLocks.desc": "当智能体试图编辑此项目文件夹中另一个智能体正在编辑的文件时如何处理。“继承”使用“设置”→“智能体与工作树”→“文件锁”。",
   "settings.project.fileLocks.tip": "适用于共用文件夹的智能体（在各自工作树中的智能体不会冲突）。智能体编辑文件时会占用该文件，在回合结束时释放。通过 shell 命令进行的编辑不在此范围内。",
   "settings.project.fileLocks.title": "文件锁",
+  "settings.project.key.desc": "用于命名其卡片的 2 到 4 个字母：AM-12。更改后，旧键仍属于此项目，并且仍能找到它的卡片。",
+  "settings.project.key.title": "项目键",
   "settings.project.keybindings.desc": "更改某个快捷键即可为此项目单独设置；点“重置”会恢复为全局快捷键。保存在项目的 .hive 文件夹中，不会被提交。",
   "settings.project.keybindings.title": "快捷键",
   "settings.project.loopRounds.desc": "此项目的卡片循环中，你未指定时每张卡片最多进行几轮，之后智能体会停下来询问你。留空则继承“设置”→“工作区”→“卡片循环轮次”。",

@@ -25,7 +25,7 @@
   "performance.cards.heading": "Cartões",
   "performance.cards.lastHeld": "Assumido por último",
   "performance.cards.loadTarget": "o custo dos cartões",
-  "performance.cards.open": "Abrir #{number}",
+  "performance.cards.open": "Abrir {number}",
   "performance.cards.project": "Projeto",
   "performance.cards.reviewer": "Revisor",
   "performance.cards.rounds": "Rodadas",

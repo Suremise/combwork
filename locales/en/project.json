@@ -667,6 +667,46 @@
     "defaultMessage": "You are working on this project",
     "description": "Tooltip on the project header's Active switch, on."
   },
+  "project.key.aliases": {
+    "defaultMessage": "Its old keys, which still find its cards: {keys}",
+    "description": "Under the project key box (Project Settings): the project's earlier keys, joined (AM and AMB), which still name its cards."
+  },
+  "project.key.change": {
+    "defaultMessage": "Change",
+    "description": "Button beside the project key box (Project Settings): makes the key typed the project’s."
+  },
+  "project.key.changed": {
+    "defaultMessage": "Its cards are named {key} now; {old} still finds them.",
+    "description": "A notification after a project's key changed. {key} and {old}: the new and the old key (letters such as AM)."
+  },
+  "project.key.failed": {
+    "defaultMessage": "Could not change the project key",
+    "description": "An error's title: changing a project's key failed."
+  },
+  "project.key.form": {
+    "defaultMessage": "A key is 2 to 4 letters, A to Z.",
+    "description": "Why a project key typed can't be used (New Project dialog, Project Settings): it isn't 2–4 letters A–Z."
+  },
+  "project.key.label": {
+    "defaultMessage": "Project key",
+    "description": "Accessible name of the project key box (Project Settings): 2–4 letters such as AM that the project's cards are named by."
+  },
+  "project.key.none": {
+    "defaultMessage": "Hive gives it a key once its board is open.",
+    "description": "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)."
+  },
+  "project.key.prefix": {
+    "defaultMessage": "{key} and {other}, another project’s key, begin alike: no key can be the start of another.",
+    "description": "Why a project key typed can't be used: {key} and another project's key {other} (letters such as AM and AMB) would be one the start of the other."
+  },
+  "project.key.taken": {
+    "defaultMessage": "{key} is another project’s key, or was: a key stays with its project for good.",
+    "description": "Why a project key typed can't be used: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)."
+  },
+  "project.key.willAlias": {
+    "defaultMessage": "Its cards will be named {key}-12; {old}-12 will still find them.",
+    "description": "Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names."
+  },
   "project.limit.heading": {
     "defaultMessage": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."

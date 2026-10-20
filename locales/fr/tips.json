@@ -234,6 +234,8 @@
   "tips.progressRecentFold.title": "Replier Récentes",
   "tips.projectCards.text": "La Vue d’ensemble d’un projet commence par ses cartes : combien il y en a dans chaque colonne, à l’arrêt ou bloquées. Clique sur un nombre pour ouvrir son onglet Tâches.",
   "tips.projectCards.title": "Les cartes d’un projet d’un coup d’œil",
+  "tips.projectKeys.text": "Chaque projet a une clé de 2 à 4 lettres qui nomme ses cartes : AM-12. Cherchez AM-12 dans le tableau ou la palette de commandes, ou AM- pour toutes les cartes du projet ; un ancien #12 fonctionne toujours. Changez une clé dans les paramètres du projet.",
+  "tips.projectKeys.title": "Les cartes portent la clé de leur projet",
   "tips.projectTabs.text": "Quand la place manque, les onglets d’un projet se réduisent à des icônes, et l’onglet actif garde son nom tant qu’il tient. Survole un onglet pour voir son nom et son raccourci.",
   "tips.projectTabs.title": "Des onglets qui font de la place",
   "tips.projectTabsKeys.text": "Alt+1 à Alt+8 ouvrent les onglets d'un projet dans l'ordre où ils apparaissent, de Session à Git. Mémoire, Compétences, Modèles et MCP sont dans Plus ▾ au bout, et dans le menu Projet de la barre de menus.",

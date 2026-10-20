@@ -15,6 +15,7 @@ import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
 import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -1493,6 +1494,8 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
   const what = String(req.label ?? '').trim().slice(0, 80) || 'Archive All' // i18n-ignore: the batch's name, stored in English and quoted in its cards' history (the window words it, archiveBatchText)
   const project = typeof req.project === 'string' ? req.project : null
   const query = typeof req.query === 'string' ? req.query : ''
+  // The board's search as the window ran it: keys and old keys too (#1221).
+  const searchKeys = keysForSearch(ws)
   const busy = req.includeBusy === true ? null : (opts.busy ?? null)
   // Why a card, as it is now, isn't one the user asked to archive (null: it is). Only the window reads it: in its language.
   const outside = (c: TaskCard): string | null =>
@@ -1500,7 +1503,7 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
       ? tr(msg({ id: 'tasks.skipped.movedColumn', defaultMessage: 'moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}', description: 'Why Archive All left a card on the board (after its number, "#12 moved to Doing"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number.' }), { column: c.column })
       : project !== null && c.project.toLowerCase() !== project.toLowerCase()
         ? tr(msg({ id: 'tasks.skipped.movedProject', defaultMessage: 'moved to another project', description: 'Why Archive All left a card on the board (after its number, "#12 moved to another project"): it moved to another project meanwhile. Lower case: it follows the number.' }))
-        : !cardMatches(c, query)
+        : !cardMatches(c, query, searchKeys)
           ? tr(msg({ id: 'tasks.skipped.noMatch', defaultMessage: 'no longer matches the search', description: 'Why Archive All left a card on the board (after its number, "#12 no longer matches the search"): it changed meanwhile, and the board\'s search no longer finds it. Lower case: it follows the number.' }))
           : (busy?.(c) ?? null)
   const result = await boardLock(ws, async (): Promise<ArchiveResult> => {

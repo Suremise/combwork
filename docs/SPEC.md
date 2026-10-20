@@ -2118,8 +2118,15 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   (`schema/keysStep.ts`), never reusing a number a card of the project has or had. The card JSON gains `key`; every card
   reference the Agent API and the hive tools take accepts a key string too; replies, wakes, the inbox and the doorbell
   name cards "HI-1230 (#1240)" (a project agent: its own project's cards; another's by number, as it sees them); one quiet
-  notice after the upgrade lists the keys. The window's side (the new-project dialog, Project Settings, tiles, labels and
-  search) is #1221.
+  notice after the upgrade lists the keys.
+- **The window, built in P3** [#1221]: one label everywhere a card is named (`cardLabel`: its key, `#12` for a card with
+  none), on the board, the card dialog, card chips, agent panes, the Assistant, lane segments, the Progress panel,
+  Performance, stall reasons and notifications; history lines and main's errors keep `#N` (agents read them, until P8).
+  New Project… has a key box, suggested from the name until the user types, checked as typed, left empty for the
+  suggestion; Project Settings → Agents & Worktrees → Project key changes it (the old one listed as an alias). The compact
+  sidebar's tiles show the key, 3–4 letters smaller. The board's search, Archive All and the command palette find `AM-12`,
+  `am-12`, `AM-` (the project's cards) and old keys (`#N` as before); a key form no project has (`re-`) is searched as
+  words. Terminal links take keys (capitals only) beside `#N`; `#N` stays the old global number.
 - **Everywhere else the key appears** [#704]: board and palette search by `AM-`; notifications; lane rows; handover and
   plan file names; Apiary rooms. Keys compare case-insensitively in ref paths (NTFS) [HB3's round 1 finding 18].
 - **Tables** [#1025]: cards with typed columns; comments, history, decisions, links, holds, and facts in their own

@@ -92,7 +92,7 @@ const until = async (fn, ms = 10000) => {
   check('Start puts the card in Doing', !!(await until(async () => (await card(n)).column === 'doing', 10000)))
   const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${(await live()).sessionId}.jsonl`)
   const prompt = await until(async () => {
-    const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => l.includes(`task #${n} `)) : []
+    const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => lib.unkey(l).includes(`task #${n} `)) : []
     // Read from its inbox (#650: the task's doorbell names it; the hive_inbox call's result has its text).
     const content = lines.length ? JSON.parse(lines.at(-1)).message.content : null
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)

@@ -134,7 +134,7 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
 
   // With a search on, the strip still puts the card at the true top of its column, above the cards the search hides
   // (#263): not at the top of the ones it shows, which here are none.
-  const search = page.getByPlaceholder('Search cards (#12, words, labels)')
+  const search = page.getByPlaceholder('Search cards (AM-12, words, labels)')
   await search.fill('t3 card')
   await collapse('On Hold')
   check('the search hides the other cards', !!(await until(async () => (await tile(n.t3).count()) === 1 && (await tile(n.t1).count()) === 0, 5000)))
@@ -148,13 +148,13 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   const fold = (x, name) => tile(x).getByRole('button', { name })
   const height = (x) => tile(x).evaluate((e) => e.getBoundingClientRect().height)
   const tall = await height(n.t1)
-  await fold(n.t1, `Collapse #${n.t1} to one line`).click()
+  await fold(n.t1, `Collapse ${await lib.cardLabel(inv, n.t1)} to one line`).click()
   check('a card folds to one line', !!(await until(async () => (await tile(n.t1).getAttribute('class')).includes('folded'), 5000)) && (await height(n.t1)) < tall && (await height(n.t1)) < 34, `${tall} → ${await height(n.t1)}`)
   const line = await tile(n.t1).evaluate((e) => {
     const t = e.querySelector('.task-title')
     return { cut: t.scrollWidth > t.clientWidth, text: e.innerText }
   })
-  check('folded, it shows its number and its title cut short', line.cut && line.text.includes(`#${n.t1}`), JSON.stringify(line))
+  check('folded, it shows its key and its title cut short', line.cut && line.text.includes(await lib.cardLabel(inv, n.t1)), JSON.stringify(line))
   // Escape a moment after a card opens closes it and asks nothing (#288): the card's first render used to take its
   // fields, not filled in yet, for edits, and its Escape listener kept that render's view until the next one's effects
   // ran: an Escape in between asked "Discard unsaved changes?". A microtask or a timer after the click was enough, and
@@ -181,14 +181,14 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   check('clicking a folded card still opens it', !!(await until(async () => (await dialog.count()) === 1, 5000)))
   await page.keyboard.press('Escape')
   check('…and Escape closes it, asking nothing', !!(await until(async () => (await dialog.count()) === 0, 5000)) && (await discard.count()) === 0)
-  await fold(n.t2, `Collapse #${n.t2} to one line`).click()
+  await fold(n.t2, `Collapse ${await lib.cardLabel(inv, n.t2)} to one line`).click()
   check('a folded blocked card keeps its marker', !!(await until(async () => (await tile(n.t2).locator('.task-flag.blocked').count()) === 1, 5000)))
-  await fold(n.t1, `Expand #${n.t1}`).click()
+  await fold(n.t1, `Expand ${await lib.cardLabel(inv, n.t1)}`).click()
   check('and unfolds', !!(await until(async () => !(await tile(n.t1).getAttribute('class')).includes('folded'), 5000)))
 
   // A folded card drags like any other, and stays folded in its new column.
   await tile(n.t2).dragTo(column('Doing').locator('.board-column-body'))
-  const toDoing = page.locator('.dialog', { hasText: `Move #${n.t2} to Doing` })
+  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, n.t2)} to Doing` })
   if (await until(async () => (await toDoing.count()) === 1, 5000)) await toDoing.getByRole('button', { name: 'Move to Doing' }).click()
   check('a folded card drags to another column and stays folded', !!(await until(async () => (await column('Doing').locator(tile(n.t2)).count()) === 1, 5000)) && (await tile(n.t2).getAttribute('class')).includes('folded'))
 
@@ -267,12 +267,12 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   await until(async () => (await pageB.locator(`.task-card[data-task="${bCard}"]`).count()) === 1, 10000)
   // A: Passed collapsed and the Review card folded.
   await collapse('Passed')
-  await fold(n.review, `Collapse #${n.review} to one line`).click()
+  await fold(n.review, `Collapse ${await lib.cardLabel(inv, n.review)} to one line`).click()
   await until(async () => (await tile(n.review).getAttribute('class')).includes('folded'), 5000)
   const afterA = await state()
   // Then B, from its own (older) view of the folds.
   await pageB.getByRole('button', { name: 'Collapse On Hold' }).click()
-  await pageB.locator(`.task-card[data-task="${bCard}"]`).getByRole('button', { name: `Collapse #${bCard} to one line` }).click()
+  await pageB.locator(`.task-card[data-task="${bCard}"]`).getByRole('button', { name: `Collapse ${await lib.cardLabel(invB, bCard)} to one line` }).click()
   const savedBoth = await until(async () => {
     const f = (await inv('ui:get')).boardFold ?? {}
     return f[wsB.toLowerCase()]?.cards?.includes(bCard) && f

@@ -97,7 +97,7 @@ const check = (name, ok, extra = '') => {
   check('it watches again', !!(await watch()))
   await inv('tasks:comment', card, 'Second change')
   const marked = await until(async () => (await live(agent.id))?.untakenLine, HUNG_MS)
-  check('not taken after Enter again: the agent is marked', !!marked && /^\[Hive\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
+  check('not taken after Enter again: the agent is marked', !!marked && /^\[Hive\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\./.test(lib.unkey(marked.text)) && lib.KEYED.test(marked.text), JSON.stringify(marked))
   // Hive's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Hive pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))

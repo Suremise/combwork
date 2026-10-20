@@ -26,6 +26,8 @@ const keysStep = await import('../src/main/schema/keysStep')
 const { openDb } = await import('../src/main/db')
 const { staleWhy } = await import('../src/main/deliveries')
 
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 15000
 const user = { kind: 'user' } as const
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
@@ -120,6 +122,21 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.key ?? `#${c.number}`).sort()).toEqual(['#4', 'AM-1', 'HI-1', 'HI-2'])
     // Keys and numbers resolve, any case; a key nobody has, nothing.
     for (const [ref, want] of [['HI-2', made[2].number], ['hi-2', made[2].number], ['AM-1', made[1].number], [`#${made[3].number}`, made[3].number], [made[0].number, made[0].number], ['HI-9', null], ['ZZ-1', null]] as [string | number, number | null][]) expect({ ref, got: keys.cardOfRef(w, ref) }).toEqual({ ref, got: want })
+    await close(w)
+  })
+
+  it('New Project…: the key chosen, refused before the folder is made when it can’t be one, or the suggestion (#1221)', async () => {
+    const ws = workspace(['hive'])
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    await keys.createProjectWithKey(w, 'web-app', 'wb')
+    expect(await keyOf(w, 'web-app')).toBe('WB')
+    for (const [name, key, why] of [['taken', 'HI', /another project’s key/], ['prefix', 'HIV', /begin alike/], ['form', 'H1', /2 to 4 letters/]] as const) {
+      await expect(keys.createProjectWithKey(w, name, key)).rejects.toThrow(why)
+      expect(existsSync(join(ws, name))).toBe(false)
+    }
+    await keys.createProjectWithKey(w, 'amberlight', null)
+    expect(await keyOf(w, 'amberlight')).toBe('AM')
     await close(w)
   })
 
@@ -310,7 +327,7 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
     // Said once, quietly.
     expect(store.keysNoticeDue(w)).toBe(true)
     keys.sayKeysOnce(w)
-    await expect.poll(() => store.keysNoticeDue(w)).toBe(false)
+    await expect.poll(() => store.keysNoticeDue(w), { timeout: HUNG_MS }).toBe(false)
     await close(w)
   })
 })

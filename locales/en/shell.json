@@ -979,6 +979,10 @@
     "defaultMessage": "No matching commands",
     "description": "The command palette when what is typed matches nothing."
   },
+  "shell.palette.openCard": {
+    "defaultMessage": "Open Card: {card} {title}",
+    "description": "A card in the command palette, found by its name: choosing it opens the card. {card} is its name (its key, such as AM-12, or #12 for a card with none), {title} its title (the user’s own words)."
+  },
   "shell.palette.placeholder": {
     "defaultMessage": "Type a command or project name",
     "description": "The command palette's placeholder."

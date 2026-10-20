@@ -51,9 +51,10 @@ const check = (name, ok, extra = '') => {
     return v
   }
   /** What Hive typed into the Assistant to wake it (the fake logs each line from Hive). */
+  // The wakes as their checks read them: cards by number (they name them by key too, #1219).
   const wakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => lib.unkey(w.text))
   }
   /** Types into a terminal as the user does; Enter separately when asked. */
   const type = async (p, id, text, enter = true) => {

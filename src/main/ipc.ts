@@ -48,7 +48,7 @@ import * as mcp from './mcp'
 import * as notes from './notes'
 import * as removal from './projectRemoval'
 import * as tasks from './tasks'
-import { changeProjectKey, keyProjects, sayKeysOnce } from './projectKeys'
+import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
@@ -595,7 +595,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return r.filePaths[0]
     },
 
-    'project:create': (name) => workspace.createProject(name),
+    'project:create': (name, key) => createProjectWithKey(workspace, name, key),
     'project:removalInfo': (p) => removal.removalInfo(p),
     'project:remove': (p, how) => {
       if (!['hide', 'remove', 'delete'].includes(how)) throw hiveError(M.removeHow, { how: String(how) }, { kind: 'invalid' })

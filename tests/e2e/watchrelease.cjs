@@ -51,9 +51,10 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
+  // The wakes as their checks read them: cards by number (they name them by key too, #1219).
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => lib.unkey(w.text))
   }
   const say = async (id, text) => {
     await inv('pty:write', lib.ptyKey(alpha, id), text)
@@ -139,7 +140,9 @@ const check = (name, ok, extra = '') => {
   const marker = lane.locator('.progress-lane-state.stalled')
   check("the lane says it is stalled: its card waits in Review on a reviewer that hasn't started", !!(await until(async () => (await marker.count()) === 1, 15000)))
   await marker.hover()
-  const tip = page.locator('.tip', { hasText: `#${c3}: Reviewer is watching #${c3} but hasn't started reviewing it: in Review for 20 min.` })
+  // The window names the card by key (#1221).
+  const C3 = await lib.cardLabel(inv, c3)
+  const tip = page.locator('.tip', { hasText: `${C3}: Reviewer is watching ${C3} but hasn't started reviewing it: in Review for 20 min.` })
   check('…and its tooltip says why', !!(await until(async () => (await tip.count()) === 1, 5000)), (await page.locator('.tip').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'watchrelease-stalled-lane.png') })
   // The lane's own wake (#405: the watch counts only a verdict) is typed into the reviewer meanwhile: taken first.
@@ -155,7 +158,7 @@ const check = (name, ok, extra = '') => {
   check('…and the lane says it is stalled again', !!(await until(async () => (await marker.count()) === 1, 15000)))
   await page.mouse.move(0, 0)
   await marker.hover()
-  const verdictTip = page.locator('.tip', { hasText: `#${c3}: Reviewer started reviewing #${c3} but has given no verdict, and has only been watching it for 20 min.` })
+  const verdictTip = page.locator('.tip', { hasText: `${C3}: Reviewer started reviewing ${C3} but has given no verdict, and has only been watching it for 20 min.` })
   check('…its tooltip says the review has no verdict', !!(await until(async () => (await verdictTip.count()) === 1, 5000)), (await page.locator('.tip').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'watchrelease-stalled-verdict.png') })
   await inv('tasks:update', c3, { blocked: 'Should the icon be a bee?' })

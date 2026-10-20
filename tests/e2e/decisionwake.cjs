@@ -55,9 +55,14 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  const wakes = () => {
+  // The wakes as their checks read them: cards by number (they name them by key too, #1219: checked once below).
+  const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).map((w) => w.text)
+  }
+  const wakes = () => {
+    const f = path.join(claudeHome, 'fake-wakes.jsonl')
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).map((w) => lib.unkey(w.text))
   }
   const reads = (n) => (fs.existsSync(mcpLog) ? fs.readFileSync(mcpLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((c) => c.tool === 'hive_read_task' && c.ok && JSON.parse(c.args).number === n)
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -85,6 +90,7 @@ const check = (name, ok, extra = '') => {
   check('one line for the two decisions', !!(await until(async () => wakes().length >= 1, HUNG_MS)), JSON.stringify(wakes()))
   await lib.sleep(4000) // A fixed wait on purpose: this checks that a second line does NOT come.
   check('…exactly one, naming the card and both', wakes().length === 1 && /^\[Hive\] #\d+ has 2 new decisions from the user: read them \(hive_read_task\) and carry on from where you asked\.$/.test(wakes()[0]) && wakes()[0].startsWith(`[Hive] #${n} `), JSON.stringify(wakes()))
+  check('…naming the card by key, with the number the tools take (#1219)', rawWakes().some((t) => lib.KEYED.test(t)), JSON.stringify(rawWakes().slice(-1)))
   check('it reads them', !!(await until(async () => reads(n).length >= 1, HUNG_MS)))
   check("the card's history says whom Hive told", !!(await until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === 'Told Asker (alpha) of 2 new decisions'), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
   await takesPrompts('after the decisions')

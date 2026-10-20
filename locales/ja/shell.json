@@ -244,6 +244,7 @@
   "shell.palette.command": "{category}：{command}",
   "shell.palette.goToProject": "プロジェクトに移動：{project}",
   "shell.palette.noMatch": "一致するコマンドはありません",
+  "shell.palette.openCard": "カードを開く：{card} {title}",
   "shell.palette.placeholder": "コマンド名またはプロジェクト名を入力",
   "shell.palette.projectsPlaceholder": "プロジェクトに移動",
   "shell.providers.choose": "プロバイダーを選択",

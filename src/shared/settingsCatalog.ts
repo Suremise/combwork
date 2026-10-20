@@ -705,6 +705,7 @@ function projectProviderRows(p: ProviderDescriptor): Row[] {
 }
 
 const PROJECT_ROWS: Row[] = [
+  { section: 'agents', key: 'key', title: msg({ id: 'settings.project.key.title', defaultMessage: 'Project key', description: "A setting's title (Project Settings → Agents & Worktrees): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)." }), desc: msg({ id: 'settings.project.key.desc', defaultMessage: 'The 2 to 4 letters its cards are named by: AM-12. Changed, the old key stays this project’s and still finds its cards.', description: 'What the setting "Project key" does, under its title (Project Settings → Agents & Worktrees). AM-12 is an example card name: keep it as it is.' }), type: 'custom' },
   { section: 'agents', key: 'defaultProvider', title: msg({ id: 'settings.project.defaultProvider.title', defaultMessage: 'Default provider', description: "A setting's title (Project Settings → Agents & Worktrees)." }), desc: msg({ id: 'settings.project.defaultProvider.desc', defaultMessage: "The provider Add Agent uses for this project's new agents (the dialog can choose another). Inherit uses Settings → Providers → Default provider.", description: 'What the setting "Default provider" does, under its title (Project Settings → Agents & Worktrees).' }), tip: msg({ id: 'settings.project.defaultProvider.tip', defaultMessage: 'Each agent keeps the provider it was given; change it in the agent’s settings.', description: 'The info tip of the setting "Default provider" (Project Settings → Agents & Worktrees): more on what it does and when it applies.' }), type: 'custom' },
   ...PROVIDERS.flatMap(projectProviderRows),
   { section: 'sessions', key: 'compactSuggestTokens', title: msg({ id: 'settings.project.compactSuggestTokens.title', defaultMessage: 'Suggest compacting above', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.compactSuggestTokens.desc', defaultMessage: 'Context size (tokens) at which Compact is highlighted for this project. Empty inherits Settings → Sessions → Suggest compacting above.', description: 'What the setting "Suggest compacting above" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.compactSuggestTokens.tip', defaultMessage: 'Only changes when the Compact button turns orange; compacting is always available once the agent has finished.', description: 'The info tip of the setting "Suggest compacting above" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 2000000, step: 10000, off: msg({ id: 'settings.project.compactSuggestTokens.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Suggest compacting above" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
@@ -764,6 +765,7 @@ const ACTIONS = new Set([
   'advanced.data',
   'advanced.reset',
   'project.storage',
+  'project.key',
   'project.keybindings',
   'project.agents',
   'project.metadata',
@@ -879,6 +881,7 @@ const DOCS: Record<string, string> = {
   advanced: 'Troubleshooting' // i18n-ignore: a heading of the user guide, which stays English (D2)
 }
 const DOCS_BY_ID: Record<string, string> = {
+  'project.key': 'Project keys', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWakes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)

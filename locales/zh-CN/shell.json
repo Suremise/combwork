@@ -244,6 +244,7 @@
   "shell.palette.command": "{category}：{command}",
   "shell.palette.goToProject": "转到项目：{project}",
   "shell.palette.noMatch": "没有匹配的命令",
+  "shell.palette.openCard": "打开卡片：{card} {title}",
   "shell.palette.placeholder": "输入命令或项目名称",
   "shell.palette.projectsPlaceholder": "转到项目",
   "shell.providers.choose": "选择提供方",
