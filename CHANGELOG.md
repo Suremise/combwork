@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Hive acts on work merged outside it, and one switch turns the rules off.** When you merge a card's branch by hand, Hive now moves the card to Done (marked *outside the rules* if its review hadn't passed yet). **Settings → Advanced → Workflow rules are enforced** (on by default) turns every workflow rule off at once: cards then move wherever you put them, and Hive only records what happens to their work. A project's workflow options are now read from Hive's and the workspace's defaults too, under the project's own; options Hive can't use leave that project with every rule off, rather than failing a move (#1263).
 - **Projects have keys, and cards are numbered in their project.** Each project gets a short key (HI, AM…), suggested from its folder's name, and its cards are named by it: `HI-12`. Cards you already have keep their number in their project (#1061 is HI-1061), and the old `#N` keeps working everywhere. A card moved to another project takes a number there, its old key still finding it. After the upgrade, a quiet notice lists the keys. Agents see cards as "HI-1230 (#1240)" and can name them by key in Hive's tools and the Agent API (#1219).
 
 - **Recent folds away.** Click the **Recent** heading in the Progress panel (or press Enter or Space on it) to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it, after a restart too (#1228).

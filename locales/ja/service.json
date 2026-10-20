@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "その画像はありません",
   "service.transcripts.noTool": "そのツール呼び出しはありません",
   "service.transcripts.none": "このセッションにはまだトランスクリプトがありません。",
+  "service.workflow.closed": "このカードのワークスペースは閉じられました",
   "service.workspace.advancedNotHere": "{setting}はワークスペースごとには設定できません。",
   "service.workspace.agentGone": "そのエージェントはもう存在しません。",
   "service.workspace.badName": "プロジェクト名は「.」で始めることも、{chars}を含めることもできません",

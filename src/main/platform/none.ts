@@ -33,6 +33,13 @@ export class NoneAdapter {
     private excluded: string[] = []
   ) {}
 
+  /** The folders left out changed (the project's options, #1263): what is hashed follows from the next read. */
+  setExcluded(excluded: string[]): void {
+    if (JSON.stringify(excluded) === JSON.stringify(this.excluded)) return
+    this.excluded = [...excluded]
+    this.cache.clear()
+  }
+
   /** A watcher write event for a path: its cached hash goes, even if its size and time look unchanged. */
   invalidate(path: string): void {
     this.cache.delete(toPosix(path))

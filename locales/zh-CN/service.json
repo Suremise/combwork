@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "没有这张图片",
   "service.transcripts.noTool": "没有这个工具调用",
   "service.transcripts.none": "此会话还没有会话记录。",
+  "service.workflow.closed": "此卡片所属的工作区已关闭",
   "service.workspace.advancedNotHere": "{setting} 不能针对工作区设置。",
   "service.workspace.agentGone": "该智能体已不存在。",
   "service.workspace.badName": "项目名称不能以“.”开头，也不能包含 {chars}",

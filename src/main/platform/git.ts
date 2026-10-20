@@ -2,7 +2,7 @@
 // with its endpoints fixed when submitted, sameness is a replay with git's own three-way merge, containment finds a
 // merge, a fast-forward or a squash. Every call goes through the `git()` runner; every answer is a value or unknown.
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
 import { existsSync, readFileSync } from 'original-fs'
 import { isAbsolute, join } from 'path'

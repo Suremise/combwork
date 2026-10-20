@@ -4,8 +4,9 @@
 // and returns it; else it writes the facts, `Moved`, the stage cache and the side effects as durable actions, which a
 // worker runs after the commit (§16.4.5).
 //
-// P2 spike (#1118): the runtime over the spike's own store (factStore.ts), not wired into the app: no IPC, no Agent API
-// route, no boardWrite. P4 puts it behind `tasks.ts` → `boardWrite` and the intents' routes.
+// In the app, one instance per project of an open workspace comes from service.ts (#1263), on the board's store, its
+// writes changes of the board and its actions run by the actions worker; reconciliation uses it. P4 routes `tasks.ts`'s
+// moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
 import { agentOf, approvedByUser, foldCard, openEntry, passingReviewers, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'

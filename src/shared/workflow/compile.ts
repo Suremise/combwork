@@ -2,7 +2,8 @@
 // plain data with a content hash as its id; a card keeps the one it started with until it's Done. Pieces are looked up
 // by id, so a ruleset can't run arbitrary code: an unknown id refuses to load.
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app (#1263): the runtime compiles a project's resolved options (main/workflow/rulesets.ts) and stores each
+// ruleset a card starts under.
 
 import { hasCapability } from '../platform/descriptors'
 import type { Category, StageId } from './facts'

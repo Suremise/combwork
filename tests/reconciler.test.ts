@@ -1,12 +1,13 @@
-// Reconciliation in the app, record-only (#1217, SPEC §16.4.4): what was done outside Hive to a card's work becomes
-// observed facts on the board's store, and nothing moves. A card works in its agent's worktree on its own line: a hand
+// Reconciliation in the app (#1217, SPEC §16.4.4): what was done outside Hive to a card's work becomes observed facts on
+// the board's store. Record-only with workflow rules not enforced (Settings → Advanced, #1263), as most of this file
+// runs: nothing moves. Enforced, it acts at the app level (S7, S41). A card works in its agent's worktree on its own line: a hand
 // merge of its branch after its pass (Integrated by outside, the card still Passed), a rebase after a pass (CarriedOver),
 // an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Hives racing on one
 // head (the log says what is true now).
 import { execFileSync } from 'child_process'
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -24,10 +25,16 @@ const { Workflow } = await import('../src/main/workflow/runtime')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
 const G = await import('../src/main/platform/git')
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
+// Record-only unless a test turns the rules on.
+advanced.load(join(base, 'profile'))
+await advanced.set(ENFORCE, false)
 afterAll(async () => {
+  advanced.stop()
   stopReconciling()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
@@ -306,5 +313,74 @@ describe('reconciliation in the app, round 3 (#1217)', () => {
       { target: 'main', from: null, to: x }
     ])
     expect(git(wt, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('card')
+  })
+})
+
+// #1263: with workflow rules enforced, reconciliation acts on what it observes, through the project's runtime (S7, S41 at
+// the app level, on the real board); turned off, the same observations are recorded and nothing moves.
+describe('reconciliation acts with workflow rules enforced (#1263)', () => {
+  beforeAll(() => advanced.set(ENFORCE, true))
+  afterEach(() => advanced.set(ENFORCE, true))
+  afterAll(() => advanced.set(ENFORCE, false))
+  const actions = (w: WS, card: number): string[] => store.boardRead(w, (db) => (db.prepare('SELECT kind FROM card_actions WHERE card = ? ORDER BY id').all(card) as { kind: string }[]).map((r) => r.kind))
+  const column = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card, w))).column
+
+  it('S7: a Passed card merged by hand is Done (outside), its lane told and its slot released', async () => {
+    const { w, repo, wt } = await workspace()
+    const { card, head } = await passedCard(w, wt)
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await reconcileNow(w, repo)
+    expect(factsOf(w, card).find((f) => f.kind === 'Integrated')).toMatchObject({ actor: 'outside', data: { revision: head, by: 'outside' } })
+    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    expect(await column(w, card)).toBe('done')
+    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    // Again: nothing more.
+    await reconcileNow(w, repo)
+    expect(kinds(w, card).filter((k) => k === 'Integrated' || k === 'Moved').slice(-2)).toEqual(['Integrated', 'Moved'])
+  })
+
+  it("S41: a card just started isn't Done; part of an Active card's work merged by hand is a mark; a Review card merged by hand is Done outside the rules", async () => {
+    const fresh = await workspace()
+    const just = (await inWorkspace(fresh.w, () => tasks.createTask({ title: 'Just started', project: 'p' }, user))).number
+    await inWorkspace(fresh.w, () => tasks.updateTask(just, { column: 'doing', agent: 'a1' }, user))
+    await reconcileNow(fresh.w, fresh.repo)
+    expect(await column(fresh.w, just)).toBe('doing')
+
+    const part = await workspace()
+    const partly = (await inWorkspace(part.w, () => tasks.createTask({ title: 'Two parts', project: 'p' }, user))).number
+    await inWorkspace(part.w, () => tasks.updateTask(partly, { column: 'doing', agent: 'a1' }, user))
+    const first = commitIn(part.wt, 'p1.txt')
+    commitIn(part.wt, 'p2.txt')
+    git(part.repo, 'merge', '-q', '--no-ff', '-m', 'part one by hand', first)
+    await reconcileNow(part.w, part.repo)
+    expect(factsOf(part.w, partly).find((f) => f.kind === 'MergedInPart')).toMatchObject({ data: { revision: first, target: 'main' } })
+    expect(await column(part.w, partly)).toBe('doing')
+
+    const rev = await workspace()
+    const reviewed = (await inWorkspace(rev.w, () => tasks.createTask({ title: 'Reviewed', project: 'p' }, user))).number
+    await inWorkspace(rev.w, () => tasks.updateTask(reviewed, { column: 'doing', agent: 'a1' }, user))
+    commitIn(rev.wt, 'r.txt')
+    await inWorkspace(rev.w, () => tasks.updateTask(reviewed, { column: 'review' }, builder))
+    git(rev.repo, 'merge', '-q', '--no-ff', '-m', 'by hand', 'card')
+    await reconcileNow(rev.w, rev.repo)
+    const r = foldCard(factsOf(rev.w, reviewed))
+    expect(r.integrated).toMatchObject({ by: 'outside' })
+    expect(r.marks.outsideRules).toEqual(['review'])
+    expect(await column(rev.w, reviewed)).toBe('done')
+  })
+
+  it('turned off, the same hand merge of a Review card is recorded and the card stays in Review', async () => {
+    await advanced.set(ENFORCE, false)
+    const { w, repo, wt } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Reviewed', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    commitIn(wt, 'r.txt')
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, builder))
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'by hand', 'card')
+    await reconcileNow(w, repo)
+    expect(factsOf(w, card).find((f) => f.kind === 'Integrated')).toMatchObject({ data: { by: 'outside', outsideRules: ['review'] } })
+    expect(kinds(w, card).at(-1)).toBe('Integrated')
+    expect(await column(w, card)).toBe('review')
+    expect(actions(w, card)).toEqual([])
   })
 })

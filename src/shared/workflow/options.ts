@@ -2,7 +2,8 @@
 // (§16.5.4, §16.7.2). Outcome-worded options are the only workflow the user sets: they compile into a ruleset
 // (compile.ts) from the fixed piece library (pieces.ts).
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app (#1263): main/workflow/rulesets.ts resolves a project's options (global → workspace → project) and checks
+// them; the Version Control tab (#1278) edits them.
 
 import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'

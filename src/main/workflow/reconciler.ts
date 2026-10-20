@@ -1,26 +1,24 @@
-// The app's reconciliation (#1217, SPEC §16.4.4; P3 is record-only): what the watcher sees in a project (a line or a
-// folder's head moved, a write) is reconciled against its cards' facts, and what is true is recorded as observed facts
-// (HeadMoved, Integrated by outside, Stale, CarriedOver, CommitAttributed, MergedInPart, LeftTarget, Gone), deduplicated
-// so two Hives on one workspace write each once (§16.17). Nothing moves, wakes or cancels: the runtime here runs with
-// `reconcileActs` off, the one switch P4's runtime turns on.
+// The app's reconciliation (#1217, SPEC §16.4.4): what the watcher sees in a project (a line or a folder's head moved, a
+// write) is reconciled against its cards' facts, and what is true is recorded as observed facts (HeadMoved, Integrated
+// by outside, Stale, CarriedOver, CommitAttributed, MergedInPart, LeftTarget, Gone), deduplicated so two Hives on one
+// workspace write each once (§16.17). With workflow rules enforced (#1263, Settings → Advanced, on by default) it acts
+// on them too: a card integrated outside Hive is Done, a stale pass moves back with its queue entry cancelled and its
+// builder woken, a lane whose cards are all done ends; off, it records only, as P3 did. It works through the project's
+// runtime (service.ts), whose `reconcileActs` is that switch.
 //
 // Runs on the watcher's events (debounced: a burst of ref changes reconciles once), when a window is focused, when a
 // card's Work section is read, and once as a workspace opens. One run at a time per project; its platform reads are
 // made outside the board's lock, its writes inside a change of it (the runtime's `locked`), and a run belongs to its
 // workspace's lifetime: once it closes or its window opens another, the run stops and its watch goes.
 
-import { join } from 'path'
-import { boardReadOnly, boardWrite } from '../boardStore'
+import { boardReadOnly } from '../boardStore'
 import { onHiveEvent } from '../events'
 import { createLogger } from '../logger'
 import { observer, type Disposable, type ObserveEvent } from '../platform/observe'
 import { openWorkspaces, WorkspaceService } from '../workspace'
-import { compile } from '../../shared/workflow/compile'
-import { allOff, type WorkflowOptions } from '../../shared/workflow/options'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { FactStore } from './factStore'
 import { reconcile } from './reconcile'
-import { Workflow } from './runtime'
+import { workflowFor } from './service'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 
@@ -132,40 +130,16 @@ function runFor(f: Followed): Promise<void> {
   return f.running
 }
 
-/** The project's options (`project.json`'s `workflow`, SPEC §16.6), or its platform's defaults (#1218 records them). */
-async function optionsOf(f: Followed): Promise<WorkflowOptions> {
-  const cfg = await f.ws.projectConfig(f.path)
-  const o = (cfg as { workflow?: { options?: unknown } }).workflow?.options
-  if (o && typeof o === 'object') {
-    try {
-      if (compile(o as WorkflowOptions).ok) return o as WorkflowOptions
-    } catch {
-      // Unreadable: the defaults.
-    }
-  }
-  return allOff(f.platform)
-}
-
 async function reconcileProject(f: Followed): Promise<void> {
   if (!f.alive() || boardReadOnly(f.ws)) return
   const lines = [...f.lines]
   const asked = [...f.cards]
   f.lines.clear()
   f.cards.clear()
-  const options = await optionsOf(f)
-  if (!f.alive()) return
-  const wf = new Workflow({
-    // The project's cards by their keys (a Hive-Card trailer): its name until the keys (#1219), as the adoption's store.
-    store: FactStore.forBoard(f.ws, { project: f.name, key: f.name }),
-    project: f.path,
-    projectKey: f.name,
-    options: () => options,
-    slots: join(f.ws.hiveDir, 'slots'),
-    autoRun: false,
-    reconcileActs: false,
-    // Each write a change of the board, only while the workspace is the one this run is for.
-    locked: (fn) => boardWrite(f.ws, async () => fn(), { alive: f.alive })
-  })
+  // The project's runtime: its options resolved now; each write a change of the board, only while the workspace is the
+  // one this run is for (its lifetime; the run checks `f.alive` between steps too).
+  const wf = await workflowFor(f.ws, f.path)
+  if (!wf || !f.alive()) return
   const cards = wf.store.cards().map((card) => ({ card, s: wf.state(card) }))
   // Done cards are looked at when their target moved: an event's line, or a target whose head isn't the one this
   // project last checked its Done cards against (HR4's #1217 round 1: a reset while Hive was closed is found at the
