@@ -130,7 +130,8 @@ export interface FactData {
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
-  Decision: { decision: string; generation: number; text: string }
+  /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
+  Decision: { decision: string; generation: number; text: string; removed?: boolean }
   DecisionsReceived: { agent: string; generation: number }
   CannotWithinRules: { rule: string; why: string; request: string }
   ReviewerRequest: { text: string }

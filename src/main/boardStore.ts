@@ -735,7 +735,8 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       } catch {
         // Closed meanwhile (the workspace closed): nothing was committed.
       }
-      throw e
+      // Undone part way by SQLite: said so, whichever error the change passed on (a batch's storage error, #1216).
+      throw state.lost ?? e
     } finally {
       state.open = false
       if (state.changed) emit({ type: 'tasks-changed', workspacePath: path })
@@ -1018,6 +1019,19 @@ export function cardPlaces(ws: WorkspaceService): { number: number; raw: { colum
     if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
     const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  })
+}
+
+/**
+ * These cards' project (as saved), column and agent, each as its document has it (null when it hasn't the field), from
+ * their columns: what a change reads of its cards before it (#1216's reads), no document composed.
+ */
+export function cardHeads(ws: WorkspaceService, numbers: number[]): { number: number; project: unknown; column: unknown; agent: unknown }[] {
+  if (!numbers.length) return []
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, ['project', 'column', 'agent'], { numbers, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, project: fields.project, column: fields.column, agent: fields.agent }))
+    const rows = db.prepare("SELECT number, doc ->> '$.project' AS project, doc ->> '$.column' AS col, doc ->> '$.agent' AS agent FROM cards WHERE number IN (SELECT value FROM json_each(?))").all(JSON.stringify(numbers)) as { number: number; project: unknown; col: unknown; agent: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, project: r.project, column: r.col, agent: r.agent }))
   })
 }
 

@@ -13,7 +13,8 @@ import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAs
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { afterBoardWrite, archiveBatchDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
+import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -310,6 +311,37 @@ export async function readTask(n: number, actor: TaskActor): Promise<TaskCard> {
   return c
 }
 
+/**
+ * readTask, with the card's decision generation read in the same snapshot as the card (#1216): what an agent reading it
+ * in full is given, for its receipt (never a decision written after the read).
+ */
+export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number }> {
+  const ws = workspace
+  if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
+  const ids = await ws.projectIds()
+  if (!ws.path) throw unknownTask(n)
+  const { raw, generation } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0 }))
+  if (!raw) throw unknownTask(n)
+  const c = withoutGone(clean(raw, n, ids), (x) => hasCard(ws, x))
+  if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+  return { card: c, generation }
+}
+
+/**
+ * allTasks, with each card's decision generation read in the same snapshot as the cards (#1216): decision lines tell an
+ * agent of the decisions read here, and their receipts record these generations.
+ */
+export async function allTasksSeen(ws: WorkspaceService, q: CardQuery = {}): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
+  if (!ws.path) return { cards: [], generations: new Map() }
+  const ids = await ws.projectIds()
+  if (!ws.path) return { cards: [], generations: new Map() }
+  const { docs, numbers, generations } = boardRead(ws, () => {
+    const read = cardDocs(ws, q)
+    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)) }
+  })
+  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x)))), generations }
+}
+
 /** The cards `refs` names that are outside the scope (another project's, or the workspace's): a confined agent sees only their numbers. */
 export async function refsOutside(refs: number[], scope: string | null): Promise<number[]> {
   if (scope === null) return []
@@ -331,17 +363,22 @@ export async function getTask(n: number, ws: WorkspaceService = workspace): Prom
  * have now (removed, or renamed before it had an id) keeps the id it was saved with, if any, and never takes another
  * project's: shown as goneProject's while another project has its name, it is saved with that name as it was.
  */
-async function saveCard(ws: WorkspaceService, n: number, card: TaskCard): Promise<void> {
+async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null): Promise<void> {
   // Who holds it now, for its cost (#602): a hold that ended gets its end, a new one starts.
   trackHolds(card, new Date().toISOString())
+  const ids = await ws.projectIds()
   const saved = savedProjectName(card.project)
-  let projectId = saved && saved === card.project ? projectIdNamed(await ws.projectIds(), saved) : null
+  let projectId = saved && saved === card.project ? projectIdNamed(ids, saved) : null
+  // The card as it was, for its facts (#1216): given by a caller that has it (null: a new card), else read.
+  const was = before === undefined || (!projectId && saved) ? cardDoc(ws, n) : null
   if (!projectId && saved) {
-    const was = cardDoc(ws, n) as { project?: unknown; projectId?: unknown } | null
-    if (was && isProjectId(was.projectId) && typeof was.project === 'string' && was.project.toLowerCase() === saved.toLowerCase()) projectId = was.projectId
+    const old = was as { project?: unknown; projectId?: unknown } | null
+    if (old && isProjectId(old.projectId) && typeof old.project === 'string' && old.project.toLowerCase() === saved.toLowerCase()) projectId = old.projectId
   }
   const { number, title, description, project: _shown, ...rest } = card
   putCard(ws, n, { number, title, description, project: saved, ...(projectId ? { projectId } : {}), ...rest })
+  // Its facts, in the same transaction (#1216): what this change moved, started, submitted, reviewed, blocked or decided.
+  recordChange(ws, before !== undefined ? before : was ? clean(was, n, ids) : null, { ...card, project: saved })
 }
 
 /** A card's fields in Hive's order, with its project and id as given (the rest as they were). */
@@ -755,7 +792,7 @@ function placement(all: CardPlace[], card: TaskCard, column: TaskColumn, patch: 
  * Done in order. An agent's or the Assistant's list adds a line to each card it moved.
  */
 export function reorderTasks(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
-  return cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor)))
+  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor))))
 }
 
 async function reorderTasksLocked(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
@@ -849,8 +886,15 @@ function checkedNumbers(numbers: unknown[]): number[] {
 /** Who can return a failed card for review: its own agent (its hive tools, or the Agent API with its token) or the user. */
 const returnsCard = (actor: TaskActor, card: TaskCard): boolean => actor.kind === 'user' || (actor.kind === 'agent' && !!card.agent && actor.self?.agentId === card.agent)
 
-export function createTask(...args: Parameters<typeof createTaskLocked>): Promise<TaskCard> {
-  return boardLock(workspace, () => createTaskLocked(...args))
+export async function createTask(...args: Parameters<typeof createTaskLocked>): Promise<TaskCard> {
+  const [input, actor] = args
+  const ws = workspace
+  // Made in Doing or Review with an agent, its work starts or is submitted: the platform's reads, before the change (#1216).
+  const column = input.column ?? 'todo'
+  const project = (column === 'doing' || column === 'review') && ws.path ? await projectName(scopeOf(actor) !== null && input.project === undefined ? scopeOf(actor)! : input.project).catch(() => '') : ''
+  const agent = project ? await agentIdIn(ws, project, input.agent ?? selfIn(actor, project)) : null
+  const reads = agent ? await gatherReads(ws, [{ number: NEW_CARD, project, agent, why: column === 'doing' ? 'start' : 'submit' }]) : null // i18n-ignore: an internal value
+  return recording(actor, reads, () => boardLock(ws, () => createTaskLocked(...args)))
 }
 
 async function createTaskLocked(
@@ -901,7 +945,7 @@ async function createTaskLocked(
     createdBy: by,
     updatedAt: now
   }
-  await saveCard(ws, n, card)
+  await saveCard(ws, n, card, null)
   log.info(`#${n} created by ${userText(by)}: ${userText(title)}`)
   changed(ws)
   return card
@@ -916,14 +960,58 @@ async function createTaskLocked(
  * Changes a card. `comment` is the same call's comment (the hive tools' and PATCH's): saved with the change in one write,
  * so nothing that reads the card meanwhile (a card watch waking its agent, the board) sees the move without it.
  */
-export function updateTask(...args: Parameters<typeof updateTaskLocked>): Promise<TaskCard> {
-  return boardLock(workspace, () => updateTaskLocked(...args))
+export async function updateTask(...args: Parameters<typeof updateTaskLocked>): Promise<TaskCard> {
+  const [n, patch, actor] = args
+  const ws = workspace
+  const reads = await gatherReads(ws, await planned(ws, [n], patch, actor))
+  return recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+}
+
+/** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */
+const NEW_CARD = 0
+
+/** An agent of a project by its id or name, as its id; null when there is none of that name (the change says so itself). */
+async function agentIdIn(ws: WorkspaceService, project: string, agent: string | null | undefined): Promise<string | null> {
+  if (!agent || !ws.path) return null
+  try {
+    const a = projectAgents(await ws.projectConfig(join(ws.path, project))).find((x) => x.id === agent || x.name.toLowerCase() === agent.toLowerCase())
+    return a?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The cards a change may start (into Doing with an agent) or submit (into Review), read as they are before it, for the
+ * platform's reads made before the change (#1216). A guess from the card as it is now: the change itself decides, on
+ * the card as it is then, and a fact whose reads don't match what happened records them as not read.
+ */
+async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<TaskPatch, 'column' | 'agent'>, actor: TaskActor): Promise<Planned[]> {
+  if (patch.column !== 'doing' && patch.column !== 'review' && patch.agent === undefined) return []
+  const out: Planned[] = []
+  // Their project, column and agent from the board's columns: no card's document is read for it.
+  for (const head of ws.path ? cardHeads(ws, numbers) : []) {
+    const n = head.number
+    // Read as clean() reads them: a project or agent of another type is none, a column not a column is Todo.
+    const card = { project: typeof head.project === 'string' ? head.project : '', column: isTaskColumn(head.column) ? head.column : 'todo', agent: typeof head.agent === 'string' && head.agent ? head.agent : null }
+    if (!card.project) continue
+    const agent = patch.agent !== undefined ? await agentIdIn(ws, card.project, patch.agent) : patch.column === 'doing' && card.column !== 'doing' ? (selfIn(actor, card.project) ?? card.agent) : card.agent
+    const column = patch.column ?? card.column
+    if (column === 'doing' && agent && (card.column !== 'doing' || agent !== card.agent)) out.push({ number: n, project: card.project, agent, why: 'start' }) // i18n-ignore: an internal value
+    else if (column === 'review') out.push({ number: n, project: card.project, agent, why: 'submit' }) // i18n-ignore: an internal value
+  }
+  return out
 }
 
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
 async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void } = {}): Promise<TaskCard> {
+  // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
+  return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
+}
+
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -933,6 +1021,8 @@ async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, o
   let intoDone = false
   const result = await (async () => {
     const card = await getTask(n, ws)
+    // As it was, for the change's facts (#1216): the change edits `card` in place.
+    const before = structuredClone(card)
     const scope = scopeOf(actor)
     if (!inScope(card, scope)) throw unknownTask(n)
     // The caller's own conditions, on the card as it is now (Start: not archived or done meanwhile).
@@ -1084,7 +1174,7 @@ async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, o
     // (the Assistant's control and session) checks it here, so a revoked change saves nothing. Unlike `check`, it doesn't
     // see the card as it was before this change.
     opts.commit?.()
-    await saveCard(ws, n, card)
+    await saveCard(ws, n, card, before)
     handoff = said.some((x) => x.id === HISTORY.reviewPassed.id || x.id === HISTORY.reviewFailed.id) ? 'verdict' : said.some(intoReview) ? 'review' : null
     return card
   })()
@@ -1130,8 +1220,10 @@ export function batchNumbers(numbers: unknown): number[] {
  * each card is all or nothing, the batch is not. Its error is the one a missing card gets, so it reveals no more.
  * Position applies to each card in turn, so the last listed ends at the top (or bottom): hive_reorder_tasks sets an order.
  */
-export function updateTasks(numbers: number[], patch: BatchPatch, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<BatchItem[]> {
-  return cardBatch(workspace, () => updateTasksUnbatched(numbers, patch, actor, opts))
+export async function updateTasks(numbers: number[], patch: BatchPatch, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<BatchItem[]> {
+  const ws = workspace
+  const reads = await gatherReads(ws, await planned(ws, Array.isArray(numbers) ? numbers.filter((x) => Number.isInteger(x)).slice(0, MAX_CHANGE_BATCH) : [], patch, actor))
+  return recording(actor, reads, () => cardBatch(ws, () => updateTasksUnbatched(numbers, patch, actor, opts)))
 }
 
 async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor: TaskActor, opts: { commit?: () => void }): Promise<BatchItem[]> {
@@ -1139,9 +1231,12 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
   for (const n of numbers) {
     const said: string[] = []
     try {
-      const card = await updateTask(n, patch, actor, { said, commit: opts.commit })
+      // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
+      const card = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
       items.push({ number: n, card, said, error: null })
     } catch (e) {
+      // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.
+      if (isStorageError(e)) throw e
       items.push({ number: n, card: null, said: [], error: (e as Error).message })
     }
   }
@@ -1276,7 +1371,7 @@ function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText): 
 export async function commentTask(n: number, comment: string, actor: TaskActor): Promise<TaskCard> {
   const ws = workspace
   const t = commentText(comment)
-  return boardLock(ws, async () => {
+  return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { n }))
@@ -1284,7 +1379,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
     await saveCard(ws, n, c)
     changed(ws)
     return c
-  })
+  }))
 }
 
 /**
@@ -1296,7 +1391,7 @@ export async function editDecision(n: number, id: string, newText: string | null
   const ws = workspace
   const t = newText === null ? null : text(newText, MAX_DECISION, 'decision').trim()
   if (t === '') throw hiveError(msg({ id: 'tasks.error.decisionEmptied', defaultMessage: 'The decision is empty: remove it instead.', description: "An error: the user emptied a decision's text; to take it off the card, remove it." }))
-  return boardLock(ws, async () => {
+  return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     const d = c.decisions?.find((x) => x.id === id)
     if (!d) throw hiveError(msg({ id: 'tasks.error.decisionGone', defaultMessage: 'That decision is no longer on #{n}.', description: 'An error: the decision being changed was removed from card #{n} (a number) meanwhile.' }), { n })
@@ -1313,7 +1408,7 @@ export async function editDecision(n: number, id: string, newText: string | null
     await saveCard(ws, n, c)
     changed(ws)
     return c
-  })
+  }))
 }
 
 /** Archives a card (hidden from the board, kept) or brings it back. The user's alone. */
@@ -1372,7 +1467,7 @@ export async function archiveBatches(ws: WorkspaceService = workspace): Promise<
  * nothing was archived) and the cards it archived.
  */
 export function archiveBatch(numbers: unknown, req: ArchiveRequest, actor: TaskActor, opts: { busy?: (card: TaskCard) => string | null } = {}): Promise<ArchiveResult> {
-  return cardBatch(workspace, () => archiveBatchUnbatched(numbers, req, actor, opts))
+  return recordingAs(actor, () => cardBatch(workspace, () => archiveBatchUnbatched(numbers, req, actor, opts)))
 }
 
 async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, actor: TaskActor, opts: { busy?: (card: TaskCard) => string | null }): Promise<ArchiveResult> {
@@ -1447,7 +1542,7 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
  * `failed`: the batch is kept, so bringing it back again retries those. Once nothing failed, the batch is forgotten.
  */
 export function unarchiveBatch(id: string, actor: TaskActor): Promise<UnarchiveResult> {
-  return cardBatch(workspace, () => boardLock(workspace, () => unarchiveBatchLocked(id, actor)))
+  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => unarchiveBatchLocked(id, actor))))
 }
 
 async function unarchiveBatchLocked(id: string, actor: TaskActor): Promise<UnarchiveResult> {
@@ -1517,20 +1612,21 @@ export async function agentCards(project: string, agentId: string, ws: Workspace
  * given to someone else meanwhile is left alone.
  */
 export function releaseAgentCards(project: string, agentId: string, actor: TaskActor): Promise<number[]> {
-  return cardBatch(workspace, () => releaseAgentCardsUnbatched(project, agentId, actor))
+  return recordingAs(actor, () => cardBatch(workspace, () => releaseAgentCardsUnbatched(project, agentId, actor)))
 }
 
 async function releaseAgentCardsUnbatched(project: string, agentId: string, actor: TaskActor): Promise<number[]> {
   const out: number[] = []
   for (const c of await agentCards(project, agentId)) {
     try {
-      await updateTask(c.number, { agent: null, ...(c.column === 'doing' ? { column: 'todo' as const } : {}) }, actor, {
+      await updateTaskLocked(c.number, { agent: null, ...(c.column === 'doing' ? { column: 'todo' as const } : {}) }, actor, {
         check: (now) => {
           if (now.agent !== agentId || now.archived || now.column === 'done') throw new Error('changed meanwhile') // i18n-ignore: only logged
         }
       })
       out.push(c.number)
     } catch (e) {
+      if (isStorageError(e)) throw e
       log.info(`#${c.number} left as it is: ${userText((e as Error).message)}`)
     }
   }
