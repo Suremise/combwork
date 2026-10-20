@@ -3,6 +3,9 @@
 // both to the same maps and the same rows, so a column added there fails here until it is added here too.
 
 const ABSENT = '$absent'
+const escapeKey = (k) => (k.startsWith('$') ? `$${k}` : k)
+const unescapeKey = (k) => (k.startsWith('$$') ? k.slice(1) : k)
+const setOwn = (o, k, v) => Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true })
 
 const SESSION = [
   { key: 'id', col: 'id', kind: 'text', required: true },
@@ -37,18 +40,18 @@ const KEPT = [
 ]
 const DELIVERY = [
   { key: 'id', col: 'id', kind: 'text', required: true },
-  { key: 'seq', col: 'seq', kind: 'int', required: true },
-  { key: 'agentId', col: 'agent_id', kind: 'text', required: true },
+  { key: 'seq', col: 'seq', kind: 'int', required: true, fallback: 0 },
+  { key: 'agentId', col: 'agent_id', kind: 'text', required: true, fallback: '' },
   { key: 'agentName', col: 'agent_name', kind: 'text' },
-  { key: 'conversation', col: 'conversation', kind: 'text', required: true, nullable: true },
-  { key: 'kind', col: 'kind', kind: 'text', required: true },
-  { key: 'from', col: 'sender', kind: 'json', required: true },
+  { key: 'conversation', col: 'conversation', kind: 'text', required: true, nullable: true, fallback: null },
+  { key: 'kind', col: 'kind', kind: 'text', required: true, fallback: '' },
+  { key: 'from', col: 'sender', kind: 'json', required: true, fallback: 'null' },
   { key: 'card', col: 'card', kind: 'int' },
   { key: 'round', col: 'round', kind: 'int' },
-  { key: 'body', col: 'body', kind: 'text', required: true },
-  { key: 'state', col: 'state', kind: 'text', required: true },
-  { key: 'created', col: 'created', kind: 'text', required: true },
-  { key: 'expires', col: 'expires', kind: 'text', required: true },
+  { key: 'body', col: 'body', kind: 'text', required: true, fallback: '' },
+  { key: 'state', col: 'state', kind: 'text', required: true, fallback: '' },
+  { key: 'created', col: 'created', kind: 'text', required: true, fallback: '' },
+  { key: 'expires', col: 'expires', kind: 'text', required: true, fallback: '' },
   { key: 'offered', col: 'offered', kind: 'text' },
   { key: 'offers', col: 'offers', kind: 'int' },
   { key: 'received', col: 'received', kind: 'text' },
@@ -79,6 +82,7 @@ const fromCol = (f, c) => (c === null || c === undefined ? null : f.kind === 'bo
 function encode(fields, rec, skip = []) {
   const row = {}
   const extra = {}
+  const keep = (k, v) => setOwn(extra, escapeKey(k), v)
   const absent = []
   const known = new Set([...fields.map((f) => f.key), ...skip])
   for (const f of fields) {
@@ -93,14 +97,14 @@ function encode(fields, rec, skip = []) {
     else if (f.required && f.fallback === undefined) return null
     else if (f.required) {
       row[f.col] = f.fallback
-      extra[f.key] = v
+      keep(f.key, v)
     } else {
       row[f.col] = f.onlyTrue ? 0 : null
-      extra[f.key] = v
+      keep(f.key, v)
     }
   }
-  for (const [k, v] of Object.entries(rec)) if (!known.has(k) && v !== undefined) extra[k] = v
-  if (absent.length) extra[ABSENT] = absent
+  for (const [k, v] of Object.entries(rec)) if (!known.has(k) && v !== undefined) keep(k, v)
+  if (absent.length) setOwn(extra, ABSENT, absent)
   row.extra = Object.keys(extra).length ? JSON.stringify(extra) : null
   return row
 }
@@ -115,10 +119,12 @@ function decode(fields, row, more) {
     else if (f.nullable) out[f.key] = null
   }
   if (more) more(out)
-  if (typeof row.extra === 'string') Object.assign(out, JSON.parse(row.extra))
-  if (Array.isArray(out[ABSENT])) {
-    for (const k of out[ABSENT]) delete out[k]
-    delete out[ABSENT]
+  if (typeof row.extra === 'string') {
+    for (const [k, v] of Object.entries(JSON.parse(row.extra))) {
+      if (k === ABSENT) {
+        if (Array.isArray(v)) for (const a of v) delete out[a]
+      } else setOwn(out, unescapeKey(k), v)
+    }
   }
   return out
 }
@@ -126,7 +132,7 @@ function decode(fields, row, more) {
 /** A session record's row and its cards' rows, or null when it has no id. */
 function sessionToRows(host, ord, rec) {
   const cards = Array.isArray(rec.cards) ? rec.cards.map((c) => (c && typeof c === 'object' ? encode(SESSION_CARD, c) : null)) : null
-  const cardsTyped = !!cards && cards.every((c) => c && c.extra === null)
+  const cardsTyped = !!cards && cards.length > 0 && cards.every((c) => c && c.extra === null)
   const sub = rec.sub
   const subTyped = !!sub && typeof sub === 'object' && Object.keys(sub).every((k) => k === 'parentId' || k === 'kind') && (sub.parentId === null || (typeof sub.parentId === 'string' && wellFormed(sub.parentId))) && typeof sub.kind === 'string' && wellFormed(sub.kind)
   const row = encode(SESSION, rec, [...(cardsTyped ? ['cards'] : []), ...(subTyped ? ['sub'] : [])])

@@ -2218,7 +2218,9 @@ one** [Darren, 20 Oct, #1119 decision 3]: each part is its own step in the board
 '1.0'`, `BOARD_MIGRATIONS`; P3's steps each take the next version as they merge), and a file that needs any step of the
 group runs **all of its pending steps in one transaction**, after one ask, one backup and one exclusive lock: to the
 user it is one upgrade, and a crash leaves the file at 0.9. The group's first step (#1207, v3) records
-`board_meta.format = 1.0`. A new file has nothing to upgrade: it takes every step unasked.
+`board_meta.format = 1.0`. A new file has nothing to upgrade: it takes every step unasked. Sessions and deliveries
+move from `store_rows` into typed tables (#1211), every record read back equal as JSON; deliveries keep their in-memory
+store (published after each transaction), the table its durable copy [Darren, 20 Oct, #1211].
 - **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? Hive 1.0 needs to upgrade this workspace's
   data. A 0.9 Hive can then only open it read-only; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
   back." [the Assistant for Darren, #1207 20 Oct]). Until the user agrees, the board opens read-only, as for a newer

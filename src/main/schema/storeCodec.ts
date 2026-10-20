@@ -9,10 +9,12 @@ import type { SQLInputValue } from 'node:sqlite'
  * - Anything else is kept in the row's `extra` (a JSON object) and read from there: a field Hive doesn't know (an older
  *   or newer Hive's), a known one of another type or null where Hive writes none, and a string with a lone surrogate
  *   (valid in JSON, not in SQLite's UTF-8 text). So nothing a record holds is lost.
- * - A session (or a deleted one's usage) missing a field its row needs, or with another kind of value there, still has
- *   its row: the column takes a fallback and `extra` keeps what it had, so its totals and lists still count it. Only one
- *   without an id (its key) isn't of Hive's form, nor a delivery missing what deliveries.ts reads (it validates them):
- *   the caller keeps those aside as they were (the store's `setAside` or deliveries' `invalid`), never in the table.
+ * - A record missing a field its row needs, or with another kind of value there (a delivery whose body has a lone
+ *   surrogate, which readDelivery accepts), still has its row: the column takes a fallback and `extra` keeps what it
+ *   had (or that it had none), so its totals, lists and inbox still have it. Only one without an id (its key) isn't of
+ *   Hive's form: the caller keeps it aside as it was (the store's `setAside` or deliveries' `invalid`).
+ * - `extra` is the record's own keys, whatever they are: an own `__proto__` stays one, and a key starting with `$` is
+ *   escaped (one more `$`), so the codec's own `$absent` never meets a record's. An empty list stays an empty list.
  */
 
 type Kind = 'text' | 'int' | 'bool' | 'json'
@@ -35,8 +37,18 @@ interface Field {
   fallback?: SQLInputValue
 }
 
-/** `extra`'s list of the required fields a record didn't have (each given its fallback in its column). */
+/**
+ * `extra`'s list of the required fields a record didn't have (each given its fallback in its column). A record's own key
+ * that starts with `$` is kept in `extra` with one more `$` before it (escaped), so none can be taken for this.
+ */
 const ABSENT = '$absent'
+const escapeKey = (k: string): string => (k.startsWith('$') ? `$${k}` : k)
+const unescapeKey = (k: string): string => (k.startsWith('$$') ? k.slice(1) : k)
+
+/** Sets an own property, whatever its name (`__proto__` included: assignment would set the object's prototype). */
+function setOwn(o: Record<string, unknown>, k: string, v: unknown): void {
+  Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true })
+}
 
 export type Row = Record<string, SQLInputValue>
 
@@ -80,6 +92,7 @@ const fromCol = (f: Field, c: unknown): unknown => {
 function encode(fields: Field[], rec: Record<string, unknown>, skip: readonly string[] = []): Row | null {
   const row: Row = {}
   const extra: Record<string, unknown> = {}
+  const keep = (k: string, v: unknown): void => setOwn(extra, escapeKey(k), v)
   const known = new Set([...fields.map((f) => f.key), ...skip])
   const absent: string[] = []
   for (const f of fields) {
@@ -94,14 +107,14 @@ function encode(fields: Field[], rec: Record<string, unknown>, skip: readonly st
     else if (f.required && f.fallback === undefined) return null
     else if (f.required) {
       row[f.col] = f.fallback!
-      extra[f.key] = v
+      keep(f.key, v)
     } else {
       row[f.col] = f.onlyTrue ? 0 : null
-      extra[f.key] = v
+      keep(f.key, v)
     }
   }
-  for (const [k, v] of Object.entries(rec)) if (!known.has(k) && v !== undefined) extra[k] = v
-  if (absent.length) extra[ABSENT] = absent
+  for (const [k, v] of Object.entries(rec)) if (!known.has(k) && v !== undefined) keep(k, v)
+  if (absent.length) setOwn(extra, ABSENT, absent)
   row.extra = Object.keys(extra).length ? JSON.stringify(extra) : null
   return row
 }
@@ -117,10 +130,13 @@ function decode(fields: Field[], row: Record<string, unknown>, more?: (out: Reco
     else if (f.nullable) out[f.key] = null
   }
   more?.(out)
-  if (typeof row.extra === 'string') Object.assign(out, JSON.parse(row.extra) as Record<string, unknown>)
-  if (Array.isArray(out[ABSENT])) {
-    for (const k of out[ABSENT] as string[]) delete out[k]
-    delete out[ABSENT]
+  if (typeof row.extra === 'string') {
+    // JSON.parse makes each key an own property; each is set so here too, never by assignment.
+    for (const [k, v] of Object.entries(JSON.parse(row.extra) as Record<string, unknown>)) {
+      if (k === ABSENT) {
+        if (Array.isArray(v)) for (const a of v as string[]) delete out[a]
+      } else setOwn(out, unescapeKey(k), v)
+    }
   }
   return out
 }
@@ -157,7 +173,8 @@ const SESSION_CARD: Field[] = [
 export function sessionToRows(host: string, ord: number, rec: Record<string, unknown>): { row: Row; cards: Row[] } | null {
   // Its cards and its `sub` have columns or a table of their own when they are of Hive's form; else they stay in `extra`.
   const cards = Array.isArray(rec.cards) ? rec.cards.map((c) => (c && typeof c === 'object' ? encode(SESSION_CARD, c as Record<string, unknown>) : null)) : null
-  const cardsTyped = !!cards && cards.every((c) => c && c.extra === null)
+  // A typed list has a card: an empty one is kept as it is in `extra` (no rows would read back as no list).
+  const cardsTyped = !!cards && cards.length > 0 && cards.every((c) => c && c.extra === null)
   const sub = rec.sub as { parentId?: unknown; kind?: unknown } | undefined
   const subTyped = !!sub && typeof sub === 'object' && Object.keys(sub).every((k) => k === 'parentId' || k === 'kind') && (sub.parentId === null || (typeof sub.parentId === 'string' && wellFormed(sub.parentId))) && typeof sub.kind === 'string' && wellFormed(sub.kind)
   const row = encode(SESSION, rec, [...(cardsTyped ? ['cards'] : []), ...(subTyped ? ['sub'] : [])])
@@ -211,18 +228,18 @@ export const keptUsageFromRow = (row: Record<string, unknown>): Record<string, u
 
 const DELIVERY: Field[] = [
   { key: 'id', col: 'id', kind: 'text', required: true },
-  { key: 'seq', col: 'seq', kind: 'int', required: true },
-  { key: 'agentId', col: 'agent_id', kind: 'text', required: true },
+  { key: 'seq', col: 'seq', kind: 'int', required: true, fallback: 0 },
+  { key: 'agentId', col: 'agent_id', kind: 'text', required: true, fallback: '' },
   { key: 'agentName', col: 'agent_name', kind: 'text' },
-  { key: 'conversation', col: 'conversation', kind: 'text', required: true, nullable: true },
-  { key: 'kind', col: 'kind', kind: 'text', required: true },
-  { key: 'from', col: 'sender', kind: 'json', required: true },
+  { key: 'conversation', col: 'conversation', kind: 'text', required: true, nullable: true, fallback: null },
+  { key: 'kind', col: 'kind', kind: 'text', required: true, fallback: '' },
+  { key: 'from', col: 'sender', kind: 'json', required: true, fallback: 'null' },
   { key: 'card', col: 'card', kind: 'int' },
   { key: 'round', col: 'round', kind: 'int' },
-  { key: 'body', col: 'body', kind: 'text', required: true },
-  { key: 'state', col: 'state', kind: 'text', required: true },
-  { key: 'created', col: 'created', kind: 'text', required: true },
-  { key: 'expires', col: 'expires', kind: 'text', required: true },
+  { key: 'body', col: 'body', kind: 'text', required: true, fallback: '' },
+  { key: 'state', col: 'state', kind: 'text', required: true, fallback: '' },
+  { key: 'created', col: 'created', kind: 'text', required: true, fallback: '' },
+  { key: 'expires', col: 'expires', kind: 'text', required: true, fallback: '' },
   { key: 'offered', col: 'offered', kind: 'text' },
   { key: 'offers', col: 'offers', kind: 'int' },
   { key: 'received', col: 'received', kind: 'text' },

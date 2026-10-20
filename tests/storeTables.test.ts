@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { BOARD_MIGRATIONS } from '../src/main/boardStore'
 import { openDb, schemaVersion } from '../src/main/db'
+import { readDelivery } from '../src/shared/deliveries'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/storeCodec'
 import { addDeliveries, moveStoreRows, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/storeTables'
 import { V1_0_STEPS } from '../src/main/schema/v1_0'
@@ -121,9 +122,34 @@ describe('records through their rows (storeCodec.ts)', () => {
     expect(deliveryFromRow(deliveryToRow('p1', d)!)).toEqual(d)
     const odd = { ...fullDelivery('m2', 2, { conversation: 'c-1' }), unknown: 'kept', offers: 'two' }
     expect(deliveryFromRow(deliveryToRow('p1', odd)!)).toEqual(odd)
-    // Missing what deliveries.ts reads (it validates them): not of Hive's form.
+    // Missing a field its row needs: kept (deliveries.ts's readDelivery sets it aside as it loads), read back as it was.
     const { state: _s, ...noState } = d
-    expect(deliveryToRow('p1', noState)).toBeNull()
+    expect(deliveryFromRow(deliveryToRow('p1', noState)!)).toEqual(noState)
+    // Without an id it has no key: not of Hive's form.
+    const { id: _i, ...noId } = d
+    expect(deliveryToRow('p1', noId)).toBeNull()
+  })
+
+  it('JSON\'s edges read back as they were (#1211 round 1): an empty list, an own __proto__, keys starting with $, a lone surrogate', () => {
+    const own = (o: Rec, k: string, v: unknown): Rec => (Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true }), o)
+    const min = { id: 'm', agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: false }
+    const cases: Rec[] = [
+      { ...min, cards: [] },
+      own({ ...min }, '__proto__', { polluted: true }),
+      { ...min, $absent: ['name'], $$x: 1, $: 'dollar' },
+      { ...min, $absent: ['id', 'agent'] }
+    ]
+    for (const rec of cases) {
+      const back = session(rec)
+      expect(JSON.stringify(back)).toBe(JSON.stringify(rec))
+      expect(Object.getPrototypeOf(back)).toBe(Object.prototype)
+    }
+    // A delivery whose body has a lone surrogate: deliveries.ts reads it, so it keeps its row.
+    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
+    expect(readDelivery(json(lone))).not.toBeNull()
+    expect(deliveryFromRow(deliveryToRow('p1', lone)!)).toEqual(lone)
+    const prot = own(fullDelivery('m8', 8), '__proto__', 1)
+    expect(JSON.stringify(deliveryFromRow(deliveryToRow('p1', prot)!))).toBe(JSON.stringify(prot))
   })
 })
 
@@ -184,10 +210,11 @@ describe("a host's records in the tables (storeTables.ts)", () => {
   it("deliveries moved in that aren't of Hive's form, or repeat an id, go with those kept aside", () => {
     const db = tables()
     db.exec('BEGIN')
-    expect(addDeliveries(db, 'p1', [fullDelivery('m1', 1), { id: 'nope' }, fullDelivery('m1', 1, { body: 'again' }), 'text'])).toBe(1)
+    // One with an id but little else keeps its row (deliveries.ts's readDelivery sets it aside as it loads).
+    expect(addDeliveries(db, 'p1', [fullDelivery('m1', 1), { id: 'nope' }, fullDelivery('m1', 1, { body: 'again' }), 'text', { seq: 3 }])).toBe(2)
     db.exec('COMMIT')
-    expect(readDeliveries(db, 'p1').map((d) => d.id)).toEqual(['m1'])
-    expect(meta(db, 'deliveries', 'p1', 'invalid')).toEqual([{ id: 'nope' }, json(fullDelivery('m1', 1, { body: 'again' })), 'text'])
+    expect(readDeliveries(db, 'p1')).toEqual([{ id: 'nope' }, json(fullDelivery('m1', 1))])
+    expect(meta(db, 'deliveries', 'p1', 'invalid')).toEqual([json(fullDelivery('m1', 1, { body: 'again' })), 'text', { seq: 3 }])
   })
 })
 
@@ -208,6 +235,8 @@ describe('the 1.0 step: store_rows into the tables', () => {
   }
 
   it('every host moves, in order, equal as JSON; the odd ones kept aside; the rows gone and the values kept', () => {
+    const min = (id: string): Rec => ({ id, agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: false })
+    const edges: Rec[] = [{ ...min('e0'), cards: [] }, JSON.parse(`{"id":"e1","agent":"codex","name":"n","createdAt":"${at}","lastActiveAt":"${at}","archived":false,"__proto__":{"x":1}}`) as Rec, { ...min('e2'), $absent: ['name'], $$y: 2 }]
     const s = (scope: string, key: string, ord: number, v: unknown) => ({ store: 'sessions', scope, key, ord, doc: typeof v === 'string' && key === 'raw' ? v : JSON.stringify(v) })
     const file = board09(
       [
@@ -223,6 +252,9 @@ describe('the 1.0 step: store_rows into the tables', () => {
         { store: 'deliveries', scope: 'p1', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
         { store: 'deliveries', scope: 'p1', key: 'm2', ord: 1, doc: JSON.stringify(fullDelivery('m2', 2, { conversation: 'c' })) },
         { store: 'deliveries', scope: 'p1', key: 'bad', ord: 2, doc: JSON.stringify({ id: 'bad' }) },
+        { store: 'deliveries', scope: 'p1', key: 'm3', ord: 3, doc: JSON.stringify(fullDelivery('m3', 3, { body: 'lone \ud800' })) },
+        { store: 'deliveries', scope: 'p1', key: '#4', ord: 4, doc: JSON.stringify({ noId: true }) },
+        ...edges.map((r, i) => s('edges', `s:e${i}`, i, r)),
         { store: 'deliveries', scope: 'folder:x', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
         { store: 'lanes', scope: '', key: 'l1', ord: 0, doc: '{"id":"l1"}' }
       ],
@@ -240,9 +272,11 @@ describe('the 1.0 step: store_rows into the tables', () => {
       expect(readDeletedUsage(w, 'p1')).toEqual([{ id: 'g1', provider: 'codex', name: 'g', usage: { inputTokens: 3 } }])
       expect(readSessionRecords(w, 'assistant')).toEqual([json(fullSession('as', { mode: 'coordinator' }))])
       expect(meta(w, 'sessions', 'p1', 'setAside')).toEqual([{ name: 'no id' }, json(fullSession('a', { name: 'second a' })), '{ damaged'])
-      expect(readDeliveries(w, 'p1')).toEqual([json(fullDelivery('m1', 1)), json(fullDelivery('m2', 2, { conversation: 'c' }))])
+      expect(readDeliveries(w, 'p1')).toEqual([{ id: 'bad' }, json(fullDelivery('m1', 1)), json(fullDelivery('m2', 2, { conversation: 'c' })), json(fullDelivery('m3', 3, { body: 'lone \ud800' }))])
       expect(readDeliveries(w, 'folder:x')).toEqual([json(fullDelivery('m1', 1))])
-      expect(meta(w, 'deliveries', 'p1', 'invalid')).toEqual([{ kept: 'before' }, { id: 'bad' }])
+      expect(meta(w, 'deliveries', 'p1', 'invalid')).toEqual([{ kept: 'before' }, { noId: true }])
+      // JSON's edges, through the step too.
+      expect(readSessionRecords(w, 'edges').map((r) => JSON.stringify(r))).toEqual(edges.map((r) => JSON.stringify(r)))
       expect(meta(w, 'deliveries', 'p1', 'next')).toBe(3)
       expect(meta(w, 'sessions', 'p1', 'imported')).toEqual({ rows: 7 })
       expect(w.prepare("SELECT store, count(*) AS n FROM store_rows GROUP BY store").all()).toEqual([{ store: 'lanes', n: 1 }])
