@@ -589,7 +589,7 @@
   "settings.project.fileLocks.desc": "Co się dzieje, gdy agent próbuje edytować plik, który edytuje inny agent w folderze tego projektu. Dziedzicz oznacza wartość z Ustawienia → Agenci i worktree → Blokady plików.",
   "settings.project.fileLocks.tip": "Dotyczy agentów pracujących w jednym folderze (agenci we własnych worktree nigdy się nie zderzają). Agent zajmuje plik, gdy go edytuje, i zwalnia go, gdy kończy turę. Edycje wykonywane poleceniami powłoki nie są objęte blokadami.",
   "settings.project.fileLocks.title": "Blokady plików",
-  "settings.project.key.desc": "2–4 litery, od których pochodzą nazwy jego kart: AM-12. Po zmianie stary klucz zostaje przy tym projekcie i nadal znajduje jego karty.",
+  "settings.project.key.desc": "2–4 litery, od których pochodzą nazwy kart tego projektu, jak w {example}. Jeśli go zmienisz, stary klucz nadal je znajduje.",
   "settings.project.key.title": "Klucz projektu",
   "settings.project.keybindings.desc": "Zmień skrót, aby nadać temu projektowi własny; Resetuj przywraca skrót globalny. Przechowywane w folderze .hive projektu, którego nie obejmują commity.",
   "settings.project.keybindings.title": "Skróty",

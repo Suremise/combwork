@@ -261,6 +261,8 @@ export interface HiveRequests {
   'project:keys': () => { projectPath: string; key: string; aliases: string[] }[]
   /** Makes a key the project's (Project Settings), its old one kept as an alias; refused, saying why. Returns the key as kept. */
   'project:setKey': (projectPath: string, key: string) => string
+  /** The names moved cards keep in the projects they left (`HI-1` → its card's number), #1221. */
+  'project:movedCardNames': () => Record<string, number>
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo

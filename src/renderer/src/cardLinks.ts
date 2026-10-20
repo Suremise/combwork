@@ -7,6 +7,7 @@ import { lineText } from './fileLinks'
 import { get, set } from './store'
 import { cardNumberOf } from './projectKeys'
 import { cardLabel } from '@shared/projectKeys'
+import type { MarkdownCards } from './components/ui'
 
 /** The hover text for a card's link: its name, title and column, and how to open it. */
 export function cardLinkTitle(c: TaskCard): string {
@@ -45,4 +46,21 @@ export function cardLinkProvider(term: Terminal, host: () => HTMLElement | null)
       callback(links.length ? links : undefined)
     }
   }
+}
+
+/**
+ * Card references in a card's description and comments (#1221, the Markdown half of #440): a key (AM-12, an old key, a
+ * moved card's key in its old project) or a number (#1061) of a card on this window's board links to it; a click opens
+ * it, and its hover is its name and title.
+ */
+export const MARKDOWN_CARDS: MarkdownCards = {
+  find: (text) => {
+    const cards = new Set(get().tasks.map((c) => c.number))
+    return findCardRefs(text, (n) => cards.has(n), cardNumberOf)
+  },
+  title: (n) => {
+    const c = get().tasks.find((x) => x.number === n)
+    return c ? `${cardLabel(c)} ${c.title}` : null
+  },
+  open: (n) => set({ taskOpen: n })
 }

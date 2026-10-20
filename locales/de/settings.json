@@ -589,7 +589,7 @@
   "settings.project.fileLocks.desc": "Was passiert, wenn ein Agent eine Datei bearbeiten will, die ein anderer Agent im Ordner dieses Projekts bearbeitet. „Geerbt“ verwendet Einstellungen → Agenten & Worktrees → Dateisperren.",
   "settings.project.fileLocks.tip": "Gilt für Agenten, die sich einen Ordner teilen (Agenten in eigenen Worktrees kommen sich nie in die Quere). Ein Agent beansprucht eine Datei, wenn er sie bearbeitet, und gibt sie frei, wenn sein Durchgang endet. Bearbeitungen über Shell-Befehle sind nicht abgedeckt.",
   "settings.project.fileLocks.title": "Dateisperren",
-  "settings.project.key.desc": "Die 2 bis 4 Buchstaben, nach denen seine Karten heißen: AM-12. Wird er geändert, bleibt der alte Schlüssel bei diesem Projekt und findet seine Karten weiterhin.",
+  "settings.project.key.desc": "Die 2 bis 4 Buchstaben, nach denen die Karten dieses Projekts heißen, etwa {example}. Wenn du ihn änderst, findet der alte Schlüssel sie weiterhin.",
   "settings.project.key.title": "Projektschlüssel",
   "settings.project.keybindings.desc": "Ändere eine, um diesem Projekt eine eigene zu geben; „Zurücksetzen“ stellt die globale Tastenkombination wieder her. Gespeichert im .hive-Ordner des Projekts, der nicht committet wird.",
   "settings.project.keybindings.title": "Tastenkombinationen",

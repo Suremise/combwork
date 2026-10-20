@@ -42,6 +42,13 @@ describe("the board's search by key", () => {
     expect(find('ZZ-1')).toEqual([])
   })
 
+  it('a moved card by the name it kept in the project it left (round 1, finding 1)', () => {
+    // AM-12 was HI-3 before it moved to amberlight.
+    const moved = { 'HI-3': 40 }
+    expect([am12, am3, hi12, ws].filter((c) => cardMatches(c, 'hi-3', keys, moved)).map((c) => cardLabel(c))).toEqual(['AM-12'])
+    expect([am12, am3, hi12, ws].filter((c) => cardMatches(c, 'HI-', keys, moved)).map((c) => cardLabel(c))).toEqual(['HI-12'])
+  })
+
   it('without the projects\' keys (main), a card\'s own key still matches', () => {
     expect([am12, am3, hi12].filter((c) => cardMatches(c, 'HI-12')).map((c) => c.number)).toEqual([41])
     expect([am12, am3, hi12].filter((c) => cardMatches(c, 'am-')).map((c) => c.number)).toEqual([40, 7])

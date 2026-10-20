@@ -140,6 +140,44 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     await close(w)
   })
 
+  it('a key chosen for a project being made is reserved: a key change or another new project meanwhile is refused it (round 1, finding 2)', async () => {
+    const ws = workspace(['hive'])
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    // web-app's folder is made only when the test says so.
+    const make = w.createProject.bind(w)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    w.createProject = async (name: string) => {
+      await held
+      return make(name)
+    }
+    const creating = keys.createProjectWithKey(w, 'web-app', 'ZZ')
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.createProjectWithKey(w, 'other', 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZA')).rejects.toThrow(/begin alike/)
+    expect(existsSync(join(ws, 'other'))).toBe(false)
+    release()
+    await creating
+    expect([await keyOf(w, 'web-app'), await keyOf(w, 'hive')]).toEqual(['ZZ', 'HI'])
+    w.createProject = make
+    // The reservation ends once it is made: the key is web-app's now.
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await close(w)
+  })
+
+  it("a moved card's names in the project it left, for the window: under each key that project holds or held (round 1, finding 1)", async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
+    await inWorkspace(w, () => tasks.updateTask(h.number, { project: 'amberlight' }, user))
+    expect(store.movedNames(w)).toEqual({ 'HI-1': h.number })
+    await keys.changeProjectKey(w, join(ws, 'hive'), 'HX')
+    expect(store.movedNames(w)).toEqual({ 'HI-1': h.number, 'HX-1': h.number })
+    await close(w)
+  })
+
   it("a project added later gets a key no other has, and none begins another's", async () => {
     const ws = workspace(['hive', 'history'])
     const w = await open(ws)

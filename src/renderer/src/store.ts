@@ -376,6 +376,8 @@ interface State {
   boardState: BoardState | null
   /** Each project's key and its old keys (#1221), read with the board (a key change is a board change). */
   projectKeys: ProjectKeys[]
+  /** The names moved cards keep in the projects they left (`HI-1` → card), read with the board too (#1221). */
+  movedCardNames: Record<string, number>
   /**
    * The Performance view's filters (activity bar: the workspace, a project filter) and each project's Performance tab's
    * (fixed to that project), kept while you move around.
@@ -533,6 +535,7 @@ export const useStore = create<State>(() => ({
   tasks: [],
   boardState: null,
   projectKeys: [],
+  movedCardNames: {},
   perfWorkspace: DEFAULT_PERF_FILTERS,
   perfProjects: {},
   overviewPeriod: 'week',
@@ -1133,10 +1136,10 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [], boardState: null, projectKeys: [] })
+  if (!ws) return set({ tasks: [], boardState: null, projectKeys: [], movedCardNames: {} })
   try {
-    const [tasks, boardState, projectKeys] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys')])
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys })
+    const [tasks, boardState, projectKeys, movedCardNames] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames')])
+    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys, movedCardNames })
   } catch {
     // The workspace closed meanwhile.
   }

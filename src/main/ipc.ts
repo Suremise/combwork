@@ -40,7 +40,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, cardHeads, exportBoard, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -694,6 +694,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       })
     },
     'project:setKey': (p, key) => changeProjectKey(workspace, workspace.assertProject(p), key),
+    'project:movedCardNames': () => movedNames(workspace),
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       return workspace.updateProjectConfig(workspace.assertProject(p), patch)

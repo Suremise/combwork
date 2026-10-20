@@ -15,7 +15,7 @@ import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeD
 import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
-import { PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
+import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
 import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
@@ -34,7 +34,7 @@ import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { addSkill, deleteSkill, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
-import { agentProviderOf, confirm, notify, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
@@ -1740,6 +1740,8 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   const cfg = project.config
   // The workspace's card-loop rounds and wait (Settings → Workspace), which this project inherits (#412).
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
+  // Its key, for Project key's example (#1221).
+  const ownKey = useStore((s) => projectKeyOf(s, project.path))
   if (!settings) return null
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
@@ -1843,6 +1845,8 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       section: 'agents',
       key: 'key',
       ...rowText('project.key'),
+      // Its example in this project's own key.
+      desc: tr(PROJECT_KEY_DESC, { example: `${ownKey ?? 'AM'}-12` }),
       render: () => <ProjectKeyField project={project} />
     },
     {

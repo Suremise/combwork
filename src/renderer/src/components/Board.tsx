@@ -10,6 +10,7 @@ import { call, errorMessage } from '../api'
 import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
 import { cardLabel, nameWithKey } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
+import { MARKDOWN_CARDS } from '../cardLinks'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -133,7 +134,7 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
 /** The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. */
 function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'project' | 'scope' | 'query'>): { shown: TaskCard[]; total: number } {
   const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && inProject(c, r.scope))
-  return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query, get().projectKeys)), total: there.length }
+  return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query, get().projectKeys, get().movedCardNames)), total: there.length }
 }
 
 /** The menu item that opens Archive All: a column's, or the board's (column null). Counted, and off with nothing shown. */
@@ -531,6 +532,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const all = useStore((s) => s.tasks)
   const keys = useStore((s) => s.projectKeys)
+  const movedNames = useStore((s) => s.movedCardNames)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
@@ -547,8 +549,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
-    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query, keys)),
-    [all, project, query, archived, keys]
+    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query, keys, movedNames)),
+    [all, project, query, archived, keys, movedNames]
   )
   const boardRef = useRef<HTMLDivElement>(null)
 
@@ -1873,7 +1875,7 @@ export function TaskDialog() {
         </div>
         {preview ? (
           <div className="task-description" onDoubleClick={() => !ro && setPreview(false)}>
-            {description.trim() ? <Markdown source={description} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
+            {description.trim() ? <Markdown source={description} cards={MARKDOWN_CARDS} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
           <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} />
@@ -1887,7 +1889,7 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={storedLine(c.text, c.hiveText)} />
+                <Markdown source={storedLine(c.text, c.hiveText)} cards={MARKDOWN_CARDS} />
               </div>
             ))}
             {!card.archived && (

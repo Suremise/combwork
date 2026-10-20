@@ -361,9 +361,10 @@ export function newSinceStart(card: Pick<TaskCard, 'history'>, d: { at: string }
 /**
  * A card matches the board's search: its key (#1221: `AM-12` or `am-12`; `AM-` for all of that project's; a project's old
  * key too), its number (#12 or 12), title, description, labels, project or agent. A key form no project has (`re-`) is
- * searched as words. `keys`: the projects' keys and old keys (without them, only a card's own key is matched).
+ * searched as words. `keys`: the projects' keys and old keys (without them, only a card's own key is matched); `moved`:
+ * the names moved cards keep in the projects they left (`HI-1` → card), which find them too.
  */
-export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'description' | 'project' | 'agentName' | 'labels'>, q: string, keys: readonly { key: string; aliases: readonly string[] }[] = []): boolean {
+export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'description' | 'project' | 'agentName' | 'labels'>, q: string, keys: readonly { key: string; aliases: readonly string[] }[] = [], moved: Readonly<Record<string, number>> = {}): boolean {
   const s = q.trim().toLowerCase()
   if (!s) return true
   if (/^#?\d+$/.test(s)) return c.number === Number(s.replace('#', ''))
@@ -372,6 +373,7 @@ export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'desc
   const project = typed ? keys.find((x) => x.key === typed || x.aliases.includes(typed)) : undefined
   if (k && (project || (!keys.length && c.key?.startsWith(`${typed}-`)))) {
     const now = project?.key ?? typed
+    if (k[2] && moved[`${typed}-${Number(k[2])}`] === c.number) return true
     return !!c.key && (k[2] ? c.key === `${now}-${Number(k[2])}` : c.key.startsWith(`${now}-`))
   }
   return [c.title, c.description, c.project, c.agentName ?? '', ...c.labels].some((x) => x.toLowerCase().includes(s))

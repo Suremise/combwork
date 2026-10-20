@@ -179,7 +179,7 @@ export function Dialogs() {
           <button className="btn subtle" onClick={() => close(null)}>
             {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
           </button>
-          <button className="btn primary" onClick={submit}>
+          <button className="btn primary" onClick={submit} disabled={!!secondError}>
             {dialog.confirmLabel ?? tr(msg({ id: 'shell.dialog.ok', defaultMessage: 'OK', description: "A dialog's button that agrees, when the dialog gives it no other name." }))}
           </button>
         </>
@@ -292,6 +292,7 @@ export function CommandPalette() {
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const tasks = useStore((s) => s.tasks)
   const keys = useStore((s) => s.projectKeys)
+  const moved = useStore((s) => s.movedCardNames)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
   useStore(() => commands.map((c) => (c.checked ? (c.checked() ? '1' : '0') : '')).join(''))
@@ -326,7 +327,7 @@ export function CommandPalette() {
     const ref = mode !== 'projects' && CARD_QUERY.test(q.trim())
     const cardItems = ref
       ? [...tasks.filter((c) => !c.archived), ...tasks.filter((c) => c.archived)]
-          .filter((c) => cardMatches(c, q, keys))
+          .filter((c) => cardMatches(c, q, keys, moved))
           .map((c) => ({
             id: `card:${c.number}`,
             command: undefined as string | undefined,
@@ -343,7 +344,7 @@ export function CommandPalette() {
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage, tasks, keys])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })

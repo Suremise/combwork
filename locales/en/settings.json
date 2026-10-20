@@ -2360,8 +2360,8 @@
     "description": "A setting's title (Project Settings → Agents & Worktrees)."
   },
   "settings.project.key.desc": {
-    "defaultMessage": "The 2 to 4 letters its cards are named by: AM-12. Changed, the old key stays this project’s and still finds its cards.",
-    "description": "What the setting \"Project key\" does, under its title (Project Settings → Agents & Worktrees). AM-12 is an example card name: keep it as it is."
+    "defaultMessage": "The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.",
+    "description": "What the setting \"Project key\" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project's own key, such as WB-12."
   },
   "settings.project.key.title": {
     "defaultMessage": "Project key",

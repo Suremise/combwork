@@ -71,10 +71,12 @@ const check = (name, ok, extra = '') => {
       ['H', /2 to 4 letters/, 'too short']
     ]) {
       await key.fill(typed)
-      check(`a key typed is checked as it changes: ${what}, with its reason`, !!(await lib.until(async () => why.test(await error.innerText().catch(() => '')), HUNG_MS)) && (await key.getAttribute('aria-invalid')) === 'true', await error.innerText().catch(() => ''))
+      check(`a key typed is checked as it changes: ${what}, with its reason`, !!(await lib.until(async () => why.test(await error.innerText().catch(() => '')), HUNG_MS)) && (await key.getAttribute('aria-invalid')) === 'true', `${await error.innerText().catch(() => '')} [box: ${await key.inputValue()}]`)
     }
-    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
-    check('…and a key that can’t be one keeps the dialog open', (await dialog.count()) === 1 && !fs.existsSync(path.join(ws, 'web-app')))
+    const create = dialog.getByRole('button', { name: 'Create', exact: true })
+    check('…and Create looks and is disabled while it can’t be one', (await create.isDisabled()) && (await create.evaluate((e) => getComputedStyle(e).opacity)) !== '1', await create.evaluate((e) => getComputedStyle(e).opacity))
+    await key.press('Enter')
+    check('…Enter makes nothing either: the dialog stays, no folder', (await dialog.count()) === 1 && !fs.existsSync(path.join(ws, 'web-app')))
     await themes('newproject-error', dialog)
     await key.fill('wb')
     check('a key typed is shown in capitals; one that can be shows how its cards are named', (await key.inputValue()) === 'WB' && (await error.count()) === 0 && /WB-1, WB-2/.test(await hint.innerText()), await key.inputValue())
@@ -112,6 +114,8 @@ const check = (name, ok, extra = '') => {
     const field = page.getByRole('textbox', { name: 'Project key', exact: true })
     await field.waitFor({ timeout: HUNG_MS })
     check('Project Settings shows the key', (await field.inputValue()) === 'WB', await field.inputValue())
+    const keyRow = page.locator('.project-key-field').locator('xpath=ancestor::*[contains(@class,"setting")][1]')
+    check('…its description giving its example in the project’s own key', (await keyRow.innerText()).includes('The 2 to 4 letters this project’s cards are named by, as in WB-12. If you change it, the old key still finds them.'), await keyRow.innerText())
     await field.fill('hi')
     check('a key taken is refused as it is typed, saying why', /HI is another project’s key/.test(await page.locator('.project-key-field .field-error').innerText().catch(() => '')) && (await page.locator('.project-key-field').getByRole('button', { name: 'Change' }).isDisabled()))
     await field.fill('WBA')
@@ -139,8 +143,93 @@ const check = (name, ok, extra = '') => {
     check('the palette finds a project’s cards by its old key alone', !!(await lib.until(async () => (await page.locator('.palette-item', { hasText: 'Open Card: WBA-' }).count()) === 2, HUNG_MS)), await page.locator('.palette-list').innerText().catch(() => ''))
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
+
+    // --- A card moved to another project keeps its names in the one it left (round 1, finding 1): WBA-1 and WB-1 (its
+    // project's old key) still find it in the search, the palette and Depends on, and link in a comment.
+    await inv('tasks:update', c1.number, { project: 'hive' })
+    const movedKey = await lib.until(async () => { const k = (await inv('tasks:list')).find((c) => c.number === c1.number)?.key; return k && k.startsWith('HI-') && k }, HUNG_MS)
+    check('a card moved to hive takes its next number there', /^HI-\d+$/.test(movedKey ?? ''), movedKey)
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    check('the board’s search finds a moved card by its name in the project it left', await finds('wba-1', [c1.number]), JSON.stringify(await shown()))
+    check('…and by its project’s old key too', await finds('WB-1', [c1.number]), JSON.stringify(await shown()))
+    await search.fill('')
+    await palette('WB-1')
+    check('the palette finds it by that name, naming it by its key now', !!(await lib.until(async () => (await page.locator('.palette-item', { hasText: `Open Card: ${movedKey} Login form` }).count()) === 1, HUNG_MS)), await page.locator('.palette-list').innerText().catch(() => ''))
+    await page.keyboard.press('Escape')
+    // The first Escape clears the palette's box, the second closes it.
+    await page.keyboard.press('Escape')
+    // Card links in Markdown (round 1, finding 3): a comment naming it by an old name and by #N links both; code doesn't.
+    await inv('tasks:comment', c2.number, `Waits for WB-1 and #${c1.number}; not \`WBA-1\` in code, nor ZZ-9.`)
+    await tile(c2.number).click()
+    const c2Dialog = page.locator('.dialog', { hasText: `WBA-2 (#${c2.number})` })
+    await c2Dialog.waitFor({ timeout: HUNG_MS })
+    const refs = c2Dialog.locator('.markdown a.card-ref')
+    check('a comment links the cards it names: an old key and #N, not in code or a key no card has', !!(await lib.until(async () => JSON.stringify(await refs.allInnerTexts()) === JSON.stringify(['WB-1', `#${c1.number}`]), HUNG_MS)) && (await c2Dialog.locator('.markdown code a').count()) === 0, JSON.stringify(await refs.allInnerTexts()))
+    check('…each saying the card it opens', (await refs.first().getAttribute('title')) === `${movedKey} Login form`, await refs.first().getAttribute('title'))
+    await refs.first().scrollIntoViewIfNeeded()
+    await themes('markdown-links', refs.first().locator('xpath=ancestor::*[contains(@class,"markdown")][1]/..'))
+    // Related by the moved card's old name (Depends on is the other way round already).
+    await c2Dialog.getByPlaceholder('Related cards, e.g. AM-7').fill('WBA-1')
+    await c2Dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    check('Related takes a moved card’s old name', !!(await lib.until(async () => JSON.stringify((await inv('tasks:list')).find((c) => c.number === c2.number)?.links) === JSON.stringify([c1.number]), HUNG_MS)), JSON.stringify((await inv('tasks:list')).find((c) => c.number === c2.number)?.links))
+    await page.keyboard.press('Escape')
+    await tile(c2.number).click()
+    await c2Dialog.waitFor({ timeout: HUNG_MS })
+    await c2Dialog.locator('.markdown a.card-ref').first().click()
+    check('a click on a card link opens that card', !!(await lib.until(async () => (await page.locator('.dialog', { hasText: `${movedKey} (#${c1.number})` }).count()) === 1, HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
   } finally {
     await app.close()
+  }
+
+  // --- German and Polish (#1221 round 1): the new controls in the window's language, as their translations say them,
+  // fitting their place. The texts are read from the locales, so a changed translation needs no change here.
+  for (const lang of ['de', 'pl']) {
+    const T = (area, id, values = {}) => Object.entries(values).reduce((t, [k, v]) => t.replace(`{${k}}`, v), JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', lang, `${area}.json`), 'utf8'))[id])
+    const appL = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off', HIVE_LANG: lang }) })
+    try {
+      const page = await appL.firstWindow()
+      await lib.fitWindow(appL, page, { width: 1400, height: 900 })
+      await lib.appReady(page)
+      const shot = async (name, target) => {
+        for (const theme of ['dark', 'light']) {
+          await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+          await target.screenshot({ path: path.join(lib.WORK, `keysui-${lang}-${name}-${theme}.png`) })
+        }
+        await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+      }
+      // New Project…, from the palette by its name in this language.
+      await page.keyboard.press('Control+Shift+P')
+      await page.locator('.palette input').fill(T('shell', 'shell.command.project.new').replace('…', ''))
+      await page.locator('.palette-item[data-command="project.new"]').first().click()
+      const dialog = page.locator('.dialog', { hasText: T('actions', 'actions.project.newTitle') })
+      await dialog.waitFor({ timeout: HUNG_MS })
+      const key = dialog.getByRole('textbox', { name: T('actions', 'actions.project.key'), exact: true })
+      await dialog.locator('input').first().fill('gamma-app')
+      check(`${lang}: the New Project key box and its hint in ${lang}`, (await key.inputValue()) === 'GA' && (await dialog.locator('.field-hint').innerText()) === T('actions', 'actions.project.keyHint', { first: 'GA-1', second: 'GA-2' }), await dialog.locator('.field-hint').innerText().catch(() => ''))
+      await key.fill('G')
+      const create = dialog.locator('.dialog-footer .btn.primary')
+      check(`${lang}: …a key that can’t be one says why, and Create is off`, (await dialog.locator('.field-error').innerText()) === T('project', 'project.key.form') && (await create.isDisabled()), await dialog.locator('.field-error').innerText().catch(() => ''))
+      const fits = await dialog.evaluate((d) => d.scrollWidth <= d.clientWidth && [...d.querySelectorAll('.field-hint, .field-error, label')].every((e) => e.scrollWidth <= e.clientWidth + 1))
+      check(`${lang}: …and it all fits the dialog`, fits)
+      await shot('newproject', dialog)
+      await page.keyboard.press('Escape')
+      // Project Settings → Project key, with its description in this language and the project's own key.
+      await page.locator('.project-row', { hasText: 'web-app' }).first().click()
+      await page.keyboard.press('Alt+0')
+      const field = page.locator('.project-key-field')
+      await field.waitFor({ timeout: HUNG_MS })
+      const row = field.locator('xpath=ancestor::*[contains(@class,"setting")][1]')
+      const text = await row.innerText()
+      check(`${lang}: Project key's row, its description and its button in ${lang}`, text.includes(T('settings', 'settings.project.key.title')) && text.includes(T('settings', 'settings.project.key.desc', { example: 'WBA-12' })) && text.includes(T('project', 'project.key.change')) && text.includes(T('project', 'project.key.aliases', { keys: 'WB' })), text)
+      await field.locator('input').fill('WBX')
+      check(`${lang}: …what a new key would mean`, (await field.locator('.field-hint').innerText()) === T('project', 'project.key.willAlias', { key: 'WBX', old: 'WBA' }), await field.locator('.field-hint').innerText().catch(() => ''))
+      await shot('settings', row)
+      await field.locator('input').press('Escape')
+    } finally {
+      await appL.close()
+    }
   }
   console.log(failed ? `${failed} failed` : 'all passed')
   process.exit(failed ? 1 : 0)

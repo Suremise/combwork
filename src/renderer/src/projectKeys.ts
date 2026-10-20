@@ -30,9 +30,8 @@ export function keyProblemText(key: string, projectPath: string, held: readonly 
 }
 
 /**
- * The card a reference names, as the window has the board (#1221): `AM-12` (any case, or an old key of its project),
- * `#12` or `12`. Null for one the board has no card for (a moved card's key in its old project is the main process's to
- * resolve: the Agent API takes it).
+ * The card a reference names, as the window has the board (#1221): `AM-12` (any case, an old key of its project, or a
+ * moved card's name in a project it left), `#12` or `12`. Null for one the board has no card for.
  */
 export function cardNumberOf(ref: string): number | null {
   const v = ref.trim()
@@ -43,5 +42,6 @@ export function cardNumberOf(ref: string): number | null {
   const typed = normalKey(k[1])
   const project = get().projectKeys.find((p) => p.key === typed || p.aliases.includes(typed))
   const key = `${project ? project.key : typed}-${Number(k[2])}`
-  return get().tasks.find((c) => c.key === key)?.number ?? null
+  // A card of that project now, else one that moved away from it (its name there kept).
+  return get().tasks.find((c) => c.key === key)?.number ?? get().movedCardNames[`${typed}-${Number(k[2])}`] ?? null
 }

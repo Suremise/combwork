@@ -96,10 +96,11 @@ export async function keyProjects(ws: WorkspaceService): Promise<string[]> {
   if (projects.every((p) => held.has(p.id))) return []
   return boardWrite(ws, async () => {
     if (!stillIn(ws, path, life)) return []
-    // A project made in the New Project dialog takes the key chosen there (#1221), still free; the others, a suggestion.
+    // A project made in the New Project dialog takes the key chosen there (#1221), reserved for it until then; the
+    // others a suggestion, never a key reserved for a project being made.
     const pick = (p: (typeof projects)[number], keys: { key: string; projectId: string }[]): string => {
       const chosen = wanted.get(p.path)
-      return chosen && !keyProblem(chosen, p.id, keys) ? chosen : suggestKey(p.name, p.id, keys)
+      return chosen && !keyProblem(chosen, p.id, keys) ? chosen : suggestKey(p.name, p.id, [...keys, ...reserved(p.path)])
     }
     const added = addProjectKeys(ws, projects.map((p) => ({ id: p.id, pick: (keys) => pick(p, keys) })))
     if (added.length) {
@@ -110,8 +111,15 @@ export async function keyProjects(ws: WorkspaceService): Promise<string[]> {
   })
 }
 
-/** The keys chosen for projects being made (the New Project dialog, #1221), by folder path (lower case). */
+/**
+ * The keys chosen for projects being made (the New Project dialog, #1221), by folder path (lower case): reserved from
+ * the check before the folder is made until the project has it, so a key change or another new project meanwhile is
+ * refused it (#1221 round 1, finding 2).
+ */
 const wanted = new Map<string, string>()
+
+/** The keys reserved for projects being made, as keys held (but `except`'s own). */
+const reserved = (except: string | null = null): KeyHeld[] => [...wanted].filter(([p]) => p !== except).map(([p, key]) => ({ key, projectId: `new:${p}` }))
 
 /**
  * Makes a project folder (the New Project dialog) with the key chosen for it: refused, saying why, before the folder
@@ -119,14 +127,19 @@ const wanted = new Map<string, string>()
  */
 export async function createProjectWithKey(ws: WorkspaceService, name: string, key?: string | null): Promise<WorkspaceInfo> {
   const k = key ? normalKey(String(key)) : null
-  if (k) refuseKey(k, '', projectKeys(ws))
   const path = ws.path ? resolve(ws.path, String(name ?? '').trim()).toLowerCase() : null
+  // Checked and reserved at once, with nothing awaited between: from here no one else can take it.
+  if (k) refuseKey(k, '', [...projectKeys(ws), ...reserved(path)])
   if (k && path) wanted.set(path, k)
   try {
     const info = await ws.createProject(name)
     // Its id read now, so it has its key before this returns (the chosen one is only known meanwhile).
-    await ws.projectIds({ fresh: true })
+    const ids = await ws.projectIds({ fresh: true })
     await keyProjects(ws)
+    // Never another key in its place without saying so (another Hive on the same workspace could have taken it).
+    const id = path ? ids.byPath.get(path) : undefined
+    const now = id ? projectKeys(ws).find((h) => h.projectId === id && h.current)?.key : undefined
+    if (k && now && now !== k) throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
     return info
   } finally {
     if (path) wanted.delete(path)
@@ -168,7 +181,7 @@ export async function changeProjectKey(ws: WorkspaceService, projectPath: string
   return boardWrite(ws, async () => {
     if (!stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
     const held = projectKeys(ws)
-    refuseKey(k, id, held)
+    refuseKey(k, id, [...held, ...reserved()])
     if (held.some((h) => h.projectId === id && h.current && normalKey(h.key) === k)) return k
     setProjectKey(ws, id, k)
     log.info(`${userText(folderOf(projectPath))}'s key is now ${k}`)

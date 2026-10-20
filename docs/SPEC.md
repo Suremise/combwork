@@ -2126,7 +2126,10 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   suggestion; Project Settings → Agents & Worktrees → Project key changes it (the old one listed as an alias). The compact
   sidebar's tiles show the key, 3–4 letters smaller. The board's search, Archive All and the command palette find `AM-12`,
   `am-12`, `AM-` (the project's cards) and old keys (`#N` as before); a key form no project has (`re-`) is searched as
-  words. Terminal links take keys (capitals only) beside `#N`; `#N` stays the old global number.
+  words. Card references link in a card's description and comments (rendered Markdown, never in code) and in
+  terminals (keys in capitals only) beside `#N`; `#N` stays the old global number. A moved card's names in the projects
+  it left (`card_aliases`, read with the board) find it in links, search and Depends on/Related. A key chosen in New
+  Project… is reserved until the project has it: a key change or another new project meanwhile is refused it.
 - **Everywhere else the key appears** [#704]: board and palette search by `AM-`; notifications; lane rows; handover and
   plan file names; Apiary rooms. Keys compare case-insensitively in ref paths (NTFS) [HB3's round 1 finding 18].
 - **Tables** [#1025]: cards with typed columns; comments, history, decisions, links, holds, and facts in their own
