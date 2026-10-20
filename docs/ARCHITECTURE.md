@@ -276,7 +276,10 @@ tracked file's and folder's size and time (the builder's own paths in a shared f
 the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
 so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
 platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
-intent is refused `evidence.changed`, "try again"); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+intent is refused `evidence.changed`, "try again". It is a best-effort snapshot, not one transaction with git and the
+files: a change after the last read, or one that keeps every size and time, isn't excluded, so P3's watcher and
+reconciliation (stale marks, observed facts) remain what settles those. #1206: an outside `git status` refreshing the
+index's stat data refuses falsely today; fingerprint the index's content, or read once more before refusing); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
