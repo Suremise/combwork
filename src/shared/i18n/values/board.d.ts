@@ -323,11 +323,16 @@ interface HiveMessageValues {
   'board.lane.labelWhenEnded': { card: string | number; title: string | number; where: string | number }
   'board.lane.more': { n: number; cards: string | number }
   'board.lane.notOnBoard': { card: string | number }
+  'board.lane.openForMore': undefined
   'board.lane.reviewFailed': { card: string | number; round: string | number; next: string | number }
   'board.lane.reviewerGist': { gist: string | number }
   'board.lane.roundFailed': { where: string | number; round: string | number }
   'board.lane.unrecorded': { card: string | number; title: string | number }
   'board.lane.unrecordedUntitled': { card: string | number }
+  'board.lane.workChecks': { passed: number; failed: number }
+  'board.lane.workMerged': { commit: string | number }
+  'board.lane.workRevision': { review: string; revision: string | number }
+  'board.lane.workVerdict': { pass: string; revision: string; current: string }
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
   'board.lanes.barUnrecorded': { pair: string | number; total: number }

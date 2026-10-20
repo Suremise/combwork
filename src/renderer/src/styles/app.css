@@ -9934,6 +9934,17 @@ button.progress-run-show:focus-visible {
   margin-top: 2px;
   color: var(--fg);
 }
+/* What its facts say (#1225): a line each, then that a click opens the card for the rest. */
+.lane-seg-work {
+  margin-top: 2px;
+}
+.lane-seg-tip > div:first-child + .lane-seg-work {
+  margin-top: 4px;
+}
+.lane-seg-more {
+  margin-top: 4px;
+  font-size: 11px;
+}
 .lane-seg.finished,
 .lane-seg.more {
   flex: 0 0 auto;

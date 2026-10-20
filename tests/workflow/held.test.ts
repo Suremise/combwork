@@ -220,10 +220,15 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
     refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
   })
 
-  it('an edit of the same size during the submit, its time kept → refused (content, not stat)', async () => {
+  it('an edit of the same size during the submit, its time put back to the millisecond → refused (content, not stat)', async () => {
     const e = (env = setup(pairOpts))
     const { card, folder } = await startedIn(e, 'a')
     const file = join(folder, 'a.txt')
+    // A time with a part below the millisecond, as a write leaves one: a tool keeping it through a Date puts back the
+    // millisecond only, which the stat fingerprint sees, so the content is asked. (A time kept exactly, to the 100 ns,
+    // is the fingerprint's practical limit: ARCHITECTURE, "The practical guarantee". A time that happened to be a whole
+    // millisecond made this test fail now and then.)
+    utimesSync(file, 1_760_000_000.0004, 1_760_000_000.0004)
     during(e, 'submit', () => {
       const st = statSync(file)
       writeFileSync(file, 'b\n')

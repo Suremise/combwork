@@ -83,6 +83,18 @@ export interface WorkflowConfig {
   effects?: Effects
   /** Test seams: called between gathering and the transaction. */
   hooks?: { beforeWrite?: (move: string) => void | Promise<void> }
+  /**
+   * Runs a write of the store under the lock its store needs (#1217): in the app, a change of the workspace's board
+   * (boardWrite), since the board's store writes only inside one; left out, the write runs as it is (a store on its own
+   * connection).
+   */
+  locked?: <T>(fn: () => T) => Promise<T>
+  /**
+   * Whether reconciliation acts on what it observes (§16.4.4's moves: Done when integrated outside, a queue entry
+   * cancelled, the builder woken, a stale card moved back), or only records it (#1217: P3 is record-only). The P4
+   * runtime turns it on; the P2 scenarios run with it.
+   */
+  reconcileActs?: boolean
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -177,10 +189,10 @@ export class Workflow {
   }
 
   /** The current options, compiled and stored. */
-  currentRuleset(): Ruleset {
+  currentRuleset(save = true): Ruleset {
     const r = compile(this.cfg.options())
     if (!r.ok) throw new Error(`contradictory options: ${r.contradictions.join(', ')}`) // i18n-ignore: a programming error in the spike, never shown
-    this.store.saveRuleset(r.ruleset)
+    if (save) this.store.saveRuleset(r.ruleset)
     return r.ruleset
   }
 
@@ -197,7 +209,8 @@ export class Workflow {
       const lane = this.lane(card.lane)
       if (lane && !lane.ended) return this.store.ruleset(lane.ruleset)
     }
-    return this.currentRuleset()
+    // Not stored here (a read): a write naming it stores it in its own transaction (write()).
+    return this.currentRuleset(false)
   }
 
   /** The card's folder on disk: its own, or the project folder. */
@@ -211,9 +224,20 @@ export class Workflow {
 
   /** One write for a card, in one transaction; then the actions run (unless left pending). */
   async write<T>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write) => T): Promise<T> {
-    const out = this.store.tx((tx) => fn(new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)))
+    const out = await this.locked(() =>
+      this.store.tx((tx) => {
+        // The ruleset its facts name, stored with them.
+        if (ruleset) tx.saveRuleset(ruleset)
+        return fn(new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage))
+      })
+    )
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
+  }
+
+  /** Runs a write under the lock its store needs (cfg.locked), else as it is. */
+  locked<T>(fn: () => T): Promise<T> {
+    return this.cfg.locked ? this.cfg.locked(fn) : Promise.resolve(fn())
   }
 
   /** A refusal: recorded as `Refused` when an agent or the Assistant was refused (the user's refused drags aren't). */

@@ -47,6 +47,7 @@ import { setTitleBarColors, trackTitleBar } from './titleBar'
 import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
+import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
@@ -961,6 +962,8 @@ app.whenReady().then(async () => {
   startBranchWatch()
   // The platform watcher (#1214): the open workspaces' repositories and folders.
   startObserving()
+  // What it sees reconciled with the cards' facts, recorded (#1217, record-only in P3).
+  startReconciling()
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()
@@ -1074,6 +1077,7 @@ app.on('will-quit', () => {
   closeProcessTracking()
   unwatchAll()
   stopObserving()
+  stopReconciling()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()
