@@ -4,7 +4,7 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -66,6 +66,7 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { cardStages } from './boardStore'
 import { cardFacts, factRow } from './workflow/cardWork'
+import { bracketFinished, bracketFor, bracketResolved, bracketStarted, takeResolved, type Bracket } from './workflow/runChecks'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE } from '../shared/workflow/facts'
@@ -2563,8 +2564,14 @@ async function runLinkOf(body: Record<string, unknown>) {
 // isn't checked out, an unknown card or a check with no command is refused before anything runs. Its `link` is for the
 // start: the only way a start gets the checkout seen here rather than read again.
 route('POST', '/v1/progress/resolve', async ({ body }) => {
+  const ws = requireWorkspace()
   const { caller, link } = await runLinkOf(bodyObject(body))
-  return publicLink(link, issuedLinks.issue(linkOwner(caller), link))
+  const id = issuedLinks.issue(linkOwner(caller), link)
+  // What a run for a card is checked against (#1222), read now: hive-progress starts its command after this reply, and
+  // reports its start up to 2 s later. Its start takes it with the link.
+  const bracket = await bracketFor(ws, link).catch((e) => (log.warn('could not read what a run is checked against', e), null))
+  if (bracket) bracketResolved(id, bracket)
+  return publicLink(link, id)
 })
 
 // A start resolves what it runs for inside its admission (admitLinked): a panel turned off, or off and on, while its
@@ -2574,16 +2581,32 @@ route('POST', '/v1/progress', async ({ body }) => {
   const ws = requireWorkspace()
   const workspacePath = ws.path!
   const life = ws.lifetime
+  // What the run is checked against as a check of its card (#1222): read at resolve, when it passes that link back;
+  // else now (a start through the Agent API, its command its caller's own).
+  let bracket: Bracket | null = null
   try {
     return await admitLinked<{ id: string; ignored?: true }>(
       progressGate,
       { id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true },
       {
         caller: () => progressCallerIn(workspacePath),
-        link: async (caller) => issuedLinks.take(linkOwner(caller), b.link) ?? (await resolveRunLink(caller, b, runLinkDeps)),
+        link: async (caller) => {
+          const taken = issuedLinks.take(linkOwner(caller), b.link)
+          if (taken) {
+            bracket = takeResolved(b.link)
+            return taken
+          }
+          const link = await resolveRunLink(caller, b, runLinkDeps)
+          bracket = await bracketFor(ws, link).catch((e) => (log.warn('could not read what a run is checked against', e), null))
+          return link
+        },
         settled: () => progressWorkspaceOpen(ws, workspacePath, life)
       },
-      (caller, link) => ({ id: progress.start(caller, b, { ...link, check: link.check?.name ?? null }).id })
+      (caller, link) => {
+        const run = progress.start(caller, b, { ...link, check: link.check?.name ?? null })
+        if (bracket) bracketStarted(run.id, bracket)
+        return { id: run.id }
+      }
     )
   } catch (e) {
     throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
@@ -2599,10 +2622,21 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
   progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
-    progress.finish(caller, decodeURIComponent(params[0]), bodyObject(body))
+    const run = progress.finish(caller, decodeURIComponent(params[0]), bodyObject(body))
+    void recordCheck(run)
     return { ok: true }
   })
 )
+
+/** A finished run for a card: its `CheckRan` in the card's facts (#1222), and how it counted on the run's row. */
+async function recordCheck(run: ProgressRun): Promise<void> {
+  try {
+    const c = await bracketFinished(run)
+    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}) })
+  } catch (e) {
+    log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
+  }
+}
 
 async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // Measured from here to the response's end (or the client going away): latency on the monotonic clock, bodies'

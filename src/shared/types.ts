@@ -2618,4 +2618,16 @@ export interface ProgressRun {
   check?: string
   /** The folder it ran in, as its reporter said. */
   folder?: string
+  /** A finished run for a card (#1222): how it counted as a check of the card's revision (its `CheckRan`). */
+  counts?: RunCheck
+}
+
+/** Why a run doesn't count as a check (SPEC §16.13), as its `CheckRan` says. */
+export type CheckWhyNot = 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
+
+/** How a run counted as a check: the check's name, and why not when it didn't. */
+export interface RunCheck {
+  name: string
+  counted: boolean
+  whyNot?: CheckWhyNot
 }

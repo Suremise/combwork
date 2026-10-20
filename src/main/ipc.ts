@@ -41,7 +41,7 @@ import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { boardState, cardHeads, exportBoard, restoreBoardBackup, upgradeBoard } from './boardStore'
-import { cardCosts, laneCosts } from './cardCosts'
+import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
 import * as mcp from './mcp'
@@ -1018,6 +1018,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const time = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
       return cardCosts(currentWorkspace(), { numbers, project: typeof q?.project === 'string' ? q.project : null, from: time(q?.from), to: time(q?.to) })
     },
+    'costs:rounds': (n) => (workspace.path && Number.isInteger(n) && n > 0 ? cardRoundCosts(currentWorkspace(), n) : null),
     'costs:lanes': (ids) => (workspace.path ? laneCosts(currentWorkspace(), Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : undefined) : []),
     'progress:list': async () => {
       const ws = workspace.path

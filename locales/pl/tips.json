@@ -212,6 +212,8 @@
   "tips.permissionMode.title": "Przełącz tryb uprawnień",
   "tips.progressCard.text": "Uruchomienie w panelu Postęp pokazuje pod agentem kartę i rewizję, na której działało, na przykład #1061 · a3f2c1d: kliknij kartę, żeby ją otworzyć, albo rewizję, żeby ją skopiować.",
   "tips.progressCard.title": "Dla której karty było to uruchomienie?",
+  "tips.progressCheck.text": "Uruchomienie dla karty jest zapisywane jako sprawdzenie rewizji karty. Jego szczegóły w panelu Postęp mówią „Liczy się jako sprawdzenie” albo dlaczego nie: nie uruchomiono go jako tego sprawdzenia, folder miał niezatwierdzone zmiany albo w trakcie działania zmieniły się pliki.",
+  "tips.progressCheck.title": "Czy to uruchomienie liczy się jako sprawdzenie?",
   "tips.progressCommand.text": "Agenci uruchamiają długie polecenia, takie jak testy i kompilacje, przez hive-progress, więc panel Postęp pokazuje je pod nazwą agenta, a od drugiego razu także szacowany pozostały czas. W ustawieniach możesz sprawić, że robią to tylko na Twoją prośbę.",
   "tips.progressCommand.title": "Postęp dowolnego polecenia",
   "tips.progressDetails.text": "Kliknij uruchomienie w panelu Postęp albo w sekcji Ostatnie, żeby zobaczyć szczegóły: całe polecenie, kiedy działało i jak długo, kod wyjścia, zapisany log i przyczynę niepowodzenia.",

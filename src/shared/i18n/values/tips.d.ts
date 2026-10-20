@@ -214,6 +214,8 @@ interface HiveMessageValues {
   'tips.permissionMode.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
+  'tips.progressCheck.text': undefined
+  'tips.progressCheck.title': undefined
   'tips.progressCommand.text': undefined
   'tips.progressCommand.title': undefined
   'tips.progressDetails.text': undefined
