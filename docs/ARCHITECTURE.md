@@ -331,14 +331,51 @@ leased to one reviewer for one submission; reviewers' sessions live in the proje
 the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir`, Codex's writable roots by `-c`),
 never the CLI's config.
 
-**Storage (P3's one migration, #1025).** New tables: card columns typed; `card_comments`, `card_history`,
-`card_decisions`, `card_links`, `card_holds`, `card_facts`, `card_actions`, `card_aliases` (old `#N` → key),
-`project_keys`, `rulesets`, `slot_leases` (P7); typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
-is rebuilt from rows, identical or versioned. One schema step, backed up first, asked before it runs and refused while
-another Hive process has the workspace open; Help restores the 0.9 backup; a newer file opens read-only. Observed
-facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
+**Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
+in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by
+#1207's 1.0 group in one transaction after one ask, one backup and one exclusive lock. All tables are STRICT; a card's
+child rows reference `cards(number)` ON DELETE CASCADE, so they go only with the card (Delete permanently); `ord` is an
+entry's place in its list; keys compare case-insensitively. A typed store row keeps the fields this build has no column
+for in `extra` (JSON), so an older Hive saving a newer one's row loses nothing. `v1_0.ts` `QUERIES` holds each module's
+real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EXPLAIN QUERY PLAN).
+
+| Step (card) | Tables (indexes) | Owner |
+|---|---|---|
+| cards in tables (#1209) | `cards`: number (the permanent global `#N`), title, description, project, project_id, agent, agent_name, review_agent/_name/_since, col (the category, today's column), stage (the cached stage, null before a 1.0 move), ord, blocked, archived, archived_for, archived_batch, context_problems, pre_workflow, created/updated, extra, layout (place, project, archived by project, agent, reviewer, updated). `card_labels` (by label), `card_links` (blockedBy and links; by target), `card_context`, `card_comments`, `card_history` (by time), `card_decisions`, `card_holds` | `boardStore.ts` (rows), `tasks.ts` (rules) |
+| sessions and deliveries in tables (#1211) | `sessions` per host (by agent), `session_cards` (by card), `sessions_deleted`, `sessions_deleted_usage`; `deliveries` per host (by agent, state, source and ref, card and round; the 7-day expiry by `received` and `ended`; unique `action`) | `sessionStore.ts`, `deliveries.ts` |
+| lanes, watches and metrics in tables (#1212) | `lanes` (by builder, reviewer, state and end), `lane_cards` (by card), `lane_frozen`; `watches` (one per folder and agent; by limit, by fired delivery), `watch_cards` (by card); `metrics_buckets` (by start), `metrics_series` (a row per series: part '' for the workspace or a project's name, family, key) | `lanes.ts`, `watches.ts`, `metrics.ts` |
+| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (pending, by card), `rulesets`, `folder_commits` | `workflow/factStore.ts` inside `boardWrite` |
+| project keys (#1219) | `project_keys` (current and old keys, one current per project), `project_counters`, `cards.project_number` (unique per project), `card_aliases` ((old project, number) → card, for a card moved since) | `cardRefs.ts`, `takeNumber` |
+
+`board_meta`, `archive_batches` (an undo record of a bulk archive, read whole) and `store_meta` (each store's few
+values: `imported`, `next`, `invalid`, `observed`…) stay as they are; `store_rows` goes with the second of #1211/#1212
+to merge. `slot_leases` is P7's.
+
+**What stays JSON, and why:** a fact's `data` (each kind's own fields and the platform's opaque `data.platform`, read
+whole per card into the fold); a ruleset (a compiled document, stored once by its hash); a card's `context_problems`
+(the last check of its references, read only with it); a history line's `what_text` and a comment's `hive_text` (a
+message id and values for the window); a session's `kept_usage` and `screen_stops` (snapshots read whole; usage.db holds
+the queryable history); a delivery's `sender` and `meta`; a watch's condition and marks (its own view of what it
+watches, capped small, never queried across watches; what is queried has a column or `watch_cards`); a metrics series'
+counters (aggregated in memory, saved as a unit). A card's old `#N` needs no alias row: `number` stays its global number.
+Cards of a workspace with no project (project '') have no project id: #1219 decides their key.
+
+**The card JSON contract** (`src/main/schema/cardRows.ts`): `composeCard(decomposeCard(n, doc))` stringifies to exactly
+the document the card's row holds today, so the Agent API's card (tasks.ts `clean` of it), Export Board and a 0.9.3 Hive
+reading an export see the same bytes. Each field of Hive's form goes to its column or child table; anything else (a
+field Hive doesn't know, a known one of another type, a string with a lone surrogate) is kept as JSON in `extra`. The
+keys' order is Hive's (`CARD_KEYS`: clean's, with `projectId` after `project` and `archivedFor`/`archivedBatch` last)
+with optional fields present when they have a value and the required lists present even when empty; a card in another
+order, or with a field missing or an optional list kept empty, keeps its key list in `layout`. A list entry not of
+Hive's form keeps its exact JSON in its row's `raw`. On the live board's copy (20 Oct: 1179 cards) every card
+round-trips, 103 with a layout of their own; written in about 0.3–0.5 s and read back in about 0.1 s. Cards written by
+1.0 are of Hive's form. The API adds `key` and `stage` from the card's columns **after** the document's fields, so
+today's JSON is unchanged but for the two fields at its end: additive, no API version.
+
+Observed facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
 workspace write each transition once, while a later repeat of the same values is still recorded; a writer that loses
-the race re-reads the platform and writes only what is true now, after the winner (SPEC §16.17).
+the race re-reads the platform and writes only what is true now, after the winner (SPEC §16.17). Help restores the 0.9
+backup; a newer file opens read-only.
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
