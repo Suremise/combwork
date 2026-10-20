@@ -65,8 +65,13 @@ const check = (name, ok, extra = '') => {
     }
   }
   const shell = async (id, cmd, ms) => (await startShell(id, cmd, ms))()
-  // A screenshot in a theme (#1250): taken again until the image shows the Progress panel's background as the page has
-  // it (just inside its left edge), so a frame still painted in the other theme never passes for this one's.
+  // A screenshot in a theme (#1250): the page must reach the theme, its Progress panel's background must be that
+  // theme's (dark or light), and the image is taken again until it shows that background (just inside the panel's left
+  // edge), so neither a switch that didn't happen nor a frame still painted in the other theme passes for this one's.
+  const isDark = (rgb) => {
+    const [r, g, b] = rgb.match(/\d+/g).map(Number)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128
+  }
   const pixelAt = (png, x, y) =>
     page.evaluate(
       async ([b64, px, py]) => {
@@ -84,12 +89,13 @@ const check = (name, ok, extra = '') => {
     )
   const themedShot = async (theme, name) => {
     await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    const reached = await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
     const at = await page.evaluate(() => {
       const el = document.querySelector('.progress-panel')
       const r = el.getBoundingClientRect()
-      return { x: Math.round((r.left + 3) * devicePixelRatio), y: Math.round((r.top + r.height / 2) * devicePixelRatio), bg: getComputedStyle(el).backgroundColor }
+      return { x: Math.round((r.left + 3) * devicePixelRatio), y: Math.round((r.top + r.height / 2) * devicePixelRatio), bg: getComputedStyle(el).backgroundColor, theme: document.documentElement.dataset.theme }
     })
+    if (!reached || isDark(at.bg) !== (theme === 'dark')) return check(`${name}: the page switches to the ${theme} theme`, false, `the page's theme is ${at.theme}, its panel ${at.bg}`)
     let shown = ''
     const ok = await until(async () => (shown = await pixelAt(await page.screenshot({ path: path.join(lib.WORK, name) }), at.x, at.y)) === at.bg, HUNG_MS)
     check(`${name} shows the ${theme} theme`, !!ok, `the panel is ${at.bg} in the page, ${shown} in the image`)
