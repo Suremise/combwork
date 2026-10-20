@@ -874,8 +874,8 @@ changes (§8, §6.6, §12, §13) as it merges. Where this section and an older o
 **Sources and how decisions are cited.** Every rule carries its source in brackets. Darren's recorded decisions win;
 then the shared note's decisions; then the phase cards' comments (the Assistant's carry-overs); then this spec's own
 choices, which are marked **[P1]** and are the builders' to keep or to change with evidence. What the design doesn't
-settle is an **open point** (OP-n), listed in §16.20 with a recommendation; the spec says which way it is written
-until Darren answers.
+settle was an **open point** (OP-n), listed in §16.20 with a recommendation; Darren agreed all 41 as recommended on
+20 Oct, so they are decisions now **[#1117 20 Oct]**.
 
 | Tag | Source |
 |---|---|
@@ -884,6 +884,7 @@ until Darren answers.
 | **[#1112 UI]** | #1112: no user-facing templates; options under the chosen version control in the Version Control tab; None and Git now; Solo/Pair/Team presets |
 | **[#1112 down]** | #1112: None is no version control, not no workflow; outcomes not mechanics; defaults are the product; switching warns and applies from the next card; scales fully down |
 | **[#1117 solo]** | #1117: 1.0 works fully without the Assistant |
+| **[#1117 20 Oct]** | #1117: all 41 open points of §16.20 agreed as recommended (Darren, 20 Oct) |
 | **[#1117 git]** | #1117: Git support is fleshed out as 1.0 goes; a missing capability goes into the phase or On Hold labelled git-support |
 | **[#1122 detect]** | #1122: version control is detected, never switched silently |
 | **[#1123 tpl]**, **[#1123 names]** | #1123: agent templates wiped and replaced by shipped defaults; agent names unique, patterns from the project key |
@@ -1336,7 +1337,7 @@ these moments).
 
 [#1112 A] Six fixed categories, the board's machinery works on them (lanes, watches, the start view, the Overview,
 the Agent API's columns). Their ids are today's column ids, unchanged in the Agent API: `hold`, `todo`, `doing`,
-`review`, `passed`, `done`. English names (OP-1, written as recommended): **On Hold, Todo, Active, Review, Approved,
+`review`, `passed`, `done`. English names (OP-1, agreed 20 Oct): **On Hold, Todo, Active, Review, Approved,
 Done** (`locales/glossary-1.0.md` §2.2).
 
 | Category | Meaning (every platform) |
@@ -1354,7 +1355,7 @@ A **stage** is a column of the board [#1112 A]. Each sits in one category; a cat
 category the options don't use is hidden. The options produce the stages (§16.6); the user may rename a stage
 (OP-30). Default stage names and when they exist:
 
-| Stage (English, proposed) | Category | Exists when |
+| Stage (English, agreed) | Category | Exists when |
 |---|---|---|
 | On Hold | On Hold | Always. |
 | Todo | Todo | Always. |
@@ -1448,8 +1449,8 @@ options, this section), then for Git the platform's own sections: Changes, Histo
 next to its card and the revision under review), and the **merge queue** (§16.9) [#1122]. The whole page changes
 with the selection [#1112 down].
 
-**Labels below are the proposed English** [#1117 c "outcome wording first"]: they are settled with Darren (OP-2)
-before any translation, then translated once into the 7 locales per `locales/glossary-1.0.md`.
+**Labels below are the agreed English** [#1117 c "outcome wording first"; OP-2, agreed 20 Oct], translated once
+into the 7 locales per `locales/glossary-1.0.md` §2.6.
 
 #### 16.6.1 None's options
 
@@ -1730,7 +1731,7 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
 [#439, #1120 c] Cards waiting on the user carry **For you**, from `ApprovalRequested`, a blocked question
 (`CannotWithinRules`), or a gate waiting on the user's approval (G10). It shows as a chip on the card, a **For you**
 board filter, a count on the activity bar and in the Progress panel's paused reasons; answering (Approve/Decline, a
-decision, a reply) clears it and **wakes the waiting agent**. Kinds (OP-11, written as recommended): **Approve**,
+decision, a reply) clears it and **wakes the waiting agent**. Kinds (OP-11, agreed 20 Oct): **Approve**,
 **Decide**, **Test**, **Sign in**, **Other**; only an Approve satisfies an approval gate. A "Test" request may carry a
 checklist (what to try, on which build) [P1]. The field records a person (`for: 'user'`) so "for <person>" can be
 added later [#439].
@@ -1939,7 +1940,7 @@ card" means after its Done fact; its merge-slot case goes away with P5). They ar
 #### 16.10.5 Reviewers and review copies
 
 [note §8, #1112 c] Reviewers aren't tied to slots. A reviewer reviews the **exact revision** in a **review copy**: a
-detached worktree at that revision from a small warm pool shared with check copies (§16.13), sized per OP-32 (proposed, pending Darren: the larger of 2 and the number of reviewer agents plus one), with dependencies installed
+detached worktree at that revision from a small warm pool shared with check copies (§16.13), sized per OP-32 (agreed 20 Oct: the larger of 2 and the number of reviewer agents plus one), with dependencies installed
 by the setup script (not junctions into a slot: AGENTS.md's junction gotcha). A review copy is **leased** to one
 reviewer for one submission (start review) and returned at its verdict; it's reset to the next revision only then.
 The reviewer's session stays in the project folder; the review copy is where it reads and runs commands. Its runs name
@@ -2044,7 +2045,7 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
 - **Agent names** pre-filled `AM-B1`, `AM-R1`; any unique name allowed [#704, #1123 names].
 - **Always a hyphen**, never an em dash; the activity bar tiles show the key, shrinking 3–4 letters to fit [#704].
 - **Branches** `hive/AM/AM-12-<slug>` [#704 19 Oct].
-- **Commit trailer** (OP-14, written as recommended): `Hive-Card: AM-12`, added by agents in a shared folder (and by
+- **Commit trailer** (OP-14, agreed 20 Oct): `Hive-Card: AM-12`, added by agents in a shared folder (and by
   Hive's merge commits, with `Hive-Revision` and `Hive-Reviewed-By`). Commit subjects `AM-12: …` are a convention, not a
   rule.
 - **Card references in intents** (OP-14): a key string (`"AM-12"`) or an old alias (`"#1061"`). **A plain number is
@@ -2346,53 +2347,56 @@ by an agent's worktree, and "Committed is done" still needs the project folder.
 Git capabilities found missing go into the phase that needs them or On Hold labelled git-support [#1117 git]
 (P1's list: §16.20's last table).
 
-### 16.20 Open points for Darren
+### 16.20 Open points, agreed
 
-Each is written into this section as recommended until answered.
+**All 41 were agreed as recommended by Darren on 20 Oct** ("Ok I agree with you on all points", recorded on #1117),
+including the four that change or narrow earlier decisions: OP-33 (same change by replay, with patch-id as a first
+test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of §16 already follows them. **[#1117
+20 Oct]** below means that decision.
 
-| # | Question | Recommendation |
+| # | Question | Agreed (Darren, 20 Oct, as recommended) |
 |---|---|---|
-| OP-1 | Category names in English: rename Doing → **Active** and Passed → **Approved** (ids unchanged)? | Yes: the note and phase cards use them, most translations already say "approved", and Polish wants "Aktywne" (#1104). |
-| OP-2 | The option labels (§16.6.1, §16.6.2) and stage names (§16.5.2) as worded? | Yes, then translate once. |
-| OP-3 | The presets' values (§16.6.3)? In particular Solo = "Committed is done" (one card in the folder: its change is `base..HEAD`, §16.3.2), Team = strict off, merge checks with a clean install, and your OK for `ui`/`release` cards. | As in the table. |
-| OP-4 | Who merges by default for Pair and Team (note q1)? | Hive merges. |
-| OP-5 | Where options live (note q4)? | `project.json`, with copy/paste as JSON; no repo file in 1.0. |
-| OP-6 | No-code kind (note q6)? | Yes (adopted by "from day one"; confirm who sets it). |
-| OP-7 | May agents propose `no-code` when creating a card? | Yes, shown as proposed until the user or the Assistant confirms. |
-| OP-8 | Intent tools: one tool each, or one tool with actions? | Decide in P4 by the scenarios and trials; one tool each is the starting point. |
-| OP-9 | Override authority (note q7): user always, the Assistant within Control (reason required), agents never? | Yes. |
-| OP-10 | Slot pinning (note q5): an agent keeps its slot for a lane? | Yes. |
-| OP-11 | For you kinds (#439): Approve, Decide, Test, Sign in, Other as one ask-the-user intent? | Yes; only Approve satisfies a gate. |
-| OP-12 | A per-card target (release and integration branches, RELEASING.md)? | Yes: a card may name a target branch; set by the user or the Assistant; the lane's cards default to the lane's. |
-| OP-13 | Who owns target and merge style (#1117 c1)? | The Git options; a slot records only its base; the Merge dialog stays for merges outside cards. |
-| OP-14 | Commit trailer `Hive-Card: AM-12`, and card references in intents? | The trailer as written; intents take `AM-12` or `#1061` and **refuse a plain number** in 1.0, since old skills and memory mean the global number (§16.12; HB3's finding 13). |
-| OP-15 | Undo retention? | 7 days on disk. |
-| OP-16 | None: isolation and integration in 1.0? | None works in the project folder; integration is acceptance (no copying); folder copies and publishing later. |
-| OP-17 | None's deliverables and what a card's revision covers? | Deliverables: the project folder except `.hive` and excluded folders, narrowed per project or card; a card's revision covers its **declared paths** (pre-filled from what its agents changed, unclaimed changes offered at submit), so two agents don't make each other's passes stale unless they share a file (§16.3.3; HB3's findings 6 and C, HR2's round 2 finding 6). |
-| OP-18 | Strict (note q2): on for Team, as the note proposed? | **Off for both** (changed after HB3's finding 4): the queue already tests target + change, a clean update keeps the pass, and strict as the note had it sent the builder round on every merge race. Strict stays an option, and when on, the queue updates the line itself (§16.9.1 step 3). |
-| OP-19 | Shipped agent templates: the set, names, providers, efforts (#1123 c)? | Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool; models "provider's default". |
-| OP-20 | #1123's decision example says "HB1…HR6 in hive"; #704 gives `HI-B1`. Correct the example? | Yes, `HI-B1…HI-R6`. |
-| OP-21 | Two reviewers per card in Team? | Offered, default 1. |
-| OP-22 | Upgrade options (§16.17): Not checked and no checks, with a reviewer agent where the project has reviewers or lanes (else no review), until a preset is picked? | Yes, with the one-time notice (everything off would strand running lanes: HB3's finding 1). The hive project moves to Pair (the agent merges) in P4's RC, Pair in P5's and Team in P7's (§16.19.1). |
-| OP-23 | The UI-screenshot gate as "your OK for cards labelled `ui`" (G10)? | Yes: a label rule is generic and needs no new card field. |
-| OP-24 | Pre-review and merge check commands: suggested from the project's scripts, never guessed silently? | Yes. |
-| OP-25 | Work merged by hand before its rules: a card in Review → Done with an "outside the rules" mark; an Active card → a "merged outside, in part" mark and it stays Active (§16.4.4)? | Yes (decision C: the rules never fight it; HB3's finding 2). |
-| OP-26 | A stale pass: stays in Approved with a mark until resubmitted (not moved back to Review), its builder woken and the lane paused "stale: submit again"? | Yes (#1120's panel comment; HB3's finding 8). |
-| OP-27 | Pre-review checks: the agent runs them through hive-progress and Hive verifies, rather than Hive running them? | Yes; Hive runs only the merge checks. |
-| OP-28 | Lane overlap warnings (§16.11.4): advice only, never a rule? | Yes. |
-| OP-29 | A project inside a larger repository: Hive's merges into the parent's branches? | Allowed only when the options name the target explicitly; the tab warns it's the whole repository. |
-| OP-30 | Users may rename stages? | Yes, per project; categories can't be renamed. |
-| OP-31 | Slot names? | `slot-a`, `slot-b`… |
-| OP-32 | Review and check copies per project (one pool serves reviewers' review copies and isolated checks, §16.13)? | The larger of 2 and the number of reviewer agents plus one, configurable; a run or review that waits for one shows "waiting for a check copy" [HB3's round 3]. |
-| OP-33 | **Same change**: #1112 B chose `git patch-id --stable`, but patch-id ignores whitespace (HR2 showed two patches differing only in Python indentation share an id), and any hash of changed lines without their positions can't tell which of two identical blocks was changed (HR2, round 2). Decide sameness by **replay** instead: replay the reviewed change onto the new base with git's three-way merge and require exactly the new tree, with patch-id only as a quick first test, and anything unsettled counting as not the same? | Yes (§16.3.2): it keeps the decision's intent (a clean rebase or a squash keeps the approval) and is exact about content and place; its cost is one `merge-tree` per comparison. The fallback, "exact revision only", stays as G4's stricter value. |
-| OP-34 | A lane's cards: separate lines, each from the target's head, reviewed and merged one by one (a card needing an earlier one waits for its merge), rather than one cumulative lane branch merged at the lane's end as today? | Separate lines: the queue merges each approved card, and review covers one card's change. Stacked cards come later. |
-| OP-35 | A decision recorded after a pass makes it stale, so the reviewer confirms the same revision before it merges (§16.4.6)? | Yes: it closes #587 for work already passed; the confirmation needs no new commit. |
-| OP-36 | A lane's next card waits until the previous one is Done (merged), rather than starting while it is in the queue (§16.11.2)? | Yes: a returned card is fixed in a clean slot by the builder who knows it, and the next card starts from a target that has the previous one. The cost is idle time during merge checks; the alternative is a second slot and a fresh conversation for a returned card. |
-| OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 Hive has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | Yes. |
-| OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | Yes, the user only, per change, with the cards listed first. |
-| OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | No RC for P2: there's nothing to install that differs from 0.9.3. |
-| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). |
-| OP-41 | The migration detects a running 0.9 Hive by SQLite's exclusive lock (§16.17). If P3's two-process test shows that can't be relied on, add a workspace presence marker to 0.9.3 (a fix on main, merged forward)? | Yes, only if needed; P3 reports which. |
+| OP-1 | Category names in English: rename Doing → **Active** and Passed → **Approved** (ids unchanged)? | **Agreed [#1117 20 Oct].** Yes: the note and phase cards use them, most translations already say "approved", and Polish wants "Aktywne" (#1104). |
+| OP-2 | The option labels (§16.6.1, §16.6.2) and stage names (§16.5.2) as worded? | **Agreed [#1117 20 Oct].** Yes, then translate once. |
+| OP-3 | The presets' values (§16.6.3)? In particular Solo = "Committed is done" (one card in the folder: its change is `base..HEAD`, §16.3.2), Team = strict off, merge checks with a clean install, and your OK for `ui`/`release` cards. | **Agreed [#1117 20 Oct].** As in the table. |
+| OP-4 | Who merges by default for Pair and Team (note q1)? | **Agreed [#1117 20 Oct].** Hive merges. |
+| OP-5 | Where options live (note q4)? | **Agreed [#1117 20 Oct].** `project.json`, with copy/paste as JSON; no repo file in 1.0. |
+| OP-6 | No-code kind (note q6)? | **Agreed [#1117 20 Oct].** Yes (adopted by "from day one"; confirm who sets it). |
+| OP-7 | May agents propose `no-code` when creating a card? | **Agreed [#1117 20 Oct].** Yes, shown as proposed until the user or the Assistant confirms. |
+| OP-8 | Intent tools: one tool each, or one tool with actions? | **Agreed [#1117 20 Oct].** Decide in P4 by the scenarios and trials; one tool each is the starting point. |
+| OP-9 | Override authority (note q7): user always, the Assistant within Control (reason required), agents never? | **Agreed [#1117 20 Oct].** Yes. |
+| OP-10 | Slot pinning (note q5): an agent keeps its slot for a lane? | **Agreed [#1117 20 Oct].** Yes. |
+| OP-11 | For you kinds (#439): Approve, Decide, Test, Sign in, Other as one ask-the-user intent? | **Agreed [#1117 20 Oct].** Yes; only Approve satisfies a gate. |
+| OP-12 | A per-card target (release and integration branches, RELEASING.md)? | **Agreed [#1117 20 Oct].** Yes: a card may name a target branch; set by the user or the Assistant; the lane's cards default to the lane's. |
+| OP-13 | Who owns target and merge style (#1117 c1)? | **Agreed [#1117 20 Oct].** The Git options; a slot records only its base; the Merge dialog stays for merges outside cards. |
+| OP-14 | Commit trailer `Hive-Card: AM-12`, and card references in intents? | **Agreed [#1117 20 Oct].** The trailer as written; intents take `AM-12` or `#1061` and **refuse a plain number** in 1.0, since old skills and memory mean the global number (§16.12; HB3's finding 13). |
+| OP-15 | Undo retention? | **Agreed [#1117 20 Oct].** 7 days on disk. |
+| OP-16 | None: isolation and integration in 1.0? | **Agreed [#1117 20 Oct].** None works in the project folder; integration is acceptance (no copying); folder copies and publishing later. |
+| OP-17 | None's deliverables and what a card's revision covers? | **Agreed [#1117 20 Oct].** Deliverables: the project folder except `.hive` and excluded folders, narrowed per project or card; a card's revision covers its **declared paths** (pre-filled from what its agents changed, unclaimed changes offered at submit), so two agents don't make each other's passes stale unless they share a file (§16.3.3; HB3's findings 6 and C, HR2's round 2 finding 6). |
+| OP-18 | Strict (note q2): on for Team, as the note proposed? | **Agreed [#1117 20 Oct].** **Off for both** (changed after HB3's finding 4): the queue already tests target + change, a clean update keeps the pass, and strict as the note had it sent the builder round on every merge race. Strict stays an option, and when on, the queue updates the line itself (§16.9.1 step 3). |
+| OP-19 | Shipped agent templates: the set, names, providers, efforts (#1123 c)? | **Agreed [#1117 20 Oct].** Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool; models "provider's default". |
+| OP-20 | #1123's decision example says "HB1…HR6 in hive"; #704 gives `HI-B1`. Correct the example? | **Agreed [#1117 20 Oct].** Yes, `HI-B1…HI-R6`. |
+| OP-21 | Two reviewers per card in Team? | **Agreed [#1117 20 Oct].** Offered, default 1. |
+| OP-22 | Upgrade options (§16.17): Not checked and no checks, with a reviewer agent where the project has reviewers or lanes (else no review), until a preset is picked? | **Agreed [#1117 20 Oct].** Yes, with the one-time notice (everything off would strand running lanes: HB3's finding 1). The hive project moves to Pair (the agent merges) in P4's RC, Pair in P5's and Team in P7's (§16.19.1). |
+| OP-23 | The UI-screenshot gate as "your OK for cards labelled `ui`" (G10)? | **Agreed [#1117 20 Oct].** Yes: a label rule is generic and needs no new card field. |
+| OP-24 | Pre-review and merge check commands: suggested from the project's scripts, never guessed silently? | **Agreed [#1117 20 Oct].** Yes. |
+| OP-25 | Work merged by hand before its rules: a card in Review → Done with an "outside the rules" mark; an Active card → a "merged outside, in part" mark and it stays Active (§16.4.4)? | **Agreed [#1117 20 Oct].** Yes (decision C: the rules never fight it; HB3's finding 2). |
+| OP-26 | A stale pass: stays in Approved with a mark until resubmitted (not moved back to Review), its builder woken and the lane paused "stale: submit again"? | **Agreed [#1117 20 Oct].** Yes (#1120's panel comment; HB3's finding 8). |
+| OP-27 | Pre-review checks: the agent runs them through hive-progress and Hive verifies, rather than Hive running them? | **Agreed [#1117 20 Oct].** Yes; Hive runs only the merge checks. |
+| OP-28 | Lane overlap warnings (§16.11.4): advice only, never a rule? | **Agreed [#1117 20 Oct].** Yes. |
+| OP-29 | A project inside a larger repository: Hive's merges into the parent's branches? | **Agreed [#1117 20 Oct].** Allowed only when the options name the target explicitly; the tab warns it's the whole repository. |
+| OP-30 | Users may rename stages? | **Agreed [#1117 20 Oct].** Yes, per project; categories can't be renamed. |
+| OP-31 | Slot names? | **Agreed [#1117 20 Oct].** `slot-a`, `slot-b`… |
+| OP-32 | Review and check copies per project (one pool serves reviewers' review copies and isolated checks, §16.13)? | **Agreed [#1117 20 Oct].** The larger of 2 and the number of reviewer agents plus one, configurable; a run or review that waits for one shows "waiting for a check copy" [HB3's round 3]. |
+| OP-33 | **Same change**: #1112 B chose `git patch-id --stable`, but patch-id ignores whitespace (HR2 showed two patches differing only in Python indentation share an id), and any hash of changed lines without their positions can't tell which of two identical blocks was changed (HR2, round 2). Decide sameness by **replay** instead: replay the reviewed change onto the new base with git's three-way merge and require exactly the new tree, with patch-id only as a quick first test, and anything unsettled counting as not the same? | **Agreed [#1117 20 Oct].** Yes (§16.3.2): it keeps the decision's intent (a clean rebase or a squash keeps the approval) and is exact about content and place; its cost is one `merge-tree` per comparison. The fallback, "exact revision only", stays as G4's stricter value. |
+| OP-34 | A lane's cards: separate lines, each from the target's head, reviewed and merged one by one (a card needing an earlier one waits for its merge), rather than one cumulative lane branch merged at the lane's end as today? | **Agreed [#1117 20 Oct].** Separate lines: the queue merges each approved card, and review covers one card's change. Stacked cards come later. |
+| OP-35 | A decision recorded after a pass makes it stale, so the reviewer confirms the same revision before it merges (§16.4.6)? | **Agreed [#1117 20 Oct].** Yes: it closes #587 for work already passed; the confirmation needs no new commit. |
+| OP-36 | A lane's next card waits until the previous one is Done (merged), rather than starting while it is in the queue (§16.11.2)? | **Agreed [#1117 20 Oct].** Yes: a returned card is fixed in a clean slot by the builder who knows it, and the next card starts from a target that has the previous one. The cost is idle time during merge checks; the alternative is a second slot and a fresh conversation for a returned card. |
+| OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 Hive has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | **Agreed [#1117 20 Oct].** Yes. |
+| OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | **Agreed [#1117 20 Oct].** Yes, the user only, per change, with the cards listed first. |
+| OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | **Agreed [#1117 20 Oct].** No RC for P2: there's nothing to install that differs from 0.9.3. |
+| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). |
+| OP-41 | The migration detects a running 0.9 Hive by SQLite's exclusive lock (§16.17). If P3's two-process test shows that can't be relied on, add a workspace presence marker to 0.9.3 (a fix on main, merged forward)? | **Agreed [#1117 20 Oct].** Yes, only if needed; P3 reports which. |
 
 **Git support (P1's list)** [#1117 git]. Capabilities the spec needs, and where they go:
 

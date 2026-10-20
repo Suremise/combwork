@@ -1,9 +1,8 @@
 # Hive 1.0 glossary: the workflow layer's terms in every language
 
 **Status:** written in 1.0 P1 (#1117), 20 Oct 2026, for every 1.0 phase (P2–P8) and the translation review (#1126).
-The English labels marked **(proposed)** wait for Darren's agreement (SPEC §16.20, open point OP-1); the
-translations follow the English once it is agreed, so a label that changes is translated again here first, then in
-`locales/`. Nothing in this file is a message: messages stay in the code (`msg()`), and their translations in
+The English labels, category and stage names were agreed by Darren as proposed on 20 Oct (SPEC §16.20, OP-1 and
+OP-2, recorded on #1117). A label that changes later is translated again here first, then in `locales/`. Nothing in this file is a message: messages stay in the code (`msg()`), and their translations in
 `locales/<code>/<area>.json`.
 
 **How it relates to the other glossaries:**
@@ -75,9 +74,9 @@ the English word stays in that language.
 | **workflow** | How work moves from Todo to Done in a project: its stages and rules. | Workflow | flujo de trabajo | flux de travail | ワークフロー | przepływ pracy | fluxo de trabalho | 工作流程 |
 | **workflow options** | The settings under the chosen version control that make the workflow. | Workflow-Optionen | opciones del flujo de trabajo | options du flux de travail | ワークフローのオプション | opcje przepływu pracy | opções do fluxo de trabalho | 工作流程选项 |
 | **preset** | One click that fills in every option. | Voreinstellung | ajuste predefinido | préréglage | プリセット | ustawienie wstępne | predefinição | 预设 |
-| **Solo** (proposed) | Preset: one person, one agent at a time, no reviewer. | Solo | Individual | Solo | ソロ | Solo | Solo | 单人 |
-| **Pair** (proposed) | Preset: a builder and a reviewer. | Paar | Pareja | Binôme | ペア | Para | Dupla | 结对 |
-| **Team** (proposed) | Preset: several builders and reviewers, Hive merges, stricter checks. | Team | Equipo | Équipe | チーム | Zespół | Equipe | 团队 |
+| **Solo** | Preset: one person, one agent at a time, no reviewer. | Solo | Individual | Solo | ソロ | Solo | Solo | 单人 |
+| **Pair** | Preset: a builder and a reviewer. | Paar | Pareja | Binôme | ペア | Para | Dupla | 结对 |
+| **Team** | Preset: several builders and reviewers, Hive merges, stricter checks. | Team | Equipo | Équipe | チーム | Zespół | Equipe | 团队 |
 | **Custom** | The options no longer match a preset. | Benutzerdefiniert | Personalizado | Personnalisé | カスタム | Własne | Personalizado | 自定义 |
 | **rule** | Something the workflow checks before a card moves (internally a *gate*). | Regel | regla | règle | ルール | reguła | regra | 规则 |
 | **old rules** | A card or lane still under the options it started with, after you changed them. | alte Regeln | reglas anteriores | anciennes règles | 旧ルール | stare reguły | regras antigas | 旧规则 |
@@ -89,7 +88,7 @@ the English word stays in that language.
 ### 2.2 The board: categories and stages
 
 Categories are fixed and Hive's machinery works on them (decision A, #1112). Stages are the board's columns; each
-sits in one category. The English category names are **proposed** (OP-1): today's *Doing* and *Passed* columns become
+sits in one category. The English category names were agreed on 20 Oct (OP-1): today's *Doing* and *Passed* columns become
 the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) don't change.
 
 | English | Meaning | de | es | fr | ja | pl | pt-BR | zh-CN |
@@ -98,10 +97,10 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **stage** | A column of the board, produced by the workflow options. | Phase | etapa | étape | ステージ | etap | etapa | 阶段 |
 | **On Hold** | Category and stage: parked by you. | Geparkt | En espera | Suspendu | 保留 | Wstrzymane | Em espera | 搁置 |
 | **Todo** | Category and stage: not started. | Offen | Pendiente | À faire | 未着手 | Do zrobienia | A fazer | 待办 |
-| **Active** (proposed; was *Doing*) | Category and default stage: being worked on. | In Arbeit | En curso | En cours | 進行中 | Aktywne (**changed** from *W toku*, #1104's feedback) | Fazendo | 进行中 |
+| **Active** (was *Doing*) | Category and default stage: being worked on. | In Arbeit | En curso | En cours | 進行中 | Aktywne (**changed** from *W toku*, #1104's feedback) | Fazendo | 进行中 |
 | **Review** | Category and stage: waiting for, or in, review. | Review | Revisión | Relecture | レビュー | Recenzja | Revisão | 评审 |
-| **Approved** (proposed; was *Passed*) | Category and stage: its revision passed review (or your approval) and isn't merged yet. | Genehmigt (**changed** from *Geprüft*, which reads as "checked"; not *Freigegeben*, which also reads as "released") | Aprobado | Validé | 承認済み | Zatwierdzone | Aprovado | 已批准 (**changed** from 已通过, which reads as a run that passed) |
-| **Merging** (proposed) | Stage in Approved: in Hive's merge queue. | Wird gemergt | Fusionando | Fusion en cours | マージ中 | Scalanie | Em merge | 合并中 |
+| **Approved** (was *Passed*) | Category and stage: its revision passed review (or your approval) and isn't merged yet. | Genehmigt (**changed** from *Geprüft*, which reads as "checked"; not *Freigegeben*, which also reads as "released") | Aprobado | Validé | 承認済み | Zatwierdzone | Aprovado | 已批准 (**changed** from 已通过, which reads as a run that passed) |
+| **Merging** | Stage in Approved: in Hive's merge queue. | Wird gemergt | Fusionando | Fusion en cours | マージ中 | Scalanie | Em merge | 合并中 |
 | **Done** | Category and stage: the approved work is in the target (Git), or accepted (None). | Erledigt | Hecho | Terminé | 完了 | Gotowe | Concluído | 已完成 |
 
 ### 2.3 Revisions, checks and reviews
@@ -157,13 +156,13 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 ### 2.6 The Version Control tab's options and values
 
 The labels of SPEC §16.6.1 (None, N1–N7) and §16.6.2 (Git, G1–G17), worded as outcomes [#1117, Darren 19 Oct], with
-their values. **Pending Darren's agreement on the English (OP-2):** once he agrees or changes a label, its row here is
-updated first and then copied into the messages; the translations below are drafts made from the proposed English, so
-the phases don't start from nothing. N7 (File locks) and the Card loops settings keep their existing messages.
+their values. **The English was agreed on 20 Oct (OP-2):** each phase copies its rows into the messages it adds; the
+translations below are AI drafts made from that English, which the phases use and the translation review (#1126)
+checks in context. N7 (File locks) and the Card loops settings keep their existing messages.
 `{target}` is the target branch's name (`main`), a placeholder kept as written. The form of address is each style
 page's (*du*, *tú*, *tu*, *ty*, *você*, 你; Japanese leaves the reader out and says 自分 for "you" as a choice).
 
-| Id | English (proposed) | de | es | fr | ja | pl | pt-BR | zh-CN |
+| Id | English (agreed) | de | es | fr | ja | pl | pt-BR | zh-CN |
 |---|---|---|---|---|---|---|---|---|
 | N1 | Who checks the work before it's done | Wer die Arbeit prüft, bevor sie erledigt ist | Quién revisa el trabajo antes de terminarlo | Qui vérifie le travail avant qu’il soit terminé | 完了前に作業を確認する人 | Kto sprawdza pracę, zanim będzie gotowa | Quem verifica o trabalho antes de concluí-lo | 完成前由谁检查工作 |
 | N1 values | No one · A reviewer agent · You · A reviewer agent, then you | Niemand · Ein Reviewer-Agent · Du · Ein Reviewer-Agent, dann du | Nadie · Un agente revisor · Tú · Un agente revisor y después tú | Personne · Un agent relecteur · Toi · Un agent relecteur, puis toi | なし · レビュアーエージェント · 自分 · レビュアーエージェント、その後に自分 | Nikt · Agent recenzent · Ty · Agent recenzent, potem Ty | Ninguém · Um agente revisor · Você · Um agente revisor e depois você | 无人 · 评审者智能体 · 你 · 评审者智能体，然后是你 |
