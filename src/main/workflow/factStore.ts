@@ -3,18 +3,29 @@
 // rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Hives observing one workspace write
 // each transition once (§16.17).
 //
-// P2 spike (#1118): a database file of its own with the tables P3's migration adds to hive.db (`card_facts`,
-// `card_actions`, `rulesets`), and a minimal card table standing in for the board's. Not wired into the app.
+// In the workspace's hive.db since #1215 (Darren, #1118: "the fact store replaced by hive.db tables written inside
+// boardWrite"): the 1.0 group's facts step makes its tables (schema/v1_0.ts), and a card is the board's own row. A store
+// is one project's: its cards, its lanes, its queue's pauses and its values. It reaches the database one of two ways
+// (HR4's #1215 round 1): on the board's (`forBoard`), its writes are part of the caller's boardWrite only, through the
+// board's own guarded write path, and its reads are the board's, on one snapshot; on a connection of its own (`open`:
+// another Hive, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
 
-import { openDb, transaction, type Db, type Migration } from '../db'
+import type { DatabaseSync } from 'node:sqlite'
+import { openDb, type Db } from '../db'
+import { BOARD_MIGRATIONS, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
+import { decomposeCard, writeCardRows } from '../schema/cardRows'
+import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
 import { STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
+import type { LaneList } from '../../shared/workflow/laneList'
 
-/** What the spike needs of a card (the board's card stands in for it from P3). */
+/** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
+  /** The card's number (`#N`). */
   id: number
+  /** `<project key>-<number>` until the keys step (#1219) numbers cards per project. */
   key: string
   title: string
   kind: CardKind
@@ -22,7 +33,7 @@ export interface CardRecord {
   blockedBy: number[]
   /** A per-card target (OP-12). */
   target?: string
-  /** None: the card's declared paths (§16.3.3). */
+  /** None: the card's declared paths (§16.3.3); absent until it declares any. */
   paths?: string[]
   /** The lane it is in, whose ruleset it uses (§16.11.1). */
   lane?: string
@@ -31,6 +42,7 @@ export interface CardRecord {
   /** A card from before 1.0 (§16.4.1). */
   preWorkflow?: boolean
   stage: StageId
+  /** The board's column. */
   category: Category
 }
 
@@ -51,22 +63,12 @@ export interface Delivery {
   payload: Record<string, unknown>
 }
 
-const MIGRATIONS: Migration[] = [
-  {
-    version: 1,
-    name: 'workflow spike',
-    up: (db) => {
-      db.exec('CREATE TABLE wf_cards (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE COLLATE NOCASE, data TEXT NOT NULL, stage TEXT NOT NULL, category TEXT NOT NULL) STRICT')
-      db.exec('CREATE TABLE card_facts (card INTEGER NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL, actor TEXT NOT NULL, source TEXT NOT NULL, ruleset TEXT, dedupe TEXT, data TEXT NOT NULL, PRIMARY KEY (card, seq)) STRICT')
-      db.exec('CREATE UNIQUE INDEX card_facts_dedupe ON card_facts (card, kind, dedupe) WHERE dedupe IS NOT NULL')
-      db.exec("CREATE TABLE card_actions (id INTEGER PRIMARY KEY, card INTEGER NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, fact INTEGER) STRICT")
-      db.exec('CREATE TABLE rulesets (id TEXT PRIMARY KEY, data TEXT NOT NULL) STRICT')
-      db.exec('CREATE TABLE deliveries (action INTEGER PRIMARY KEY, kind TEXT NOT NULL, target TEXT NOT NULL, payload TEXT NOT NULL) STRICT')
-      db.exec('CREATE TABLE folder_commits (folder TEXT NOT NULL, sha TEXT NOT NULL, card INTEGER, how TEXT NOT NULL, PRIMARY KEY (folder, sha)) STRICT')
-      db.exec('CREATE TABLE wf_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
-    }
-  }
-]
+/** A target's merge queue paused (§16.9): why, by which card, the files a conflict named. */
+export interface QueuePause {
+  reason: string
+  card: string
+  files?: string[]
+}
 
 /** A write inside one transaction: facts, the stage cache and actions together. */
 export interface Tx {
@@ -84,154 +86,414 @@ export interface Tx {
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean
 }
 
-export class FactStore {
-  readonly db: Db
-  private now: () => Date
+/** How a store reaches its database: each read on one snapshot, each write in a transaction it may write in. */
+interface Conn {
+  read<T>(fn: (db: DatabaseSync) => T): T
+  write<T>(fn: (db: DatabaseSync) => T): T
+  close(): void
+}
 
-  constructor(file: string, opts: { now?: () => Date } = {}) {
-    this.db = openDb(file, { migrations: MIGRATIONS, hiveVersion: 'spike' })
-    this.now = opts.now ?? (() => new Date())
+/**
+ * The board's database: reads as the board's readers make them (the caller's change's transaction inside one of its
+ * own, else the reader, on one snapshot); writes only inside a change of the workspace's board (boardWrite), by the
+ * board's guard: a write outside one, from another change's async context, or once SQLite has undone the change, fails.
+ */
+const boardConn = (ws: WorkspaceService): Conn => ({
+  read: (fn) => boardRead(ws, fn),
+  write: (fn) => boardWriteOp(ws, fn),
+  close: () => undefined
+})
+
+/** SQLite undid a store's own transaction part way (a full disk, an I/O error): nothing of it was saved. */
+const lostTx = (): Error => new Error("The fact store's write was undone part way: nothing of it was saved") // i18n-ignore: an error from SQLite's side, logged and thrown to the runtime's caller
+
+/**
+ * A connection of the store's own (nothing else uses it): a write is a transaction of its own (BEGIN IMMEDIATE: another
+ * Hive's write waits for it), and what the store does inside it (synchronously: nothing else runs meanwhile) is part of
+ * it; a read outside one is a read transaction of its own, one snapshot.
+ */
+class OwnConn implements Conn {
+  private depth = 0
+  private closed = false
+
+  constructor(
+    private readonly db: Db,
+    private readonly owned: boolean
+  ) {}
+
+  private inOwn<T>(fn: (db: DatabaseSync) => T): T {
+    if (!this.db.writer.isTransaction) throw lostTx()
+    return fn(this.db.writer)
+  }
+
+  read<T>(fn: (db: DatabaseSync) => T): T {
+    if (this.depth) return this.inOwn(fn)
+    return this.run('BEGIN', fn)
+  }
+
+  write<T>(fn: (db: DatabaseSync) => T): T {
+    if (this.depth) return this.inOwn(fn)
+    return this.run('BEGIN IMMEDIATE', fn)
+  }
+
+  private run<T>(begin: string, fn: (db: DatabaseSync) => T): T {
+    const w = this.db.writer
+    w.exec(begin)
+    this.depth++
+    try {
+      const out = fn(w)
+      // Undone part way, whatever `fn` made of the error meanwhile: it fails whole.
+      if (!w.isTransaction) throw lostTx()
+      w.exec('COMMIT')
+      return out
+    } catch (e) {
+      if (w.isTransaction) w.exec('ROLLBACK')
+      throw e
+    } finally {
+      this.depth--
+    }
   }
 
   close(): void {
+    if (!this.owned || this.closed) return
+    this.closed = true
     this.db.close()
   }
+}
 
-  // --- Reads (the writer connection: the spike reads its own writes at once).
+/** The stage a column stands for, for a card no 1.0 rule has moved yet (its `stage` empty). */
+const COLUMN_STAGE: Record<Category, StageId> = { hold: 'hold', todo: 'todo', doing: 'active', review: 'review', passed: 'approved', done: 'done' }
+
+/** The runtime's columns of a card, as the store reads them. */
+interface CardCols {
+  number: number
+  title: string
+  col: Category
+  stage: StageId | null
+  pre_workflow: number
+  kind: CardKind
+  target: string | null
+  lane: string | null
+  lane_reviewer: string | null
+  paths_declared: number
+}
+const COLS = 'number, title, col, stage, pre_workflow, kind, target, lane, lane_reviewer, paths_declared'
+
+type Scope = { project: string; key: string; now?: () => Date }
+
+/** For tests: runs once a read of cards' records has read their rows, before their lists (another connection committing there). */
+export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCards: null }
+
+export class FactStore {
+  private now: () => Date
+
+  private constructor(
+    private readonly conn: Conn,
+    readonly scope: Scope
+  ) {
+    this.now = scope.now ?? (() => new Date())
+  }
+
+  /**
+   * A project's store on a workspace's board: its writes are part of the caller's change of that board (boardWrite) and
+   * fail outside one; its reads see that change inside it, else what was committed. `project` is the project's name on
+   * the board (its cards' `project`), `key` its key.
+   */
+  static forBoard(ws: WorkspaceService, scope: Scope): FactStore {
+    return new FactStore(boardConn(ws), scope)
+  }
+
+  /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Hive on it; a restart). */
+  static open(file: string, scope: Scope): FactStore {
+    return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: 'workflow' }), true), scope)
+  }
+
+  /** Closes the connection the store opened; once. */
+  close(): void {
+    this.conn.close()
+  }
+
+  private keyOf(n: number): string {
+    return `${this.scope.key}-${n}`
+  }
+
+  // --- Cards.
+
+  /** Cards' records by a condition on `cards` (this module's SQL, its arguments bound), in number order, on one snapshot. */
+  private records(where: string, args: (string | number)[]): CardRecord[] {
+    return this.conn.read((db) => {
+      const rows = db.prepare(`SELECT ${COLS} FROM cards WHERE ${where} ORDER BY number`).all(...args) as unknown as CardCols[]
+      if (!rows.length) return []
+      factStoreTestHooks.afterCards?.()
+      const of = `card IN (SELECT number FROM cards WHERE ${where})`
+      const lists = <V>(sql: string): Map<number, V[]> => {
+        const m = new Map<number, V[]>()
+        for (const r of db.prepare(sql).all(...args) as { card: number; v: V }[]) m.set(r.card, [...(m.get(r.card) ?? []), r.v])
+        return m
+      }
+      const labels = lists<string>(`SELECT card, label AS v FROM card_labels WHERE ${of} ORDER BY card, ord`)
+      const blockedBy = lists<number>(`SELECT card, target AS v FROM card_links WHERE ${of} AND kind = 'blockedBy' ORDER BY card, ord`)
+      const paths = lists<string>(`SELECT card, path AS v FROM card_paths WHERE ${of} AND kind = 'declared' ORDER BY card, ord`)
+      return rows.map((r) => ({
+        id: r.number,
+        key: this.keyOf(r.number),
+        title: r.title,
+        kind: r.kind,
+        labels: labels.get(r.number) ?? [],
+        blockedBy: blockedBy.get(r.number) ?? [],
+        ...(r.target !== null ? { target: r.target } : {}),
+        ...(r.paths_declared ? { paths: paths.get(r.number) ?? [] } : {}),
+        ...(r.lane !== null ? { lane: r.lane } : {}),
+        ...(r.lane_reviewer !== null ? { reviewer: r.lane_reviewer } : {}),
+        ...(r.pre_workflow ? { preWorkflow: true } : {}),
+        stage: r.stage ?? COLUMN_STAGE[r.col] ?? 'todo',
+        category: r.col
+      }))
+    })
+  }
 
   card(id: number): CardRecord {
-    const row = this.db.writer.prepare('SELECT data, stage, category FROM wf_cards WHERE id = ?').get(id) as { data: string; stage: StageId; category: Category } | undefined
-    if (!row) throw new Error(`no card ${id}`) // i18n-ignore: a programming error in the spike, never shown
-    return { ...JSON.parse(row.data), id, stage: row.stage, category: row.category }
+    const c = this.records('number = ?', [id])[0]
+    if (!c) throw new Error(`no card ${id}`) // i18n-ignore: a programming error, never shown
+    return c
   }
 
+  /** A card of this project by its key (`AM-12`), or null. */
   cardByKey(key: string): CardRecord | null {
-    const row = this.db.writer.prepare('SELECT id FROM wf_cards WHERE key = ?').get(key) as { id: number } | undefined
-    return row ? this.card(row.id) : null
+    const m = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(key)
+    if (!m || m[1].toLowerCase() !== this.scope.key.toLowerCase()) return null
+    return this.records('number = ? AND project = ?', [Number(m[2]), this.scope.project])[0] ?? null
   }
 
+  /** This project's cards (not archived), in number order. */
   cards(): CardRecord[] {
-    return (this.db.writer.prepare('SELECT id FROM wf_cards ORDER BY id').all() as { id: number }[]).map((r) => this.card(r.id))
+    return this.records('project = ? AND archived = 0', [this.scope.project])
   }
+
+  /** A new card of this project on the board (the runtime's own; the board's are made by tasks.ts), in Todo unless `stage` says. */
+  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category'> & { stage?: StageId }): CardRecord {
+    const stage = c.stage ?? 'todo'
+    return this.conn.write((db) => {
+      const n = takeNumberIn(db)
+      const at = this.now().toISOString()
+      const doc = { number: n, title: c.title, description: '', project: this.scope.project, agent: null, column: STAGE_CATEGORY[stage], order: n, labels: c.labels, blocked: null, blockedBy: c.blockedBy, links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'Hive', updatedAt: at }
+      writeCardRows(db, decomposeCard(n, doc))
+      db.prepare('UPDATE cards SET stage = ?, kind = ?, pre_workflow = ? WHERE number = ?').run(stage, c.kind, c.preWorkflow ? 1 : 0, n)
+      setColumns(db, n, c)
+      return this.card(n)
+    })
+  }
+
+  /** Changes what the runtime keeps of a card: its kind, target, declared paths, lane and lane's reviewer. */
+  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category'>>): CardRecord {
+    const other = Object.keys(patch).filter((k) => !['kind', 'target', 'paths', 'lane', 'reviewer', 'title', 'labels', 'blockedBy', 'preWorkflow'].includes(k))
+    if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
+    return this.conn.write((db) => {
+      if (patch.kind !== undefined) db.prepare('UPDATE cards SET kind = ? WHERE number = ?').run(patch.kind, id)
+      setColumns(db, id, patch)
+      return this.card(id)
+    })
+  }
+
+  /** None: the paths Hive saw a card's agents edit (its pre-fill, §16.3.3), in the order seen. */
+  prefill(id: number): string[] {
+    return this.conn.read((db) => (db.prepare("SELECT path FROM card_paths WHERE card = ? AND kind = 'prefill' ORDER BY ord").all(id) as { path: string }[]).map((r) => r.path))
+  }
+
+  /** Adds a path to a card's pre-fill (once). */
+  addPrefill(id: number, path: string): void {
+    this.conn.write((db) => db.prepare("INSERT OR IGNORE INTO card_paths (card, kind, ord, path) VALUES (?, 'prefill', (SELECT coalesce(max(ord), -1) + 1 FROM card_paths WHERE card = ? AND kind = 'prefill'), ?)").run(id, id, path))
+  }
+
+  // --- Facts, rulesets, actions.
 
   facts(card: number): Fact[] {
-    const rows = this.db.writer.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]
-    return rows.map((r) => ({
-      seq: r.seq as number,
-      card: r.card as number,
-      kind: r.kind as FactKind,
-      at: r.at as string,
-      actor: r.actor as Actor,
-      source: r.source as 'recorded' | 'observed',
-      ...(r.ruleset ? { ruleset: r.ruleset as string } : {}),
-      ...(r.dedupe ? { dedupe: r.dedupe as string } : {}),
-      data: JSON.parse(r.data as string)
-    }))
+    return this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf))
   }
 
-  /** Every fact of a kind across cards, in the order written (the queue's order). */
+  /** This project's facts of a kind, in the order written (the queue's order). */
   factsOfKind(kind: FactKind): Fact[] {
-    const ids = this.db.writer.prepare('SELECT card, seq FROM card_facts WHERE kind = ? ORDER BY rowid').all(kind) as { card: number; seq: number }[]
-    return ids.map((r) => this.facts(r.card).find((f) => f.seq === r.seq)!)
+    return this.conn.read((db) => (db.prepare('SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind = ? AND c.project = ? ORDER BY f.rowid').all(kind, this.scope.project) as Record<string, string | number | null>[]).map(factOf))
   }
 
   ruleset(id: string): Ruleset {
-    const row = this.db.writer.prepare('SELECT data FROM rulesets WHERE id = ?').get(id) as { data: string } | undefined
-    if (!row) throw new Error(`no ruleset ${id}`) // i18n-ignore: a programming error in the spike, never shown
+    const row = this.conn.read((db) => db.prepare('SELECT data FROM rulesets WHERE id = ?').get(id) as { data: string } | undefined)
+    if (!row) throw new Error(`no ruleset ${id}`) // i18n-ignore: a programming error, never shown
     const r = loadRuleset(JSON.parse(row.data))
-    if (!r.ok) throw new Error(`ruleset ${id}: ${r.error} ${r.piece ?? ''}`) // i18n-ignore: a programming error in the spike, never shown
+    if (!r.ok) throw new Error(`ruleset ${id}: ${r.error} ${r.piece ?? ''}`) // i18n-ignore: a programming error, never shown
     return r.ruleset
   }
 
   saveRuleset(r: Ruleset): void {
-    this.db.writer.prepare('INSERT OR IGNORE INTO rulesets (id, data) VALUES (?, ?)').run(r.id, JSON.stringify(r))
+    this.conn.write((db) => db.prepare('INSERT OR IGNORE INTO rulesets (id, data) VALUES (?, ?)').run(r.id, JSON.stringify(r)))
   }
 
+  /** This project's pending actions, in the order written. */
   pendingActions(): ActionRow[] {
-    return (this.db.writer.prepare("SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id").all() as Record<string, string | number | null>[]).map((r) => ({
-      id: r.id as number,
-      card: r.card as number,
-      kind: r.kind as string,
-      payload: JSON.parse(r.payload as string),
-      state: r.state as ActionRow['state'],
-      attempts: r.attempts as number,
-      fact: r.fact as number | null
-    }))
+    return this.conn.read((db) => (db.prepare("SELECT a.* FROM card_actions a JOIN cards c ON c.number = a.card WHERE a.state = 'pending' AND c.project = ? ORDER BY a.id").all(this.scope.project) as Record<string, string | number | null>[]).map(actionOf))
   }
 
   markAction(id: number, state: ActionRow['state']): void {
-    this.db.writer.prepare('UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ?').run(state, id)
+    this.conn.write((db) => db.prepare('UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ?').run(state, id))
   }
 
-  /** Records a delivery once per action: false when it was already delivered (an action run twice, §16.4.5). */
+  /** Records an action's delivery once: false when it was already delivered (an action run twice, §16.4.5). */
   deliver(d: Delivery): boolean {
-    const r = this.db.writer.prepare('INSERT OR IGNORE INTO deliveries (action, kind, target, payload) VALUES (?, ?, ?, ?)').run(d.action, d.kind, d.target, JSON.stringify(d.payload))
-    return Number(r.changes) > 0
+    return this.conn.write((db) => deliverOnce(db, d))
   }
 
+  /** This project's actions' deliveries, in the actions' order. */
   deliveries(): Delivery[] {
-    return (this.db.writer.prepare('SELECT * FROM deliveries ORDER BY action').all() as Record<string, string | number>[]).map((r) => ({ action: r.action as number, kind: r.kind as string, target: r.target as string, payload: JSON.parse(r.payload as string) }))
+    return this.conn.read((db) => (db.prepare('SELECT a.id, a.delivered FROM card_actions a JOIN cards c ON c.number = a.card WHERE a.delivered IS NOT NULL AND c.project = ? ORDER BY a.id').all(this.scope.project) as { id: number; delivered: string }[]).map((r) => ({ action: r.id, ...(JSON.parse(r.delivered) as Omit<Delivery, 'action'>) })))
   }
+
+  // --- Shared folders, lanes, the queue's pauses, values.
 
   folderCommits(folder: string): { sha: string; card: number | null; how: string }[] {
-    return this.db.writer.prepare('SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY rowid').all(folder) as { sha: string; card: number | null; how: string }[]
+    return this.conn.read((db) => db.prepare('SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id').all(folder) as { sha: string; card: number | null; how: string }[])
   }
 
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean {
-    return Number(this.db.writer.prepare('INSERT OR IGNORE INTO folder_commits (folder, sha, card, how) VALUES (?, ?, ?, ?)').run(folder, sha, card, how).changes) > 0
+    return this.conn.write((db) => Number(db.prepare('INSERT OR IGNORE INTO folder_commits (folder, sha, card, how) VALUES (?, ?, ?, ?)').run(folder, sha, card, how).changes) > 0)
   }
 
+  lane(id: string): LaneList | null {
+    const p = this.scope.project
+    return this.conn.read((db) => {
+      const row = db.prepare('SELECT ruleset, current, ended, has_pending FROM workflow_lanes WHERE project = ? AND id = ?').get(p, id) as { ruleset: string; current: number | null; ended: number; has_pending: number } | undefined
+      if (!row) return null
+      const cards = (list: string): number[] => (db.prepare('SELECT card FROM workflow_lane_cards WHERE project = ? AND lane = ? AND list = ? ORDER BY ord').all(p, id, list) as { card: number }[]).map((r) => r.card)
+      return { id, cards: cards('cards'), ruleset: row.ruleset, pending: row.has_pending ? cards('pending') : null, current: row.current, ended: row.ended === 1 }
+    })
+  }
+
+  saveLane(l: LaneList): void {
+    const p = this.scope.project
+    this.conn.write((db) => {
+      db.prepare('INSERT INTO workflow_lanes (project, id, ruleset, current, ended, has_pending) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (project, id) DO UPDATE SET ruleset = excluded.ruleset, current = excluded.current, ended = excluded.ended, has_pending = excluded.has_pending').run(p, l.id, l.ruleset, l.current, l.ended ? 1 : 0, l.pending ? 1 : 0)
+      db.prepare('DELETE FROM workflow_lane_cards WHERE project = ? AND lane = ?').run(p, l.id)
+      const ins = db.prepare('INSERT INTO workflow_lane_cards (project, lane, list, ord, card) VALUES (?, ?, ?, ?, ?)')
+      l.cards.forEach((c, i) => ins.run(p, l.id, 'cards', i, c))
+      l.pending?.forEach((c, i) => ins.run(p, l.id, 'pending', i, c))
+    })
+  }
+
+  queuePause(target: string): QueuePause | null {
+    const p = this.scope.project
+    return this.conn.read((db) => {
+      const row = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string } | undefined
+      if (!row) return null
+      const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}) }
+    })
+  }
+
+  /** Pauses a target's queue (`pause`), or resumes it (null). */
+  setQueuePause(target: string, pause: QueuePause | null): void {
+    const p = this.scope.project
+    this.conn.write((db) => {
+      db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
+      if (!pause) return
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card) VALUES (?, ?, ?, ?)').run(p, target, pause.reason, pause.card)
+      const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
+      pause.files?.forEach((f, i) => ins.run(p, target, i, f))
+    })
+  }
+
+  /** One of this project's values (a scalar: a line's last head seen, a folder's installed manifests' hash). */
   meta(key: string): string | null {
-    return (this.db.writer.prepare('SELECT value FROM wf_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null
+    return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.metaKey(key)) as { value: string } | undefined)?.value ?? null)
   }
 
   setMeta(key: string, value: string): void {
-    this.db.writer.prepare('INSERT INTO wf_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
+    this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
 
-  createCard(c: Omit<CardRecord, 'id' | 'stage' | 'category'> & { stage?: StageId }): CardRecord {
-    const stage = c.stage ?? 'todo'
-    const { stage: _s, ...data } = c
-    const r = this.db.writer.prepare('INSERT INTO wf_cards (key, data, stage, category) VALUES (?, ?, ?, ?)').run(c.key, JSON.stringify(data), stage, STAGE_CATEGORY[stage])
-    return this.card(Number(r.lastInsertRowid))
+  private metaKey(key: string): string {
+    return `workflow:${this.scope.project.toLowerCase()}:${key}`
   }
 
-  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'stage' | 'category'>>): CardRecord {
-    const { id: _id, stage: _st, category: _c, ...data } = { ...this.card(id), ...patch }
-    this.db.writer.prepare('UPDATE wf_cards SET data = ? WHERE id = ?').run(JSON.stringify(data), id)
-    return this.card(id)
-  }
+  // --- Writes.
 
-  /** One transaction (BEGIN IMMEDIATE): everything `fn` writes commits together or not at all. */
+  /**
+   * One transaction: everything `fn` writes commits together or not at all. On the board, the caller's change (outside
+   * one, it fails); on a connection of the store's own, a transaction of its own, which what `fn` does joins.
+   */
   tx<T>(fn: (tx: Tx) => T): T {
-    const w = this.db.writer
-    const at = () => this.now().toISOString()
-    const nextSeq = (card: number) => ((w.prepare('SELECT MAX(seq) AS m FROM card_facts WHERE card = ?').get(card) as { m: number | null }).m ?? 0) + 1
-    const insert = <K extends FactKind>(card: number, f: NewFact<K> & { dedupe?: string }): Fact<K> => {
-      const seq = nextSeq(card)
-      const full = { ...f, seq, card, at: at() } as Fact<K>
-      w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
-      return full
-    }
-    const tx: Tx = {
-      append: (card, f) => insert(card, f),
-      appendObserved: (card, f) => {
-        const exists = w.prepare('SELECT 1 FROM card_facts WHERE card = ? AND kind = ? AND dedupe = ?').get(card, f.kind, f.dedupe)
-        return exists ? null : insert(card, { ...f, source: 'observed' })
-      },
-      setStage: (card, stage) => {
-        w.prepare('UPDATE wf_cards SET stage = ?, category = ? WHERE id = ?').run(stage, STAGE_CATEGORY[stage], card)
-      },
-      action: (card, kind, payload, fact) => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid),
-      facts: (card) => this.facts(card),
-      card: (id) => this.card(id),
-      putCard: (c) => {
-        this.updateCard(c.id, c)
-      },
-      meta: (k) => this.meta(k),
-      setMeta: (k, v) => this.setMeta(k, v),
-      recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
-    }
-    return transaction(w, () => fn(tx))
+    return this.conn.write((w) => {
+      const at = (): string => this.now().toISOString()
+      const nextSeq = (card: number): number => ((w.prepare('SELECT MAX(seq) AS m FROM card_facts WHERE card = ?').get(card) as { m: number | null }).m ?? 0) + 1
+      const insert = <K extends FactKind>(card: number, f: NewFact<K> & { dedupe?: string }): Fact<K> => {
+        const seq = nextSeq(card)
+        const full = { ...f, seq, card, at: at() } as Fact<K>
+        w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
+        return full
+      }
+      const tx: Tx = {
+        append: (card, f) => this.conn.write(() => insert(card, f)),
+        appendObserved: (card, f) =>
+          this.conn.write(() => {
+            const exists = w.prepare('SELECT 1 FROM card_facts WHERE card = ? AND kind = ? AND dedupe = ?').get(card, f.kind, f.dedupe)
+            return exists ? null : insert(card, { ...f, source: 'observed' })
+          }),
+        setStage: (card, stage) => {
+          // The stage cache, and the card's column its category (SPEC §16.4.3): the board shows where the fold put it.
+          this.conn.write(() => w.prepare('UPDATE cards SET stage = ?, col = ? WHERE number = ?').run(stage, STAGE_CATEGORY[stage], card))
+        },
+        action: (card, kind, payload, fact) => this.conn.write(() => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid)),
+        facts: (card) => this.facts(card),
+        card: (id) => this.card(id),
+        putCard: (c) => {
+          const { id, key: _k, stage: _s, category: _c, ...patch } = c
+          this.updateCard(id, patch)
+        },
+        meta: (k) => this.meta(k),
+        setMeta: (k, v) => this.setMeta(k, v),
+        recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
+      }
+      return fn(tx)
+    })
   }
+}
+
+/** The columns beside the document a create or an update gives (each left as it is when not given). */
+function setColumns(db: DatabaseSync, id: number, c: { target?: string; paths?: string[]; lane?: string; reviewer?: string }): void {
+  if ('target' in c) db.prepare('UPDATE cards SET target = ? WHERE number = ?').run(c.target ?? null, id)
+  if ('lane' in c) db.prepare('UPDATE cards SET lane = ? WHERE number = ?').run(c.lane ?? null, id)
+  if ('reviewer' in c) db.prepare('UPDATE cards SET lane_reviewer = ? WHERE number = ?').run(c.reviewer ?? null, id)
+  if (c.paths) {
+    db.prepare('UPDATE cards SET paths_declared = 1 WHERE number = ?').run(id)
+    db.prepare("DELETE FROM card_paths WHERE card = ? AND kind = 'declared'").run(id)
+    const ins = db.prepare("INSERT OR IGNORE INTO card_paths (card, kind, ord, path) VALUES (?, 'declared', ?, ?)")
+    c.paths.forEach((p, i) => ins.run(id, i, p))
+  }
+}
+
+function factOf(r: Record<string, string | number | null>): Fact {
+  return {
+    seq: r.seq as number,
+    card: r.card as number,
+    kind: r.kind as FactKind,
+    at: r.at as string,
+    actor: r.actor as Actor,
+    source: r.source as 'recorded' | 'observed',
+    ...(r.ruleset ? { ruleset: r.ruleset as string } : {}),
+    ...(r.dedupe ? { dedupe: r.dedupe as string } : {}),
+    data: JSON.parse(r.data as string)
+  }
+}
+
+function actionOf(r: Record<string, string | number | null>): ActionRow {
+  return { id: r.id as number, card: r.card as number, kind: r.kind as string, payload: JSON.parse(r.payload as string), state: r.state as ActionRow['state'], attempts: r.attempts as number, fact: r.fact as number | null }
+}
+
+/** Records an action's delivery once (the conditional update is the guard): false when it was already delivered. */
+export function deliverOnce(w: DatabaseSync, d: Delivery): boolean {
+  const { action, ...rest } = d
+  return Number(w.prepare('UPDATE card_actions SET delivered = ? WHERE id = ? AND delivered IS NULL').run(JSON.stringify(rest), action).changes) > 0
+}
+
+/** Every pending action of the workspace, in the order written (the actions worker's list). */
+export function pendingActionsOf(db: DatabaseSync): ActionRow[] {
+  return (db.prepare("SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id").all() as Record<string, string | number | null>[]).map(actionOf)
 }

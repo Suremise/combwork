@@ -10,7 +10,7 @@ import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
-import { CARDS_STEP } from './schema/v1_0'
+import { CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -121,6 +121,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => {
       const n = moveStoreRows(db)
       log.info(`moved ${n.sessions} session record(s) and ${n.deliveries} deliveries into their tables`)
+    }
+  },
+  {
+    // #1215: the fact log, durable actions and rulesets (SPEC §16.4), and what the runtime keeps of a card and a project
+    // beside them (workflow/factStore.ts), written inside boardWrite.
+    version: 7,
+    name: FACTS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of FACTS_STEP.ddl) db.exec(sql)
     }
   }
 ]
@@ -692,16 +702,20 @@ const inWrite = (key: string): boolean => {
  * when it changed anything. Re-entrant: a change inside another (a card of a batch) is part of it. Reads inside it see
  * its own changes; reads elsewhere see the board as last committed.
  */
-export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>): Promise<T> {
+export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, opts: { alive?: () => boolean } = {}): Promise<T> {
   const path = pathOf(ws)
   const key = keyOf(path)
   if (inWrite(key)) return fn()
   return withFileLock(boardLock(path), async () => {
+    // `alive`: the caller's workspace, as it was when it asked, is still open (a background run's, #1215 round 1): a
+    // change that waited for the lock while it closed or switched is refused, and the board isn't opened again for it.
+    if (opts.alive && !opts.alive()) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
     const b = boardOf(path)
     if (b.db.newer !== null) throw hiveError(M.newer, undefined, { kind: 'conflict' })
     if (b.db.pending) throw hiveError(M.upgradeFirst, undefined, { kind: 'conflict' })
     const state: WriteState = { key, open: true, changed: false, after: [], lost: null }
     const db = b.db.writer
+    let committed = false
     db.exec('BEGIN IMMEDIATE')
     try {
       const out = await writing.run(state, fn)
@@ -710,6 +724,7 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>):
       if (state.lost) throw state.lost
       if (!db.isTransaction) throw lostChange()
       db.exec('COMMIT')
+      committed = true
       return out
     } catch (e) {
       state.changed = false
@@ -730,8 +745,27 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>):
           log.warn('after a board change', e)
         }
       }
+      if (committed) {
+        for (const listener of committedListeners) {
+          try {
+            writing.exit(() => listener(ws))
+          } catch (e) {
+            log.warn('after a board change', e)
+          }
+        }
+      }
     }
   })
+}
+
+const committedListeners = new Set<(ws: WorkspaceService) => void>()
+/**
+ * Runs `fn` after every board change that commits, outside it (as afterBoardWrite's), with the change's workspace: what
+ * follows any change, whoever made it (the actions worker, #1215: a change may have written actions to run). Returns its removal.
+ */
+export function onBoardCommitted(fn: (ws: WorkspaceService) => void): () => void {
+  committedListeners.add(fn)
+  return () => void committedListeners.delete(fn)
 }
 
 /**
@@ -767,6 +801,16 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
  * (or a read already holding one) it runs on that transaction; else it opens a read transaction on the reader, whose
  * snapshot every statement of `fn` sees, and ends it after. `fn` is synchronous: nothing else uses the reader meanwhile.
  */
+/** A read of the board's database on one snapshot, as the board's readers make (the fact store's, #1215). */
+export function boardRead<T>(ws: WorkspaceService, fn: (db: Db['reader']) => T): T {
+  return readSnapshot(ws, (_b, db) => fn(db))
+}
+
+/** A write to the board's database: inside a change of `ws`'s board only, and only while its transaction is live (writeOp). */
+export function boardWriteOp<T>(ws: WorkspaceService, fn: (db: Db['writer']) => T): T {
+  return writeOp(ws, (b) => fn(b.db.writer))
+}
+
 function readSnapshot<T>(ws: WorkspaceService, fn: (b: Board, db: Db['reader']) => T): T {
   const { b, db } = readConn(ws)
   if (db.isTransaction) return fn(b, db)
@@ -992,12 +1036,17 @@ export function deleteCard(ws: WorkspaceService, n: number): boolean {
  */
 export function takeNumber(ws: WorkspaceService): number {
   return writeOp(ws, (b) => {
-    const db = b.db.writer
-    const n = nextOf(db)
-    setMeta(db, 'next', String(n + 1))
+    const n = takeNumberIn(b.db.writer)
     writeStubNext(join(b.path, HIVE_DIR), n + 1)
     return n
   })
+}
+
+/** The next card number, taken on a connection inside its transaction (the fact store's cards, #1215): as takeNumber, but for the stub. */
+export function takeNumberIn(db: Db['writer']): number {
+  const n = nextOf(db)
+  setMeta(db, 'next', String(n + 1))
+  return n
 }
 
 /** The bulk archives kept, oldest first. */

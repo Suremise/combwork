@@ -24,6 +24,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/workspace.ts` | Workspace/project discovery, `.hive` folders, git exclude; one `WorkspaceService` per window behind the `workspace` stand-in |
 | `src/main/db.ts`, `src/main/boardStore.ts`, `src/main/presence.ts` | Hive's SQLite layer (`node:sqlite`: connections, settings, migrations, a group of steps run as one: #1207), and the board's database (`.hive/hive.db`): its one write path (`boardWrite`, a transaction told once), the move in from the cards' files, export (#1017), the 1.0 upgrade (asked first, `upgradeBoard`, `restoreBoardBackup`), and the workspace presence marker (`.hive/open`) |
 | `src/main/schema/` | hive.db's 1.0 tables (`v1_0.ts`, #1208) and the cards in them (#1209): `cardRows.ts`, a card's document as rows and back byte for byte (the card JSON contract), and `cardsStep.ts`, the 1.0 group's step that moves 0.9's cards into the tables |
+| `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each delivered once |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
 | `src/main/transcripts.ts`, `src/main/providers/conversation.ts` | Sessions tab transcript viewer: per-provider incremental parsers, search, Markdown export |
@@ -223,7 +224,8 @@ keeping the boundaries.
 Agent API route, no `boardWrite`): `src/shared/platform/descriptors.ts`; `src/shared/workflow/` (`facts.ts` with the
 fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as messages, `cardRefs.ts`, `laneList.ts`);
 `src/main/platform/` (`adapter.ts`, `gitPlatform.ts` and `nonePlatform.ts` behind it, `git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
-a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table; `runtime.ts`;
+then a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table, in hive.db
+since #1215; `runtime.ts`;
 `reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
 scenarios on real temporary repositories. **Darren decided (#1118, 20 Oct)** that it is P3's base in part: `shared/workflow` and
 the platform adapters as they are, the runtime, reconciliation, queue and checks as P4's and P5's starting point, and
@@ -393,7 +395,7 @@ real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EX
 | cards in tables (#1209) | `cards`: number (the permanent global `#N`), title, description, project, project_id, agent, agent_name, review_agent/_name/_since, col (the category, today's column), stage (the cached stage, null before a 1.0 move), ord, blocked, archived, archived_for, archived_batch, context_problems, pre_workflow, created/updated, extra, layout (place, project, archived by project, agent, reviewer, updated). `card_labels` (by label), `card_links` (blockedBy and links; by target), `card_context`, `card_comments`, `card_history` (by time), `card_decisions`, `card_holds` | `boardStore.ts` (rows), `tasks.ts` (rules) |
 | sessions and deliveries in tables (#1211; built, v6: `schema/sessionDeliveryTables.ts` moves `store_rows`' rows in and drops `store_rows`) | `sessions` per host (by agent), `session_cards` (by card), `sessions_deleted`, `sessions_deleted_usage`; `deliveries` per host (by agent, state, source and ref, card and round; the 7-day expiry by `received` and `ended`; unique `action`) | `sessionStore.ts`, `deliveries.ts` |
 | lanes, watches and metrics in tables (#1212) | `lanes` (by builder, reviewer, state and end), `lane_cards` (by card), `lane_frozen`; `watches` (one per folder and agent; by limit, by fired delivery), `watch_cards` (by card); `metrics_buckets` (by start), `metrics_series` (a row per series: part '' for the workspace or a project's name, family, key) | `lanes.ts`, `watches.ts`, `metrics.ts` |
-| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card), `rulesets`, `folder_commits` (a folder's commits in the order seen) | `workflow/factStore.ts` inside `boardWrite` |
+| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card; `delivered`, transitional, below), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files` | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
 | project keys (#1219) | `project_keys` (current and old keys, one current per project), `project_counters`, `cards.project_number` (unique per project), `card_aliases` ((old project, number) → card, for a card moved since) | `cardRefs.ts`, `takeNumber` |
 
 `board_meta` and `archive_batches` (an undo record of a bulk archive, read whole) stay as they are; the stores' few
@@ -436,6 +438,44 @@ between them would otherwise give a card neither version saved (HR4, #1209 round
 column) is read from its documents as before. Tests and the e2e helpers read and write cards through the same module
 (`tests/boardDb.ts`; `tests/e2e/boardRows.cjs`, which loads `cardRows.ts` with Node, so it imports nothing), and
 `tests/boardDb.ts` `as09()` puts a board made by this build back as 0.9 left it.
+
+**The fact store (#1215).** `workflow/factStore.ts` keeps one project's part of the workspace's hive.db (the 1.0 group's
+facts step, v7: #1208's facts tables and what the runtime keeps beside them, Darren's rule of 20 Oct applied by the
+Assistant: typed tables, never JSON values). A `CardRecord` is the board's card: its number (`id`), its key
+(`<project key>-<number>` until #1219's keys), title, labels and `blockedBy` from the card's rows, and the runtime's
+columns of the row outside the card's JSON document (`stage`, `kind`, `target`, `lane`, `lane_reviewer`,
+`pre_workflow`, and `card_paths` for None's declared paths and pre-fill), so `tasks.ts`' saves of the document keep
+them and the Agent API's card is unchanged. `stage` empty (a card no 1.0 rule has moved) reads as its column's stage;
+`setStage` writes the stage and the column, its category (§16.4.3). The runtime's lanes and a target's queue pause are
+tables of their own per project (`workflow_lanes`, `workflow_queue_pauses`) until P4 and P7 make them `lanes.ts`' and
+the queue's; scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
+`workflow:<project>:<key>`. A store reaches the database one of two ways (HR4's #1215 round 1: a connection's open
+transaction is no sign it is the caller's). **On the board** (`FactStore.forBoard(ws)`): its writes go through the
+board's own guard (`boardWriteOp`, writeOp's): only inside the caller's change of that board, in that change's async
+context, and only while its transaction is live, so a fact commits with the card change it causes and is undone with
+it, and once SQLite has undone the change nothing more is written; its reads are the board's (`boardRead`): the
+change's own inside one, else the reader, each on one snapshot. **On a connection of its own** (`FactStore.open(file)`,
+opened through the board's migrations: another Hive, a restart, `tests/workflow`'s runtime): a write is its own
+transaction (`BEGIN IMMEDIATE`: another Hive's write waits for it), which what the store does inside it joins (it is
+synchronous, and nothing else uses the connection), and fails whole once SQLite has undone it; a read outside one is
+a read transaction of its own. Either way a record, a list, a lane or a pause is read on one snapshot, never mixing
+two commits. An observed fact whose dedupe key is there already returns null, and the caller reads again.
+
+**The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
+change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for
+meanwhile runs after) in id order; the workspace's open (`WorkspaceService.onOpened`) runs those a crash or a close left
+pending. For each action, in a board change of its own, its delivery is recorded once (`card_actions.delivered`, by a
+conditional update: an action delivered already, by another run or before a crash, isn't run again), then its handler
+runs (`onAction(kind, fn)`), then it is marked done (failed when the handler throws; never tried again). P3 registers
+no handler: nothing wakes, notifies or merges yet, and an action without one is marked done as the no-op it is. A
+run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
+opens another, the run stops, checked after every wait and inside each board change before the board is touched
+(`boardWrite`'s `alive`), and between an action's claim and its handler (a listener of the claim's commit may close
+it), so it never opens a closed board again nor writes another workspace's (whose actions are numbered from 1 too),
+and no handler runs for a workspace that has gone. A run asked for while one goes on joins it with its own workspace
+(HR4's #1215 round 2): when the run's workspace has gone, the newest that asked and is still open takes over what is
+left, so a window still open on the board never loses its request to one that switched away.
+**`delivered` is transitional:** #1211's typed `deliveries` (unique `action`) replace it when P4 wires wakes (#1120).
 
 Observed facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
 workspace write each transition once, while a later repeat of the same values is still recorded; a writer that loses

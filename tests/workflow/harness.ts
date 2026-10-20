@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { FactStore } from '../../src/main/workflow/factStore'
+import { boardFile, closeBoard, workspaceDb } from '../../src/main/boardStore'
 import { isRefusal, Workflow, type Reply } from '../../src/main/workflow/runtime'
 import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/workflow/mergeQueue'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
@@ -56,7 +57,7 @@ export interface Env {
   wf: Workflow
   store: FactStore
   project: string
-  /** Where the spike's store and slots live: outside the repository. */
+  /** The workspace folder: its hive.db holds the store (#1215); slots live here too, outside the repository. */
   home: string
   options: WorkflowOptions
   wakes: { agent: string; card: string; why: string }[]
@@ -64,6 +65,8 @@ export interface Env {
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
   /** Another Hive on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
+  /** A store on a connection of its own to the workspace's hive.db, as a restarted Hive opens it (closed with the rest). */
+  reopen: () => FactStore
   /** Facts of a card, by kind. */
   kinds: (card: number) => FactKind[]
   close: () => void
@@ -77,7 +80,11 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   else mkdirSync(project, { recursive: true })
   if (extra.files) for (const [f, c] of Object.entries(extra.files)) put(project, f, c)
   const o: WorkflowOptions = { ...allOff(options.platform), ...options }
-  const store = new FactStore(join(home, 'workflow.db'))
+  // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
+  // runtime, outside any board change, has a connection of its own to it, as another Hive would.
+  const scope = { project: 'project', key: 'AM' }
+  workspaceDb(home)
+  const store = FactStore.open(boardFile(home), scope)
   const wakes: Env['wakes'] = []
   const notes: Env['notes'] = []
   const stores: FactStore[] = [store]
@@ -105,13 +112,19 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
     notes,
     queue: (cfg = {}) => new MergeQueue(wf, { folder: join(home, 'queue'), runCheck: passing, ...cfg }),
     another: () => {
-      const s = new FactStore(join(home, 'workflow.db'))
+      const s = FactStore.open(boardFile(home), scope)
       stores.push(s)
       return make(s)
+    },
+    reopen: () => {
+      const s = FactStore.open(boardFile(home), scope)
+      stores.push(s)
+      return s
     },
     kinds: (card) => store.facts(card).map((f) => f.kind),
     close: () => {
       for (const s of stores) s.close()
+      closeBoard(home)
     }
   }
 }

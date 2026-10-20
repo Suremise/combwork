@@ -160,8 +160,7 @@ export class Workflow {
   // --- Cards, rulesets, folders.
 
   createCard(input: { title: string; kind?: CardKind; labels?: string[]; blockedBy?: number[]; target?: string; paths?: string[]; reviewer?: string }): CardRecord {
-    const n = this.store.cards().length + 1
-    return this.store.createCard({ key: `${this.cfg.projectKey}-${n}`, title: input.title, kind: input.kind ?? 'code', labels: input.labels ?? [], blockedBy: input.blockedBy ?? [], ...(input.target ? { target: input.target } : {}), ...(input.paths ? { paths: input.paths } : {}), ...(input.reviewer ? { reviewer: input.reviewer } : {}) })
+    return this.store.createCard({ title: input.title, kind: input.kind ?? 'code', labels: input.labels ?? [], blockedBy: input.blockedBy ?? [], ...(input.target ? { target: input.target } : {}), ...(input.paths ? { paths: input.paths } : {}), ...(input.reviewer ? { reviewer: input.reviewer } : {}) })
   }
 
   /** A card by reference (`AM-12`, `#12`) or id; a plain number from an agent is refused (§16.12). */
@@ -1119,9 +1118,7 @@ export class Workflow {
 
   /** Edits Hive saw through the card's agents' hooks and file locks: the pre-fill of its paths. */
   noteEdit(card: CardRecord, path: string): void {
-    const key = `prefill:${card.id}`
-    const list: string[] = JSON.parse(this.store.meta(key) ?? '[]')
-    if (!list.includes(path)) this.store.setMeta(key, JSON.stringify([...list, path]))
+    this.store.addPrefill(card.id, path)
     this.none.invalidate(path)
   }
 
@@ -1137,7 +1134,7 @@ export class Workflow {
   }
 
   prefill(card: CardRecord): string[] {
-    return JSON.parse(this.store.meta(`prefill:${card.id}`) ?? '[]')
+    return this.store.prefill(card.id)
   }
 
   /** declare paths (None): sets the card's paths; replies with the pre-fill, the unclaimed changes and the revision. */
@@ -1165,12 +1162,11 @@ export class Workflow {
   // --- Lanes (§16.11).
 
   lane(id: string): LaneList | null {
-    const v = this.store.meta(`lane:${id}`)
-    return v ? JSON.parse(v) : null
+    return this.store.lane(id)
   }
 
   private saveLane(l: LaneList): void {
-    this.store.setMeta(`lane:${l.id}`, JSON.stringify(l))
+    this.store.saveLane(l)
   }
 
   /** Starts a lane: its cards use the ruleset in force now until it ends. */
