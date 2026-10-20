@@ -4,7 +4,8 @@
 // received of the decisions, a folder that can't be read (recorded unknown, the move made all the same) and a card from
 // before 1.0 (no facts until it starts). Nothing is refused.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -18,7 +19,10 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { recordDecisionsRead } = await import('../src/main/workflow/recorder')
+const { decisionsDigest, recordDecisionsReceived, recorderTestHooks } = await import('../src/main/workflow/recorder')
+const { foldCard } = await import('../src/shared/workflow/facts')
+const { allOff } = await import('../src/shared/workflow/options')
+const { mustCompile } = await import('../src/shared/workflow/compile')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -97,10 +101,10 @@ describe('recording facts from the board’s moves (#1216)', () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Decided', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Use SQLite' }, user))
-    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Keep the JSON identical' }, user))
+    const both = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Keep the JSON identical' }, user))).decisions
     expect(factsOf(w, card).filter((f) => f.kind === 'Decision').map((f) => (f.data as { generation: number }).generation)).toEqual([1, 2])
-    await recordDecisionsRead(w, 'a1', card)
-    await recordDecisionsRead(w, 'a1', card)
+    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(both))
+    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(both))
     expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 2 }])
   })
 
@@ -144,5 +148,149 @@ describe('recording facts from the board’s moves (#1216)', () => {
     await inWorkspace(w, () => tasks.commentTask(card, 'Just a comment', user))
     await inWorkspace(w, () => tasks.updateTask(card, { title: 'Renamed' }, user))
     expect(kinds(w, card)).toEqual([])
+  })
+})
+
+// HR4's #1216 round 1: the work cycle kept through a review's fixes, no partial facts, decisions' generations, receipts
+// bound to what was given, no reads under the lock, a card made straight into a column, the ruleset and no-code cards.
+describe('recording facts, round 2 (#1216)', () => {
+  const store$ = (w: WS) => FactStore.forBoard(w, { project: 'p', key: 'P' })
+  const commitIn = (repo: string, file: string): string => {
+    writeFileSync(join(repo, file), `${file}\n`)
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', file)
+    return git(repo, 'rev-parse', 'HEAD')
+  }
+
+  it("a review's fixes through Doing go on in the same cycle: one Started, its base kept, every file of the change", async () => {
+    const { w, repo } = await workspace()
+    const start = git(repo, 'rev-parse', 'HEAD')
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Cycle', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    commitIn(repo, 'first.txt')
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, builder))
+    await inWorkspace(w, () => tasks.updateTask(card, { review: 'start' }, reviewer))
+    await inWorkspace(w, () => tasks.updateTask(card, { review: 'failed' }, reviewer, { comment: 'Fix it' }))
+    // The card loop's own path: back to Doing for the fixes, then to Review.
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing' }, builder))
+    const fixed = commitIn(repo, 'fix.txt')
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, builder))
+    expect(kinds(w, card).filter((k) => k === 'Started')).toHaveLength(1)
+    const subs = factsOf(w, card).filter((f) => f.kind === 'Submitted')
+    expect(subs.map((f) => f.data)).toMatchObject([
+      { base: start, round: 1, files: [{ path: 'first.txt', status: 'A' }] },
+      { base: start, head: fixed, round: 2, files: [{ path: 'first.txt', status: 'A' }, { path: 'fix.txt', status: 'A' }], sameRevision: false }
+    ])
+    // The fold keeps both submissions and the failed verdict of the cycle.
+    const s = foldCard(factsOf(w, card))
+    expect([s.submissions.length, s.verdicts.length, s.started?.base]).toEqual([2, 1, start])
+  })
+
+  it('a fact that fails to write fails the change: the card is as it was, with no facts', async () => {
+    const { ws, w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Fails', project: 'p' }, user))).number
+    // SQLite refuses the Moved fact (Started was written before it), leaving the transaction live.
+    const db = new DatabaseSync(store.boardFile(ws))
+    db.exec("CREATE TRIGGER refuse_moved BEFORE INSERT ON card_facts WHEN new.kind = 'Moved' BEGIN SELECT RAISE(ABORT, 'no moves (test)'); END")
+    db.close()
+    await expect(inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))).rejects.toThrow('no moves (test)')
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
+    expect(kinds(w, card)).toEqual([])
+  })
+
+  it("each change of a card's decisions is a new generation, by whoever made it: added, changed, removed, added", async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Decisions', project: 'p' }, user))).number
+    const a = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'A' }, builder))).decisions![0]
+    // The agent reads it at generation 1.
+    await recordDecisionsReceived(w, 'a1', card, decisionsDigest([a]))
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, 'A, changed', user))
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, null, user))
+    const b = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'B' }, user))).decisions![0]
+    const decided = factsOf(w, card).filter((f) => f.kind === 'Decision')
+    expect(decided.map((f) => [f.actor, f.data])).toEqual([
+      ['agent:a1', { decision: a.id, generation: 1, text: 'A' }],
+      ['user', { decision: a.id, generation: 2, text: 'A, changed' }],
+      ['user', { decision: a.id, generation: 3, text: 'A, changed', removed: true }],
+      ['user', { decision: b.id, generation: 4, text: 'B' }]
+    ])
+    // What the agent had received stays generation 1 until it is given B.
+    expect(foldCard(factsOf(w, card)).received.a1).toBe(1)
+    await recordDecisionsReceived(w, 'a1', card, decisionsDigest([b]))
+    expect(foldCard(factsOf(w, card)).received.a1).toBe(4)
+  })
+
+  it('a receipt records what the agent was given, never a decision written after it; a verdict, what its reviewer had received', async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Given', project: 'p' }, user))).number
+    const given = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'First' }, user))).decisions!
+    // A second decision is written after the reply was made, before its receipt is recorded.
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Second' }, user))
+    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(given))
+    expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 1 }])
+    // Another project's view of it (the card moved meanwhile): nothing.
+    await recordDecisionsReceived(w, 'a2', card, decisionsDigest(given), 'elsewhere')
+    expect(foldCard(factsOf(w, card)).received.a2).toBeUndefined()
+    // The reviewer, who read none of them, gives a verdict: on generation 0.
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review', agent: 'a1' }, user))
+    await inWorkspace(w, () => tasks.updateTask(card, { review: 'start' }, reviewer))
+    await inWorkspace(w, () => tasks.updateTask(card, { review: 'passed' }, reviewer))
+    expect(last(w, card, 'Verdict')!.data).toMatchObject({ reviewer: 'a2', generation: 0 })
+  })
+
+  it('a batch reads its cards before its change, never inside it', async () => {
+    const { ws, w, repo } = await workspace()
+    const cards = await inWorkspace(w, async () => [(await tasks.createTask({ title: 'One', project: 'p', agent: 'a1', column: 'doing' }, user)).number, (await tasks.createTask({ title: 'Two', project: 'p', agent: 'a1', column: 'doing' }, user)).number])
+    commitIn(repo, 'batch.txt')
+    const inside: boolean[] = []
+    recorderTestHooks.onRead = () => void inside.push(store.inBoardWrite(ws))
+    try {
+      const items = await inWorkspace(w, () => tasks.updateTasks(cards, { column: 'review' }, builder))
+      expect(items.every((i) => i.error === null)).toBe(true)
+      // And a single change too.
+      await inWorkspace(w, () => tasks.updateTask(cards[0], { column: 'doing' }, builder))
+    } finally {
+      recorderTestHooks.onRead = null
+    }
+    expect(inside.length).toBeGreaterThanOrEqual(3)
+    expect(inside.every((x) => x === false)).toBe(true)
+    for (const c of cards) expect(last(w, c, 'Submitted')!.data).toMatchObject({ files: [{ path: 'batch.txt', status: 'A' }] })
+  })
+
+  it('a card made straight into Doing or Review has its first move, and its stage follows', async () => {
+    const { w } = await workspace()
+    const doing = (await inWorkspace(w, () => tasks.createTask({ title: 'Doing', project: 'p', agent: 'a1', column: 'doing' }, user))).number
+    expect(kinds(w, doing)).toEqual(['Started', 'Moved'])
+    expect(last(w, doing, 'Moved')!.data).toMatchObject({ from: 'todo', to: 'active', cause: 'user' })
+    expect([foldCard(factsOf(w, doing)).stage, store$(w).card(doing).stage]).toEqual(['active', 'active'])
+    const review = (await inWorkspace(w, () => tasks.createTask({ title: 'Review', project: 'p', agent: 'a1', column: 'review' }, builder))).number
+    expect(kinds(w, review)).toEqual(['Moved', 'Submitted'])
+    expect([foldCard(factsOf(w, review)).stage, store$(w).card(review).stage]).toEqual(['review', 'review'])
+  })
+
+  it("Started names the project's ruleset (its options compiled and stored); a no-code card's submission has no revision", async () => {
+    const { ws, w, repo } = await workspace()
+    const options = allOff('git')
+    const cfgFile = join(ws, 'p', '.hive', 'project.json')
+    writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(readFileSync(cfgFile, 'utf8')), workflow: { platform: 'git', preset: 'none', options } }))
+    await w.refresh()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Docs only', project: 'p' }, user))).number
+    await store.boardWrite(w, async () => void store$(w).updateCard(card, { kind: 'no-code' }))
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    const id = mustCompile(options).id
+    const started = last(w, card, 'Started')!
+    expect(started.ruleset).toBe(id)
+    expect(started.data).toMatchObject({ cardKind: 'no-code' })
+    expect(store$(w).ruleset(id).id).toBe(id)
+    commitIn(repo, 'notes.txt')
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, builder, { comment: 'Written up' }))
+    expect(last(w, card, 'Submitted')).toMatchObject({ ruleset: id, data: { revision: null, head: null, base: null, key: null, files: [] } })
+    // A project with no options yet: named unknown, not a failure.
+    const other = (await workspace()).w
+    const c2 = (await inWorkspace(other, () => tasks.createTask({ title: 'No options', project: 'p' }, user))).number
+    await inWorkspace(other, () => tasks.updateTask(c2, { column: 'doing', agent: 'a1' }, user))
+    const s2 = factsOf(other, c2).find((f) => f.kind === 'Started')!
+    expect(s2.ruleset).toBeUndefined()
+    expect((s2.data as { platform: { unknown: Record<string, string> } }).platform.unknown.ruleset).toMatch(/no options yet/)
   })
 })

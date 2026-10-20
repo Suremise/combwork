@@ -1207,9 +1207,11 @@ that starts after the upgrade loses the mark and is a 1.0 card from then on [Dar
 **P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
 transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change
 `Moved`, cause `user` from the window, `intent` from an agent's or the Assistant's tools; blocked and unblocked; each
-decision; and an agent reading a card in full, `DecisionsReceived`). The platform is read before the change; a value
-that couldn't be read never refuses the move: its field is empty and the fact's `platform.unknown` says what couldn't
-be read.
+decision change, each a new generation; and what an agent was given of the decisions, by reading the card or receiving
+a decision line, `DecisionsReceived`). A card's work cycle starts once (none yet, or reopened from Done): fixes after a
+failed review, through Doing or not, go on in it. The platform is read before the change; a value that couldn't be
+read never refuses the move: its field is empty and the fact's `platform.unknown` says what couldn't be read. A fact
+that can't be written fails the change whole.
 
 #### 16.4.2 Kinds
 

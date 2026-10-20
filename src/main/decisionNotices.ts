@@ -1,3 +1,4 @@
+import { decisionsDigest } from './workflow/recorder'
 import { basename } from 'path'
 import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
@@ -97,8 +98,8 @@ export async function newDecisions(ws: WorkspaceService, agent: { projectPath: s
  * newDecisions, each card with when its newest such decision was made (ms): for a line that tells them (#401). `told`:
  * per card, what an earlier line already told (the latest decision time it covered): only later ones count.
  */
-export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>): Promise<Map<number, { count: number; latest: number }>> {
-  const out = new Map<number, { count: number; latest: number }>()
+export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>): Promise<Map<number, { count: number; latest: number; digest: string }>> {
+  const out = new Map<number, { count: number; latest: number; digest: string }>()
   if (!ws.path) return out
   const project = basename(agent.projectPath).toLowerCase()
   const seen = reads.get(keyOf(agent))
@@ -109,7 +110,8 @@ export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath:
     if (base === null) continue
     const since = Math.max(base, told?.get(c.number) ?? 0)
     const fresh = c.decisions.filter((d) => t(d.editedAt) > since || (d.recordedBy !== self && t(d.at) > since))
-    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))) })
+    // The card's decisions as read here: what a receipt of this line is matched with (#1216).
+    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))), digest: decisionsDigest(c.decisions) })
   }
   return out
 }

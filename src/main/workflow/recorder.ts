@@ -10,14 +10,17 @@
 // its field is null and the fact names it, with why, in `platform.unknown`.
 
 import { AsyncLocalStorage } from 'async_hooks'
+import { createHash } from 'crypto'
 import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
-import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
+import type { Actor, Fact, FactData, FileChange, StageId } from '../../shared/workflow/facts'
+import { compile, type Ruleset } from '../../shared/workflow/compile'
+import type { WorkflowOptions } from '../../shared/workflow/options'
 import { agentActor, foldCard } from '../../shared/workflow/facts'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
-import { createLogger, userText } from '../logger'
+import { createLogger } from '../logger'
 import * as G from '../platform/git'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown, type Maybe } from '../platform/types'
@@ -41,6 +44,8 @@ export interface Reads {
   base: string | null
   files: FileChange[]
   key: string | null
+  /** The project's ruleset now (a start's: the options in project.json, `workflow`, compiled; SPEC §16.6). */
+  ruleset?: Ruleset
   /** Each field that couldn't be read, and why. */
   unknown: Record<string, string>
 }
@@ -103,12 +108,27 @@ export async function gatherReads(ws: WorkspaceService, planned: Planned[]): Pro
   return out
 }
 
+/** For tests: told of each card's reads as they begin (whether that is inside a board change: it never should be). */
+export const recorderTestHooks: { onRead: ((n: number) => void) | null } = { onRead: null }
+
 async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
+  recorderTestHooks.onRead?.(p.number)
   const projectPath = join(ws.path!, p.project)
   const cfg = await ws.projectConfig(projectPath)
   const def = projectAgents(cfg).find((a) => a.id === p.agent)
   const folder = def?.worktree?.path ?? projectPath
   const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {} }
+  // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
+  if (p.why === 'start') {
+    const options = (cfg as { workflow?: { options?: unknown } }).workflow?.options
+    try {
+      const c = options && typeof options === 'object' ? compile(options as WorkflowOptions) : null
+      if (c?.ok) r.ruleset = c.ruleset
+      else r.unknown.ruleset = c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)"
+    } catch (e) {
+      r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})`
+    }
+  }
   // None (no version control): no line, head or base yet (P5 adds its manifests).
   if (projectPlatform(projectPath, cfg.platform).id !== 'git') return r
   const take = <T>(field: string, v: Maybe<T>): T | null => {
@@ -158,46 +178,67 @@ const roundOf = (card: TaskCard): number => {
 
 /**
  * The facts of a card's change, written in its transaction (from saveCard, inside the change): what moved, what started
- * or was submitted, a review's start or verdict, blocked or unblocked, a decision. `before` is null for a new card. A card
- * from before 1.0 gets none until it starts, which makes it a 1.0 card (Darren, #1119 decision 4). Never refuses: a
- * failure here is logged and the change goes on (P3 records; it doesn't decide), unless SQLite undid the transaction,
- * which fails the change whole as any other write.
+ * or was submitted, a review's start or verdict, blocked or unblocked, its decisions' changes. `before` is null for a new
+ * card. A card from before 1.0 gets none until it starts, which makes it a 1.0 card (Darren, #1119 decision 4). Never
+ * refuses for what it couldn't read (named unknown), but a failure to write fails the change whole (HR4's #1216 round 1:
+ * a card and its facts never diverge).
  */
 export function recordChange(ws: WorkspaceService, before: TaskCard | null, after: TaskCard): void {
-  const ctx = context.getStore()
-  try {
-    write(ws, ctx, before, after)
-  } catch (e) {
-    log.warn(`recording the facts of #${after.number}'s change (${userText(after.title)})`, e)
-  }
+  write(ws, context.getStore(), before, after)
 }
+
+/** A card's decisions as an agent can see them, as a short digest: what a receipt of them is matched with. */
+export const decisionsDigest = (ds: readonly { id?: string; text: string }[] | undefined): string =>
+  createHash('sha256')
+    .update(JSON.stringify((ds ?? []).map((d) => [d.id ?? '', d.text])))
+    .digest('hex')
+    .slice(0, 16)
 
 function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard | null, after: TaskCard): void {
   const n = after.number
   const actor = actorOf(ctx?.actor)
   const store = FactStore.forBoard(ws, { project: after.project, key: '' })
   const record = store.card(n)
-  // The stage before this change: its cache, else its column's (the row is already saved with the new column).
+  // The stage before this change: its cache, else its column's (the row is already saved with the new column); a new
+  // card's starts in Todo (HR4's round 1 finding 6: its first move is recorded like any other).
   const cached = boardRead(ws, (db) => (db.prepare('SELECT stage FROM cards WHERE number = ?').get(n) as { stage: StageId | null } | undefined)?.stage ?? null)
-  const was: StageId = cached ?? (before ? STAGE_OF[before.column] : STAGE_OF[after.column])
-  const moved = !!before && before.column !== after.column
-  const intoDoing = after.column === 'doing' && !!after.agent && (!before || before.column !== 'doing' || before.agent !== after.agent)
+  const was: StageId = before ? (cached ?? STAGE_OF[before.column]) : 'todo'
+  const earlier = foldCard(store.facts(n), was)
+  const to = STAGE_OF[after.column]
   const history = added(before?.history ?? [], after.history)
   const returned = history.some((h) => h.whatText?.id === HISTORY.returned.id)
-  const intoReview = after.column === 'review' && !!before && (before.column !== 'review' || returned)
+  // A new work cycle only for a real start (HR4's round 1 finding 1): none yet, or one that ended Done (reopened). A
+  // card back in Doing for its review's fixes, or out of Hold, goes on in its cycle, its base and rounds kept.
+  const intoDoing = after.column === 'doing' && !!after.agent && (!before || before.column !== 'doing' || before.agent !== after.agent)
+  const starts = intoDoing && (!earlier.started || earlier.stage === 'done' || before?.column === 'done')
+  const intoReview = after.column === 'review' && (!before || before.column !== 'review' || returned)
   const comment = added(before?.comments ?? [], after.comments).at(-1)?.id ?? ''
   // Before 1.0 until it starts (its mark cleared by the start): no facts.
-  if (record.preWorkflow && !intoDoing) return
+  if (record.preWorkflow && !starts) return
+  const reads = ctx?.reads.get(n) ?? (before ? undefined : ctx?.reads.get(NEW_CARD))
   store.tx((tx) => {
-    if (record.preWorkflow) store.updateCard(n, { preWorkflow: false })
+    let generation = earlier.generation
+    const decision = (d: { id: string; text: string }, removed = false): void =>
+      void tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } })
+    // The ruleset the card's cycle works under (its Started's), on each fact of it.
+    const ruleset = (): { ruleset?: string } => {
+      const id = tx.facts(n).findLast((f) => f.kind === 'Started')?.ruleset
+      return id ? { ruleset: id } : {}
+    }
+    if (record.preWorkflow) {
+      store.updateCard(n, { preWorkflow: false })
+      // What it was decided before it became a 1.0 card, as it stands: what later receipts are matched with.
+      for (const d of before?.decisions ?? []) decision(d)
+    }
     const facts = () => foldCard(tx.facts(n), was)
-    if (intoDoing) {
-      const r = ctx?.reads.get(n) ?? (before ? undefined : ctx?.reads.get(NEW_CARD))
-      const mine = r && r.agent === after.agent ? r : null
+    if (starts) {
+      const mine = reads && reads.agent === after.agent ? reads : null
+      if (mine?.ruleset) tx.saveRuleset(mine.ruleset)
       tx.append(n, {
         kind: 'Started',
         actor,
         source: 'recorded',
+        ...(mine?.ruleset ? { ruleset: mine.ruleset.id } : {}),
         data: {
           folder: mine?.folder ?? 'project',
           line: mine?.line ?? null,
@@ -205,64 +246,64 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
           target: mine?.target ?? null,
           builder: after.agent!,
           cardKind: record.kind,
-          ...unknownOf(mine, ['line', 'base', 'target'])
+          ...unknownOf(mine, ['line', 'base', 'target', 'ruleset'])
         }
       })
     }
-    if (moved || !before) {
-      const from = was
-      const to = STAGE_OF[after.column]
-      if (moved && from !== to) tx.append(n, { kind: 'Moved', actor, source: 'recorded', data: { from, to, cause: causeOf(ctx?.actor) } })
-      if (from !== to) tx.setStage(n, to)
+    if (was !== to) {
+      tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } })
+      tx.setStage(n, to)
     }
     if (intoReview) {
       const s = facts()
-      const r = ctx?.reads.get(n)
-      const mine = r && r.agent === after.agent ? r : null
       const builder = after.agent ?? s.started?.builder ?? null
       const failed = s.latest && s.verdicts.findLast((v) => v.submission === s.latest!.id && !v.pass)
-      tx.append(n, {
-        kind: 'Submitted',
-        actor,
-        source: 'recorded',
-        data: {
-          revision: mine?.head ?? null,
-          base: mine?.base ?? null,
-          head: mine?.head ?? null,
-          key: mine?.key ?? null,
-          files: mine?.files ?? [],
-          round: roundOf(after),
-          generation: builder ? (s.received[builder] ?? 0) : 0,
-          sameRevision: !!failed && !!mine?.head && failed.revision === mine.head,
-          summary: comment,
-          ...unknownOf(mine, ['revision', 'base', 'files', 'key'])
-        }
-      })
+      const common = { round: roundOf(after), generation: builder ? (s.received[builder] ?? 0) : 0, summary: comment }
+      // A no-code card has no revision (SPEC §16.7.3): its submission is its summary.
+      const data =
+        record.kind === 'no-code'
+          ? { revision: null, base: null, head: null, key: null, files: [], sameRevision: !!failed, ...common }
+          : (() => {
+              const mine = reads && reads.agent === after.agent ? reads : null
+              return {
+                revision: mine?.head ?? null,
+                base: mine?.base ?? null,
+                head: mine?.head ?? null,
+                key: mine?.key ?? null,
+                files: mine?.files ?? [],
+                sameRevision: !!failed && !!mine?.head && failed.revision === mine.head,
+                ...common,
+                ...unknownOf(mine, ['revision', 'base', 'files', 'key'])
+              }
+            })()
+      tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data })
     }
     if (after.review && (!before?.review || before.review.agent !== after.review.agent)) {
       const s = facts()
-      tx.append(n, { kind: 'ReviewStarted', actor, source: 'recorded', data: { reviewer: after.review.agent, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null } })
+      tx.append(n, { kind: 'ReviewStarted', actor, source: 'recorded', ...ruleset(), data: { reviewer: after.review.agent, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null } })
     }
     for (const h of history) {
       if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
       const s = facts()
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
+      // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
       tx.append(n, {
         kind: 'Verdict',
         actor,
         source: 'recorded',
-        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.generation, comment }
+        ...ruleset(),
+        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
       })
     }
     if ((before?.blocked ?? null) !== after.blocked) {
-      if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', data: { reason: after.blocked } })
-      else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', data: {} })
+      if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } })
+      else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} })
     }
-    const decisions = after.decisions ?? []
-    const had = new Set((before?.decisions ?? []).map((d) => d.id))
-    decisions.forEach((d, i) => {
-      if (!had.has(d.id)) tx.append(n, { kind: 'Decision', actor, source: 'recorded', data: { decision: d.id, generation: i + 1, text: d.text } })
-    })
+    // Each change of its decisions, a new generation each (HR4's round 1 finding 3): added, its words changed, removed.
+    const had = new Map((record.preWorkflow ? [] : (before?.decisions ?? [])).map((d) => [d.id, d.text]))
+    const now = new Map((after.decisions ?? []).map((d) => [d.id, d.text]))
+    for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
+    for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
   })
 }
 
@@ -285,21 +326,43 @@ function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<strin
 }
 
 /**
- * An agent read a card in full (hive_read_task): what it has received of the card's decisions (`DecisionsReceived`, its
- * newest generation), once per generation, in a board change of its own. In the background: never in the read's way.
+ * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (hive_read_task), or a line
+ * telling it of new decisions (a decision delivery) received. Bound to what it was given (HR4's round 1 finding 4): the
+ * generation whose decisions are exactly those it saw (`digest`), never a later one written meanwhile; once per
+ * generation, in a board change of its own, only while the workspace (and the card's project, when given) is the one
+ * the receipt was for. In the background: never in the read's way.
  */
-export async function recordDecisionsRead(ws: WorkspaceService, agentId: string, n: number): Promise<void> {
+export async function recordDecisionsReceived(ws: WorkspaceService, agentId: string, n: number, digest: string, project?: string): Promise<void> {
+  const path = ws.path
+  if (!path) return
+  const life = ws.lifetime
+  const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   try {
-    await boardWrite(ws, async () => {
-      const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined)
-      if (!card || card.pre_workflow) return
-      const store = FactStore.forBoard(ws, { project: card.project, key: '' })
-      const s = foldCard(store.facts(n))
-      if (!s.generation || (s.received[agentId] ?? 0) >= s.generation) return
-      store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation: s.generation } }))
-    })
+    await boardWrite(
+      ws,
+      async () => {
+        if (!alive()) return
+        const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined)
+        if (!card || card.pre_workflow || (project !== undefined && card.project.toLowerCase() !== project.toLowerCase())) return
+        const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+        const facts = store.facts(n)
+        // The decisions after each generation, in the card's order: the newest whose digest is what the agent saw.
+        const state = new Map<string, string>()
+        let seen = 0
+        for (const f of facts) {
+          if (f.kind !== 'Decision') continue
+          const d = f.data as FactData['Decision']
+          if (d.removed) state.delete(d.decision)
+          else state.set(d.decision, d.text)
+          if (decisionsDigest([...state].map(([id, text]) => ({ id, text }))) === digest) seen = Math.max(seen, d.generation)
+        }
+        if (!seen || (foldCard(facts).received[agentId] ?? 0) >= seen) return
+        store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation: seen } }))
+      },
+      { alive }
+    )
   } catch (e) {
-    log.warn(`recording what an agent received of #${n}'s decisions`, e)
+    if (alive()) log.warn(`recording what an agent received of #${n}'s decisions`, e)
   }
 }
 

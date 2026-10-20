@@ -761,7 +761,7 @@ function placement(all: CardPlace[], card: TaskCard, column: TaskColumn, patch: 
  * Done in order. An agent's or the Assistant's list adds a line to each card it moved.
  */
 export function reorderTasks(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
-  return cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor)))
+  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor))))
 }
 
 async function reorderTasksLocked(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
@@ -858,11 +858,11 @@ const returnsCard = (actor: TaskActor, card: TaskCard): boolean => actor.kind ==
 export async function createTask(...args: Parameters<typeof createTaskLocked>): Promise<TaskCard> {
   const [input, actor] = args
   const ws = workspace
-  // Made in Doing with an agent, its work starts: the platform's reads, before the change (#1216).
+  // Made in Doing or Review with an agent, its work starts or is submitted: the platform's reads, before the change (#1216).
   const column = input.column ?? 'todo'
-  const project = column === 'doing' && ws.path ? await projectName(scopeOf(actor) !== null && input.project === undefined ? scopeOf(actor)! : input.project).catch(() => '') : ''
+  const project = (column === 'doing' || column === 'review') && ws.path ? await projectName(scopeOf(actor) !== null && input.project === undefined ? scopeOf(actor)! : input.project).catch(() => '') : ''
   const agent = project ? await agentIdIn(ws, project, input.agent ?? selfIn(actor, project)) : null
-  const reads = agent ? await gatherReads(ws, [{ number: NEW_CARD, project, agent, why: 'start' }]) : null // i18n-ignore: an internal value
+  const reads = agent ? await gatherReads(ws, [{ number: NEW_CARD, project, agent, why: column === 'doing' ? 'start' : 'submit' }]) : null // i18n-ignore: an internal value
   return recording(actor, reads, () => boardLock(ws, () => createTaskLocked(...args)))
 }
 
@@ -1200,7 +1200,8 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
   for (const n of numbers) {
     const said: string[] = []
     try {
-      const card = await updateTask(n, patch, actor, { said, commit: opts.commit })
+      // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
+      const card = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
       items.push({ number: n, card, said, error: null })
     } catch (e) {
       items.push({ number: n, card: null, said: [], error: (e as Error).message })
@@ -1337,7 +1338,7 @@ function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText): 
 export async function commentTask(n: number, comment: string, actor: TaskActor): Promise<TaskCard> {
   const ws = workspace
   const t = commentText(comment)
-  return boardLock(ws, async () => {
+  return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { n }))
@@ -1345,7 +1346,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
     await saveCard(ws, n, c)
     changed(ws)
     return c
-  })
+  }))
 }
 
 /**
@@ -1357,7 +1358,7 @@ export async function editDecision(n: number, id: string, newText: string | null
   const ws = workspace
   const t = newText === null ? null : text(newText, MAX_DECISION, 'decision').trim()
   if (t === '') throw hiveError(msg({ id: 'tasks.error.decisionEmptied', defaultMessage: 'The decision is empty: remove it instead.', description: "An error: the user emptied a decision's text; to take it off the card, remove it." }))
-  return boardLock(ws, async () => {
+  return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     const d = c.decisions?.find((x) => x.id === id)
     if (!d) throw hiveError(msg({ id: 'tasks.error.decisionGone', defaultMessage: 'That decision is no longer on #{n}.', description: 'An error: the decision being changed was removed from card #{n} (a number) meanwhile.' }), { n })
@@ -1374,7 +1375,7 @@ export async function editDecision(n: number, id: string, newText: string | null
     await saveCard(ws, n, c)
     changed(ws)
     return c
-  })
+  }))
 }
 
 /** Archives a card (hidden from the board, kept) or brings it back. The user's alone. */
@@ -1433,7 +1434,7 @@ export async function archiveBatches(ws: WorkspaceService = workspace): Promise<
  * nothing was archived) and the cards it archived.
  */
 export function archiveBatch(numbers: unknown, req: ArchiveRequest, actor: TaskActor, opts: { busy?: (card: TaskCard) => string | null } = {}): Promise<ArchiveResult> {
-  return cardBatch(workspace, () => archiveBatchUnbatched(numbers, req, actor, opts))
+  return recordingAs(actor, () => cardBatch(workspace, () => archiveBatchUnbatched(numbers, req, actor, opts)))
 }
 
 async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, actor: TaskActor, opts: { busy?: (card: TaskCard) => string | null }): Promise<ArchiveResult> {
@@ -1508,7 +1509,7 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
  * `failed`: the batch is kept, so bringing it back again retries those. Once nothing failed, the batch is forgotten.
  */
 export function unarchiveBatch(id: string, actor: TaskActor): Promise<UnarchiveResult> {
-  return cardBatch(workspace, () => boardLock(workspace, () => unarchiveBatchLocked(id, actor)))
+  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => unarchiveBatchLocked(id, actor))))
 }
 
 async function unarchiveBatchLocked(id: string, actor: TaskActor): Promise<UnarchiveResult> {
@@ -1578,7 +1579,7 @@ export async function agentCards(project: string, agentId: string, ws: Workspace
  * given to someone else meanwhile is left alone.
  */
 export function releaseAgentCards(project: string, agentId: string, actor: TaskActor): Promise<number[]> {
-  return cardBatch(workspace, () => releaseAgentCardsUnbatched(project, agentId, actor))
+  return recordingAs(actor, () => cardBatch(workspace, () => releaseAgentCardsUnbatched(project, agentId, actor)))
 }
 
 async function releaseAgentCardsUnbatched(project: string, agentId: string, actor: TaskActor): Promise<number[]> {

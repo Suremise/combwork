@@ -1,4 +1,3 @@
-import { recordDecisionsRead } from './workflow/recorder'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
@@ -71,6 +70,7 @@ import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
+import { decisionsDigest, recordDecisionsReceived } from './workflow/recorder'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -1886,9 +1886,10 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const me = agentCaller()
   if (me) {
     noteCardRead(me, view.number)
-    // What it has received of the card's decisions, as a fact (#1216), in the background.
+    // What it has received of the card's decisions, as a fact (#1216), in the background: the decisions this reply
+    // gives it, never ones written since.
     const ws = contextWorkspace()
-    if (ws) void recordDecisionsRead(ws, me.agentId, view.number)
+    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, decisionsDigest(view.decisions), view.project)
   }
   const raw = query.get('comments')
   const n = raw === null ? null : Number(raw)

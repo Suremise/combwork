@@ -480,23 +480,32 @@ two commits. An observed fact whose dedupe key is there already returns null, an
 **The recorder** (`workflow/recorder.ts`, #1216; P3 records, nothing is refused). Every card change is saved by
 tasks.ts' `saveCard`, which hands `recordChange` the card as it was (`updateTaskLocked` keeps a copy before its edits,
 a new card is null, other callers' is read) and as it is now, inside the change: a column change writes `Moved` (its
-stage, from the stage cache, to the column's) and the stage cache; into Doing with an agent, `Started` (folder,
-line, base, target, builder, kind); into Review (or returned for review), `Submitted` (revision, base, head, the
-files changed, the candidate key, round, the builder's received decision generation, same revision, the summary
-comment's id); a review's start `ReviewStarted` and its verdict `Verdict`, on the latest submission; `Blocked` and
-`Unblocked`; each new decision `Decision` with its generation. A card read in full by an agent (`GET /v1/tasks/:n`)
-records `DecisionsReceived`, once per generation, in a change of its own. The actor is the change's
-(`recording`/`recordingAs`, an AsyncLocalStorage): `user`, `assistant`, `agent:<id>`, or `hive` for Hive's own; a
-move's cause `user` from the window, `intent` from an agent's or the Assistant's tools and the API, `derived` for
-Hive's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
+stage, from the stage cache, to the column's; a new card's from Todo) and the stage cache; a **start**, `Started`
+(folder, line, base, target, builder, kind, and the ruleset: the project's options in `project.json`'s `workflow`,
+compiled and stored, named on the fact and on every fact of its cycle) only for a new work cycle, none yet or one that
+ended Done: a card back in Doing for its review's fixes, or out of Hold, goes on in its cycle, its base, submissions and
+rounds kept (HR4's round 1); into Review (or returned for review), `Submitted` (revision, base, head, the files changed
+since the cycle's base, the candidate key, round, the builder's received decision generation, same revision, the
+summary comment's id; a no-code card's has no revision, base, head, key or files); a review's start `ReviewStarted`
+and its verdict `Verdict` on the latest submission, with the generation its reviewer had received; `Blocked` and
+`Unblocked`; and each change of the card's decisions, added, its words changed or removed (`removed`), a `Decision`
+with the next generation (monotonic, from the facts). **Receipts** (`DecisionsReceived`) record what an agent was
+given, never more: a card read in full (`GET /v1/tasks/:n`) and a decision line received (`decisionWakes.ts`, whose
+delivery's `meta.digests` saves the decisions each line was made from) carry a digest of the card's decisions as
+given, and the receipt credits the newest generation whose decisions are exactly those, once, in a change of its own,
+while the workspace (and the card's project) is still the one it was for. The actor is the change's
+(`recording`/`recordingAs`, an AsyncLocalStorage set by every tasks.ts entry point that takes one): `user`,
+`assistant`, `agent:<id>`, or `hive` for Hive's own; a move's cause `user` from the window, `intent` from an agent's
+or the Assistant's tools and the API, `derived` for Hive's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
 `updateTask`, `updateTasks` and `createTask` plan which cards a change may start or submit from the board's columns
 (`cardHeads`, no document read) and read their folders with git (`platform/git.ts`: branch, head, merge base with the
-target, files, candidate key); a fact whose reads are missing or for another agent records them as not read. A read
-that fails never refuses: its field is null and `platform.unknown` names it with what couldn't be read. A card from
-before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts, which clears the mark (Darren, #1119
-decision 4). A failure in the recorder is logged and the change goes on, except SQLite undoing the transaction, which
-fails the change whole as any write does. The window reads a card's facts with `tasks:facts`. Not yet: the ruleset id
-on `Started` (#1218's options), None's manifests (P5).
+target, files, candidate key); a batch's are made before its lock and its cards changed by the locked path, so no read
+runs inside a change. A fact whose reads are missing or for another agent records them as not read. A read that fails
+never refuses: its field is null and `platform.unknown` names it with what couldn't be read (a project with no options
+yet names its ruleset so). A card from before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts,
+which clears the mark (Darren, #1119 decision 4) and records the decisions it has then. **A fact that fails to write
+fails the change whole** (HR4's round 1): a card and its facts never diverge. The window reads a card's facts with
+`tasks:facts`. Not yet: None's manifests (P5).
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for
