@@ -17,7 +17,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 
 const { Observer } = await import('../src/main/platform/observe')
 const { isUnknown } = await import('../src/main/platform/types')
-const { checkStart, checkEnd, bracketFor, bracketStarted, bracketFinished } = await import('../src/main/workflow/runChecks')
+const { checkStart, checkEnd, bracketFor, bracketStarted, bracketFinished, cardRunRevision } = await import('../src/main/workflow/runChecks')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
@@ -287,5 +287,34 @@ describe("a run's bracket in the app (#1222)", () => {
     // The declaration changed during the run, no file touched: a new revision.
     expect(await finish(() => declare(['b.txt']))).toMatchObject({ counted: false, whyNot: 'revisionChanged' })
     expect(cardWork(w, card)!.checks.map((c) => [c.counted, c.whyNot])).toEqual([[true, undefined], [false, 'changed'], [false, 'revisionChanged']])
+  })
+
+  it("a card's run is read through its platform's adapter once it has started, and with git before (#1233)", async () => {
+    const ws = join(base, 'ws-run')
+    const p = join(ws, 'p')
+    const n = join(ws, 'n')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(n, '.hive'), { recursive: true })
+    git(ws, 'init', '-q', '-b', 'main', p)
+    for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git' }))
+    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    writeFileSync(join(n, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none' }))
+    writeFileSync(join(n, 'a.txt'), 'a\n')
+    const head = commit(p, 'a.txt', 'a\n')
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const user = { kind: 'user' } as const
+    const gitCard = (await inWorkspace(w, () => tasks.createTask({ title: 'Git', project: 'p' }, user))).number
+    expect(await cardRunRevision(w, gitCard, p, null)).toBeNull()
+    await inWorkspace(w, () => tasks.updateTask(gitCard, { column: 'doing', agent: 'a1' }, user))
+    expect(await cardRunRevision(w, gitCard, p, 'main')).toEqual({ revision: head, tested: head, testedIs: 'checkout', named: head })
+    const noneCard = (await inWorkspace(w, () => tasks.createTask({ title: 'None', project: 'n' }, user))).number
+    await store.boardWrite(w, async () => void FactStore.forBoard(w, { project: 'n', key: 'N' }).updateCard(noneCard, { paths: ['a.txt'] }))
+    await inWorkspace(w, () => tasks.updateTask(noneCard, { column: 'doing', agent: 'a1' }, user))
+    const none = (await cardRunRevision(w, noneCard, n, null))!
+    expect(none).toMatchObject({ testedIs: 'content', revision: expect.any(String) })
+    expect(none.tested).toBe(none.revision)
   })
 })

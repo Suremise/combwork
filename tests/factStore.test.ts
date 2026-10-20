@@ -464,4 +464,82 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
       { id: second, state: 'done', delivered: 1 }
     ])
   })
+
+  // HR4's #1215 round 3 (#1240): one requester per window and lifetime, however often it asks while a run goes on.
+  /** A handler that holds the first action until released, recording which window ran each. */
+  function holdFirst(first: number): { ran: { id: number; ws: unknown }[]; entered: Promise<void>; release: () => void } {
+    const ran: { id: number; ws: unknown }[] = []
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let inside!: () => void
+    const entered = new Promise<void>((r) => (inside = r))
+    worker.onAction('notice', async (a, ws) => {
+      ran.push({ id: a.id, ws })
+      if (a.id !== first) return
+      inside()
+      await held
+    })
+    return { ran, entered, release }
+  }
+
+  it('many requests from one window while a run goes on are one requester; each action runs once', async () => {
+    const { ws, w } = await workspace()
+    const [first, second] = await twoActions(ws, w)
+    const h = holdFirst(first)
+    const run = worker.runActions(w)
+    await h.entered
+    const asked = Array.from({ length: 200 }, () => worker.runActions(w))
+    expect(worker.runRequesters(ws)).toBe(1)
+    h.release()
+    await Promise.all([run, ...asked])
+    expect(worker.runRequesters(ws)).toBe(0)
+    expect(h.ran.map((r) => r.id)).toEqual([first, second])
+    expect(statesIn(ws).map((s) => s.state)).toEqual(['done', 'done'])
+  })
+
+  it('a window that asked again and again switches away: the window that opens the board next takes the rest, one requester', async () => {
+    const { ws, w } = await workspace()
+    const other = join(base, `ws-${++n}`)
+    mkdirSync(other, { recursive: true })
+    const [first, second] = await twoActions(ws, w)
+    const h = holdFirst(first)
+    const run = worker.runActions(w)
+    await h.entered
+    const asked = Array.from({ length: 50 }, () => worker.runActions(w))
+    expect(worker.runRequesters(ws)).toBe(1)
+    // The first window opens another workspace; a new window opens this one and asks, again and again: the switched
+    // window's request is dropped as the new one comes in, the new window's kept once.
+    await w.open(other)
+    const w2 = createWorkspaceService()
+    await w2.open(ws)
+    opened.push(w2)
+    for (let i = 0; i < 50; i++) asked.push(worker.runActions(w2))
+    expect(worker.runRequesters(ws)).toBe(1)
+    h.release()
+    await Promise.all([run, ...asked])
+    expect(h.ran).toEqual([
+      { id: first, ws: w },
+      { id: second, ws: w2 }
+    ])
+    expect(statesIn(ws).map((s) => s.state)).toEqual(['done', 'done'])
+  })
+
+  it('a window that closes and opens the workspace again asks as its new lifetime: the old request is gone, the new one runs the rest', async () => {
+    const { ws, w } = await workspace()
+    const [first, second] = await twoActions(ws, w)
+    const h = holdFirst(first)
+    const run = worker.runActions(w)
+    await h.entered
+    await w.close()
+    await w.open(ws)
+    const again = worker.runActions(w)
+    expect(worker.runRequesters(ws)).toBe(1)
+    const more = Array.from({ length: 20 }, () => worker.runActions(w))
+    expect(worker.runRequesters(ws)).toBe(1)
+    h.release()
+    await Promise.all([run, again, ...more])
+    // The first's delivery was recorded before the close, so it isn't run again: the new lifetime marks it and runs the second.
+    expect(h.ran.map((r) => r.id)).toEqual([first, second])
+    expect(statesIn(ws).map((s) => s.state)).toEqual(['done', 'done'])
+  })
 })

@@ -16,6 +16,7 @@ const base = tempDir('hive-adoption-')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
 const store = await import('../../src/main/boardStore')
+const tasks = await import('../../src/main/tasks')
 const { adoptNow, adoptWorkspace } = await import('../../src/main/workflow/adoption')
 const { FactStore } = await import('../../src/main/workflow/factStore')
 const { cardWork } = await import('../../src/main/workflow/cardWork')
@@ -260,6 +261,21 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(r!.configured).toBe(1)
     expect(factsOf(w, 'p', 2).map((f) => f.kind)).toEqual(['Moved'])
     expect(marked(w)).not.toContain(2)
+  })
+
+  it("an adopted card's cycle goes on under the ruleset it was adopted with: its submission, review and verdict (#1249)", async () => {
+    const { w } = await world()
+    await adoptNow(w)
+    const adopted = (factsOf(w, 'p', 2)[0] as unknown as { ruleset?: string }).ruleset
+    expect(adopted).toEqual(expect.any(String))
+    const b1 = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b1' } } as const
+    const r1 = { kind: 'agent', name: 'R1 (p)', self: { project: 'p', agentId: 'r1' } } as const
+    await inWorkspace(w, () => tasks.updateTask(2, { column: 'review' }, b1, { comment: 'Done' }))
+    await inWorkspace(w, () => tasks.updateTask(2, { review: 'start' }, r1))
+    await inWorkspace(w, () => tasks.updateTask(2, { review: 'failed' }, r1, { comment: 'Needs a test' }))
+    const after = factsOf(w, 'p', 2) as unknown as { kind: string; ruleset?: string }[]
+    expect(after.map((f) => f.kind)).toEqual(['Adopted', 'Moved', 'Submitted', 'ReviewStarted', 'Verdict'])
+    for (const f of after) expect([f.kind, f.ruleset]).toEqual([f.kind, adopted])
   })
 })
 

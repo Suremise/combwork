@@ -4,11 +4,14 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { admitLinked, commitIn, folderHead, IssuedLinks, LINK_TTL_MS, linkOwner, MAX_LINKS, publicLink, resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { keptRuns, ProgressStore, type ProgressCaller } from '../src/main/progress'
 import { publicRun } from '../src/main/apiEvents'
-import { runDetails } from '../src/shared/progress'
+import { runDetails, shortRevision } from '../src/shared/progress'
+import { preset } from '../src/shared/workflow/options'
+import { reconcile } from '../src/main/workflow/reconcile'
+import { B1, B2, commit, moved, put, setup, sh, type Env } from './workflow/harness'
 import { setLanguage, tr } from '../src/shared/i18n'
 import type { ProgressRun, TaskColumn } from '../src/shared/types'
 import { tempDir } from './tempDir'
@@ -37,13 +40,15 @@ const agent: ProgressCaller = { source: 'agent', workspacePath: base, projectPat
 const script: ProgressCaller = { source: 'api', workspacePath: base }
 
 /** The board and the options as a stand-in: cards by number, an agent's Doing cards, the check commands per project. */
-function deps(o: { cards?: Record<number, { project: string; column?: TaskColumn; agent?: string | null }>; doing?: number[]; commands?: Record<string, Record<string, string>>; keys?: Record<string, number> } = {}): RunLinkDeps {
+function deps(o: { cards?: Record<number, { project: string; column?: TaskColumn; agent?: string | null }>; doing?: number[]; commands?: Record<string, Record<string, string>>; keys?: Record<string, number>; cardRun?: RunLinkDeps['cardRun'] } = {}): RunLinkDeps {
   return {
     card: async (num) => {
       const c = o.cards?.[num]
       return c ? { project: c.project, column: c.column ?? 'doing', agent: c.agent ?? null } : null
     },
     doing: async () => o.doing ?? [],
+    // No card with a start in its facts, unless a test gives its adapter's reads (#1233).
+    cardRun: o.cardRun ?? (async () => null),
     head: folderHead,
     commitOf: commitIn,
     projectName: (p) => p.split(/[\\/]/).pop()!,
@@ -135,6 +140,72 @@ describe("a run's card, revision and check (#1220)", () => {
     // A script's check is its card's project's; with no card, there's no project to ask.
     expect((await resolveRunLink(script, { check: 'test', card: '#40' }, d)).check).toEqual({ name: 'test', command: 'npm test' })
     await expect(resolveRunLink(script, { check: 'test' }, d)).rejects.toThrow('name the card too')
+  })
+})
+
+// #1233: a card with a start in its facts has its run read through its platform's adapter (the workflow harness's real
+// Git and None adapters), never by switching on a platform id; a card with none is read with git, as above.
+describe("a card's run through its platform adapter (#1233)", () => {
+  let env: Env | null = null
+  afterEach(() => {
+    env?.close()
+    env = null
+  })
+  /** deps whose card `num` is the harness's card, read through the adapter its ruleset names. */
+  const through = (e: Env, num: number): RunLinkDeps =>
+    deps({
+      cards: { [num]: { project: 'hive' } },
+      cardRun: async (c, folder, named) => {
+        const card = e.wf.store.card(c)
+        return e.wf.platformOf(card).runRevision(card, e.wf.state(card), folder, named)
+      }
+    })
+
+  it("Git, its own line: the card's revision is its folder's head; a run elsewhere keeps the two apart; a named one must be what's checked out", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
+    const card = e.wf.createCard({ title: 'Own line' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    const head = commit(folder, { 'c.txt': 'c\n' }, 'c')
+    const d = through(e, card.id)
+    expect(await resolveRunLink(agent, { folder, card: `#${card.id}` }, d)).toMatchObject({ card: card.id, revision: head, testedCheckout: head })
+    // Run in the project's checkout (a reviewer's, say): tested on what's there, for the card's revision.
+    const main = sh(e.project, 'rev-parse', 'HEAD')
+    expect(await resolveRunLink(agent, { folder: e.project, card: `#${card.id}` }, d)).toMatchObject({ revision: head, testedCheckout: main })
+    expect((await resolveRunLink(agent, { folder, card: `#${card.id}`, revision: head.slice(0, 7) }, d)).revision).toBe(head)
+    await expect(resolveRunLink(agent, { folder, card: `#${card.id}`, revision: main.slice(0, 7) }, d)).rejects.toThrow(`${main.slice(0, 7)} isn't what's checked out here (${head.slice(0, 7)} is)`)
+    await expect(resolveRunLink(agent, { folder, card: `#${card.id}`, revision: 'nonesuch' }, d)).rejects.toThrow("nonesuch isn't a commit in")
+  })
+
+  it("Git, a shared folder: the card's revision is its newest attributed commit, not the folder's head", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const a = e.wf.createCard({ title: 'A' })
+    const b = e.wf.createCard({ title: 'B' })
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    const a1 = commit(e.project, { 'a1.txt': 'a\n' }, 'a1', { trailer: a.key })
+    const b1 = commit(e.project, { 'b1.txt': 'b\n' }, 'b1', { trailer: b.key })
+    await reconcile(e.wf, a)
+    expect(await resolveRunLink(agent, { folder: e.project, card: `#${a.id}` }, through(e, a.id))).toMatchObject({ revision: a1, testedCheckout: b1 })
+  })
+
+  it("None: the card's revision is its declared paths' hash, which is also what it's tested on; a named one must be that hash", async () => {
+    const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files: { 'docs/a.md': 'a\n', 'docs/b.md': 'b\n' } }))
+    const card = e.wf.createCard({ title: 'Docs A', paths: ['docs/a.md'] })
+    moved(await e.wf.start(card.key, B1))
+    const d = through(e, card.id)
+    const first = await resolveRunLink(agent, { folder: e.project, card: `#${card.id}` }, d)
+    expect(first.revision).toEqual(expect.any(String))
+    expect(first.testedCheckout).toBe(first.revision)
+    // No git anywhere: a name is checked against the hash, not as a commit.
+    expect((await resolveRunLink(agent, { folder: e.project, card: `#${card.id}`, revision: first.revision! }, d)).revision).toBe(first.revision)
+    await expect(resolveRunLink(agent, { folder: e.project, card: `#${card.id}`, revision: 'abc1234' }, d)).rejects.toThrow(`abc1234 isn't #${card.id}'s revision now (its paths hash to ${shortRevision(first.revision!)})`)
+    // Its paths edited: a new revision; another file: the same.
+    put(e.project, 'docs/b.md', 'b, edited\n')
+    expect((await resolveRunLink(agent, { folder: e.project, card: `#${card.id}` }, d)).revision).toBe(first.revision)
+    put(e.project, 'docs/a.md', 'a, edited\n')
+    expect((await resolveRunLink(agent, { folder: e.project, card: `#${card.id}` }, d)).revision).not.toBe(first.revision)
   })
 })
 
