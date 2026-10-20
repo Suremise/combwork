@@ -7,6 +7,8 @@ import { readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
+import { gitTestHooks } from '../../src/main/git'
+import { isRefusal } from '../../src/main/workflow/runtime'
 
 let env: Env | null = null
 afterEach(() => {
@@ -91,6 +93,16 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
     expect(e.wf.state(card).stage).toBe('review')
   })
 
+  it("a verdict during an outside git status (the index's stat data refreshed) → recorded, every intent alike", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    touch(join(folder, 'a.txt'))
+    during(e, 'verdict', () => void sh(folder, 'status', '--porcelain'))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'no' }))
+  })
+
   it('a file only touched during the submit → submitted', async () => {
     const e = (env = setup(pairOpts))
     const { card, folder } = await startedIn(e, 'a')
@@ -172,6 +184,33 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
     touch(join(folder, 'ê', 'a.txt'))
     during(e, 'submit', () => void sh(folder, 'status', '--porcelain'))
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("dirty, clean when the guards read, dirty again at the write: the same content as at the start, but never the guards' clean answer → refused (HR5, round 2)", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    const file = join(folder, 'a.txt')
+    writeFileSync(file, 'dirty\n')
+    // Just before the submission reads the folder's status: the committed content back.
+    gitTestHooks.started = (_cwd, args) => {
+      if (!args.includes('status')) return
+      delete gitTestHooks.started
+      writeFileSync(file, 'a\n')
+    }
+    // Just before the write: the dirty content again, with a new time.
+    during(e, 'submit', () => {
+      writeFileSync(file, 'dirty\n')
+      touch(file)
+    })
+    try {
+      const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+      expect(isRefusal(r)).toBe(true)
+    } finally {
+      delete gitTestHooks.started
+    }
+    expect(sh(folder, 'status', '--porcelain')).toContain('a.txt')
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.state(card).latest).toBeNull()
   })
 
   it('a change staged during the submit (the index entries, not the files) → refused', async () => {
