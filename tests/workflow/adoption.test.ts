@@ -17,6 +17,7 @@ const { createWorkspaceService, disposeWorkspaceService } = await import('../../
 const store = await import('../../src/main/boardStore')
 const { adoptNow, adoptWorkspace } = await import('../../src/main/workflow/adoption')
 const { FactStore } = await import('../../src/main/workflow/factStore')
+const { cardWork } = await import('../../src/main/workflow/cardWork')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -99,6 +100,10 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(config(ws, 'n')).toMatchObject({ platform: 'none', workflow: { platform: 'none', preset: null, options: { review: 'none', folder: 'project' } } })
     const rulesets = store.boardRead(w, (db) => (db.prepare('SELECT COUNT(*) AS n FROM rulesets').get() as { n: number }).n)
     expect(rulesets).toBe(2)
+    // The card's work view (#1223) reads them so: adopted from its column, its submission adopted; a Todo card from before 1.0.
+    expect(cardWork(w, 3)).toMatchObject({ adopted: true, adoptedFrom: 'review', preWorkflow: false, revisions: [expect.objectContaining({ revision: head, adopted: true })] })
+    expect(cardWork(w, 4)).toMatchObject({ adopted: true, adoptedFrom: 'passed' })
+    expect(cardWork(w, 1)).toMatchObject({ adopted: false, preWorkflow: true, revisions: [] })
     // Nothing moved on the board.
     expect(store.adoptionCards(w).map((c) => c.column)).toEqual(['todo', 'doing', 'review', 'passed', 'done', 'onhold', 'doing', 'doing', 'doing', 'review'])
   })
