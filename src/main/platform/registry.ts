@@ -4,7 +4,7 @@
 
 import { resolve } from 'path'
 import { otherVcsOf, vcsOf } from '../hiveVcs'
-import { PLATFORMS, type Detection, type PlatformId, type PlatformOffer, type ProjectPlatform } from '../../shared/platform/descriptors'
+import { isPlatformId, PLATFORMS, type Detection, type PlatformId, type PlatformOffer, type ProjectPlatform } from '../../shared/platform/descriptors'
 
 export type { Detection } from '../../shared/platform/descriptors'
 
@@ -28,12 +28,15 @@ export function offer(current: PlatformId, found: Detection): PlatformOffer | nu
 }
 
 /**
- * A project's platform for ProjectInfo: the recorded one (`current`; a project Hive hasn't recorded yet takes what
- * detection finds), its descriptor's capabilities, the detection, and the offer when they differ.
+ * A project's platform for ProjectInfo: the recorded one (`recorded`, project.json's, as read: a project Hive hasn't
+ * recorded yet takes what detection finds), its descriptor's capabilities, the detection, and the offer when they
+ * differ. A recorded value that is no platform is said (`invalid`) and detection used meanwhile, with no offer.
  */
-export function projectPlatform(folder: string, current: PlatformId | undefined): ProjectPlatform {
+export function projectPlatform(folder: string, recorded: unknown): ProjectPlatform {
   const detected = detect(folder)
-  const id = current ?? detected.platform
-  const o = offer(id, detected)
-  return { id, capabilities: PLATFORMS[id].capabilities, detected, ...(o ? { offer: o } : {}) }
+  const valid = isPlatformId(recorded)
+  const id = valid ? recorded : detected.platform
+  const o = valid ? offer(id, detected) : null
+  const invalid = recorded === undefined || recorded === null || valid ? undefined : typeof recorded === 'string' ? recorded : JSON.stringify(recorded)
+  return { id, capabilities: PLATFORMS[id].capabilities, detected, ...(o ? { offer: o } : {}), ...(invalid !== undefined ? { invalid } : {}) }
 }

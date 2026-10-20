@@ -151,6 +151,7 @@
   "service.workspace.notRoot": "Not a project or agent worktree in the open workspace: {path}",
   "service.workspace.openElsewhere": "{folder} is already open in another window.",
   "service.workspace.platformGitFound": "{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.",
+  "service.workspace.platformInvalid": "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.",
   "service.workspace.platformOtherFound": "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.",
   "service.workspace.platformRepositoryGone": "{project}'s Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back.",
   "service.workspace.platformTitle": "Version control changed in {project}",

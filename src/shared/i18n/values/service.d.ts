@@ -153,6 +153,7 @@ interface HiveMessageValues {
   'service.workspace.notRoot': { path: string | number }
   'service.workspace.openElsewhere': { folder: string | number }
   'service.workspace.platformGitFound': { project: string | number }
+  'service.workspace.platformInvalid': { project: string | number; value: string | number }
   'service.workspace.platformOtherFound': { vcs: string | number; project: string | number }
   'service.workspace.platformRepositoryGone': { project: string | number }
   'service.workspace.platformTitle': { project: string | number }

@@ -42,11 +42,13 @@ const M = {
   platformTitle: msg({ id: 'service.workspace.platformTitle', defaultMessage: 'Version control changed in {project}', description: "A notice's title: the version control found in the project {project}'s folder is no longer the one Hive recorded for it." }),
   gitFound: msg({ id: 'service.workspace.platformGitFound', defaultMessage: '{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.', description: 'A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it.' }),
   repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back.", description: "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it." }),
+  platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it.' })
 }
 
 /** The notice that a project's folder no longer has the version control Hive recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
+  if (p.invalid !== undefined) return { title: tr(M.platformTitle, { project }), message: tr(M.platformInvalid, { project, value: p.invalid }) }
   const why = p.offer?.why
   const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? '' }) : tr(M.repositoryGone, { project })
   return { title: tr(M.platformTitle, { project }), message }
@@ -309,6 +311,8 @@ export class WorkspaceService {
 
   async close(): Promise<void> {
     this.generation++
+    // What was said of the projects' platforms is this workspace's.
+    this.platformOffers.clear()
     this.life.abort(hiveError(M.closed, undefined, { kind: 'conflict' }))
     const closing = this.path
     if (closing) {
@@ -1024,9 +1028,11 @@ export class WorkspaceService {
       unmanagedMcp: await this.unmanagedMcp(projectPath),
       removedData: await removedData(projectPath),
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await hiveVcs(projectPath).catch(() => undefined), platform: this.platformOf(projectPath, cfg) })
+      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await hiveVcs(projectPath).catch(() => undefined), platform: projectPlatform(projectPath, cfg.platform) })
     }
     this.readAt.set(info, ticket)
+    // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's.
+    if (info.platform && gen === this.generation && this.path) this.sayPlatform(projectPath, info.platform)
     return info
   }
 
@@ -1034,21 +1040,20 @@ export class WorkspaceService {
   private platformOffers = new Map<string, string>()
 
   /**
-   * The project's platform (SPEC §16.3.5), detected again at each refresh against the one recorded when its project.json
-   * was made (ensureProject), so a later difference (git init, a repository gone) is offered and said, never switched to
-   * silently. A project from before platforms has none recorded until the 1.0 upgrade records it: it follows detection.
+   * Says what a project's platform (SPEC §16.3.5) has that the user should know, once while it lasts: detection, done at
+   * each refresh, differs from the one recorded when its project.json was made (ensureProject), so a later difference
+   * (git init, a repository gone) is offered and said, never switched to silently; or the recorded one is no platform.
+   * A project from before platforms has none recorded until the 1.0 upgrade records it: it follows detection.
    */
-  private platformOf(projectPath: string, cfg: ProjectConfig): ProjectPlatform {
-    const p = projectPlatform(projectPath, cfg.platform)
+  private sayPlatform(projectPath: string, p: ProjectPlatform): void {
     const key = projectPath.toLowerCase()
-    const why = p.offer?.why ?? ''
-    if (this.platformOffers.get(key) === why) return p
+    const why = p.invalid !== undefined ? `invalid:${p.invalid}` : (p.offer?.why ?? '')
+    if ((this.platformOffers.get(key) ?? '') === why) return
     this.platformOffers.set(key, why)
-    if (p.offer) {
-      log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
-      this.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', ...platformNotice(basename(projectPath), p), source: projectPath, timestamp: new Date().toISOString() } })
-    }
-    return p
+    if (!why) return
+    if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
+    else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
+    this.emit({ type: 'toast', toast: { id: randomUUID(), level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), source: projectPath, timestamp: new Date().toISOString() } })
   }
 
   /** Whether project.json was written after this read of it began (#999). */
@@ -1096,6 +1101,8 @@ export class WorkspaceService {
     for (const [k, v] of this.roots) if (!known.has(v.toLowerCase()) && (this.rootsAt.get(v.toLowerCase()) ?? 0) < listed) this.roots.delete(k)
     for (const [project, at] of this.rootsAt) if (!known.has(project) && at < listed) this.rootsAt.delete(project)
     for (const [project, at] of this.savedAt) if (!this.listedAt.known.has(project) && at < listed) this.savedAt.delete(project)
+    // A project gone is said again if it comes back.
+    for (const project of this.platformOffers.keys()) if (!known.has(project)) this.platformOffers.delete(project)
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
     this.emit({ type: 'workspace-changed', workspace: this.cached })
     this.flagDuplicateNames(projects)

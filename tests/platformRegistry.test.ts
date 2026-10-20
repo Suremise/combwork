@@ -4,7 +4,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
@@ -22,6 +22,9 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
 const gitInit = (folder: string): void => void run(folder, 'init', '-q', '-b', 'main')
+
+// The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 10000
 
 describe('detection, per case of §16.3.5', () => {
   it('a Git repository is Git, at its root', () => {
@@ -78,6 +81,18 @@ describe("a project's platform", () => {
     expect(projectPlatform(p, 'none').offer).toBeUndefined()
   })
 
+  it('a recorded value that is no platform uses detection, offers nothing, and says what it holds', () => {
+    const p = tempDir('hive-platform-invalid-')
+    gitInit(p)
+    for (const [value, said] of [['mercurial', 'mercurial'], ['Git', 'Git'], ['toString', 'toString'], ['__proto__', '__proto__'], [42, '42'], [true, 'true'], [{ id: 'git' }, '{"id":"git"}'], [['git'], '["git"]']] as const) {
+      expect(projectPlatform(p, value)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p }, invalid: said })
+    }
+    // Absent or null: not recorded, nothing to say.
+    expect(projectPlatform(p, null)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p } })
+    // A valid one still holds against detection.
+    expect(projectPlatform(p, 'none')).toMatchObject({ id: 'none', offer: { offer: 'git', why: 'gitFound' } })
+  })
+
   it('shows revisions through its descriptor', () => {
     expect(revisionShort('git', 'a3f2c1d9e8b7')).toBe('a3f2c1d')
     expect(revisionShort('none', '0123456789abcdef')).toBe('0123456')
@@ -108,9 +123,9 @@ describe('in ProjectInfo', () => {
     w = createWorkspaceService()
     await w.open(ws)
   })
-  afterEach(() => {
+  afterEach(async () => {
     off()
-    disposeWorkspaceService(w)
+    await disposeWorkspaceService(w)
   })
 
   it('records the platform found as the project is set up, then keeps it: git init is offered and said once, not switched to', async () => {
@@ -137,6 +152,54 @@ describe('in ProjectInfo', () => {
     renameSync(join(p, '.git'), join(p, 'moved.git'))
     expect((await info(p)).platform).toMatchObject({ id: 'git', capabilities: PLATFORMS.git.capabilities, offer: { why: 'repositoryGone' } })
     expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back."])
+  })
+
+  it('a project.json naming no platform stays readable, with a warning said once', async () => {
+    const p = join(ws, 'delta')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    for (const value of ['mercurial', 7]) {
+      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: value }))
+      expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
+      await info(p)
+    }
+    expect(notices(p).map((t) => [t.level, t.message])).toEqual([
+      ['warning', `delta's project.json names a version control Hive doesn't know (platform: mercurial). Until it says "git" or "none", Hive uses what it finds in the folder.`],
+      ['warning', `delta's project.json names a version control Hive doesn't know (platform: 7). Until it says "git" or "none", Hive uses what it finds in the folder.`]
+    ])
+  })
+
+  it("a read of a workspace closed or switched meanwhile says nothing in the next one, which says its own afresh", async () => {
+    const p = await project('epsilon', gitInit)
+    renameSync(join(p, '.git'), join(p, 'moved.git'))
+    // The old workspace's read of epsilon holds once it has read its config, while the window opens another workspace.
+    const service = w as unknown as { projectConfig: (path: string) => Promise<ProjectConfig> }
+    const real = service.projectConfig.bind(w)
+    let release: () => void = () => undefined
+    const released = new Promise<void>((r) => (release = r))
+    let held = false
+    const spy = vi.spyOn(service, 'projectConfig').mockImplementation(async (path: string) => {
+      const cfg = await real(path)
+      if (path === p && !held) {
+        held = true
+        await released
+      }
+      return cfg
+    })
+    try {
+      const old = info(p)
+      await vi.waitFor(() => expect(held).toBe(true), { timeout: HUNG_MS })
+      const next = tempDir('hive-platform-ws2-')
+      await w.open(next)
+      release()
+      expect((await old).platform?.offer?.why).toBe('repositoryGone')
+    } finally {
+      release()
+      spy.mockRestore()
+    }
+    expect(notices(p)).toEqual([])
+    // Back in the first workspace: said there, as its own.
+    await w.open(ws)
+    await vi.waitFor(() => expect(notices(p)).toHaveLength(1), { timeout: HUNG_MS })
   })
 
   it('a project from before platforms (none recorded) follows detection, offering nothing, until the upgrade records one', async () => {

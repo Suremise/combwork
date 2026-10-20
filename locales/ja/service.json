@@ -151,6 +151,7 @@
   "service.workspace.notRoot": "開いているワークスペースのプロジェクトでも、エージェントのワークツリーでもありません：{path}",
   "service.workspace.openElsewhere": "{folder}はすでに別のウィンドウで開かれています。",
   "service.workspace.platformGitFound": "{project} は Git リポジトリになりました。Hive は引き続きバージョン管理のないプロジェクトとして扱います。Hive が自動で切り替えることはありません。",
+  "service.workspace.platformInvalid": "{project} の project.json に Hive が知らないバージョン管理が指定されています (platform: {value})。\"git\" または \"none\" になるまで、Hive はフォルダーで見つけたものを使います。",
   "service.workspace.platformOtherFound": "{project} で {vcs} が見つかりました。Hive はまだ対応していないため、引き続き Git プロジェクトとして扱います。",
   "service.workspace.platformRepositoryGone": "{project} の Git リポジトリが見つかりません。Hive は引き続き Git プロジェクトとして扱うため、リポジトリが戻るまで Git が必要な情報は読み取れません。",
   "service.workspace.platformTitle": "{project} のバージョン管理が変わりました",

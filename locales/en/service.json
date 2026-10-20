@@ -607,6 +607,10 @@
     "defaultMessage": "{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.",
     "description": "A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it."
   },
+  "service.workspace.platformInvalid": {
+    "defaultMessage": "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.",
+    "description": "A notice: the platform setting in the project {project}'s .hive/project.json is {value}, which is not one Hive has (only \"git\" and \"none\" are: keep them as they are, they are setting values)."
+  },
   "service.workspace.platformOtherFound": {
     "defaultMessage": "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.",
     "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it."
