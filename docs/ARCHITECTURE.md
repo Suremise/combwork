@@ -308,7 +308,8 @@ never the CLI's config.
 is rebuilt from rows, identical or versioned. One schema step, backed up first, asked before it runs and refused while
 another Hive process has the workspace open; Help restores the 0.9 backup; a newer file opens read-only. Observed
 facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
-workspace write each transition once, while a later repeat of the same values is still recorded (SPEC §16.17).
+workspace write each transition once, while a later repeat of the same values is still recorded; a writer that loses
+the race re-reads the platform and writes only what is true now, after the winner (SPEC §16.17).
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
