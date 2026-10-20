@@ -276,10 +276,22 @@ tracked file's and folder's size and time (the builder's own paths in a shared f
 the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
 so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
 platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
-intent is refused `evidence.changed`, "try again". It is a best-effort snapshot, not one transaction with git and the
-files: a change after the last read, or one that keeps every size and time, isn't excluded, so P3's watcher and
-reconciliation (stale marks, observed facts) remain what settles those. #1206: an outside `git status` refreshing the
-index's stat data refuses falsely today; fingerprint the index's content, or read once more before refusing); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+intent is refused `evidence.changed`, "try again". **Cached stat data alone never refuses** (#1206): the fingerprint stays cheap (sizes and times, no process), and
+`evidenceOf` also takes the platform's own answer by content (`content()`; Git: the same refs, HEAD and operations,
+`ls-files --stage`'s entries, and `hash-object` of each covered file `diff-files` lists whose content isn't its
+entry's, so git applies each path's attributes, filters and line endings, and reads every index version and extension
+itself). Just before the transaction (`revalidate`), if the fingerprint moved, the content answer is asked again
+outside it: the same answer, with the fingerprint steady across the asking and the cards waited for unchanged, means
+likely only stat data moved (an outside `git status` refreshing the index, an editor's git integration, a file
+touched). Even then the guards' inputs read in between may have seen another state and back (HR5, round 2: dirty,
+clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
+from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
+an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). The Assistant
+suggested letting git answer (#1206 round 1) after HR5 found that reading the index in Hive (an earlier round) got
+attributes, v4 paths and required extensions wrong. **The practical guarantee:** git, the files and SQLite can't be
+one transaction, so the fingerprint proves only that nothing it covers changed between its two reads; a change after
+the transaction's read, or one it doesn't cover, is caught afterwards by the watcher and reconciliation (stale marks,
+observed facts), never claimed excluded); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside

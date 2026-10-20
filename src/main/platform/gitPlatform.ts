@@ -3,6 +3,7 @@
 //
 // P2 spike (#1118): not wired into the app yet.
 
+import { createHash } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
 import { dirname, join } from 'path'
 import { git } from '../git'
@@ -29,6 +30,15 @@ function statLine(p: string): string {
 }
 
 const unknownRefusal = (card: CardRecord, what: string, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what, rule } })
+
+/** What `prime` reads once per intent for the evidence: the card's folder, and the tracked files it covers. */
+interface Primed {
+  gitDir: string | null
+  folder: string | null
+  files: string[]
+  /** A shared folder's own paths (what the evidence covers there), or null: the whole folder. */
+  own: string[] | null
+}
 
 export class GitPlatform implements PlatformAdapter {
   readonly id = 'git' as const
@@ -67,7 +77,7 @@ export class GitPlatform implements PlatformAdapter {
       if (!isUnknown(c)) this.common = c
     }
     // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
-    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [] }
+    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [], own: null } satisfies Primed
     const folder = this.wf.folderOf(s)
     const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
     const ls = await git(folder, ['ls-files', '-z'])
@@ -76,7 +86,7 @@ export class GitPlatform implements PlatformAdapter {
     const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
     const all = ls.out.split('\0').filter(Boolean)
     const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
-    return { gitDir: gd.out.trim(), folder, files }
+    return { gitDir: gd.out.trim(), folder, files, own } satisfies Primed
   }
 
   /**
@@ -85,7 +95,7 @@ export class GitPlatform implements PlatformAdapter {
    * covered tracked file's and folder's size and time (an edit, or a new file beside them, shows). Null when unreadable.
    */
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
-    const p = primed as { gitDir: string | null; folder: string | null; files: string[] } | null
+    const p = primed as Primed | null
     if (!this.common || !p) return null
     const target = s.started?.target ?? card.target ?? o.target
     const line = s.stage === 'todo' ? null : s.started?.line
@@ -98,6 +108,57 @@ export class GitPlatform implements PlatformAdapter {
         parts.push(statLine(join(p.folder, f)))
         dirs.add(dirname(f))
       }
+      for (const d of [...dirs].sort()) parts.push(statLine(join(p.folder, d)))
+    }
+    return parts.join('|')
+  }
+
+  /**
+   * Git's own answer about what `evidence` covers (#1206): the same refs, HEAD and operations, the index's entries (mode,
+   * object id, stage, path: `ls-files --stage`) and the content of each covered file that differs from them (the files
+   * `diff-files` lists, hashed by `hash-object` with the path's own attributes, filters and line endings; one whose
+   * content is its entry's, only its stat differing, isn't listed). An outside `git status`
+   * refreshing the index's stat data, or a file only touched, changes the stat fingerprint but not this. Null when git
+   * can't say. Never read inside the transaction (it runs git): the runtime asks it when the fingerprint moved.
+   */
+  async content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null> {
+    const p = primed as Primed | null
+    if (!this.common || !p) return null
+    const target = s.started?.target ?? card.target ?? o.target
+    const line = s.stage === 'todo' ? null : s.started?.line
+    const parts = [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : '']
+    if (p.gitDir && p.folder) {
+      parts.push(`HEAD:${G.refSync(p.gitDir, 'HEAD') ?? ''}`)
+      for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) parts.push(existsSync(join(p.gitDir, m)) ? m : '')
+      // A shared folder with no paths of the builder's: nothing of the index or files is covered.
+      if (!p.own || p.own.length) {
+        const spec = p.own ? ['--', ...p.own] : []
+        const staged = await git(p.folder, ['ls-files', '--stage', '-z', ...spec])
+        const differ = await git(p.folder, ['diff-files', '--name-only', '-z', ...spec])
+        if (!staged.ok || !differ.ok) return null
+        parts.push(`index:${createHash('sha256').update(staged.buf).digest('hex')}`)
+        // Each entry's object id, to tell a file whose stat alone differs (diff-files lists it: it doesn't refresh).
+        const ids = new Map<string, string>()
+        for (const rec of staged.out.split('\0')) {
+          const m = rec.match(/^\d+ ([0-9a-f]+) 0\t(.*)$/s)
+          if (m) ids.set(m[2], m[1])
+        }
+        const changed = differ.out.split('\0').filter(Boolean).sort()
+        const present = changed.filter((f) => existsSync(join(p.folder!, f)))
+        let oids: string[] = []
+        if (present.length) {
+          const h = await git(p.folder, ['hash-object', '--stdin-paths'], undefined, present.join('\n') + '\n')
+          oids = h.ok ? h.out.split(/\r?\n/).filter(Boolean) : []
+          if (oids.length !== present.length) return null
+        }
+        for (const f of changed) {
+          const oid = present.includes(f) ? oids[present.indexOf(f)] : 'gone'
+          if (oid !== ids.get(f)) parts.push(`${f}:${oid}`)
+        }
+      }
+      // As in the fingerprint: a file made or removed beside the covered ones.
+      const dirs = new Set<string>(['.'])
+      for (const f of p.files) dirs.add(dirname(f))
       for (const d of [...dirs].sort()) parts.push(statLine(join(p.folder, d)))
     }
     return parts.join('|')

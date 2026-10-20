@@ -45,6 +45,8 @@ export type Reply = Moved | Refusal
 export interface Evidence {
   primed: unknown
   value: string | null
+  /** The platform's own answer by content, taken with it (`content`), when it has one. */
+  content: string | null
 }
 
 /** The user's (or the Assistant's) drag running an intent: asking first, or across the rules that refuse, with a reason. */
@@ -297,6 +299,7 @@ export class Workflow {
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     this.store.saveRuleset(r)
     await this.cfg.hooks?.beforeWrite?.('start')
+    if (await this.revalidate(card, s, o, before)) return this.regather(card, () => this.start(ref, actor, opts))
     const out = await this.write(card, r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, o, before)
       if (changed) return changed
@@ -349,7 +352,46 @@ export class Workflow {
    */
   async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<Evidence> {
     const primed = await this.platform(o).prime(card, s, o)
-    return { primed, value: this.evidenceNow(card, s, o, primed) }
+    const content = await this.platform(o).content(card, s, o, primed)
+    return { primed, value: this.evidenceNow(card, s, o, primed), content }
+  }
+
+  /** Cards whose intent is being gathered again (`regather`): at most once, so a fingerprint moving again refuses. */
+  private regathering = new Set<number>()
+
+  /**
+   * Just before an intent's transaction (#1206): whether to gather it again from the top. Only when the fingerprint
+   * moved since it was taken while the platform's answer by content, asked again outside the transaction, is the same
+   * (with the fingerprint steady across the asking and the cards waited for unchanged): what moved is likely cached
+   * stat data only (an outside `git status`, a file touched). Even then, what the intent read in between (its guards'
+   * inputs: dirty files, the revision) may have seen another state and back, so it is never reused with a new
+   * fingerprint: the intent starts again, reading everything afresh, once (`regather`). A real change refuses at once,
+   * as does a fingerprint moving again in the second pass. Git, the files and SQLite can't be one transaction:
+   * reconciliation settles what comes after the transaction's read.
+   */
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<boolean> {
+    if (before.value === null || before.content === null || this.regathering.has(card.id)) return false
+    const a = this.evidenceNow(card, s, o, before.primed)
+    if (a === null || a === before.value || this.depsOf(a) !== this.depsOf(before.value)) return false
+    const content = await this.platform(o).content(card, s, o, before.primed)
+    const b = this.evidenceNow(card, s, o, before.primed)
+    return content !== null && content === before.content && b === a
+  }
+
+  /** Runs an intent again from the top, once (`revalidate`). */
+  private async regather(card: CardRecord, run: () => Promise<Reply>): Promise<Reply> {
+    this.regathering.add(card.id)
+    try {
+      return await run()
+    } finally {
+      this.regathering.delete(card.id)
+    }
+  }
+
+  /** The part of a fingerprint that is the cards waited for (`evidenceNow`). */
+  private depsOf(value: string): string {
+    const i = value.indexOf('#')
+    return i < 0 ? '' : value.slice(i)
   }
 
   private evidenceNow(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
@@ -544,6 +586,7 @@ export class Workflow {
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
+        if (await this.revalidate(card, s, o, evidence)) return this.regather(card, () => this.submit(ref, actor, args))
         const g = await this.write(card, r, actor, (w) => {
           const bad = this.stillAt(w, s, 'submit') ?? this.evidenceChanged(w, o, evidence) ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
@@ -589,6 +632,7 @@ export class Workflow {
 
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     await this.cfg.hooks?.beforeWrite?.('submit')
+    if (await this.revalidate(card, s, o, before)) return this.regather(card, () => this.submit(ref, actor, args))
     const sAtGather = s
     const out = await this.write(card, r, actor, (w) => {
       const changed = this.stillAt(w, sAtGather, 'submit') ?? this.evidenceChanged(w, o, before)
@@ -665,6 +709,7 @@ export class Workflow {
     const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     await this.cfg.hooks?.beforeWrite?.('verdict')
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
       const bad = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'verdict', { agent, submission: args.submission })
       if (bad) return bad
@@ -707,6 +752,7 @@ export class Workflow {
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
     const from = s.stage
     await this.cfg.hooks?.beforeWrite?.('answer')
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, note))
     const out = await this.write(card, r, 'user', (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
       const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
@@ -762,6 +808,7 @@ export class Workflow {
       }
     }
     const th = await this.platform(r.options).targetHead(target)
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target })
       if (bad) return bad
