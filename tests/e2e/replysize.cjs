@@ -268,7 +268,7 @@ const prose = (seed, n) => {
   const waited = measure('hive_wait_for_tasks (no change)', tool('hive_wait_for_tasks', { cards: [target], timeoutSeconds: 1 }), 300)
   check('a wait with no change: no change, with its since', /^No change\.\nsince: @[0-9a-z]+;/.test(waited), waited)
   const met = measure('hive_wait_for_tasks (already in the column)', tool('hive_wait_for_tasks', { cards: [target], column: 'review' }), 400)
-  check('a column already reached answers at once', met.startsWith(`#${target} is in Review (column`), met)
+  check('a column already reached answers at once, the card by key (#1219)', lib.unkey(met).startsWith(`#${target} is in Review (column`) && lib.KEYED.test(met), met)
   const watchingNow = measure('hive_wait_for_tasks (wake)', tool('hive_wait_for_tasks', { cards: [todo[0]], wake: true }, 'assistant'), 300)
   check('a watch begun: what it waits for, and to end the turn', lib.unkey(watchingNow).startsWith(`Waiting for #${todo[0]}. End your turn now`), watchingNow)
   check('cancel ends it', measure('hive_wait_for_tasks (cancel)', tool('hive_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your card watch.', texts['hive_wait_for_tasks (cancel)'])
