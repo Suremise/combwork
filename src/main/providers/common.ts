@@ -9,6 +9,7 @@ import { readFirstLineOf } from '../transcriptFiles'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, removePath, sourceProblem, swapIn, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
 import { hiveError } from '../hiveError'
+import { git } from '../git'
 import type { HookIds, LaunchContext, SkillDelivery } from './types'
 
 const log = createLogger('providers')
@@ -341,8 +342,8 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
 
 /** Keeps Hive's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
-  const common = await run('git', ['-C', cwd, 'rev-parse', '--git-common-dir'], 5000)
-  const gitDir = common.code === 0 ? common.stdout.trim() : ''
+  const common = await git(cwd, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: 5000 })
+  const gitDir = common.ok ? common.out.trim() : ''
   if (!gitDir) return
   const exclude = join(isAbsolute(gitDir) ? gitDir : resolvePath(cwd, gitDir), 'info', 'exclude')
   const text = await readFile(exclude, 'utf8').catch(() => '')

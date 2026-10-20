@@ -210,6 +210,8 @@
   "tips.performance.title": "Was Hive selbst kostet",
   "tips.permissionMode.text": "Klicke auf den Modus in der Fußzeile eines Agenten oder drück {key}, um zwischen erst fragen, Änderungen annehmen und planen zu wechseln.",
   "tips.permissionMode.title": "Berechtigungsmodus wechseln",
+  "tips.progressCard.text": "Ein Lauf im Fortschrittspanel zeigt unter dem Agenten die Karte und die Revision, auf der er lief, etwa #1061 · a3f2c1d: Klicke auf die Karte, um sie zu öffnen, oder auf die Revision, um sie zu kopieren.",
+  "tips.progressCard.title": "Für welche Karte war dieser Lauf?",
   "tips.progressCommand.text": "Agenten führen lange Befehle wie Tests und Builds über hive-progress aus, sodass das Fortschrittspanel sie unter dem Namen des Agenten zeigt, ab dem zweiten Mal mit der ungefähren Restzeit. In den Einstellungen kannst du festlegen, dass sie das nur auf deine Bitte tun.",
   "tips.progressCommand.title": "Fortschritt für jeden Befehl",
   "tips.progressDetails.text": "Klicke auf einen Lauf im Fortschrittspanel oder unter „Zuletzt“, um seine Details zu sehen: den vollständigen Befehl, wann er lief und wie lange er dauerte, seinen Exit-Code, das Log, das er geschrieben hat, und warum er fehlgeschlagen ist.",

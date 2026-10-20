@@ -210,6 +210,8 @@
   "tips.performance.title": "Hive自体のコスト",
   "tips.permissionMode.text": "エージェントのフッターのモードをクリックするか{key}を押すと、先に確認するモード、編集を承認するモード、計画モードを切り替えられます。",
   "tips.permissionMode.title": "権限モードを切り替える",
+  "tips.progressCard.text": "進捗パネルの実行には、エージェント名の下に対象のカードと実行したリビジョンが表示されます（例：#1061 · a3f2c1d）。カードをクリックすると開き、リビジョンをクリックするとコピーします。",
+  "tips.progressCard.title": "その実行はどのカードのため？",
   "tips.progressCommand.text": "エージェントはテストやビルドなどの長いコマンドをhive-progress経由で実行するので、進捗パネルにエージェント名の下で表示され、2回目からは残り時間の目安も表示されます。依頼したときだけそうするよう設定することもできます。",
   "tips.progressCommand.title": "どんなコマンドにも進捗を",
   "tips.progressDetails.text": "進捗パネルの実行、または「最近」の下の実行をクリックすると詳細が表示されます：コマンド全体、実行日時と所要時間、終了コード、書き出したログ、失敗した理由。",

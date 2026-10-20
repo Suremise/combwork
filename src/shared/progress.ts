@@ -34,6 +34,12 @@ export const RECENT_RUNS = 10
 export const MAX_TOTAL = 100_000
 export const MAX_ESTIMATE_MS = 7 * 24 * 3_600_000
 
+/** A run's card as runs name it (#1220): `#1061`, the old global number, until project keys arrive (#1219). */
+export const cardRefText = (n: number): string => `#${n}`
+
+/** The short form of a commit id, as the panel and replies show it. */
+export const shortRevision = (id: string): string => id.slice(0, 7)
+
 /**
  * Whether a run is in the panel's list (else under Recent): a running one; a failed or stale one until the user has
  * seen it, and a few seconds more (as a passed one); a passed or stopped one for a few seconds. A dismissed one never.
@@ -362,6 +368,9 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
       : tr(msg({ id: 'board.details.tookTotal', defaultMessage: '{took}{expected, select, none {} other { · expected about {expected}}}', description: "How long a finished run took, in its details (Progress panel): {took} (\"4 min\"), then about how long runs like it take ({expected}, a duration, or none when unknown: keep that branch empty)." }), { took: ran, expected })
   const out: RunDetail[] = [{ label: tr(msg({ id: 'board.details.run', defaultMessage: 'Run', description: "A label in a run's details (Progress panel): the run's title follows." })), text: r.title }]
   if (r.command) out.push({ label: tr(msg({ id: 'board.details.command', defaultMessage: 'Command', description: "A label in a run's details (Progress panel): the command it ran follows." })), text: r.command, code: true })
+  // What it ran for (#1220): its card and the revision (in full, for copying; the row shows it short).
+  if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardRefText(r.card) })
+  if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)." })), text: r.revision, code: true })
   out.push({ label: tr(msg({ id: 'board.details.agent', defaultMessage: 'Agent', description: "A label in a run's details (Progress panel): the agent that ran it (and its project) follows." })), text: `${runAgentName(r, tr)}${project ? ` · ${project}` : ''}` })
   if (r.provider) out.push({ label: tr(msg({ id: 'board.details.provider', defaultMessage: 'Provider', description: "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)." })), text: providerName(r.provider) })
   out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt) })

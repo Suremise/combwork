@@ -10,6 +10,7 @@ import { git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import { errorText, hiveError, shownError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { unwatchedWhile } from './platform/observe'
 
 const log = createLogger('worktrees')
 
@@ -192,7 +193,7 @@ export async function createWorktree(projectPath: string, dest: string, branch: 
 
 export async function removeWorktree(projectPath: string, wt: AgentWorktree, deleteBranch: boolean): Promise<void> {
   if (existsSync(wt.path)) {
-    const r = await git(projectPath, ['worktree', 'remove', '--force', wt.path])
+    const r = await unwatchedWhile([wt.path], () => git(projectPath, ['worktree', 'remove', '--force', wt.path]))
     if (!r.ok) throw gitError(r.err, 'git worktree remove') // i18n-ignore: a git command, as it is
   } else {
     await git(projectPath, ['worktree', 'prune'])
@@ -385,7 +386,7 @@ export async function removeCheckedWorktree(projectPath: string, wt: AgentWorktr
   }
   const moved = await refsMoved(projectPath, wt, into, tip, intoTip)
   if (moved) return { deleted: false, reason: moved }
-  const removed = await git(projectPath, ['worktree', 'remove', wt.path])
+  const removed = await unwatchedWhile([wt.path], () => git(projectPath, ['worktree', 'remove', wt.path]))
   if (!removed.ok) return { deleted: false, reason: gitKept(removed.err, 'git worktree remove') } // i18n-ignore: a git command, as it is
   const kept = await deleteCheckedBranch(projectPath, wt, into, tip, intoTip)
   log.info(`Removed merged, clean worktree ${userText(wt.path)}${kept ? ` (branch ${userText(wt.branch)} kept: ${userText(kept)})` : ` and branch ${userText(wt.branch)}`}`)

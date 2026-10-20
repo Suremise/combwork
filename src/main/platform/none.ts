@@ -142,6 +142,12 @@ export class NoneAdapter {
     return out.sort((x, y) => (x.path < y.path ? -1 : 1))
   }
 
+  /** Whether a project-relative path is in the deliverables (no part of it is `.hive`, `.git` or an excluded folder). */
+  isDeliverable(rel: string): boolean {
+    const parts = toPosix(rel).split('/').filter(Boolean)
+    return parts.length > 0 && !parts.some((part) => this.skip(part))
+  }
+
   /** A path relative to the project, with `/`. */
   rel(abs: string): string {
     return toPosix(relative(this.project, abs))

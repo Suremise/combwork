@@ -607,6 +607,10 @@
     "defaultMessage": "Agent",
     "description": "A label in a run's details (Progress panel): the agent that ran it (and its project) follows."
   },
+  "board.details.card": {
+    "defaultMessage": "Card",
+    "description": "A label in a run's details (Progress panel): the card it ran for follows (#1061)."
+  },
   "board.details.command": {
     "defaultMessage": "Command",
     "description": "A label in a run's details (Progress panel): the command it ran follows."
@@ -642,6 +646,10 @@
   "board.details.provider": {
     "defaultMessage": "Provider",
     "description": "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)."
+  },
+  "board.details.revision": {
+    "defaultMessage": "Revision",
+    "description": "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)."
   },
   "board.details.run": {
     "defaultMessage": "Run",
@@ -1487,6 +1495,10 @@
     "defaultMessage": "{what, select, command {Could not copy the command} other {Could not copy the details}}",
     "description": "A notification: copying a run's command or its details from the Progress panel failed."
   },
+  "board.progress.copyRevision": {
+    "defaultMessage": "Copy revision {revision}",
+    "description": "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)."
+  },
   "board.progress.detailsOf": {
     "defaultMessage": "Details of {run}",
     "description": "Accessible name of a run's details in the Progress panel ({run}: the run's title)."
@@ -1530,6 +1542,10 @@
   "board.progress.noAssistant": {
     "defaultMessage": "The Assistant is not in this workspace.",
     "description": "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none."
+  },
+  "board.progress.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)."
   },
   "board.progress.openLog": {
     "defaultMessage": "Open log",
@@ -1578,6 +1594,14 @@
   "board.progress.region": {
     "defaultMessage": "Progress",
     "description": "Accessible name of the Progress panel (long runs agents report: tests, builds)."
+  },
+  "board.progress.revisionCopied": {
+    "defaultMessage": "Revision {revision} copied",
+    "description": "A notification after copying a run's revision (a commit id) from the Progress panel. {revision} is its short form (a3f2c1d)."
+  },
+  "board.progress.revisionCopyFailed": {
+    "defaultMessage": "Could not copy the revision",
+    "description": "A notification: copying a run's revision (a commit id) from the Progress panel failed."
   },
   "board.progress.script": {
     "defaultMessage": "Script",

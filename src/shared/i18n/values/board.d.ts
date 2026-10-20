@@ -153,6 +153,7 @@ interface HiveMessageValues {
   'board.delete.message': { title: string | number }
   'board.delete.title': { card: string | number }
   'board.details.agent': undefined
+  'board.details.card': undefined
   'board.details.command': undefined
   'board.details.ended': undefined
   'board.details.exitCode': undefined
@@ -162,6 +163,7 @@ interface HiveMessageValues {
   'board.details.line': { label: string | number; text: string | number }
   'board.details.log': undefined
   'board.details.provider': undefined
+  'board.details.revision': undefined
   'board.details.run': undefined
   'board.details.staleAgentStopped': undefined
   'board.details.staleQuiet': { quiet: string | number }
@@ -373,6 +375,7 @@ interface HiveMessageValues {
   'board.progress.copyCommand': undefined
   'board.progress.copyDetails': undefined
   'board.progress.copyFailed': { what: string }
+  'board.progress.copyRevision': { revision: string | number }
   'board.progress.detailsOf': { run: string | number }
   'board.progress.dismiss': undefined
   'board.progress.empty': undefined
@@ -384,6 +387,7 @@ interface HiveMessageValues {
   'board.progress.moreOthers': { n: number }
   'board.progress.moreRuns': { n: number }
   'board.progress.noAssistant': undefined
+  'board.progress.openCard': { card: string | number }
   'board.progress.openLog': undefined
   'board.progress.openLogFailed': undefined
   'board.progress.projectGone': undefined
@@ -396,6 +400,8 @@ interface HiveMessageValues {
   'board.progress.recentHoverTook': { agent: string | number; run: string | number; state: string | number; took: string | number }
   'board.progress.recentRuns': undefined
   'board.progress.region': undefined
+  'board.progress.revisionCopied': { revision: string | number }
+  'board.progress.revisionCopyFailed': undefined
   'board.progress.script': undefined
   'board.progress.scriptRun': undefined
   'board.progress.show': undefined

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { ALL_PROJECTS, RECENT_RUNS, SHOW_ALL, activeFilter, agentChoices, ProgressSync, barLook, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isListed, isOpenRun, isRecent, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
+import { ALL_PROJECTS, RECENT_RUNS, SHOW_ALL, activeFilter, agentChoices, ProgressSync, barLook, cardRefText, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isListed, isOpenRun, isRecent, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -286,6 +286,7 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
           />
         )}
       </div>
+      {(r.card || r.revision) && <RunFor run={r} />}
       <Tooltip block content={r.command ?? r.title}>
         <div className="progress-title">{r.title}</div>
       </Tooltip>
@@ -308,6 +309,49 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
     </div>
   )
 })
+
+/**
+ * What a run ran for (#1220), under its agent: "#1061 · a3f2c1d". The card opens it; the revision copies the whole
+ * commit id.
+ */
+function RunFor({ run: r }: { run: ProgressRun }) {
+  const card = r.card ? cardRefText(r.card) : null
+  return (
+    <div className="progress-run-for faint">
+      {card && (
+        <button
+          type="button"
+          className="progress-run-card"
+          title={tr(msg({ id: 'board.progress.openCard', defaultMessage: 'Open {card}', description: "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)." }), { card })}
+          onClick={(e) => {
+            e.stopPropagation()
+            set({ taskOpen: r.card! })
+          }}
+        >
+          {card}
+        </button>
+      )}
+      {card && r.revision && <span aria-hidden="true"> · </span>}
+      {r.revision && (
+        <button
+          type="button"
+          className="progress-run-revision"
+          title={tr(msg({ id: 'board.progress.copyRevision', defaultMessage: 'Copy revision {revision}', description: "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)." }), { revision: shortRevision(r.revision) })}
+          onClick={(e) => {
+            e.stopPropagation()
+            const id = r.revision!
+            void navigator.clipboard.writeText(id).then(
+              () => notify('success', tr(msg({ id: 'board.progress.revisionCopied', defaultMessage: 'Revision {revision} copied', description: "A notification after copying a run's revision (a commit id) from the Progress panel. {revision} is its short form (a3f2c1d)." }), { revision: shortRevision(id) })),
+              () => notify('error', tr(msg({ id: 'board.progress.revisionCopyFailed', defaultMessage: 'Could not copy the revision', description: "A notification: copying a run's revision (a commit id) from the Progress panel failed." })))
+            )
+          }}
+        >
+          <code>{shortRevision(r.revision)}</code>
+        </button>
+      )}
+    </div>
+  )
+}
 
 /** The button opening or closing a run's details (the row's click does the same; this is it for the keyboard). */
 function DetailsToggle({ run: r, open, onToggle }: { run: ProgressRun; open: boolean; onToggle: (id: string) => void }) {

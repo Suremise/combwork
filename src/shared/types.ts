@@ -16,6 +16,7 @@ import type { ConsoleEvent, ConsoleRecordingInfo } from './devConsole'
 import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
+import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -935,6 +936,11 @@ export interface ProjectConfig {
    * the only ones Hive takes for this project's. Added when Hive first makes a branch in one; never removed.
    */
   branchSpaces?: string[]
+  /**
+   * The project's version control platform (SPEC §16.3), recorded from detection when Hive makes its project.json and
+   * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
+   */
+  platform?: PlatformId
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
@@ -1499,6 +1505,8 @@ export interface ProjectInfo {
   removedData?: RemovedData | null
   /** Whether its .hive is kept out of version control (#345); absent for the Assistant's home. */
   hiveVcs?: HiveVcs
+  /** Its version control platform, capabilities and detection (SPEC §16.3); absent for the Assistant's home. */
+  platform?: ProjectPlatform
 }
 
 /**
@@ -2583,4 +2591,17 @@ export interface ProgressRun {
    * its program alone, since a command's arguments can hold a token or a prompt.
    */
   titleFromCommand?: true
+  /**
+   * The card it ran for (its number, #1220): named (`hive-progress --card`, `card`), or the reporting agent's card in
+   * Doing when it has one and named none. Absent for a run with no card.
+   */
+  card?: number
+  /** The revision it ran for (a full commit id): named (`--revision`, which must be what's checked out), else the folder's head at the start. */
+  revision?: string
+  /** What was checked out where it ran when it started (a full commit id): the revision it actually tested (SPEC §16.13). */
+  testedCheckout?: string
+  /** The check it was started as (`hive-progress --check <name>`: the project's configured command for that name ran). */
+  check?: string
+  /** The folder it ran in, as its reporter said. */
+  folder?: string
 }

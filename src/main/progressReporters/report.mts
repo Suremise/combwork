@@ -60,6 +60,15 @@ export interface ProgressStart {
   titleFromCommand?: boolean
   /** What it waits for before it can begin (#549): no time left is shown meanwhile. */
   waiting?: string
+  /**
+   * What it runs for (#1220), as `resolveRun` gave it: `link`, the id Hive gave what it resolved (the checkout before the
+   * command started), and what it names, for a Hive that no longer has the link to resolve it again.
+   */
+  link?: string
+  card?: string | null
+  revision?: string
+  check?: string
+  folder?: string
 }
 
 /** What a finish may add: the command's exit code, a log or run record it wrote, and that it was interrupted. */
@@ -84,7 +93,7 @@ export interface ProgressUpdate {
 }
 
 /** The fetch it calls (tests pass their own). */
-export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ ok: boolean; json(): Promise<unknown> }>
+export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ ok: boolean; status?: number; json(): Promise<unknown> }>
 
 // The API's limits: it clips text itself, and refuses numbers out of range.
 const MAX_TITLE = 120
@@ -138,6 +147,11 @@ export class ProgressRun {
       ...(start.command ? { command: clip(start.command, MAX_COMMAND) } : {}),
       ...(start.titleFromCommand ? { titleFromCommand: true } : {}),
       ...(start.waiting ? { waiting: clip(start.waiting, MAX_TITLE) } : {}),
+      ...(start.card !== undefined ? { card: start.card } : {}),
+      ...(start.revision ? { revision: start.revision } : {}),
+      ...(start.link ? { link: start.link } : {}),
+      ...(start.check ? { check: start.check } : {}),
+      ...(start.folder ? { folder: start.folder } : {}),
       // Its process (#549): once it is gone without a finish, Hive says the run ended without a report.
       pid: process.pid
     }
@@ -240,6 +254,61 @@ export class ProgressRun {
       return null
     }
   }
+}
+
+/** What a run is for (#1220): what it names, or nothing for Hive's defaults (the agent's card, the folder's head). */
+export interface RunAsk {
+  folder: string
+  card?: string
+  revision?: string
+  check?: string
+}
+
+/** What Hive resolved a run to be for: the card's reference, the commits, the check and its configured command. */
+export interface RunLink {
+  /** The id its start passes back, so the run gets what was resolved here. */
+  link: string | null
+  card: string | null
+  revision: string | null
+  testedCheckout: string | null
+  check: { name: string; command: string } | null
+  folder: string | null
+}
+
+/**
+ * Asks Hive what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
+ * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` (no
+ * Hive, an older one without the call, a timeout).
+ */
+export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { unreachable: true }> {
+  const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
+  try {
+    const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      body: JSON.stringify(ask),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000)
+    })
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (res.ok && body && typeof body === 'object') {
+      const text = (v: unknown): string | null => (typeof v === 'string' && v ? v : null)
+      const check = body.check && typeof body.check === 'object' ? (body.check as Record<string, unknown>) : null
+      return {
+        link: {
+          link: text(body.link),
+          card: text(body.card),
+          revision: text(body.revision),
+          testedCheckout: text(body.testedCheckout),
+          check: check && text(check.name) && text(check.command) ? { name: check.name as string, command: check.command as string } : null,
+          folder: text(body.folder)
+        }
+      }
+    }
+    if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
+  } catch {
+    // no Hive, or it didn't answer in time
+  }
+  return { unreachable: true }
 }
 
 // Timings: how long a run (a command in a folder, a test suite) took the last few times, for its estimate.
