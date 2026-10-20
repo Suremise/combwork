@@ -21,6 +21,8 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore } from './factStore'
 import { reconcile } from './reconcile'
 import { Workflow } from './runtime'
+import * as G from '../platform/git'
+import { isUnknown } from '../platform/types'
 
 const log = createLogger('workflow')
 
@@ -153,9 +155,10 @@ async function reconcileProject(f: Followed): Promise<void> {
   const options = await optionsOf(f)
   if (!f.alive()) return
   const wf = new Workflow({
-    store: FactStore.forBoard(f.ws, { project: f.name, key: '' }),
+    // The project's cards by their keys (a Hive-Card trailer): its name until the keys (#1219), as the adoption's store.
+    store: FactStore.forBoard(f.ws, { project: f.name, key: f.name }),
     project: f.path,
-    projectKey: '',
+    projectKey: f.name,
     options: () => options,
     slots: join(f.ws.hiveDir, 'slots'),
     autoRun: false,
@@ -163,12 +166,25 @@ async function reconcileProject(f: Followed): Promise<void> {
     // Each write a change of the board, only while the workspace is the one this run is for.
     locked: (fn) => boardWrite(f.ws, async () => fn(), { alive: f.alive })
   })
-  for (const card of wf.store.cards()) {
+  const cards = wf.store.cards().map((card) => ({ card, s: wf.state(card) }))
+  // Done cards are looked at when their target moved: an event's line, or a target whose head isn't the one this
+  // project last checked its Done cards against (HR4's #1217 round 1: a reset while Hive was closed is found at the
+  // next open or focus). One read per target, however many Done cards it has.
+  const moved = new Set(lines)
+  const checked = new Map<string, string>()
+  if (f.platform === 'git') {
+    for (const t of new Set(cards.flatMap(({ card, s }) => (card.stage === 'done' && s.started?.target ? [s.started.target] : [])))) {
+      const th = await G.lineHead(f.path, t)
+      if (isUnknown(th) || !th) continue
+      if (wf.store.meta(`target:${t}`) !== th) moved.add(t)
+      checked.set(t, th)
+    }
+  }
+  for (const { card, s } of cards) {
     if (!f.alive()) return
-    const s = wf.state(card)
     if (!s.started) continue
     const target = s.started.target
-    const wanted = UNFINISHED.includes(card.stage) || asked.includes(card.id) || (card.stage === 'done' && !!target && lines.includes(target))
+    const wanted = UNFINISHED.includes(card.stage) || asked.includes(card.id) || (card.stage === 'done' && !!target && moved.has(target))
     if (!wanted) continue
     try {
       await reconcile(wf, card)
@@ -176,6 +192,11 @@ async function reconcileProject(f: Followed): Promise<void> {
       if (!f.alive()) return
       log.warn(`reconciling #${card.id}`, e)
     }
+  }
+  // What the Done cards were checked against, for the next run.
+  for (const [t, th] of checked) {
+    if (!f.alive()) return
+    if (wf.store.meta(`target:${t}`) !== th) await wf.locked(() => wf.store.setMeta(`target:${t}`, th))
   }
 }
 

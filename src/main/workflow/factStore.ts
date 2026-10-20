@@ -263,10 +263,10 @@ export class FactStore {
     return c
   }
 
-  /** A card of this project by its key (`AM-12`), or null. */
+  /** A card of this project by its key (`<key>-12`, any case; the key may itself hold hyphens: a project's name), or null. */
   cardByKey(key: string): CardRecord | null {
-    const m = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(key)
-    if (!m || m[1].toLowerCase() !== this.scope.key.toLowerCase()) return null
+    const m = /^(.+)-(\d+)$/.exec(key.trim())
+    if (!m || !this.scope.key || m[1].toLowerCase() !== this.scope.key.toLowerCase()) return null
     return this.records('number = ? AND project = ?', [Number(m[2]), this.scope.project])[0] ?? null
   }
 

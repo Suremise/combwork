@@ -4,7 +4,7 @@
 // an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Hives racing on one
 // head (the log says what is true now).
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -39,7 +39,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 
 /** A workspace whose project `p` is a git repository on main, its builder working in a worktree on `card`, based on main. */
-async function workspace(): Promise<{ ws: string; w: WS; repo: string; wt: string }> {
+async function workspace(opts: { shared?: boolean } = {}): Promise<{ ws: string; w: WS; repo: string; wt: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
@@ -51,7 +51,8 @@ async function workspace(): Promise<{ ws: string; w: WS; repo: string; wt: strin
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }] }))
+  // `shared`: both agents work in the project folder itself.
+  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }] }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -165,5 +166,96 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     await reopened.open(path)
     opened.push(reopened)
     expect(FactStore.forBoard(reopened, { project: 'p', key: '' }).facts(card).some((f) => f.kind === 'Integrated')).toBe(false)
+  })
+})
+
+// HR4's #1217 round 1: trailers resolved by the project's name, an observation never written into a cycle it wasn't
+// read in, TargetMoved, Gone for a folder or a repository, and a Done card's target checked after a time closed.
+describe('reconciliation in the app, round 2 (#1217)', () => {
+  it("a shared folder's commit with a card's trailer is that card's, with two cards working there", async () => {
+    const { w, repo } = await workspace({ shared: true })
+    const [one, two] = await inWorkspace(w, async () => [(await tasks.createTask({ title: 'One', project: 'p' }, user)).number, (await tasks.createTask({ title: 'Two', project: 'p' }, user)).number])
+    await inWorkspace(w, () => tasks.updateTask(one, { column: 'doing', agent: 'a1' }, user))
+    await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
+    writeFileSync(join(repo, 'two.txt'), 'two\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: P-${two}`)
+    const sha = git(repo, 'rev-parse', 'HEAD')
+    await reconcileNow(w, repo)
+    expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
+    expect(kinds(w, one)).not.toContain('CommitAttributed')
+    expect(FactStore.forBoard(w, { project: 'p', key: 'p' }).folderCommits(repo)).toMatchObject([{ sha, card: two, how: 'trailer' }])
+  })
+
+  it('a head read before the card started again is never written into its new cycle', async () => {
+    const { ws, w, repo, wt } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Cycles', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    const ours = new Workflow({ store: FactStore.forBoard(w, { project: 'p', key: 'p' }), project: repo, projectKey: 'p', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, locked: (fn) => store.boardWrite(w, async () => fn()) })
+    const b = commitIn(wt, 'b.txt')
+    // Read B; meanwhile C is committed and the card goes Done and is started again: a new cycle.
+    await reconcile(ours, ours.store.card(card), {
+      afterRead: async () => {
+        commitIn(wt, 'c.txt')
+        await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+        await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+      }
+    })
+    const facts = factsOf(w, card)
+    const second = facts.findLast((f) => f.kind === 'Started')!
+    expect(facts.filter((f) => f.kind === 'Started')).toHaveLength(2)
+    expect(facts.filter((f) => f.seq > second.seq && f.kind === 'HeadMoved' && (f.data as { to: string }).to === b)).toEqual([])
+  })
+
+  it("TargetMoved: the card's target observed from its last recorded head, each move once", async () => {
+    const { w, repo, wt } = await workspace()
+    const { card } = await passedCard(w, wt)
+    const first = git(repo, 'rev-parse', 'main')
+    await reconcileNow(w, repo)
+    const moves = () => factsOf(w, card).filter((f) => f.kind === 'TargetMoved').map((f) => f.data)
+    expect(moves()).toEqual([{ target: 'main', from: null, to: first }])
+    const next = commitIn(repo, 'target.txt')
+    await reconcileNow(w, repo)
+    await reconcileNow(w, repo)
+    expect(moves()).toEqual([
+      { target: 'main', from: null, to: first },
+      { target: 'main', from: first, to: next }
+    ])
+  })
+
+  it("Gone: the card's worktree folder taken away (its branch still there), and a repository gone", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Folder', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    renameSync(wt, `${wt}-away`)
+    await reconcileNow(w, repo)
+    await reconcileNow(w, repo)
+    expect(factsOf(w, card).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'folder' }])
+    // Another workspace: the repository itself gone.
+    const other = await workspace()
+    const c2 = (await inWorkspace(other.w, () => tasks.createTask({ title: 'Repository', project: 'p' }, user))).number
+    await inWorkspace(other.w, () => tasks.updateTask(c2, { column: 'doing', agent: 'a1' }, user))
+    renameSync(join(other.repo, '.git'), join(other.repo, '.git-away'))
+    await reconcileNow(other.w, other.repo)
+    expect(factsOf(other.w, c2).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'repository' }])
+  })
+
+  it("a Done card's target reset while Hive was closed: found at the next open, with no event", async () => {
+    const { w, repo, wt } = await workspace()
+    const { card, head } = await passedCard(w, wt)
+    const before = git(repo, 'rev-parse', 'main')
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await reconcileNow(w, repo)
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+    // A run that checks the Done cards' targets as they are now.
+    await reconcileNow(w, repo)
+    const path = w.path!
+    await w.close()
+    git(repo, 'reset', '-q', '--hard', before)
+    const again = createWorkspaceService()
+    await again.open(path)
+    opened.push(again)
+    await reconcileNow(again, repo)
+    expect(FactStore.forBoard(again, { project: 'p', key: 'p' }).facts(card).find((f) => f.kind === 'LeftTarget')).toMatchObject({ data: { revision: head, target: 'main' } })
   })
 })

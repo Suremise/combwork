@@ -8,6 +8,8 @@
 // run only with the runtime's `reconcileActs`, which P4 turns on; without it, what is observed is recorded and nothing
 // else changes. Every write goes through the runtime's lock (`wf.locked`: the board's change, in the app).
 
+import { statSync } from 'original-fs'
+import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
 import { hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
@@ -35,6 +37,8 @@ function sharedFolderCards(wf: Workflow): CardRecord[] {
 export async function attributeFolder(wf: Workflow): Promise<void> {
   const project = wf.cfg.project
   const cards = sharedFolderCards(wf)
+  // Each card's cycle as read: attribution decided on these is written only while they are still the folder's cards.
+  const cycles = new Map(cards.map((c) => [c.id, wf.state(c).cycle]))
   const line = await G.branch(project)
   if (isUnknown(line) || !line) return
   const head = await G.lineHead(project, line)
@@ -59,16 +63,25 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
     const how = byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed'
     // The folder's record, the card's facts and the cursor in one transaction: a crash keeps all or none of them.
-    await wf.locked(() => wf.store.tx((tx) => {
-      if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return
-      if (card) {
-        const s = foldCard(tx.facts(card.id))
-        tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${c.commit}`, data: { commit: c.commit, how: how as 'trailer' | 'onlyCard' } })
-        // A shared-folder card's revision is its newest commit: working revisions, never an integration.
-        if (UNFINISHED.includes(card.stage) || card.stage === 'todo') tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
-      }
-      tx.setMeta(seenKey, c.commit)
-    }))
+    const kept = await wf.locked(() =>
+      wf.store.tx((tx) => {
+        // The folder's cards as they are now, under the lock (HR4's #1217 round 1): one started, finished or in a new cycle
+        // since they were read, and this attribution (immutable once written) waits: the next run reads from the cursor.
+        const now = sharedFolderCards(wf)
+        if (now.length !== cards.length || now.some((x) => cycles.get(x.id) !== wf.state(x).cycle)) return false
+        if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return true
+        if (card) {
+          const s = foldCard(tx.facts(card.id))
+          tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${c.commit}`, data: { commit: c.commit, how: how as 'trailer' | 'onlyCard' } })
+          // A shared-folder card's revision is its newest commit: working revisions, never an integration.
+          const stage = tx.card(card.id).stage
+          if (UNFINISHED.includes(stage) || stage === 'todo') tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
+        }
+        tx.setMeta(seenKey, c.commit)
+        return true
+      })
+    )
+    if (!kept) return
   }
   await wf.locked(() => wf.store.setMeta(seenKey, head))
 }
@@ -80,6 +93,7 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
 async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<string | null | { unknown: true }>, line: string | null, hooks: ReconcileHooks): Promise<void> {
   // The view this observer read the log at (the fact it follows), then the platform.
   let s = wf.state(card)
+  const cycle = s.cycle
   let now = await read()
   await hooks.afterRead?.()
   let prev = s.lastHeadFact
@@ -88,10 +102,20 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
     if (isUnknown(now)) return
     if (now === from) return
     const to = now as string | null
-    const wrote = await wf.locked(() => wf.store.tx((tx) => tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to } })))
-    if (wrote) return
+    // Written only after the fact it was read after, in the cycle it was read in (HR4's #1217 round 1): a new cycle
+    // since (the card started again) drops it; another fact since is a lost race.
+    const wrote = await wf.locked(() =>
+      wf.store.tx((tx) => {
+        const cur = foldCard(tx.facts(card.id))
+        if (cur.cycle !== cycle) return 'cycle' as const
+        if (cur.lastHeadFact !== prev) return null
+        return tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to } })
+      })
+    )
+    if (wrote === 'cycle' || wrote) return
     // Lost the race: read the winner and the platform now.
     s = wf.state(card)
+    if (s.cycle !== cycle) return
     prev = s.lastHeadFact
     from = s.head
     now = await read()
@@ -115,6 +139,18 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   const o = r.options
   const project = wf.cfg.project
 
+  // Gone (§16.4.4), only for what doesn't exist (an unreadable folder is unknown, not gone): the repository, then the
+  // card's own folder. Recorded once per cycle.
+  const s0 = s
+  if (presence(project) === 'gone' || (presence(join(project, '.git')) === 'gone' && isUnknown(await G.commonDir(project)))) {
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } }))
+    return
+  }
+  if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone') {
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } }))
+  }
+  await observeTarget(wf, card, s)
+
   if (!wf.ownLine(s)) {
     // A shared folder: attribution; its commits are working revisions, never an integration (§16.4.4).
     await attributeFolder(wf)
@@ -124,7 +160,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
     s = wf.state(card)
     const lh = await G.lineHead(project, line)
-    if (lh === null) await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } }))
+    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } }))
   }
 
   card = wf.store.card(card.id)
@@ -149,6 +185,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await G.sameChange(project, approved, { base: b2, revision: s.head }))
       const head = s.head
       await wf.write(card, r, 'hive', (w) => {
+        if (!sameCycle(w, s)) return
         // Observed once per cycle and revision (§16.17): two Hives seeing the same new revision write one fact.
         if (same) {
           observed(w, 'CarriedOver', `carried:${s.cycle}:${head}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
@@ -183,7 +220,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     for (const c of own) if ((await G.isAncestor(project, c, th)) === true) found = found ?? c
     if (!found) return
     const part = found
-    await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'MergedInPart', actor: 'outside', source: 'observed', dedupe: `part:${s.cycle}:${part}`, data: { revision: part, target } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'MergedInPart', actor: 'outside', source: 'observed', dedupe: `part:${s.cycle}:${part}`, data: { revision: part, target } }))
     return
   }
 
@@ -198,7 +235,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     const c = await G.contains(project, target, { base: from, revision, key: s.latest?.key })
     if (isUnknown(c) || !c) return
     const th = await G.lineHead(project, target)
-    await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
     return
   }
 
@@ -210,7 +247,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     const sub = s.latest
     const c = await G.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key })
     const resultIn = await G.isAncestor(project, i.result, th)
-    if (!isUnknown(c) && !c && resultIn === false && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (!isUnknown(c) && !c && resultIn === false && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
   }
 }
 
@@ -219,6 +256,7 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
   const th = await G.lineHead(wf.cfg.project, target)
   const entry = openEntry(s)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
+    if (!sameCycle(w, s)) return
     // Unique per cycle: two Hives observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } })
     if (!f) return
@@ -239,6 +277,7 @@ export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState
   if (isUnknown(now) || now.revision === s.approved?.revision) return
   const r = wf.rulesetOf(card, s)
   await wf.write(card, r, 'outside', (w) => {
+    if (!sameCycle(w, s)) return
     if (!observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })) return
     // P4: what follows from it (#1217: P3 records only).
     if (!wf.cfg.reconcileActs) return
@@ -255,4 +294,44 @@ function observed<K extends 'Stale' | 'CarriedOver'>(w: Write, kind: K, dedupe: 
   const f = w.tx.appendObserved(w.card.id, { kind, actor: 'outside', source: 'observed', dedupe, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data })
   if (f) w.written.push(f as Fact)
   return f
+}
+
+/** Whether the card is still in the cycle an observation was read in (HR4's #1217 round 1): checked under the write's lock. */
+const sameCycle = (w: Write, s: CardState): boolean => w.state().cycle === s.cycle
+
+/** Whether a path exists: `gone` only when it doesn't (ENOENT, ENOTDIR); anything else that stops a look is `unknown`. */
+function presence(path: string): 'there' | 'gone' | 'unknown' {
+  try {
+    statSync(path)
+    return 'there'
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    return code === 'ENOENT' || code === 'ENOTDIR' ? 'gone' : 'unknown'
+  }
+}
+
+/**
+ * The card's target, observed (`TargetMoved`, §16.4.4): its head now against the last one recorded this cycle, read
+ * again under the write's lock from the ref files (a cheap read: no git process), so what is written is the move from the
+ * newest recorded head to the head now. Keyed by the fact it follows: two Hives write each move once; a run that finds
+ * no move writes nothing, and one after a time closed records what changed meanwhile.
+ */
+async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState): Promise<void> {
+  const target = s0.started?.target
+  if (!target) return
+  const common = await G.commonDir(wf.cfg.project)
+  if (isUnknown(common)) return
+  await wf.locked(() =>
+    wf.store.tx((tx) => {
+      const facts = tx.facts(card.id)
+      const s = foldCard(facts)
+      if (s.cycle !== s0.cycle) return
+      const to = G.refSync(common, `refs/heads/${target}`)
+      if (!to) return
+      const last = facts.filter((f) => f.kind === 'TargetMoved' && f.seq > s.cycle && (f.data as FactData['TargetMoved']).target === target).at(-1)
+      const from = last ? (last.data as FactData['TargetMoved']).to : null
+      if (from === to) return
+      tx.appendObserved(card.id, { kind: 'TargetMoved', actor: 'outside', source: 'observed', dedupe: `target:${last?.seq ?? s.cycle}`, data: { target, from, to } })
+    })
+  )
 }

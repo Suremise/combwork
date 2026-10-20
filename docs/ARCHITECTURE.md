@@ -382,9 +382,18 @@ actions and wakes run only with that switch, which the P4 runtime turns on (the 
 reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
 fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
 revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
-(`observeHead`). Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own
-transaction (`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window
-opens another; its watch goes as the workspace closes.
+(`observeHead`). Every delayed observation is written only in the cycle it was read in (`sameCycle`, checked under the
+write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
+never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the
+folder's cards changed since it read them. `TargetMoved` records the card's target from the last head recorded this
+cycle to the head now, read again under the lock from the ref files. `Gone` is recorded for a line, the card's own
+folder and the repository, only for what doesn't exist (`presence`: ENOENT; anything else is unknown). Done cards are
+reconciled when their target moved: an event's line, or a target whose head isn't the one stored as last checked
+(`board_meta` `workflow:<project>:target:<line>`), so a reset while Hive was closed is found at the next open or focus,
+with one read per target. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
+Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
+(`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
+watch goes as the workspace closes.
 
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
