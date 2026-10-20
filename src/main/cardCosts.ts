@@ -4,8 +4,9 @@ import { cardHolds, costCards } from './tasks'
 import { listLanes } from './lanes'
 import { usageHistory } from './usageHistory'
 import { inWorkspace, type WorkspaceService } from './workspace'
+import { cardFacts } from './workflow/cardWork'
 import { projectAgents } from '../shared/defaults'
-import { addPart, cardRounds, emptyPart, mergeSpans, roundPart, sliceSession, subtractSpans, unknownPart, type CardCost, type LaneCost, type SessionSlice, type Span } from '../shared/cardCosts'
+import { addPart, cardRounds, emptyPart, mergeSpans, roundPart, roundSpans, scalePart, sharedSpans, sliceSession, subtractSpans, unknownPart, type CardCost, type CardRoundCosts, type LaneCost, type RoundCost, type SessionSlice, type Span } from '../shared/cardCosts'
 import { holdIsSessions, holdsOfCard, rowsPart, usageFromRows, type LedgerRow, type SessionWho } from '../shared/usageLedger'
 import type { ProviderId, TaskCard, TaskHold } from '../shared/types'
 
@@ -57,6 +58,8 @@ function namedIn(p: HostSessions): (name: string) => string[] {
 }
 
 const holdSpan = (h: TaskHold, now: number): Span => [ms(h.from, now), ms(h.to, now)]
+/** The parts of some spans inside one span. */
+const within = (spans: Span[], span: Span): Span[] => subtractSpans(spans, subtractSpans(spans, [span]))
 
 /**
  * A card's cost: its rows in the history, each session's apart (a part each, as cost per card counts them), its builders'
@@ -148,6 +151,60 @@ export async function cardCosts(ws: WorkspaceService, o: { numbers?: number[]; p
       out.push(costOf(c, rows.get(c.number) ?? [], c.project ? await read(c.project) : null, now))
     }
     return out
+  })
+}
+
+/**
+ * A card's cost per round and role (#1226, #820 item 2), as data: its rounds from its facts (roundSpans), and in each
+ * what each agent's sessions used while it held the card then, in its role (its holds: the builder in Doing, a reviewer
+ * from its review's start to its verdict), shared with the live cards the agent held at the same time, as cost per card
+ * shares it. Split by time from the sessions' timelines, so a round's parts are Hive's (≈) and their sum can differ a
+ * little from the card's total, which stays the ledger's. Reads the card asked for (archived too) and the live cards'
+ * holds; null when there is no such card.
+ */
+export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<CardRoundCosts | null> {
+  return inWorkspace(ws, async () => {
+    const now = Date.now()
+    const work = cardFacts(ws, n)
+    const [card] = await costCards(ws, [n])
+    if (!card) return null
+    const preWorkflow = work?.card.preWorkflow ?? true
+    const spans = roundSpans(work?.facts ?? [], now)
+    if (!spans.length) return { number: n, preWorkflow, rounds: [] }
+    const others = (await cardHolds(ws, { live: true })).filter((c) => c.number !== n)
+    await usageHistory.freshen(ws)
+    const p = card.project ? await (await sessionReader(ws))(card.project) : null
+    const named = p ? namedIn(p) : () => []
+    // The card's holds by agent and role, and each agent's spans on its other live cards (what its time is shared with).
+    const groups = new Map<string, { who: TaskHold; spans: Span[] }>()
+    for (const h of holdsOfCard(card)) {
+      const key = `${h.role} ${h.agent ?? `name:${h.name.toLowerCase()}`}`
+      const g = groups.get(key) ?? { who: h, spans: [] }
+      g.spans.push(holdSpan(h, now))
+      groups.set(key, g)
+    }
+    const isWho = (who: TaskHold) => (h: TaskHold) => (who.agent && h.agent ? h.agent === who.agent : h.name.toLowerCase() === who.name.toLowerCase())
+    const rounds = spans.map((r): RoundCost => {
+      const build = emptyPart()
+      const review = emptyPart()
+      const agents: RoundCost['agents'] = []
+      for (const g of groups.values()) {
+        const held = within(mergeSpans(g.spans), [r.from, r.to])
+        if (!held.length) continue
+        const sessions = p ? p.list.filter((s) => holdIsSessions(g.who, s, named)).map((s) => s.slice) : []
+        let part = emptyPart()
+        if (!sessions.length) part = unknownPart()
+        else {
+          const theirs = others.map((c) => mergeSpans(holdsOfCard(c).filter(isWho(g.who)).map((h) => holdSpan(h, now)))).filter((s) => s.length)
+          for (const [k, pieces] of sharedSpans(held, theirs)) addPart(part, scalePart(usedIn(sessions, pieces), 1 / k))
+        }
+        addPart(g.who.role === 'build' ? build : review, part)
+        agents.push({ agent: g.who.agent ?? null, name: g.who.name, role: g.who.role, part: roundPart(part) })
+      }
+      const iso = (t: number): string => new Date(t).toISOString()
+      return { cycle: r.cycle, round: r.round, from: iso(r.from), to: iso(r.to), submitted: r.submitted === null ? null : iso(r.submitted), verdict: r.verdict, reviewer: r.reviewer, build: roundPart(build), review: roundPart(review), agents }
+    })
+    return { number: n, preWorkflow, rounds }
   })
 }
 

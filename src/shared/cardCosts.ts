@@ -5,6 +5,7 @@ import { TASK_COLUMNS } from './tasks'
 import { reviewRounds } from './laneBar'
 import { costText, money } from './usageTotals'
 import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, type UsageTimeline } from './usageTimeline'
+import type { Fact, FactData } from './workflow/facts'
 
 /**
  * Cost per card and per lane (#602, Darren's decision of 11 Oct). Usage is the card's while an agent held it: its
@@ -339,6 +340,95 @@ export interface LaneCost {
   overhead: CostPart
   /** Its cards that passed or are done. */
   finished: number
+}
+
+/**
+ * One round of a card's work, from its facts (#1226, #820 item 2): from its cycle's start (`Started`, `Adopted`) or the
+ * verdict that failed the round before, to its own verdict, or to now while it goes on (the next cycle's start ends it
+ * too). A pass ends the card's rounds: what follows (its merge) is no round's.
+ */
+export interface RoundSpan {
+  /** The seq of the cycle's start: a card reopened after Done starts its rounds again. */
+  cycle: number
+  round: number
+  from: number
+  to: number
+  /** When its change was submitted (its first submission's time); null while it has none. */
+  submitted: number | null
+  verdict: 'passed' | 'failed' | null
+  /** Its verdict's reviewer (an actor, `agent:<id>`), when it has one. */
+  reviewer: string | null
+}
+
+/** A card's rounds from its facts in seq order; none for a card with no cycle (from before 1.0, or never started). */
+export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
+  const out: RoundSpan[] = []
+  let open: RoundSpan | null = null
+  const time = (f: Fact): number => {
+    const t = Date.parse(f.at)
+    return Number.isFinite(t) ? t : now
+  }
+  const close = (to: number): void => {
+    if (open) out.push({ ...open, to: Math.max(open.from, to) })
+    open = null
+  }
+  for (const f of facts) {
+    if (f.kind === 'Started' || f.kind === 'Adopted') {
+      close(time(f))
+      open = { cycle: f.seq, round: 1, from: time(f), to: now, submitted: null, verdict: null, reviewer: null }
+    } else if (f.kind === 'Submitted' && open) {
+      const d = f.data as FactData['Submitted']
+      if (Number.isInteger(d.round) && d.round > 0) open.round = d.round
+      open.submitted ??= time(f)
+    } else if (f.kind === 'Verdict' && open) {
+      const d = f.data as FactData['Verdict']
+      const cycle: number = open.cycle
+      if (Number.isInteger(d.round) && d.round > 0) open.round = d.round
+      open.verdict = d.pass ? 'passed' : 'failed'
+      open.reviewer = d.reviewer || null
+      const at = time(f)
+      const round: number = open.round
+      close(at)
+      // Failed: the next round, its fixes, starts at the verdict. Passed: no more rounds in this cycle.
+      if (!d.pass) open = { cycle, round: round + 1, from: at, to: now, submitted: null, verdict: null, reviewer: null }
+    }
+  }
+  close(now)
+  return out
+}
+
+/** What one agent used on a card in one round, in a role (the time it held the card then, shared as cost per card shares it). */
+export interface RoundAgentCost {
+  /** Its id, when the hold has one (older holds name the agent only). */
+  agent: string | null
+  name: string
+  role: 'build' | 'review'
+  part: CostPart
+}
+
+export interface RoundCost {
+  cycle: number
+  round: number
+  /** ISO times of its span. */
+  from: string
+  to: string
+  submitted: string | null
+  verdict: 'passed' | 'failed' | null
+  reviewer: string | null
+  build: CostPart
+  review: CostPart
+  /** By agent and role, in the order the card's holds name them. */
+  agents: RoundAgentCost[]
+}
+
+/**
+ * A card's cost per round and role (#1226), as data (no view yet: #820). `rounds` is empty for a card with no rounds:
+ * `preWorkflow` says when that is because it is from before 1.0 (it has no facts to split by).
+ */
+export interface CardRoundCosts {
+  number: number
+  preWorkflow: boolean
+  rounds: RoundCost[]
 }
 
 /** Tokens and requests as whole numbers (a row partly in a span gives fractions). */
