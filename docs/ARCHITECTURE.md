@@ -430,7 +430,9 @@ fields need (`readCardRows`' `columns` and `parts`) and take each field with `ca
 `layout`, so they give what the 0.9 queries over the documents gave. The query columns keep what 0.9's index held where
 readers picked cards by it: `archived` is 1 for `true` or `1`, `ord` is the order as a REAL column held it (a number
 literal in a string as its number). `putCard` replaces the card's child rows for now (row-level writes are #1210);
-`deleteCard` deletes the card and its rows go with it. A board waiting for its upgrade (`Board.legacy`: a `doc`
+`deleteCard` deletes the card and its rows go with it. Every read is one SQLite snapshot (`readSnapshot`, and
+`readCardRows` on its own): a card's row and its child rows are separate statements, and another process committing
+between them would otherwise give a card neither version saved (HR4, #1209 round 1). A board waiting for its upgrade (`Board.legacy`: a `doc`
 column) is read from its documents as before. Tests and the e2e helpers read and write cards through the same module
 (`tests/boardDb.ts`; `tests/e2e/boardRows.cjs`, which loads `cardRows.ts` with Node, so it imports nothing), and
 `tests/boardDb.ts` `as09()` puts a board made by this build back as 0.9 left it.
