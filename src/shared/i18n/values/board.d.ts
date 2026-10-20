@@ -260,9 +260,11 @@ interface HiveMessageValues {
   'board.error.newer': undefined
   'board.error.noBackup': undefined
   'board.error.noWorkspace': undefined
+  'board.error.stopAgentsFirst': undefined
   'board.error.unarchive': undefined
   'board.error.unavailable': { error: string | number }
   'board.error.upgradeFirst': undefined
+  'board.error.upgradeFirstStart': undefined
   'board.export.command': undefined
   'board.export.done': { n: number }
   'board.export.failed': undefined
@@ -407,6 +409,7 @@ interface HiveMessageValues {
   'board.progress.stepOfNamed': { step: number; total: number; name: string | number }
   'board.progress.title': undefined
   'board.progress.waiting': undefined
+  'board.readOnly.newer': undefined
   'board.restore09.done': undefined
   'board.restore09.doneDetail': { file: string | number }
   'board.restore09.message': { when: string | number }

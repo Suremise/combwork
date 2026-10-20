@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
-import { workspaceDb } from './boardStore'
+import { upgradeWaiting, workspaceDb } from './boardStore'
 import { readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openStore, readStore, rowKeys, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
@@ -148,6 +148,8 @@ async function opening(place: SessionsPlace): Promise<StoreData | null> {
   const k = openedKey(place)
   if (opened.has(k)) return null
   const now = readStore(place.workspace, 'sessions', place.scope)
+  // The workspace's upgrade to 1.0 waits (#1207): nothing is moved, and it is asked again once it is upgraded.
+  if (upgradeWaiting(place.workspace)) return now
   if (now.meta.has('exported')) {
     // Not marked opened: asked again at each read until the project is back.
     if (place.removed || removing.has(k)) return now

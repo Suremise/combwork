@@ -8,7 +8,7 @@ import { app } from 'electron'
 import { HIVE_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
-import { backupsOf, DbInUseError, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { emit } from './events'
 import { withFileLock } from './fsutil'
 import { trash } from './trash'
@@ -144,6 +144,8 @@ const M = {
   noWorkspace: msg({ id: 'board.error.noWorkspace', defaultMessage: 'No workspace is open', description: 'An error: the task board needs an open workspace, and there is none.' }),
   newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Hive. It is shown read-only: update Hive to change it.', description: "An error: the workspace's task board was saved by a newer Hive, whose format this version doesn't know; cards can be read but not changed." }),
   upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to Hive 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
+  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Hive couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
+  stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Hive can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Hive, so their sessions couldn't be recorded. Nothing was changed." }),
   inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Hive has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Hive (an older version, or another profile) has the workspace open. Nothing was changed." }),
   noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to Hive 1.0 is kept in the workspace." }),
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
@@ -914,8 +916,39 @@ export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writ
 export function boardState(ws: WorkspaceService): BoardState {
   const path = pathOf(ws)
   const b = boardOf(path)
-  const kept = backupsOf(join(path, HIVE_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID)).at(-1)
+  const kept = copy09(path)
   return { readOnly: b.db.newer !== null ? 'newer' : b.db.pending ? 'upgrade' : null, backup09: kept ? { at: isoOf(kept.at) } : null }
+}
+
+/** The 1.0 group's first version: a copy of the file before it is a 0.9 board. */
+const FIRST_10 = Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === UPGRADE_GROUP_ID).map((m) => m.version))
+
+/**
+ * The newest copy kept from before the board's upgrade to 1.0: of the group's family, and of a version before the group
+ * (by its name; the restore checks the file itself). A copy made before a later step of the group is a 1.0 board's, and
+ * db.ts keeps those with the ordinary copies anyway.
+ */
+const copy09 = (path: string): { file: string; version: number; at: string } | undefined =>
+  backupsOf(join(path, HIVE_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
+    .filter((c) => c.version < FIRST_10)
+    .at(-1)
+
+/**
+ * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
+ * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
+ * all: that is told where it is used.
+ */
+export function upgradeWaiting(workspacePath: string): boolean {
+  try {
+    return !!boardOf(workspacePath).db.pending
+  } catch {
+    return false
+  }
+}
+
+/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without hive.db (an agent's start). */
+export function assertUpgraded(workspacePath: string): void {
+  if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
 }
 
 /** A copy's time as its name has it (`2026-10-20T14-06-21-256Z`), as ISO. */
@@ -934,7 +967,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
   const path = pathOf(ws)
   const key = keyOf(path)
   const out = await withFileLock(boardLock(path), async () => {
-    if (!boardOf(path).db.pending) return { backup: null }
+    const pending = boardOf(path).db.pending
+    if (!pending) return { backup: null }
+    const from09 = pending.from < FIRST_10
     closeBoard(path)
     try {
       openBoard(path, true)
@@ -950,8 +985,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
       boardOf(path)
       throw hiveError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
     }
-    const kept = backupsOf(join(path, HIVE_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID)).at(-1)
-    log.info(`upgraded the board of ${userText(path)} to 1.0; the 0.9 board is kept as ${kept ? basename(kept.file) : '(no copy)'}`)
+    // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
+    const kept = from09 ? copy09(path) : undefined
+    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}); ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
     return { backup: kept?.file ?? null }
   })
   emit({ type: 'tasks-changed', workspacePath: path })
@@ -964,15 +1000,19 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
  * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Hive has the workspace open:
  * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
  */
-export async function restoreBoardBackup(ws: WorkspaceService): Promise<{ saved: string; restored: string }> {
+export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
   const path = pathOf(ws)
   const hive = join(path, HIVE_DIR)
   const file = join(hive, DB_FILE)
   const out = await withFileLock(boardLock(path), async () => {
-    const kept = backupsOf(join(hive, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID)).at(-1)
-    if (!kept) throw hiveError(M.noBackup, undefined, { kind: 'conflict' })
-    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    // Opened first: an open is what upgrades it (a test copy's answer), and so makes its copy.
     const version = schemaVersion(boardOf(path).db.reader)
+    const kept = copy09(path)
+    // The file itself, not only its name: a 0.9 board, which a 0.9 Hive can change again.
+    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw hiveError(M.noBackup, undefined, { kind: 'conflict' })
+    // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
+    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
     closeBoard(path)
     let saved: string
     try {

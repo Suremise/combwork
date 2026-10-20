@@ -2,6 +2,7 @@ import { randomUUID, randomBytes } from 'crypto'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
+import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { folderChanging, folderSteady } from './folderFence'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
@@ -1021,6 +1022,12 @@ class SessionManager {
     return [...this.live.values()].map((l) => l.state)
   }
 
+  /** How many agents of a workspace (its projects', its worktrees', its Assistant's) run or are starting. */
+  agentsIn(workspacePath: string): number {
+    const mine = (p: string): boolean => workspaceFor(p)?.path?.toLowerCase() === workspacePath.toLowerCase()
+    return [...this.live.values()].filter((l) => mine(l.state.projectPath)).length + [...this.starting.values()].filter((p) => mine(p.projectPath)).length
+  }
+
   /** One agent's session; without agentId, the project's first running agent's. */
   liveFor(projectPath: string, agentId?: string): LiveSessionState | null {
     if (agentId) return this.live.get(liveId(projectPath, agentId))?.state ?? null
@@ -1217,10 +1224,14 @@ class SessionManager {
 
   /**
    * Refuses a start while Hive quits, while the project's workspace is closing or switching, or while a fence holds the
-   * project (it is being removed, or a template is replacing its agents), or while its workspace's move is being repaired.
+   * project (it is being removed, or a template is replacing its agents), while its workspace's move is being repaired,
+   * or while its workspace's upgrade to 1.0 waits.
    */
   private assertStartsAllowed(projectPath: string): void {
     if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Hive is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Hive is quitting, or its workspace is closing.' }))
+    // Its workspace's upgrade to 1.0 waits (#1207): hive.db takes no writes, so the session couldn't be recorded.
+    const ws = workspaceFor(projectPath)?.path
+    if (ws) assertUpgraded(ws)
     if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Hive is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }))
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)
     if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why })

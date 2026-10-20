@@ -198,7 +198,10 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
     const steps = todo.slice(i, end)
     const pending: PendingGroup = { group, from: schemaVersion(db), to: steps[steps.length - 1].version }
     if (opts.approve && !opts.approve(pending)) return pending
-    runGroup(db, file, opts, pending, groupBackupFamily(family, group), () => steps.forEach(run))
+    // The copy before the group's first step is kept for good (the way back); one before a later step of it (a file in the
+    // group already) is an ordinary copy, of the file's own three.
+    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
+    runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run))
     // The group's copy is the file before every step after it too.
     copied = true
     i = end
@@ -212,7 +215,7 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
  * check, a copy kept for good, then every step in one transaction (a failure or a crash leaves the file before the group).
  * The lock goes back to NORMAL after, whatever happened. Another connection holding the file: DbInUseError, nothing changed.
  */
-function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, family: string, steps: () => void): void {
+function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, keptFamily: string | null, family: string, steps: () => void): void {
   db.exec('PRAGMA locking_mode = EXCLUSIVE')
   try {
     db.exec(`PRAGMA busy_timeout = ${GROUP_LOCK_WAIT_MS}`)
@@ -228,13 +231,23 @@ function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: Pe
       db.exec('PRAGMA busy_timeout = 5000')
     }
     opts.beforeGroup?.(pending)
-    if (opts.backupDir) backupTo(db, opts.backupDir, family, pending.from, new Date(), true)
+    if (opts.backupDir) backupTo(db, opts.backupDir, keptFamily ?? family, pending.from, new Date(), !!keptFamily)
     transaction(db, steps)
     opts.whileGroupLocked?.()
   } finally {
     db.exec('PRAGMA locking_mode = NORMAL')
     // The lock is let go at the file's next use.
     db.prepare('SELECT count(*) FROM sqlite_master').get()
+  }
+}
+
+/** The schema version of a database file, read on a connection of its own (read-only; a copy, say). */
+export function fileSchemaVersion(file: string): number {
+  const db = new DatabaseSync(file, { readOnly: true, timeout: GROUP_LOCK_WAIT_MS })
+  try {
+    return schemaVersion(db)
+  } finally {
+    db.close()
   }
 }
 

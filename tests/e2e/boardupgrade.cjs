@@ -22,6 +22,7 @@ const oldProfile = path.join(lib.WORK, 'boardupgrade-old')
 const ws = path.join(lib.WORK, 'boardupgrade-ws')
 const shots = path.join(lib.WORK, 'boardupgrade-shots')
 const held = path.join(lib.WORK, 'boardupgrade-held.txt')
+const claudeHome = path.join(lib.WORK, 'boardupgrade-claude')
 const alpha = path.join(ws, 'alpha')
 const dbFile = path.join(ws, '.hive', 'hive.db')
 const backups = path.join(ws, '.hive', 'backups')
@@ -89,6 +90,18 @@ async function startOld(old, mayFail = false) {
 const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
 
 const dialogWith = (page, text) => page.locator('.dialog', { hasText: text })
+/** The dev build's running sessions. */
+const live = (h) => h.inv('session:live')
+
+/** An agent's start refused, saying why, before anything starts: no session running, none recorded. */
+async function refusesStart(h, when) {
+  const why = await failure(h.inv('session:start', alpha, { agentId: 'a-coder' }))
+  check(`${when}, the agent is refused a start, saying why`, /upgrade it to 1\.0 before starting agents/.test(why ?? ''), why ?? 'started')
+  check(`…none runs (${when})`, (await live(h)).length === 0)
+  // The 0.9 board has none (the one run in step 5 is in the 1.0 board, kept aside by the restore).
+  const records = await h.inv('session:list', alpha)
+  check(`…and none was recorded (${when})`, records.length === 0, JSON.stringify(records.map((r) => r.id)))
+}
 const ASK = "Upgrade this workspace's board to 1.0?"
 
 /** Screenshots of what is on screen in both themes, back to dark after. */
@@ -124,13 +137,16 @@ async function themes(dev, name) {
     check('0.9 made the board at its schema (v2)', fileVersion() === 2, String(fileVersion()))
 
     // 2. The dev build opens it: asked first.
-    const dev = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 } })
+    // The fake Claude Code for the project's agent: what may start, and when.
+    fs.mkdirSync(devProfile, { recursive: true })
+    const claude = lib.fakeClaude(devProfile, claudeHome, [alpha])
+    const dev = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: claude })
     open.add(dev)
     dev.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(dev.inv, dev.page, ws)
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
-    check('…saying a 0.9 Hive can then open it read-only and a backup is kept', /A 0\.9 Hive can then open it read-only\. A backup is kept\./.test(await ask.innerText().catch(() => '')))
+    check('…saying why, that a 0.9 Hive can then only open it read-only, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Hive can then only open it read-only; a backup is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     await themes(dev, '1-ask')
 
     // 3. Upgrade while the 0.9 Hive has it open: refused, nothing changed.
@@ -142,10 +158,16 @@ async function themes(dev, name) {
 
     // 4. Not Now: read-only, with the banner.
     await ask.getByRole('button', { name: 'Not Now', exact: true }).click()
-    await dev.page.locator('.activity-btn[aria-label="Task Board"]').click()
     const banner = dev.page.locator('.board-upgrade')
-    check('Not Now leaves a banner above the board', !!(await lib.until(async () => (await banner.count()) === 1 && (await ask.count()) === 0, HUNG_MS)))
-    check("…which says it's read-only until upgraded", /read-only here until it is upgraded to 1\.0/.test(await banner.innerText().catch(() => '')))
+    // On every view, not only the board's: here the project's Session view.
+    check('Not Now leaves a banner at the top of the window', !!(await lib.until(async () => (await banner.count()) === 1 && (await ask.count()) === 0, HUNG_MS)))
+    check("…which says the board is read-only and agents can't start", /its board is read-only here and its agents can't start/.test(await banner.innerText().catch(() => '')), await banner.innerText().catch(() => ''))
+    await dev.page.screenshot({ path: path.join(shots, '3-banner-session.png') })
+    await refusesStart(dev, 'while the upgrade waits')
+    await dev.page.locator('.activity-btn[aria-label="Task Board"]').click()
+    check('the banner is there above the board too', !!(await lib.until(async () => (await banner.count()) === 1 && (await dev.page.locator('.board-toolbar').count()) === 1, HUNG_MS)))
+    const newCard = dev.page.locator('.board-toolbar .btn.primary', { hasText: 'New Card' })
+    check('…and New Card is off, saying why', (await newCard.isDisabled()) && /until it is upgraded to 1\.0, its board is read-only here/.test((await newCard.getAttribute('title')) ?? ''))
     await themes(dev, '3-banner')
     const refusedWrite = await failure(dev.inv('tasks:create', { title: 'Too soon', project: 'alpha' }))
     check('the dev build refuses a change meanwhile', /read-only until it is upgraded to 1\.0/.test(refusedWrite ?? ''), refusedWrite ?? 'accepted')
@@ -158,8 +180,10 @@ async function themes(dev, name) {
     check('with the 0.9 Hive closed, the upgrade runs', !!(await lib.until(async () => (await ask.count()) === 0 && (await dev.page.locator('.toast', { hasText: 'Board upgraded to 1.0' }).count()) === 1, HUNG_MS)))
     check('…the file moved on from v2', fileVersion() > 2, String(fileVersion()))
     check('…the 0.9 copy kept', copiesOf('hive-before-1.0-v2-').length === 1, String(copiesOf('hive-before')))
-    check('…the banner gone', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
+    check('…the banner gone, New Card on again', !!(await lib.until(async () => (await banner.count()) === 0 && !(await newCard.isDisabled()), HUNG_MS)))
     check('…and the board takes changes', (await failure(dev.inv('tasks:create', { title: 'Made in 1.0', project: 'alpha' }))) === null)
+    const startFailed = await failure(dev.inv('session:start', alpha, { agentId: 'a-coder' }))
+    check('…and its agent starts', startFailed === null && !!(await lib.until(async () => (await live(dev)).length === 1, HUNG_MS)), startFailed ?? 'not live')
     const markers = fs.readdirSync(path.join(ws, '.hive', 'open'))
     check('the dev build marks the workspace open (.hive/open)', markers.length === 1 && /^boardupgrade-dev-[0-9a-f]{8}\.json$/.test(markers[0]), String(markers))
 
@@ -174,7 +198,12 @@ async function themes(dev, name) {
     await old2.page.screenshot({ path: path.join(shots, '4-old-after.png') })
     await close(old2)
 
-    // 7. Help → Restore the 0.9 Board Backup….
+    // 7. Help → Restore the 0.9 Board Backup…: not while the agent runs (it would go on unrecorded).
+    const whileRunning = await failure(dev.inv('board:restore09'))
+    check('Restore is refused while an agent runs', /Stop this workspace's agents and its Assistant first/.test(whileRunning ?? ''), whileRunning ?? 'restored')
+    check('…nothing changed', fileVersion() > 2 && copiesOf('hive-before-restore-').length === 0)
+    await dev.inv('session:stop', alpha, 'a-coder')
+    check('the agent stopped', !!(await lib.until(async () => (await live(dev)).length === 0, HUNG_MS)))
     await dev.page.locator('.menubar-item', { hasText: 'Help' }).click()
     await lib.menuEntry(dev.page, 'Restore the 0.9 Board Backup…').click()
     const restore = dialogWith(dev.page, 'Restore the 0.9 board backup?')
@@ -185,6 +214,7 @@ async function themes(dev, name) {
     check('…the file at v2 again', fileVersion() === 2, String(fileVersion()))
     check('…the 1.0 board kept, and the 0.9 copy still there', copiesOf('hive-before-restore-').length === 1 && copiesOf('hive-before-1.0-').length === 1)
     check('…and the dev build is read-only again, with its banner', !!(await lib.until(async () => (await banner.count()) === 1, HUNG_MS)))
+    await refusesStart(dev, 'after the restore')
     await close(dev)
     check('the dev build removed its marker as it closed', fs.readdirSync(path.join(ws, '.hive', 'open')).length === 0)
     const old3 = await startOld(old)
@@ -194,7 +224,7 @@ async function themes(dev, name) {
     await close(old3)
 
     // 8. A 0.9 Hive started during the upgrade: the dev build holds the lock (its main thread waits) while it starts.
-    const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { HIVE_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
+    const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { ...claude, HIVE_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
     open.add(dev2)
     await lib.openWorkspace(dev2.inv, dev2.page, ws)
     const ask2 = dialogWith(dev2.page, ASK)

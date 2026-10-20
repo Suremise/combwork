@@ -588,7 +588,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:takeRemovedData': (p, keep) => removal.takeRemovedData(p, keep),
     'board:state': () => boardState(currentWorkspace()),
     'board:upgrade': () => upgradeBoard(currentWorkspace()),
-    'board:restore09': () => restoreBoardBackup(currentWorkspace()),
+    'board:restore09': () => {
+      const ws = currentWorkspace()
+      return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
+    },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:export': async () => {
       // The board as this window shows it now; the files go in a folder of their own inside the one chosen.

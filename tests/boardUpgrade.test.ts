@@ -12,10 +12,12 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
+const { sessions } = await import('../src/main/sessions')
+const storeRows = await import('../src/main/storeRows')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
-const { BACKUPS_KEPT, DbInUseError, openDb, schemaVersion } = await import('../src/main/db')
+const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
 type Step = { version: number; name: string; group?: string; up: (d: DatabaseSync) => void }
@@ -124,6 +126,34 @@ describe('a group of steps (db.ts)', () => {
     const after = readdirSync(f.backups)
     expect(after.filter((x) => x.startsWith('x-v'))).toHaveLength(BACKUPS_KEPT)
     expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual(kept)
+  })
+
+  it("a later step of the group on a file in it already: an ordinary copy, never another 'before the group' one (#1207 round 1)", () => {
+    const f = at09()
+    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
+    const asked: unknown[] = []
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
+    try {
+      expect(asked).toEqual([{ group: '1.0', from: 4, to: 5 }])
+      expect(schemaVersion(db.writer)).toBe(5)
+    } finally {
+      db.close()
+    }
+    const after = readdirSync(f.backups)
+    expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual([expect.stringMatching(/^x-before-1\.0-v2-/)])
+    expect(after.filter((x) => x.startsWith('x-v4-'))).toHaveLength(1)
+  })
+
+  it('a file made in 1.0 (every step unasked) gets no copy kept for good when a later step of the group comes', () => {
+    const f = fileIn()
+    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups }).close()
+    const raw = new DatabaseSync(f.file)
+    raw.exec('INSERT INTO a VALUES (2)')
+    raw.close()
+    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
+    openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: () => true }).close()
+    expect(readdirSync(f.backups).filter((x) => x.includes('before-1.0'))).toEqual([])
   })
 
   it('is refused while another connection has the file open, changing nothing; runs once it has closed', () => {
@@ -300,10 +330,10 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   it('Restore the 0.9 Board Backup puts the copy back after keeping the 1.0 board; upgrading again works', async () => {
     const ws = await board09()
     const w = await open(ws)
-    await expect(inWorkspace(w, () => store.restoreBoardBackup(w))).rejects.toThrow('There is no 0.9 board backup')
+    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('There is no 0.9 board backup')
     await inWorkspace(w, () => store.upgradeBoard(w))
     await inWorkspace(w, () => tasks.createTask({ title: 'Made in 1.0', project: 'p' }, user))
-    const { saved, restored } = await inWorkspace(w, () => store.restoreBoardBackup(w))
+    const { saved, restored } = await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
     // Back to what 0.9 had, read-only here until upgraded again.
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
     expect(await titles(w)).toEqual(['From 0.9'])
@@ -328,12 +358,91 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     const other = new DatabaseSync(store.boardFile(ws))
     other.prepare('SELECT count(*) FROM cards').get()
     try {
-      await expect(inWorkspace(w, () => store.restoreBoardBackup(w))).rejects.toThrow('close it first')
+      await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('close it first')
     } finally {
       other.close()
     }
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
     expect(await titles(w)).toEqual(['From 0.9', 'Made in 1.0'])
+    await close(w)
+  })
+})
+
+describe('while the upgrade waits, nothing needing hive.db starts or writes (#1207 round 1)', () => {
+  it('an agent is refused before anything starts, saying why; it starts once upgraded', async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
+    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents')
+    expect(sessions.agentsIn(ws)).toBe(0)
+    // The Assistant's home is in the workspace: refused the same way.
+    await expect(inWorkspace(w, () => sessions.start(join(ws, '.hive', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(store.upgradeWaiting(ws)).toBe(false)
+    expect(() => store.assertUpgraded(ws)).not.toThrow()
+    await close(w)
+  })
+
+  it("a store's file isn't moved in meanwhile (no write): read from the database, left in place, moved in once upgraded", async () => {
+    const ws = await board09()
+    const p = join(ws, 'p')
+    const old = { version: 1, sessions: [{ id: 's1', agent: 'claude-code', name: 'From 0.9', createdAt: '2026-10-19T10:00:00.000Z', lastActiveAt: '2026-10-19T10:00:00.000Z', archived: false }] }
+    writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify(old))
+    const w = await open(ws)
+    const read = await inWorkspace(w, () => workspace.sessionsFile(p))
+    expect(read.sessions).toEqual([])
+    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(true)
+    // A store's open the same way: nothing moved, nothing marked.
+    const probe = join(ws, '.hive', 'never-a-store.json')
+    writeFileSync(probe, '[]')
+    const data = await storeRows.openStore(ws, 'watches', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
+    expect(data.rows).toEqual([])
+    expect(data.meta.has('imported')).toBe(false)
+    expect(existsSync(probe)).toBe(true)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect((await inWorkspace(w, () => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['s1'])
+    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    await close(w)
+  })
+
+  it('Restore is refused while agents of the workspace run or start, nothing changed', async () => {
+    const ws = await board09()
+    store.boardTestHooks.upgradeAnswer = 'yes'
+    const w = await open(ws)
+    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 1))).rejects.toThrow("Stop this workspace's agents and its Assistant first")
+    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBeGreaterThan(2)
+    await close(w)
+  })
+
+  it("Restore puts back the 0.9 board's copy, never a later 1.0 copy of the group's family (#1207 round 1)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    const dir = join(hiveOf(ws), 'backups')
+    const [v2] = readdirSync(dir).filter((x) => x.startsWith('hive-before-1.0-v2-'))
+    // A later copy of the family, of a 1.0 board (as round 1 made one before a later step of the group), named newer.
+    const raw = new DatabaseSync(store.boardFile(ws))
+    raw.prepare('VACUUM INTO ?').run(join(dir, 'hive-before-1.0-v3-2099-01-01T00-00-00-000Z.db'))
+    raw.close()
+    const at = v2.replace(/^hive-before-1\.0-v2-(.*)\.db$/, '$1').replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
+    expect(inWorkspace(w, () => store.boardState(w)).backup09?.at).toBe(at)
+    const { restored } = await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+    expect(restored.endsWith(v2)).toBe(true)
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(2)
+    await close(w)
+  })
+
+  it("Restore refuses a copy named as 0.9's whose file isn't a 0.9 board", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    const dir = join(hiveOf(ws), 'backups')
+    const raw = new DatabaseSync(store.boardFile(ws))
+    raw.prepare('VACUUM INTO ?').run(join(dir, 'hive-before-1.0-v2-2099-01-01T00-00-00-000Z.db'))
+    raw.close()
+    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('There is no 0.9 board backup')
+    expect(fileSchemaVersion(store.boardFile(ws))).toBeGreaterThan(2)
     await close(w)
   })
 })
