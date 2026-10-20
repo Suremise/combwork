@@ -101,6 +101,26 @@ describe('roundSpans on the facts the runtime writes (#1226)', () => {
       [2, null, []]
     ])
   })
+  it('a card reopened after a fail: its new cycle is one round, numbered as the runtime counts on (HR1 round 2)', async () => {
+    const e = pair()
+    const { card } = await startedCard(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'first' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'no' }))
+    moved(await e.wf.move(card.key, 'done', 'user', { confirm: true, reason: 'close' }))
+    moved(await e.wf.move(card.key, 'todo', 'user'))
+    const restart = await e.wf.start(card.key, B1)
+    moved(restart)
+    commit(restart.data!.folder as string, { 'src/a.txt': 'reopened\n' }, 'reopened work')
+    moved(await e.wf.submit(card.key, B1, { summary: 'reopened' }))
+    const log = e.store.facts(card.id)
+    const start = log.findLast((f) => f.kind === 'Started')!
+    expect((log.findLast((f) => f.kind === 'Submitted')!.data as { round: number }).round).toBe(2)
+    const again = rounds(e, card.id).filter((r) => r.cycle === start.seq)
+    // Its building before the submission and the review after it are the same round, 2: no invented round 1.
+    expect(again.map((r) => [r.round, r.submitted !== null, r.verdict])).toEqual([[2, true, null]])
+    expect(again[0].from).toBe(Date.parse(start.at))
+  })
 })
 
 describe('roundSpans in time (#1226)', () => {

@@ -345,7 +345,8 @@ export interface LaneCost {
 /**
  * One round of a card's work, from its facts (#1226, #820 item 2). Rounds follow the card's submissions: a submission's
  * round is its `Submitted.round`, and a verdict counts for the round of the submission it names (never its own `round`,
- * which counts failures). Round 1 begins at its cycle's start (`Started`, `Adopted`); round k+1 at the first failed
+ * which counts failures). A cycle's first round begins at its start (`Started`, `Adopted`), numbered by its first
+ * submission (a reopened card's runtime counts its rounds on: its new cycle may begin at round 2); round k+1 at the first failed
  * verdict on round k (its fixes begin there), or at its own first submission if no verdict failed it (a stale pass sent
  * back). A pass ends nothing by itself (a second reviewer may still review, a later verdict may fail it): the card's work
  * pauses while its stage is past Review or not yet started (Approved, Merging, Done, Hold, Todo, from its `Moved` facts)
@@ -375,7 +376,9 @@ const ADOPTED_STAGE: Record<string, StageId> = { doing: 'active', review: 'revie
 /** A card's rounds from its facts in seq order; none for a card with no cycle (from before 1.0, or never started). */
 export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
   const out: RoundSpan[] = []
-  type Cycle = { seq: number; rounds: Map<number, RoundSpan>; current: number; since: number | null; subs: Map<number, number> }
+  // `numbered`: its first round has its number, from its first submission (or a verdict); until then that round is the
+  // work before it, whatever number the submission gives (the runtime counts rounds on across a reopened card's cycles).
+  type Cycle = { seq: number; rounds: Map<number, RoundSpan>; current: number; since: number | null; subs: Map<number, number>; numbered: boolean }
   let cyc: Cycle | null = null
   const time = (f: Fact): number => {
     const t = Date.parse(f.at)
@@ -417,7 +420,7 @@ export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
     const t = time(f)
     if (f.kind === 'Started' || f.kind === 'Adopted') {
       finish(t)
-      const c: Cycle = { seq: f.seq, rounds: new Map(), current: 1, since: null, subs: new Map() }
+      const c: Cycle = { seq: f.seq, rounds: new Map(), current: 1, since: null, subs: new Map(), numbered: false }
       roundOf(c, 1)
       const from = f.kind === 'Started' ? 'active' : (ADOPTED_STAGE[(f.data as FactData['Adopted']).adoptedFrom ?? 'doing'] ?? 'active')
       if (WORKED.has(from)) resume(c, t)
@@ -433,6 +436,14 @@ export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
       const d = f.data as FactData['Submitted']
       const k = Number.isInteger(d.round) && d.round > 0 ? d.round : c.current
       c.subs.set(f.seq, k)
+      if (!c.numbered && k !== c.current) {
+        // The cycle's first submission numbers the work before it: one round, never an invented round 1.
+        const first = roundOf(c, c.current)
+        c.rounds.delete(c.current)
+        c.rounds.set(k, { ...first, round: k })
+        c.current = k
+      }
+      c.numbered = true
       begin(c, k, t)
       resume(c, t)
       const r = roundOf(c, k)
@@ -440,6 +451,7 @@ export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
     } else if (f.kind === 'Verdict') {
       const d = f.data as FactData['Verdict']
       const k = c.subs.get(d.submission) ?? c.current
+      c.numbered = true
       const r = roundOf(c, k)
       if (d.reviewer && !r.reviewers.includes(d.reviewer)) r.reviewers.push(d.reviewer)
       if (d.pass) r.verdict ??= 'passed'
