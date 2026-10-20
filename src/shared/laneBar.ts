@@ -1,6 +1,7 @@
 import { msg } from './i18n/msg'
 import { columnName, type Tr } from './tasks'
 import type { LaneCard, LaneState, TaskCard, TaskColumn } from './types'
+import type { WorkBadge } from './workflow/workView'
 
 /**
  * A lane in the Progress panel (#484): a segmented bar, one equal-width segment per card in the lane's order, coloured
@@ -118,6 +119,32 @@ function whereText(column: TaskColumn, round: number | null, how: 'failed' | 'in
   if (how === 'failed') return tr(msg({ id: 'board.lane.roundFailed', defaultMessage: '{where}, round {round} failed review', description: "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Review\"), and that its review round {round} failed." }), { where, round })
   if (how === 'in-round') return tr(msg({ id: 'board.lane.inRound', defaultMessage: '{where}, round {round}', description: "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Doing\" or \"Review\") and the review round it is in ({round}, a number)." }), { where, round })
   return tr(msg({ id: 'board.lane.afterRound', defaultMessage: '{where} in round {round}', description: "Where a lane's finished card is, in its segment's label (Progress panel): its column ({where}, \"Passed\" or \"Done\") and the review round it passed in ({round}, a number above 1)." }), { where, round })
+}
+
+/**
+ * What a card's facts say of its work (#1225), a line each under its segment's label in the hover: the revision under
+ * review (or its revision), the last verdict and on which revision (and that it no longer counts), the checks on that
+ * revision, and its merge commit once Done: its `Integrated` fact's, else the lane's own record of its merge. Revisions
+ * through the project's platform (`short`, revisionShort). Nothing for a card with no work recorded.
+ */
+export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMerge: string | null, short: (id: string) => string, tr: Tr): string[] {
+  const out: string[] = []
+  if (b?.revision) out.push(tr(msg({ id: 'board.lane.workRevision', defaultMessage: '{review, select, yes {Under review: {revision}} other {Revision: {revision}}}', description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }), { review: b.stage === 'review' ? 'yes' : 'no', revision: short(b.revision) }))
+  if (b?.verdict)
+    out.push(
+      tr(
+        msg({
+          id: 'board.lane.workVerdict',
+          defaultMessage: '{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}',
+          description: "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are."
+        }),
+        { pass: b.verdict.pass ? 'yes' : 'no', revision: b.verdict.revision ? short(b.verdict.revision) : 'none', current: b.verdict.current ? 'yes' : 'no' } // i18n-ignore: select keys, never shown
+      )
+    )
+  if (b && b.checks.passed + b.checks.failed > 0) out.push(tr(msg({ id: 'board.lane.workChecks', defaultMessage: 'Checks on it: {passed, number} passed, {failed, number} failed', description: "A line in a lane segment's hover (Progress panel): how many of the checks on the card's revision passed and failed (each check's latest run that counted)." }), { passed: b.checks.passed, failed: b.checks.failed }))
+  const merge = b?.merged ?? (state === 'done' ? laneMerge : null)
+  if (merge && state === 'done') out.push(tr(msg({ id: 'board.lane.workMerged', defaultMessage: 'Merged as {commit}', description: "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)." }), { commit: /^[0-9a-f]{12,}$/i.test(merge) ? short(merge) : merge }))
+  return out
 }
 
 /** A card segment's accessible name: its label and its notes (#706). */
