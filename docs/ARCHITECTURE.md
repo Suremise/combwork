@@ -326,6 +326,15 @@ connection marks the board change (`boardChanged`), so an observed fact tells th
 Agent API's card gains `stage` after the document's fields (`boardStore.cardStages`: the row's stage, else its
 column's), and `GET /v1/tasks/:n/facts` gives a card's facts as short rows (`factRow`), whole with `view=full`.
 
+**Runs as checks** (#1222, `workflow/runChecks.ts`). A progress run for a card is bracketed: `POST /v1/progress/resolve`
+(before hive-progress starts the command; a start through the Agent API, at its start) reads what it is checked against
+(`checkStart`: the folder settled in the write log first, then its start time, `git status`, and a stat snapshot of its
+tracked files and reflog; None: the card's declared paths' revision and the deliverables' snapshot), kept by the link
+until the run starts, then by the run's id (at most 200 at once). Its finish (`checkEnd`) reads the end and writes
+`CheckRan` in the card's facts inside a board change, counted or with why not (the rules in the module's header; the
+write log decides "nothing changed", the snapshots where its record isn't complete), and the run keeps how it counted
+(`ProgressRun.counts`) for its details. In a shared folder the card's revision is its newest attributed commit.
+
 **The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
 `Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at
 once), each repository and folder watched once however many projects share it:

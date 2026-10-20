@@ -134,7 +134,9 @@ const check = (name, ok, extra = '') => {
   // shows "#N · a3f2c1d" under the agent (the card opens it), and its details the card and the whole revision.
   const gitIn = (...a) => require('child_process').execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.baseEnv(), encoding: 'utf8' }).trim()
   fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 2\n')
-  gitIn('add', 'b.ts')
+  // What the checks below write is ignored (#1222: an ignored output doesn't count against a check).
+  fs.writeFileSync(path.join(alpha, '.gitignore'), 'check-ran.txt\n')
+  gitIn('add', 'b.ts', '.gitignore')
   gitIn('commit', '-qm', 'second')
   const head = gitIn('rev-parse', 'HEAD')
   const card = await inv('tasks:create', { title: 'Run for a card', project: 'alpha', agent: builder.id, column: 'doing' })
@@ -172,6 +174,33 @@ const check = (name, ok, extra = '') => {
   const checked = await shell(builder.id, 'hive-progress --check quick')
   const quick = (await runs()).find((r) => !known.includes(r.id) && r.check === 'quick')
   check("--check runs the project's command for it, titled by its name", checked?.code === 0 && fs.readFileSync(path.join(alpha, 'check-ran.txt'), 'utf8') === 'yes' && quick?.title === 'quick' && quick?.card === card.number && quick?.state === 'passed', JSON.stringify({ checked, quick }))
+
+  // --- Runs as checks (#1222): the --check run is a check of the card's revision in its facts, counted, and its details
+  // say so; a check that edits a tracked file while it runs (undone before it ends) is recorded, not counted.
+  const work = () => inv('tasks:work', card.number)
+  const counted = await until(async () => (await work())?.checks.find((c) => c.run === quick?.id), 10000)
+  check("…and is the card's check of its revision, counted", counted?.counted === true && counted.name === 'quick' && counted.revision === head && counted.tested === head && counted.result === 'passed', JSON.stringify({ counted, status: gitIn('status', '--porcelain') }))
+  const quickRow = panel.locator(`.progress-run[data-run="${quick?.id}"]`)
+  await quickRow.locator('.progress-title').click()
+  const quickDetails = async () => (await quickRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
+  check('…and its details say it counts as the check', !!(await until(async () => (await quickDetails()).includes('CheckCounts as check: quick'), 10000)), await quickDetails())
+  pj.workflow.options.commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
+  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  known = (await runs()).map((r) => r.id)
+  const edited = await shell(builder.id, 'hive-progress --check edit')
+  const editRun = (await runs()).find((r) => !known.includes(r.id) && r.check === 'edit')
+  const notCounted = await until(async () => (await work())?.checks.find((c) => c.run === editRun?.id), 10000)
+  check('a check that edits a tracked file while it runs is recorded, not counted (changed)', edited?.code === 0 && notCounted?.counted === false && notCounted.whyNot === 'changed', JSON.stringify({ edited, notCounted }))
+  const editRow = panel.locator(`.progress-run[data-run="${editRun?.id}"]`)
+  await editRow.locator('.progress-title').click()
+  const editDetails = async () => (await editRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
+  check('…and its details say why', !!(await until(async () => (await editDetails()).includes("Doesn't count as check edit: files changed in the folder while it ran"), 10000)), await editDetails())
+  for (const theme of ['light', 'dark']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 10000)
+    await page.screenshot({ path: path.join(lib.WORK, `progressreport-check-${theme}.png`) })
+  }
+
   const unknown = await shell(builder.id, 'hive-progress --check lint')
   check('…and with no command for the name, runs nothing and says so', unknown?.code === 2 && /no command configured for the check "lint"/.test(unknown?.stderr ?? ''), JSON.stringify(unknown))
   await inv('tasks:update', card.number, { column: 'todo' }).catch(() => undefined)
