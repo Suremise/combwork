@@ -95,6 +95,8 @@
   "tips.cardReadFirst.title": "Aponte para um cartão os documentos de que ele precisa",
   "tips.cardSummaries.text": "Os agentes começam o relatório ou o veredito de revisão de um cartão com uma linha que diz o que está pronto ou o que foi encontrado, com os detalhes abaixo; eles e o Assistente leem só essas linhas quando isso basta.",
   "tips.cardSummaries.title": "Relatórios começam pelo essencial",
+  "tips.cliOverrides.text": "O Hive muda um pouco o comportamento de cada CLI nas sessões dele, como o Copilot não se atualizar sozinho ou o título do terminal do Codex. Cada mudança pode ser desativada em Configurações → Avançado, sob a CLI dela, que diz o que o Hive não consegue mais fazer sem ela.",
+  "tips.cliOverrides.title": "Mantenha uma CLI como ela é fora do Hive",
   "tips.closeWindow.text": "Com várias janelas abertas, Arquivo → Fechar janela ({key}) fecha só esta, como o X dela. Sair do Hive (todas as janelas) fecha todas as janelas e para todos os agentes delas.",
   "tips.closeWindow.title": "Feche uma janela, ou todas",
   "tips.commandName": "“{command}”",

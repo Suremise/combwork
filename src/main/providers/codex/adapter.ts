@@ -26,6 +26,7 @@ import { parseCodexModels } from './models'
 import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
+import { overrides } from '../../advancedValues'
 
 const log = createLogger('codex')
 
@@ -591,7 +592,8 @@ export class CodexAdapter implements ProviderAdapter {
     args.push('--no-daemon')
     args.push(...hookOverrides(ctx.hookUrl, ctx.hookAuthFile, this.hashesByRun.get(ctx.runId)))
     this.hashesByRun.delete(ctx.runId)
-    args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
+    // Switched off (#1167), the user's own [tui].terminal_title applies, and titleAttention reads nothing from it.
+    if (overrides(CODEX, 'terminalTitle')) args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
@@ -721,10 +723,10 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Codex titles its terminal "[ ! ] Action Required | <project>" (blinking with "[ . ]") exactly while a person
    * must act (an approval prompt, a question), and not while its auto-reviewer decides. Older versions than the one
-   * Hive was tested with go by the hooks.
+   * Hive was tested with go by the hooks, as do sessions whose title Hive leaves to the user's config (#1167).
    */
   titleAttention(version: string | null): ((title: string) => boolean) | null {
-    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0) return null
+    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0 || !overrides(CODEX, 'terminalTitle')) return null
     return (title) => /^\[ [!.] \] Action Required\b/.test(title)
   }
 

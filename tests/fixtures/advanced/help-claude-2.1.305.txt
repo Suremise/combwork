@@ -1,0 +1,17 @@
+$ claude --help (excerpt)
+  --system-prompt-snapshot <on|off>     Record the system prompt once per
+                                        conversation and reuse it verbatim on
+                                        every request and resume. on (the
+                                        default, except under --bare outside
+                                        cloud and background sessions): the
+                                        prompt is rendered on the conversation's
+                                        first request — a --system-prompt or
+                                        --append-system-prompt included — sent,
+                                        and recorded; every later request and
+                                        resume sends the record as-is, even when
+                                        a later launch passes different text,
+                                        until the conversation is compacted.
+                                        off: never record; the prompt is
+                                        rendered fresh every request (for
+                                        iterating on prompt text). (choices:
+                                        "on", "off")

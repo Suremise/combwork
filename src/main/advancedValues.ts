@@ -1,4 +1,5 @@
-import { ADVANCED_DEFS, advancedDef, advancedRegExp, literalRegExp } from '../shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedRegExp, literalRegExp, overrideId } from '../shared/advanced'
+import type { ProviderId } from '../shared/types'
 
 /**
  * The advanced settings (#367) as the CLIs' transcript parsers read them (#1106): the parsers also run in the usage
@@ -40,6 +41,9 @@ export const advancedValues: AdvancedReader = {
   get: <T extends string | number | string[] | boolean>(id: string) => reader.get<T>(id),
   pattern: (id) => reader.pattern(id)
 }
+
+/** Whether Hive applies one of its overrides of a CLI (#1167): its off switch (overrideId), on unless turned off. */
+export const overrides = (provider: ProviderId, what: string): boolean => advancedValues.get<boolean>(overrideId(provider, what))
 
 /** Makes `r` the parsers' reader (main's AdvancedStore; the worker's values from main). */
 export function readAdvancedFrom(r: AdvancedReader): void {

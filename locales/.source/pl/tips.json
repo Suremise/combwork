@@ -95,6 +95,8 @@
   "tips.cardReadFirst.title": "Point a card at the docs it needs",
   "tips.cardSummaries.text": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
   "tips.cardSummaries.title": "Reports start with the gist",
+  "tips.cliOverrides.text": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
+  "tips.cliOverrides.title": "Keep a CLI as it is outside Hive",
   "tips.closeWindow.text": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
   "tips.closeWindow.title": "Close one window, or all of them",
   "tips.commandName": "“{command}”",

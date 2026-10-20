@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Hive's changes to the CLIs can be turned off.** Settings → Advanced has a switch, under each CLI, for more of what Hive changes in the sessions it starts. All are on by default, as before: **Resume the Assistant with its current instructions** (Claude Code), **Set Codex's terminal title**, **Don't let Copilot update itself** and **Include every MCP server's instructions** (Copilot; off, Hive gives Copilot its guidance as custom instructions instead). **Pass right-click to Codex** joins Copilot's, now that Codex tracks the mouse. The user guide lists each one, what Hive loses without it, and why Codex's `--no-daemon` has no switch (#1167).
 - **Projects have keys, and cards are numbered in their project.** Each project gets a short key (HI, AM…), suggested from its folder's name, and its cards are named by it: `HI-12`. Cards you already have keep their number in their project (#1061 is HI-1061), and the old `#N` keeps working everywhere. A card moved to another project takes a number there, its old key still finding it. After the upgrade, a quiet notice lists the keys. Agents see cards as "HI-1230 (#1240)" and can name them by key in Hive's tools and the Agent API (#1219).
 
 - **Recent folds away.** Click the **Recent** heading in the Progress panel (or press Enter or Space on it) to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it, after a restart too (#1228).
