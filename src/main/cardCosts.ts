@@ -1,6 +1,6 @@
 import { basename } from 'path'
 import { config } from './config'
-import { allTasks, cardHolds } from './tasks'
+import { cardHolds, costCards } from './tasks'
 import { listLanes } from './lanes'
 import { usageHistory } from './usageHistory'
 import { inWorkspace, type WorkspaceService } from './workspace'
@@ -139,7 +139,8 @@ export async function cardCosts(ws: WorkspaceService, o: { numbers?: number[]; p
       list.push({ provider: r.provider, session: `${r.scope}\0${r.session}`, row: r.row })
       rows.set(r.row.card, list)
     }
-    const cards = await allTasks(ws, { numbers: held.map((c) => c.number) })
+    // What a cost needs of each card (#1210): its title, column, holds and history, never its comments or description.
+    const cards = await costCards(ws, held.map((c) => c.number))
     const read = await sessionReader(ws)
     const out: CardCost[] = []
     for (const c of cards) {

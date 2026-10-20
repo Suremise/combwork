@@ -13,7 +13,7 @@ import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAs
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { afterBoardWrite, archiveBatchDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -257,6 +257,17 @@ export async function cardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
     const c = clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)
     return { number, project: c.project, held: c.held, history: c.history, agent: c.agent, agentName: c.agentName, review: c.review }
   })
+}
+
+/**
+ * The cards given, with what their cost needs (#1210: number, title, project, column, holds, history, agent and reviewer; the rest as a
+ * card without them has it): their comments, descriptions and decisions never read. In number order.
+ */
+export async function costCards(ws: WorkspaceService, numbers: number[]): Promise<TaskCard[]> {
+  if (!ws.path || !numbers.length) return []
+  const ids = await ws.projectIds()
+  if (!ws.path) return []
+  return costDocs(ws, numbers).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids))
 }
 
 /** A card's place on the board: all that placing another card needs of it (#458). */
