@@ -51,12 +51,26 @@ export interface CheckBracket {
   whyNot?: CheckRanData['whyNot']
 }
 
+/**
+ * What a progress run for a card is for (§16.13, #1233): the card's revision now, the revision the run is tested on,
+ * and a revision the run names (`--revision`) as the platform reads names (null: it names none). `tested` is a
+ * `checkout` (Git: what's checked out where it runs) or the card's `content` (None: its paths' hash).
+ */
+export interface RunRevision {
+  revision: string | null
+  tested: string | null
+  testedIs: 'checkout' | 'content'
+  named?: string | null
+}
+
 export interface PlatformAdapter {
   readonly id: PlatformId
   /** Start (§16.7.2): where the card works and what its change starts from. */
   start(card: CardRecord, o: WorkflowOptions): Promise<Maybe<StartPlan>>
   /** The card's revision now (Git: its folder's head, or its newest attributed commit; None: its paths' hash). */
   revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
+  /** A progress run's revisions for the card, run in `folder` (null: none given), resolving `named` if given (§16.13). */
+  runRevision(card: CardRecord, s: CardState, folder: string | null, named: string | null): Promise<RunRevision>
   /** Submit's platform side; a refusal for an empty change, a wrong revision or what couldn't be read. */
   submission(card: CardRecord, s: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan>
   /** What a finish needs (§16.7.2's Finish table). */

@@ -28,6 +28,9 @@ import { snapshot } from './checks'
 import { cardFacts } from './cardWork'
 import { FactStore } from './factStore'
 import { folderHead, LINK_TTL_MS, type RunLink } from './runLink'
+import { projectOptionsOf } from './reconciler'
+import { Workflow } from './runtime'
+import type { RunRevision } from '../platform/adapter'
 import type { ProgressRun, ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { agentActor, foldCard, type Actor, type CheckRanData, type Fact } from '../../shared/workflow/facts'
@@ -215,6 +218,28 @@ export async function bracketFor(ws: WorkspaceService, link: RunLink): Promise<B
   const excluded = Array.isArray(options?.excluded) && options.excluded.every((x) => typeof x === 'string') ? (options.excluded as string[]) : allOff('none').excluded
   const f: CheckRunFor = { card: link.card, folder: platform === 'none' ? project : link.folder!, project, platform, tested: link.testedCheckout, check: link.check?.name ?? null, checkCommand: link.check?.command ?? null, command: null, commands, facts: got.facts, paths: platform === 'none' ? declaredPaths(ws, c.project, link.card) : [], excluded }
   return { ws, workspacePath, project: c.project, for: f, start: await checkStart(f) }
+}
+
+/**
+ * A run's revisions for a card, through the adapter of the platform its ruleset names (#1233, runLink's `cardRun`), or
+ * null for a card with no start in its facts (from before 1.0, not started; archived or gone), whose run reads its
+ * folder with git.
+ */
+export async function cardRunRevision(ws: WorkspaceService, n: number, folder: string | null, named: string | null): Promise<RunRevision | null> {
+  const workspacePath = ws.path
+  const got = workspacePath ? cardFacts(ws, n) : null
+  const s = got ? foldCard(got.facts) : null
+  if (!workspacePath || !s?.started) return null
+  const c = await getTask(n, ws).catch(() => null)
+  if (!c || c.archived || !c.project) return null
+  const project = join(workspacePath, c.project)
+  const cfg = await ws.projectConfig(project).catch(() => null)
+  const platform = projectPlatform(project, cfg?.platform).id
+  const options = await projectOptionsOf(ws, project, platform).catch(() => allOff(platform))
+  // Reads only: no write, so no lock and no actions.
+  const wf = new Workflow({ store: FactStore.forBoard(ws, { project: c.project, key: c.project }), project, projectKey: c.project, options: () => options, slots: join(ws.hiveDir, 'slots'), autoRun: false, reconcileActs: false })
+  const card = wf.store.card(n)
+  return wf.platformOf(card, s).runRevision(card, s, folder, named)
 }
 
 /** None's declared paths of a card, as the board has them now. */
