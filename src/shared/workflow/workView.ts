@@ -5,7 +5,7 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type StageId } from './facts'
+import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type StageId } from './facts'
 
 export interface WorkRevision {
   /** The submission's id (its fact's seq): what verdicts name. */
@@ -37,7 +37,10 @@ export interface WorkVerdict {
   round: number
   generation: number
   at: string
-  /** On the latest submission at the card's current decision generation: a verdict that still counts. */
+  /**
+   * A verdict that still counts: on the latest submission, at the card's current decision generation, and not made stale
+   * by another change since (a pass carried over to the same change still counts).
+   */
   current: boolean
 }
 
@@ -82,6 +85,17 @@ export interface WorkIntegration {
   at: string
 }
 
+/**
+ * How a card was accepted where there is no merge to make (§16.4.2): None's code cards by revision, a no-code card by its
+ * submission, on either platform.
+ */
+export interface WorkAcceptance {
+  revision: string | null
+  submission: number | null
+  at: string
+  actor: Actor
+}
+
 /** The merge queue's newest entry for the card this cycle, and how it stands. */
 export interface WorkQueueEntry {
   entry: string
@@ -119,6 +133,8 @@ export interface WorkView {
   checks: WorkCheck[]
   marks: WorkMarks
   integration: WorkIntegration | null
+  /** Its acceptance this cycle, where there is no merge (None, a no-code card). */
+  accepted: WorkAcceptance | null
   queue: WorkQueueEntry | null
   /** The card's newest decision generation (0: none) and the one each agent has received. */
   decisions: { generation: number; received: Record<string, number> }
@@ -130,7 +146,10 @@ export interface WorkView {
   lastSeq: number
 }
 
-/** What a view is made of beside its facts: the card's cached stage and whether it is from before 1.0. */
+/**
+ * What a view is made of beside its facts: the card's cached stage (the stage before its first `Moved`, so a card with
+ * none, from before 1.0, keeps it: the view's stage is the fold's) and whether it is from before 1.0.
+ */
 export interface WorkCard {
   card: number
   stage: StageId
@@ -149,7 +168,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const verdicts = s.verdicts
     .filter((v) => v.seq >= s.cycle)
     .map(
-      (v): WorkVerdict => ({ submission: v.submission, revision: v.revision, reviewer: v.reviewer, pass: v.pass, ...(v.failKind ? { failKind: v.failKind } : {}), round: v.round, generation: v.generation, at: at.get(v.seq) ?? '', current: v.submission === latest && v.generation === s.generation })
+      (v): WorkVerdict => ({ submission: v.submission, revision: v.revision, reviewer: v.reviewer, pass: v.pass, ...(v.failKind ? { failKind: v.failKind } : {}), round: v.round, generation: v.generation, at: at.get(v.seq) ?? '', current: v.submission === latest && v.generation === s.generation && !s.stale })
     )
   const checks = cycle
     .filter((f) => f.kind === 'CheckRan')
@@ -164,11 +183,12 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
       return { from: d.from, to: d.to, how: d.how, at: f.at }
     })
   const integrated = [...facts].reverse().find((f) => f.kind === 'Integrated')
+  const accepted = s.accepted ? [...cycle].reverse().find((f) => f.kind === 'Accepted') : undefined
   const entry = s.entries.at(-1)
   const started = s.started
   return {
     card: c.card,
-    stage: c.stage,
+    stage: s.stage,
     preWorkflow: c.preWorkflow,
     adopted: !!started?.adopted,
     ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
@@ -185,6 +205,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     checks,
     marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden },
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
+    accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
     queue: entry ? { entry: entry.id, revision: entry.revision, target: entry.target, state: entry.state, ...(entry.failure ? { failure: entry.failure.reason } : {}), ...(entry.cancelled ? { cancelled: entry.cancelled } : {}) } : null,
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
@@ -216,6 +237,8 @@ export interface WorkBadge {
   outsideRules: boolean
   mergedInPart: boolean
   leftTarget: boolean
+  /** Accepted where there is no merge (None, a no-code card). */
+  accepted: boolean
   forYou: number
   /** A decision was recorded since the latest submission was made. */
   decisionSince: boolean
@@ -246,6 +269,7 @@ export function workBadge(v: WorkView): WorkBadge {
     outsideRules: v.marks.outsideRules.length > 0,
     mergedInPart: !!v.marks.mergedInPart,
     leftTarget: !!v.marks.leftTarget,
+    accepted: !!v.accepted,
     forYou: v.forYou,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     lastSeq: v.lastSeq

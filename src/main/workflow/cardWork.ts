@@ -146,6 +146,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['TargetMoved']
         return `${x.target}: ${r(x.from)} to ${r(x.to)}`
       }
+      case 'Accepted': {
+        const x = d as FactData['Accepted']
+        return x.revision ? r(x.revision) : x.submission !== undefined ? `submission ${x.submission}` : ''
+      }
       case 'Gone':
         return (d as FactData['Gone']).what
       default:

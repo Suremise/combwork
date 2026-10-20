@@ -123,6 +123,8 @@ describe("a card's work from the board (#1223)", () => {
     expect(row('CheckRan', { name: 'unit', command: 'npm test', revision: 'abcdef12345', tested: 'abcdef12345', result: 'passed', run: 'r', durationMs: 1, by: 'B1', counted: false, whyNot: 'dirty' }).what).toBe('unit passed on abcdef1, not counted (dirty)')
     expect(row('Integrated', { revision: 'abcdef12345', target: 'main', result: '99999999aa', method: 'merge', by: 'hive' }).what).toBe('abcdef1 into main as 9999999 (merge, by hive)')
     expect(row('Moved', { from: 'review', to: 'approved', cause: 'intent' }).what).toBe('review to approved (intent)')
+    expect(row('Accepted', { revision: 'abcdef12345' }).what).toBe('abcdef1')
+    expect(row('Accepted', { submission: 4 }).what).toBe('submission 4')
     expect(row('Unblocked', {}).what).toBe('')
   })
 })

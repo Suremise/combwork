@@ -80,7 +80,9 @@ describe("a card's work view (#1223)", () => {
     const v = workView(card, stale)
     expect(v.marks.stale).toEqual({ approved: 'rev2222bbbb', current: 'rev3333cccc', why: 'change' })
     expect(v.head).toBe('rev3333cccc')
-    expect(workBadge(v).stale).toBe(true)
+    // The pass stays in its history, on its revision, but no longer counts (HR5's round 1 finding 2).
+    expect(v.verdicts.at(-1)).toMatchObject({ pass: true, revision: 'rev2222bbbb', current: false })
+    expect(workBadge(v)).toMatchObject({ stale: true, verdict: { pass: true, current: false } })
     const again = workView(card, [...stale, fact('Submitted', submit('rev3333cccc', 3), 'agent:B1')])
     expect(again.marks.stale).toBeNull()
     expect(again.revisions.map((r) => r.round)).toEqual([1, 2, 3])
@@ -92,7 +94,8 @@ describe("a card's work view (#1223)", () => {
     expect(v.marks.carriedOver).toEqual([{ from: 'rev2222bbbb', to: 'rev4444dddd', how: 'replay', at: expect.any(String) }])
     expect(v.approved).toEqual({ revision: 'rev4444dddd', base: 'base1111bbbb' })
     expect(v.marks.stale).toBeNull()
-    expect(workBadge(v)).toMatchObject({ revision: 'rev4444dddd', stale: false, checks: { passed: 0, failed: 1, notCounted: 0 } })
+    expect(v.verdicts.at(-1)).toMatchObject({ pass: true, current: true })
+    expect(workBadge(v)).toMatchObject({ revision: 'rev4444dddd', stale: false, verdict: { current: true }, checks: { passed: 0, failed: 1, notCounted: 0 } })
   })
 
   it('the integration: the queue entry, its method, result revision and merge commit; outside the rules', () => {
@@ -136,6 +139,32 @@ describe("a card's work view (#1223)", () => {
     const { facts } = reviewed()
     const v = workView({ ...card, stage: 'active' }, [...facts, fact('Moved', moved('review', 'todo')), fact('Started', start({ line: 'hive/b2', builder: 'B2' }), 'agent:B2')])
     expect(v).toMatchObject({ line: 'hive/b2', builder: 'B2', revisions: [], verdicts: [], checks: [], rounds: 1 })
+  })
+
+  it("its stage is the fold's: the last Moved, else the cached stage it starts from (HR5's round 1 finding 3)", () => {
+    const { facts } = reviewed()
+    expect(workView({ ...card, stage: 'active' }, facts).stage).toBe('review')
+    expect(workBadge(workView({ ...card, stage: 'active' }, facts)).stage).toBe('review')
+    expect(workView({ ...card, stage: 'approved' }, facts.filter((f) => f.kind !== 'Moved')).stage).toBe('approved')
+    expect(workView({ card: 3, stage: 'hold', preWorkflow: true }, []).stage).toBe('hold')
+  })
+
+  it("None's acceptance by revision, a no-code card's by submission; a new cycle clears it (HR5's round 1 finding 1)", () => {
+    seq = 0
+    const none = [
+      fact('Started', start({ line: null, target: null, base: 'hash0000', manifest: { 'a.md': 'h1' } }), 'agent:B1'),
+      fact('Submitted', submit('hash1111', 1, { base: 'hash0000', head: null, key: null }), 'agent:B1'),
+      fact('Verdict', verdict(2, 'hash1111', true, 1), 'agent:R1'),
+      fact('Accepted', { revision: 'hash1111' }, 'user'),
+      fact('Moved', moved('approved', 'done'))
+    ]
+    const v = workView(card, none)
+    expect(v).toMatchObject({ stage: 'done', line: null, integration: null, accepted: { revision: 'hash1111', submission: null, at: none[3].at, actor: 'user' } })
+    expect(workBadge(v).accepted).toBe(true)
+    seq = 0
+    const noCode = [fact('Started', start({ cardKind: 'no-code' }), 'agent:B1'), fact('Submitted', submit('', 1, { revision: null, base: null, head: null, key: null, files: [] }), 'agent:B1'), fact('Accepted', { submission: 2 }, 'user')]
+    expect(workView(card, noCode)).toMatchObject({ kind: 'no-code', revisions: [{ revision: null }], accepted: { revision: null, submission: 2 } })
+    expect(workView(card, [...noCode, fact('Moved', moved('done', 'todo')), fact('Started', start(), 'agent:B1')]).accepted).toBeNull()
   })
 
   it('requests to the user and an override past review', () => {
