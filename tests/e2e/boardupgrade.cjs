@@ -180,8 +180,11 @@ async function themes(dev, name) {
     const tile = dev.page.locator('.task-card', { hasText: 'Still 0.9' })
     check('…its cards can not be dragged', (await tile.getAttribute('draggable')) === 'false', String(await tile.getAttribute('draggable')))
     await tile.click()
-    const dialog = dev.page.locator('.dialog', { has: dev.page.locator('.task-read-only') })
-    check('…its card dialog opens, saying the card is read-only', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)) && /its board is read-only here/.test(await dialog.locator('.task-read-only').innerText().catch(() => '')))
+    const dialog = dev.page.locator('.dialog', { has: dev.page.locator('.task-title-input') })
+    check('…its card dialog opens', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
+    // Drawn with the dialog: there as soon as it is.
+    const roBanner = dialog.locator('.task-read-only')
+    check('…saying the card is read-only', (await roBanner.count()) === 1 && /its board is read-only here/.test(await roBanner.innerText()))
     const saveBtn = dialog.locator('.dialog-footer .btn.primary', { hasText: 'Save' })
     check("…with Save, the comment box and the decision box off", (await saveBtn.isDisabled()) && (await dialog.getByRole('textbox', { name: 'New comment' }).isDisabled()) && (await dialog.getByRole('textbox', { name: 'New decision' }).isDisabled()) && (await dialog.locator('.task-title-input').getAttribute('readonly')) !== null)
     await themes(dev, '3-dialog')
