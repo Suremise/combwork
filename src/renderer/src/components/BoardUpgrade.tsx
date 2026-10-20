@@ -18,7 +18,7 @@ const M = {
   notNow: msg({ id: 'board.upgrade.notNow', defaultMessage: 'Not Now', description: "The upgrade dialog's other button: leaves the board as it is, read-only in this Hive, with a banner offering the upgrade." }),
   done: msg({ id: 'board.upgrade.done', defaultMessage: 'Board upgraded to 1.0', description: "A notification after the workspace's board was converted to Hive 1.0's format." }),
   doneDetail: msg({ id: 'board.upgrade.doneDetail', defaultMessage: 'The 0.9 board is kept: Help → Restore the 0.9 Board Backup… puts it back.', description: 'Under "Board upgraded to 1.0". Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it.' }),
-  banner: msg({ id: 'board.upgrade.banner', defaultMessage: "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.", description: "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of the board's disabled add-card buttons." }),
+  banner: msg({ id: 'board.upgrade.banner', defaultMessage: "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.", description: "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume." }),
   bannerButton: msg({ id: 'board.upgrade.bannerButton', defaultMessage: 'Upgrade…', description: 'A button on the banner above a read-only 0.9 board: asks to upgrade it to 1.0. The … says it asks first: keep it.' }),
   learnMore: msg({ id: 'board.upgrade.learnMore', defaultMessage: 'Learn more', description: "A button on the banner above a read-only 0.9 board: opens the user guide's section about upgrading to 1.0." }),
   restoreTitle: msg({ id: 'board.restore09.title', defaultMessage: 'Restore the 0.9 board backup?', description: "Title of the confirmation before Help → Restore the 0.9 Board Backup… puts back the copy of the board Hive kept when it upgraded it to 1.0." }),
@@ -31,7 +31,7 @@ const M = {
   restoring: msg({ id: 'board.restore09.restoring', defaultMessage: 'Restoring…', description: 'The Restore button while the 0.9 board backup is put back.' }),
   restored: msg({ id: 'board.restore09.done', defaultMessage: 'The 0.9 board is back', description: 'A notification after the 0.9 board backup was put back.' }),
   restoredDetail: msg({ id: 'board.restore09.doneDetail', defaultMessage: 'The 1.0 board is kept as {file}.', description: 'Under "The 0.9 board is back": {file} is the file the board as it was before the restore was saved to.' }),
-  newer: msg({ id: 'board.readOnly.newer', defaultMessage: 'This board was saved by a newer version of Hive: it is read-only here.', description: "Tooltip on the board's add-card buttons, disabled while the board was saved by a newer Hive (whose format this one can't change)." }),
+  newer: msg({ id: 'board.readOnly.newer', defaultMessage: 'This board was saved by a newer version of Hive: it is read-only here.', description: "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Hive (whose format this one can't change); also a banner in the card dialog." }),
   none: msg({ id: 'board.restore09.none', defaultMessage: 'There is no 0.9 board backup to restore', description: 'A notification from Help → Restore the 0.9 Board Backup… when the workspace has no copy of its board from before an upgrade to 1.0.' })
 }
 
@@ -74,6 +74,19 @@ export async function restoreBoard09(): Promise<void> {
 /** Why the board takes no changes (its add-card buttons' tooltip), or null when it does. */
 export function readOnlyReason(readOnly: BoardState['readOnly'] | undefined): string | null {
   return readOnly === 'upgrade' ? tr(M.banner) : readOnly === 'newer' ? tr(M.newer) : null
+}
+
+/**
+ * Why no agent can start here (#1230): the workspace's upgrade to 1.0 waits, and Hive refuses a start then
+ * (`board.error.upgradeFirstStart`), so New Session and Resume are disabled with this as their tooltip. Else null.
+ */
+export function startBlockedReason(readOnly: BoardState['readOnly'] | undefined): string | null {
+  return readOnly === 'upgrade' ? tr(M.banner) : null
+}
+
+/** startBlockedReason() for this window's workspace, drawn again as it changes. */
+export function useStartBlocked(): string | null {
+  return startBlockedReason(useStore((s) => s.boardState?.readOnly))
 }
 
 /** The workspaces this window has asked about already: Not Now holds until Hive starts again (the banner stays). */

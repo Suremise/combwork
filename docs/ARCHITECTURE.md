@@ -383,6 +383,35 @@ once), each repository and folder watched once however many projects share it:
 target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.
 It also runs when a gate reads a card and once at start.
 
+**In the app, record-only (#1217, P3).** `workflow/reconciler.ts` follows the open workspaces' projects (as
+`platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
+reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
+runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
+when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run builds the project's
+runtime on the board's store (`FactStore.forBoard`) with its writes as changes of the board (`cfg.locked`:
+`boardWrite`, with the run's workspace lifetime as `alive`), its options from `project.json` (else the platform's
+defaults), and **`reconcileActs` off**: `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
+MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone) and the table's moves, queue cancellations,
+actions and wakes run only with that switch, which the P4 runtime turns on (the P2 scenarios run with it). It
+reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
+fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
+revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
+(`observeHead`). Every delayed observation is written only in the cycle it was read in (`sameCycle`, checked under the
+write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
+never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the
+folder's cards changed since it read them. `TargetMoved` records the card's target from the last head recorded this
+cycle to the head now, read again under the lock from the ref files; a target that doesn't exist (git says so) is
+recorded as null, so its deletion and its return are moves too, and an unreadable one records nothing. `Gone` is recorded for a line, the card's own
+folder and the repository, only for what doesn't exist (`presence`: ENOENT; anything else is unknown). Done cards are
+reconciled when their target moved: an event's line, or a target whose head isn't the one stored as last checked
+(`board_meta` `workflow:<project>:target:<line>`; '' for a deleted target), so a reset while Hive was closed is found at
+the next open or focus, with one read per target. The checkpoint moves only once all of that target's Done cards were
+reconciled to the end (`ReconcileHooks.unknown` tells of a read that couldn't be made, and a failure counts too): one
+left undecided is looked at again at the next run. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
+Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
+(`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
+watch goes as the workspace closes.
+
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
 

@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "Ponha suas raias em ordem",
   "tips.progressPanel.text": "Quando os agentes rodam testes ou builds que informam o progresso, o painel Progresso à direita mostra cada execução: o agente, quanto já avançou e o tempo restante, e o botão do Hive na barra de tarefas vai se preenchendo. {key} mostra o painel.",
   "tips.progressPanel.title": "Quanto falta para os testes terminarem?",
+  "tips.progressRecentFold.text": "Clique no título Recentes do painel Progresso para recolher as execuções nessa única linha, com quantas são ao lado; clique de novo para mostrá-las. Cada espaço de trabalho se lembra disso.",
+  "tips.progressRecentFold.title": "Recolha Recentes",
   "tips.projectCards.text": "A Visão geral de um projeto começa pelos cartões dele: quantos há em cada coluna, travados ou bloqueados. Clique em um número para abrir a aba Tarefas.",
   "tips.projectCards.title": "Os cartões de um projeto num relance",
   "tips.projectTabs.text": "Quando falta espaço, as abas de um projeto encolhem para ícones, e a aba em que você está mantém o nome enquanto ele couber. Passe o mouse sobre uma aba para ver o nome e o atalho dela.",

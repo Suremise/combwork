@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "给通道排序",
   "tips.progressPanel.text": "智能体运行会报告进度的测试或构建时，右侧的进度面板会显示每次运行：哪个智能体、进展到哪了以及剩余时间，Hive 的任务栏按钮也会随之填充。{key} 可以显示它。",
   "tips.progressPanel.title": "测试还要多久才能跑完？",
+  "tips.progressRecentFold.text": "点击进度面板中的“最近”标题，可将其运行收起为这一行，并在旁边显示数量；再次点击即可显示。每个工作区都会记住。",
+  "tips.progressRecentFold.title": "收起“最近”",
   "tips.projectCards.text": "项目的“概览”最先显示它的卡片：每列各有多少张、多少张停滞或受阻。点击数字即可打开其“任务”标签页。",
   "tips.projectCards.title": "项目的卡片一目了然",
   "tips.projectTabs.text": "空间不足时，项目的标签页会缩成图标，当前标签页只要放得下就会保留名称。悬停在标签页上可查看其名称和快捷键。",

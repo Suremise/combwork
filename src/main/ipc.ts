@@ -40,7 +40,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, exportBoard, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, cardHeads, exportBoard, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -96,6 +96,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 
@@ -294,8 +295,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       .catch((e) => log.warn('archiving old Done cards', e))
     // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
     void runActions(contextWorkspace()!)
-    // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once.
-    void adoptWorkspace(contextWorkspace()!)
+    // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
+    // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
+    const opening = contextWorkspace()!
+    void adoptWorkspace(opening).finally(() => reconcileWorkspace(opening))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
@@ -655,7 +658,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'tasks:work': (n) => {
       const ws = currentWorkspace()
-      return ws.path ? cardWork(ws, n) : null
+      if (!ws.path) return null
+      // Read for its Work section: reconciled soon, whatever its stage (#1217); the board is told of what that records.
+      const project = cardHeads(ws, [n])[0]?.project
+      if (typeof project === 'string' && project) reconcileCard(ws, n, project)
+      return cardWork(ws, n)
     },
     'tasks:workBadges': () => {
       const ws = currentWorkspace()

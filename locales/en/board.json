@@ -1611,6 +1611,10 @@
     "defaultMessage": "Recent",
     "description": "A section heading in the Progress panel: runs that finished a while ago."
   },
+  "board.progress.recentFold": {
+    "defaultMessage": "Fold the recent runs",
+    "description": "Tooltip of the Progress panel's Recent heading: folds its runs away, leaving the heading."
+  },
   "board.progress.recentHover": {
     "defaultMessage": "{agent}: {run} {state}",
     "description": "Tooltip of a run under the Progress panel's Recent: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)."
@@ -1622,6 +1626,10 @@
   "board.progress.recentRuns": {
     "defaultMessage": "Recent runs",
     "description": "What the Progress panel's Recent list holds, for its Show all button and accessible name."
+  },
+  "board.progress.recentShow": {
+    "defaultMessage": "Show the recent runs",
+    "description": "Tooltip of the Progress panel's Recent heading while its runs are folded away: shows them."
   },
   "board.progress.region": {
     "defaultMessage": "Progress",
@@ -1689,7 +1697,7 @@
   },
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Hive: it is read-only here.",
-    "description": "Tooltip on the board's add-card buttons, disabled while the board was saved by a newer Hive (whose format this one can't change)."
+    "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Hive (whose format this one can't change); also a banner in the card dialog."
   },
   "board.restore09.done": {
     "defaultMessage": "The 0.9 board is back",
@@ -2161,7 +2169,7 @@
   },
   "board.upgrade.banner": {
     "defaultMessage": "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
-    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of the board's disabled add-card buttons."
+    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
   },
   "board.upgrade.bannerButton": {
     "defaultMessage": "Upgrade…",
