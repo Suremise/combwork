@@ -2137,7 +2137,9 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
 ### 16.13 Checks and the Progress panel
 
 **Runs become checks** [#1119 c]. A run can name its card and revision (`hive-progress --card AM-12 [--revision …]`,
-`/v1/progress` fields; default from the agent's current card and its folder's head at start; backwards compatible).
+`/v1/progress` fields; default from the agent's current card and, at start, that card's revision read through its
+platform's adapter (Git: its folder's head on its own line, its newest attributed commit in a shared folder; None: its
+declared paths' hash), or the folder's head for a run for no card or for one not started [#1233]; backwards compatible).
 A finished run naming a card and revision writes `CheckRan`. The gates read the same facts the panel shows, so they
 agree by construction.
 
@@ -2152,7 +2154,7 @@ where it ran) and counts for a card's submission only if all of these hold; othe
 - **the tested checkout contains the card's revision:** for a card with its own line, it *is* the revision; in a
   shared folder, the card's revision is an ancestor of it (other cards' later commits may be in it too, which the
   option's description says). An explicit `--revision` must equal the checkout at the start (else refused at once,
-  "a3f2c1d isn't what's checked out here");
+  "a3f2c1d isn't what's checked out here"; None: the card's paths' hash, its tested checkout);
 - the folder was clean when it started (§16.3.2's dirty), and is clean and at the same checkout when it ends;
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
