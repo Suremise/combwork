@@ -6,7 +6,8 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { writeCard } from './boardDb'
+import { as09, writeCard } from './boardDb'
+import { holdsOfCard } from '../src/shared/usageLedger'
 
 const base = tempDir('hive-card-writes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -134,5 +135,59 @@ describe('costs read what they need of the cards (#1210)', () => {
     // Nothing else read: no comments, description or decisions.
     expect(cost.every((c) => c.comments.length === 0 && c.description === '')).toBe(true)
     expect(await inWorkspace(w, () => tasks.costCards(w, []))).toEqual([])
+  })
+
+  /** Cards from before Hive kept holds (no `held`): their holds come from their history and their agent and reviewer now. */
+  const unheld = (num: number): Record<string, unknown> => {
+    const { held: _held, ...card } = bigCard(num)
+    return {
+      ...card,
+      blockedBy: [],
+      links: [],
+      agent: 'a1',
+      agentName: 'Agent 1',
+      review: { agent: 'r1', agentName: 'Reviewer', since: at(5) },
+      column: 'review',
+      history: [
+        { at: at(1), by: 'You', what: 'Created in Doing' },
+        { at: at(3), by: 'Agent 1 (p)', what: 'Moved to Review' },
+        { at: at(5), by: 'Reviewer (p)', what: 'Started reviewing' }
+      ]
+    }
+  }
+
+  it("a card without stored holds keeps them as its history and agents give them, builder's and reviewer's (HR1's #1210 round 1)", async () => {
+    const { w } = await workspace()
+    await inWorkspace(w, () => writeCard(w, 1, unheld(1)))
+    const [full] = await inWorkspace(w, () => tasks.allTasks(w, { numbers: [1] }))
+    const [cost] = await inWorkspace(w, () => tasks.costCards(w, [1]))
+    expect(full.held).toBeUndefined()
+    const holds = holdsOfCard(full)
+    expect(holds.map((h) => h.role).sort()).toEqual(['build', 'review'])
+    expect(holdsOfCard(cost)).toEqual(holds)
+    expect([cost.agent, cost.agentName, cost.review]).toEqual([full.agent, full.agentName, full.review])
+    expect(cost.comments).toEqual([])
+  })
+
+  it('the same on a 0.9 board waiting for its upgrade (its documents read for those fields)', async () => {
+    const { ws, w } = await workspace()
+    await inWorkspace(w, () => writeCard(w, 1, unheld(1)))
+    const [full] = await inWorkspace(w, () => tasks.allTasks(w, { numbers: [1] }))
+    await disposeWorkspaceService(w)
+    opened.splice(opened.indexOf(w), 1)
+    store.closeBoard(ws)
+    as09(store.boardFile(ws))
+    store.boardTestHooks.upgradeAnswer = 'no'
+    try {
+      const w2 = createWorkspaceService()
+      await w2.open(ws)
+      opened.push(w2)
+      expect(inWorkspace(w2, () => store.boardState(w2)).readOnly).toBe('upgrade')
+      const [cost] = await inWorkspace(w2, () => tasks.costCards(w2, [1]))
+      expect(holdsOfCard(cost)).toEqual(holdsOfCard(full))
+      expect(cost.comments).toEqual([])
+    } finally {
+      store.boardTestHooks.upgradeAnswer = null
+    }
   })
 })

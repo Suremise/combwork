@@ -899,11 +899,14 @@ function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; num
   return readCardRows(db, { where: sel.where, numbers: sel.numbers, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
 }
 
-/** The fields a card's cost needs (cardCosts.ts). */
-const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'held', 'history']
+/**
+ * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Hive kept them its history with
+ * the agent and reviewer it has now (holdsFromHistory names them by those: HR1's #1210 round 1 finding).
+ */
+const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'held', 'history', 'agent', 'agentName', 'review']
 
 /**
- * The fields a card's cost needs of the cards given (#1210): its title, project, column, holds and history, read from
+ * The fields a card's cost needs of the cards given (#1210): its title, project, column, holds, history, agent and reviewer, read from
  * their columns and child tables, nothing else of it (its description, comments, decisions). In number order.
  */
 export function costDocs(ws: WorkspaceService, numbers: number[]): { number: number; doc: Record<string, unknown> }[] {

@@ -260,7 +260,7 @@ export async function cardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
 }
 
 /**
- * The cards given, with what their cost needs (#1210: number, title, project, column, holds and history; the rest as a
+ * The cards given, with what their cost needs (#1210: number, title, project, column, holds, history, agent and reviewer; the rest as a
  * card without them has it): their comments, descriptions and decisions never read. In number order.
  */
 export async function costCards(ws: WorkspaceService, numbers: number[]): Promise<TaskCard[]> {
