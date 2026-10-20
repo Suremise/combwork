@@ -40,6 +40,11 @@ export class NoneAdapter {
     this.cache.clear()
   }
 
+  /** Every cached hash goes (writes may have been missed: the watcher's record isn't complete), each path read again. */
+  forget(): void {
+    this.cache.clear()
+  }
+
   /** A watcher write event for a path: its cached hash goes, even if its size and time look unchanged. */
   invalidate(path: string): void {
     this.cache.delete(toPosix(path))

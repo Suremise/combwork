@@ -393,9 +393,19 @@ the commit (`runActions`/`perform` stay in `runtime.ts` for `tests/workflow`). I
 ones, read again at each `workflowFor`: `workflow/rulesets.ts` (`resolveOptions`) lays the platform's all-off, the global
 defaults (`settings.workflow`), the workspace's (`workspace.json` `workflow`) and the project's (`project.json`
 `workflow.options`) over each other, the first two per platform, with each option's origin, and falls back to all-off
-(logged once per project and reason) on an unknown option, a wrong type, another platform's options or a
-contradiction. `optionsFor` gives them with their origins. Its `reconcileActs` is a getter on the Advanced switch
-`hive.workflow.enforce` (`workflowEnforced()`, default on, #1120's table: off is P3's behaviour), read at each use.
+(logged once per project and reason) on an unknown option, a value it doesn't take (each option's check in `TAKES`:
+its type and its choices), another platform's options or a contradiction. `optionsFor` gives them with their origins.
+Its `reconcileActs` is a getter on the Advanced switch `hive.workflow.enforce` (`workflowEnforced()`, default on,
+#1120's table: off is P3's behaviour), read at each use. A None project's kept runtime keeps its paths' hashes, so
+each `workflowFor` first syncs them with the watcher (`syncHashes`, one at a time per instance): the paths
+`observer.changedBetween` saw written since the last sync are invalidated, or every hash is forgotten when its record
+of that time isn't complete. `cardRunRevision` (`runChecks.ts`) takes its runtime from `workflowFor` too.
+
+**Acting once (#1263).** `reconcile.ts` records an observation once (its dedupe key) and applies what follows from it
+apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
+(`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake
+written for that fact (`card_actions.fact`, read with `hasAction`) as the record that it was applied. So an observation
+recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing.
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,

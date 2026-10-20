@@ -1275,7 +1275,10 @@ on window focus, when a card is read for a rule, and once at start. **P3 only re
 facts below are written (each once across Hives, by its dedupe key). **From P4 it acts** [#1263]: the table's moves,
 queue cancellations, wakes and lane ends follow, through the project's runtime, while **workflow rules are enforced**
 (Settings → Advanced → *Workflow rules are enforced*, `hive.workflow.enforce`, on by default). Turned off, it records
-only, as in P3: a card merged by hand stays where it is, with its `Integrated` fact. Its rules:
+only, as in P3: a card merged by hand stays where it is, with its `Integrated` fact. What follows an observation is
+applied apart from recording it, once: an observation recorded while the rules were off is acted on at the next
+reconciliation once they're on again (an integration until the card is Done; a stale pass once, its builder's wake
+tied to its `Stale` fact) [HR2's #1263 round 1]. Its rules:
 
 | Observed | Then |
 |---|---|
@@ -1590,8 +1593,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   `src/shared/lanes.ts:58`) [note §11]. An option unset at a level inherits. **Built [#1263]:** the global and
   workspace defaults are per platform (`workflow: { git: {…}, none: {…} }` in Hive's config and in `workspace.json`),
   over the platform's all-off (§16.6.4), each option with its origin (platform, global, workspace, project). They are
-  checked as they are read: an unknown option, a value of the wrong type, a project's options for another platform or
-  a contradiction (§16.5.4) makes the project work with every rule off (all-off), logged once, never an error at a
+  checked as they are read: an unknown option, a value it doesn't take (its type, or one of its choices: a `finish`
+  of `typo`), a project's options for another platform or a contradiction (§16.5.4) makes the project work with every rule off (all-off), logged once, never an error at a
   move. The upgrade (#1218) writes a project's options whole, so its own values win until the Version Control tab
   (#1278) lets an option inherit again.
 - **One switch for every rule** [#1263, #1120's table]: Settings → Advanced → *Workflow rules are enforced*

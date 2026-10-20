@@ -2,9 +2,9 @@
 // with another workspace, refusing once its workspace has closed; a project's options resolved global → workspace →
 // project with each option's origin, and options that can't be used falling back to the platform's all-off.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -19,6 +19,11 @@ const { config } = await import('../src/main/config')
 const { optionsFor, workflowFor } = await import('../src/main/workflow/service')
 const { resolveOptions } = await import('../src/main/workflow/rulesets')
 const { allOff } = await import('../src/shared/workflow/options')
+const { observer } = await import('../src/main/platform/observe')
+const { isUnknown } = await import('../src/main/platform/types')
+
+/** The bound for a hung run: the watcher's events and the folder settling come well within it. */
+const HUNG_MS = 20_000
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -85,6 +90,67 @@ describe('one runtime per workspace and project (#1263)', () => {
   })
 })
 
+// HR2's round 1: a runtime kept across calls keeps None's hashes, so a write the watcher saw (a same-size edit with its
+// time kept: a file restored or copied) must drop its hash before the next call reads it, and every hash goes when the
+// watcher's record isn't complete.
+describe("None: the kept runtime's hashes follow the watcher (#1263)", () => {
+  it('a same-size edit with its time kept is seen at the next call; with no complete record, every hash is read again', async () => {
+    const ws = join(base, `ws-${++n}`)
+    const folder = join(ws, 'n')
+    mkdirSync(join(folder, '.hive'), { recursive: true })
+    writeFileSync(join(folder, 'a.txt'), 'AAAA')
+    writeFileSync(join(folder, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const unwatched = (await workflowFor(w, folder))!
+    expect(unwatched.cfg.options().platform).toBe('none')
+    // One time for every version of the file, in whole seconds (a time with more precision than utimes keeps would differ).
+    const at = 1_700_000_000
+    const edit = (text: string): void => {
+      writeFileSync(join(folder, 'a.txt'), text)
+      utimesSync(join(folder, 'a.txt'), at, at)
+    }
+    edit('AAAA')
+    expect(statSync(join(folder, 'a.txt')).mtimeMs).toBe(at * 1000)
+    const before = unwatched.none.revision(['a.txt'])
+    // Not watched (no complete record): the next call drops every hash.
+    edit('BBBB')
+    expect(unwatched.none.revision(['a.txt'])).toEqual(before)
+    const forget = vi.spyOn(unwatched.none, 'forget')
+    expect(await workflowFor(w, folder)).toBe(unwatched)
+    expect(forget).toHaveBeenCalled()
+    const second = unwatched.none.revision(['a.txt'])
+    expect(second).not.toEqual(before)
+    forget.mockClear()
+    // Watched: the record is complete from when its watch is armed; the written path alone is dropped.
+    observer.follow([{ path: folder, platform: 'none' }])
+    try {
+      await vi.waitFor(async () => expect(isUnknown(await observer.changedBetween(folder, Date.now(), Date.now(), (p) => p))).toBe(false), { timeout: HUNG_MS })
+      // This call's record began before the watch did: every hash goes once more. Read again, the hash is kept.
+      await workflowFor(w, folder)
+      expect(unwatched.none.revision(['a.txt'])).toEqual(second)
+      forget.mockClear()
+      const invalidate = vi.spyOn(unwatched.none, 'invalidate')
+      edit('CCCC')
+      expect(unwatched.none.revision(['a.txt'])).toEqual(second)
+      await vi.waitFor(
+        async () => {
+          await workflowFor(w, folder)
+          expect(invalidate).toHaveBeenCalledWith('a.txt')
+        },
+        { timeout: HUNG_MS }
+      )
+      expect(forget).not.toHaveBeenCalled()
+      const third = unwatched.none.revision(['a.txt'])
+      expect(third).not.toEqual(second)
+      expect(third).not.toEqual(before)
+    } finally {
+      observer.follow([])
+    }
+  })
+})
+
 describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
   it('global → workspace → project, each level inheriting what it leaves unset, with each origin', () => {
     const r = resolveOptions('git', {
@@ -110,6 +176,23 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
     expect(off(resolveOptions('git', { project: { platform: 'none' } }))).toMatch(/options for none/)
     expect(off(resolveOptions('git', { global: { git: { review: 'agent', noSelfReview: false } } }))).toMatch(/contradict each other \(selfReview\)/)
     expect(off(resolveOptions('git', { project: 'all' as never }))).toMatch(/not an object/)
+  })
+
+  it("a choice an option doesn't have falls back to all-off, at every level (HR2's round 1)", () => {
+    const off = (r: ReturnType<typeof resolveOptions>, why: RegExp) => {
+      expect(r.options).toEqual(allOff('git'))
+      expect(r.invalid).toMatch(why)
+    }
+    off(resolveOptions('git', { project: { finish: 'typo' } as never }), /project options: finish/)
+    off(resolveOptions('git', { workspace: { git: { review: 'everyone' } } as never }), /workspace options: review/)
+    off(resolveOptions('git', { global: { git: { style: 'rebase' } } as never }), /global options: style/)
+    off(resolveOptions('git', { project: { sameness: 'close' } as never }), /project options: sameness/)
+    off(resolveOptions('git', { project: { folder: 'tmp' } as never }), /project options: folder/)
+    off(resolveOptions('git', { project: { okBefore: { mode: 'sometimes', labels: [] } } as never }), /project options: okBefore/)
+    off(resolveOptions('git', { project: { identity: { name: 'A' } } as never }), /project options: identity/)
+    off(resolveOptions('git', { project: { commands: { test: 1 } } as never }), /project options: commands/)
+    // Every value each option takes passes.
+    expect(resolveOptions('git', { project: { review: 'agentThenYou', noSelfReview: true, reviewers: 2, sameness: 'exact', finish: 'hiveMerges', style: 'squash', folder: 'slots', okBefore: { mode: 'never', labels: ['ui'] }, identity: { name: 'A', email: 'a@example.com' } } }).invalid).toBeNull()
   })
 
   it("the runtime works under the project's resolved options, read again at each call", async () => {

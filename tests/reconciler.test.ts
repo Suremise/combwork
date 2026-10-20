@@ -369,6 +369,48 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     expect(await column(rev.w, reviewed)).toBe('done')
   })
 
+  // HR2's round 1: an observation recorded while the rules were off is acted on once they're on again, once.
+  it('off then on: a hand merge recorded while off makes the card Done once the rules are on, with its actions written once', async () => {
+    await advanced.set(ENFORCE, false)
+    const { w, repo, wt } = await workspace()
+    const { card } = await passedCard(w, wt)
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await reconcileNow(w, repo)
+    expect(kinds(w, card).at(-1)).toBe('Integrated')
+    expect(await column(w, card)).toBe('passed')
+    await advanced.set(ENFORCE, true)
+    await reconcileNow(w, repo)
+    expect(await column(w, card)).toBe('done')
+    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    expect(kinds(w, card).filter((k) => k === 'Integrated')).toHaveLength(1)
+    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    await reconcileNow(w, repo, ['main'])
+    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    expect(factsOf(w, card).filter((f) => f.kind === 'Moved' && (f.data as { cause: string }).cause === 'derived')).toHaveLength(1)
+  })
+
+  it('off then on: a stale pass recorded while off wakes its builder once the rules are on, once', async () => {
+    await advanced.set(ENFORCE, false)
+    const { w, repo, wt } = await workspace()
+    const { card } = await passedCard(w, wt)
+    // Amended with new content after the pass: not the same change.
+    writeFileSync(join(wt, 'b.txt'), 'changed\n')
+    git(wt, 'commit', '-q', '-a', '--amend', '--no-edit')
+    await reconcileNow(w, repo)
+    const stale = factsOf(w, card).find((f) => f.kind === 'Stale')!
+    expect(stale).toBeTruthy()
+    expect(actions(w, card)).toEqual([])
+    await advanced.set(ENFORCE, true)
+    await reconcileNow(w, repo)
+    const wakes = () => store.boardRead(w, (db) => db.prepare("SELECT fact, payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { fact: number; payload: string }[])
+    expect(wakes()).toHaveLength(1)
+    expect(wakes()[0].fact).toBe(stale.seq)
+    expect(JSON.parse(wakes()[0].payload)).toMatchObject({ agent: 'a1' })
+    expect(await column(w, card)).toBe('passed')
+    await reconcileNow(w, repo)
+    expect(wakes()).toHaveLength(1)
+  })
+
   it('turned off, the same hand merge of a Review card is recorded and the card stays in Review', async () => {
     await advanced.set(ENFORCE, false)
     const { w, repo, wt } = await workspace()

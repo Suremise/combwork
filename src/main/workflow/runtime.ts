@@ -138,8 +138,9 @@ export class Write {
     return this.stage
   }
 
-  action(kind: string, payload: Record<string, unknown> = {}): number {
-    return this.tx.action(this.card.id, kind, payload, this.written.at(-1)?.seq ?? null)
+  /** An action for the card, for the fact that caused it (the last this write wrote, unless named). */
+  action(kind: string, payload: Record<string, unknown> = {}, fact: number | null = this.written.at(-1)?.seq ?? null): number {
+    return this.tx.action(this.card.id, kind, payload, fact)
   }
 
   /** The card's state with what this write has added. */

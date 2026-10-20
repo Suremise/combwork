@@ -14,6 +14,8 @@ import { advanced } from '../advanced'
 import { boardWrite } from '../boardStore'
 import { config } from '../config'
 import { hiveError } from '../hiveError'
+import { observer } from '../platform/observe'
+import { isUnknown } from '../platform/types'
 import { msg } from '../../shared/i18n'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
@@ -40,6 +42,9 @@ interface Instance {
   life: AbortSignal
   wsPath: string
   resolved: ResolvedOptions
+  /** None: the time its hashes were last brought in line with the watcher's write log, and that sync (one at a time). */
+  syncedAt: number
+  sync: Promise<void>
 }
 
 const instances = new WeakMap<WorkspaceService, Map<string, Instance>>()
@@ -76,14 +81,35 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   let inst = byProject.get(key)
   // Another lifetime's (closed, or another workspace in this window), or the project's platform changed: a new one.
   if (!inst || inst.life !== life || inst.wsPath !== wsPath || inst.resolved.options.platform !== resolved.options.platform) {
-    const made: Omit<Instance, 'wf'> & { wf?: Workflow } = { life, wsPath, resolved }
+    const made: Omit<Instance, 'wf'> & { wf?: Workflow } = { life, wsPath, resolved, syncedAt: Date.now(), sync: Promise.resolve() }
     made.wf = make(ws, project, life, wsPath, () => made.resolved.options)
     inst = made as Instance
     byProject.set(key, inst)
   }
   inst.resolved = resolved
   inst.wf.none.setExcluded(resolved.options.excluded)
+  if (resolved.options.platform === 'none') await syncHashes(inst, project.path)
   return inst.wf
+}
+
+/**
+ * None (§16.3.3): a runtime kept across calls keeps its paths' hashes, which a write with the same size and time (a
+ * file restored or copied) wouldn't change (HR2's #1263 round 1). So each call first drops the hashes of the paths the
+ * watcher saw written since the last one, or all of them when its record of that time isn't complete (lost events, a
+ * watch started again, too long ago). One sync at a time, in order, so a call never reads hashes an earlier one hasn't
+ * dropped yet.
+ */
+function syncHashes(inst: Instance, project: string): Promise<void> {
+  const run = inst.sync.then(async () => {
+    const from = inst.syncedAt
+    const to = Date.now()
+    const seen = await observer.changedBetween(project, from, to, (paths) => paths)
+    if (isUnknown(seen)) inst.wf.none.forget()
+    else for (const p of seen.paths) inst.wf.none.invalidate(p)
+    inst.syncedAt = to
+  })
+  inst.sync = run.catch(() => inst.wf.none.forget())
+  return inst.sync
 }
 
 /** The options a project's runtime works under, with their origins (§16.6.6), as last resolved; null like workflowFor. */
