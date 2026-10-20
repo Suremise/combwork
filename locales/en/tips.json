@@ -319,6 +319,14 @@
     "defaultMessage": "Cards made by an older Hive",
     "description": "A tip's title."
   },
+  "tips.boardUpgrade.text": {
+    "defaultMessage": "Hive keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Hive can change it again.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.boardUpgrade.title": {
+    "defaultMessage": "Back to 0.9 after the upgrade",
+    "description": "A tip's title."
+  },
   "tips.cardCost.text": {
     "defaultMessage": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is a card's cost line as the board shows it (\"cost: ≈ $1.84 · 2 rounds\")."

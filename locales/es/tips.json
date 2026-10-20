@@ -79,6 +79,8 @@
   "tips.boardReview.title": "Haz que un agente revise una tarjeta",
   "tips.boardSetAside.text": "Si un espacio de trabajo se abrió en una versión anterior de Hive, sus tarjetas se apartan cuando esta versión lo vuelve a abrir. Revisar… en el aviso, o Tarjetas apartadas… en el menú ⋯ del tablero, agrega cada una al tablero o la descarta.",
   "tips.boardSetAside.title": "Tarjetas creadas por una versión anterior de Hive",
+  "tips.boardUpgrade.text": "Hive guarda el tablero 0.9 que actualizó a 1.0. Ayuda → Restaurar la copia de seguridad del tablero 0.9… lo devuelve, tras guardar una copia del tablero tal como está, para que un Hive 0.9 pueda cambiarlo de nuevo.",
+  "tips.boardUpgrade.title": "Volver a 0.9 después de actualizar",
   "tips.cardCost.text": "El panel de una tarjeta dice lo que usaron sus agentes mientras la tenían, “{example}”, con las partes del autor y del revisor y los tokens al pasar el puntero. Rendimiento muestra el costo de cada tarjeta, y al pasar el puntero por un carril en el panel Progreso, sus gastos generales.",
   "tips.cardCost.title": "Lo que costó una tarjeta",
   "tips.cardDecisions.text": "Las Decisiones de una tarjeta, encima de sus comentarios, guardan lo que decidiste: los agentes comprueban su trabajo con ellas antes de Revisión, y los revisores rechazan el trabajo que ignore alguna. Dile una decisión al Asistente y la anota ahí; si un agente espera tu respuesta, se le avisa.",

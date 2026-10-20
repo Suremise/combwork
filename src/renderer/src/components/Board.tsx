@@ -17,6 +17,7 @@ import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, ST
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { EXPORT_BOARD, exportBoard, reportArchived, unarchiveBatch } from '../boardBatches'
+import { BoardUpgradeBanner } from './BoardUpgrade'
 import { SET_ASIDE_ITEM } from './SetAside'
 import { useNow } from '../usage'
 import { ProviderIcon } from './ProviderIcon'
@@ -1292,6 +1293,7 @@ export function BoardView() {
         <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.', description: 'Under the Task Board\'s title. Review and Passed are board columns.' }))}</span>
       </div>
       <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} />
+      <BoardUpgradeBanner />
       <Board project={project} query={query} archived={archived} />
     </div>
   )
@@ -1309,6 +1311,7 @@ export function ProjectTasksTab({ project }: { project: ProjectInfo }) {
   return (
     <div className="board-view in-tab">
       <BoardToolbar project={project.name} scope={project.name} query={query} setQuery={setQuery} archived={archived} setArchived={setArchived} />
+      <BoardUpgradeBanner />
       <Board project={project.name} scope={project.name} query={query} archived={archived} />
     </div>
   )

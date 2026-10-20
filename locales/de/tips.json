@@ -79,6 +79,8 @@
   "tips.boardReview.title": "Eine Karte von einem Agenten reviewen lassen",
   "tips.boardSetAside.text": "Wurde ein Arbeitsbereich in einer älteren Version von Hive geöffnet, werden seine Karten zurückgestellt, wenn diese Version ihn wieder öffnet. „Ansehen…“ in der Meldung oder „Zurückgestellte Karten…“ im ⋯-Menü des Boards fügt jede zum Board hinzu oder verwirft sie.",
   "tips.boardSetAside.title": "Karten aus einer älteren Version von Hive",
+  "tips.boardUpgrade.text": "Hive bewahrt das 0.9-Board auf, das es auf 1.0 aktualisiert hat. „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ spielt es zurück, nachdem eine Kopie des Boards in seinem jetzigen Zustand aufbewahrt wurde, damit ein Hive 0.9 es wieder ändern kann.",
+  "tips.boardUpgrade.title": "Zurück zu 0.9 nach der Aktualisierung",
   "tips.cardCost.text": "Das Panel einer Karte zeigt, was ihre Agenten verbraucht haben, während sie sie hatten, „{example}“, mit den Anteilen von Bearbeiter und Reviewer und den Tokens beim Darüberfahren. „Leistung“ listet die Kosten jeder Karte, und beim Darüberfahren über eine Lane im Fortschrittspanel siehst du ihren Overhead.",
   "tips.cardCost.title": "Was eine Karte gekostet hat",
   "tips.cardDecisions.text": "Die Entscheidungen einer Karte, über ihren Kommentaren, halten fest, was du entschieden hast: Agenten prüfen ihre Arbeit vor dem Review daran, und Reviewer lassen Arbeit durchfallen, die eine davon missachtet. Sag dem Assistenten eine Entscheidung, und er trägt sie dort ein; ein Agent, der auf deine Antwort wartet, erfährt es.",

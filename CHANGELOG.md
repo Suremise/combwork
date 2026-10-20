@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **Hive 1.0 asks before it upgrades a workspace's board.** The first time 1.0 opens a workspace whose board 0.9 saved, it asks first. The upgrade happens in one go, and only while no other Hive has the workspace open (*Another Hive has this workspace open: close it first*). Hive keeps a copy of the 0.9 board that it never removes, and afterwards a 0.9 Hive shows the board read-only. Until you upgrade, the board is read-only in 1.0, with a banner offering the upgrade. **Help → Restore the 0.9 Board Backup…** puts the 0.9 board back for going back to 0.9, after keeping a copy of the board as it is. Every 1.0 Hive also marks the workspaces it has open in `.hive/open` (#1207).
+
 ## 0.9.3 — 2026-10-20
 
 - **The Assistant's modes are in `.hive/modes`.** Modes were once called personas, and their files still were: each workspace's are now in `.hive/modes`, where Hive moves its `.hive/personas` folder when the workspace opens, your own modes and edits with it, and the mode you chose stays chosen. If the folder can't be moved yet (a file in it open), Hive uses it where it is and moves it next time (#1084).
