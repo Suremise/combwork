@@ -19,6 +19,7 @@ import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
+import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('board')
@@ -110,6 +111,17 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: CARDS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: moveCardsIntoTables
+  },
+  {
+    // #1211: sessions and deliveries out of store_rows, into their typed tables (schema/sessionDeliveryTables.ts); the last of
+    // store_rows' stores, so store_rows goes with it (store_meta stays: sessions' and deliveries' values).
+    version: 6,
+    name: 'sessions and deliveries in tables', // i18n-ignore: a schema step's name, recorded in schema_version
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      const n = moveStoreRows(db)
+      log.info(`moved ${n.sessions} session record(s) and ${n.deliveries} deliveries into their tables`)
+    }
   }
 ]
 

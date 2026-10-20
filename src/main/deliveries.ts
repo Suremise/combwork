@@ -33,8 +33,9 @@ import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
 import { readCapped, readJson, renameRetrying } from './fsutil'
-import { openStore, readStore, rowsOf, saveStore } from './storeRows'
-import { dbGeneration, onDbReplaced } from './boardStore'
+import { openTable, readStore, saveTable, storeValue } from './storeRows'
+import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, writeDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -366,16 +367,22 @@ export function load(host: string): Promise<Store> {
  */
 async function readSaved(host: string, place: Store['place']): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[] }> {
   const file = fileOf(host)
-  const data = await openStore(place.workspace, 'deliveries', place.scope, file, async () => {
-    const got = await readFileOf(host)
-    if (!got) return null
-    const rows = rowsOf(got.deliveries)
-    const meta: Record<string, string> = { ...(got.next !== undefined ? { next: JSON.stringify(got.next) } : {}), ...(got.invalid.length ? { invalid: JSON.stringify(got.invalid) } : {}) }
-    return { rows, meta }
-  })
-  const raw = data.rows.map((r) => JSON.parse(r.doc) as unknown)
-  const kept = data.meta.get('invalid')
-  const savedNext = data.meta.has('next') ? (JSON.parse(data.meta.get('next')!) as unknown) : undefined
+  let raw: unknown[]
+  let value: (key: string) => string | null
+  if (upgradeWaiting(place.workspace)) {
+    // The workspace's upgrade to 1.0 waits (#1207): its file is 0.9's, its deliveries rows of store_rows; nothing is moved in.
+    const data = readStore(place.workspace, 'deliveries', place.scope)
+    raw = data.rows.map((r) => JSON.parse(r.doc) as unknown)
+    value = (key) => data.meta.get(key) ?? null
+  } else {
+    // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
+    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(host), DELIVERIES_TABLE)
+    const db = workspaceDb(place.workspace).reader
+    raw = readDeliveryRows(db, place.scope)
+    value = (key) => storeValue(db, 'deliveries', place.scope, key)
+  }
+  const kept = value('invalid')
+  const savedNext = value('next') !== null ? (JSON.parse(value('next')!) as unknown) : undefined
   const records: DeliveryRecord[] = []
   const invalid: unknown[] = kept ? [...(JSON.parse(kept) as unknown[])] : []
   for (const v of raw) {
@@ -387,6 +394,12 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
   const top = records.reduce((m, r) => Math.max(m, r.seq), 0)
   const next = Number.isInteger(savedNext) && (savedNext as number) > top ? (savedNext as number) : top + 1
   return { records, next, invalid }
+}
+
+/** The deliveries' side of a move in (openTable): how many a host has, and a file's written beside them. */
+const DELIVERIES_TABLE = {
+  count: (db: ReturnType<typeof workspaceDb>['writer'], scope: string) => countDeliveries(db, scope),
+  put: (db: ReturnType<typeof workspaceDb>['writer'], scope: string, got: { deliveries: unknown[]; next: unknown; invalid: unknown[] }) => addDeliveriesFile(db, scope, got)
 }
 
 /**
@@ -464,12 +477,13 @@ async function save(store: Store, d: Draft): Promise<void> {
   for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Hive could read back`)
   const text = fileText(d)
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('too many deliveries to keep in this project')
-  const rows = rowsOf(d.records)
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
     if (store.gen !== dbGeneration(store.place.workspace)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
   }
-  await saveStore(store.place.workspace, 'deliveries', store.place.scope, rows, { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  // Their table's rows that changed (#1211), the next id and the entries kept aside beside them, in one transaction.
+  const records = d.records as unknown as Record<string, unknown>[]
+  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => writeDeliveries(db, store.place.scope, records), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
 }
 
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
@@ -1486,9 +1500,15 @@ export async function loadsForTests(): Promise<void> {
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
 export async function savedForTests(host: string): Promise<{ next: number | undefined; deliveries: DeliveryRecord[]; invalid?: unknown[] }> {
   const place = await hostPlace(host)
-  const { rows, meta } = readStore(place.workspace, 'deliveries', place.scope)
-  const invalid = meta.get('invalid')
-  return { next: meta.has('next') ? (JSON.parse(meta.get('next')!) as number) : undefined, deliveries: rows.map((r) => JSON.parse(r.doc) as DeliveryRecord), ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }
+  // In their table since 1.0 (#1211, store_rows gone); 0.9's rows while the workspace's upgrade waits.
+  const waiting = upgradeWaiting(place.workspace)
+  const old = waiting ? readStore(place.workspace, 'deliveries', place.scope) : null
+  const db = workspaceDb(place.workspace).reader
+  const value = (key: string): string | null => (old ? (old.meta.get(key) ?? null) : storeValue(db, 'deliveries', place.scope, key))
+  const deliveries = old ? old.rows.map((r) => JSON.parse(r.doc) as DeliveryRecord) : (readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[])
+  const next = value('next')
+  const invalid = value('invalid')
+  return { next: next !== null ? (JSON.parse(next) as number) : undefined, deliveries, ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }
 }
 
 export async function forgetDeliveriesForTests(): Promise<void> {
