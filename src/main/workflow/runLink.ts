@@ -9,7 +9,7 @@
 import { randomUUID } from 'crypto'
 import { isAbsolute } from 'path'
 import { gitReading } from '../git'
-import { ProgressError, type ProgressCaller } from '../progress'
+import { ProgressError, admitReport, type ProgressCaller, type ProgressGate } from '../progress'
 import type { TaskColumn } from '../../shared/types'
 import { cardRefText, shortRevision } from '../../shared/progress'
 
@@ -122,6 +122,25 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
 /** A link as the Agent API gives it: the card by its reference, the commits in full, and the id its start passes back. */
 export function publicLink(l: RunLink, id: string): Record<string, unknown> {
   return { link: id, card: l.card === null ? null : cardRefText(l.card), revision: l.revision, testedCheckout: l.testedCheckout, check: l.check, folder: l.folder }
+}
+
+/**
+ * Admits a run's start with what it runs for (#1220 round 2): its caller and its link are looked up inside the admission,
+ * so a panel turned off (or off and on) while they are is ignored as any report is (admitReport), and `settled` (the
+ * request's workspace still open) is checked after both, right before the start.
+ */
+export function admitLinked<T>(gate: ProgressGate, ignored: T, steps: { caller: () => Promise<ProgressCaller>; link: (caller: ProgressCaller) => Promise<RunLink>; settled: () => void }, start: (caller: ProgressCaller, link: RunLink) => T): Promise<T> {
+  return admitReport(
+    gate,
+    ignored,
+    async () => {
+      const caller = await steps.caller()
+      const link = await steps.link(caller)
+      steps.settled()
+      return { caller, link }
+    },
+    ({ caller, link }) => start(caller, link)
+  )
 }
 
 /** Who a link was given to: an agent, or a workspace's Assistant or scripts. */

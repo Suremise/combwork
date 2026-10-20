@@ -5,7 +5,7 @@ import { execFileSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { commitIn, folderHead, IssuedLinks, LINK_TTL_MS, linkOwner, MAX_LINKS, publicLink, resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
+import { admitLinked, commitIn, folderHead, IssuedLinks, LINK_TTL_MS, linkOwner, MAX_LINKS, publicLink, resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { keptRuns, ProgressStore, type ProgressCaller } from '../src/main/progress'
 import { publicRun } from '../src/main/apiEvents'
 import { runDetails } from '../src/shared/progress'
@@ -152,6 +152,66 @@ describe("links resolve gives out, for the run's start (round 1's finding 1)", (
     const rest = Array.from({ length: MAX_LINKS }, () => links.issue(linkOwner(agent), link))
     expect(links.take(linkOwner(agent), first)).toBeNull()
     expect(links.take(linkOwner(agent), rest[rest.length - 1])).toEqual(link)
+  })
+})
+
+describe("a start's link is looked up inside its admission (round 2's finding)", () => {
+  const link = { card: 12, revision: null, testedCheckout: null, check: null, folder: null }
+  const IGNORED: { id?: string; ignored?: boolean } = { ignored: true }
+
+  /** A gate the test turns off and on, a link lookup it finishes when it chooses, and the starts made. */
+  function rig() {
+    let on = true
+    let generation = 0
+    let release!: () => void
+    const ready = new Promise<void>((r) => (release = r))
+    const starts: unknown[] = []
+    let lookups = 0
+    let closed = false
+    const admit = () =>
+      admitLinked(
+        { on: () => on, generation: () => generation },
+        IGNORED,
+        {
+          caller: async () => agent,
+          link: async () => (lookups++, await ready, link),
+          settled: () => {
+            if (closed) throw new Error('The workspace was closed')
+          }
+        },
+        (caller, l) => (starts.push({ caller, l }), { id: 'started' })
+      )
+    return { admit, release, starts, lookups: () => lookups, toggle: (v: boolean) => ((on = v), generation++), close: () => (closed = true) }
+  }
+
+  it('a panel turned off, or off and on, while the link is looked up ignores the start', async () => {
+    for (const toggles of [[false], [false, true]]) {
+      const r = rig()
+      const reply = r.admit()
+      for (const v of toggles) r.toggle(v)
+      r.release()
+      expect(await reply).toBe(IGNORED)
+      expect(r.starts).toEqual([])
+    }
+  })
+
+  it('with the panel off from the start, nothing is looked up; a workspace closed meanwhile gets no run; otherwise it starts with its link', async () => {
+    const off = rig()
+    off.toggle(false)
+    expect(await off.admit()).toBe(IGNORED)
+    expect(off.lookups()).toBe(0)
+
+    const closing = rig()
+    const reply = closing.admit()
+    closing.close()
+    closing.release()
+    await expect(reply).rejects.toThrow('The workspace was closed')
+    expect(closing.starts).toEqual([])
+
+    const fine = rig()
+    fine.release()
+    expect(await fine.admit()).toEqual({ id: 'started' })
+    expect(fine.starts).toEqual([{ caller: agent, l: link }])
   })
 })
 

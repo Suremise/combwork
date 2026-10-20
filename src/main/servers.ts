@@ -17,7 +17,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
-import { commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
+import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -2332,9 +2332,13 @@ async function progressCaller(): Promise<ProgressCaller> {
   const workspacePath = ws.path!
   const life = ws.lifetime
   const caller = await progressCallerIn(workspacePath)
-  // Looking the agent up waited: a workspace that closed meanwhile (its runs cleared) must not get a run back.
-  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, 'The workspace was closed')
+  progressWorkspaceOpen(ws, workspacePath, life)
   return caller
+}
+
+/** Looking the caller up waited: a workspace that closed meanwhile (its runs cleared) must not get a run back. */
+function progressWorkspaceOpen(ws: WorkspaceService, workspacePath: string, life: WorkspaceService['lifetime']): void {
+  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, 'The workspace was closed')
 }
 
 async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> {
@@ -2504,15 +2508,11 @@ const runLinkDeps: RunLinkDeps = {
 /** The links resolve gave out, for the starts that pass them back (runLink.ts). */
 const issuedLinks = new IssuedLinks()
 
-/**
- * What a progress request says it runs for, resolved and checked (runLink.ts): its 400s as the API's. A start that
- * passes back the `link` resolve gave its caller gets what was resolved then (the checkout before its command started).
- */
-async function runLinkOf(body: Record<string, unknown>, issued = false) {
+/** What a progress request says it runs for, resolved and checked (runLink.ts): its 400s as the API's. */
+async function runLinkOf(body: Record<string, unknown>) {
   try {
     const caller = await progressCallerIn(requireWorkspace().path!)
-    const given = issued ? issuedLinks.take(linkOwner(caller), body.link) : null
-    return { caller, link: given ?? (await resolveRunLink(caller, body, runLinkDeps)) }
+    return { caller, link: await resolveRunLink(caller, body, runLinkDeps) }
   } catch (e) {
     throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
   }
@@ -2526,10 +2526,27 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
   return publicLink(link, issuedLinks.issue(linkOwner(caller), link))
 })
 
+// A start resolves what it runs for inside its admission (admitLinked): a panel turned off, or off and on, while its
+// link is looked up (the board, git) ignores it, and a workspace closed meanwhile gets no run.
 route('POST', '/v1/progress', async ({ body }) => {
   const b = bodyObject(body)
-  const link = progressGate.on() ? (await runLinkOf(b, true)).link : null
-  return progressCall<{ id: string; ignored?: true }>({ id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true }, (caller) => ({ id: progress.start(caller, b, link ? { ...link, check: link.check?.name ?? null } : {}).id }))
+  const ws = requireWorkspace()
+  const workspacePath = ws.path!
+  const life = ws.lifetime
+  try {
+    return await admitLinked<{ id: string; ignored?: true }>(
+      progressGate,
+      { id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true },
+      {
+        caller: () => progressCallerIn(workspacePath),
+        link: async (caller) => issuedLinks.take(linkOwner(caller), b.link) ?? (await resolveRunLink(caller, b, runLinkDeps)),
+        settled: () => progressWorkspaceOpen(ws, workspacePath, life)
+      },
+      (caller, link) => ({ id: progress.start(caller, b, { ...link, check: link.check?.name ?? null }).id })
+    )
+  } catch (e) {
+    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+  }
 })
 
 route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
