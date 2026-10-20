@@ -212,6 +212,8 @@
   "tips.permissionMode.title": "Changer de mode d’autorisation",
   "tips.progressCard.text": "Une exécution du panneau Progression montre sous l’agent la carte et la révision sur laquelle elle a tourné, par exemple #1061 · a3f2c1d : clique sur la carte pour l’ouvrir, ou sur la révision pour la copier.",
   "tips.progressCard.title": "Pour quelle carte était cette exécution ?",
+  "tips.progressCheck.text": "Une exécution pour une carte est enregistrée comme vérification de la révision de la carte. Ses détails dans le panneau Progression indiquent « Compte comme vérification », ou pourquoi pas : elle n’a pas été lancée comme cette vérification, le dossier avait des modifications non validées, ou des fichiers ont changé pendant l’exécution.",
+  "tips.progressCheck.title": "Cette exécution compte-t-elle comme vérification ?",
   "tips.progressCommand.text": "Les agents lancent les commandes longues, comme les tests et les builds, via hive-progress, pour que le panneau Progression les affiche sous le nom de l’agent, avec le temps restant approximatif dès la deuxième fois. Les paramètres permettent de ne le leur faire faire que quand tu le demandes.",
   "tips.progressCommand.title": "La progression de n’importe quelle commande",
   "tips.progressDetails.text": "Clique sur une exécution dans le panneau Progression, ou sur une de Récentes, pour voir ses détails : la commande complète, quand elle a tourné et combien de temps elle a pris, son code de sortie, le journal qu’elle a écrit et pourquoi elle a échoué.",

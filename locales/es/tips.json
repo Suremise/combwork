@@ -212,6 +212,8 @@
   "tips.permissionMode.title": "Cambia el modo de permisos",
   "tips.progressCard.text": "Una ejecución del panel Progreso muestra bajo el agente la tarjeta y la versión en la que se ejecutó, como #1061 · a3f2c1d: haz clic en la tarjeta para abrirla, o en la versión para copiarla.",
   "tips.progressCard.title": "¿Para qué tarjeta era esa ejecución?",
+  "tips.progressCheck.text": "Una ejecución para una tarjeta queda registrada como comprobación de la versión de la tarjeta. Sus detalles en el panel Progreso dicen «Cuenta como comprobación» o por qué no: no se inició como esa comprobación, la carpeta tenía cambios sin confirmar o cambiaron archivos mientras se ejecutaba.",
+  "tips.progressCheck.title": "¿Contó esa ejecución como comprobación?",
   "tips.progressCommand.text": "Los agentes ejecutan los comandos largos, como pruebas y compilaciones, con hive-progress, así que el panel Progreso los muestra bajo el nombre del agente, con una estimación del tiempo restante a partir de la segunda vez. La configuración puede hacer que lo hagan solo cuando lo pidas.",
   "tips.progressCommand.title": "Progreso para cualquier comando",
   "tips.progressDetails.text": "Haz clic en una ejecución del panel Progreso, o en una de Recientes, para ver sus detalles: el comando completo, cuándo se ejecutó y cuánto tardó, su código de salida, el registro que escribió y por qué falló.",
