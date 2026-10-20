@@ -2363,14 +2363,15 @@ export function forgetWatches(ws: WorkspaceService): void {
 }
 
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its watches, read from the file
-// before, go from memory (closed by their generation: a change begun on them is refused) and are read again from it now.
+// before, go from memory (closed by their generation: a change begun on them is refused). They are read again from it
+// by their next use (the replacement's tasks-changed checks them, for a workspace still open), never by this: a
+// workspace closed meanwhile isn't opened again (#1207 round 3).
 onDbReplaced((workspacePath) => {
   const k = workspacePath.toLowerCase()
   const store = stores.get(k)
   if (!store) return
   stores.delete(k)
   for (const d of store.delivering.values()) d.cancelled = true
-  setImmediate(() => void load(store.ws).catch((e) => log.warn('reading the card watches again', e)))
 })
 
 /**

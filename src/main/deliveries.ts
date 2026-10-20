@@ -335,8 +335,12 @@ export function load(host: string): Promise<Store> {
         recheck(store, d)
       }).catch((e) => log.warn('restoring deliveries', e))
       if (stores.has(k)) return stores.get(k)!
-      // The database replaced meanwhile (the upgrade to 1.0, a restore): read again, from the file as it is now.
-      if (gen !== dbGeneration(place.workspace) && tries < 3) continue
+      if (gen !== dbGeneration(place.workspace)) {
+        // The database replaced meanwhile (the upgrade to 1.0, a restore): read again, from the file as it is now, while
+        // its workspace is still open; closed meanwhile, the stale read is kept by nobody (its saves are refused anyway).
+        if (!workspaceFor(host)) return store
+        if (tries < 3) continue
+      }
       stores.set(k, store)
       showAll(store)
       // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
@@ -1433,18 +1437,12 @@ export function initDeliveries(): void {
 }
 
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
-// file before, go from memory (a save begun from them is refused by their generation) and are read again from the file
-// as it is now, with what another Hive saved meanwhile.
+// file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's
+// status, the workspace opening) reads it again from the file as it is then, with what another Hive saved meanwhile;
+// nothing reads it for a workspace closed meanwhile, which would open its database again (#1207 round 3). While the upgrade
+// waited no agent could start, so none waits for an offer.
 onDbReplaced((workspacePath) => {
-  const again: string[] = []
-  for (const [k, store] of stores) {
-    if (store.place.workspace.toLowerCase() !== workspacePath.toLowerCase()) continue
-    stores.delete(k)
-    again.push(store.host)
-  }
-  setImmediate(() => {
-    for (const h of again) void load(h).catch((e) => log.warn('reading the deliveries again', e))
-  })
+  for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === workspacePath.toLowerCase()) stores.delete(k)
 })
 
 // Sessions give their own lines through the service (#649: a lock's go-ahead, the carry-on after a sign-in, a handover's
