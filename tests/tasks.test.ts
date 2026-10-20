@@ -524,10 +524,26 @@ describe('archiving in batches', () => {
   it('a card an agent takes while the archive waits is left on the board (race)', async () => {
     const [idle, alsoIdle] = [await make('Idle'), await make('Also idle')]
     const busy = (c: { column: string; agent: string | null }): string | null => (c.column === 'doing' && c.agent ? 'Agent 1 is working on it' : null)
-    // The agent takes the card (under its lock) just as the archive, sent for it as idle, reaches it.
-    const [, inTodo] = await Promise.all([run(() => tasks.updateTask(idle, { column: 'doing', agent: 'a1' }, user)), run(() => tasks.archiveBatch([idle], req('All in Todo', { column: 'todo' }), user, { busy }))])
+    // The agent takes the card (under its lock) just as the archive, sent for it as idle, reaches it: the archive is sent
+    // once the take is in its change (a move reads its work first, #1216, so which starts first decides nothing).
+    const takeThenArchive = async <T>(n: number, archive: () => Promise<T>): Promise<T> => {
+      let inside!: () => void
+      const entered = new Promise<void>((r) => (inside = r))
+      tasks.taskTestHooks.beforeUpdate = async (x) => {
+        if (x === n) inside()
+      }
+      try {
+        const taking = run(() => tasks.updateTask(n, { column: 'doing', agent: 'a1' }, user))
+        await entered
+        const [, out] = await Promise.all([taking, run(archive)])
+        return out
+      } finally {
+        tasks.taskTestHooks.beforeUpdate = null
+      }
+    }
+    const inTodo = await takeThenArchive(idle, () => tasks.archiveBatch([idle], req('All in Todo', { column: 'todo' }), user, { busy }))
     expect([inTodo.archived, inTodo.skipped]).toEqual([[], [{ number: idle, why: 'moved to Doing' }]])
-    const [, board] = await Promise.all([run(() => tasks.updateTask(alsoIdle, { column: 'doing', agent: 'a1' }, user)), run(() => tasks.archiveBatch([alsoIdle], req('All Cards'), user, { busy }))])
+    const board = await takeThenArchive(alsoIdle, () => tasks.archiveBatch([alsoIdle], req('All Cards'), user, { busy }))
     expect([board.archived, board.skipped]).toEqual([[], [{ number: alsoIdle, why: 'Agent 1 is working on it' }]])
     for (const n of [idle, alsoIdle]) expect((await run(() => tasks.getTask(n))).archived).toBe(false)
   })
