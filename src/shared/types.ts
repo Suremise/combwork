@@ -17,6 +17,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
+import type { PresetId, WorkflowOptions } from './workflow/options'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -882,6 +883,13 @@ export interface RemovedData {
 
 export type Inherit<T> = 'inherit' | T
 
+/** A project's workflow options as project.json keeps them (SPEC §16.6.6). */
+export interface ProjectWorkflow {
+  platform: PlatformId
+  preset: PresetId | null
+  options: WorkflowOptions
+}
+
 export interface ProjectConfig {
   /** 2 since 0.2.0: agents are all equal and a project starts with none (0.1's agents are cleared). */
   version: 2
@@ -941,6 +949,12 @@ export interface ProjectConfig {
    * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
    */
   platform?: PlatformId
+  /**
+   * The project's workflow options (SPEC §16.6.6, OP-5): its platform, the preset they came from (null: set one by one,
+   * or the upgrade's), and the options. The upgrade to 1.0 writes them from how the project works today (#1218, §16.17);
+   * read-only in P3 (P4's Version Control tab edits them).
+   */
+  workflow?: ProjectWorkflow
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null

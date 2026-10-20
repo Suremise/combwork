@@ -219,6 +219,7 @@ export const SUITES = [
   { name: 'unsaved' },
   { name: 'unusedwt' },
   { name: 'update' },
+  { name: 'upgradelane' },
   { name: 'viewer' },
   { name: 'wakepaste' },
   { name: 'wakepaste-codex', needs: ['codex'] },
