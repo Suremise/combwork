@@ -10,6 +10,7 @@ import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel } from './tasks'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
+import type { StageId } from './workflow/facts'
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
 export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
@@ -21,6 +22,8 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   reviewStalled?: string
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
+  /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
+  stage: StageId
 }
 
 /** A card in a listing (GET /v1/tasks?view=short): what it is and where it stands, without its text. */

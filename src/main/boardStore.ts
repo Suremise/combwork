@@ -21,6 +21,7 @@ import { createLogger, userText } from './logger'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
+import { CATEGORY_STAGE, type Category, type StageId } from '../shared/workflow/facts'
 
 const log = createLogger('board')
 
@@ -899,6 +900,19 @@ export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown
 export function hasCard(ws: WorkspaceService, n: number): boolean {
   const { db } = readConn(ws)
   return !!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n) // i18n-ignore: SQL
+}
+
+/**
+ * Cards' 1.0 stages (#1223, SPEC §16.4.3), by number: the `stage` column, else (no 1.0 rule has moved the card, or the
+ * board waits for its upgrade) the stage its column stands for. A card not on the board isn't in the map.
+ */
+export function cardStages(ws: WorkspaceService, numbers: number[]): Map<number, StageId> {
+  if (!numbers.length) return new Map()
+  return readSnapshot(ws, (b, db) => {
+    const cols = b.legacy ? "NULL AS stage, doc ->> '$.column' AS col" : 'stage, col' // i18n-ignore: SQL
+    const rows = db.prepare(`SELECT number, ${cols} FROM cards WHERE number IN (SELECT value FROM json_each(?))`).all(JSON.stringify(numbers)) as { number: number; stage: StageId | null; col: Category }[] // i18n-ignore: SQL
+    return new Map(rows.map((r) => [r.number, r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo']))
+  })
 }
 
 /** Every card number on the board. */
