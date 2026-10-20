@@ -529,7 +529,7 @@
   "board.toolbar.more": "Quadro: mais",
   "board.toolbar.search": "Pesquisar cartões (#12, palavras, rótulos)",
   "board.upgrade.askDetail": "Feche antes qualquer outro Hive que esteja com este espaço de trabalho aberto. Até ser atualizado, o quadro dele fica só para leitura aqui e os agentes dele não podem iniciar.",
-  "board.upgrade.askMessage": "O Hive 1.0 precisa atualizar os dados deste espaço de trabalho. Depois, um Hive 0.9 só poderá abri-lo para leitura; um backup é guardado, e Ajuda → Restaurar o backup do quadro 0.9… o traz de volta.",
+  "board.upgrade.askMessage": "O Hive 1.0 precisa atualizar os dados deste espaço de trabalho. Depois, um Hive 0.9 não poderá mais abri-lo; um backup é guardado, e Ajuda → Restaurar o backup do quadro 0.9… o traz de volta.",
   "board.upgrade.askTitle": "Atualizar o quadro deste espaço de trabalho para 1.0?",
   "board.upgrade.banner": "Este espaço de trabalho é do Hive 0.9: até ser atualizado para 1.0, o quadro dele fica só para leitura aqui e os agentes dele não podem iniciar.",
   "board.upgrade.bannerButton": "Atualizar…",

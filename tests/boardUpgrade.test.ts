@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { as09 } from './boardDb'
 
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -243,29 +244,11 @@ async function board09(): Promise<string> {
   const w = await open(ws)
   await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
   await close(w)
-  // As 0.9 left it: none of the 1.0 group's steps, and none of the tables they make (#1212's on).
-  const raw = new DatabaseSync(store.boardFile(ws))
-  raw.prepare(`DELETE FROM schema_version WHERE version >= ?`).run(Math.min(...upgradeSteps.map((m) => m.version)))
-  raw.exec("DELETE FROM board_meta WHERE key = 'format'")
-  raw.exec('PRAGMA foreign_keys = OFF')
-  for (const t of tablesOf(raw)) if (!tables09().includes(t)) raw.exec(`DROP TABLE "${t}"`)
-  raw.close()
+  // As 0.9 left it: its cards as documents, none of the 1.0 group's steps.
+  as09(store.boardFile(ws))
   return ws
 }
 
-/** A database's own tables. */
-const tablesOf = (db: DatabaseSync): string[] => (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((r) => r.name)
-let known09: string[] | null = null
-/** The tables a board 0.9 made has: those of every step before the 1.0 group. */
-function tables09(): string[] {
-  if (known09) return known09
-  const file = join(base, `tables-09-${++n}.db`)
-  openDb(file, { migrations: store.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
-  const db = new DatabaseSync(file, { readOnly: true })
-  known09 = tablesOf(db)
-  db.close()
-  return known09
-}
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
 
 describe("the board's upgrade to 1.0 (#1207)", () => {

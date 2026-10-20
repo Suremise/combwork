@@ -529,7 +529,7 @@
   "board.toolbar.more": "Board: more",
   "board.toolbar.search": "Search cards (#12, words, labels)",
   "board.upgrade.askDetail": "Close every other Hive that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",
-  "board.upgrade.askMessage": "Hive 1.0 needs to upgrade this workspace's data. A 0.9 Hive can then only open it read-only; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it back.",
+  "board.upgrade.askMessage": "Hive 1.0 needs to upgrade this workspace's data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it back.",
   "board.upgrade.askTitle": "Upgrade this workspace's board to 1.0?",
   "board.upgrade.banner": "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
   "board.upgrade.bannerButton": "Upgrade…",

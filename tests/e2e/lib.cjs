@@ -17,6 +17,7 @@ const ROOT = path.resolve(__dirname, '..', '..')
 /** Electron's executable (the electron package resolves to its path in plain Node). */
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
+const { readDocs, writeDoc } = require('./boardRows.cjs')
 // WORK: where suites keep their profiles, workspaces and screenshots. Stable, so Claude Code trusts its folders once.
 fs.mkdirSync(WORK, { recursive: true })
 
@@ -61,16 +62,16 @@ function trashed(match = '') {
 }
 
 /**
- * A card of a workspace's board as Hive saved it (#1017: in .hive\hive.db, the card's JSON document), read on a
+ * A card of a workspace's board as Hive saved it (in .hive\hive.db: its JSON document, from 1.0's tables, #1209), read on a
  * connection of its own (read-only; Hive writing meanwhile is fine). Throws when there is no such card.
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { readOnly: true, timeout: 5000 })
   try {
-    const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n)
+    const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
-    return JSON.parse(row.doc)
+    return row.doc
   } finally {
     db.close()
   }
@@ -81,7 +82,7 @@ function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
   try {
-    db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc').run(n, JSON.stringify(doc))
+    writeDoc(db, n, doc)
   } finally {
     db.close()
   }

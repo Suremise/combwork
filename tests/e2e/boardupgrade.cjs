@@ -1,7 +1,8 @@
 // S60, the 1.0 upgrade's two-process test (#1207, SPEC §16.17, OP-41): a released 0.9 Hive (another profile) holds a
 // workspace whose board it made while the dev build opens it. The dev build asks first; Upgrade is refused with "close
 // it first" and nothing changes; Not Now leaves the board read-only with a banner. With the 0.9 Hive closed the upgrade
-// runs, keeping the 0.9 copy; the 0.9 Hive opened afterwards shows the board read-only. Help → Restore the 0.9 Board
+// runs, keeping the 0.9 copy; the 0.9 Hive opened afterwards can't open the board (its cards are in 1.0's tables, #1209),
+// and says so. Help → Restore the 0.9 Board
 // Backup… puts the copy back, after which 0.9 writes again. Last, a 0.9 Hive started *during* the upgrade (the dev build
 // holding its lock, HIVE_TEST_UPGRADE_HOLD): what it shows is recorded for the RC notes. Banner and dialog in both themes.
 //
@@ -146,7 +147,7 @@ async function themes(dev, name) {
     await lib.openWorkspace(dev.inv, dev.page, ws)
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
-    check('…saying why, that a 0.9 Hive can then only open it read-only, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Hive can then only open it read-only; a backup is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
+    check('…saying why, that a 0.9 Hive can then no longer open it, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Hive can then no longer open it; a backup is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     await themes(dev, '1-ask')
 
     // 3. Upgrade while the 0.9 Hive has it open: refused, nothing changed.
@@ -187,14 +188,15 @@ async function themes(dev, name) {
     const markers = fs.readdirSync(path.join(ws, '.hive', 'open'))
     check('the dev build marks the workspace open (.hive/open)', markers.length === 1 && /^boardupgrade-dev-[0-9a-f]{8}\.json$/.test(markers[0]), String(markers))
 
-    // 6. The 0.9 Hive opened afterwards: read-only.
-    const old2 = await startOld(old)
+    // 6. The 0.9 Hive opened afterwards: it can no longer open the board, its cards being in 1.0's tables (#1209; Darren,
+    // 20 Oct), and says so: the workspace not opened, or opened with its board unreadable. Nothing it tries reaches the board.
+    const old2 = await startOld(old, true)
     open.add(old2)
-    const list2 = await old2.inv('tasks:list')
-    check('0.9 opened afterwards reads the board', list2.some((c) => c.title === 'Made in 1.0'), JSON.stringify(list2.map((c) => c.title)))
-    const refused09 = await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' }))
-    check('…and is refused a change: a newer Hive saved it', /newer version of Hive/.test(refused09 ?? ''), refused09 ?? 'accepted')
-    record('0.9 after the upgrade', refused09 ?? 'accepted')
+    const read09 = old2.openError ?? (await failure(old2.inv('tasks:list')))
+    check("0.9 opened afterwards can't open the board, saying so", read09 !== null && /couldn't be opened|newer version of Hive/.test(read09), read09 ?? 'read it')
+    const refused09 = old2.openError ?? (await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' })))
+    check('…nor change it', refused09 !== null, 'accepted')
+    record('0.9 after the upgrade', old2.openError ? `opening the workspace failed: ${old2.openError}` : `the workspace opened; its board: ${read09}; a change: ${refused09}`)
     await old2.page.screenshot({ path: path.join(shots, '4-old-after.png') })
     await close(old2)
 

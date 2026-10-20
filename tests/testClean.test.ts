@@ -14,6 +14,8 @@ import { claimLane } from './e2e/lanes.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { finishRunDirs, keepSuiteFiles, newRunDir, omittedLine, pruneRunDirs, pruneRunDirsReleasing } from './e2e/logs.mjs'
 import { tempDir } from './tempDir'
+import { decomposeCard, writeCardRows } from '../src/main/schema/cardRows'
+import { CARDS_STEP } from '../src/main/schema/v1_0'
 
 const require = createRequire(import.meta.url)
 const { citedBy, findBoard, readCards, evidence, freshFolder, clearDir, finishSuiteDir, recordKept, releaseKept, claimedByRuns, MAX_COPIES } = require('./e2e/evidence.cjs')
@@ -155,6 +157,24 @@ describe('what cards cite (they keep it)', () => {
     const missing = readCards(join(dir, 'gone.db'))
     expect(missing.ok).toBe(false)
     expect(evidence({ tasksDir: join(dir, 'gone.db'), testRoot: 'C:\\hive-test' }).protects('C:\\hive-test\\e2e\\anything')).toMatch(/can't be read/)
+  })
+
+  it("reads a 1.0 board's cards from its tables (#1209) as it reads a 0.9 board's documents", () => {
+    const dir = temp('hive-clean-db10-')
+    const file = join(dir, 'hive.db')
+    const db = new DatabaseSync(file)
+    for (const sql of CARDS_STEP.ddl) db.exec(sql)
+    const add = (n: number, c: object): void => writeCardRows(db, decomposeCard(n, { number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
+    add(1, { description: 'hive-test\\e2e\\a.png' })
+    add(2, { column: 'done', description: 'hive-test\\e2e\\b.png' })
+    add(3, { archived: true, description: 'hive-test\\e2e\\c.png' })
+    add(4, { column: 'passed', comments: [{ at: '2026-10-20T00:00:00.000Z', by: 'You', text: 'e2e\\D.png' }] })
+    db.close()
+    const read = readCards(file)
+    expect(read.ok).toBe(true)
+    expect(read.cards.map((c: Card) => c.number).sort()).toEqual([1, 4])
+    expect(citedBy('e2e/d.png', read.cards)).toBe(4)
+    expect(citedBy('e2e/a.png', read.cards)).toBe(1)
   })
 
   it('finds the database before the stub folder an older Hive reads (#1017): a moved board never reads as empty', () => {
