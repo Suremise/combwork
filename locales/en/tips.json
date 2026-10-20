@@ -851,6 +851,14 @@
     "defaultMessage": "Which card was that run for?",
     "description": "A tip's title."
   },
+  "tips.progressCheck.text": {
+    "defaultMessage": "A run for a card is recorded as a check of the card's revision. Its details in the Progress panel say Counts as check, or why not: it wasn't started as the check, the folder had uncommitted changes, or files changed while it ran.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. \"Counts as check\" is how a run's details say it counts: keep it as the details do."
+  },
+  "tips.progressCheck.title": {
+    "defaultMessage": "Did that run count as a check?",
+    "description": "A tip's title."
+  },
   "tips.progressCommand.text": {
     "defaultMessage": "Agents run long commands such as tests and builds through hive-progress, so the Progress panel shows them under the agent's name, with about how long is left from the second time. Settings can have them do it only when you ask.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -913,6 +921,14 @@
   },
   "tips.progressPanel.title": {
     "defaultMessage": "How long until the tests finish?",
+    "description": "A tip's title."
+  },
+  "tips.progressRecentFold.text": {
+    "defaultMessage": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Recent is the Progress panel's section of runs that ended."
+  },
+  "tips.progressRecentFold.title": {
+    "defaultMessage": "Fold Recent away",
     "description": "A tip's title."
   },
   "tips.projectCards.text": {

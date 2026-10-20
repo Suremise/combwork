@@ -254,11 +254,11 @@ export type CardHolds = Pick<TaskCard, 'number' | 'project' | 'held' | 'history'
  * Every card's holds (archived ones too), for costs (#602): only those fields of each document, made in the query
  * (#1107), so a card's comments are never parsed for it.
  */
-export async function cardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
+export async function cardHolds(ws: WorkspaceService, o: { live?: boolean } = {}): Promise<CardHolds[]> {
   if (!ws.path) return []
   const ids = await ws.projectIds()
   if (!ws.path) return []
-  return holdDocs(ws).map(({ number, doc }) => {
+  return holdDocs(ws, o).map(({ number, doc }) => {
     const c = clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)
     return { number, project: c.project, held: c.held, history: c.history, agent: c.agent, agentName: c.agentName, review: c.review }
   })

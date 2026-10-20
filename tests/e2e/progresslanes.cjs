@@ -332,6 +332,34 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
   }
+  // What the cards' facts say (#1225), from the moves above: the revision under review and the last verdict on its
+  // revision, a passed card's verdict, and a Done card's merge commit (the ended lane's own record: no merge fact).
+  const head7 = String(lib.git(alpha, ['rev-parse', 'HEAD'])).trim().slice(0, 7)
+  const workLines = async (row, n) => page.locator('.tip', { hasText: `#${n} ` }).locator('.lane-seg-work').allInnerTexts().catch(() => [])
+  const work = [
+    [row1, n3, 'review', (l) => l.includes(`Under review: ${head7}`) && l.some((x) => x.startsWith(`Last verdict: failed on ${head7}`))],
+    [row1, n2, 'passed', (l) => l.some((x) => x.startsWith(`Last verdict: passed on ${head7}`))],
+    [section.locator(`.progress-lane[data-lane="${l4}"]`), n1, 'merged', (l) => l.includes('Merged as abc1234')]
+  ]
+  for (const [row, n, what, ok] of work) {
+    const seg = row.locator(`.lane-seg[data-card="${n}"]`)
+    await page.mouse.move(0, 0)
+    await seg.hover()
+    check(`hovering the ${what} segment says what its facts say`, !!(await until(async () => ok(await workLines(row, n)), HUNG_MS)), JSON.stringify(await workLines(row, n)))
+    if (what === 'merged') continue
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      const shown = await until(async () => {
+        if (ok(await workLines(row, n))) return true
+        await seg.hover()
+        return false
+      }, HUNG_MS)
+      check(`${theme}: the ${what} hover with its facts shows for its screenshot`, !!shown)
+      await page.screenshot({ path: path.join(shots, `hover-work-${what}-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+  }
   await page.mouse.move(0, 0)
   // A click opens the card.
   await row1.locator(`.lane-seg[data-card="${n6}"]`).click()

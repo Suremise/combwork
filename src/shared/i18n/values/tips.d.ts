@@ -214,6 +214,8 @@ interface HiveMessageValues {
   'tips.permissionMode.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
+  'tips.progressCheck.text': undefined
+  'tips.progressCheck.title': undefined
   'tips.progressCommand.text': undefined
   'tips.progressCommand.title': undefined
   'tips.progressDetails.text': undefined
@@ -230,6 +232,8 @@ interface HiveMessageValues {
   'tips.progressLanesOrder.title': undefined
   'tips.progressPanel.text': { key: string | number }
   'tips.progressPanel.title': undefined
+  'tips.progressRecentFold.text': undefined
+  'tips.progressRecentFold.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
   'tips.projectTabs.text': undefined

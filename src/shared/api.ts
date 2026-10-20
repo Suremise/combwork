@@ -110,7 +110,7 @@ import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { GitHistory, GitRepoInfo, GitRepoSummary } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
-import type { CardCost, LaneCost } from './cardCosts'
+import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
 import type { WorkBadge, WorkView } from './workflow/workView'
@@ -580,6 +580,8 @@ export interface HiveRequests {
    * (ms since the epoch).
    */
   'costs:cards': (q: { numbers?: number[]; project?: string | null; from?: number; to?: number }) => CardCost[]
+  /** A card's cost per round and role (#1226): null when there is no such card. */
+  'costs:rounds': (card: number) => CardRoundCosts | null
   /** Cost per lane (#602): the lanes named, or every lane listed. */
   'costs:lanes': (laneIds?: string[]) => LaneCost[]
   /** This window's workspace's progress runs, newest first. */

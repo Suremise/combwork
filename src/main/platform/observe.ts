@@ -594,6 +594,16 @@ export class Observer {
     return null
   }
 
+  /**
+   * Once the events of what was written in a folder so far have come in (it is quiet a moment; at most
+   * WRITES_SETTLE_MAX_MS): an event is timed when it arrives, so a check's start waits for this, or a commit just before
+   * it would count as a change during it (#1222).
+   */
+  async settled(folder: string): Promise<void> {
+    const l = this.logOf(folder)
+    if (l) await settle(l)
+  }
+
   /** Agents' edit hooks (sessions.ts preToolUse): each file's folder, if watched, records an edit now. */
   markEdits(files: readonly string[]): void {
     const now = Date.now()

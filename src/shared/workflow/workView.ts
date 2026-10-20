@@ -239,6 +239,8 @@ export interface WorkBadge {
   leftTarget: boolean
   /** Accepted where there is no merge (None, a no-code card). */
   accepted: boolean
+  /** The target's revision with the card's change in it, once integrated (`Integrated`'s result): its merge commit. */
+  merged: string | null
   forYou: number
   /** A decision was recorded since the latest submission was made. */
   decisionSince: boolean
@@ -270,6 +272,7 @@ export function workBadge(v: WorkView): WorkBadge {
     mergedInPart: !!v.marks.mergedInPart,
     leftTarget: !!v.marks.leftTarget,
     accepted: !!v.accepted,
+    merged: v.integration?.result ?? null,
     forYou: v.forYou,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     lastSeq: v.lastSeq

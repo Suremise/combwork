@@ -1084,16 +1084,16 @@ export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc
  * project, agent, reviewer and holds (null for a field the card hasn't), and its history only for a card that keeps no
  * holds (holdsFromHistory), read for those cards alone.
  */
-export function holdDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
+export function holdDocs(ws: WorkspaceService, o: { live?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
   // One snapshot for both reads: the history read for the cards without holds sees the cards the first read saw.
   return readSnapshot(ws, (b, db) => {
     if (!b.legacy) {
-      const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'] })
+      const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'], ...(o.live ? { where: 'archived = 0' } : {}) })
       const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
       const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
       return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
     }
-    const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards${o.live ? " WHERE coalesce(json_extract(doc, '$.archived'), 0) = 0" : ''} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
   })
 }

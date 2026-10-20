@@ -154,7 +154,9 @@ interface HiveMessageValues {
   'board.delete.title': { card: string | number }
   'board.details.agent': undefined
   'board.details.card': undefined
+  'board.details.check': undefined
   'board.details.command': undefined
+  'board.details.countsAsCheck': { name: string | number }
   'board.details.ended': undefined
   'board.details.exitCode': undefined
   'board.details.gone': undefined
@@ -162,6 +164,7 @@ interface HiveMessageValues {
   'board.details.lastStep': { step: string | number }
   'board.details.line': { label: string | number; text: string | number }
   'board.details.log': undefined
+  'board.details.notCounted': { name: string | number; why: string }
   'board.details.provider': undefined
   'board.details.revision': undefined
   'board.details.run': undefined
@@ -320,11 +323,16 @@ interface HiveMessageValues {
   'board.lane.labelWhenEnded': { card: string | number; title: string | number; where: string | number }
   'board.lane.more': { n: number; cards: string | number }
   'board.lane.notOnBoard': { card: string | number }
+  'board.lane.openForMore': undefined
   'board.lane.reviewFailed': { card: string | number; round: string | number; next: string | number }
   'board.lane.reviewerGist': { gist: string | number }
   'board.lane.roundFailed': { where: string | number; round: string | number }
   'board.lane.unrecorded': { card: string | number; title: string | number }
   'board.lane.unrecordedUntitled': { card: string | number }
+  'board.lane.workChecks': { passed: number; failed: number }
+  'board.lane.workMerged': { commit: string | number }
+  'board.lane.workRevision': { review: string; revision: string | number }
+  'board.lane.workVerdict': { pass: string; revision: string; current: string }
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
   'board.lanes.barUnrecorded': { pair: string | number; total: number }
@@ -396,9 +404,11 @@ interface HiveMessageValues {
   'board.progress.railLabel': undefined
   'board.progress.railShowing': { name: string | number; shown: number; all: number }
   'board.progress.recent': undefined
+  'board.progress.recentFold': undefined
   'board.progress.recentHover': { agent: string | number; run: string | number; state: string | number }
   'board.progress.recentHoverTook': { agent: string | number; run: string | number; state: string | number; took: string | number }
   'board.progress.recentRuns': undefined
+  'board.progress.recentShow': undefined
   'board.progress.region': undefined
   'board.progress.revisionCopied': { revision: string | number }
   'board.progress.revisionCopyFailed': undefined

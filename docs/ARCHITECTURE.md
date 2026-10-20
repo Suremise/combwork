@@ -145,7 +145,7 @@ Those reads (`sessions.usageFor`: a running session's footer, context gauge, com
 - `hive-mcp.ts`: each `tools/call` reply's final text (chars, UTF-8 bytes, monotonic time, outcome, mode) and the first `tools/list`, batched (at most 50 a post, every 2 s, at once when the CLI closes input and no call is running) to `POST /v1/metrics/mcp` with the session's own token; the route checks and bounds each entry (`recordMcp`, `recordCatalog`) and attributes it by the token.
 - `sessions.ts` launch: `recordLaunch` with the session contract (`ctx.guidance`, counted once whichever way the provider gets it), the Assistant's instructions, the delivered skills measured on their copies (`deliveredSkillSizes`: each adapter's `skillCopyPath`, the copy's header through `headerOf` and its `treeSignature` byte total) and the skills asked for that weren't delivered.
 - `revisions.ts` / `guidance.ts`: hits, misses, invalidations, too-big outcomes and what each hash read (`HashOptions.count`, scoped instead of the global `readStats`), header bytes (`headerOf`), and each `skillRevisions` scan's time and shared callers (`coalesced(scan, onShare)`).
-- `cardCosts.ts` (#602): cost per card and per lane, read on request (IPC `costs:cards`, `costs:lanes`). Each card's holds (`TaskCard.held`, kept by `trackHolds` in `tasks.ts`'s `saveCard`, or from its history) against its agents' sessions' timelines (the parser's `timeline`, rows of a second with the charges covering them): worked out as each session is recorded in the usage history (#1106), so a card's cost is its rows there (`rowsPart`), and a lane's is sliced from the timelines kept there; the slicing and the charge sharing are pure, in `shared/cardCosts.ts` (`sliceSession`, `chargeShares` in `shared/usageTimeline.ts`) and `shared/usageLedger.ts` (`ledgerRows`, `sessionHolds`).
+- `cardCosts.ts` (#602): cost per card and per lane, read on request (IPC `costs:cards`, `costs:lanes`). Each card's holds (`TaskCard.held`, kept by `trackHolds` in `tasks.ts`'s `saveCard`, or from its history) against its agents' sessions' timelines (the parser's `timeline`, rows of a second with the charges covering them): worked out as each session is recorded in the usage history (#1106), so a card's cost is its rows there (`rowsPart`), and a lane's is sliced from the timelines kept there; the slicing and the charge sharing are pure, in `shared/cardCosts.ts` (`sliceSession`, `chargeShares` in `shared/usageTimeline.ts`) and `shared/usageLedger.ts` (`ledgerRows`, `sessionHolds`). Cost per round and role (#1226, #820 item 2; data only, no view yet): `cardRoundCosts` (IPC `costs:rounds`) takes a card's rounds from its facts (`roundSpans`: rounds follow submissions, a verdict counting for the round of the submission it names, never by its own `round`, which counts failures; round 1 begins at its cycle's `Started` or `Adopted`, round k+1 at the first failed verdict on round k or else its first submission; a pass ends nothing by itself, since a second reviewer may still review or a later verdict fail it; the card is worked while its stage is Active or Review, by its `Moved` facts, so a round is the spans it was worked in, a pass made stale and sent back counting on) and in each, per agent and role, what that agent's sessions used while it held the card then (its holds within the round's spans), shared 1/k with its project's live cards it held at the same time (`sharedSpans`, `scalePart`; another project's agent is another agent, whatever its name); a split by time from the timelines, so a round's parts are Hive's (≈) and the card's total stays the ledger's. It reads the card asked for and the live cards' holds (`cardHolds(ws, { live: true })`); a card from before 1.0 has no rounds (`preWorkflow`).
 - `metricsUsage.ts`: `metricsReport()` adds the providers' own reported usage (`sessions.usageItems`, sessions active in the range: tokens, requests, compactions, cost) to `queryMetrics()`, for `GET /v1/metrics` and IPC `metrics:query`; `metricsExport()` wraps a report for IPC `metrics:export` (schema, version, units, optional sanitizing).
 - The Performance view and tab (`views/Performance.tsx`) share one `PerformancePage`: the scope is in every query (a project's tab asks for its project only), `useScopedLoad` keys results by workspace, scope and range, refreshes are coalesced, and filtering and totals are the pure `shared/metricsView.ts` (`select`, `totals`, `byRoute`, `byTool`). The page's filters go to main with the query (`queryFor()`); `queryMetrics` narrows each bucket's parts with `filtered()` before summing them and before `trendOf()` (so the parts, trend and an export agree), reports `filters.notFiltered`, and reads coverage from the store's `observed` stretches (`touch()` on each record and query and on an unref'd 5-minute tick over the stores some workspace holds (`holders`); `seal()` ends a stretch when recording is turned off (`config.onSettingsChanged`, or a touch that finds it off) or the last holder closes, and a loaded store starts sealed; `evicted()` moves `evictedThrough` and trims observation when `roll()`'s bucket cap or `write()`'s byte cap removes a bucket; saved with the buckets, expired by `roll()`, cleared by `reset()`). `providerUsage()` reads the hosts the scope and filters keep (projects as `agent`, the Assistant's home as `assistant`), counts running sessions from `sessions.projectStates()`, takes context as a snapshot, and counts hosts whose `usageItems()` failed (`providersUnreadable`). `launchParts()` in `guidance.ts` splits a launch's text into core, custom, role and mode for `recordLaunch`.
 
@@ -321,12 +321,26 @@ the marks (carried over, stale, outside the rules, merged in part, left the targ
 queue's newest entry, decisions' generations, and `preWorkflow` / `adopted`. Its stage is the fold's (the card's cached
 stage is where the fold starts), and a verdict is `current` only while no other change has made it stale. A `WorkBadge` is what the board's badges need of it. Revisions stay whole: the window shows them through its
 project's descriptor (`revisionShort`). `main/workflow/cardWork.ts` reads a card's row and facts on one snapshot for the
-IPC `tasks:work`, and every live card's for `tasks:workBadges`, the archived ones left out in the query (#1107's rule:
+IPC `tasks:work`, and every live card's for `tasks:workBadges` (the lane hover's lines, `laneBar.workNotes`, #1225), the archived ones left out in the query (#1107's rule:
 `facts.live` joins `cards` on `archived = 0`, so neither their rows nor their facts are parsed). The window reads them
 again each time it reads the board (`renderer/cardWork.ts`, on `tasks-changed`): a fact written on the board's
 connection marks the board change (`boardChanged`), so an observed fact tells the window as a recorded one does. The
 Agent API's card gains `stage` after the document's fields (`boardStore.cardStages`: the row's stage, else its
 column's), and `GET /v1/tasks/:n/facts` gives a card's facts as short rows (`factRow`), whole with `view=full`.
+
+**Runs as checks** (#1222, `workflow/runChecks.ts`). A progress run for a card is bracketed: `POST /v1/progress/resolve`
+(before hive-progress starts the command; a start through the Agent API, at its start) reads what it is checked against
+(`checkStart`: the folder settled in the write log first, then its start time, `git status`, and a stat snapshot of its
+tracked files and reflog; None: the card's declared paths' revision and the deliverables' snapshot), kept by the link
+until the run starts, then by the run's id (at most 200 at once). Its finish (`checkEnd`) reads the end and writes
+`CheckRan` in the card's facts inside a board change, counted or with why not (the rules in the module's header; the
+write log decides "nothing changed", the snapshots where its record isn't complete), and the run keeps how it counted
+(`ProgressRun.counts`) for its details. A `--check` run counts only if it reported the command its link resolved for
+that check. The card's revision is read from where it works when the run starts: its own line's folder head (which the
+tested checkout must be), or in a shared folder its newest attributed commit (which it must contain); a card with no
+start in its facts yet is checked on the run's own checkout. None hashes with the options' exclusions, and its end
+reads the card's declared paths again: a list changed during the run is a new revision. The fact is written only while
+the card is still its project's (and None's declaration the one the end read), in the board change.
 
 **The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
 `Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at
@@ -368,6 +382,35 @@ once), each repository and folder watched once however many projects share it:
 **Reconciliation.** `observe.ts` turns platform events into observed facts per affected card (a commit in a slot, a
 target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.
 It also runs when a gate reads a card and once at start.
+
+**In the app, record-only (#1217, P3).** `workflow/reconciler.ts` follows the open workspaces' projects (as
+`platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
+reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
+runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
+when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run builds the project's
+runtime on the board's store (`FactStore.forBoard`) with its writes as changes of the board (`cfg.locked`:
+`boardWrite`, with the run's workspace lifetime as `alive`), its options from `project.json` (else the platform's
+defaults), and **`reconcileActs` off**: `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
+MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone) and the table's moves, queue cancellations,
+actions and wakes run only with that switch, which the P4 runtime turns on (the P2 scenarios run with it). It
+reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
+fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
+revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
+(`observeHead`). Every delayed observation is written only in the cycle it was read in (`sameCycle`, checked under the
+write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
+never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the
+folder's cards changed since it read them. `TargetMoved` records the card's target from the last head recorded this
+cycle to the head now, read again under the lock from the ref files; a target that doesn't exist (git says so) is
+recorded as null, so its deletion and its return are moves too, and an unreadable one records nothing. `Gone` is recorded for a line, the card's own
+folder and the repository, only for what doesn't exist (`presence`: ENOENT; anything else is unknown). Done cards are
+reconciled when their target moved: an event's line, or a target whose head isn't the one stored as last checked
+(`board_meta` `workflow:<project>:target:<line>`; '' for a deleted target), so a reset while Hive was closed is found at
+the next open or focus, with one read per target. The checkpoint moves only once all of that target's Done cards were
+reconciled to the end (`ReconcileHooks.unknown` tells of a read that couldn't be made, and a failure counts too): one
+left undecided is looked at again at the next run. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
+Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
+(`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
+watch goes as the workspace closes.
 
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.

@@ -650,6 +650,30 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await page.keyboard.press('Enter')
   check('…and Show fewer from the keyboard', !!(await until(async () => (await recentRows.count()) === 10, HUNG_MS)))
 
+  // --- Recent folds to its heading (#1228): Enter or Space on it, remembered for the workspace, with its count.
+  const recentHead = panel.locator('button.progress-section-toggle')
+  const recentKey = `progress-recent-fold:${ws.toLowerCase()}`
+  const recentShots = async (name) => {
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      await panel.screenshot({ path: path.join(shots, `${theme}-${name}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+  }
+  check(`Recent's heading is a button, expanded, counting its ${nAll} runs`, (await recentHead.count()) === 1 && (await recentHead.getAttribute('aria-expanded')) === 'true' && (await recentHead.locator('.progress-section-count').textContent()) === String(nAll), `${await recentHead.getAttribute('aria-expanded').catch(() => '')} ${await recentHead.locator('.progress-section-count').textContent().catch(() => '')}`)
+  await recentShots('recent-expanded')
+  await recentHead.focus()
+  await page.keyboard.press('Enter')
+  check('Enter on it folds Recent to that one line', !!(await until(async () => (await recentRows.count()) === 0 && (await fold.count()) === 0 && (await recentHead.getAttribute('aria-expanded')) === 'false', HUNG_MS)))
+  check('…still counting its runs', (await recentHead.locator('.progress-section-count').textContent()) === String(nAll))
+  check('…remembered for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[recentKey] === 1, HUNG_MS)))
+  await recentShots('recent-folded')
+  await recentHead.focus()
+  await page.keyboard.press(' ')
+  check('Space unfolds it, as it was (the newest 10)', !!(await until(async () => (await recentRows.count()) === 10 && (await recentHead.getAttribute('aria-expanded')) === 'true', HUNG_MS)))
+  check('…and that is remembered too', !!(await until(async () => (await inv('ui:get')).panes?.[recentKey] === undefined, HUNG_MS)))
+
   // --- Light theme, and with the Assistant's panel open beside it.
   await inv('settings:update', { appearance: { theme: 'light' } })
   await page.keyboard.press('Control+Alt+I')
@@ -743,7 +767,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   r = await call(workspaceToken, 'PATCH', `/v1/progress/${run4}`, { step: 1 })
   check("and the old run's id is unknown (404)", r.status === 404, JSON.stringify(r))
 
-  // --- A restart keeps Recent (#352): seen, so under Recent, with its details.
+  // --- A restart keeps Recent (#352): seen, so under Recent, with its details. Folded first (#1228), to see that kept too.
+  await inv('ui:setPane', `progress-recent-fold:${ws.toLowerCase()}`, 1)
   await app.close()
   const app2 = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page2 = await app2.firstWindow()
@@ -753,6 +778,12 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   if ((await inv2('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv2, page2, ws)
   const kept = (await inv2('progress:list')).find((x) => x.id === run5)
   check('after a restart, the ended run is under Recent with its summary', kept?.state === 'failed' && kept?.summary === 'kept' && kept?.seenAt !== null, JSON.stringify(kept))
+  check('…Recent still folded (#1228)', (await inv2('ui:get')).panes?.[`progress-recent-fold:${ws.toLowerCase()}`] === 1)
+  const head2 = page2.locator('.progress-panel button.progress-section-toggle')
+  if (await lib.until(async () => (await head2.count()) === 1 || (await page2.locator('.progress-rail').count()) === 1, HUNG_MS) && (await head2.count()) === 1) {
+    check('…its heading says so', (await head2.getAttribute('aria-expanded')) === 'false' && (await page2.locator('.progress-recent-item').count()) === 0)
+    await head2.click()
+  }
   check('…and shows there', !!(await until(async () => (await page2.locator(`.progress-panel .progress-recent-item[data-run="${run5}"]`).count()) === 1 || (await page2.locator('.progress-rail').count()) === 1, HUNG_MS)))
   await app2.close()
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll progress checks passed')

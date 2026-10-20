@@ -98,6 +98,8 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
       runsOf: extra.runsOf,
       locksOf: extra.locksOf,
       autoRun: extra.autoRun,
+      // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
+      reconcileActs: true,
       effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text) => notes.push({ card: card.key, text }) }
     })
   const wf = make(store)
