@@ -42,13 +42,14 @@ const M = {
   platformTitle: msg({ id: 'service.workspace.platformTitle', defaultMessage: 'Version control changed in {project}', description: "A notice's title: the version control found in the project {project}'s folder is no longer the one Hive recorded for it." }),
   gitFound: msg({ id: 'service.workspace.platformGitFound', defaultMessage: '{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.', description: 'A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it.' }),
   repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back.", description: "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it." }),
+  platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Hive doesn't have." }),
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it.' })
 }
 
 /** The notice that a project's folder no longer has the version control Hive recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
-  if (p.invalid !== undefined) return { title: tr(M.platformTitle, { project }), message: tr(M.platformInvalid, { project, value: p.invalid }) }
+  if (p.invalid !== undefined) return { title: tr(M.platformInvalidTitle, { project }), message: tr(M.platformInvalid, { project, value: p.invalid }) }
   const why = p.offer?.why
   const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? '' }) : tr(M.repositoryGone, { project })
   return { title: tr(M.platformTitle, { project }), message }

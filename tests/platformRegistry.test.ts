@@ -162,6 +162,7 @@ describe('in ProjectInfo', () => {
       expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
       await info(p)
     }
+    expect(notices(p).map((t) => t.title)).toEqual(['Unknown version control setting in delta', 'Unknown version control setting in delta'])
     expect(notices(p).map((t) => [t.level, t.message])).toEqual([
       ['warning', `delta's project.json names a version control Hive doesn't know (platform: mercurial). Until it says "git" or "none", Hive uses what it finds in the folder.`],
       ['warning', `delta's project.json names a version control Hive doesn't know (platform: 7). Until it says "git" or "none", Hive uses what it finds in the folder.`]
