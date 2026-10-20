@@ -22,13 +22,13 @@ const HUNG_MS = 10000
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
-/** A repository on main with one commit (a.txt), `out/` ignored. */
+/** A repository on main with one commit (a.txt), `out/` and `node_modules/` ignored. */
 function repo(): string {
   const p = tempDir('hive-observe-repo-')
   run(p, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')
-  writeFileSync(join(p, '.gitignore'), 'out/\n')
+  writeFileSync(join(p, '.gitignore'), 'out/\nnode_modules/\n')
   run(p, 'add', '-A')
   run(p, 'commit', '-q', '-m', 'one')
   return p
@@ -102,16 +102,61 @@ describe('the watcher on a Git repository', () => {
     expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
   })
 
-  it('a write in an ignored folder (out/, node_modules) does not count', async () => {
+  it("a write in an ignored folder (out/, node_modules) does not count, an install's burst included", async () => {
     mkdirSync(join(p, 'out'))
-    mkdirSync(join(p, 'node_modules'))
+    mkdirSync(join(p, 'node_modules', 'pkg'), { recursive: true })
     const t0 = Date.now()
     writeFileSync(join(p, 'out', 'bundle.js'), 'x')
-    writeFileSync(join(p, 'node_modules', 'x.js'), 'x')
+    writeFileSync(join(p, 'node_modules', 'pkg', 'x.js'), 'x')
     expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // A burst (an install) may overflow Windows' buffer: then unknown (the check uses its snapshot), never a change.
+    await armed(o, p)
+    const t1 = Date.now()
+    for (let i = 0; i < 300; i++) writeFileSync(join(p, 'node_modules', 'pkg', `f${i}.js`), 'x')
+    const burst = await o.changedBetween(p, t1, Date.now())
+    expect(isUnknown(burst) ? null : burst).toEqual(isUnknown(burst) ? null : { changed: false, paths: [] })
     // A tracked file beside them still does.
+    await armed(o, p)
+    const t2 = Date.now()
     writeFileSync(join(p, 'a.txt'), 'b\n')
-    expect((await between(t0)).paths).toEqual(['a.txt'])
+    expect((await between(t2)).paths).toEqual(['a.txt'])
+  })
+
+  it('a tracked file in node_modules counts, its edit undone too', async () => {
+    mkdirSync(join(p, 'node_modules'))
+    writeFileSync(join(p, 'node_modules', 'vendored.js'), 'v\n')
+    run(p, 'add', '-f', 'node_modules/vendored.js')
+    run(p, 'commit', '-q', '-m', 'vendored')
+    await seen({ kind: 'lineMoved', line: 'main' })
+    await armed(o, p)
+    const t0 = Date.now()
+    writeFileSync(join(p, 'node_modules', 'vendored.js'), 'changed\n')
+    writeFileSync(join(p, 'node_modules', 'vendored.js'), 'v\n')
+    expect(run(p, 'status', '--porcelain')).toBe('')
+    expect(await between(t0)).toEqual({ changed: true, paths: ['node_modules/vendored.js'] })
+  })
+
+  it("a move made just before a refresh's follow is still said (the line's and the folder's)", async () => {
+    const wt = join(tempDir('hive-observe-follow-'), 'wt')
+    run(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
+    const a = run(p, 'rev-parse', 'HEAD')
+    run(p, 'branch', 'side')
+    await seen({ kind: 'lineMoved', line: 'side', to: a })
+    await vi.waitFor(() => expect(o.size.folders).toBe(2), { timeout: HUNG_MS })
+    const b = commit(wt, 'w.txt', 'w\n')
+    await seen({ kind: 'lineMoved', line: 'feature', to: b })
+    await seen({ kind: 'folderMoved', folder: wt, to: b })
+    events.length = 0
+    // Moved outside Hive, and a refresh follows the same projects at once, before the watch's own read.
+    run(p, 'update-ref', 'refs/heads/side', b)
+    run(wt, 'checkout', '-q', '--detach', a)
+    o.follow([{ path: p, platform: 'git', root: p }])
+    await seen({ kind: 'lineMoved', line: 'side', from: a, to: b })
+    await seen({ kind: 'folderMoved', folder: wt, from: b, to: a })
+    // Said once each, whatever reads follow.
+    o.rescan()
+    expect(events.filter((e) => e.kind === 'lineMoved' && e.line === 'side')).toHaveLength(1)
+    expect(events.filter((e) => e.kind === 'folderMoved' && e.folder === wt)).toHaveLength(1)
   })
 
   it("an agent's edit hook counts in its folder", async () => {

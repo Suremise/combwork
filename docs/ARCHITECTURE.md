@@ -305,10 +305,12 @@ once), each repository and folder watched once however many projects share it:
   `HEAD`, `packed-refs`, `refs/heads`, `logs/HEAD` and `worktrees/<n>/{HEAD,gitdir,logs/HEAD}` count. A burst is read
   once (150 ms quiet, at most 1 s), from the ref files with no git process (`linesOf`, `refSync`), and said to
   subscribers as `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a
-  working folder's HEAD). Each read also compares each folder's `logs/HEAD` size, so a reflog entry whose event was lost
+  working folder's HEAD). Only a repository's first read takes what it finds silently; every later read (its events, a
+  rescan, a refresh's `follow`) says each move, so no move is taken in unsaid. Each read also compares each folder's `logs/HEAD` size, so a reflog entry whose event was lost
   still counts. The minute and window focus read again (`rescan`), for what a watch missed.
 - **Every working folder** (a repository's worktrees, at most 64, and a None project's folder) has a **write log**
-  from one recursive watch on it (`.git` and `node_modules` left out of the log). Windows hands a watch its changes in
+  from one recursive watch on it (`.git` left out of the log; `node_modules` kept, since a project can track vendored
+  files there, what git ignores being dropped when a check asks). Windows hands a watch its changes in
   a small buffer: a burst (a commit writing objects into the main folder's `.git`, from any worktree) can overflow it,
   and Node names no file. The record then restarts, so a check over that moment is unknown and falls back to its
   snapshot. Each HEAD reflog entry (`:reflog`) and each agent's edit hook (`:edit`, `sessions.ts` `preToolUse` →

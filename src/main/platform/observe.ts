@@ -188,8 +188,9 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
-    // An install writes thousands of files there, always ignored: not worth a record each.
-    if (rel === 'node_modules' || rel.startsWith('node_modules/') || rel.includes('/node_modules/')) return
+    // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
+    // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a
+    // question about their time is unknown.
     this.push({ at: now, path: rel })
     this.written([rel])
   }
@@ -313,6 +314,8 @@ class RepoWatch {
   private first = 0
   private lines: Heads = new Map()
   private heads: Heads = new Map()
+  /** Read once: from now on, every move is said. */
+  private primed = false
   /** Working folder (lower-cased) → its write log. */
   readonly logs = new Map<string, FolderLog>()
   /** git dir (lower-cased) → its working folder, for a reflog entry. */
@@ -327,7 +330,7 @@ class RepoWatch {
     private held: (folder: string) => boolean = () => false
   ) {
     if (!isMainGitDir(common)) this.bare = new DirWatch(common, true, (n) => this.event(n === null ? null : n.split(sep).join('/')))
-    this.read(false)
+    this.read()
   }
 
   /** An event in the git dir (its path relative to it, with `/`), or null: events were lost, so the refs are read. */
@@ -355,13 +358,17 @@ class RepoWatch {
     this.timer = setTimeout(() => {
       this.timer = null
       this.first = 0
-      this.read(true)
+      this.read()
     }, wait)
     this.timer.unref?.()
   }
 
-  /** Reads the lines and folders' HEADs; says what moved (`say`), and keeps the folders' write logs in step. */
-  read(say: boolean): void {
+  /**
+   * Reads the lines and folders' HEADs, says what moved since the last read, and keeps the folders' write logs in step.
+   * Only the first read (the repository just attached) takes what it finds without saying it: every later one, whoever
+   * asks (its own events, a rescan, a refresh's `follow`), says every move, so none is taken in silently.
+   */
+  read(): void {
     const lines = linesOf(this.common)
     const folders = foldersOf(this.common).slice(0, MAX_FOLDERS)
     const heads: Heads = new Map()
@@ -382,11 +389,12 @@ class RepoWatch {
       if (was !== undefined && was !== size) this.reflog(f.gitDir)
     }
     this.reflogSize = sizes
-    if (say) {
+    if (this.primed) {
       for (const [line, to] of lines) if (this.lines.get(line) !== to) this.tell({ kind: 'lineMoved', line, from: this.lines.get(line) ?? null, to })
       for (const [line, from] of this.lines) if (!lines.has(line)) this.tell({ kind: 'lineMoved', line, from, to: null })
       for (const [folder, to] of heads) if (this.heads.has(folder) && this.heads.get(folder) !== to) this.tell({ kind: 'folderMoved', folder, from: this.heads.get(folder) ?? null, to })
     }
+    this.primed = true
     this.lines = lines
     this.heads = heads
     // Worktrees added get a write log; those removed lose theirs.
@@ -485,7 +493,7 @@ export class Observer {
       this.folders.delete(k)
     }
     // Worktrees being removed lose their write logs.
-    for (const r of this.repos.values()) r.read(false)
+    for (const r of this.repos.values()) r.read()
     for (const p of want.values()) {
       if (p.repo && !this.repos.has(p.repo.toLowerCase()) && !this.held(p.repo)) {
         const repo = p.repo
@@ -571,7 +579,7 @@ export class Observer {
 
   /** Reads every repository's refs again (the minute, window focus): what a watch missed is said now. */
   rescan(): void {
-    for (const r of this.repos.values()) r.read(true)
+    for (const r of this.repos.values()) r.read()
     for (const l of [...this.folders.values(), ...[...this.repos.values()].flatMap((r) => [...r.logs.values()])]) l.verify()
   }
 
@@ -602,7 +610,8 @@ export class Observer {
   /**
    * Did anything that counts change in a working folder between t0 and t1 (§16.13)? A write to a file git doesn't
    * ignore (tracked, or new and not ignored: anywhere in the tree, not only a card's files), a HEAD reflog entry, an
-   * agent's edit hook. Ignored outputs (`out/`, `node_modules`) don't count. `counts` narrows the paths for a None
+   * agent's edit hook. Ignored outputs (`out/`, an ignored `node_modules`) don't count; a tracked file anywhere does,
+   * `node_modules` included. `counts` narrows the paths for a None
    * folder (its deliverables). Unknown when the folder isn't watched or its record isn't complete for the whole time:
    * the caller then falls back to its stat snapshot.
    */
