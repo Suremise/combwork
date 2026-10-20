@@ -248,8 +248,12 @@ interface LiveSession {
   recognition: ScreenRecognition
   /** The mode it was launched in. */
   launchMode: PermissionMode | null
-  /** The mode the settings asked for when it launched, or when the user last applied a settings change to it. */
-  configuredMode: PermissionMode | null
+  /**
+   * The mode the settings asked for when it launched, or when the user last applied a settings change to it; undefined
+   * until its launch has read the settings (#1234: a refresh meanwhile, as when an agent restarts in a new conversation,
+   * has nothing to compare the setting with, so offers no switch).
+   */
+  configuredMode: PermissionMode | null | undefined
   /** A settings change already offered to it, so the offer isn't repeated on every refresh. */
   offeredMode?: PermissionMode | null
   /** Launch in this mode instead of the configured one (Restart in mode). */
@@ -1342,7 +1346,7 @@ class SessionManager {
       launchSignature: '',
       unseen: false
     }
-    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition(adapter), launchMode: null, configuredMode: null, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId })
+    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition(adapter), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId })
     this.runs.set(runId, id)
 
     const setup = cfg.worktreeSetup.trim()
@@ -2610,7 +2614,7 @@ class SessionManager {
   private modeOfferTimer: NodeJS.Timeout | null = null
 
   private noticeModeSetting(l: LiveSession, mode: PermissionMode | null): void {
-    if (!mode || mode === l.configuredMode || mode === l.offeredMode) return
+    if (!mode || l.configuredMode === undefined || mode === l.configuredMode || mode === l.offeredMode) return
     if (mode === l.state.permissionMode) {
       // Already in it (switched by hand): nothing to offer.
       l.configuredMode = mode
@@ -2646,7 +2650,8 @@ class SessionManager {
     const todo: { l: LiveSession; mode: PermissionMode }[] = []
     for (const l of [...this.live.values()]) {
       const st = l.state
-      if (st.settingUp) continue
+      // Still launching: it starts in what the settings say now.
+      if (st.settingUp || l.configuredMode === undefined) continue
       const { agent } = await this.agentDef(st.projectPath, st.agentId).catch(() => ({ agent: null }))
       if (!agent) continue
       const mode = (await this.effective(st.projectPath, pinProvider(agent, st.provider))).permissionMode

@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **No more "Permission mode changed" when an agent starts a new conversation.** When the Assistant gave an agent a task in a new conversation, Hive could say "Permission mode changed to Auto" and offer to switch the agent to the mode it was already in, though no setting had changed. Hive offers the switch only when an agent's permission mode setting really changes while it runs.
+
 ## 0.9.3 — 2026-10-20
 
 - **The Assistant's modes are in `.hive/modes`.** Modes were once called personas, and their files still were: each workspace's are now in `.hive/modes`, where Hive moves its `.hive/personas` folder when the workspace opens, your own modes and edits with it, and the mode you chose stays chosen. If the folder can't be moved yet (a file in it open), Hive uses it where it is and moves it next time (#1084).
