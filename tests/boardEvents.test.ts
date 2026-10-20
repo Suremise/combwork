@@ -160,17 +160,23 @@ describe('board events (#1011)', () => {
     // As a full disk or an I/O error would: SQLite rolls the whole transaction back on the middle card's write.
     const outside = new DatabaseSync(boardFile(wsPath), { timeout: 5000 })
     outside.exec(`CREATE TRIGGER undo_test BEFORE UPDATE ON cards WHEN old.number = ${cards[1]} BEGIN SELECT RAISE(ROLLBACK, 'disk I/O error (test)'); END`)
+    // The trigger is another connection's commit, which the board's poll tells (#1017): wait for that, so it isn't taken for the batches'.
+    await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: HUNG_MS })
+    seen.length = 0
     try {
       // Archive All skips a card it can't save and goes on: the change still fails whole, and nothing is saved after it.
       await expect(run(() => tasks.archiveBatch(cards, { label: 'Archive All', column: 'done', project: null, query: '', includeBusy: true }, user))).rejects.toThrow(/undone part way/)
       // A batch move does the same with each card's refusal.
       await expect(run(() => tasks.updateTasks(cards, { labels: ['x'] }, user))).rejects.toThrow(/undone part way/)
+      expect(seen).toHaveLength(0)
     } finally {
       outside.exec('DROP TRIGGER undo_test')
       outside.close()
     }
+    // Dropping it is told the same way: wait for it, so it isn't counted by the next test.
+    await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: HUNG_MS })
+    seen.length = 0
     expect(await Promise.all(cards.map((n) => run(() => tasks.getTask(n))))).toEqual(before)
-    expect(seen).toHaveLength(0)
     // The board goes on as before.
     await run(() => tasks.updateTasks(cards, { labels: ['after'] }, user))
     expect((await run(() => tasks.getTask(cards[2]))).labels).toEqual(['after'])
