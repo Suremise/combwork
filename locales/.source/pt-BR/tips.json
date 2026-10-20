@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "Put your lanes in order",
   "tips.progressPanel.text": "When agents run tests or builds that report progress, the Progress panel on the right shows each run: the agent, how far along it is and the time left, and Hive's taskbar button fills as they go. {key} shows it.",
   "tips.progressPanel.title": "How long until the tests finish?",
+  "tips.progressRecentFold.text": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
+  "tips.progressRecentFold.title": "Fold Recent away",
   "tips.projectCards.text": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
   "tips.projectCards.title": "A project's cards at a glance",
   "tips.projectTabs.text": "When space is short, a project's tabs shrink to icons, and the tab you're on keeps its name while it fits. Hover a tab for its name and shortcut.",

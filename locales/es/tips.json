@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "Ordena tus carriles",
   "tips.progressPanel.text": "Cuando los agentes ejecutan pruebas o compilaciones que informan de su progreso, el panel Progreso de la derecha muestra cada ejecución: el agente, cuánto lleva y el tiempo restante, y el botón de Hive en la barra de tareas se llena a medida que avanzan. {key} lo muestra.",
   "tips.progressPanel.title": "¿Cuánto falta para que terminen las pruebas?",
+  "tips.progressRecentFold.text": "Haz clic en el encabezado Recientes del panel de Progreso para plegar sus ejecuciones en esa única línea, con cuántas hay a su lado; vuelve a hacer clic para mostrarlas. Cada espacio de trabajo lo recuerda.",
+  "tips.progressRecentFold.title": "Pliega Recientes",
   "tips.projectCards.text": "El Resumen de un proyecto empieza con sus tarjetas: cuántas hay en cada columna, estancadas o bloqueadas. Haz clic en un número para abrir su pestaña Tareas.",
   "tips.projectCards.title": "Las tarjetas de un proyecto de un vistazo",
   "tips.projectTabs.text": "Cuando falta espacio, las pestañas de un proyecto se reducen a iconos, y la pestaña en la que estás conserva su nombre mientras quepa. Pasa el puntero por una pestaña para ver su nombre y su atajo.",

@@ -1611,6 +1611,10 @@
     "defaultMessage": "Recent",
     "description": "A section heading in the Progress panel: runs that finished a while ago."
   },
+  "board.progress.recentFold": {
+    "defaultMessage": "Fold the recent runs",
+    "description": "Tooltip of the Progress panel's Recent heading: folds its runs away, leaving the heading."
+  },
   "board.progress.recentHover": {
     "defaultMessage": "{agent}: {run} {state}",
     "description": "Tooltip of a run under the Progress panel's Recent: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)."
@@ -1622,6 +1626,10 @@
   "board.progress.recentRuns": {
     "defaultMessage": "Recent runs",
     "description": "What the Progress panel's Recent list holds, for its Show all button and accessible name."
+  },
+  "board.progress.recentShow": {
+    "defaultMessage": "Show the recent runs",
+    "description": "Tooltip of the Progress panel's Recent heading while its runs are folded away: shows them."
   },
   "board.progress.region": {
     "defaultMessage": "Progress",

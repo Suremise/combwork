@@ -923,6 +923,14 @@
     "defaultMessage": "How long until the tests finish?",
     "description": "A tip's title."
   },
+  "tips.progressRecentFold.text": {
+    "defaultMessage": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Recent is the Progress panel's section of runs that ended."
+  },
+  "tips.progressRecentFold.title": {
+    "defaultMessage": "Fold Recent away",
+    "description": "A tip's title."
+  },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

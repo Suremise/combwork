@@ -230,6 +230,8 @@
   "tips.progressLanesOrder.title": "Deine Lanes ordnen",
   "tips.progressPanel.text": "Wenn Agenten Tests oder Builds ausführen, die ihren Fortschritt melden, zeigt das Fortschrittspanel rechts jeden Lauf: den Agenten, wie weit er ist und die Restzeit, und die Taskleistenschaltfläche von Hive füllt sich dabei. {key} blendet es ein.",
   "tips.progressPanel.title": "Wie lange noch, bis die Tests fertig sind?",
+  "tips.progressRecentFold.text": "Klicke im Fortschrittspanel auf die Überschrift „Zuletzt“, um ihre Läufe auf diese eine Zeile einzuklappen, mit ihrer Anzahl daneben; ein weiterer Klick zeigt sie wieder. Jeder Arbeitsbereich merkt es sich.",
+  "tips.progressRecentFold.title": "„Zuletzt“ einklappen",
   "tips.projectCards.text": "Der Tab „Übersicht“ eines Projekts beginnt mit seinen Karten: wie viele in jeder Spalte sind, festgefahren oder blockiert. Klicke auf eine Zahl, um den Tab „Aufgaben“ zu öffnen.",
   "tips.projectCards.title": "Die Karten eines Projekts auf einen Blick",
   "tips.projectTabs.text": "Wird der Platz knapp, schrumpfen die Tabs eines Projekts zu Symbolen, und der aktive Tab behält seinen Namen, solange er passt. Fahre mit der Maus über einen Tab für seinen Namen und seine Tastenkombination.",
