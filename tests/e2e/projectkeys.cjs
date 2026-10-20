@@ -2,10 +2,12 @@
 // in their project and carry their key, and every place a card is named takes its key (any case), an old key after a
 // change, a moved card's key in its old project, or #N: reading and changing a card, blockedBy and before, a batch (a key
 // no card has refused as that card, the rest changed), a reorder, a bounded wait and a progress run's card. A key no
-// card has is 404. Replies name cards "AL-1 (#1)".
+// card has is 404. Replies name cards "AL-1 (#1)", the hive tools' too: hive_lane's start, join, list and end, through
+// the real hive MCP server.
 // Dev build, throwaway profile and workspace; no CLI is started.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
+const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -73,11 +75,44 @@ const check = (name, ok, extra = '') => {
     check('before takes a key, and the reply names the card by key', placed.status === 200 && placed.body?.key === 'AL-2', JSON.stringify(placed))
     const batch = await call('POST', '/v1/tasks/batch', { numbers: ['AL-1', 'AL-99', 'be-1'], addLabels: ['keyed'], reply: 'short' })
     check('a batch by key changes the cards it names, and refuses a key no card has as that card', batch.status === 200 && batch.body?.changed?.length === 2 && batch.body?.refused?.[0]?.error === 'Unknown card AL-99', JSON.stringify(batch))
+    // Checked whole before any key is looked up (#1219 round 2, finding 3): over the limit, or a field a batch can't set,
+    // refuses it all, even with keys no card has; a missing #N is refused as that card, as a missing key is.
+    const tooMany = await call('POST', '/v1/tasks/batch', { numbers: Array.from({ length: 101 }, (_, i) => `AL-${900 + i}`), addLabels: ['x'] })
+    check('a batch of over 100 cards is refused, keys or not', tooMany.status === 400 && !tooMany.body?.refused, JSON.stringify(tooMany).slice(0, 300))
+    const badField = await call('POST', '/v1/tasks/batch', { numbers: ['AL-99'], title: 'x' })
+    check('a batch setting a field it cannot is refused, with keys no card has', badField.status === 400 && /goes on one card/.test(badField.body?.error ?? ''), JSON.stringify(badField))
+    const noPatch = await call('POST', '/v1/tasks/batch', { numbers: ['AL-99'] })
+    check('…and one changing nothing', noPatch.status === 400 && !noPatch.body?.refused, JSON.stringify(noPatch))
+    const mixed = await call('POST', '/v1/tasks/batch', { numbers: [`#${a1?.number}`, '#999', 'AL-98'], addLabels: ['mixed'], reply: 'short' })
+    check('a missing #N is refused as that card, as a missing key is, and the card beside them changes', mixed.status === 200 && mixed.body?.changed?.length === 1 && mixed.body?.refused?.length === 2 && mixed.body.refused.some((r) => r.number === 999) && mixed.body.refused.some((r) => r.ref === 'AL-98'), JSON.stringify(mixed))
     const reordered = await call('POST', '/v1/tasks/reorder', { column: 'todo', cards: ['AL-1', 'AL-2'], reply: 'short' })
     check('a reorder takes keys, and names them in its reply', reordered.status === 200 && JSON.stringify(reordered.body?.top) === JSON.stringify([a1?.number, a2?.number]) && reordered.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(reordered))
     const waited = await call('POST', '/v1/tasks/wait', { cards: ['AL-1'], column: 'todo' })
     // Already in Todo: it answers at once, with the card, named by key for the hive tools' words.
     check('a wait takes a key', waited.status === 200 && [waited.body?.already, ...(waited.body?.changes ?? [])].some((c) => c?.number === a1?.number) && waited.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(waited))
+
+    // --- hive_lane through the real hive MCP server (#1219 round 2, finding 1): its replies name the cards by key.
+    const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
+    const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
+    const tool = (agentId, name, args) => {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+        input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
+        env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: token, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: agentId }),
+        timeout: 60000
+      }).toString()
+      const r = JSON.parse(out.split('\n')[0]).result
+      return { text: r.content[0].text, isError: !!r.isError }
+    }
+    const keyed2 = `AL-2 (#${a2?.number})`
+    const started = tool(builder.id, 'hive_lane', { action: 'start', cards: ['AL-2'], name: 'keyed' })
+    check("hive_lane start's reply names its cards by key", !started.isError && started.text.startsWith('Lane started: ') && started.text.includes(keyed2), started.text)
+    const joined = tool(reviewer.id, 'hive_lane', { action: 'join', builder: 'Builder' })
+    check("…join's", !joined.isError && joined.text.startsWith('Joined the lane: ') && joined.text.includes(keyed2), joined.text)
+    const listed = tool(builder.id, 'hive_lane', { action: 'list' })
+    check("…list's", !listed.isError && listed.text.includes(keyed2), listed.text)
+    const laneId = (await call('GET', '/v1/lanes')).body?.[0]?.id
+    const ended = tool(builder.id, 'hive_lane', { action: 'end', lane: laneId, abandoned: true })
+    check("…and end's", !ended.isError && ended.text.startsWith('Lane abandoned: ') && ended.text.includes(keyed2), ended.text)
 
     // --- A key changed: the cards show it, the old one still finds them.
     const changed = await inv('project:setKey', alpha, 'alp')

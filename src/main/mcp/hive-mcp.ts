@@ -23,7 +23,7 @@ import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import { laneChangeText, laneEndText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
-import { cardName, namedBy, namesFrom } from '../../shared/projectKeys'
+import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 
 const VERSION = '1.0.0'
 const API = (process.env.HIVE_API_URL || 'http://127.0.0.1:47821').replace(/\/$/, '')
@@ -383,11 +383,11 @@ const tools: Tool[] = [
       "Leave a running agent a message it can't take as a prompt now: one that is watching (a card loop), working, waiting on background tasks or for the user, or where the user just typed. Saved in its inbox, and Hive tells it (its id, never its text): at its next tool call or before its turn ends while it works, else with a short line typed once it is idle or watching (a watching agent is woken by it, and its watch carries on). It reads it with hive_inbox, labelled as yours (at most 5 waiting, 4000 characters each; kept if it stops; refused if your Control is turned down or your session ends meanwhile). For what it already works on (a re-brief, the user's answer); a new task is still hive_prompt_agent or hive_start_task. Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. card: the card in Doing or Review it is about; tied to that card's round, it is dropped as stale, never given, once the card passes, leaves Doing and Review or starts a new round. Replies with its id; hive_agent_activity shows its state: offered once its line is typed, received once it reads it with hive_inbox, acked once it says it acted on it, stale. cancel=true cancels the messages it hasn't read yet.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: cardArg, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
     run: async (a) => {
-      const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; cancelled?: number; round?: number }
+      const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = String(a.agent || 'the agent')
       if (a.cancel === true) return r.cancelled ? `Cancelled ${r.cancelled === 1 ? 'the message' : `${r.cancelled} messages`} waiting for ${who}.` : `No message was waiting for ${who}.`
-      // The card as the agent named it: its number (#12) or its key (HI-12).
-      const tied = r.round ? `, for ${/^\d+$/.test(String(a.card)) ? `#${a.card}` : String(a.card)} round ${r.round}` : ''
+      // The card as Hive names it (#1219): its key and number ("HI-12 (#40)"), whichever way the agent gave it.
+      const tied = r.round && r.card ? `, for ${named(r, () => cardRef(r.card!))} round ${r.round}` : ''
       if (r.typed) return `Told ${who} now (${r.id}${tied}): it reads it with hive_inbox${r.status === 'watching' ? '; its watch carries on' : ''}.`
       return `Queued for ${who} (${r.id}${tied}, ${r.status}): Hive tells it at its next tool call or turn's end, or once it is idle; ${r.queued} waiting. hive_agent_activity says when it is received and acked.`
     }
@@ -494,15 +494,17 @@ const tools: Tool[] = [
       const pick = (keys: string[]): Record<string, unknown> => Object.fromEntries(keys.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       if (a.action === 'list') {
         const q = [a.project ? `project=${enc(a.project)}` : '', a.all ? 'all=true' : ''].filter(Boolean).join('&')
-        return lanesText((await api('GET', `/v1/lanes${q ? `?${q}` : ''}`)) as LaneInfo[], !!a.all)
+        // Each lane carries the names of its cards (#1219): one map for the list.
+        const list = (await api('GET', `/v1/lanes${q ? `?${q}` : ''}`)) as (LaneInfo & { names?: Record<string, string> })[]
+        return named({ names: Object.assign({}, ...list.map((l) => l.names ?? {})) }, () => lanesText(list, !!a.all))
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.HIVE_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.HIVE_AGENT_ID } : {}) }
-      if (a.action === 'start') return laneChangeText((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'name']), ...me })) as LaneChange)
-      if (a.action === 'join') return laneChangeText((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'name']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action !== 'end') throw new Error('action must be start, join, end or list')
       if (typeof a.lane !== 'string' || !a.lane) throw new Error('lane is required: the id hive_lane list gives')
-      return laneEndText((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo)
+      return named((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo, laneEndText)
     }
   },
   {

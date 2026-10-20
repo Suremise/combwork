@@ -1088,7 +1088,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
   const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
   if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card: its number or key (12 or HI-12)')
-  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; round?: number }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
+  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the message as its task instead (hive_start_agent with prompt).`)
     guard()
@@ -1099,7 +1099,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, `The message wasn't typed into ${a.name}: ${r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}`}.`)
     const typed = r.fate === 'typed'
     const tied = r.round && card !== undefined ? ` for ${cardRef(card)} round ${r.round}` : ''
-    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(r.round ? { round: r.round } : {}) } }
+    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
   })
 })
 
@@ -1448,10 +1448,24 @@ route('POST', '/v1/projects/:name/merge-slot/release', async ({ params, body }) 
 
 const laneCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
-    return await fn()
+    return lanesNamed(await fn())
   } catch (e) {
     throw e instanceof lanes.LaneError ? new HttpError(e.status, e.message) : e
   }
+}
+
+/**
+ * A lane reply with `names` for its cards (#1219 round 2, finding 1): on each lane (a list, an ended lane) or on the
+ * change (started, joined), for the hive MCP server that words it.
+ */
+function lanesNamed<T>(r: T): T {
+  const numbersOf = (l: LaneInfo | null | undefined): number[] => (l ? [...l.cards.map((c) => c.number), ...(l.current !== null ? [l.current] : []), ...(l.pausedOn !== null ? [l.pausedOn] : [])] : [])
+  const isLane = (v: unknown): v is LaneInfo => !!v && typeof v === 'object' && Array.isArray((v as LaneInfo).cards) && typeof (v as LaneInfo).id === 'string'
+  if (Array.isArray(r)) return r.map((l) => (isLane(l) ? { ...l, ...withNames(numbersOf(l)) } : l)) as T
+  if (isLane(r)) return { ...r, ...withNames(numbersOf(r)) }
+  const change = r as { lane?: unknown; replaced?: unknown } | null
+  if (change && typeof change === 'object' && isLane(change.lane)) return { ...change, ...withNames([...numbersOf(change.lane), ...(isLane(change.replaced) ? numbersOf(change.replaced) : [])]) } as T
+  return r
 }
 
 /** The project a lane call is about: a project agent's own (another named is refused), else the one named. */
@@ -2011,21 +2025,22 @@ route('POST', '/v1/tasks/batch', async ({ body }) => {
   const short = shortReply(body)
   return asRefused(async () => {
     // Cards named by key too (#1219): one no card has (or, for a project agent, another project's) is refused as that
-    // card, the others changed, as a number no card has is.
-    const unknown: string[] = []
+    // card, the others changed, as a number no card has is. The request is checked whole first (its count, its fields),
+    // before any key is looked up (#1219 round 2, finding 3); `#N` and numbers go on as they are, refused per card.
     const refs = body && typeof body === 'object' && Array.isArray((body as { numbers?: unknown }).numbers) ? (body as { numbers: unknown[] }).numbers : null
-    const given = refs
-      ? {
-          ...(body as object),
-          numbers: refs.flatMap((v) => {
-            if (typeof v !== 'string' || !/^[A-Za-z]{2,4}-\d+$/.test(v.trim())) return [cardRefIn(v)]
-            const n = cardOfRef(requireWorkspace(), v, callerScope())
-            if (n === null) unknown.push(v.trim())
-            return n === null ? [] : [n]
-          })
-        }
-      : body
-    if (unknown.length && !(given as { numbers: unknown[] }).numbers.length) return batchReply([], short, unknown)
+    const isKey = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z]{2,4}-\d+$/.test(v.trim())
+    taskBatch.batchRequest(refs ? { ...(body as object), numbers: refs.map((v, i) => (isKey(v) ? `#${1e9 + i}` : v)) } : body)
+    const unknown: string[] = []
+    const given = {
+      ...(body as object),
+      numbers: refs!.flatMap((v) => {
+        if (!isKey(v)) return [v]
+        const n = cardOfRef(requireWorkspace(), v, callerScope())
+        if (n === null) unknown.push(v.trim())
+        return n === null ? [] : [n]
+      })
+    }
+    if (unknown.length && !given.numbers.length) return batchReply([], short, unknown)
     const { numbers, patch } = taskBatch.batchRequest(given)
     const actor = await taskActor()
     const items = actor.kind !== 'assistant' ? await tasks.updateTasks(numbers, patch, actor) : await taskBatch.assistantBatch(assistantCaller() ?? '', assistantCallerToken() ?? '', numbers, patch, actor)

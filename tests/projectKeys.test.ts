@@ -3,7 +3,7 @@
 // new cards numbered per project, a key changed (the old one an alias), a card moved to another project (its old key an
 // alias, its number there again when it comes back), a counter after a change undone part way, and references for the
 // Agent API (`HI-12`, `hi-12`, `#12`, 12). HIVE_KEYS_LIVE_DB=<a hive.db> runs the step on a copy of that board.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -226,6 +226,29 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     expect(keys.cardNamesOf(w, 'amberlight')(h.number)).toBe(`#${h.number}`)
     expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe(`HI-1 (#${h.number})`)
     expect(keys.cardNamesOf(w)(h.number)).toBe(`HI-1 (#${h.number})`)
+    await close(w)
+  })
+
+  it('by the project a card is in now, by its id: renamed, its own; another project in its old folder, not (round 2, finding 2)', async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
+    // hive renamed hivemind (its id goes with it); a new project takes the folder hive.
+    renameSync(join(ws, 'hive'), join(ws, 'hivemind'))
+    mkdirSync(join(ws, 'hive', '.hive'), { recursive: true })
+    writeFileSync(join(ws, 'hive', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    await w.projectIds({ fresh: true })
+    // The card as saved still says hive: the board's readers follow its id, and so must keys.
+    expect(store.cardKeyOf(w, h.number)?.project).toBe('hive')
+    expect((await inWorkspace(w, () => tasks.getTask(h.number, w))).project).toBe('hivemind')
+    expect([keys.cardOfRef(w, 'HI-1', 'hivemind'), keys.cardOfRef(w, `#${h.number}`, 'hivemind')]).toEqual([h.number, h.number])
+    expect([keys.cardOfRef(w, 'HI-1', 'hive'), keys.cardOfRef(w, 'HI-1', 'amberlight'), keys.cardOfRef(w, 'HI-9', 'hivemind')]).toEqual([null, null, null])
+    // Its old key after a key change too.
+    await keys.changeProjectKey(w, join(ws, 'hivemind'), 'HM')
+    expect([keys.cardOfRef(w, 'HI-1', 'hivemind'), keys.cardOfRef(w, 'HM-1', 'hivemind'), keys.cardOfRef(w, 'HM-1', 'hive'), keys.cardOfRef(w, 'HI-1', 'hive')]).toEqual([h.number, h.number, null, null])
+    expect(keys.cardNamesOf(w, 'hivemind')(h.number)).toBe(`HM-1 (#${h.number})`)
+    expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe(`#${h.number}`)
     await close(w)
   })
 })

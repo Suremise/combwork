@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { resolve } from 'path'
 import { addProjectKeys, boardOpen, boardWrite, boardChanged, cardKeyOf, cardNamed, hasCard, keysNoticeDue, keysNoticeSaid, projectKeys, setProjectKey } from './boardStore'
 import { fmt, msg, tr } from '../shared/i18n'
+import { projectNow } from '../shared/projectIds'
 import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames } from '../shared/projectKeys'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -17,6 +18,14 @@ const log = createLogger('keys')
  */
 
 const folderOf = (p: string): string => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? ''
+
+/**
+ * Whether a keyed card is in `scope`'s project (null: every card is), by the project it is in now: the one with its id,
+ * renamed or moved since it was saved, as the board's readers show it (#1219 round 2, finding 2), never by the folder
+ * name it was saved with, which another project may have now.
+ */
+const inScope = (ws: WorkspaceService, of: { project: string; projectId: string | null }, scope: string | null): boolean =>
+  scope === null || projectNow(ws.projectIdsNow(), of.project, of.projectId).toLowerCase() === scope.toLowerCase()
 
 // ---------------------------------------------------------------------------
 // Card names in what agents read (#1219; Darren, 20 Oct: "HI-1230 (#1240)" until P8).
@@ -41,7 +50,7 @@ export function cardNamesOf(ws: WorkspaceService, scope: string | null = null): 
     try {
       const k = cardKeyOf(ws, n)
       // Another project's card, for an agent confined to its own (#1219 round 1, finding 4): its number only, as before.
-      const key = k && (scope === null || k.project.toLowerCase() === scope.toLowerCase()) ? k.key : undefined
+      const key = k && inScope(ws, k, scope) ? k.key : undefined
       if (key) found.set(n, key)
       return nameWithKey(n, key)
     } catch {
@@ -173,7 +182,7 @@ export function cardOfRef(ws: WorkspaceService, ref: string | number, scope: str
   // so a reply never tells whether it exists, nor its number.
   if (card === null || scope === null) return card
   const of = cardKeyOf(ws, card)
-  return of && of.project.toLowerCase() === scope.toLowerCase() ? card : null
+  return of && inScope(ws, of, scope) ? card : null
 }
 
 /** Whether a reference is in a card reference's form (a key, `#N` or a number), whether or not a card has it. */

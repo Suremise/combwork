@@ -1155,13 +1155,16 @@ export function cardKeys(ws: WorkspaceService, numbers?: readonly number[]): Map
   return readSnapshot(ws, (b, db) => (b.legacy ? new Map() : keysOfCards(db, numbers)))
 }
 
-/** A card's key and its project's folder name, or null when it has no key. */
-export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; project: string } | null {
+/**
+ * A card's key, with its project as saved: the folder name and the id (the project it is now is the one with that id:
+ * projectNow), or null when it has no key.
+ */
+export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; project: string; projectId: string | null } | null {
   return readSnapshot(ws, (b, db) => {
     if (b.legacy) return null
     const key = keysOfCards(db, [n]).get(n)
-    const r = key ? (db.prepare('SELECT project FROM cards WHERE number = ?').get(n) as { project: string } | undefined) : undefined // i18n-ignore: SQL
-    return key && r ? { key, project: r.project } : null
+    const r = key ? (db.prepare('SELECT project, project_id FROM cards WHERE number = ?').get(n) as { project: string; project_id: string | null } | undefined) : undefined // i18n-ignore: SQL
+    return key && r ? { key, project: r.project, projectId: r.project_id } : null
   })
 }
 
