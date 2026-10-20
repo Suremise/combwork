@@ -1709,12 +1709,12 @@ export function TaskDialog() {
           <>
             {card && (
               <>
-                <button className="btn subtle danger-text" disabled={ro} title={readOnly ?? undefined} onClick={() => void remove(card).then((ok) => ok && close())}>
+                <button className={cx('btn subtle danger-text', ro && 'ro-off') /* i18n-ignore: class names */} disabled={ro} title={readOnly ?? undefined} onClick={() => void remove(card).then((ok) => ok && close())}>
                   <Icon name="trash" /> {tr(msg({ id: 'board.dialog.delete', defaultMessage: 'Delete', description: "Button in the card dialog: deletes the card (after asking)." }))}
                 </button>
                 <Tooltip content={readOnly}>
                 <BusyButton
-                  className="subtle"
+                  className={cx('subtle', ro && 'ro-off') /* i18n-ignore: class names */}
                   disabled={ro}
                   busy={action.busy === 'archive'}
                   busyLabel={card.archived ? tr(msg({ id: 'board.dialog.bringingBack', defaultMessage: 'Bringing back…', description: 'The Bring Back button while the archived card is being brought back.' })) : tr(ARCHIVING)}
@@ -1732,7 +1732,7 @@ export function TaskDialog() {
                 </Tooltip>
                 {!card.archived && (
                   <Tooltip content={readOnly ?? (!card.project ? tr(NEEDS_PROJECT) : edited.length ? tr(msg({ id: 'board.dialog.startTipSave', defaultMessage: 'Save your changes, then give it to an agent with the card as its prompt.', description: "Tooltip on the card dialog's Save and Start… button." })) : tr(msg({ id: 'board.dialog.startTip', defaultMessage: 'Give it to an agent, with the card as its prompt.', description: "Tooltip on the card dialog's Start… button." })))}>
-                    <BusyButton className="subtle" busy={action.busy === 'start'} busyLabel={tr(SAVING)} disabled={!card.project || !title.trim() || ro} onClick={() => void start()}>
+                    <BusyButton className={cx('subtle', ro && 'ro-off') /* i18n-ignore: class names */} busy={action.busy === 'start'} busyLabel={tr(SAVING)} disabled={!card.project || !title.trim() || ro} onClick={() => void start()}>
                       <Icon name="play" /> {edited.length ? tr(msg({ id: 'board.dialog.saveAndStart', defaultMessage: 'Save and Start…', description: 'Button in the card dialog with unsaved changes: saves them, then asks which agent starts the card.' })) : tr(msg({ id: 'board.dialog.start', defaultMessage: 'Start…', description: 'Button in the card dialog: asks which agent starts the card.' }))}
                     </BusyButton>
                   </Tooltip>
@@ -1744,7 +1744,7 @@ export function TaskDialog() {
               {tr(CANCEL)}
             </button>
             <Tooltip content={readOnly}>
-              <BusyButton className="primary" busy={action.busy === 'save'} busyLabel={isNew ? tr(ADDING) : tr(SAVING)} disabled={!title.trim() || card?.archived || ro} onClick={() => void save()}>
+              <BusyButton className={cx('primary', ro && 'ro-off') /* i18n-ignore: class names */} busy={action.busy === 'save'} busyLabel={isNew ? tr(ADDING) : tr(SAVING)} disabled={!title.trim() || card?.archived || ro} onClick={() => void save()}>
                 {isNew ? tr(msg({ id: 'board.dialog.addCard', defaultMessage: 'Add Card', description: 'The New Card dialog\'s main button: adds the card.' })) : tr(SAVE)}
               </BusyButton>
             </Tooltip>

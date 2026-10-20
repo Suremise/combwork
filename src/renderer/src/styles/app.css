@@ -8217,6 +8217,33 @@ textarea.input.task-blocked-input {
 .task-form {
   margin-bottom: 4px;
 }
+/*
+ * A card on a read-only board (#1230): its fields look read-only (no fill, faded), and the footer's buttons it
+ * can't use look off, as faded as Delete (a disabled subtle or gold button otherwise still reads as one to click).
+ */
+.task-title-input:read-only,
+.task-form .input:read-only,
+.task-form .select:disabled,
+.task-description-input:read-only,
+.task-decision-new .input:disabled,
+.task-comment-new .input:disabled {
+  background: transparent;
+  border-color: var(--border-subtle);
+  opacity: 0.5;
+  cursor: default;
+}
+/* No arrow: nothing to pick. */
+.task-form .select:disabled {
+  appearance: none;
+}
+.dialog-footer .btn.ro-off:disabled {
+  opacity: 0.3;
+}
+.dialog-footer .btn.primary.ro-off:disabled {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--fg-muted);
+}
 /* The card dialog's Read first (#818): its references, one a line, then each as a link to its section. */
 .task-context {
   display: flex;
