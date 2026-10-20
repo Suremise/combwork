@@ -212,6 +212,115 @@ Changes emit `tasks-changed` (routed by workspace path), once a board change com
 
 **Tool replies** are lean: every character a tool returns goes into the agent's context and is paid for on each later turn. The Agent API keeps its full replies by default and has opt-in short ones (`?view=short` on task and project lists, `?history=false` on a card, `?days=false` on usage, `reply: "short"` on card changes, comments, reorders and starts); `servers.ts` builds them (`taskChange()` reports what changed in the card's history words, which `updateTask()` hands back through `opts.said`, and where the card is now). `hive-mcp.ts` asks for those and turns them into text with `shared/toolReplies.ts` (a line per card or project, a confirmation per change, notes as their text); everything else goes out as compact JSON. `tests/e2e/replysize.cjs` measures every tool against a busy workspace and holds each reply to a size.
 
+## Workflow layer (1.0)
+
+The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch: the modules
+below don't exist yet, and each phase moves its part of this section into the code map when it merges. Names are
+proposals the builders may change, keeping the boundaries.
+
+**Today, where it attaches** (read on 20 Oct, 1.0.0 at edbf9b33):
+- Every card write goes through `boardWrite(ws, fn)` (`src/main/boardStore.ts:536`): file lock, `BEGIN IMMEDIATE`,
+  commit, then `tasks-changed` once; `afterBoardWrite` runs callbacks after the commit. `tasks.ts` wraps it
+  (`boardLock`, `cardBatch`). The caller is a `TaskActor` (`tasks.ts:58`) from the token (`taskActor`,
+  `servers.ts:1737`). The guards today are scattered in `tasks.ts` (project scope, archived, On Hold, Done on create
+  and placement, reviews at `:1151-1169`); there is no transition graph.
+- Verdicts are history lines (`shared/watch.ts:61`), the round count is parsed from them (`returnRound`); the card's
+  `review` holds only the current reviewer.
+- hive.db has `cards` (a JSON document with generated columns), `store_rows`/`store_meta` (lanes, watches, deliveries,
+  sessions), `board_meta`, `archive_batches`; migrations in `BOARD_MIGRATIONS` (`boardStore.ts:34`), versioned and
+  backed up by `db.ts`.
+- Lanes (`lanes.ts`) are bookkeeping; `mergeCommit` is the agent's text. Merge slots (`mergeSlots.ts`) are in-memory,
+  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts:430`) auto-commits and doesn't
+  return the merge commit; squash detection is `alreadyMerged` (`:417`). The Git view's actions fence the folder
+  (`folderFence.ts`, `gitRepo.ts:343`) and take a `.git/hive-merge` lock.
+
+**Layers and modules (planned):**
+
+| Layer | Shared (pure, unit-tested) | Main |
+|---|---|---|
+| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce) |
+| Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
+| Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
+| Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
+| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
+| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
+| Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
+
+**The one path.** An intent (Agent API route or hive tool) or a user move (IPC) calls `runtime.move(card, request,
+actor)`. It asks the platform adapter for the facts the guards need first, outside the transaction (keys, files,
+containment, check facts: slow reads). Then, inside one `boardWrite` transaction, it reads the card, its facts and
+its ruleset, **re-reads the cheap folder state the guards depend on** (head and dirty for Git; for None the stored
+hash against the watcher's write log since it was computed), refusing if it differs from what the slow reads used
+rather than racing; runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
+the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
+runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
+happens for a write that rolled back, and nothing is lost to a crash after the commit (SPEC §16.4.5).
+
+**Same change.** The Git adapter stores each submission's endpoints (base, head), its candidate key
+(`git patch-id --stable`) and its files, and never recomputes a submitted change from the target's current state.
+Sameness is a **replay**: `git merge-tree --write-tree --merge-base=<B1> <B2> <R1>` must succeed and give `<R2>`'s
+tree; patch-id only rules out a different change quickly; anything unsettled is not the same (SPEC §16.3.2). In a
+shared folder, `CommitAttributed` facts record which card each commit belongs to when it is seen.
+
+**Facts and derived state.** `facts.ts` folds a card's facts into its derived state (stage, revision under review,
+last verdict, stale, overrides, For you). The same fold runs in the spike (P2), main and tests. The card's stored
+`column` is a cache of the fold's category, written in the same transaction, so existing readers (watches, lanes, the
+Agent API, the board's queries on generated columns) keep working.
+
+**Reconciliation.** `observe.ts` turns platform events into observed facts per affected card (a commit in a slot, a
+target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.
+It also runs when a gate reads a card and once at start.
+
+**Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
+ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
+
+**Merge queue.** One worker per repository, holding `repoLock`. Entries come from `IntegrationRequested` facts (each
+with an entry id; cancelled, failed and integrated entries are skipped); the order is rebuilt from facts at start,
+after reconciling any entry with `IntegrationStarted` and no outcome. The test merge happens in the queue's own
+worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Hive; the target advances by
+compare-and-swap (`update-ref` with the expected old value), and when the target is checked out in a folder, by the
+**journaled** read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence: conditions checked before the
+folder is touched (branch, ref, nothing staged, no unstaged changes in the merged files), each phase written to the
+`IntegrationStarted` fact before it runs, a recovery table on restart, and a terminal "needs you" state that pauses
+the queue (never `merge --ff-only`, which has no expected value). The repository lock (a lock file in the common git
+dir, replacing the in-process `.git/hive-merge` lock of `withFileLock`, `fsutil.ts:512`) is held only for the
+advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
+submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
+the queue's ref.
+
+**Checks.** A run records its tested checkout and counts for a card's submission under SPEC §16.13's rules (the
+checkout contains the card's revision; nothing written in the tracked tree during the run). `hive-progress --check
+<name> --isolated` runs in a **check copy** from the review-copy pool, the remedy when a shared folder is busy.
+
+**Slots and sessions.** `slots.ts` owns the worktrees under `<Workspace>.worktrees/<Project>/` and lends them by
+**lease** (a `slot_leases` row: slot, card or lane, builder, from, to), one open lease per slot, taken under the slot's
+lock. Sessions record their folder and lease; `sessions.ts` resumes a session only in its folder (as today) and only
+while its lease is open or the slot is free at its last revision, so a reused slot never resumes the wrong work, and
+Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detached worktrees from a small warm pool,
+leased to one reviewer for one submission; reviewers' sessions live in the project folder, and their launch grants
+the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir`, Codex's writable roots by `-c`),
+never the CLI's config.
+
+**Storage (P3's one migration, #1025).** New tables: card columns typed; `card_comments`, `card_history`,
+`card_decisions`, `card_links`, `card_holds`, `card_facts`, `card_actions`, `card_aliases` (old `#N` → key),
+`project_keys`, `rulesets`, `slot_leases` (P7); typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
+is rebuilt from rows, identical or versioned. One schema step, backed up first, asked before it runs and refused while
+another Hive process has the workspace open; Help restores the 0.9 backup; a newer file opens read-only. Observed
+facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
+workspace write each transition once, while a later repeat of the same values is still recorded; a writer that loses
+the race re-reads the platform and writes only what is true now, after the winner (SPEC §16.17).
+
+**What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
+(`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
+the runtime's `Moved` and `Verdict` facts instead of `onLoopEvent`), the Progress runs (`ProgressRun` gains `card` and
+`revision`).
+
+**Risks the builders own** (SPEC §16 and the note's section 12): `sessions.ts`, `servers.ts` and `tasks.ts` are large;
+follow the service-changes skill; keep adapter calls out of long transactions; slots touch about 45–55 files
+(templates, project agents, sessions, actions, the agent dialogs and panes, project tabs, the Agent API's agent
+replies).
+
 ## Removing projects
 
 `main/projectRemoval.ts` hides, removes or deletes a project (`project:removalInfo`, `project:remove`, `project:restore`, `project:forget`, `project:takeRemovedData`). Hidden and removed projects are listed by folder name in `workspace.json` (`hiddenProjects`); `WorkspaceService.listProjectPaths()` and `isProjectPath()` leave them out, so everything that lists or names projects (the renderer, the Agent API, the board) stops seeing them without changes of its own. **Remove** packs the project's handovers (found with `projectHandovers()`, as the MCP server finds them) and cards into `<project>/.hive/removed` with a `manifest.json`, archives the cards (`archivedFor: 'project-removed'`) and moves the handovers to the Recycle Bin; **Restore** or the banner (`ProjectInfo.removedData`, from the manifest) unpacks it: the archived originals come back in the workspace they left, copies with new numbers anywhere else (`importCards()` maps the references). **Delete** sends the folder to the Recycle Bin first (watchers paused with `files.suspendWatching()`, resumed if it fails), then worktrees, handovers and cards, reporting what couldn't follow as `warnings`. Every way runs under a per-project guard with the project's starts fenced (`sessions.fenceStarts()`, checked in `assertStartsAllowed`); agents are stopped and the worktrees (`branchStatus(..., { strict: true })`, which throws when git fails), handovers (`projectHandovers(..., { strict: true })`, by exact name in the header) and cards are read again after the stop. `checkedWorktrees()` only lets through folders `git worktree list` gives for the project that don't contain the project or workspace and aren't another project. The dialog is `components/ProjectRemoval.tsx`, with the Settings → Workspace list and the restore banner.
