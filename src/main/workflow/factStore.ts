@@ -12,11 +12,11 @@
 
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
-import { BOARD_MIGRATIONS, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
+import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
 import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
-import { STAGE_CATEGORY } from '../../shared/workflow/facts'
+import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import type { LaneList } from '../../shared/workflow/laneList'
@@ -100,7 +100,13 @@ interface Conn {
  */
 const boardConn = (ws: WorkspaceService): Conn => ({
   read: (fn) => boardRead(ws, fn),
-  write: (fn) => boardWriteOp(ws, fn),
+  // A fact (observed ones too) changes what the window shows of a card (its work view, #1223): `tasks-changed` once
+  // the change commits.
+  write: (fn) => {
+    const out = boardWriteOp(ws, fn)
+    boardChanged(ws)
+    return out
+  },
   close: () => undefined
 })
 
@@ -160,9 +166,6 @@ class OwnConn implements Conn {
     this.db.close()
   }
 }
-
-/** The stage a column stands for, for a card no 1.0 rule has moved yet (its `stage` empty). */
-const COLUMN_STAGE: Record<Category, StageId> = { hold: 'hold', todo: 'todo', doing: 'active', review: 'review', passed: 'approved', done: 'done' }
 
 /** The runtime's columns of a card, as the store reads them. */
 interface CardCols {
@@ -246,7 +249,7 @@ export class FactStore {
         ...(r.lane !== null ? { lane: r.lane } : {}),
         ...(r.lane_reviewer !== null ? { reviewer: r.lane_reviewer } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
-        stage: r.stage ?? COLUMN_STAGE[r.col] ?? 'todo',
+        stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
       }))
     })
@@ -469,7 +472,8 @@ function setColumns(db: DatabaseSync, id: number, c: { target?: string; paths?: 
   }
 }
 
-function factOf(r: Record<string, string | number | null>): Fact {
+/** A `card_facts` row as a fact. */
+export function factOf(r: Record<string, string | number | null>): Fact {
   return {
     seq: r.seq as number,
     card: r.card as number,

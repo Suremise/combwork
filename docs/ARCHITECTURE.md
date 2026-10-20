@@ -311,6 +311,21 @@ last verdict, stale, overrides, For you). The same fold runs in the spike (P2), 
 `column` is a cache of the fold's category, written in the same transaction, so existing readers (watches, lanes, the
 Agent API, the board's queries on its columns) keep working.
 
+**A card's work, read (#1223).** `shared/workflow/workView.ts` makes the fold a **work view**: the start's folder,
+line, base and target; this cycle's submissions (round, files, time, builder), verdicts tied to their submission and
+round (`current`: on the latest submission at the card's decision generation), checks per revision (counted or not),
+the marks (carried over, stale, outside the rules, merged in part, left the target, overridden), the integration
+(method, result revision, merge commit) or, where there is no merge (None, a no-code card), the acceptance, the
+queue's newest entry, decisions' generations, and `preWorkflow` / `adopted`. Its stage is the fold's (the card's cached
+stage is where the fold starts), and a verdict is `current` only while no other change has made it stale. A `WorkBadge` is what the board's badges need of it. Revisions stay whole: the window shows them through its
+project's descriptor (`revisionShort`). `main/workflow/cardWork.ts` reads a card's row and facts on one snapshot for the
+IPC `tasks:work`, and every live card's for `tasks:workBadges`, the archived ones left out in the query (#1107's rule:
+`facts.live` joins `cards` on `archived = 0`, so neither their rows nor their facts are parsed). The window reads them
+again each time it reads the board (`renderer/cardWork.ts`, on `tasks-changed`): a fact written on the board's
+connection marks the board change (`boardChanged`), so an observed fact tells the window as a recorded one does. The
+Agent API's card gains `stage` after the document's fields (`boardStore.cardStages`: the row's stage, else its
+column's), and `GET /v1/tasks/:n/facts` gives a card's facts as short rows (`factRow`), whole with `view=full`.
+
 **The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
 `Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at
 once), each repository and folder watched once however many projects share it:
