@@ -8,6 +8,7 @@
 import type { MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel } from './tasks'
+import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
@@ -29,6 +30,10 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
 /** A card in a listing (GET /v1/tasks?view=short): what it is and where it stands, without its text. */
 export interface TaskRow {
   number: number
+  /** Its key (#1219: HI-12), when it has one. */
+  key?: string
+  /** How its text names the cards it waits for (#1219: "HI-3 (#12)"), by number, for the hive MCP server (namesOf). */
+  names?: Record<string, string>
   title: string
   column: TaskColumn
   project: string
@@ -48,6 +53,7 @@ export interface TaskRow {
 export function taskRow(v: TaskView): TaskRow {
   return {
     number: v.number,
+    ...(v.key ? { key: v.key } : {}),
     title: v.title,
     column: v.column,
     project: v.project,
@@ -55,6 +61,7 @@ export function taskRow(v: TaskView): TaskRow {
     labels: v.labels,
     blocked: v.blocked,
     blockedBy: v.blockedBy,
+    ...(namesOf(v.blockedBy) ? { names: namesOf(v.blockedBy) } : {}),
     ...(v.elsewhere?.length ? { elsewhere: v.elsewhere } : {}),
     stalled: v.stalled,
     ...(v.review ? { reviewing: { name: v.review.agentName, ...(v.reviewStalled ? { stalled: v.reviewStalled } : {}) } } : {}),
@@ -81,6 +88,8 @@ export function newestComments<T extends { comments: unknown[] }>(v: T, n: numbe
 /** What a change did to a card (reply: "short"): the changes in words and where the card is now. */
 export interface TaskChange {
   number: number
+  /** Its key (#1219: HI-12), when it has one. */
+  key?: string
   title: string
   column: TaskColumn
   /** Its place in its column, 1 at the top; null when archived. */
@@ -98,15 +107,15 @@ export const ordinal = (n: number): string => {
 
 const place = (c: Pick<TaskChange, 'column' | 'position' | 'of'>): string => `${columnLabel(c.column)}${c.position ? ` (${ordinal(c.position)} of ${c.of})` : ''}`
 
-/** "#61 created in Todo (51st of 51) for alpha, given to Coder: Lean replies". */
+/** "HI-61 (#61) created in Todo (51st of 51) for alpha, given to Coder: Lean replies" (#61 for a card with no key). */
 export function createdText(c: TaskChange): string {
-  return `#${c.number} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}`
+  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}`
 }
 
-/** "#60 Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */
+/** "HI-60 (#60) Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */
 export function changedText(c: TaskChange): string {
   const what = c.changes.length ? c.changes.join('; ') : 'No change'
-  return `#${c.number} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
+  return `${cardName(c)} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
 }
 
 /** What a reorder did (reply: "short"). */
@@ -116,24 +125,32 @@ export interface TaskReorder {
   top: number[]
   /** How many cards the column has. */
   count: number
+  /** How its text names those cards (#1219), by number (namesOf). */
+  names?: Record<string, string>
 }
 
 /** What a batch change did (reply: "short"): each card changed, and each card refused with why (left as it was). */
 export interface TaskBatch {
   changed: TaskChange[]
-  refused: { number: number; error: string }[]
+  /** `ref`: a key no card has (its number 0), as it was given. */
+  refused: { number: number; ref?: string; error: string }[]
+  /** How its text names the cards refused (#1219), by number (namesOf). */
+  names?: Record<string, string>
 }
 
 export function batchText(b: TaskBatch): string {
+  return namedBy(namesFrom(b.names), () => batchLines(b))
+}
+function batchLines(b: TaskBatch): string {
   const lines = [b.changed.length ? `${b.changed.length} card${b.changed.length === 1 ? '' : 's'} changed:` : 'No card changed.']
   for (const c of b.changed) lines.push(changedText(c))
-  if (b.refused.length) lines.push(`Refused, left as they were: ${b.refused.map((r) => `#${r.number} (${r.error})`).join('; ')}.`)
+  if (b.refused.length) lines.push(`Refused, left as they were: ${b.refused.map((r) => (r.ref ? r.error : `${cardRef(r.number)} (${r.error})`)).join('; ')}.`)
   return lines.join('\n')
 }
 
 export function reorderText(r: TaskReorder): string {
   const rest = r.count - r.top.length
-  return `${columnLabel(r.column)} now starts ${r.top.map((n) => `#${n}`).join(', ')}${rest > 0 ? `; its other ${rest} card${rest === 1 ? '' : 's'} keep their order below` : ''}.`
+  return `${columnLabel(r.column)} now starts ${namedBy(namesFrom(r.names), () => r.top.map(cardRef).join(', '))}${rest > 0 ? `; its other ${rest} card${rest === 1 ? '' : 's'} keep their order below` : ''}.`
 }
 
 const STATUS: Record<string, string> = { ready: 'idle', finished: 'idle', background: 'waiting on background tasks', waiting: 'waiting for the user', watching: 'waiting for cards', signin: 'waiting for the user to sign in' }
@@ -145,14 +162,17 @@ function agentText(a: TaskRow['agent']): string {
   return `${a.name} (${bits.join(', ')})`
 }
 
-/** "#35 Number settings · alpha · Coder (working) · bug · blocked: … · after #12 · reviewing: Codex · 3 comments". */
+/** "HI-35 (#35) Number settings · alpha · Coder (working) · bug · blocked: … · after #12 · reviewing: Codex · 3 comments". */
 export function taskRowText(r: TaskRow): string {
-  const bits = [`#${r.number} ${r.title}`]
+  return namedBy(namesFrom(r.names), () => rowText(r))
+}
+function rowText(r: TaskRow): string {
+  const bits = [`${cardName(r)} ${r.title}`]
   if (r.project) bits.push(r.project)
   if (r.agent) bits.push(agentText(r.agent))
   if (r.labels.length) bits.push(r.labels.join(', '))
   if (r.blocked) bits.push(`blocked: ${r.blocked}`)
-  if (r.blockedBy.length) bits.push(`after ${r.blockedBy.map((n) => (r.elsewhere?.includes(n) ? `#${n} (another project)` : `#${n}`)).join(', ')}`)
+  if (r.blockedBy.length) bits.push(`after ${r.blockedBy.map((n) => (r.elsewhere?.includes(n) ? `${cardRef(n)} (another project)` : `${cardRef(n)}`)).join(', ')}`)
   if (r.stalled) bits.push(`stalled: ${r.stalled}`)
   if (r.reviewing) bits.push(`reviewing: ${r.reviewing.name}${r.reviewing.stalled ? ` (stalled: ${r.reviewing.stalled})` : ''}`)
   if (r.comments) bits.push(`${r.comments} comment${r.comments === 1 ? '' : 's'}`)
@@ -328,7 +348,11 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is hive_read_task with latestComment.
  */
-export function taskWaitText(r: { done?: string; watching?: string; limitAt?: string; already?: WaitChange; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards }): string {
+type WaitReply = { done?: string; watching?: string; limitAt?: string; already?: WaitChange; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; names?: Record<string, string> }
+export function taskWaitText(r: WaitReply): string {
+  return namedBy(namesFrom(r.names), () => waitText(r))
+}
+function waitText(r: WaitReply): string {
   if (r.done) return r.done
   // A lane watch (#531): what it counts, and the watch it replaced.
   // The events only when they aren't the default (lean: the agent asked for them, or knows the default).
@@ -336,12 +360,12 @@ export function taskWaitText(r: { done?: string; watching?: string; limitAt?: st
     const own = r.events.length !== LANE_DEFAULT_EVENTS.length || r.events.some((e) => !LANE_DEFAULT_EVENTS.includes(e as LaneEvent))
     // The cards beside its lanes (#726): kept from the last lane watch, replacing its cards, or left (done or gone).
     const c = r.cards
-    const list = (ns: number[]): string => ns.map((n) => `#${n}`).join(', ')
+    const list = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
     const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}` : ''
     return `${r.watching}${own ? ` (${r.events.join(', ')})` : ''}. End your turn now: Hive types a line into this session on a lane event${c?.now.length ? ` or a change to ${list(c.now)}` : ''}, or at ${r.limitAt ?? 'the limit'} if none comes.${r.replaced ? ` It replaces your watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''}${cards}`
   }
   const line = (c: WaitChange): string =>
-    `#${c.number} ${c.changes === 'gone' ? (c.archived ? 'was archived' : 'was archived or deleted') : `is in ${c.column[0].toUpperCase()}${c.column.slice(1)} (${c.changes.join(', ')}${c.by ? `, by ${c.by}` : ''})`}${c.comment ? `; latest comment by ${c.comment.by}: "${c.comment.firstLine}"` : ''}`
+    `${cardRef(c.number)} ${c.changes === 'gone' ? (c.archived ? 'was archived' : 'was archived or deleted') : `is in ${c.column[0].toUpperCase()}${c.column.slice(1)} (${c.changes.join(', ')}${c.by ? `, by ${c.by}` : ''})`}${c.comment ? `; latest comment by ${c.comment.by}: "${c.comment.firstLine}"` : ''}`
   if (r.watching) return `${r.watching}. End your turn now: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does. Nothing runs meanwhile.`
   if (r.already) return `Already: ${line(r.already)}.`
   const since = r.since ? `\nsince: ${r.since}` : ''

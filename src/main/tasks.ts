@@ -14,7 +14,7 @@ import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
-import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -147,12 +147,14 @@ const INTO_REVIEW = new Set<string>([HISTORY.moved.id, HISTORY.movedTop.id, HIST
 const intoReview = (s: StoredText): boolean => s.id === HISTORY.returned.id || (INTO_REVIEW.has(s.id) && s.values?.column === 'review')
 
 /** A card as saved, with anything missing or of the wrong type made safe (a card from an older Hive or an export may lack fields). */
-function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?: ProjectIdIndex): TaskCard {
+function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?: ProjectIdIndex, key?: string): TaskCard {
   const nums = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x) && x > 0) : [])
   const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
   const now = new Date(0).toISOString()
   return {
     number: n,
+    // Its key (#1219: HI-12), from its project's key and its number there; not part of what is saved.
+    ...(key ? { key } : {}),
     title: typeof raw.title === 'string' ? raw.title : `Task ${n}`, // i18n-ignore: a damaged card's stand-in title, saved and read by agents
     description: typeof raw.description === 'string' ? raw.description : '',
     // Renamed or moved since it was saved: the project that has its id now (projectNow).
@@ -224,9 +226,10 @@ export async function allTasks(ws: WorkspaceService = workspace, q: CardQuery = 
   const ids = await ws.projectIds()
   if (!ws.path) return []
   const docs = cardDocs(ws, q)
+  const keys = cardKeys(ws, q.archived === undefined && !q.numbers && !q.agents && !q.reviewers ? undefined : docs.map((d) => d.number))
   // References to cards that are gone are left out: every number the board has, when only some cards were read.
   const numbers = q.archived === undefined && !q.numbers && !q.agents && !q.reviewers ? new Set(docs.map((d) => d.number)) : cardNumbers(ws)
-  return sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x))))
+  return sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x))))
 }
 
 /**
@@ -238,8 +241,9 @@ export async function windowTasks(ws: WorkspaceService = workspace, full = false
   const ids = await ws.projectIds()
   if (!ws.path) return []
   const numbers = cardNumbers(ws)
-  const live = cardDocs(ws, { archived: false }).map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x)))
-  const short = archivedSummaryDocs(ws).map((d): TaskCard => ({ ...clean(d.doc, d.number, ids), summary: true }))
+  const keys = cardKeys(ws)
+  const live = cardDocs(ws, { archived: false }).map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x)))
+  const short = archivedSummaryDocs(ws).map((d): TaskCard => ({ ...clean(d.doc, d.number, ids, keys.get(d.number)), summary: true }))
   return sortCards([...live, ...short])
 }
 
@@ -320,9 +324,9 @@ export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card:
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
   if (!ws.path) throw unknownTask(n)
-  const { raw, generation } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0 }))
+  const { raw, generation, key } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0, key: cardKeys(ws, [n]).get(n) }))
   if (!raw) throw unknownTask(n)
-  const c = withoutGone(clean(raw, n, ids), (x) => hasCard(ws, x))
+  const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
   return { card: c, generation }
 }
@@ -335,11 +339,11 @@ export async function allTasksSeen(ws: WorkspaceService, q: CardQuery = {}): Pro
   if (!ws.path) return { cards: [], generations: new Map() }
   const ids = await ws.projectIds()
   if (!ws.path) return { cards: [], generations: new Map() }
-  const { docs, numbers, generations } = boardRead(ws, () => {
+  const { docs, numbers, generations, keys } = boardRead(ws, () => {
     const read = cardDocs(ws, q)
-    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)) }
+    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)), keys: cardKeys(ws, read.map((d) => d.number)) }
   })
-  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x)))), generations }
+  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x)))), generations }
 }
 
 /** The cards `refs` names that are outside the scope (another project's, or the workspace's): a confined agent sees only their numbers. */
@@ -355,7 +359,7 @@ export async function getTask(n: number, ws: WorkspaceService = workspace): Prom
   const ids = await ws.projectIds()
   const raw = ws.path ? cardDoc(ws, n) : null
   if (!raw) throw unknownTask(n)
-  return withoutGone(clean(raw, n, ids), (x) => hasCard(ws, x))
+  return withoutGone(clean(raw, n, ids, cardKeys(ws, [n]).get(n)), (x) => hasCard(ws, x))
 }
 
 /**
@@ -375,10 +379,14 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
     const old = was as { project?: unknown; projectId?: unknown } | null
     if (old && isProjectId(old.projectId) && typeof old.project === 'string' && old.project.toLowerCase() === saved.toLowerCase()) projectId = old.projectId
   }
-  const { number, title, description, project: _shown, ...rest } = card
+  const { number, title, description, project: _shown, key: _key, ...rest } = card
   putCard(ws, n, { number, title, description, project: saved, ...(projectId ? { projectId } : {}), ...rest })
   // Its facts, in the same transaction (#1216): what this change moved, started, submitted, reviewed, blocked or decided.
   recordChange(ws, before !== undefined ? before : was ? clean(was, n, ids) : null, { ...card, project: saved })
+  // Its key now (#1219: a card moved to another project has that project's): what callers return of it.
+  const key = cardKeys(ws, [n]).get(n)
+  if (key) card.key = key
+  else delete card.key
 }
 
 /** A card's fields in Hive's order, with its project and id as given (the rest as they were). */
@@ -414,7 +422,10 @@ export function stampCardProjects(ws: WorkspaceService): Promise<number> {
           if (id) next = { project: raw.project, projectId: id }
         }
         if (!next) return false
+        const stamped = !isProjectId(raw.projectId)
         putCard(ws, number, withProject(raw, next.project, next.projectId))
+        // Given its project's id only now: a card from before keeps its own number there (#1219).
+        if (stamped) keepOwnNumber(ws, number)
         return true
       })().catch((e) => {
         log.warn(`giving card ${f} its project's id`, e)

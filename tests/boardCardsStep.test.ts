@@ -130,9 +130,10 @@ const versionOf = (file: string): number => {
 }
 
 describe('the cards step (#1209)', () => {
-  it("is in the 1.0 group, after #1212's step (#1211's follows it)", () => {
+  it("is in the 1.0 group, after #1212's step, before the keys step (#1219) that numbers its cards", () => {
     const step = store.BOARD_MIGRATIONS.find((m) => m.name === 'cards in tables')
     expect(step).toMatchObject({ version: 5, group: '1.0' })
+    expect(store.BOARD_MIGRATIONS.find((m) => m.name === 'project keys')!.version).toBeGreaterThan(5)
   })
 
   it("moves a 0.9 board's cards into the tables: every reader gives the same bytes after as before", async () => {
@@ -148,7 +149,9 @@ describe('the cards step (#1209)', () => {
     expect(store.boardState(w).readOnly).toBeNull()
     const after = await readers(w, numbers, join(base, `export-${n}-after`))
     expect(Object.keys(after)).toEqual(Object.keys(before))
-    for (const k of Object.keys(before)) expect(after[k], k).toBe(before[k])
+    // Every reader the same, but for the key each card of a project has now (#1219: additive, worked out when read).
+    const withoutKeys = (s: string): string => s.replace(/"key":\s*"[A-Z]{2,4}-\d+",\s*/g, '')
+    for (const k of Object.keys(before)) expect(withoutKeys(after[k]), k).toBe(before[k])
     // The odd cards came through as they were saved, not as clean() reads them.
     for (const [k, doc] of Object.entries(ODD)) expect(readFileSync(join(base, `export-${n}-after`, `${k}.json`), 'utf8')).toBe(JSON.stringify(doc, null, 2) + '\n')
     // The documents are gone: typed columns and child tables, no table left aside.

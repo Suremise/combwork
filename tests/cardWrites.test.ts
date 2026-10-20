@@ -90,7 +90,9 @@ describe("a card's save writes what changed (#1210)", () => {
   it('a comment through the board (commentTask) writes a few rows, not the card again', async () => {
     const { ws, w } = await workspace()
     // Its links to cards the board has (a link to a card that isn't there is dropped as the card is saved).
-    await inWorkspace(w, () => writeCard(w, 1, { ...bigCard(1), blockedBy: [], links: [] }))
+    // With its project's id, as Hive saves a card (one saved without would take it, and its number there, #1219, now).
+    const projectId = [...(await w.projectIds()).byId.keys()][0]
+    await inWorkspace(w, () => writeCard(w, 1, { ...bigCard(1), blockedBy: [], links: [], projectId }))
     // Its comment and the card's own row (its time): never its 600 other entries.
     expect(await rowsWritten(ws, () => inWorkspace(w, () => tasks.commentTask(1, 'Through the board', user)))).toBe(2)
   })

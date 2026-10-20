@@ -2112,6 +2112,14 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   `1061` meaning the old global card, which after the migration could be another project's existing per-project
   number. The existing tools that take `number` (`hive_read_task`, `hive_update_task`…) keep taking it as the old
   global number until P8 switches them to keys.
+- **Built in P3** [#1219]: the 1.0 group's "project keys" step gives each project with cards a suggested key (the
+  projects with the most cards choosing first) and every existing card its own number in its project; projects with no
+  card get theirs when the workspace opens, and new ones when they appear. `putCard` numbers new and moved cards
+  (`schema/keysStep.ts`), never reusing a number a card of the project has or had. The card JSON gains `key`; every card
+  reference the Agent API and the hive tools take accepts a key string too; replies, wakes, the inbox and the doorbell
+  name cards "HI-1230 (#1240)" (a project agent: its own project's cards; another's by number, as it sees them); one quiet
+  notice after the upgrade lists the keys. The window's side (the new-project dialog, Project Settings, tiles, labels and
+  search) is #1221.
 - **Everywhere else the key appears** [#704]: board and palette search by `AM-`; notifications; lane rows; handover and
   plan file names; Apiary rooms. Keys compare case-insensitively in ref paths (NTFS) [HB3's round 1 finding 18].
 - **Tables** [#1025]: cards with typed columns; comments, history, decisions, links, holds, and facts in their own

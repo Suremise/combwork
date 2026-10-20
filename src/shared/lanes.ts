@@ -1,5 +1,6 @@
 import { currentCard, laneCardState } from './laneBar'
 import type { LaneCard, LaneInfo, LaneState, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
+import { cardRef } from './projectKeys'
 
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
@@ -233,7 +234,7 @@ export const waitText = (minutes: number): string => (minutes >= 60 && minutes %
 const COLUMN_WORD: Record<LaneCard['column'], string> = { hold: 'On Hold', todo: 'Todo', doing: 'Doing', review: 'Review', passed: 'Passed', done: 'Done', gone: 'gone', unrecorded: 'not recorded' }
 
 /** A lane's card in a few words: "#405 Review r2", "#412 Todo", "#402 Doing (blocked)". */
-const cardWord = (c: LaneCard): string => `#${c.number} ${COLUMN_WORD[c.column]}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` r${c.round}` : ''}${c.blocked ? ' (blocked)' : ''}`
+const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.column]}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` r${c.round}` : ''}${c.blocked ? ' (blocked)' : ''}`
 
 /**
  * A lane in one line, for the hive tools: "B1 / R1 (hive) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
@@ -241,7 +242,7 @@ const cardWord = (c: LaneCard): string => `#${c.number} ${COLUMN_WORD[c.column]}
  */
 export function laneLine(l: LaneInfo): string {
   const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project})`
-  const state = l.state === 'paused' ? `paused, #${l.pausedOn} is blocked` : l.state === 'active' ? (l.current !== null ? `active, on #${l.current}` : 'active, every card passed') : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
+  const state = l.state === 'paused' ? `paused, ${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} is blocked` : l.state === 'active' ? (l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed') : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
   return `${pair}${l.name ? ` ${l.name}` : ''}: ${state}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
 }
 

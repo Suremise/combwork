@@ -1,5 +1,6 @@
 import { msg, type Msg } from './i18n/msg'
 import type { BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
+import { cardName, cardRef } from './projectKeys'
 
 /**
  * The window's tr() (#798), passed in: agent scripts (hive-mcp.js) import this module and must not load the
@@ -198,10 +199,10 @@ export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'ar
   // #777: it did watch the card; its wake, which Hive typed, waits untaken in its prompt (its CLI didn't take the line).
   if (a.untaken) {
     if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Hive typed for #{card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card number (after #).' }), { agent: a.name, card: card.number })
-    return `${a.name} hasn't taken the wake Hive typed for #${card.number}: it waits in its prompt.` // i18n-ignore: agent-facing (the Agent API's stalled)
+    return `${a.name} hasn't taken the wake Hive typed for ${cardName(card)}: it waits in its prompt.` // i18n-ignore: agent-facing (the Agent API's stalled)
   }
   if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching #{card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card number (after #). A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: card.number })
-  return `${a.name} isn't watching #${card.number}: its turn ended with no card watch.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return `${a.name} isn't watching ${cardName(card)}: its turn ended with no card watch.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** The longest a comment's summary line runs before it is cut (#532). */
@@ -254,7 +255,7 @@ export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'arc
     return tr(msg({ id: 'board.stalled.reviewWait', defaultMessage: "{agent} is watching #{card} but hasn't started reviewing it: in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
   }
   const state = w.silentMinutes !== undefined ? ` (it shows working, but has been silent for ${w.silentMinutes} min: state unknown)` : w.status === 'working' ? ' (it is working on something else)' : '' // i18n-ignore: agent-facing (the Agent API's stalled)
-  return `${w.name} is watching #${card.number} but hasn't started reviewing it${state}: in Review for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return `${w.name} is watching ${cardName(card)} but hasn't started reviewing it${state}: in Review for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** Whole minutes as the Agent API's stall reasons say them: "40 min", "5 h 5 min", "2 h". */
@@ -278,7 +279,7 @@ export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column'
   if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
   const min = Math.round(ms / 60_000)
   if (tr) return tr(msg({ id: 'board.stalled.reviewVerdictWait', defaultMessage: '{agent} started reviewing #{card} but has given no verdict, and has only been watching it for {waited}.', description: "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")." }), { agent: w.name, card: card.number, waited: durationText(min * 60_000, tr) })
-  return `${w.name} started reviewing #${card.number} but has given no verdict, and has only been watching it for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return `${w.name} started reviewing ${cardName(card)} but has given no verdict, and has only been watching it for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /**
@@ -467,12 +468,12 @@ const PROMPT_COMMENT_MAX = 4000
  * from; note: what to do now.
  */
 export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[] } = {}): string {
-  const parts = [`Work on task #${card.number} from the Hive task board: ${card.title}`] // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  const parts = [`Work on task ${cardName(card)} from the Hive task board: ${card.title}`] // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const again = opts.from === 'review' || opts.from === 'passed' || opts.from === 'done'
   if (again) parts.push(`It was in ${columnLabel(opts.from!)} and is back in Doing for more work.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   if (opts.note?.trim()) parts.push(opts.note.trim())
   if (card.description.trim()) parts.push(card.description.trim())
-  if (card.blockedBy.length) parts.push(`It depends on ${card.blockedBy.map((n) => `#${n}`).join(', ')}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (card.blockedBy.length) parts.push(`It depends on ${card.blockedBy.map((n) => `${cardRef(n)}`).join(', ')}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const context = opts.context ?? (card.context ?? []).map((ref) => ({ ref }))
   if (context.length) parts.push(contextText(context, withTools))
   const latest = card.comments[card.comments.length - 1]

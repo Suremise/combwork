@@ -5,6 +5,7 @@ import type { TaskCard } from '../shared/types'
 import { onHiveEvent } from './events'
 import { allTasksSeen } from './tasks'
 import type { WorkspaceService } from './workspace'
+import { cardRef } from '../shared/projectKeys'
 
 /**
  * The "new decision" flag (#357): a hive tool's reply to an agent working on a card (in Doing, its agent), asking the
@@ -123,7 +124,7 @@ export const lastCardRead = (agent: { projectPath: string; agentId: string }, n:
 /** The line for a reply, or null when nothing is new. */
 export function noticeText(cards: Map<number, number>): string | null {
   if (!cards.size) return null
-  const parts = [...cards].map(([n, k]) => `#${n} has ${k} new decision${k === 1 ? '' : 's'}`)
+  const parts = [...cards].map(([n, k]) => `${cardRef(n)} has ${k} new decision${k === 1 ? '' : 's'}`)
   return `[Hive] ${parts.join(', ')} since you last read ${parts.length === 1 ? 'it' : 'them'}: read ${parts.length === 1 ? 'the card' : 'each card'} (hive_read_task) at your next checkpoint.`
 }
 

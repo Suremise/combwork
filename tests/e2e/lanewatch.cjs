@@ -53,10 +53,12 @@ const check = (name, ok, extra = '') => {
     return v
   }
   /** The lines Hive typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
-  const wakes = () => {
+  const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => !['Builder', 'Reviewer', 'Builder2'].includes(w.agent)).map((w) => w.text)
   }
+  // The wakes as their checks read them: cards by number (they name them by key too, checked once below, #1219).
+  const wakes = () => rawWakes().map(lib.unkey)
   const say = async (p, id, text) => {
     await inv('pty:write', lib.ptyKey(p, id), text)
     await lib.sleep(300)
@@ -112,6 +114,7 @@ const check = (name, ok, extra = '') => {
   await say(alpha, reviewer.id, `boardreview ${a} failed`)
   const failedLine = () => wakes().slice(before).find((t) => t.startsWith('[Hive] Lane Builder / Reviewer (greetings):'))
   check('a failed review wakes it: one line with the lane and the card', !!(await until(async () => !!failedLine(), 20000)) && failedLine().includes(`#${a} failed review (Reviewer (alpha))`) && failedLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
+  check('its wakes name cards by key, with the number the tools take (#1219)', rawWakes().some((t) => lib.KEYED.test(t)), JSON.stringify(rawWakes().slice(-2)))
 
   // (c) Builder2, on the release card, shows a permission prompt: the same watch wakes, naming it and its card.
   await watchAgain()

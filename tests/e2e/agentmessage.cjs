@@ -62,8 +62,9 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
   }
-  const wakes = (agent) => wakeLog(agent).map((w) => w.text)
-  const bells = (agent) => wakeLog(agent).map((w) => w.doorbell ?? '')
+  // As their checks read them: cards by number (named by key too, #1219: checked once below).
+  const wakes = (agent) => wakeLog(agent).map((w) => lib.unkey(w.text))
+  const bells = (agent) => wakeLog(agent).map((w) => lib.unkey(w.doorbell ?? ''))
   const say = async (id, text) => {
     await inv('pty:write', lib.ptyKey(alpha, id), text)
     await lib.sleep(300)
@@ -157,19 +158,31 @@ const check = (name, ok, extra = '') => {
   // --- 3b. Tied to a card round (#652): refused for a card out of Doing and Review; once the card passes, stale, never told.
   const c3 = (await inv('tasks:create', { title: 'Round-tied', project: 'alpha', agent: builder.id, column: 'todo' })).number
   const early = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Too early.', card: c3 })
-  check('a message tied to a card not in Doing or Review is refused', early.isError && early.text.includes(`#${c3} left Doing and Review: a message tied to its round needs it in Doing or Review`), early.text)
+  check('a message tied to a card not in Doing or Review is refused', early.isError && lib.unkey(early.text).includes(`#${c3} left Doing and Review: a message tied to its round needs it in Doing or Review`), early.text)
   await inv('tasks:update', c3, { column: 'doing' })
-  await say(builder.id, 'work 6')
+  // Busy until the card has passed (holduntil), so each message below is queued, never told.
+  await say(builder.id, 'holduntil agentmessage-round-go')
   await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
   const tied = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: also cover the empty case.', card: c3 })
-  const tiedId = /\((m\d+), for #\d+ round 1, working\)/.exec(tied.text)?.[1]
-  check('a message tied to its round is queued, saying the round', !tied.isError && !!tiedId && tied.text.startsWith(`Queued for Builder (${tiedId}, for #${c3} round 1, working)`), tied.text)
+  const tiedId = /\((m\d+), for #\d+ round 1, working\)/.exec(lib.unkey(tied.text))?.[1]
+  check('a message tied to its round is queued, saying the round', !tied.isError && !!tiedId && lib.unkey(tied.text).startsWith(`Queued for Builder (${tiedId}, for #${c3} round 1, working)`), tied.text)
+  // Its reply names the card by key and number however it was given (#1219): its number, its key, or a key it had.
+  const key3 = (await inv('tasks:list')).find((c) => c.number === c3)?.key
+  const byNumber = `${key3} (#${c3})`
+  check('…naming the card by key and number when given its number (#1219)', tied.text.includes(`, for ${byNumber} round 1, working)`), tied.text)
+  const byKey = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by key.', card: key3.toLowerCase() })
+  check('…and when given its key, in any case', !byKey.isError && byKey.text.includes(`, for ${byNumber} round 1, working)`), byKey.text)
+  const renamed = await inv('project:setKey', alpha, 'ALX')
+  const byAlias = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by its old key.', card: key3 })
+  check('…and when given the key its project had: by the key it has now', renamed === 'ALX' && !byAlias.isError && byAlias.text.includes(`, for ALX-${key3.split('-')[1]} (#${c3}) round 1, working)`), byAlias.text)
   await inv('tasks:update', c3, { column: 'passed' })
-  check('…the card passes before it is read: stale, saying why', !!(await until(() => lastDelivery('Builder')?.id === tiedId && lastDelivery('Builder')?.state === 'stale' && lastDelivery('Builder')?.detail === `#${c3} passed review`, 15000)), JSON.stringify(lastDelivery('Builder')))
+  const tiedDelivery = () => activity('Builder').inbox?.deliveries?.find((d) => d.id === tiedId) ?? null
+  check('…the card passes before it is read: stale, saying why', !!(await until(() => tiedDelivery()?.state === 'stale' && lib.unkey(tiedDelivery()?.detail) === `#${c3} passed review`, 15000)), JSON.stringify(tiedDelivery()))
   check('…and no longer unread in its pane', !!(await until(async () => !(await unread()), 10000)))
+  fs.writeFileSync(path.join(claudeHome, 'agentmessage-round-go'), '')
   await until(() => idle(builder.id), 20000)
   // Stale is an end: nothing can offer it after, so no doorbell names it and the builder never reads it.
-  check('…never told or read', !bells('Builder').some((t) => t.includes(`${tiedId})`) || t.includes(`${tiedId},`)) && !wakes('Builder').some((t) => t.includes('Round 1: also cover the empty case.')), JSON.stringify(wakeLog('Builder')))
+  check('…never told or read', !bells('Builder').some((t) => t.includes(`${tiedId})`) || t.includes(`${tiedId},`)) && !wakes('Builder').some((t) => t.includes('Round 1: also cover the empty case.') || t.includes('Round 1: by')), JSON.stringify(wakeLog('Builder')))
 
   // --- 4. A message queued for a busy reviewer whose card watch fires meanwhile: both in one line, the message first.
   const c2 = (await inv('tasks:create', { title: 'Revised scope', project: 'alpha', agent: builder.id, column: 'doing' })).number
@@ -182,6 +195,7 @@ const check = (name, ok, extra = '') => {
   check('a message for it is queued', tool('hive_message_agent', { project: 'alpha', agent: 'Reviewer', text: 'Use the revised review scope.' }).text.startsWith('Queued for Reviewer (m'))
   await inv('tasks:update', c2, { column: 'review' })
   check('its watch wake and the message ring together, read in one go, the message first', !!(await until(async () => wakes('Reviewer').length > before4, 30000)) && /^\[Hive\] New in your inbox: 1 message and 1 card event \(#\d+\) \(m\d+, m\d+\)\./.test(bells('Reviewer')[before4]) && /^Use the revised review scope\. \[Hive\] #\d+ \(Builder's card\) is in Review/.test(wakes('Reviewer')[before4]), JSON.stringify(wakeLog('Reviewer').slice(before4)))
+  check('its wakes name cards by key, with the number the tools take (#1219)', wakeLog('Reviewer').some((w) => lib.KEYED.test(w.text ?? '')), JSON.stringify(wakeLog('Reviewer').slice(-1)))
   await until(() => idle(reviewer.id), 15000)
   check('…and only once, received as it read it', wakes('Reviewer').filter((t) => t.includes('Use the revised review scope.')).length === 1 && !!(await until(() => activity('Reviewer').inbox?.deliveries?.filter((d) => d.text.startsWith('Use the revised review scope.')).every((d) => d.state === 'received'), 10000)), JSON.stringify(wakes('Reviewer').slice(before4)))
 

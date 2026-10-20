@@ -13,6 +13,8 @@ import { noteOnCard } from './tasks'
 import { createDelivery, fromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting } from '../shared/deliveries'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { cardRef } from '../shared/projectKeys'
+import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
  * Decisions reach an agent waiting for the user (#401). An agent asks the user, and its turn ends; the user answers
@@ -58,7 +60,7 @@ const ready = (st: LiveSessionState | null): boolean => !!st && (st.status === '
 
 /** The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." */
 export function decisionLine(cards: Map<number, { count: number }>): string {
-  const parts = [...cards].map(([n, d]) => `#${n} has ${d.count} new decision${d.count === 1 ? '' : 's'}`)
+  const parts = [...cards].map(([n, d]) => `${cardRef(n)} has ${d.count} new decision${d.count === 1 ? '' : 's'}`)
   const them = parts.length === 1 && [...cards.values()][0].count === 1 ? 'it' : 'them'
   return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) and carry on from where you asked.`
 }
@@ -155,7 +157,12 @@ registerSource('decision', {
 })
 
 /** Gives one agent a line of the decisions new to it, if it may be told now: a delivery, one per agent, offered now. */
-async function tell(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
+/** Tells an agent of new decisions (tellNamed), naming cards by key, its workspace's (#1219). */
+function tell(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
+  return withCardNames(ws, () => tellNamed(ws, projectPath, agentId), scopeOfHost(projectPath))
+}
+
+async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
   const key = keyOf(projectPath, agentId)
   if (telling.has(key) || ws.isAssistantHome(projectPath)) return
   // Not ready (working, on background tasks, watching, a prompt shown, stopped): the end of its turn checks again. Its

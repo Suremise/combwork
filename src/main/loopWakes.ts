@@ -11,6 +11,7 @@ import { inFlightNow as watchesInFlight, settled as watchesSettled, watchCovers,
 import { cancelFromSource, createDelivery, everyFromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
 import { workspaceFor, type WorkspaceService } from './workspace'
+import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
  * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
@@ -111,13 +112,14 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
  */
 function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopEvent['kind'], to: { id: string; name: string }, since: TaskHistoryEntry | null): void {
   if (watchCovers(projectPath, to.id, card.number, kind, card.column)) return
-  inBackground('a loop wake', (async () => {
+  // Its line names cards by key, its workspace's (#1219).
+  inBackground('a loop wake', withCardNames(ws, async () => {
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds: ('column' | 'verdict')[] = kind === 'review' ? ['column'] : ['verdict']
     const meta = { n: card.number, kind, agentName: to.name, sinceAt: since?.at ?? '', sinceId: since?.id ?? '' }
     await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: 'card-event', from: HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, kind), expiresMs: KEEP_MS, source: 'loop', ref: `#${card.number}`, replace: true, meta })
     await offerNow(projectPath, to.id)
-  })())
+  }, scopeOfHost(projectPath)))
 }
 
 /** A handoff saved (tasks.ts): whose wake it is, if anyone's, queued and tried. */

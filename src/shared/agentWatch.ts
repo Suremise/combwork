@@ -9,6 +9,7 @@ import { columnName, type Tr } from './tasks'
 import type { SessionStatus, TaskWatchInfo } from './types'
 import { DEFAULT_USER_NAME, WAKE_MAX_BYTES } from './watch'
 import { isProjectId } from './projectIds'
+import { cardRef } from './projectKeys'
 
 /** An agent a watch follows: where it is, and its name and project's for the line (as they were when the watch began). */
 export interface WatchedAgent {
@@ -119,7 +120,7 @@ export const agentWatchLabel = (cond: AgentWatchCondition): string => `Waiting f
  * for #12 → Review", "Waiting on lane l-1 and #4". Its `label` is the English agents and the Agent API read.
  */
 export function watchText(w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' | 'lanes'>, tr: Tr, list: (items: string[]) => string, form: 'line' | 'cell' = 'line'): string {
-  const cards = w.cards.map((n) => `#${n}`).join(', ')
+  const cards = w.cards.map((n) => `${cardRef(n)}`).join(', ')
   // A lane watch's cell says it whole ("Waiting on all running lanes"), as its English label does.
   if (form === 'cell' && !w.lanes?.length) return watchCell(w, cards, tr, list)
   if (w.agents?.length) return tr(msg({ id: 'panes.watch.agents', defaultMessage: 'Waiting for {agents} to finish', description: "A watching agent's status (its pane): it waits for these agents ({agents}: their names, listed) to finish their turns." }), { agents: list(w.agents) })

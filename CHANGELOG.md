@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Projects have keys, and cards are numbered in their project.** Each project gets a short key (HI, AM…), suggested from its folder's name, and its cards are named by it: `HI-12`. Cards you already have keep their number in their project (#1061 is HI-1061), and the old `#N` keeps working everywhere. A card moved to another project takes a number there, its old key still finding it. After the upgrade, a quiet notice lists the keys. Agents see cards as "HI-1230 (#1240)" and can name them by key in Hive's tools and the Agent API (#1219).
+
 - **Recent folds away.** Click the **Recent** heading in the Progress panel (or press Enter or Space on it) to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it, after a restart too (#1228).
 - **A read-only board says so where you'd change it.** While a workspace waits for its upgrade to 1.0, or its board was saved by a newer Hive, cards can't be dragged and the card dialog's changes (Save, comments, decisions, Archive, Delete) are off, with the reason in a banner and in their tooltips; while the upgrade waits, New Session and Resume are off too, saying why, instead of failing when clicked (#1230).
 - **A lane's segments say what the card's work is.** Hovering a card in a lane in the Progress panel now also shows the revision under review, the last verdict and which revision it was on (and whether it still counts), how many checks passed and failed on that revision, and for a Done card the commit that merged it (#1225).

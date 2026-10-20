@@ -411,6 +411,34 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.keys.closed": {
+    "defaultMessage": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
+    "description": "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed."
+  },
+  "service.keys.form": {
+    "defaultMessage": "A project key is 2 to 4 letters, A to Z.",
+    "description": "An error changing a project's key (Project Settings): the key typed isn't 2–4 letters A–Z."
+  },
+  "service.keys.notice": {
+    "defaultMessage": "Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.",
+    "description": "A quiet notice once after the upgrade to Hive 1.0. {keys}: the projects' keys, joined (HI, AM and WE)."
+  },
+  "service.keys.noticeTitle": {
+    "defaultMessage": "Projects have keys now",
+    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)."
+  },
+  "service.keys.prefix": {
+    "defaultMessage": "{key} and another project’s key {other} begin alike: no key can be the start of another.",
+    "description": "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed."
+  },
+  "service.keys.taken": {
+    "defaultMessage": "{key} is another project’s key, or was: a key stays with its project for good.",
+    "description": "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)."
+  },
+  "service.keys.unknownProject": {
+    "defaultMessage": "That project has no id yet, so it can’t have a key: open it in Hive first.",
+    "description": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)."
+  },
   "service.lanes.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error changing a workspace's lanes (card loops) while no workspace is open in the window."

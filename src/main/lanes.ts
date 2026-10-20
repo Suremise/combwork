@@ -18,6 +18,8 @@ import { createLogger, userText } from './logger'
 import { getTask, inScope } from './tasks'
 import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
+import { cardRef } from '../shared/projectKeys'
+import { withCardNames } from './projectKeys'
 
 const log = createLogger('lanes')
 
@@ -249,7 +251,7 @@ const newId = (): string => `lane-${randomBytes(3).toString('hex')}`
 /** A lane's start or end as a fact in the Assistant's journal (#1031): who, which cards, how it ended, its merge. */
 function laneFact(ws: WorkspaceService, l: LaneRecord): void {
   const who = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}`
-  const cards = l.cards.map((n) => `#${n}`).join(', ')
+  const cards = withCardNames(ws, () => l.cards.map(cardRef).join(', '))
   const what = l.state === 'active' ? 'started' : l.state === 'ended' ? (l.mergeCommit ? `ended, merged at ${l.mergeCommit}` : 'ended') : 'abandoned' // i18n-ignore: a journal fact (the Assistant's, English)
   journalFact(ws, {
     summary: `Lane ${l.name ? `"${l.name}" ` : ''}${what}: ${who}, ${cards}`, // i18n-ignore: a journal fact (the Assistant's, English)

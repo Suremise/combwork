@@ -43,6 +43,8 @@ import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { getTask } from './tasks'
 import { workspaceFor } from './workspace'
+import { cardRef } from '../shared/projectKeys'
+import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
  * The delivery service (#647, plans/2026-10-12-messaging-redesign.md §3.1). Everything Hive has for an agent to read is a
@@ -941,13 +943,13 @@ export const roundOf = (card: TaskCard): number => reviewRounds(card).failures +
  * it is still relevant: the card in Doing or Review, in that round.
  */
 export function staleWhy(card: TaskCard | null, n: number, round: number): string | null {
-  if (!card) return `#${n} is gone`
-  if (card.archived) return `#${n} was archived`
-  if (card.column === 'passed') return `#${n} passed review`
-  if (card.column === 'done') return `#${n} is done`
-  if (card.column !== 'doing' && card.column !== 'review') return `#${n} left Doing and Review`
+  if (!card) return `${cardRef(n)} is gone`
+  if (card.archived) return `${cardRef(n)} was archived`
+  if (card.column === 'passed') return `${cardRef(n)} passed review`
+  if (card.column === 'done') return `${cardRef(n)} is done`
+  if (card.column !== 'doing' && card.column !== 'review') return `${cardRef(n)} left Doing and Review`
   const now = roundOf(card)
-  return now > round ? `#${n} is in round ${now} now` : null
+  return now > round ? `${cardRef(n)} is in round ${now} now` : null
 }
 
 /** A card as the board has it now (null: it is gone; undefined: Hive can't tell, its workspace closed or the card unreadable). */
@@ -968,8 +970,8 @@ export const setCardReaderForTests = (fn: ((host: string, n: number) => Promise<
  */
 export async function roundNow(host: string, n: number): Promise<number> {
   const card = await cardNow(host, n)
-  if (card === undefined) throw new Error(`Hive couldn't read #${n} now.`)
-  if (!card) throw new Error(`There is no card #${n}.`)
+  if (card === undefined) throw new Error(`Hive couldn't read ${cardRef(n)} now.`)
+  if (!card) throw new Error(`There is no card ${cardRef(n)}.`)
   const round = roundOf(card)
   const why = staleWhy(card, n, round)
   if (why) throw new Error(`${why}: a message tied to its round needs it in Doing or Review.`)
@@ -986,7 +988,7 @@ async function staleOf(host: string, records: readonly DeliveryRecord[]): Promis
     const card = cards.get(r.card)
     // Not known now (its workspace closed, the card unreadable): not stale on that account.
     if (card === undefined) continue
-    const why = staleWhy(card, r.card, r.round)
+    const why = withCardNames(workspaceFor(host), () => staleWhy(card, r.card!, r.round!), scopeOfHost(host))
     if (why) out.set(r.id, why)
   }
   return out
@@ -1097,7 +1099,7 @@ function planOffer(store: Store, d: Draft, items: readonly DeliveryRecord[], tar
   const now = items.map((r) => byId(d.records, r.id)).filter((r): r is DeliveryRecord => !!r && isWaiting(r) && !whyNot(store, r))
   if (!now.length) return null
   // A watching agent is told its watch carries on, unless the line is its own watch's wake (whose receipt ends it).
-  const line = offerLine(now, now.some((r) => r.source === 'watch') ? null : label)
+  const line = withCardNames(workspaceFor(store.host), () => offerLine(now, now.some((r) => r.source === 'watch') ? null : label), scopeOfHost(store.host))
   const was = new Map(now.map((r) => [r.id, r]))
   for (const r of now) set(store, d, r, 'offered', undefined, undefined, { offerRun: target.runId })
   return { ids: now.map((r) => r.id), was, line, runId: target.runId, sessionId: target.sessionId, need: needOf(now) }
@@ -1149,7 +1151,8 @@ async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promi
     const fn = r.source ? sources.get(r.source)?.refresh : undefined
     if (!fn) continue
     try {
-      const got = await fn(r, store.host)
+      // Its line names cards by key, its host's workspace's (#1219).
+      const got = await withCardNames(workspaceFor(store.host), () => fn(r, store.host), scopeOfHost(store.host))
       if (got) out.set(r.id, got)
     } catch (e) {
       log.warn(`making delivery ${r.id} again`, e)
@@ -1363,7 +1366,7 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
   store.offering.add(rec.id)
   let run: T
   try {
-    run = await start(offerLine([rec], null))
+    run = await start(withCardNames(workspaceFor(store.host), () => offerLine([rec], null), scopeOfHost(store.host)))
   } catch (e) {
     store.offering.delete(rec.id)
     await transact(store, (d) => {
