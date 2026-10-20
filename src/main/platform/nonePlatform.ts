@@ -36,6 +36,11 @@ export class NonePlatform implements PlatformAdapter {
     return null
   }
 
+  /** None's fingerprint is already its paths' content hash: nothing more to ask. */
+  async content(): Promise<string | null> {
+    return null
+  }
+
   /** The card's paths' hash now (the hash cache follows writes and file times, so an edit since shows). */
   evidence(card: CardRecord): string | null {
     const r = this.hashing.revision(this.wf.store.card(card.id).paths ?? [])

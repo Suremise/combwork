@@ -2,10 +2,13 @@
 // uncommitted edit or a checkout during submit, a commit during a requeue), and a trip to On Hold keeps a card able to
 // go on: its gate asked again on return, a move out of it counted from where it was.
 import { afterEach, describe, expect, it } from 'vitest'
-import { writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
+import { gitTestHooks } from '../../src/main/git'
+import { isRefusal } from '../../src/main/workflow/runtime'
 
 let env: Env | null = null
 afterEach(() => {
@@ -65,6 +68,168 @@ describe("the card's folder is part of the evidence", () => {
     during(e, 'submit', () => void commit(folder, { 'a.txt': 'unreviewed\n' }, 'sneaked in'))
     refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'evidence.changed')
     expect(e.wf.state(card).stage).toBe('active')
+  })
+})
+
+// #1206: the evidence is content, not cached stat data. Git and the files can't be one transaction with SQLite, so a
+// change after the transaction's own read is reconciliation's (stale marks), never claimed excluded.
+describe('an index refreshed or a file touched meanwhile is no change', () => {
+  /** A file's time moved, its content as it was. */
+  const touch = (file: string): void => {
+    const later = new Date(Date.now() + 5000)
+    utimesSync(file, later, later)
+  }
+
+  it("an outside git status during the submit (the index's stat data refreshed) → submitted", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    // Touched before: the index's stat data is stale, so the status rewrites the index.
+    touch(join(folder, 'a.txt'))
+    const index = join(sh(folder, 'rev-parse', '--path-format=absolute', '--git-dir'), 'index')
+    const before = statSync(index).mtimeMs
+    during(e, 'submit', () => void sh(folder, 'status', '--porcelain'))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    expect(statSync(index).mtimeMs).not.toBe(before)
+    expect(e.wf.state(card).stage).toBe('review')
+  })
+
+  it("a verdict during an outside git status (the index's stat data refreshed) → recorded, every intent alike", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    touch(join(folder, 'a.txt'))
+    during(e, 'verdict', () => void sh(folder, 'status', '--porcelain'))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'no' }))
+  })
+
+  it('a file only touched during the submit → submitted', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => touch(join(folder, 'a.txt')))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it('a file touched, then edited and put back during the submit → submitted (the same content)', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => {
+      writeFileSync(join(folder, 'a.txt'), 'other\n')
+      writeFileSync(join(folder, 'a.txt'), 'a\n')
+      touch(join(folder, 'a.txt'))
+    })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("in a shared folder, another agent staging its own file during the submit → submitted; the builder's own → refused", async () => {
+    const locks: Record<string, string[]> = { B1: ['mine.txt'], B2: ['theirs.txt'] }
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }, { locksOf: (a) => locks[a] ?? [] }))
+    const card = e.wf.createCard({ title: 'Mine', reviewer: 'R1' })
+    moved(await e.wf.start(card.key, B1))
+    commit(e.project, { 'theirs.txt': 'theirs\n' }, 'theirs')
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
+    // An edit to a file already there (a new file would change the folder's own time, which the evidence covers).
+    during(e, 'submit', () => {
+      writeFileSync(join(e.project, 'theirs.txt'), 'theirs, edited\n')
+      sh(e.project, 'add', 'theirs.txt')
+    })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const other = e.wf.createCard({ title: 'Mine too', reviewer: 'R1' })
+    moved(await e.wf.start(other.key, B1))
+    commit(e.project, { 'mine.txt': 'mine again\n' }, 'mine again', { trailer: other.key })
+    during(e, 'submit', () => void sh(e.project, 'rm', '-q', '--cached', 'mine.txt'))
+    refusedBy(await e.wf.submit(other.key, B1, { summary: 'y' }), 'evidence.changed')
+  })
+
+  // Git, not Hive, says what content is the same: each path's own attributes and filters (HR5, round 1).
+  it('core.autocrlf on, a path marked -text: rewritten with CRLF during the submit → refused (a real edit to git)', async () => {
+    const e = (env = setup(pairOpts))
+    sh(e.project, 'config', 'core.autocrlf', 'true')
+    commit(e.project, { '.gitattributes': 'raw.txt -text\n', 'raw.txt': 'one\ntwo\n' }, 'raw')
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => writeFileSync(join(folder, 'raw.txt'), 'one\r\ntwo\r\n'))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
+    expect(sh(folder, 'status', '--porcelain')).toContain('raw.txt')
+  })
+
+  it('core.autocrlf off, a path marked text eol=crlf: its CRLF copy only touched during the submit → submitted', async () => {
+    const e = (env = setup(pairOpts))
+    commit(e.project, { '.gitattributes': 'crlf.txt text eol=crlf\n', 'crlf.txt': 'one\ntwo\n' }, 'crlf')
+    const { card, folder } = await startedIn(e, 'a')
+    expect(readFileSync(join(folder, 'crlf.txt'), 'utf8')).toBe('one\r\ntwo\r\n')
+    during(e, 'submit', () => touch(join(folder, 'crlf.txt')))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it('an index git can no longer read (an unknown required extension, its checksum valid) → refused', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    const index = join(sh(folder, 'rev-parse', '--path-format=absolute', '--git-dir'), 'index')
+    during(e, 'submit', () => {
+      const body = readFileSync(index).subarray(0, -20)
+      const ext = Buffer.alloc(8)
+      ext.write('abcd', 0, 'latin1')
+      const next = Buffer.concat([body, ext])
+      writeFileSync(index, Buffer.concat([next, createHash('sha1').update(next).digest()]))
+    })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
+    expect(() => sh(folder, 'status', '--porcelain')).toThrow()
+  })
+
+  it('a version 4 index with neighbouring non-ASCII paths, refreshed by an outside git status → submitted', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    commit(folder, { 'é/a.txt': '1\n', 'ê/a.txt': '2\n', '日本/a.txt': '3\n', '日本語/b.txt': '4\n', 'z/a.txt': '5\n' }, 'unicode')
+    sh(folder, 'update-index', '--index-version', '4')
+    touch(join(folder, 'ê', 'a.txt'))
+    during(e, 'submit', () => void sh(folder, 'status', '--porcelain'))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("dirty, clean when the guards read, dirty again at the write: the same content as at the start, but never the guards' clean answer → refused (HR5, round 2)", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    const file = join(folder, 'a.txt')
+    writeFileSync(file, 'dirty\n')
+    // Just before the submission reads the folder's status: the committed content back.
+    gitTestHooks.started = (_cwd, args) => {
+      if (!args.includes('status')) return
+      delete gitTestHooks.started
+      writeFileSync(file, 'a\n')
+    }
+    // Just before the write: the dirty content again, with a new time.
+    during(e, 'submit', () => {
+      writeFileSync(file, 'dirty\n')
+      touch(file)
+    })
+    try {
+      const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+      expect(isRefusal(r)).toBe(true)
+    } finally {
+      delete gitTestHooks.started
+    }
+    expect(sh(folder, 'status', '--porcelain')).toContain('a.txt')
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.state(card).latest).toBeNull()
+  })
+
+  it('a change staged during the submit (the index entries, not the files) → refused', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => void sh(folder, 'rm', '-q', '--cached', 'a.txt'))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
+  })
+
+  it('an edit of the same size during the submit, its time kept → refused (content, not stat)', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    const file = join(folder, 'a.txt')
+    during(e, 'submit', () => {
+      const st = statSync(file)
+      writeFileSync(file, 'b\n')
+      utimesSync(file, st.atime, st.mtime)
+    })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
   })
 })
 

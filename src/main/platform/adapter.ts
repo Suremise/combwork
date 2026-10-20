@@ -82,6 +82,13 @@ export interface PlatformAdapter {
    */
   prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown>
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
+  /**
+   * The platform's own answer about the same evidence, by content (#1206), read with processes (never in the
+   * transaction): when the fingerprint moved, the same answer means the content didn't (Git: an index's stat data
+   * refreshed, a file touched), and the runtime decides on the fingerprint now. Null where the fingerprint is already
+   * content (None) or the platform can't say.
+   */
+  content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null>
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
