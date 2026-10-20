@@ -17,6 +17,7 @@ import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, ST
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { EXPORT_BOARD, exportBoard, reportArchived, unarchiveBatch } from '../boardBatches'
+import { readOnlyReason } from './BoardUpgrade'
 import { SET_ASIDE_ITEM } from './SetAside'
 import { useNow } from '../usage'
 import { ProviderIcon } from './ProviderIcon'
@@ -520,6 +521,7 @@ type DragState = { n: number; column: TaskColumn; before: number | null }
  */
 export function Board({ project, scope = null, query, archived }: { project: string | null; scope?: string | null; query: string; archived: boolean }) {
   useLanguage()
+  const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const all = useStore((s) => s.tasks)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
@@ -714,7 +716,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
               <ColumnLabel name={name} description={description} />
               <span className="count">{list.length}</span>
               <span className="grow" />
-              {col.id === 'todo' && <IconButton icon="add" title={tr(NEW_CARD_TIP)} onClick={() => set({ taskOpen: { project: project ?? '' } })} />}
+              {col.id === 'todo' && <IconButton icon="add" title={readOnly ?? tr(NEW_CARD_TIP)} disabled={!!readOnly} onClick={() => set({ taskOpen: { project: project ?? '' } })} />}
               <IconButton
                 icon="ellipsis"
                 title={tr(msg({ id: 'board.columns.more', defaultMessage: '{column}: more', description: "Tooltip on a board column's ⋯ button: opens its menu. {column} is its name." }), { column: name })}
@@ -950,6 +952,7 @@ export function BoardToolbar({
   setArchived: (v: boolean) => void
 }) {
   useLanguage()
+  const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
   // How many cards an older Hive saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board changes.
   const tasks = useStore((s) => s.tasks)
@@ -975,7 +978,7 @@ export function BoardToolbar({
         <input type="checkbox" className="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.archived', defaultMessage: 'Archived ({n, number})', description: "A checkbox in the board's toolbar: shows the archived cards instead (how many there are: {n})." }), { n: count })}
       </label>
       <div className="grow" />
-      <button className="btn primary" onClick={() => set({ taskOpen: { project: project ?? '' } })}>
+      <button className="btn primary" disabled={!!readOnly} title={readOnly ?? undefined} onClick={() => set({ taskOpen: { project: project ?? '' } })}>
         <Icon name="add" /> {tr(NEW_CARD)}
       </button>
       {!archived && (
@@ -1320,6 +1323,7 @@ export function BoardPanel() {
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const chosen = useStore((s) => s.boardProject)
   useLanguage()
+  const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const open = (name: string | null): number => tasks.filter((c) => !c.archived && c.column !== 'done' && (name === null || c.project.toLowerCase() === name.toLowerCase())).length
   const review = tasks.filter((c) => !c.archived && c.column === 'review')
   useNow(60_000)
@@ -1336,7 +1340,7 @@ export function BoardPanel() {
         {tr(TASK_BOARD)}
         <InfoTip text={tr(msg({ id: 'board.panel.info', defaultMessage: "The workspace's cards, in .hive/tasks. Agents and the Assistant read, change and move them through Hive's tools (finished work goes to Review); only you archive or delete them.", description: "The (i) beside the Board sidebar's title. Keep .hive/tasks as it is (a folder). Review is a board column." }))} />
         <div className="actions">
-          <IconButton icon="add" title={tr(NEW_CARD_TIP)} onClick={() => set({ taskOpen: { project: chosen ?? '' } })} />
+          <IconButton icon="add" title={readOnly ?? tr(NEW_CARD_TIP)} disabled={!!readOnly} onClick={() => set({ taskOpen: { project: chosen ?? '' } })} />
           <IconButton icon="refresh" title={tr(msg({ id: 'board.panel.refresh', defaultMessage: 'Refresh', description: "Tooltip on the Board sidebar's refresh button: reads the cards again." }))} onClick={() => void loadTasks()} />
         </div>
       </div>

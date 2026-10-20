@@ -193,7 +193,8 @@ describe('the workspace database from before (#1017: schema 1)', () => {
     const v1 = openDb(file, { migrations: board.BOARD_MIGRATIONS.slice(0, 1), hiveVersion: '0.9.0' })
     v1.writer.prepare('INSERT INTO cards (number, doc) VALUES (1, ?)').run(JSON.stringify({ number: 1, title: 'Kept', column: 'todo' }))
     v1.close()
-    const db = openDb(file, { migrations: board.BOARD_MIGRATIONS, hiveVersion: '0.9.0', backupDir: join(ws, '.hive', 'backups') })
+    // 0.9's steps (the 1.0 group's have their own tests: boardUpgrade.test.ts).
+    const db = openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.0', backupDir: join(ws, '.hive', 'backups') })
     try {
       expect(schemaVersion(db.writer)).toBe(2)
       expect((db.reader.prepare('SELECT count(*) AS n FROM cards').get() as { n: number }).n).toBe(1)

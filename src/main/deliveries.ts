@@ -34,6 +34,7 @@ import { config } from './config'
 import { onHiveEvent } from './events'
 import { readCapped, readJson, renameRetrying } from './fsutil'
 import { openStore, readStore, rowsOf, saveStore } from './storeRows'
+import { dbGeneration, onDbReplaced } from './boardStore'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -160,6 +161,8 @@ interface Store {
    * go-ahead): its own check, asked with offerHolds, and what to do once it is received or ends without that.
    */
   hooks: Map<string, DeliveryHooks>
+  /** The workspace database's generation it was read from (#1207 round 2): from an older one, it is stale and never saved. */
+  gen: number
 }
 
 /** A transaction's working copy: planned on, saved, then published. */
@@ -288,6 +291,11 @@ let beforePlan: (() => Promise<void> | void) | null = null
 export const setBeforePlanForTests = (fn: (() => Promise<void> | void) | null): void => {
   beforePlan = fn
 }
+/** For tests: awaited as a host's load begins, before anything is read (a read held up, as a slow disk would). */
+let beforeRead: (() => Promise<void> | void) | null = null
+export const setBeforeReadForTests = (fn: (() => Promise<void> | void) | null): void => {
+  beforeRead = fn
+}
 
 /** Transactions not finished yet (also those nothing waits for): what settled() waits for. */
 let running = 0
@@ -320,21 +328,31 @@ export function load(host: string): Promise<Store> {
   const going = loading.get(k)
   if (going) return going
   const p = (async () => {
+    await beforeRead?.()
     const place = await hostPlace(host)
-    const read = await readSaved(host, place)
-    if (stores.has(k)) return stores.get(k)!
-    const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map() }
-    // Restored before anything else sees it (a second load waits for this one).
-    await transact(store, (d) => {
-      for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', 'may not have reached it: Hive stopped while offering it', undefined, { again: AGAIN_RESTART })
-      recheck(store, d)
-    }).catch((e) => log.warn('restoring deliveries', e))
-    if (stores.has(k)) return stores.get(k)!
-    stores.set(k, store)
-    showAll(store)
-    // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
-    if (store.records.some((r) => r.round && isUnread(r))) sweepStale()
-    return store
+    for (let tries = 1; ; tries++) {
+      const gen = dbGeneration(place.workspace)
+      const read = await readSaved(host, place)
+      if (stores.has(k)) return stores.get(k)!
+      const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen }
+      // Restored before anything else sees it (a second load waits for this one).
+      await transact(store, (d) => {
+        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', 'may not have reached it: Hive stopped while offering it', undefined, { again: AGAIN_RESTART })
+        recheck(store, d)
+      }).catch((e) => log.warn('restoring deliveries', e))
+      if (stores.has(k)) return stores.get(k)!
+      if (gen !== dbGeneration(place.workspace)) {
+        // The database replaced meanwhile (the upgrade to 1.0, a restore): read again, from the file as it is now, while
+        // its workspace is still open; closed meanwhile, the stale read is kept by nobody (its saves are refused anyway).
+        if (!workspaceFor(host)) return store
+        if (tries < 3) continue
+      }
+      stores.set(k, store)
+      showAll(store)
+      // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
+      if (store.records.some((r) => r.round && isUnread(r))) sweepStale()
+      return store
+    }
   })().finally(() => {
     if (loading.get(k) === p) loading.delete(k)
   })
@@ -447,7 +465,11 @@ async function save(store: Store, d: Draft): Promise<void> {
   const text = fileText(d)
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('too many deliveries to keep in this project')
   const rows = rowsOf(d.records)
-  await saveStore(store.place.workspace, 'deliveries', store.place.scope, rows, { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null })
+  // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
+  const guard = (): void => {
+    if (store.gen !== dbGeneration(store.place.workspace)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
+  }
+  await saveStore(store.place.workspace, 'deliveries', store.place.scope, rows, { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
 }
 
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
@@ -1420,6 +1442,15 @@ export function initDeliveries(): void {
   })
 }
 
+// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
+// file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's
+// status, the workspace opening) reads it again from the file as it is then, with what another Hive saved meanwhile;
+// nothing reads it for a workspace closed meanwhile, which would open its database again (#1207 round 3). While the upgrade
+// waited no agent could start, so none waits for an offer.
+onDbReplaced((workspacePath) => {
+  for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === workspacePath.toLowerCase()) stores.delete(k)
+})
+
 // Sessions give their own lines through the service (#649: a lock's go-ahead, the carry-on after a sign-in, a handover's
 // steps): it is set as this loads.
 sessions.deliveries = {
@@ -1446,6 +1477,10 @@ export async function followAllForTests(): Promise<void> {
 /** For tests: transactions still running finish. */
 export async function settledForTests(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.all([...stores.values()].map((s) => s.lock))
+}
+/** For tests: every host's load under way has finished (those started while waiting too), however long its reads take. */
+export async function loadsForTests(): Promise<void> {
+  while (loading.size) await Promise.allSettled([...loading.values()])
 }
 /** For tests: forgets every host in memory, as a restart of Hive does (transactions finish first); what is on disk stays. */
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */

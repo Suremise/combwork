@@ -1,6 +1,6 @@
 import { existsSync, renameSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, inBoardWrite, workspaceDb } from './boardStore'
+import { boardLock, boardOpen, closeBoard, inBoardWrite, upgradeWaiting, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -194,6 +194,9 @@ export async function openStore(workspacePath: string, store: StoreName, scope: 
   const path = resolve(workspacePath)
   const toMove = (now: StoreData): boolean => !now.meta.has('imported') || (!!opts.whenEmpty && !now.rows.length && existsSync(file))
   const first = toMove(readStore(path, store, scope))
+  // The workspace's upgrade to 1.0 waits (#1207): the database takes no writes, so nothing is moved in and the file is left
+  // where it is, for the move once it is upgraded. Read meanwhile: what the database has (a 0.9 Hive moved in what it had).
+  if (upgradeWaiting(path)) return readStore(path, store, scope)
   if (first) {
     const got = await readFile()
     if (got) assertUnique(store, got.rows)

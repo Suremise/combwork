@@ -19,7 +19,7 @@ import type { GitSection } from '@shared/gitRepo'
 import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type {
   AgentApiInfo,
   AgentInfo,
@@ -366,6 +366,8 @@ interface State {
 
   /** The workspace's task board (archived cards too), and the board view's filters. */
   tasks: TaskCard[]
+  /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
+  boardState: BoardState | null
   /**
    * The Performance view's filters (activity bar: the workspace, a project filter) and each project's Performance tab's
    * (fixed to that project), kept while you move around.
@@ -521,6 +523,7 @@ export const useStore = create<State>(() => ({
   filesRoot: {},
 
   tasks: [],
+  boardState: null,
   perfWorkspace: DEFAULT_PERF_FILTERS,
   perfProjects: {},
   overviewPeriod: 'week',
@@ -1121,10 +1124,10 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [] })
+  if (!ws) return set({ tasks: [], boardState: null })
   try {
-    const tasks = await window.hive.invoke('tasks:list', fullArchive > 0)
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks })
+    const [tasks, boardState] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state')])
+    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState })
   } catch {
     // The workspace closed meanwhile.
   }

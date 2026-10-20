@@ -707,6 +707,16 @@ export interface TaskCard {
  * A bulk archive by the user (#351): Archive All in a column, or Archive All Cards. Kept so the batch can be brought back
  * later (Undo, "Unarchive this batch"), each card where it was.
  */
+/**
+ * The board's state for the window (#1207): why it is read-only (saved by a newer Hive, or waiting for its upgrade to 1.0,
+ * which the user is asked for), and when the copy kept from before its upgrade to 1.0 was made (Help → Restore the 0.9
+ * Board Backup… puts it back), if there is one.
+ */
+export interface BoardState {
+  readOnly: 'newer' | 'upgrade' | null
+  backup09: { at: string } | null
+}
+
 export interface ArchiveBatch {
   id: string
   at: string
