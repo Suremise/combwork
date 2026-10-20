@@ -269,7 +269,7 @@ const check = (name, ok, extra = '') => {
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
-  check('the board changes are listed', (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started #${cardNo} on a new agent, Writer`)))
+  check('the board changes are listed', (await inv('assistant:actions')).some((x) => x.ok && lib.unkey(x.text).startsWith(`Started #${cardNo} on a new agent, Writer`)))
   // Putting cards in order: listed in Done by the Assistant; the order of Done is the user's, refused without asking.
   const o1 = (await api('POST', '/v1/tasks', { title: 'Order one', project: 'alpha' })).body.number
   const o2 = (await api('POST', '/v1/tasks', { title: 'Order two', project: 'alpha' })).body.number
@@ -278,7 +278,10 @@ const check = (name, ok, extra = '') => {
   check('the Assistant puts cards in order', ordered.status === 200 && ordered.body[0]?.number === o2 && o2Card.history.at(-1)?.by === 'Assistant', JSON.stringify(ordered.body?.map?.((c) => c.number) ?? ordered))
   const top = await api('PATCH', `/v1/tasks/${o1}`, { position: 'top' })
   check('and one card to the top', top.status === 200 && (await api('GET', '/v1/tasks?column=todo')).body[0]?.number === o1, JSON.stringify(top.body))
-  const listed = (await inv('assistant:actions')).map((x) => x.ok && x.text)
+  // As the checks read them: cards by number (the list names them by key too, #1219: checked once here).
+  const keyedList = (await inv('assistant:actions')).map((x) => x.ok && x.text)
+  const listed = keyedList.map(lib.unkey)
+  check('the list names cards by key with their number', keyedList.some((t) => t && lib.KEYED.test(t) && t.includes(`(#${o1})`)), JSON.stringify(keyedList.slice(-3)))
   check('both are listed in Done by the Assistant', listed.includes(`Put #${o2}, #${o1} at the top of Todo`) && listed.some((t) => t && t.startsWith(`#${o1} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify(listed.slice(-3)))
   const doneTop = await api('PATCH', `/v1/tasks/${cardNo}`, { position: 'top' })
   check("the Assistant can't put Done in order, and the user isn't asked", doneTop.status === 403 && (await page.locator('.assistant-question').count()) === 0, JSON.stringify(doneTop))
