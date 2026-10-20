@@ -279,19 +279,25 @@ after reconciling any entry with `IntegrationStarted` and no outcome. The test m
 worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Hive; the target advances by
 compare-and-swap (`update-ref` with the expected old value), and when the target is checked out in a folder, by the
 read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence (never `merge --ff-only`, which has no expected
-value).
+value). The repository lock (a lock file in the common git dir, replacing the in-process `.git/hive-merge` lock of
+`withFileLock`, `fsutil.ts:512`) is held only while the queue writes (the test merge, the swap), never across merge
+checks. Every submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived.
 
 **Slots and sessions.** `slots.ts` owns the worktrees under `<Workspace>.worktrees/<Project>/` and lends them by
 **lease** (a `slot_leases` row: slot, card or lane, builder, from, to), one open lease per slot, taken under the slot's
 lock. Sessions record their folder and lease; `sessions.ts` resumes a session only in its folder (as today) and only
 while its lease is open or the slot is free at its last revision, so a reused slot never resumes the wrong work, and
 Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detached worktrees from a small warm pool,
-leased to one reviewer for one submission; reviewers' sessions live in the project folder.
+leased to one reviewer for one submission; reviewers' sessions live in the project folder, and their launch grants
+the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir`, Codex's writable roots by `-c`),
+never the CLI's config.
 
 **Storage (P3's one migration, #1025).** New tables: card columns typed; `card_comments`, `card_history`,
 `card_decisions`, `card_links`, `card_holds`, `card_facts`, `card_actions`, `card_aliases` (old `#N` → key),
 `project_keys`, `rulesets`, `slot_leases` (P7); typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
-is rebuilt from rows, identical or versioned. One schema step, backed up first; a newer file opens read-only.
+is rebuilt from rows, identical or versioned. One schema step, backed up first, asked before it runs and refused while
+another Hive process has the workspace open; Help restores the 0.9 backup; a newer file opens read-only. Observed
+facts have a unique key (card, kind, revision, target), so two Hives observing one workspace write each fact once.
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
