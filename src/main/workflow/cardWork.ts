@@ -69,7 +69,7 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       case 'Started':
       case 'Adopted': {
         const x = d as FactData['Started']
-        return `${x.line ?? x.folder} from ${r(x.base)}${x.target ? ` into ${x.target}` : ''}, by ${x.builder}`
+        return `${x.line ?? x.folder} from ${r(x.base)}${x.head !== undefined ? `, at ${r(x.head)}` : ''}${x.target ? ` into ${x.target}` : ''}, by ${x.builder}`
       }
       case 'Submitted': {
         const x = d as FactData['Submitted']

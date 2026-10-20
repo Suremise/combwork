@@ -2318,6 +2318,21 @@ an invented history:
 | Review | `Adopted` and an **adopted submission**: a `Submitted` fact marked `source: observed, adopted: true` at the line's head, with endpoints and keys computed then | its reviewer reviews that revision as usual. If the head isn't what the builder meant, the review says so. |
 | Passed | `Adopted` with `passedBefore1_0: true` (what the column said), **no `Verdict`**: a pass can't be tied to a revision history doesn't prove | under the upgrade's options (G5 Not checked, below) nothing needs a verdict: the builder reports its merge or the user moves it. A later stricter ruleset applies only from the next card [#1112 down]. |
 
+The adoption (#1218, `workflow/adoption.ts`) runs in the background once the migration has committed, and again at each
+start until it has handled every card once (board_meta `adoption`). It handles only the cards from before 1.0: the
+upgrade's transaction records the highest card number (board_meta `adoption_upto`; 0 on a board made by 1.0, which so
+adopts nothing), so a card made since is never marked. Archived cards, workspace cards and the cards of a project no
+longer in the workspace are **before 1.0** whatever their column. A card's folder is its agent's worktree (target: the
+branch it came from) or the project folder (target: its branch); git is read outside the board's lock. `Adopted` keeps
+the folder's head as observed (`head`, null when unknown) apart from `base`, and the fold's head is that head (a
+`Started` fact's head is its base). Each card is checked again inside the change that writes it: one started, adopted
+or marked meanwhile (by another Hive, or a rerun) is left as it is; one changed meanwhile (moved, archived, given another
+agent, its agent's folder changed) is never written from the stale reads but classified again by another run (up to
+three in a row, else at the next start), and the adoption isn't finished until none is left. So it is safe to repeat
+and to run in two Hives at once, and a project's options are written only when project.json has none. Nothing moves on
+the board: each adopted card is already at the stage its column stands for. A project's agents count as reviewer agents
+when a role or name says *review*.
+
 **Options at the upgrade** [#1122 c: "options matching how they work today, so nothing changes overnight"]:
 - Git projects get Git with G5 **Not checked**, G11 as their agents work (slots if any agent has a worktree, else the
   project folder), every check off, and **G1 = A reviewer agent if the project has reviewer agents or a lane**, else No

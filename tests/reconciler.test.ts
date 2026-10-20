@@ -127,7 +127,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Race', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
     const a = git(wt, 'rev-parse', 'HEAD')
-    const runtime = (s: InstanceType<typeof FactStore> | ReturnType<typeof FactStore.open>, locked?: <T>(fn: () => T) => Promise<T>) =>
+    const runtime = (s: ReturnType<typeof FactStore.open>, locked?: <T>(fn: () => T) => Promise<T>) =>
       new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
     // This Hive: the board's store, its writes changes of the board. The other: a connection of its own.
     const ours = runtime(FactStore.forBoard(w, { project: 'p', key: '' }), (fn) => store.boardWrite(w, async () => fn()))
