@@ -10,7 +10,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
-import { as09, removeCard, writeCard } from './boardDb'
+import { as09, removeCard, writeCard, writeCardOutside } from './boardDb'
 
 const base = tempDir('hive-cards-step-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -19,6 +19,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { schemaVersion } = await import('../src/main/db')
+const { cardRowsTestHooks } = await import('../src/main/schema/cardRows')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -30,6 +31,7 @@ afterAll(async () => {
 })
 afterEach(() => {
   store.boardTestHooks.upgradeAnswer = null
+  cardRowsTestHooks.afterCards = null
 })
 
 async function open(ws: string): Promise<WS> {
@@ -278,6 +280,90 @@ describe('the cards step (#1209)', () => {
     console.log(`golden: ${numbers.length} cards; upgraded in ${Math.round(upgradeMs)} ms; ${Object.keys(before).length} readings compared, ${differ.length} differ${differ.length ? `: ${differ.slice(0, 20).join(', ')}` : ''}`)
     expect(differ).toEqual([])
     expect(Object.keys(after)).toEqual(Object.keys(before))
+    await close(w)
+  })
+})
+
+// A card is its row and its child rows, read by separate statements: another process committing between them must
+// never give a card neither of them saved (HR4's #1209 round 1 finding). The commit is made at that very point, by a
+// connection of its own, from the hook a read runs once it has read the cards' rows.
+describe('the board read on one snapshot (#1209 round 1)', () => {
+  /** Commits these documents from another connection the `at`-th time a read has read its cards' rows; says how many reads there were. */
+  function commitAt(ws: string, at: number, docs: Record<number, Record<string, unknown>>): { reads: number } {
+    const seen = { reads: 0 }
+    cardRowsTestHooks.afterCards = () => {
+      if (++seen.reads === at) for (const [k, doc] of Object.entries(docs)) writeCardOutside(ws, Number(k), doc)
+    }
+    return seen
+  }
+  const comment = (text: string): Record<string, unknown> => ({ at: '2026-10-20T17:00:00.000Z', by: 'Agent 2 (q)', text, id: `c-${text.length}` })
+  const text = (v: unknown): string => JSON.stringify(v)
+
+  async function board(): Promise<{ ws: string; w: WS; a: number; b: number }> {
+    const ws = workspace()
+    mkdirSync(join(ws, 'q', '.hive'), { recursive: true })
+    writeFileSync(join(ws, 'q', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2' }] }))
+    const w = await open(ws)
+    const [a, b] = await inWorkspace(w, async () => {
+      const first = await tasks.createTask({ title: 'Old title', project: 'p', agent: 'a1' }, user)
+      await tasks.commentTask(first.number, 'Old comment', user)
+      const second = await tasks.createTask({ title: 'Second', project: 'p', agent: 'a1' }, user)
+      return [first.number, second.number]
+    })
+    return { ws, w, a, b }
+  }
+
+  it("a card read while another process moves it to another project, with a new comment, is the card before, never a mix", async () => {
+    const { ws, w, a } = await board()
+    const old = store.cardDoc(w, a)!
+    const moved = { ...old, title: 'New title', project: 'q', agent: 'a2', comments: [...(old.comments as unknown[]), comment('New private comment')] }
+    const seen = commitAt(ws, 1, { [a]: moved })
+    expect(text(store.cardDoc(w, a))).toBe(text(old))
+    expect(seen.reads).toBe(1)
+    cardRowsTestHooks.afterCards = null
+    // The change was committed: the next read has it whole.
+    expect(text(store.cardDoc(w, a))).toBe(text(moved))
+    await close(w)
+  })
+
+  it('cards picked by a query keep their own child rows when another process changes which cards it picks', async () => {
+    const { ws, w, a, b } = await board()
+    const before = store.cardDocs(w, { agents: ['a1'] })
+    expect(before.map((d) => d.number)).toEqual([a, b])
+    const docA = before[0].doc
+    // Card a leaves the query (another agent), with a comment more; b stays and gets one too.
+    const seen = commitAt(ws, 1, {
+      [a]: { ...docA, agent: 'a2', comments: [...(docA.comments as unknown[]), comment('Moved on')] },
+      [b]: { ...before[1].doc, comments: [comment('Later')] }
+    })
+    expect(text(store.cardDocs(w, { agents: ['a1'] }))).toBe(text(before))
+    expect(seen.reads).toBe(1)
+    cardRowsTestHooks.afterCards = null
+    expect(store.cardDocs(w, { agents: ['a1'] }).map((d) => d.number)).toEqual([b])
+    await close(w)
+  })
+
+  it("costs' holds and the history read after them for cards without holds are one snapshot", async () => {
+    const { ws, w, a } = await board()
+    const before = store.holdDocs(w)
+    const old = store.cardDoc(w, a)!
+    // Between the holds' read and the history read (the second read of cards' rows): a history line more.
+    const seen = commitAt(ws, 2, { [a]: { ...old, history: [...(old.history as unknown[]), { at: '2026-10-20T17:00:00.000Z', by: 'Agent 2 (q)', what: 'Moved to Review' }] } })
+    expect(text(store.holdDocs(w))).toBe(text(before))
+    expect(seen.reads).toBe(2)
+    cardRowsTestHooks.afterCards = null
+    expect(text(store.holdDocs(w))).not.toBe(text(before))
+    await close(w)
+  })
+
+  it('a read inside a board change uses the change’s own transaction and sees its writes', async () => {
+    const { w, a } = await board()
+    await store.boardWrite(w, async () => {
+      store.putCard(w, a, { ...store.cardDoc(w, a)!, title: 'Inside' })
+      expect(store.cardDoc(w, a)!.title).toBe('Inside')
+      expect(store.cardDocs(w, { numbers: [a] })[0].doc.title).toBe('Inside')
+    })
+    expect(store.cardDoc(w, a)!.title).toBe('Inside')
     await close(w)
   })
 })

@@ -740,6 +740,27 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 }
 
 /**
+ * A read of several statements on one snapshot of the board (#1209 round 1, HR4's finding): a card is its row and its
+ * child rows, read by separate statements, and another process (another Hive, a script) committing between them must
+ * never give a card neither of them saved, nor a child query that picks other cards than its parent's. Inside a change
+ * (or a read already holding one) it runs on that transaction; else it opens a read transaction on the reader, whose
+ * snapshot every statement of `fn` sees, and ends it after. `fn` is synchronous: nothing else uses the reader meanwhile.
+ */
+function readSnapshot<T>(ws: WorkspaceService, fn: (b: Board, db: Db['reader']) => T): T {
+  const { b, db } = readConn(ws)
+  if (db.isTransaction) return fn(b, db)
+  db.exec('BEGIN')
+  try {
+    const out = fn(b, db)
+    db.exec('COMMIT')
+    return out
+  } catch (e) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
  * A write to the board, inside boardWrite only, and only while its transaction is live: once SQLite has undone it (an
  * error that rolls back the whole transaction), every later write of the change fails too, never going on in autocommit,
  * and the change fails whole as it ends.
@@ -765,13 +786,14 @@ function writeOp<T>(ws: WorkspaceService, op: (b: Board) => T): T {
 
 /** A card's document as saved; null when there is no such card. */
 export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown> | null {
-  const { b, db } = readConn(ws)
-  if (b.legacy) {
-    const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n) as { doc: string } | undefined // i18n-ignore: SQL
-    return row ? (JSON.parse(row.doc) as Record<string, unknown>) : null
-  }
-  const [r] = readCardRows(db, { numbers: [n] })
-  return r ? composeCard(r) : null
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) {
+      const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n) as { doc: string } | undefined // i18n-ignore: SQL
+      return row ? (JSON.parse(row.doc) as Record<string, unknown>) : null
+    }
+    const [r] = readCardRows(db, { numbers: [n] })
+    return r ? composeCard(r) : null
+  })
 }
 
 /** Whether there is a card of that number. */
@@ -799,7 +821,10 @@ export interface CardQuery {
 
 /** Cards' documents, by number, as the query asks; in number order. */
 export function cardDocs(ws: WorkspaceService, q: CardQuery = {}): { number: number; doc: Record<string, unknown> }[] {
-  const { b, db } = readConn(ws)
+  return readSnapshot(ws, (b, db) => docsOf(b, db, q))
+}
+
+function docsOf(b: Board, db: Db['reader'], q: CardQuery): { number: number; doc: Record<string, unknown> }[] {
   const where: string[] = []
   const args: (number | string)[] = []
   if (q.archived !== undefined) where.push(`archived = ${q.archived ? 1 : 0}`)
@@ -862,11 +887,12 @@ const SUMMARY = ['title', 'project', 'projectId', 'agent', 'agentName', 'column'
  * card's dialog read them in full.
  */
 export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
-  const { b, db } = readConn(ws)
-  if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
-  const field = (k: string): string => `'${k}', doc -> '$.${k}'`
-  const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
+    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
+    const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
 }
 
 /**
@@ -875,24 +901,27 @@ export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc
  * holds (holdsFromHistory), read for those cards alone.
  */
 export function holdDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
-  const { b, db } = readConn(ws)
-  if (!b.legacy) {
-    const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'] })
-    const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
-    const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
-    return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
-  }
-  const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  // One snapshot for both reads: the history read for the cards without holds sees the cards the first read saw.
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) {
+      const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'] })
+      const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
+      const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
+      return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
+    }
+    const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
 }
 
 /** Each card's place fields, from their columns (nothing else of a card read): what placing a card needs (#458). */
 export function cardPlaces(ws: WorkspaceService): { number: number; raw: { column: unknown; order: unknown; archived: boolean; project: unknown; projectId: unknown } }[] {
-  const { b, db } = readConn(ws)
-  // Order and archived as the 0.9 index gave them (cardRows.ts): its order a number where the document's was one in another form.
-  if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
-  const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  return readSnapshot(ws, (b, db) => {
+    // Order and archived as the 0.9 index gave them (cardRows.ts): its order a number where the document's was one in another form.
+    if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
+    const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  })
 }
 
 /** How many archived cards each project has (the board's Archived count, without reading them). */
@@ -1131,10 +1160,8 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
  * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
  */
 export async function exportBoard(ws: WorkspaceService, dir: string): Promise<number> {
-  const docs = cardDocs(ws)
-  const { db } = readConn(ws)
-  const next = nextOf(db)
-  const batches = archiveBatchDocs(ws)
+  // Its cards, next number and batches as one snapshot of the board.
+  const { docs, next, batches } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws) }))
   await mkdir(dir, { recursive: true })
   for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(doc, null, 2) + '\n', 'utf8')
   await writeFile(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n', 'utf8')

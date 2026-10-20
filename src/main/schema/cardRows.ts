@@ -442,8 +442,28 @@ export interface CardSelection {
   columns?: (keyof CardRow)[]
 }
 
-/** Cards' rows read back, in number order, as the selection asks; the lists of parts left out stay empty. */
+/** For tests: runs once a read's `cards` rows are read, before their child rows (another connection committing there, #1209 round 1). */
+export const cardRowsTestHooks: { afterCards: (() => void) | null } = { afterCards: null }
+
+/**
+ * Cards' rows read back, in number order, as the selection asks; the lists of parts left out stay empty. Its statements
+ * see one snapshot (HR4's #1209 round 1 finding): in the caller's transaction, else in a read transaction of its own, so
+ * another connection committing between the cards and their child rows never gives a card that was never saved.
+ */
 export function readCardRows(db: DatabaseSync, sel: CardSelection = {}): CardRows[] {
+  if (db.isTransaction) return readRows(db, sel)
+  db.exec('BEGIN')
+  try {
+    const out = readRows(db, sel)
+    db.exec('COMMIT')
+    return out
+  } catch (e) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+function readRows(db: DatabaseSync, sel: CardSelection): CardRows[] {
   const parts = new Set(sel.parts ?? ALL_PARTS)
   const where = sel.numbers ? 'number IN (SELECT value FROM json_each(?))' : (sel.where ?? null)
   const args: Sql[] = sel.numbers ? [JSON.stringify(sel.numbers)] : (sel.args ?? [])
@@ -452,6 +472,7 @@ export function readCardRows(db: DatabaseSync, sel: CardSelection = {}): CardRow
   const byCard = new Map<number, CardRows>()
   for (const card of cards) byCard.set(card.number, { card: { ...card }, labels: [], context: [], blockedBy: [], links: [], comments: [], history: [], decisions: [], holds: [] })
   if (!byCard.size) return []
+  cardRowsTestHooks.afterCards?.()
   // One card: by its key. More: the children of the cards the condition picks (every card's when there is none).
   const one = byCard.size === 1 ? [...byCard.keys()][0] : null
   const childWhere = one !== null ? ' WHERE card = ?' : where ? ` WHERE card IN (SELECT number FROM cards WHERE ${where})` : ''
