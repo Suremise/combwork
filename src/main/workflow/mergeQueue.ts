@@ -327,7 +327,7 @@ export class MergeQueue {
       // git refused before writing: the files are as they were. The user's edit since the check pauses (named); anything
       // else is the target moving: back to the test merge.
       const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
-      const busy = st.out.split(' ').filter(Boolean).map((l) => l.slice(3))
+      const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
       await this.moved(card, entry, target)
       if (busy.length) return { pause: 'unstagedChanges', files: busy }
       return 'moved'
