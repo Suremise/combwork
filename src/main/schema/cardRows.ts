@@ -401,6 +401,58 @@ function stmt(db: DatabaseSync, sql: string): StatementSync {
   return s
 }
 
+/**
+ * Writes what changed of a card's rows (#1210), given the rows it has (`before`, read in the same transaction; null for a
+ * new card): its own row when a column changed (one row, every column); each list and list of entries compared place by
+ * place, so an added comment or history line is one insert, an edited one an update in place, and a removed one the
+ * places from it on. The rows end as writeCardRows would leave them (the same values at the same places), so the card
+ * composes back to the same bytes (the card JSON contract).
+ */
+export function writeCardChanges(db: DatabaseSync, before: CardRows | null, r: CardRows): void {
+  if (!before) return writeCardRows(db, r)
+  const n = r.card.number
+  if (CARD_COLS.some((c) => before.card[c] !== r.card[c])) stmt(db, `UPDATE cards SET ${CARD_COLS.slice(1).map((c) => `${c} = ?`).join(', ')} WHERE number = ?`).run(...CARD_COLS.slice(1).map((c) => r.card[c] as Sql), n)
+  // A list compared place by place: `same` says whether a place holds the same, `set` writes one, `add` one past the end.
+  const places = <T>(was: readonly T[], now: readonly T[], same: (a: T, b: T) => boolean, set: (i: number, v: T) => void, add: (i: number, v: T) => void, cutFrom: (i: number) => void): void => {
+    for (let i = 0; i < now.length; i++) {
+      if (i >= was.length) add(i, now[i])
+      else if (!same(was[i], now[i])) set(i, now[i])
+    }
+    if (was.length > now.length) cutFrom(now.length)
+  }
+  for (const t of LIST_TABLES) {
+    places<string>(
+      t.of(before),
+      t.of(r),
+      (a, b) => a === b,
+      (i, v) => stmt(db, `UPDATE ${t.table} SET ${t.col} = ? WHERE card = ? AND ord = ?`).run(v, n, i),
+      (i, v) => stmt(db, `INSERT INTO ${t.table} (card, ord, ${t.col}) VALUES (?, ?, ?)`).run(n, i, v),
+      (i) => stmt(db, `DELETE FROM ${t.table} WHERE card = ? AND ord >= ?`).run(n, i)
+    )
+  }
+  for (const [kind, of] of [['blockedBy', (x: CardRows) => x.blockedBy], ['link', (x: CardRows) => x.links]] as const) {
+    places<number>(
+      of(before),
+      of(r),
+      (a, b) => a === b,
+      (i, v) => stmt(db, 'UPDATE card_links SET target = ? WHERE card = ? AND kind = ? AND ord = ?').run(v, n, kind, i),
+      (i, v) => stmt(db, 'INSERT INTO card_links (card, kind, ord, target) VALUES (?, ?, ?, ?)').run(n, kind, i, v),
+      (i) => stmt(db, 'DELETE FROM card_links WHERE card = ? AND kind = ? AND ord >= ?').run(n, kind, i)
+    )
+  }
+  for (const t of ENTRY_TABLES) {
+    const cols = t.spec.fields.map((f) => f.col)
+    places<EntryRow>(
+      t.of(before),
+      t.of(r),
+      (a, b) => a.raw === b.raw && cols.every((c) => (a.cols[c] ?? null) === (b.cols[c] ?? null)),
+      (i, e) => stmt(db, `UPDATE ${t.spec.table} SET ${cols.map((c) => `${c} = ?`).join(', ')}, raw = ? WHERE card = ? AND ord = ?`).run(...cols.map((c) => e.cols[c] ?? null), e.raw, n, i),
+      (i, e) => stmt(db, `INSERT INTO ${t.spec.table} (card, ord, ${cols.join(', ')}, raw) VALUES (?, ?, ${cols.map(() => '?').join(', ')}, ?)`).run(n, i, ...cols.map((c) => e.cols[c] ?? null), e.raw),
+      (i) => stmt(db, `DELETE FROM ${t.spec.table} WHERE card = ? AND ord >= ?`).run(n, i)
+    )
+  }
+}
+
 /** Writes a card's rows, replacing whatever it had (inside the caller's transaction). */
 export function writeCardRows(db: DatabaseSync, r: CardRows): void {
   const n = r.card.number

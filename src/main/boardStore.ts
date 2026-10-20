@@ -8,7 +8,7 @@ import { app } from 'electron'
 import { HIVE_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
-import { cardField, composeCard, decomposeCard, readCardRows, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
+import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
@@ -938,9 +938,27 @@ const FIELD_COLUMNS: Record<string, (keyof CardRow)[]> = {
  * Some fields of each card a condition picks (every card without one), each as its document has it (null when it hasn't
  * the field), read from only the columns and child tables they need: nothing else of a card (its description, comments…).
  */
-function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; parts: CardPart[] }): { r: CardRows; fields: Record<string, unknown> }[] {
+function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; numbers?: number[]; parts: CardPart[] }): { r: CardRows; fields: Record<string, unknown> }[] {
   const columns = [...new Set(keys.flatMap((k) => FIELD_COLUMNS[k] ?? []))]
-  return readCardRows(db, { where: sel.where, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
+  return readCardRows(db, { where: sel.where, numbers: sel.numbers, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
+}
+
+/**
+ * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Hive kept them its history with
+ * the agent and reviewer it has now (holdsFromHistory names them by those: HR1's #1210 round 1 finding).
+ */
+const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'held', 'history', 'agent', 'agentName', 'review']
+
+/**
+ * The fields a card's cost needs of the cards given (#1210): its title, project, column, holds, history, agent and reviewer, read from
+ * their columns and child tables, nothing else of it (its description, comments, decisions). In number order.
+ */
+export function costDocs(ws: WorkspaceService, numbers: number[]): { number: number; doc: Record<string, unknown> }[] {
+  if (!numbers.length) return []
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return docsOf(b, db, { numbers }).map(({ number, doc }) => ({ number, doc: Object.fromEntries(COST_FIELDS.map((k) => [k, doc[k] ?? null])) }))
+    return cardFields(db, COST_FIELDS, { numbers, parts: ['holds', 'history'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
+  })
 }
 
 /** The fields of an archived card's summary (archivedSummaryDocs), in its order. */
@@ -999,7 +1017,10 @@ export function archivedCounts(ws: WorkspaceService): { project: string; count: 
 export function putCard(ws: WorkspaceService, n: number, doc: Record<string, unknown>): void {
   writeOp(ws, (b) => {
     if (boardTestHooks.failPut?.(n)) throw new Error(`SQLITE_FULL: database or disk is full (test, card #${n})`) // i18n-ignore: a test's stand-in for SQLite's error
-    writeCardRows(b.db.writer, decomposeCard(n, doc))
+    // Only what changed (#1210): the card as saved, read in this change's transaction, against the card given.
+    const db = b.db.writer
+    const [before] = readCardRows(db, { numbers: [n] })
+    writeCardChanges(db, before ?? null, decomposeCard(n, doc))
   })
 }
 
