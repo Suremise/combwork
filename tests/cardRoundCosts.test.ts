@@ -2,13 +2,15 @@
 // reviewers' sessions used while they held the card then, shared with the live cards they held at the same time.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { writeCard } from './boardDb'
 import { roundSpans } from '../src/shared/cardCosts'
 import { TimelineBuilder } from '../src/shared/usageTimeline'
 import type { Fact, FactKind } from '../src/shared/workflow/facts'
+import { preset } from '../src/shared/workflow/options'
+import { B1, R1, R2, commit, moved, setup, type Env } from './workflow/harness'
 
 const base = tempDir('hive-round-costs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -27,35 +29,121 @@ const NOW = t(100)
 
 let seq = 0
 const fact = (kind: FactKind, m: number, data: Record<string, unknown> = {}, actor = 'hive'): Fact => ({ card: 1, seq: ++seq, kind, at: iso(m), actor, source: 'recorded', data }) as unknown as Fact
-const started = (m: number, kind: 'Started' | 'Adopted' = 'Started'): Fact => fact(kind, m, { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code' })
+const started = (m: number, kind: 'Started' | 'Adopted' = 'Started', adoptedFrom?: string): Fact => fact(kind, m, { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code', ...(adoptedFrom ? { adoptedFrom } : {}) })
 const submitted = (m: number, round: number): Fact => fact('Submitted', m, { revision: `r${round}`, base: 'b0', head: `r${round}`, key: null, files: [], round, generation: 0, sameRevision: false, summary: '' }, 'agent:b1')
-const verdict = (m: number, round: number, pass: boolean, reviewer: string): Fact => fact('Verdict', m, { reviewer, submission: 0, revision: `r${round}`, pass, round, generation: 0, comment: '' }, reviewer)
+/** A verdict on the submission whose fact is `submission` (its seq); its own round is the runtime's count of failures, never read. */
+const verdict = (m: number, pass: boolean, submission: number, reviewer: string): Fact => fact('Verdict', m, { reviewer: reviewer.replace(/^agent:/, ''), submission, revision: null, pass, round: 99, generation: 0, comment: '' }, reviewer)
+const movedAt = (m: number, from: string, to: string): Fact => fact('Moved', m, { from, to, cause: 'intent' })
 
-describe('roundSpans (#1226)', () => {
-  it('two rounds: a fail ends round 1 and starts round 2, a pass ends the rounds; each with its reviewer', () => {
-    expect(roundSpans([started(0), submitted(10, 1), verdict(20, 1, false, 'agent:r1'), submitted(30, 2), verdict(40, 2, true, 'agent:r2')], NOW)).toEqual([
-      { cycle: 1, round: 1, from: t(0), to: t(20), submitted: t(10), verdict: 'failed', reviewer: 'agent:r1' },
-      { cycle: 1, round: 2, from: t(20), to: t(40), submitted: t(30), verdict: 'passed', reviewer: 'agent:r2' }
+describe('roundSpans on the facts the runtime writes (#1226)', () => {
+  let env: Env | null = null
+  afterEach(() => {
+    env?.close()
+    env = null
+  })
+  const pair = (more: Record<string, unknown> = {}): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], finish: 'agentMerges', ...more } as never))
+  async function startedCard(e: Env) {
+    const card = e.wf.createCard({ title: 'Costed', reviewer: 'R1' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    commit(folder, { 'src/a.txt': 'one\n' }, 'one')
+    return { card, folder }
+  }
+  const rounds = (e: Env, id: number) => roundSpans(e.store.facts(id), Date.now() + 60_000)
+  const lastAt = (e: Env, id: number, kind: FactKind): number => Date.parse(e.store.facts(id).findLast((f) => f.kind === kind)!.at)
+
+  it('a fail then a pass: rounds 1 and 2 (a verdict counts for its submission, not by its own round)', async () => {
+    const e = pair()
+    const { card, folder } = await startedCard(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'no' }))
+    commit(folder, { 'src/a.txt': 'two\n' }, 'two')
+    moved(await e.wf.submit(card.key, B1, { summary: 'y' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    // As the runtime numbers them: the pass's own round is 1, its submission's 2.
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'Verdict').map((f) => (f.data as { round: number }).round)).toEqual([1, 1])
+    expect(rounds(e, card.id).map((r) => [r.round, r.verdict, r.reviewers])).toEqual([
+      [1, 'failed', ['R1']],
+      [2, 'passed', ['R1']]
     ])
   })
 
-  it('a round under way runs to now; a reopened card starts its rounds again; an adopted cycle counts as a start', () => {
+  it('two reviewers: the first pass ends nothing; the round runs to the second, and on to Approved', async () => {
+    const e = pair({ reviewers: 2 })
+    const { card } = await startedCard(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: '1' }))
+    moved(await e.wf.startReview(card.key, R2))
+    moved(await e.wf.verdict(card.key, R2, { pass: true, comment: '2' }))
+    expect(e.wf.state(card).stage).toBe('approved')
+    const [r] = rounds(e, card.id)
+    expect(rounds(e, card.id)).toHaveLength(1)
+    expect(r).toMatchObject({ round: 1, verdict: 'passed', reviewers: ['R1', 'R2'] })
+    expect(r.to).toBeGreaterThanOrEqual(lastAt(e, card.id, 'Verdict'))
+  })
+
+  it('a pass then a fail by the second reviewer: the round failed, and the fixes are round 2', async () => {
+    const e = pair({ reviewers: 2 })
+    const { card, folder } = await startedCard(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: '1' }))
+    moved(await e.wf.startReview(card.key, R2))
+    moved(await e.wf.verdict(card.key, R2, { pass: false, comment: 'no' }))
+    commit(folder, { 'src/a.txt': 'two\n' }, 'two')
+    moved(await e.wf.submit(card.key, B1, { summary: 'y' }))
+    expect(rounds(e, card.id).map((r) => [r.round, r.verdict, r.reviewers])).toEqual([
+      [1, 'failed', ['R1', 'R2']],
+      [2, null, []]
+    ])
+  })
+})
+
+describe('roundSpans in time (#1226)', () => {
+  it('rounds follow submissions; a round under way runs to now; a reopened card starts again; work pauses outside Active and Review', () => {
     seq = 0
-    expect(roundSpans([started(0), submitted(10, 1)], NOW)).toMatchObject([{ round: 1, from: t(0), to: NOW, submitted: t(10), verdict: null }])
-    seq = 0
-    const reopened = roundSpans([started(0), submitted(5, 1), verdict(10, 1, true, 'agent:r1'), started(50), submitted(60, 1)], NOW)
-    expect(reopened.map((r) => [r.cycle, r.round, r.from, r.to, r.verdict])).toEqual([
-      [1, 1, t(0), t(10), 'passed'],
-      [4, 1, t(50), NOW, null]
+    const log = [started(0), submitted(10, 1), verdict(20, false, 2, 'agent:r1'), submitted(30, 2), verdict(40, true, 4, 'agent:r2'), movedAt(40, 'review', 'approved')]
+    expect(roundSpans(log, NOW)).toEqual([
+      { cycle: 1, round: 1, spans: [[t(0), t(20)]], from: t(0), to: t(20), submitted: t(10), verdict: 'failed', reviewers: ['r1'] },
+      { cycle: 1, round: 2, spans: [[t(20), t(40)]], from: t(20), to: t(40), submitted: t(30), verdict: 'passed', reviewers: ['r2'] }
     ])
     seq = 0
-    expect(roundSpans([started(0, 'Adopted'), submitted(0, 1)], NOW)).toMatchObject([{ cycle: 1, round: 1, from: t(0) }])
+    expect(roundSpans([started(0), submitted(10, 1)], NOW)).toMatchObject([{ round: 1, spans: [[t(0), NOW]], submitted: t(10), verdict: null }])
+    seq = 0
+    const reopened = roundSpans([started(0), submitted(5, 1), verdict(10, true, 2, 'agent:r1'), movedAt(10, 'review', 'done'), started(50), submitted(60, 1)], NOW)
+    expect(reopened.map((r) => [r.cycle, r.round, r.spans])).toEqual([
+      [1, 1, [[t(0), t(10)]]],
+      [5, 1, [[t(50), NOW]]]
+    ])
+    // On Hold for a while: not worked then.
+    seq = 0
+    expect(roundSpans([started(0), movedAt(10, 'active', 'hold'), movedAt(30, 'hold', 'active'), submitted(40, 1)], NOW)[0].spans).toEqual([[t(0), t(10)], [t(30), NOW]])
+  })
+
+  it('a pass made stale and sent back: the later work counts, in its round', () => {
+    seq = 0
+    const log = [started(0), submitted(10, 1), verdict(20, true, 2, 'agent:r1'), movedAt(20, 'review', 'approved'), movedAt(50, 'approved', 'active'), submitted(60, 2), verdict(70, true, 7, 'agent:r1'), movedAt(70, 'review', 'approved')]
+    expect(roundSpans(log, NOW).map((r) => [r.round, r.spans, r.verdict])).toEqual([
+      [1, [[t(0), t(20)], [t(50), t(60)]], 'passed'],
+      [2, [[t(60), t(70)]], 'passed']
+    ])
+  })
+
+  it('an adopted card in Passed is worked only once it comes back; an adopted cycle counts as a start', () => {
+    seq = 0
+    expect(roundSpans([started(0, 'Adopted', 'passed')], NOW)).toEqual([])
+    seq = 0
+    expect(roundSpans([started(0, 'Adopted', 'review'), submitted(0, 1)], NOW)).toMatchObject([{ cycle: 1, round: 1, spans: [[t(0), NOW]] }])
   })
 
   it('no cycle, no rounds: a card from before 1.0, or one never started (a Submitted alone is no round)', () => {
     seq = 0
     expect(roundSpans([], NOW)).toEqual([])
-    expect(roundSpans([submitted(10, 1), verdict(20, 1, true, 'agent:r1')], NOW)).toEqual([])
+    expect(roundSpans([submitted(10, 1), verdict(20, true, 1, 'agent:r1')], NOW)).toEqual([])
   })
 })
 
@@ -89,10 +177,12 @@ describe('cardRoundCosts (#1226)', () => {
     // B1 also held a live card in round 2's last five minutes of building (shared 1/2), and an archived one in round 1 (not read).
     await writeCard(w, 2, doc(2, [hold('b1', 'build', 25, 30)], { column: 'doing' }))
     await writeCard(w, 3, doc(3, [hold('b1', 'build', 0, 10)], { archived: true }))
+    // Another project's live card held by its own B1 (an older hold, named only) during round 1: another agent, not shared (HR1's round 1).
+    await writeCard(w, 4, doc(4, [{ name: 'B1', role: 'build', from: iso(0), to: iso(10) }], { project: 'q', agent: null, column: 'doing' }))
     // Card 1's facts, at their times.
     const fs = FactStore.forBoard(w, { project: 'p', key: 'p' })
     seq = 0
-    const log = [started(0), submitted(10, 1), verdict(20, 1, false, 'agent:r1'), submitted(30, 2), verdict(40, 2, true, 'agent:r2')]
+    const log = [started(0), submitted(10, 1), verdict(20, false, 2, 'agent:r1'), submitted(30, 2), verdict(40, true, 4, 'agent:r2'), movedAt(40, 'review', 'approved')]
     await store.boardWrite(w, async () => {
       fs.tx((tx) => {
         for (const f of log) tx.append(1, { kind: f.kind, actor: f.actor, source: 'recorded', data: f.data } as never)
@@ -111,9 +201,9 @@ describe('cardRoundCosts (#1226)', () => {
     const w = await world()
     const c = (await cardRoundCosts(w, 1))!
     expect(c.preWorkflow).toBe(false)
-    expect(c.rounds.map((r) => [r.round, r.verdict, r.reviewer, r.build.outputTokens, r.review.outputTokens])).toEqual([
-      [1, 'failed', 'agent:r1', 100, 30],
-      [2, 'passed', 'agent:r2', 25, 40]
+    expect(c.rounds.map((r) => [r.round, r.verdict, r.reviewers, r.build.outputTokens, r.review.outputTokens])).toEqual([
+      [1, 'failed', ['r1'], 100, 30],
+      [2, 'passed', ['r2'], 25, 40]
     ])
     expect(c.rounds[0].agents.map((a) => [a.agent, a.role, a.part.outputTokens])).toEqual([['b1', 'build', 100], ['r1', 'review', 30]])
     expect(c.rounds[1].agents.map((a) => [a.agent, a.role, a.part.outputTokens])).toEqual([['b1', 'build', 25], ['r2', 'review', 40]])

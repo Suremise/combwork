@@ -58,8 +58,8 @@ function namedIn(p: HostSessions): (name: string) => string[] {
 }
 
 const holdSpan = (h: TaskHold, now: number): Span => [ms(h.from, now), ms(h.to, now)]
-/** The parts of some spans inside one span. */
-const within = (spans: Span[], span: Span): Span[] => subtractSpans(spans, subtractSpans(spans, [span]))
+/** The parts of some spans inside others. */
+const within = (spans: Span[], inside: Span[]): Span[] => subtractSpans(spans, subtractSpans(spans, inside))
 
 /**
  * A card's cost: its rows in the history, each session's apart (a part each, as cost per card counts them), its builders'
@@ -157,7 +157,7 @@ export async function cardCosts(ws: WorkspaceService, o: { numbers?: number[]; p
 /**
  * A card's cost per round and role (#1226, #820 item 2), as data: its rounds from its facts (roundSpans), and in each
  * what each agent's sessions used while it held the card then, in its role (its holds: the builder in Doing, a reviewer
- * from its review's start to its verdict), shared with the live cards the agent held at the same time, as cost per card
+ * from its review's start to its verdict), shared with its project's live cards the agent held at the same time, as cost per card
  * shares it. Split by time from the sessions' timelines, so a round's parts are Hive's (≈) and their sum can differ a
  * little from the card's total, which stays the ledger's. Reads the card asked for (archived too) and the live cards'
  * holds; null when there is no such card.
@@ -171,7 +171,8 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
     const preWorkflow = work?.card.preWorkflow ?? true
     const spans = roundSpans(work?.facts ?? [], now)
     if (!spans.length) return { number: n, preWorkflow, rounds: [] }
-    const others = (await cardHolds(ws, { live: true })).filter((c) => c.number !== n)
+    // Its project's other live cards: another project's agents are other agents, whatever their names (HR1's round 1).
+    const others = (await cardHolds(ws, { live: true })).filter((c) => c.number !== n && c.project.toLowerCase() === card.project.toLowerCase())
     await usageHistory.freshen(ws)
     const p = card.project ? await (await sessionReader(ws))(card.project) : null
     const named = p ? namedIn(p) : () => []
@@ -189,7 +190,7 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
       const review = emptyPart()
       const agents: RoundCost['agents'] = []
       for (const g of groups.values()) {
-        const held = within(mergeSpans(g.spans), [r.from, r.to])
+        const held = within(mergeSpans(g.spans), r.spans)
         if (!held.length) continue
         const sessions = p ? p.list.filter((s) => holdIsSessions(g.who, s, named)).map((s) => s.slice) : []
         let part = emptyPart()
@@ -202,7 +203,7 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
         agents.push({ agent: g.who.agent ?? null, name: g.who.name, role: g.who.role, part: roundPart(part) })
       }
       const iso = (t: number): string => new Date(t).toISOString()
-      return { cycle: r.cycle, round: r.round, from: iso(r.from), to: iso(r.to), submitted: r.submitted === null ? null : iso(r.submitted), verdict: r.verdict, reviewer: r.reviewer, build: roundPart(build), review: roundPart(review), agents }
+      return { cycle: r.cycle, round: r.round, from: iso(r.from), to: iso(r.to), submitted: r.submitted === null ? null : iso(r.submitted), verdict: r.verdict, reviewers: r.reviewers, spans: r.spans.map(([a, b]): [string, string] => [iso(a), iso(b)]), build: roundPart(build), review: roundPart(review), agents }
     })
     return { number: n, preWorkflow, rounds }
   })

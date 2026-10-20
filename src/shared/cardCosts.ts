@@ -5,7 +5,7 @@ import { TASK_COLUMNS } from './tasks'
 import { reviewRounds } from './laneBar'
 import { costText, money } from './usageTotals'
 import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, type UsageTimeline } from './usageTimeline'
-import type { Fact, FactData } from './workflow/facts'
+import type { Fact, FactData, StageId } from './workflow/facts'
 
 /**
  * Cost per card and per lane (#602, Darren's decision of 11 Oct). Usage is the card's while an agent held it: its
@@ -343,57 +343,114 @@ export interface LaneCost {
 }
 
 /**
- * One round of a card's work, from its facts (#1226, #820 item 2): from its cycle's start (`Started`, `Adopted`) or the
- * verdict that failed the round before, to its own verdict, or to now while it goes on (the next cycle's start ends it
- * too). A pass ends the card's rounds: what follows (its merge) is no round's.
+ * One round of a card's work, from its facts (#1226, #820 item 2). Rounds follow the card's submissions: a submission's
+ * round is its `Submitted.round`, and a verdict counts for the round of the submission it names (never its own `round`,
+ * which counts failures). Round 1 begins at its cycle's start (`Started`, `Adopted`); round k+1 at the first failed
+ * verdict on round k (its fixes begin there), or at its own first submission if no verdict failed it (a stale pass sent
+ * back). A pass ends nothing by itself (a second reviewer may still review, a later verdict may fail it): the card's work
+ * pauses while its stage is past Review or not yet started (Approved, Merging, Done, Hold, Todo, from its `Moved` facts)
+ * and goes on, in the current round, when it comes back. So a round is the spans of time it was worked in.
  */
 export interface RoundSpan {
   /** The seq of the cycle's start: a card reopened after Done starts its rounds again. */
   cycle: number
   round: number
+  /** The spans it was worked in, merged, in order. */
+  spans: Span[]
+  /** The first span's start and the last one's end (its first submission's time when it has no span). */
   from: number
   to: number
-  /** When its change was submitted (its first submission's time); null while it has none. */
+  /** When its change was first submitted; null while it has none. */
   submitted: number | null
+  /** Failed when a verdict on its submissions failed, passed when any passed and none failed. */
   verdict: 'passed' | 'failed' | null
-  /** Its verdict's reviewer (an actor, `agent:<id>`), when it has one. */
-  reviewer: string | null
+  /** The reviewers who gave a verdict in it (as the verdicts name them: an agent's id, or `user`), in order, each once. */
+  reviewers: string[]
 }
+
+/** The stages a card is worked in: its builder in Active, its reviewers in Review. */
+const WORKED = new Set<StageId>(['active', 'review'])
+const ADOPTED_STAGE: Record<string, StageId> = { doing: 'active', review: 'review', passed: 'approved' }
 
 /** A card's rounds from its facts in seq order; none for a card with no cycle (from before 1.0, or never started). */
 export function roundSpans(facts: readonly Fact[], now: number): RoundSpan[] {
   const out: RoundSpan[] = []
-  let open: RoundSpan | null = null
+  type Cycle = { seq: number; rounds: Map<number, RoundSpan>; current: number; since: number | null; subs: Map<number, number> }
+  let cyc: Cycle | null = null
   const time = (f: Fact): number => {
     const t = Date.parse(f.at)
     return Number.isFinite(t) ? t : now
   }
-  const close = (to: number): void => {
-    if (open) out.push({ ...open, to: Math.max(open.from, to) })
-    open = null
+  const roundOf = (c: Cycle, k: number): RoundSpan => {
+    let r = c.rounds.get(k)
+    if (!r) c.rounds.set(k, (r = { cycle: c.seq, round: k, spans: [], from: 0, to: 0, submitted: null, verdict: null, reviewers: [] }))
+    return r
+  }
+  // Work pauses (the span so far goes to the current round) and goes on.
+  const pause = (c: Cycle, t: number): void => {
+    if (c.since !== null && t > c.since) roundOf(c, c.current).spans.push([c.since, t])
+    c.since = null
+  }
+  const resume = (c: Cycle, t: number): void => {
+    if (c.since === null) c.since = t
+  }
+  // Round k begins at t (never an earlier one again): work under way goes on in it.
+  const begin = (c: Cycle, k: number, t: number): void => {
+    if (k <= c.current) return
+    const working = c.since !== null
+    pause(c, t)
+    c.current = k
+    roundOf(c, k)
+    if (working) resume(c, t)
+  }
+  const finish = (t: number): void => {
+    if (!cyc) return
+    pause(cyc, t)
+    for (const r of [...cyc.rounds.values()].sort((a, b) => a.round - b.round)) {
+      const spans = mergeSpans(r.spans)
+      if (!spans.length && r.submitted === null && !r.verdict) continue
+      out.push({ ...r, spans, from: spans[0]?.[0] ?? r.submitted ?? t, to: spans.at(-1)?.[1] ?? r.submitted ?? t })
+    }
+    cyc = null
   }
   for (const f of facts) {
+    const t = time(f)
     if (f.kind === 'Started' || f.kind === 'Adopted') {
-      close(time(f))
-      open = { cycle: f.seq, round: 1, from: time(f), to: now, submitted: null, verdict: null, reviewer: null }
-    } else if (f.kind === 'Submitted' && open) {
+      finish(t)
+      const c: Cycle = { seq: f.seq, rounds: new Map(), current: 1, since: null, subs: new Map() }
+      roundOf(c, 1)
+      const from = f.kind === 'Started' ? 'active' : (ADOPTED_STAGE[(f.data as FactData['Adopted']).adoptedFrom ?? 'doing'] ?? 'active')
+      if (WORKED.has(from)) resume(c, t)
+      cyc = c
+      continue
+    }
+    const c: Cycle | null = cyc
+    if (!c) continue
+    if (f.kind === 'Moved') {
+      if (WORKED.has((f.data as FactData['Moved']).to)) resume(c, t)
+      else pause(c, t)
+    } else if (f.kind === 'Submitted') {
       const d = f.data as FactData['Submitted']
-      if (Number.isInteger(d.round) && d.round > 0) open.round = d.round
-      open.submitted ??= time(f)
-    } else if (f.kind === 'Verdict' && open) {
+      const k = Number.isInteger(d.round) && d.round > 0 ? d.round : c.current
+      c.subs.set(f.seq, k)
+      begin(c, k, t)
+      resume(c, t)
+      const r = roundOf(c, k)
+      r.submitted ??= t
+    } else if (f.kind === 'Verdict') {
       const d = f.data as FactData['Verdict']
-      const cycle: number = open.cycle
-      if (Number.isInteger(d.round) && d.round > 0) open.round = d.round
-      open.verdict = d.pass ? 'passed' : 'failed'
-      open.reviewer = d.reviewer || null
-      const at = time(f)
-      const round: number = open.round
-      close(at)
-      // Failed: the next round, its fixes, starts at the verdict. Passed: no more rounds in this cycle.
-      if (!d.pass) open = { cycle, round: round + 1, from: at, to: now, submitted: null, verdict: null, reviewer: null }
+      const k = c.subs.get(d.submission) ?? c.current
+      const r = roundOf(c, k)
+      if (d.reviewer && !r.reviewers.includes(d.reviewer)) r.reviewers.push(d.reviewer)
+      if (d.pass) r.verdict ??= 'passed'
+      else {
+        r.verdict = 'failed'
+        // Its fixes: the next round, from this verdict.
+        begin(c, k + 1, t)
+      }
     }
   }
-  close(now)
+  finish(now)
   return out
 }
 
@@ -414,7 +471,9 @@ export interface RoundCost {
   to: string
   submitted: string | null
   verdict: 'passed' | 'failed' | null
-  reviewer: string | null
+  reviewers: string[]
+  /** The spans it was worked in (ISO times): its parts are what was used in them. */
+  spans: [string, string][]
   build: CostPart
   review: CostPart
   /** By agent and role, in the order the card's holds name them. */
