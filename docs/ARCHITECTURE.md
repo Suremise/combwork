@@ -321,7 +321,7 @@ the marks (carried over, stale, outside the rules, merged in part, left the targ
 queue's newest entry, decisions' generations, and `preWorkflow` / `adopted`. Its stage is the fold's (the card's cached
 stage is where the fold starts), and a verdict is `current` only while no other change has made it stale. A `WorkBadge` is what the board's badges need of it. Revisions stay whole: the window shows them through its
 project's descriptor (`revisionShort`). `main/workflow/cardWork.ts` reads a card's row and facts on one snapshot for the
-IPC `tasks:work`, and every live card's for `tasks:workBadges`, the archived ones left out in the query (#1107's rule:
+IPC `tasks:work`, and every live card's for `tasks:workBadges` (the lane hover's lines, `laneBar.workNotes`, #1225), the archived ones left out in the query (#1107's rule:
 `facts.live` joins `cards` on `archived = 0`, so neither their rows nor their facts are parsed). The window reads them
 again each time it reads the board (`renderer/cardWork.ts`, on `tasks-changed`): a fact written on the board's
 connection marks the board change (`boardChanged`), so an observed fact tells the window as a recorded one does. The
