@@ -104,6 +104,12 @@ interface HiveMessageValues {
   'service.hiveVcs.exitCode': { code: string | number }
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
+  'service.keys.form': undefined
+  'service.keys.notice': { keys: string | number }
+  'service.keys.noticeTitle': undefined
+  'service.keys.prefix': { key: string | number; other: string | number }
+  'service.keys.taken': { key: string | number }
+  'service.keys.unknownProject': undefined
   'service.lanes.noWorkspace': undefined
   'service.lanes.unknown': { id: string | number }
   'service.metrics.badProvider': undefined

@@ -17,6 +17,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
+import { cardOfRef, isCardRef } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
@@ -1408,7 +1409,7 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const p = projectByName(params[0])
     const agent = await slotAgent(p)
     const branch = await slotBranchFor(p, body?.branch)
-    const cards = slotCards(body?.cards)
+    const cards = slotCards(cardRefsIn(body?.cards))
     const t = body?.timeoutSeconds
     if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, 'timeoutSeconds must be a number of seconds')
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
@@ -1458,7 +1459,7 @@ function laneProject(v: unknown): string {
 function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null } {
   const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null } = {}
   if (body?.cards !== undefined) {
-    const c = laneCards(body.cards)
+    const c = laneCards(cardRefsIn(body.cards))
     if (typeof c === 'string') throw new HttpError(400, c)
     out.cards = c
   }
@@ -1823,14 +1824,36 @@ async function taskChange(c: TaskCard, changes: string[]): Promise<TaskChange> {
 /** A card's change, given its column's list (where it is in that list is its place). */
 function changeRow(c: TaskCard, changes: string[], list: TaskCard[]): TaskChange {
   const i = list.findIndex((x) => x.number === c.number)
-  return { number: c.number, title: c.title, column: c.column, position: i >= 0 ? i + 1 : null, of: list.length, project: c.project, agent: c.agent ? (c.agentName ?? c.agent) : null, changes }
+  return { number: c.number, ...(c.key ? { key: c.key } : {}), title: c.title, column: c.column, position: i >= 0 ? i + 1 : null, of: list.length, project: c.project, agent: c.agent ? (c.agentName ?? c.agent) : null, changes }
 }
 
+/**
+ * A card in a request's path: its number (`12`, the old global number the tools take until P8), `#12`, or its key
+ * (`HI-12`, any case, an old key too: #1219). A key no card has is 404.
+ */
 const taskNumber = (v: string): number => {
-  const n = Number(decodeURIComponent(v).replace(/^#/, ''))
-  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, `"${v}" is not a card number`)
+  const ref = decodeURIComponent(v).trim()
+  if (/^[A-Za-z]{2,4}-\d+$/.test(ref)) {
+    const n = cardOfRef(requireWorkspace(), ref)
+    if (n === null) throw new HttpError(404, `Unknown card ${ref}`)
+    return n
+  }
+  const n = Number(ref.replace(/^#/, ''))
+  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, `"${v}" is not a card number or key (12, #12 or HI-12)`)
   return n
 }
+
+/**
+ * A card reference in a request's body (#1219): a key (`"HI-12"`) or `"#12"` becomes the card's number; a number, or
+ * anything else, is left as it is for the route's own check (a key no card has is 404).
+ */
+function cardRefIn(v: unknown): unknown {
+  if (typeof v !== 'string' || !isCardRef(v) || /^\d+$/.test(v.trim())) return v
+  const n = cardOfRef(requireWorkspace(), v)
+  if (n === null) throw new HttpError(404, `Unknown card ${v.trim()}`)
+  return n
+}
+const cardRefsIn = <T>(v: T): T => (Array.isArray(v) ? (v.map(cardRefIn) as T) : v)
 
 function columnParam(v: unknown): TaskColumn | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -1846,12 +1869,12 @@ function taskPatch(body: any): TaskPatch {
   for (const k of ['title', 'description', 'project', 'blocked'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
   if (body?.agent !== undefined) out.agent = body.agent ? String(body.agent) : null
   if (body?.column !== undefined) out.column = columnParam(body.column)
-  if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(body.before).replace(/^#/, ''))
+  if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(cardRefIn(body.before)).replace(/^#/, ''))
   if (body?.position !== undefined && body.position !== null && body.position !== '') {
     if (body.position !== 'top' && body.position !== 'bottom') throw new HttpError(400, `Unknown position "${String(body.position)}": top or bottom.`)
     out.position = body.position
   }
-  for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = body[k]
+  for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = k === 'blockedBy' || k === 'links' ? cardRefsIn(body[k]) : body[k]
   if (body?.decision !== undefined && body.decision !== null) out.decision = String(body.decision)
   if (body?.review !== undefined && body.review !== null && body.review !== '') {
     if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, `Unknown review "${String(body.review)}": start, passed or failed.`)
@@ -1890,7 +1913,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, 'title is required')
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: body?.blockedBy, links: body?.links, context: body?.context }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context }
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, []) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.createTask(input, actor))
@@ -1979,7 +2002,7 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   requireWorkspace()
   const column = columnParam(body?.column)
   if (!column) throw new HttpError(400, 'column is required: hold, todo, doing, review or passed')
-  const cards = body?.cards
+  const cards = cardRefsIn(body?.cards)
   const actor = await taskActor()
   const view = async (list: TaskCard[]): Promise<TaskView[] | TaskReorder> => {
     // Short: the agent chose the cards and their order; it only needs to know it worked.
@@ -2026,8 +2049,10 @@ const WAITS_PER_CALLER = 2
  * call waits itself, up to its longest (Settings → Advanced, #367), for a change since `since` (or since the call), driven by the board's
  * change events (no polling). A project agent waits only on its own project's cards.
  */
-route('POST', '/v1/tasks/wait', async ({ body }) => {
+route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const ws = requireWorkspace()
+  // Its cards named by key or `#12` too (#1219).
+  const body = raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as { cards?: unknown }).cards !== undefined ? { ...(raw as object), cards: cardRefsIn((raw as { cards: unknown }).cards) } : raw
   // The workspace as it is now: the call belongs to it, and stops (409) if it closes or the window opens another.
   const wsPath = ws.path
   const life = ws.lifetime

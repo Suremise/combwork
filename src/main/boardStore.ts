@@ -10,6 +10,7 @@ import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
+import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, numberCard } from './schema/keysStep'
 import { CARDS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -110,6 +111,13 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: CARDS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: moveCardsIntoTables
+  },
+  {
+    // #1219: project keys (#704), each card's number in its project (an existing card keeps its own), aliases.
+    version: 6,
+    name: KEYS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => moveKeys(db)
   }
 ]
 
@@ -284,6 +292,8 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   db.exec('BEGIN IMMEDIATE')
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
+    // Cards from before 1.0 keep their number in their project (#1219: #1061 is HI-1061).
+    db.exec("UPDATE cards SET project_number = number WHERE project_id IS NOT NULL AND project_id != ''") // i18n-ignore: SQL
     // Past every card file's number, a damaged one's too (it is kept, and may be mended): as the old allocator was.
     setMeta(db, 'next', String(Math.max(Number(board.next) || 1, highestName(names) + 1)))
     const ins = db.prepare('INSERT OR IGNORE INTO archive_batches (id, doc) VALUES (?, ?)') // i18n-ignore: SQL
@@ -939,12 +949,85 @@ export function archivedCounts(ws: WorkspaceService): { project: string; count: 
   return (db.prepare("SELECT coalesce(project, '') AS project, count(*) AS count FROM cards WHERE archived = 1 GROUP BY project").all() as { project: string; count: number }[]).map((r) => ({ project: String(r.project), count: Number(r.count) })) // i18n-ignore: SQL
 }
 
-/** Saves a card's document (inside boardWrite): its rows replaced by the document's (cardRows.ts). */
+/**
+ * Saves a card's document (inside boardWrite): its rows replaced by the document's (cardRows.ts), then its number in its
+ * project given or kept (#1219, keysStep.ts: a new card, or one moved to another project, takes that project's next).
+ */
 export function putCard(ws: WorkspaceService, n: number, doc: Record<string, unknown>): void {
   writeOp(ws, (b) => {
     if (boardTestHooks.failPut?.(n)) throw new Error(`SQLITE_FULL: database or disk is full (test, card #${n})`) // i18n-ignore: a test's stand-in for SQLite's error
-    writeCardRows(b.db.writer, decomposeCard(n, doc))
+    const was = cardPlace(b.db.writer, n)
+    const rows = decomposeCard(n, doc)
+    // Moving to another project: its number there comes after (numberCard); the one it had can't follow it in.
+    if (was && was.projectNumber !== null && (was.projectId || null) !== (rows.card.project_id || null)) b.db.writer.prepare('UPDATE cards SET project_number = NULL WHERE number = ?').run(n) // i18n-ignore: SQL
+    writeCardRows(b.db.writer, rows)
+    numberCard(b.db.writer, n, was)
   })
+}
+
+// ---------------------------------------------------------------------------
+// Project keys (#1219, #704): the queries are keysStep.ts's; these run them on the board's connections.
+// ---------------------------------------------------------------------------
+
+/** Each card's key (`HI-12`), by number: these cards, or all (none for one with no key: a workspace card, a 0.9 board). */
+export function cardKeys(ws: WorkspaceService, numbers?: readonly number[]): Map<number, string> {
+  return readSnapshot(ws, (b, db) => (b.legacy ? new Map() : keysOfCards(db, numbers)))
+}
+
+/** The card a key names (`HI-12`, any case, an old key or a card's old number in another project too), or null. */
+export function cardNamed(ws: WorkspaceService, key: string, number: number): number | null {
+  return readSnapshot(ws, (b, db) => (b.legacy ? null : cardOfKey(db, key, number)))
+}
+
+/** Every key the projects hold: current and old (aliases), each with its project's id. */
+export function projectKeys(ws: WorkspaceService): { key: string; projectId: string; current: boolean }[] {
+  return readSnapshot(ws, (b, db) => (b.legacy ? [] : keysHeld(db)))
+}
+
+/** Gives projects that have none their key (inside boardWrite): `pick` chooses each from the keys held so far. */
+export function addProjectKeys(ws: WorkspaceService, projects: { id: string; pick: (held: { key: string; projectId: string }[]) => string }[]): string[] {
+  return writeOp(ws, (b) => {
+    const db = b.db.writer
+    const have = currentKeys(db)
+    const added: string[] = []
+    for (const p of projects) {
+      if (have.has(p.id)) continue
+      const key = p.pick(keysHeld(db))
+      addKey(db, p.id, key)
+      have.set(p.id, key)
+      added.push(key)
+    }
+    return added
+  })
+}
+
+/**
+ * A card from before 1.0 that has just been given its project's id (#508's stamp, after the upgrade): its own number in
+ * its project, as every card from before 1.0 has (#1219), where no card there has it. Inside boardWrite.
+ */
+export function keepOwnNumber(ws: WorkspaceService, n: number): void {
+  writeOp(ws, (b) => {
+    const db = b.db.writer
+    const c = db.prepare('SELECT project_id FROM cards WHERE number = ?').get(n) as { project_id: string | null } | undefined // i18n-ignore: SQL
+    if (!c?.project_id || cardOfKeyIn(db, c.project_id, n) !== null) return
+    db.prepare('UPDATE cards SET project_number = ? WHERE number = ?').run(n, n) // i18n-ignore: SQL
+  })
+}
+const cardOfKeyIn = (db: Db['writer'], projectId: string, n: number): number | null =>
+  ((db.prepare('SELECT number FROM cards WHERE project_id = ? AND project_number = ? UNION SELECT card FROM card_aliases WHERE project_id = ? AND number = ?').get(projectId, n, projectId, n) as { number: number } | undefined)?.number ?? null) // i18n-ignore: SQL
+
+/** Makes `key` a project's key (inside boardWrite; checked by the caller), its key before kept as an alias. */
+export function setProjectKey(ws: WorkspaceService, projectId: string, key: string): void {
+  writeOp(ws, (b) => changeKey(b.db.writer, projectId, key))
+}
+
+/** Whether the window still has to say that projects have keys now (once, after the upgrade gave them), and saying it. */
+export function keysNoticeDue(ws: WorkspaceService): boolean {
+  const { b, db } = readConn(ws)
+  return !b.legacy && meta(db, 'keys.notice') === 'due'
+}
+export function keysNoticeSaid(ws: WorkspaceService): void {
+  writeOp(ws, (b) => setMeta(b.db.writer, 'keys.notice', 'said'))
 }
 
 /** Removes a card (inside boardWrite), and its child rows with it (ON DELETE CASCADE); false when there was none. */

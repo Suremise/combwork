@@ -40,7 +40,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, exportBoard, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, exportBoard, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -48,6 +48,7 @@ import * as mcp from './mcp'
 import * as notes from './notes'
 import * as removal from './projectRemoval'
 import * as tasks from './tasks'
+import { changeProjectKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
@@ -286,6 +287,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       .catch((e) => log.warn("giving the cards their projects' ids", e))
       .then(() => stampLaneProjects(ws).catch((e) => log.warn("giving the lanes their projects' ids", e)))
       .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
+      // Each project its key (#1219), and once after the upgrade gave them, a quiet notice saying so.
+      .then(() => keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e)))
+      .then(() => sayKeysOnce(ws))
       .then(() => tasks.archiveOldDone(ws))
       .catch((e) => log.warn('archiving old Done cards', e))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
@@ -297,7 +301,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     if (ws.path) startupStep(recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e)))
   }
   // Each read of the projects' ids (#514): their names by id, and what follows a rename, follow it.
-  WorkspaceService.onIdsRead = followNames
+  WorkspaceService.onIdsRead = (ws, seen) => {
+    followNames(ws, seen)
+    // A project added since (made, or a folder opened): its key (#1219).
+    void keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e))
+  }
   /** The window the current request came from. */
   const win = (): BrowserWindow => {
     const w = contextWorkspace()?.window
@@ -645,6 +653,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       workspace.setActive(p, active)
       return workspace.refresh()
     },
+    'project:keys': async () => {
+      const ws = workspace
+      const ids = await ws.projectIds()
+      const held = projectKeys(ws)
+      return [...ids.byId].flatMap(([id, projectPath]) => {
+        const mine = held.filter((k) => k.projectId === id)
+        const current = mine.find((k) => k.current)
+        return current ? [{ projectPath, key: current.key, aliases: mine.filter((k) => !k.current).map((k) => k.key) }] : []
+      })
+    },
+    'project:setKey': (p, key) => changeProjectKey(workspace, workspace.assertProject(p), key),
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       return workspace.updateProjectConfig(workspace.assertProject(p), patch)

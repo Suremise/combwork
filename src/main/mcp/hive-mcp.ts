@@ -98,6 +98,8 @@ const projectArg = {
   type: 'string',
   description: `Project name. Defaults to the current project${PROJECT ? ` ("${PROJECT}")` : ''}.`
 }
+/** A card (#1219: tools take a key string too, Darren 20 Oct): its number, or its key. */
+const cardArg = { type: ['number', 'string'], description: 'The card: its number (#12 is 12) or its key ("HI-12").' }
 const agentArg = { type: 'string', description: "The agent's name (e.g. \"Agent 2\") or id. Optional when the project has one agent." }
 const settingsArgs = {
   provider: { type: 'string', description: 'Provider id (hive_list_providers). Default: the project\'s default provider.' },
@@ -504,7 +506,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        number: { type: 'number', description: 'The card number (#12 is 12).' },
+        number: cardArg,
         comments: { type: 'number', description: 'Only the newest n comments.' },
         latestComment: { type: 'boolean', description: 'Only the newest comment.' },
         summary: { type: 'boolean', description: 'Each comment as its first line only.' },
@@ -548,7 +550,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        number: { type: 'number' },
+        number: cardArg,
         comment: { type: 'string', description: 'Added to its comments.' },
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: ASSISTANT ? 'The top (highest priority) or bottom of its column.' : "The top (highest priority) or bottom of your project's cards in its column." },
@@ -619,7 +621,7 @@ const tools: Tool[] = [
       'Start a card on an agent of its project: Hive moves it to doing, gives it to the agent and sends the card as its prompt. For any work on a card, also more on one in review or done: note says what to do now. agent: one that is stopped or idle; without it, Hive adds a new agent (worktree=true for its own git worktree, only if the user asked). Follow with hive_wait_for_agents. Replies with the agent that has it.',
     inputSchema: {
       type: 'object',
-      properties: { number: { type: 'number' }, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, worktree: { type: 'boolean' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, worktree: { type: 'boolean' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
       required: ['number']
     },
     run: async (a) => {

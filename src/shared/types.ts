@@ -644,6 +644,11 @@ export interface ContextProblem {
 export interface TaskCard {
   /** #number, unique in the workspace and never reused. */
   number: number
+  /**
+   * Its key (#1219, #704): its project's key and its number there, `HI-12`; absent for a card with none (a workspace
+   * card, a project with no key yet, a 0.9 board). Worked out when the card is read, never saved with it.
+   */
+  key?: string
   title: string
   /** Markdown. */
   description: string

@@ -8,6 +8,7 @@
 import type { MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel } from './tasks'
+import { cardName } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 
@@ -26,6 +27,8 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
 /** A card in a listing (GET /v1/tasks?view=short): what it is and where it stands, without its text. */
 export interface TaskRow {
   number: number
+  /** Its key (#1219: HI-12), when it has one. */
+  key?: string
   title: string
   column: TaskColumn
   project: string
@@ -45,6 +48,7 @@ export interface TaskRow {
 export function taskRow(v: TaskView): TaskRow {
   return {
     number: v.number,
+    ...(v.key ? { key: v.key } : {}),
     title: v.title,
     column: v.column,
     project: v.project,
@@ -78,6 +82,8 @@ export function newestComments<T extends { comments: unknown[] }>(v: T, n: numbe
 /** What a change did to a card (reply: "short"): the changes in words and where the card is now. */
 export interface TaskChange {
   number: number
+  /** Its key (#1219: HI-12), when it has one. */
+  key?: string
   title: string
   column: TaskColumn
   /** Its place in its column, 1 at the top; null when archived. */
@@ -95,15 +101,15 @@ export const ordinal = (n: number): string => {
 
 const place = (c: Pick<TaskChange, 'column' | 'position' | 'of'>): string => `${columnLabel(c.column)}${c.position ? ` (${ordinal(c.position)} of ${c.of})` : ''}`
 
-/** "#61 created in Todo (51st of 51) for alpha, given to Coder: Lean replies". */
+/** "HI-61 (#61) created in Todo (51st of 51) for alpha, given to Coder: Lean replies" (#61 for a card with no key). */
 export function createdText(c: TaskChange): string {
-  return `#${c.number} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}`
+  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}`
 }
 
-/** "#60 Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */
+/** "HI-60 (#60) Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */
 export function changedText(c: TaskChange): string {
   const what = c.changes.length ? c.changes.join('; ') : 'No change'
-  return `#${c.number} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
+  return `${cardName(c)} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
 }
 
 /** What a reorder did (reply: "short"). */
@@ -142,9 +148,9 @@ function agentText(a: TaskRow['agent']): string {
   return `${a.name} (${bits.join(', ')})`
 }
 
-/** "#35 Number settings · alpha · Coder (working) · bug · blocked: … · after #12 · reviewing: Codex · 3 comments". */
+/** "HI-35 (#35) Number settings · alpha · Coder (working) · bug · blocked: … · after #12 · reviewing: Codex · 3 comments". */
 export function taskRowText(r: TaskRow): string {
-  const bits = [`#${r.number} ${r.title}`]
+  const bits = [`${cardName(r)} ${r.title}`]
   if (r.project) bits.push(r.project)
   if (r.agent) bits.push(agentText(r.agent))
   if (r.labels.length) bits.push(r.labels.join(', '))

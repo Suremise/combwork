@@ -197,10 +197,13 @@ const prose = (seed, n) => {
   // The Assistant's inbox (#647; these calls use the workspace token, not an agent's): nothing new; an ack of an id that isn't its own says so, and nothing about it.
   check('the inbox with nothing new says so', measure('hive_inbox', tool('hive_inbox', {}, 'assistant'), 200) === 'Nothing new.', texts.hive_inbox)
   check("an ack of an id that isn't its own", measure('hive_inbox (ack)', tool('hive_inbox', { ack: ['m99'] }, 'assistant'), 100) === 'Nothing acked. Not in your inbox: m99.', texts['hive_inbox (ack)'])
+  // A card's line: its key with its number (#1219: "AL-12 (#77) …"), or its number for a card with no key.
+  const CARD = '([A-Z]{2,4}-\\d+ \\(#\\d+\\)|#\\d+)'
+  const isCardLine = (l) => new RegExp(`^${CARD} `).test(l)
   const all = measure('hive_list_tasks (all)', tool('hive_list_tasks', {}), 76 * 200)
-  check('the board: a line a card, no descriptions', all.split('\n').filter((l) => l.startsWith('#')).length === 76 && !all.includes('## Why'), all.slice(0, 300))
+  check('the board: a line a card, no descriptions', all.split('\n').filter(isCardLine).length === 76 && !all.includes('## Why'), all.slice(0, 300))
   const todoList = measure('hive_list_tasks (todo)', tool('hive_list_tasks', { column: 'todo' }), 50 * 200)
-  check('Todo is listed top first', todoList.startsWith('Todo (50, top first):\n#'), todoList.slice(0, 80))
+  check('Todo is listed top first', todoList.startsWith('Todo (50, top first):\n') && isCardLine(todoList.split('\n')[1]), todoList.slice(0, 80))
   measure('hive_list_tasks (alpha)', tool('hive_list_tasks', { project: 'alpha' }), 25 * 200)
   const full = tool('hive_list_tasks', { column: 'review', details: true }).text
   check('details=true still lists cards in full', JSON.parse(full).length === 10 && JSON.parse(full)[0].description.length > 1000)
@@ -216,9 +219,9 @@ const prose = (seed, n) => {
   const allSummary = JSON.parse(tool('hive_read_task', { number: target, summary: true }).text)
   check('…and every comment of a card read with it', allSummary.comments.length === read.comments.length && allSummary.comments.every((x, i) => x.text.length <= 300 && read.comments[i].text.includes(x.text.replace(/…$/, '').slice(0, 20))), JSON.stringify(allSummary.comments).slice(0, 300))
   const created = measure('hive_create_task', tool('hive_create_task', { title: 'Measured card', description: prose(500, 1800), labels: ['bug'] }), 400)
-  check('a new card: its number and place', /^#\d+ created in Todo \(51st of 51\) for alpha: Measured card$/.test(created), created)
+  check('a new card: its key, number and place', new RegExp(`^${CARD} created in Todo \\(51st of 51\\) for alpha: Measured card$`).test(created) && /^[A-Z]{2,4}-\d+ /.test(created), created)
   const commented = measure('hive_update_task (comment)', tool('hive_update_task', { number: target, comment: 'Looked at it.' }), 400)
-  check('a comment is confirmed with where the card is', new RegExp(`^#${target} .+: Commented\\. Now in Todo \\(\\d+\\w\\w of 51\\), \\w+\\.$`).test(commented), commented)
+  check('a comment is confirmed with where the card is', new RegExp(`^([A-Z]{2,4}-\\d+ \\(#${target}\\)|#${target}) .+: Commented\\. Now in Todo \\(\\d+\\w\\w of 51\\), \\w+\\.$`).test(commented), commented)
   const top = measure('hive_update_task (to top)', tool('hive_update_task', { number: target, position: 'top' }), 400)
   check('a move says where to', /: Moved to the top of Todo\. Now in Todo \(1st of 51\), \w+\.$/.test(top), top)
   const review = measure('hive_update_task (to review)', tool('hive_update_task', { number: target, column: 'review', comment: 'Done: see the branch.' }), 400)
@@ -227,11 +230,11 @@ const prose = (seed, n) => {
   check('a reorder confirms the new top', reordered === `Todo now starts #${todo[10]}, #${todo[5]}, #${todo[7]}; its other 47 cards keep their order below.`, reordered)
   const batched = measure('hive_update_tasks (3 cards)', tool('hive_update_tasks', { numbers: [todo[20], todo[21], todo[22]], labels: ['perf'] }), 400)
   const batchLines = batched.split('\n')
-  check('a batch confirms each card and its change', batchLines[0] === '3 cards changed:' && batchLines.length === 4 && batchLines.slice(1).every((l) => /^#\d+ .+: Labels: perf\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), batched)
+  check('a batch confirms each card and its change', batchLines[0] === '3 cards changed:' && batchLines.length === 4 && batchLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+ \(#\d+\)|#\d+) .+: Labels: perf\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), batched)
   // #1131: tagging says only the label added, not each card's labels.
   const tagged = measure('hive_update_tasks (3 cards, addLabels)', tool('hive_update_tasks', { numbers: [todo[20], todo[21], todo[22]], addLabels: ['0.9.4'] }), 400)
   const tagLines = tagged.split('\n')
-  check('tagging says only the label added', tagLines[0] === '3 cards changed:' && tagLines.length === 4 && tagLines.slice(1).every((l) => /^#\d+ .+: Labels: added 0\.9\.4\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), tagged)
+  check('tagging says only the label added', tagLines[0] === '3 cards changed:' && tagLines.length === 4 && tagLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+ \(#\d+\)|#\d+) .+: Labels: added 0\.9\.4\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), tagged)
   // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end.
   const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }), 400)
   check('a lane start: its pair, state, cards and id', /^Lane started: Coder \/ Tester \(alpha\) measured lane: active, on #\d+; .+; rounds 10, wait 6 h\. lane-[0-9a-f]+$/.test(laneStarted), laneStarted)
@@ -270,7 +273,7 @@ const prose = (seed, n) => {
   check('a watch begun: what it waits for, and to end the turn', watchingNow.startsWith(`Waiting for #${todo[0]}. End your turn now`), watchingNow)
   check('cancel ends it', measure('hive_wait_for_tasks (cancel)', tool('hive_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your card watch.', texts['hive_wait_for_tasks (cancel)'])
   const page2 = measure('hive_list_tasks (offset 70)', tool('hive_list_tasks', { offset: 70 }), 10 * 200)
-  check('offset carries on where a page stopped', /^Cards 71–\d+ of \d+\.$/m.test(page2) && page2.split('\n').filter((l) => l.startsWith('#')).length === all.split('\n').filter((l) => l.startsWith('#')).length + 1 - 70, page2.slice(0, 200))
+  check('offset carries on where a page stopped', /^Cards 71–\d+ of \d+\.$/m.test(page2) && page2.split('\n').filter(isCardLine).length === all.split('\n').filter(isCardLine).length + 1 - 70, page2.slice(0, 200))
 
   // The developer console (#636; offered while Settings → Agent API lets agents read it): with no console open a read
   // starts nothing and says so; with the window watching Coder, a turn reads as a line an event (its prompt hidden), one
