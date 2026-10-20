@@ -895,6 +895,7 @@ settle was an **open point** (OP-n), listed in §16.20 with a recommendation; Da
 | **[note §n]** | The shared note `URGENT/2026-10-19-workflow-layer.md`, section n (a proposal; binding only where a decision adopted it) |
 | **[#11nn c]** | A comment on that phase card (the Assistant's carry-overs, 19–20 Oct) |
 | **[P2]** | A gap the core spike (#1118, 20 Oct) found where the spec was wrong or silent, fixed with its evidence (the tests in `tests/workflow`) |
+| **[#1118 20 Oct]** | #1118: Darren agreed the spike's 7 points as recommended (what P3 adopts, the scenario list, decisions holding resubmission, the i18n exclusion, lanes at Done under Not checked, dependencies by containment, S10's conflicted rebase) |
 
 **Reading order for a phase's builder:** §16.1 (principles), §16.2 (the model), then your phase's sections (the table
 in §16.19), §16.18 (the scenarios your phase must pass) and §16.20 (open points that touch you).
@@ -1410,7 +1411,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `submit.checksPassed` | Every configured pre-review check has a passing, counted `CheckRan` on this exact revision (§16.13). | revisions | G3 / N3 |
 | `submit.identity` | Every commit of the change is authored with the project's identity. | authorship | G12 |
 | `submit.ownRunsStopped` | The agent has no runs or background processes it started still running (Progress, background tasks). | — | G13 |
-| `submit.decisionsReceived` | The builder has received every decision on the card (§16.4.6). | — | Any review |
+| `submit.decisionsReceived` | The builder has received every decision on the card (§16.4.6). | — | Any review, and **any ruleset with a merge step** (Hive merges, the agent merges), so a no-review card a decision returned to Active reads it before submitting again; all off stays free [#1118 20 Oct; P4 applies it, the spike holds it with review only] |
 | `review.notAuthor` | The reviewer isn't among the card's builders (Hive's records). | authorship | G2 / N2 (forced on with a reviewer) |
 | `review.decisionsReceived` | The reviewer has received every decision on the card (§16.4.6). | — | Any review |
 | `verdict.reviewing` | The reviewer started a review (`ReviewStarted`) of the submission it names. | — | Any reviewer agent |
@@ -1665,7 +1666,7 @@ Changing the kind later is the user's, recorded as an override.
 - **Your approvals carry over** by the same rule as passes (G4): a clean rebase by the queue keeps them.
 - **Dependencies and per-card targets** (OP-12): `start.dependenciesIntegrated` checks each `blockedBy` card in **the
   dependent card's target**: integrated into that target, or found in it by containment (merged into `release`,
-  then `release` into `main`); a card integrated only elsewhere still blocks [P2].
+  then `release` into `main`); a card integrated only elsewhere still blocks [P2, #1118 20 Oct].
 - **A new project before a preset is chosen:** the detected platform's all-off options (§16.6.4), the free flow of
   today, until the user picks a preset or sets an option.
 
@@ -2042,7 +2043,7 @@ lane ends; a Todo card not in a lane uses the current one.
 
 [P1, answering HB3's round 1 finding 4; OP-36] A lane's builder keeps one slot (OP-10), and the merge queue is
 asynchronous. So a lane's **next card starts only once the previous card is Done** (merged, or accepted; under Not
-checked, simply Done, which has no `Integrated` to wait for, and `endLaneIfDone` ends such a lane too [P2]); while it
+checked, simply Done, which has no `Integrated` to wait for, and `endLaneIfDone` ends such a lane too [P2, #1118 20 Oct]); while it
 waits in the queue the lane is paused ("waiting: AM-11 merging"). A card returned by the queue is therefore always
 picked up in a clean slot, by the builder that knows it, and the next card always starts from a target that contains
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
@@ -2289,7 +2290,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S7 | Approved → the user merges by hand in a terminal → observed `Integrated (outside)` → Done; the queue drops the entry; the lane counts it. | manual merge | Git |
 | S8 | Approved → the builder amends with new content → `Stale`; enqueue refused; the builder submits → Review. | rewritten approval | Git |
 | S9 | Approved → a clean rebase onto a newer target → `CarriedOver`; stays Approved; with "Exact revision only", Stale. | carry-over | Git |
-| S10 | Approved → a rebase that resolves conflicts so the change differs → `Stale`; one that conflicted commit by commit and whose resolution gives exactly the whole change's replay → `CarriedOver` (the change merged is byte for byte the one reviewed). A conflict in the whole change's replay never carries over (§16.3.2) [P2]. | carry-over | Git |
+| S10 | Approved → a rebase that resolves conflicts so the change differs → `Stale`; one that conflicted commit by commit and whose resolution gives exactly the whole change's replay → `CarriedOver` (the change merged is byte for byte the one reviewed). A conflict in the whole change's replay never carries over (§16.3.2) [P2, #1118 20 Oct]. | carry-over | Git |
 | S11 | All off; three agents in the project folder on one branch → they commit with trailers; cards move freely; facts recorded; G16 warns when one commit includes another agent's file; no refusal. | all off | Git |
 | S12 | A card blocked by AM-11 (Approved, not merged) → start → refused `start.dependenciesIntegrated`. | dependencies | Git |
 | S13 | Team. A change imports a package missing from `package.json`, while the queue's warm worktree still has it installed from earlier → the queue sees the manifest differs from its last install and installs clean (`npm ci`) → the checks fail; the target doesn't move. | #187 | Git |
@@ -2347,7 +2348,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 
 | Phase | Card | Builds (sections) | Ends with |
 |---|---|---|---|
-| P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59, S61, S62 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. **Built** (20 Oct): every scenario of this row passes in `tests/workflow` (ARCHITECTURE "Workflow layer" says where the code is and what it stands in for); the spec fixes it found are marked **[P2]**. |
+| P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59, S61, S62 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. **Built** (20 Oct): every scenario of this row passes in `tests/workflow` (ARCHITECTURE "Workflow layer" says where the code is and what it stands in for); the spec fixes it found are marked **[P2]**. **What P3 adopts** [#1118 20 Oct]: `src/shared/workflow` and the platform adapters (`src/main/platform`) as they are; `runtime.ts`, `reconcile.ts`, `mergeQueue.ts` and `checks.ts` as P4's and P5's starting point; the fact store replaced by hive.db tables written inside `boardWrite` (P3). This row's list (43 scenarios) is the source, not the 28 the card's brief named. |
 | P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
 | P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_change_setting`; the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
 | P5 Hive merges | #1121 | The merge queue (§16.9), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |

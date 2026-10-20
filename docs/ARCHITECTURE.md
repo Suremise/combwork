@@ -224,7 +224,9 @@ fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as mes
 `src/main/platform/` (`adapter.ts`, `gitPlatform.ts` and `nonePlatform.ts` behind it, `git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
 a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table; `runtime.ts`;
 `reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
-scenarios on real temporary repositories. Whether it becomes P3's base or is rewritten is Darren's decision on #1118;
+scenarios on real temporary repositories. **Darren decided (#1118, 20 Oct)** that it is P3's base in part: `shared/workflow` and
+the platform adapters as they are, the runtime, reconciliation, queue and checks as P4's and P5's starting point, and
+the fact store replaced by hive.db tables;
 where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), "nothing
 changed during a run" read from stat snapshots and the HEAD reflog (P3's watcher), card folders as plain worktrees
 (P7's slots), no repository lock or signing pauses in the queue (P5), refusal text in English only (P4 translates).
