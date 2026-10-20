@@ -194,15 +194,18 @@ export async function contains(repo: string, target: string, c: { base: string; 
   }
   const key = c.key !== undefined ? c.key : await candidateKey(repo, c.base, c.revision)
   if (isUnknown(key)) return key
-  // Commits on the target since the change's base (bounded), newest first, each tried as a squash of the change.
-  const list = await git(repo, ['rev-list', '--parents', '--max-count=500', `${c.base}..${t}`])
-  if (!list.ok) return unknown(`the commits on ${target}`)
-  for (const line of lines(list.out)) {
-    const [commit, parent, ...more] = line.split(' ')
-    if (!parent || more.length) continue // the first commit, or a merge commit (its first parent's merge is covered above)
-    const k = await candidateKey(repo, parent, commit)
-    if (isUnknown(k)) return k
-    if (k !== key) continue
+  // The target's commits since the change's base (bounded, merges left out: a merge's change is covered above), keyed in
+  // one pass (`log -p -U0 | patch-id`); only those with the change's key are replayed, as a squash of it.
+  const log = await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--binary', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
+  if (!log.ok) return unknown(`the commits on ${target}`)
+  const ids = await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, log.out)
+  if (!ids.ok) return unknown(`the commits on ${target}`)
+  for (const line of lines(ids.out)) {
+    const [k, commit] = line.split(/\s+/)
+    if (!commit || k !== key) continue
+    const parent = await resolve(repo, `${commit}^`)
+    if (isUnknown(parent)) return parent
+    if (!parent) continue
     const replayed = await replayTree(repo, c.base, parent, c.revision)
     const tree = await treeOf(repo, commit)
     if (isUnknown(replayed) || isUnknown(tree)) return unknown(`whether ${commit.slice(0, 7)} holds the change`)
@@ -214,6 +217,12 @@ export async function contains(repo: string, target: string, c: { base: string; 
   if (isUnknown(whole) || isUnknown(tt)) return unknown(`whether ${target} holds the change`)
   if (whole && whole === tt) return { method: 'sameTree' }
   return null
+}
+
+/** A line's own commits since a base, newest first: its first-parent history (a merge brings others' in beside it). */
+export async function firstParents(repo: string, base: string, headRev: string): Promise<Maybe<string[]>> {
+  const r = await git(repo, ['rev-list', '--first-parent', `${base}..${headRev}`])
+  return r.ok ? lines(r.out) : unknown(`the commits of ${headRev.slice(0, 7)} since ${base.slice(0, 7)}`)
 }
 
 /** The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. */

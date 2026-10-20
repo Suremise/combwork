@@ -42,6 +42,8 @@ export interface StartedData {
   cardKind: CardKind
   /** None: the card's paths and their hashes at the start. */
   manifest?: Manifest
+  /** None: every deliverable's hash at the start, which unclaimed changes are found against (§16.4.2). */
+  deliverables?: Manifest
   /** `Adopted` only: the column it was in at the upgrade (§16.17). */
   adoptedFrom?: 'doing' | 'review' | 'passed'
   passedBefore1_0?: boolean
@@ -208,6 +210,8 @@ export interface CardState {
   /** Every agent recorded working the card (Started, Submitted): no-self-review reads these, never commit authors. */
   builders: string[]
   overrides: FactData['Override'][]
+  /** The user (or the Assistant) moved the latest submission past its review and approvals, as a recorded override. */
+  approvalOverridden: boolean
   /** The last observed head of the card's folder. */
   head: string | null
   /** The last observed HeadMoved's seq this cycle (what the next observation follows), else the cycle's start. */
@@ -240,6 +244,7 @@ export const emptyState = (): CardState => ({
   rounds: 0,
   builders: [],
   overrides: [],
+  approvalOverridden: false,
   head: null,
   lastHeadFact: 0,
   attributed: [],
@@ -278,6 +283,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.latest = sub
         s.approved = { revision: d.revision, base: d.base }
         s.stale = null
+        // A new submission retires the requests bound to an earlier one: they can't approve this one.
+        s.requests = s.requests.filter((r) => r.submission === undefined)
+        s.approvalOverridden = false
         if (by) s.builders = addOnce(s.builders, by)
         break
       }
@@ -336,8 +344,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'IntegrationStarted': {
         const d = f.data as FactData['IntegrationStarted']
+        // A late fact can't revive an entry that has its outcome (cancelled, failed, integrated).
         const e = s.entries.find((x) => x.id === d.entry)
-        if (e) Object.assign(e, { state: 'started', started: d })
+        if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'started', started: d })
         break
       }
       case 'IntegrationPhase': {
@@ -348,7 +357,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'IntegrationFailed': {
         const d = f.data as FactData['IntegrationFailed']
         const e = s.entries.find((x) => x.id === d.entry)
-        if (e) Object.assign(e, { state: 'failed', failure: d })
+        if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'failed', failure: d })
         break
       }
       case 'Integrated': {
@@ -372,9 +381,12 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Moved':
         s.stage = (f.data as FactData['Moved']).to
         break
-      case 'Override':
-        s.overrides.push(f.data as FactData['Override'])
+      case 'Override': {
+        const d = f.data as FactData['Override']
+        s.overrides.push(d)
+        if (s.latest && d.rules.includes('integrate.approved')) s.approvalOverridden = true
         break
+      }
       case 'Blocked':
         s.blocked = (f.data as FactData['Blocked']).reason
         break

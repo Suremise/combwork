@@ -65,6 +65,8 @@ export function okBeforeApplies(r: Ruleset, labels: string[]): boolean {
  */
 export function notApproved(s: CardState, r: Ruleset, labels: string[]): { missing: 'stale' | 'passes' | 'userOk'; n?: number; q?: number } | null {
   if (s.stale) return { missing: 'stale' }
+  // The user moved it past review across the rules (an override, recorded): it counts as approved.
+  if (s.approvalOverridden) return null
   const o = r.options
   if (reviewerAgent(o.review)) {
     const n = passingReviewers(s).length
@@ -164,6 +166,11 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     if (isUnknownAnswer(i.contained)) return unknownRefusal(i, 'done.contained', i.contained)
     return i.contained ? null : { rule: 'done.contained', values: { card: i.card.key, revision: short(i.revision), target: i.target ?? '' } }
   }
+}
+
+/** Every guard that refuses, in the ruleset's order: what a move across rules would skip (§16.8.4). */
+export function evaluateAll(ids: readonly GuardId[], inputs: GuardInputs): GuardRefusal[] {
+  return ids.map((id) => GUARD_FNS[id](inputs)).filter((r): r is GuardRefusal => !!r)
 }
 
 /** Runs guards in the ruleset's order: the first refusal, or null when all hold. */

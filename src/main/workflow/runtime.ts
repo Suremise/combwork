@@ -7,18 +7,20 @@
 // P2 spike (#1118): the runtime over the spike's own store (factStore.ts), not wired into the app: no IPC, no Agent API
 // route, no boardWrite. P4 puts it behind `tasks.ts` → `boardWrite` and the intents' routes.
 
-import { join } from 'path'
 import { agentOf, approvedByUser, foldCard, openEntry, passingReviewers, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
-import { evaluate, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
+import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, newLane, nextCard, type LaneList } from '../../shared/workflow/laneList'
-import * as G from '../platform/git'
+import type { FinishInputs, PlatformAdapter } from '../platform/adapter'
+import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
+import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, type Maybe } from '../platform/types'
+import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 
 export interface Moved {
@@ -38,6 +40,13 @@ export interface Ask {
 }
 
 export type Reply = Moved | Refusal
+
+/** The user's (or the Assistant's) drag running an intent: asking first, or across the rules that refuse, with a reason. */
+export interface Drag {
+  by: 'user' | 'assistant'
+  reason: string
+  ask: boolean
+}
 
 export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'object' && (r as Refusal).refused === true
 
@@ -80,14 +89,6 @@ export function slugOf(title: string): string {
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
 
-/** What a finish needs from the platform, gathered before the transaction. */
-interface FinishInputs {
-  /** Committed is done: the revision on the folder's line. */
-  contained?: Maybe<boolean>
-  /** None: the card's paths' revision now. */
-  noneRevision?: Maybe<string>
-}
-
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
   readonly written: Fact[] = []
@@ -129,10 +130,23 @@ export class Write {
 export class Workflow {
   readonly store: FactStore
   readonly none: NoneAdapter
+  /** The platform adapters (§16.3.1): the runtime asks them, and never switches on a platform id. */
+  private platforms: Record<PlatformId, PlatformAdapter>
 
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
     this.none = new NoneAdapter(cfg.project, cfg.options().excluded)
+    this.platforms = { git: new GitPlatform(this), none: new NonePlatform(this, this.none) }
+  }
+
+  /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */
+  platform(o: WorkflowOptions): PlatformAdapter {
+    return this.platforms[o.platform]
+  }
+
+  /** A card's platform adapter, by the ruleset it works under. */
+  platformOf(card: CardRecord, s: CardState = this.state(card)): PlatformAdapter {
+    return this.platform(this.rulesetOf(card, s).options)
   }
 
   // --- Cards, rulesets, folders.
@@ -186,10 +200,6 @@ export class Workflow {
 
   ownLine = (s: CardState): boolean => !!s.started && s.started.folder !== 'project'
 
-  private async targetOf(card: CardRecord, o: WorkflowOptions): Promise<Maybe<string>> {
-    return card.target || o.target || (await G.defaultBranch(this.cfg.project))
-  }
-
   // --- Writing.
 
   /** One write for a card, in one transaction; then the actions run (unless left pending). */
@@ -209,12 +219,24 @@ export class Workflow {
   }
 
   private notFrom(card: CardRecord, actor: Actor, s: CardState, move: string): Promise<Refusal> {
-    return this.refuse(card, actor, move, { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move, moves: this.movesFrom(s.stage).join(', ') } })
+    return this.refuse(card, actor, move, { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move, moves: this.movesFrom(s.stage, this.rulesetOf(card, s), s).join(', ') } })
   }
 
-  movesFrom(stage: StageId): string[] {
-    const m: Record<StageId, string[]> = { hold: [], todo: ['start'], active: ['submit', 'put back'], review: ['start review', 'verdict'], approved: ['submit', 'report merge'], merging: [], done: [] }
-    return m[stage]
+  /** The intents an agent can use from a stage under a ruleset (§16.7.2's table): what a refusal offers as the next step. */
+  movesFrom(stage: StageId, r?: Ruleset, s?: CardState): string[] {
+    const o = r?.options
+    switch (stage) {
+      case 'todo':
+        return ['start']
+      case 'active':
+        return ['submit', 'put back']
+      case 'review':
+        return !o || reviewerAgent(o.review) ? ['start review', 'verdict'] : []
+      case 'approved':
+        return [...(s?.stale ? ['submit'] : []), ...(!o || o.finish === 'agentMerges' || o.finish === 'notChecked' ? ['report merge'] : [])]
+      default:
+        return []
+    }
   }
 
   private ok(card: CardRecord, from: StageId, to: StageId, data?: Record<string, unknown>, warnings?: string[]): Moved {
@@ -223,15 +245,35 @@ export class Workflow {
 
   /** Guards evaluated inside the transaction, on the card's facts as they are now. */
   private check(w: Write, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
+  }
+
+  private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
+    return (w.ruleset?.guards[move] ?? []).filter((id) => !only || only(id))
+  }
+
+  private guardInputs(w: Write, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>): GuardInputs {
     const s = w.state()
-    const ids = (w.ruleset?.guards[move] ?? []).filter((id) => !only || only(id))
-    return evaluate(ids, { card: { key: w.card.key, kind: w.card.kind, labels: w.card.labels, blocked: s.blocked }, state: s, ruleset: w.ruleset!, ...inputs })
+    return { card: { key: w.card.key, kind: w.card.kind, labels: w.card.labels, blocked: s.blocked }, state: s, ruleset: w.ruleset!, ...inputs }
+  }
+
+  /**
+   * An intent's guards for the user's (or the Assistant's) drag (§16.8.4): nothing refuses → it just moves; else, asking,
+   * the rules that refuse (`move.needsOverride`, nothing written); across them, an `Override` naming exactly those.
+   */
+  private across(w: Write, move: MoveId, to: StageId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, drag: Drag, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    const failing = evaluateAll(this.guardIds(w, move, only), this.guardInputs(w, inputs))
+    if (!failing.length) return null
+    const rules = [...new Set(failing.map((f) => f.rule))]
+    if (drag.ask) return { rule: 'move.needsOverride', values: { card: w.card.key, stage: to, rules: rules.join(', ') } }
+    w.fact('Override', { rules, move: `${w.current}→${to}`, by: drag.by, reason: drag.reason })
+    return null
   }
 
   // --- Intents and moves (§16.7.2).
 
   /** start: Todo → Active, the card's line and base recorded, its folder prepared (slots). */
-  async start(ref: unknown, actor: Actor, opts: { builder?: string; override?: FactData['Override'] } = {}): Promise<Reply> {
+  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -239,46 +281,25 @@ export class Workflow {
     const r = this.rulesetOf(card, s)
     const o = r.options
     const builder = agentOf(actor) ?? opts.builder ?? 'user'
-    // Dependencies Done by facts, in this card's target (§16.7.4).
-    const waitingFor = card.blockedBy.filter((id) => !this.doneByFacts(id)).map((id) => this.store.card(id).key)
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
-    let data: FactData['Started']
-    if (o.platform === 'none') {
-      const paths = card.paths ?? []
-      const rev = this.none.revision(paths)
-      if (isUnknown(rev)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: rev.what, rule: 'start' } })
-      const all = this.none.deliverables()
-      if (!isUnknown(all)) {
-        const m = this.none.manifest(all)
-        if (!isUnknown(m)) this.store.setMeta(`deliverables:${card.id}`, JSON.stringify(m))
-      }
-      data = { folder: 'project', line: null, base: rev.revision, target: null, builder, cardKind: card.kind, manifest: rev.manifest }
-    } else if (o.folder === 'slots') {
-      const target = await this.targetOf(card, o)
-      if (isUnknown(target)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: target.what, rule: 'start' } })
-      const base = await G.lineHead(this.cfg.project, target)
-      if (isUnknown(base) || !base) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: `the head of ${target}`, rule: 'start' } })
-      const slug = slugOf(card.title)
-      const line = `hive/${this.cfg.projectKey}/${card.key}${slug ? `-${slug}` : ''}`
-      data = { folder: join(this.cfg.slots, card.key), line, base, target, builder, cardKind: card.kind }
-    } else {
-      const line = await G.branch(this.cfg.project)
-      const base = await G.head(this.cfg.project)
-      if (isUnknown(line) || isUnknown(base)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: isUnknown(base) ? base.what : 'the folder\'s branch', rule: 'start' } })
-      // Committed is done: the target is the line the folder works on.
-      const target = o.finish === 'committed' ? line : card.target || o.target || line
-      data = { folder: 'project', line, base, target, builder, cardKind: card.kind }
-    }
+    const plan = await this.platform(o).start(card, o)
+    if (isUnknown(plan)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: plan.what, rule: 'start' } })
+    const data: FactData['Started'] = { ...plan, builder, cardKind: card.kind }
+    // Dependencies Done by facts, in this card's target (§16.7.4).
+    const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     this.store.saveRuleset(r)
     await this.cfg.hooks?.beforeWrite?.('start')
     const out = await this.write(card, r, actor, (w) => {
+      const changed = this.stillAt(w, s, 'start')
+      if (changed) return changed
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
-      const g = opts.override ? null : this.check(w, 'start', { agent: agentOf(actor), waitingFor, slotFree: true })
+      const ins = { agent: agentOf(actor), waitingFor, slotFree: true }
+      const g = opts.drag ? this.across(w, 'start', 'active', ins, opts.drag) : this.check(w, 'start', ins)
       if (g) return g
-      if (opts.override) w.fact('Override', opts.override)
+      const overridden = w.written.some((f) => f.kind === 'Override')
       w.fact('Started', data)
-      w.move('active', opts.override ? 'override' : actor === 'user' ? 'user' : 'intent')
+      w.move('active', overridden ? 'override' : actor === 'user' ? 'user' : 'intent')
       if (data.folder !== 'project') w.action('prepareSlot', { folder: data.folder, line: data.line, base: data.base })
       return null
     })
@@ -292,11 +313,26 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     if (s.stage !== 'active') return this.notFrom(card, actor, s, 'put back')
-    await this.write(card, this.rulesetOf(card, s), actor, (w) => {
+    const out = await this.write(card, this.rulesetOf(card, s), actor, (w) => {
+      const changed = this.stillAt(w, s, 'put back')
+      if (changed) return changed
       w.move('todo', 'intent')
       w.action('releaseSlot', {})
+      return null
     })
+    if (out) return this.refuse(card, actor, 'put back', out)
     return this.ok(card, 'active', 'todo')
+  }
+
+  /**
+   * The card changed between the reads an intent gathered and its transaction (another intent or move won the race):
+   * its stage, cycle, latest submission or queue entries differ. Refused from where it is now, never applied to a card
+   * that moved on (§16.7, ARCHITECTURE "The one path").
+   */
+  stillAt(w: Write, s: CardState, move: string): GuardRefusal | null {
+    const now = w.state()
+    if (now.stage === s.stage && now.cycle === s.cycle && (now.latest?.id ?? 0) === (s.latest?.id ?? 0) && now.entries.length === s.entries.length) return null
+    return { rule: 'move.notFromHere', values: { card: w.card.key, stage: now.stage, move, moves: this.movesFrom(now.stage).join(', ') } }
   }
 
   /** Is a card Done by facts: integrated, or accepted (§16.5.3 `start.dependenciesIntegrated`), not just Approved. */
@@ -305,31 +341,51 @@ export class Workflow {
     return s.stage === 'done' && (!!s.integrated || !!s.accepted)
   }
 
-  /** The card's revision now: its folder's head (own line), its newest attributed commit (shared folder), its paths' hash (None). */
-  async revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {
-    if (card.kind === 'no-code') return null
-    const o = this.rulesetOf(card, s).options
-    if (o.platform === 'none') {
-      const r = this.none.revision(card.paths ?? [])
-      return isUnknown(r) ? r : r.revision
+  /**
+   * A lane's card is finished once it is Done, however it got there (Not checked finishes with no `Integrated`): the
+   * lane goes on. Dependencies need more (`waitingFor`).
+   */
+  laneDone(id: number): boolean {
+    return this.state(id).stage === 'done'
+  }
+
+  /**
+   * The cards a card waits for that aren't Done by facts **in its target** (§16.7.4): accepted, or with their change in
+   * that target now, by containment of their stored endpoints (merged into a release branch and then into main counts;
+   * a target reset since doesn't). A Done card with no `Integrated` (Not checked, an override) counts once its change is
+   * found there: verified, never assumed.
+   */
+  async waitingFor(card: CardRecord, target: string | null, o: WorkflowOptions): Promise<Maybe<string[]>> {
+    const out: string[] = []
+    for (const id of card.blockedBy) {
+      const d = this.state(id)
+      const key = this.store.card(id).key
+      if (d.stage !== 'done') {
+        out.push(key)
+        continue
+      }
+      if (d.accepted) continue
+      const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
+      const base = d.approved?.base ?? d.latest?.base ?? d.started?.base
+      if (!revision || !base || !target || revision === base) {
+        out.push(key)
+        continue
+      }
+      const c = await this.platform(o).contains(target, { base, revision, key: d.latest?.key })
+      if (isUnknown(c)) return c
+      if (!c) out.push(key)
     }
-    if (this.ownLine(s)) return G.head(this.folderOf(s))
-    return s.attributed.at(-1) ?? s.started?.base ?? null
+    return out
+  }
+
+  /** The card's revision now (its platform's answer). */
+  revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {
+    return this.platformOf(card, s).revisionNow(card, s)
   }
 
   /** What a finish needs from the platform (gathered before the transaction). */
-  async finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
-    if (card.kind === 'no-code' || !revision) return {}
-    if (r.options.platform === 'none') {
-      const now = this.none.revision(card.paths ?? [])
-      return { noneRevision: isUnknown(now) ? now : now.revision }
-    }
-    if (r.options.finish === 'committed' && s.started?.line) {
-      const lh = await G.lineHead(this.cfg.project, s.started.line)
-      if (isUnknown(lh)) return { contained: lh }
-      return { contained: lh ? await G.isAncestor(this.cfg.project, revision, lh) : false }
-    }
-    return {}
+  finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
+    return this.platform(r.options).finishInputs(card, s, r.options, revision)
   }
 
   /** Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. */
@@ -371,15 +427,15 @@ export class Workflow {
       w.action('endLaneIfDone', {})
       return
     }
-    if (o.platform === 'none') {
-      // Accepted only if the card's paths still hash to the approved revision (§16.3.3).
+    if (o.finish === 'accept') {
+      // Accepted only if the card's work still has the approved revision (None: its paths still hash to it, §16.3.3).
       const approved = s.approved?.revision ?? null
-      if (!isUnknown(fin.noneRevision) && fin.noneRevision === approved) {
+      if (!isUnknown(fin.currentRevision) && fin.currentRevision === approved) {
         w.fact('Accepted', { revision: approved! })
         w.move('done', 'derived')
         w.action('endLaneIfDone', {})
       } else {
-        w.fact('Stale', { approved, current: isUnknown(fin.noneRevision) ? null : (fin.noneRevision ?? null), why: 'change' })
+        w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' })
         w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
         this.wake(w, s.started?.builder, 'stale: your paths changed since the pass, submit again')
       }
@@ -422,7 +478,7 @@ export class Workflow {
    * submit (§16.8.1): the card's revision with its endpoints, keys and files → Review, or Finish without review, or
    * back into the merge queue after a transient failure (`requeue.allowed`).
    */
-  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; override?: FactData['Override'] }): Promise<Reply> {
+  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag }): Promise<Reply> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
     let card = card0
@@ -436,12 +492,13 @@ export class Workflow {
 
     // After a queue failure: the same approved, unstale revision goes straight back into the queue (no review, no round).
     const last = s.entries.at(-1)
-    if (from === 'active' && o.finish === 'hiveMerges' && card.kind === 'code' && last && (last.state === 'failed' || last.state === 'cancelled') && !s.stale) {
+    // (A decision's cancel isn't a queue failure: the builder resubmits as usual, with a note for the same revision.)
+    if (from === 'active' && o.finish === 'hiveMerges' && card.kind === 'code' && last && (last.state === 'failed' || (last.state === 'cancelled' && last.cancelled !== 'decision')) && !s.stale) {
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
         const g = await this.write(card, r, actor, (w) => {
-          const bad = this.check(w, 'requeue', { agent, revision: now })
+          const bad = this.stillAt(w, s, 'submit') ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
           this.enqueue(w, 'transient')
           return null
@@ -451,7 +508,7 @@ export class Workflow {
     }
     if (!(from === 'active' || ((from === 'approved' || from === 'review') && s.stale) || from === 'review')) return this.notFrom(card, actor, s, 'submit')
 
-    // The submission: revision, fixed endpoints, key and files.
+    // The submission's platform side: revision, fixed endpoints, key and files, and the guards' platform inputs.
     let revision: string | null = null
     let base: string | null = null
     let key: string | null = null
@@ -460,50 +517,15 @@ export class Workflow {
     let paths: string[] | undefined
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder }
     const warnings: string[] = []
-    if (card.kind === 'code' && o.platform === 'none') {
-      if (args.paths) card = this.store.updateCard(card.id, { paths: args.paths })
-      paths = card.paths ?? this.prefill(card)
-      if (!card.paths) card = this.store.updateCard(card.id, { paths })
-      const rev = this.none.revision(paths)
-      if (isUnknown(rev)) return this.refuse(card, actor, 'submit', { rule: 'platform.unknown', values: { card: card.key, what: rev.what, rule: 'submit' } })
-      revision = rev.revision
-      base = s.started.base
-      files = NoneAdapter.diff(s.started.manifest ?? {}, rev.manifest)
-      key = revision
-      if (!files.length && revision === s.started.base) return this.refuse(card, actor, 'submit', { rule: 'submit.empty', values: { card: card.key } })
-    } else if (card.kind === 'code') {
-      if (this.ownLine(s)) {
-        const h = await G.head(folder)
-        if (isUnknown(h)) return this.refuse(card, actor, 'submit', { rule: 'platform.unknown', values: { card: card.key, what: h.what, rule: 'submit' } })
-        if (args.revision && args.revision !== h) return this.refuse(card, actor, 'submit', { rule: 'check.revisionMismatch', values: { revision: args.revision.slice(0, 7) } })
-        revision = h
-        const th = await G.lineHead(this.cfg.project, s.started.target ?? '')
-        const mb = !isUnknown(th) && th ? await G.mergeBase(this.cfg.project, th, h) : th
-        if (isUnknown(mb) || !mb) return this.refuse(card, actor, 'submit', { rule: 'platform.unknown', values: { card: card.key, what: 'the merge base with the target', rule: 'submit' } })
-        base = mb
-      } else {
-        // A shared folder: the card's change is its own attributed commits (§16.3.2).
-        const { reconcile } = await import('./reconcile')
-        await reconcile(this, card)
-        s = this.state(card)
-        commits = s.attributed
-        revision = commits.at(-1) ?? s.started!.base
-        base = s.started!.base
-      }
-      if (revision && base) {
-        const c = commits && commits.length ? await this.ownChange(base, commits) : await G.change(this.cfg.project, base, revision)
-        if (isUnknown(c)) return this.refuse(card, actor, 'submit', { rule: 'platform.unknown', values: { card: card.key, what: c.what, rule: 'submit' } })
-        files = c.files
-        key = c.key
-      }
-      if (!revision || revision === base || !files.length) return this.refuse(card, actor, 'submit', { rule: 'submit.empty', values: { card: card.key } })
-      // Gathered for the guards the ruleset holds.
-      const guards = r.guards.submit
-      if (guards.includes('submit.clean')) inputs.dirty = await G.dirty(folder, this.ownLine(s) || !agent || !this.cfg.locksOf ? undefined : this.cfg.locksOf(agent))
-      if (guards.includes('submit.ready')) inputs.conflicts = []
-      if (guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
-      if (guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
-      if (o.sharedFolderWarning && !this.ownLine(s)) warnings.push(...this.othersFiles(card, s, files.map((f) => f.path)))
+    if (card.kind === 'code') {
+      const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, paths: args.paths, agent, guards: r.guards.submit })
+      if (!plan.ok) return this.refuse(card, actor, 'submit', plan.refusal)
+      ;({ revision, base, key, files, commits, paths } = plan)
+      Object.assign(inputs, plan.inputs)
+      warnings.push(...plan.warnings)
+      // The adapter may have reconciled (a shared folder's attribution) or updated the card (None's paths).
+      card = this.store.card(card.id)
+      s = this.state(card)
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
@@ -512,17 +534,21 @@ export class Workflow {
     // The same revision again: a new submission only with a note (§16.8.1).
     const earlier = card.kind === 'code' ? s.submissions.find((x) => x.revision === revision) : undefined
     const waiting = (from === 'review' || from === 'approved') && !s.stale
-    if (earlier && !waiting && !args.note && !args.override) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: revision!.slice(0, 7) } })
+    if (earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: revision!.slice(0, 7) } })
 
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     await this.cfg.hooks?.beforeWrite?.('submit')
+    const sAtGather = s
     const out = await this.write(card, r, actor, (w) => {
+      const changed = this.stillAt(w, sAtGather, 'submit')
+      if (changed) return changed
       const noCode = card.kind === 'no-code'
       const noCodeGuards: GuardId[] = ['submit.notDuplicate', 'submit.ownRunsStopped', 'submit.decisionsReceived']
-      const bad = args.override ? null : this.check(w, 'submit', inputs, noCode ? (id) => noCodeGuards.includes(id) : undefined)
+      // Every refusal before anything is written: an override never commits without its move.
+      if (from === 'review' && !s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, r).join(', ') } } as GuardRefusal
+      const only = noCode ? (id: GuardId) => noCodeGuards.includes(id) : undefined
+      const bad = args.drag ? this.across(w, 'submit', 'review', inputs, args.drag, only) : this.check(w, 'submit', inputs, only)
       if (bad) return bad
-      if (args.override) w.fact('Override', args.override)
-      if (from === 'review' && !s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from).join(', ') } } as GuardRefusal
       const st = w.state()
       const sub = w.fact('Submitted', {
         revision,
@@ -539,12 +565,12 @@ export class Workflow {
         ...(commits ? { commits } : {}),
         ...(warnings.length ? { warnings } : {})
       })
-      if (revision && o.platform === 'git') w.action('pin', { ref: `refs/hive/cards/${card.key.toLowerCase()}/${st.submissions.length + 1}`, revision, submission: sub.seq })
+      if (revision) w.action('pin', { ref: `refs/hive/cards/${card.key.toLowerCase()}/${st.submissions.length + 1}`, revision, submission: sub.seq })
       if (o.review === 'none') {
         this.finish(w, fin)
         return null
       }
-      w.move('review', args.override ? 'override' : 'intent')
+      w.move('review', w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
       w.action('prepareReviewCopy', { revision })
       if (reviewerAgent(o.review)) this.wake(w, this.reviewerOf(card), `${card.key} is in Review`)
       else this.askUser(w, 'approve', 'review', `${card.key} waits for your review`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
@@ -552,52 +578,6 @@ export class Workflow {
     })
     if (out) return this.refuse(card, actor, 'submit', out)
     return this.ok(card, from, this.state(card).stage, { revision, base, files: files.length }, warnings)
-  }
-
-  /** The combined change of a shared-folder card's own commits, applied in order (§16.3.2). */
-  private async ownChange(base: string, commits: string[]): Promise<Maybe<{ files: FactData['Submitted']['files']; key: string | null }>> {
-    const files = new Map<string, string>()
-    const keys: string[] = []
-    for (const c of commits) {
-      const parent = await G.resolve(this.cfg.project, `${c}^`)
-      if (isUnknown(parent)) return parent
-      const ch = await G.change(this.cfg.project, parent ?? base, c)
-      if (isUnknown(ch)) return ch
-      for (const f of ch.files) files.set(f.path, f.status)
-      if (ch.key) keys.push(ch.key)
-    }
-    return { files: [...files].map(([path, status]) => ({ path, status })), key: keys.length ? keys.join('+') : null }
-  }
-
-  /** A commit attributed to no card, made in the card's folder since it started, when another unfinished card shares it. */
-  private untrailered(card: CardRecord, s: CardState): string | null {
-    const others = this.store.cards().filter((c) => c.id !== card.id && ['active', 'review', 'approved'].includes(c.stage) && this.state(c).started?.folder === 'project')
-    if (!others.length) return null
-    const lastSub = s.latest?.commits?.at(-1)
-    const rows = this.store.folderCommits(this.cfg.project)
-    const since = lastSub ? rows.slice(rows.findIndex((x) => x.sha === lastSub) + 1) : rows
-    return since.find((x) => x.card === null)?.sha ?? null
-  }
-
-  /** G16: files of the change that another agent holds or held file locks on (a warning, never a refusal). */
-  private othersFiles(card: CardRecord, s: CardState, files: string[]): string[] {
-    if (!this.cfg.locksOf) return []
-    const out: string[] = []
-    for (const c of this.store.cards()) {
-      const b = c.id === card.id ? null : this.state(c).started?.builder
-      if (!b || b === s.started?.builder) continue
-      const theirs = this.cfg.locksOf(b)
-      for (const f of files) if (theirs.includes(f)) out.push(`${f} is ${b}'s (${c.key})`) // i18n-ignore: agent-facing warning in the spike's reply
-    }
-    return out
-  }
-
-  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<string | null>> {
-    if (!o.identity) return null
-    const list = await G.commits(this.cfg.project, `${base}..${revision}`)
-    if (isUnknown(list)) return list
-    const mine = commits ? list.filter((c) => commits.includes(c.commit)) : list
-    return mine.find((c) => c.email.toLowerCase() !== o.identity!.email.toLowerCase())?.commit ?? null
   }
 
   /** start review: the reviewer takes the latest submission (§16.8.1). */
@@ -610,7 +590,7 @@ export class Workflow {
     if (!sub) return this.refuse(card, actor, 'start review', { rule: 'review.noSubmission', values: { card: card.key } })
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.check(w, 'startReview', { agent: agentOf(actor) })
+      const bad = this.stillAt(w, s, 'start review') ?? this.check(w, 'startReview', { agent: agentOf(actor) })
       if (bad) return bad
       w.fact('ReviewStarted', { reviewer: agentOf(actor) ?? 'user', submission: sub.id, revision: sub.revision })
       return null
@@ -630,20 +610,11 @@ export class Workflow {
     const subId = args.submission ?? s.latest?.id
     const sub = s.submissions.find((x) => x.id === subId)
     // The head moved since the submission (a card with its own line): same change or not (§16.4.4).
-    let moved: { to: string; base: string | null; same: boolean } | null = null
-    if (args.pass && sub?.revision && this.ownLine(s)) {
-      const h = await G.head(this.folderOf(s))
-      if (!isUnknown(h) && h !== sub.revision) {
-        const th = await G.lineHead(this.cfg.project, s.started!.target ?? '')
-        const b2 = !isUnknown(th) && th ? await G.mergeBase(this.cfg.project, th, h) : null
-        const same = r.options.sameness === 'change' && !!b2 && !isUnknown(b2) && !!sub.base && (await G.sameChange(this.cfg.project, { base: sub.base, revision: sub.revision, key: sub.key }, { base: b2, revision: h }))
-        moved = { to: h, base: b2 && !isUnknown(b2) ? b2 : null, same }
-      }
-    }
+    const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     await this.cfg.hooks?.beforeWrite?.('verdict')
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.check(w, 'verdict', { agent, submission: args.submission })
+      const bad = this.stillAt(w, s, 'verdict') ?? this.check(w, 'verdict', { agent, submission: args.submission })
       if (bad) return bad
       const st = w.state()
       w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment })
@@ -682,26 +653,36 @@ export class Workflow {
     const r = this.rulesetOf(card, s)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
     const from = s.stage
-    await this.write(card, r, 'user', (w) => {
-      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: s.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) })
-      const builder = s.started?.builder
+    await this.cfg.hooks?.beforeWrite?.('answer')
+    const out = await this.write(card, r, 'user', (w) => {
+      // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
+      const changed = this.stillAt(w, s, 'answer')
+      if (changed) return changed
+      const st = w.state()
+      if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
+      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) })
+      const builder = st.started?.builder
       if (answer === 'declined') {
         w.move('active', 'user')
         this.wake(w, builder, `${card.key}: the user declined it`)
-        return
+        return null
       }
       if (answer !== 'approved' || req.kind !== 'approve') {
         this.wake(w, builder, `${card.key}: the user answered`)
-        return
+        return null
       }
+      // The gate is evaluated before anything moves on: passes and approvals at the current generation, not stale.
       const now = w.state()
+      const missing = notApproved(now, r, card.labels)
       if (req.gate === 'review') {
-        if (!notApproved(now, r, card.labels) || notApproved(now, r, card.labels)?.missing === 'userOk') this.finish(w, fin)
-      } else if (req.gate === 'okBefore') {
+        if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
+      } else if (req.gate === 'okBefore' && !missing && st.stage === 'approved') {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
         else this.wake(w, builder, 'approved: merge it and report the merge')
       }
+      return null
     })
+    if (out) return this.refuse(card, 'user', 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
 
@@ -710,8 +691,9 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.stage !== 'approved') return this.notFrom(card, actor, s, 'report merge')
     const r = this.rulesetOf(card, s)
+    // Only where the builder merges (or nothing is checked): under Hive merges the queue merges, never a report.
+    if (s.stage !== 'approved' || (r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge')
     const target = s.started?.target ?? ''
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
     let contained: Maybe<boolean> | undefined
@@ -720,14 +702,14 @@ export class Workflow {
       // Integration needs a non-empty change (§16.4.4).
       if (!rev || !s.approved?.base || rev === s.approved.base) contained = false
       else {
-        const c = await G.contains(this.cfg.project, target, { base: s.approved.base, revision: rev, key: s.latest?.key })
+        const c = await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key })
         contained = isUnknown(c) ? c : !!c
         if (!isUnknown(c) && c) method = c.method === 'sameTree' ? 'sameTree' : c.method
       }
     }
-    const th = await G.lineHead(this.cfg.project, target)
+    const th = await this.platform(r.options).targetHead(target)
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target })
+      const bad = this.stillAt(w, s, 'report merge') ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target })
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' })
       w.move('done', 'intent')
@@ -795,15 +777,17 @@ export class Workflow {
     const r = s.started ? this.rulesetOf(card, s) : null
     const from = s.stage
     await this.write(card, r, 'user', (w) => {
-      const generation = s.generation + 1
+      // Read under the transaction: where the card is now, not where it was when the call began.
+      const now = w.state()
+      const generation = now.generation + 1
       w.fact('Decision', { decision: `${card.key}/d${generation}`, generation, text })
-      this.wake(w, s.started?.builder, `${card.key} has a new decision`)
-      if (['review', 'approved', 'merging'].includes(from)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`)
-      if (!r || (from !== 'approved' && from !== 'merging')) return
-      const entry = openEntry(s)
+      this.wake(w, now.started?.builder, `${card.key} has a new decision`)
+      if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`)
+      if (!r || (now.stage !== 'approved' && now.stage !== 'merging')) return
+      const entry = openEntry(now)
       // After IntegrationStarted it's too late to stop that merge: it completes, then For you (§16.4.6).
       if (entry?.state === 'started') return
-      w.fact('Stale', { approved: s.approved?.revision ?? null, current: s.approved?.revision ?? null, why: 'decision' })
+      w.fact('Stale', { approved: now.approved?.revision ?? null, current: now.approved?.revision ?? null, why: 'decision' })
       if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'decision' })
       w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
     })
@@ -855,14 +839,19 @@ export class Workflow {
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
     const r = this.rulesetOf(card, s)
+    // Never into a stage the card's ruleset doesn't have (no review: no Review; no merge step: no Approved or Merging).
+    if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: to, moves: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
     if (to === 'hold') {
-      await this.write(card, r, by, (w) => {
+      const out = await this.write(card, r, by, (w) => {
+        const changed = this.stillAt(w, s, 'move')
+        if (changed) return changed
         const e = openEntry(s)
         if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'hold' })
         w.move('hold', 'user')
+        return null
       })
-      return this.ok(card, from, 'hold')
+      return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, 'hold')
     }
     if (from === 'hold') {
       const back = [...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')
@@ -877,37 +866,58 @@ export class Workflow {
         return this.ok(card, from, this.state(card).stage)
       }
     }
-    // A drag that stands for an intent (Todo → Active is Start) runs it: through its guards, or across them as an
-    // override whose recorded facts still run (§16.8.4), never a bare move that leaves the card without its Started.
-    if (from === 'todo' && to === 'active') {
-      const started = await this.start(card.id, by, { builder: opts.builder })
-      if (!isRefusal(started)) return started
-      const rules = [...new Set([started.rule, ...r.guards.start])]
-      if (started.rule === 'platform.unknown' || started.rule === 'card.plainNumber') return started
-      if (by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules }
-      if (by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant')
-      return this.start(card.id, by, { builder: opts.builder, override: { rules, move: 'todo→active', by, reason: opts.reason ?? '' } })
-    }
-    // Active → Review is a submit at the card's revision, for the reviewer to start a review of.
-    if (from === 'active' && to === 'review' && card.kind === 'code' && hasStage(r, 'review')) {
-      const rules = r.guards.submit.filter((g) => g !== 'submit.notDuplicate')
-      if (rules.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules }
-      if (rules.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant')
-      const sub = await this.submit(card.id, by, { summary: '', ...(rules.length ? { override: { rules, move: 'active→review', by, reason: opts.reason ?? '' } } : {}) })
-      if (!isRefusal(sub) || sub.rule === 'platform.unknown') return sub
-    }
+    // A forward drag into Active, Review, Approved or Merging stands for intents, and runs them in order (Start, then
+    // submit, then the review skipped): never a bare move that leaves a card with no start, nothing to review or no
+    // queue entry. Each step that skips nothing just happens; one that would skip a rule asks first (§16.8.4).
+    if (from !== 'hold' && ORDER.indexOf(to) > ORDER.indexOf(from) && to !== 'done') return this.dragForward(card, from, to, by, opts)
     const skipped = this.skippedRules(card, r, from === 'hold' ? 'todo' : from, to)
     if (skipped.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules: skipped }
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant')
-    await this.write(card, r, by, (w) => {
+    const out = await this.write(card, r, by, (w) => {
+      // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
+      const changed = this.stillAt(w, s, 'move')
+      if (changed) return changed
       if (skipped.length) w.fact('Override', { rules: skipped, move: `${from}→${to}`, by, reason: opts.reason ?? '' })
       // Leaving a stage with a queue entry cancels it (the user moved it out).
       const e = openEntry(s)
       if (e && to !== 'merging') w.fact('IntegrationCancelled', { entry: e.id, reason: 'user' })
       w.move(to, skipped.length ? 'override' : 'user')
       if (to === 'done') w.action('endLaneIfDone', {})
+      return null
     })
-    return this.ok(card, from, to)
+    return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, to)
+  }
+
+  /** A forward drag's intents, in order; it stops at the first that refuses with something other than a rule to skip. */
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }): Promise<Moved | Ask | Refusal> {
+    const asking = by === 'user' ? !opts.confirm : !opts.reason
+    const drag: Drag = { by, reason: opts.reason ?? '', ask: asking }
+    // A step's refusal: the rules it would skip become the question (the user) or a refusal naming them (the Assistant).
+    const asked = (r: Refusal): Ask | Refusal => (r.rule === 'move.needsOverride' && by === 'user' ? { ask: true, card: card.key, rules: String(r.values.rules).split(', ') } : r)
+    if (this.state(card).stage === 'todo') {
+      const r = await this.start(card.id, by, { builder: opts.builder, drag })
+      if (isRefusal(r)) return asked(r)
+    }
+    if (to === 'active') return this.ok(card, from, this.state(card).stage)
+    if (this.state(card).stage === 'active') {
+      const r = await this.submit(card.id, by, { summary: '', drag })
+      if (isRefusal(r)) return asked(r)
+    }
+    const s = this.state(card)
+    if (ORDER.indexOf(s.stage) >= ORDER.indexOf(to)) return this.ok(card, from, s.stage)
+    // Past Review (or the user's OK): the review and approvals are skipped, named, and the change counts as approved.
+    const rs = this.rulesetOf(card, s)
+    const rules = ['integrate.approved']
+    if (asking) return by === 'user' ? { ask: true, card: card.key, rules } : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant')
+    const out = await this.write(card, rs, by, (w) => {
+      const changed = this.stillAt(w, s, 'move')
+      if (changed) return changed
+      w.fact('Override', { rules, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })
+      if (to === 'merging' && rs.options.finish === 'hiveMerges') this.enqueue(w)
+      else w.move(hasStage(rs, 'approved') ? 'approved' : to, 'override')
+      return null
+    })
+    return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
   }
 
   /**
@@ -954,7 +964,8 @@ export class Workflow {
       if (!e) return
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by: 'user', reason })
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' })
-      w.move('approved', 'user')
+      // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
+      w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
     })
     return this.ok(card, s.stage, this.state(card).stage)
   }
@@ -965,10 +976,17 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
-    await this.write(card, r, 'user', (w) => {
+    const out = await this.write(card, r, 'user', (w) => {
+      // Only for a card the queue returned (Active, its last entry failed), approved and unstale, once per revision.
+      const st = w.state()
+      const last = st.entries.at(-1)
+      const retries = st.entries.filter((x) => x.seq > (st.latest?.id ?? 0) && x.requeue === 'retry').length
+      if (st.stage !== 'active' || last?.state !== 'failed' || st.stale || notApproved(st, r, card.labels) || retries >= 1) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage).join(', ') } } as GuardRefusal
       w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by: 'user', reason })
       this.enqueue(w, 'retry')
+      return null
     })
+    if (out) return this.refuse(card, 'user', 'retry merge', out)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
@@ -1008,7 +1026,7 @@ export class Workflow {
 
   /** Deliverables changed since the card started that are in neither its paths nor its pre-fill: for it to add or leave. */
   unclaimed(card: CardRecord): string[] {
-    const before: Record<string, string> = JSON.parse(this.store.meta(`deliverables:${card.id}`) ?? '{}')
+    const before = this.state(card).started?.deliverables ?? {}
     const all = this.none.deliverables()
     if (isUnknown(all)) return []
     const now = this.none.manifest(all)
@@ -1042,7 +1060,7 @@ export class Workflow {
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */
   changeLane(id: string, cards: number[]): { lane: LaneList; queuedAfter: string | null } {
     const l = this.lane(id)!
-    const current = l.current !== null && !this.doneByFacts(l.current) ? l.current : null
+    const current = l.current !== null && !this.laneDone(l.current) ? l.current : null
     const next = changeList({ ...l, current }, cards)
     for (const c of cards) this.store.updateCard(c, { lane: id })
     this.saveLane(next)
@@ -1051,7 +1069,7 @@ export class Workflow {
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */
   laneNext(id: string): number | null {
-    const { lane, card } = nextCard(this.lane(id)!, (c) => this.doneByFacts(c))
+    const { lane, card } = nextCard(this.lane(id)!, (c) => this.laneDone(c))
     this.saveLane(lane)
     return card
   }
@@ -1079,20 +1097,16 @@ export class Workflow {
       case 'notify':
         if (this.store.deliver({ action: id, kind, target: 'user', payload })) this.cfg.effects?.notify?.(card, String(payload.text))
         return
-      case 'prepareSlot': {
-        const f = await G.isolate(this.cfg.project, String(payload.folder), String(payload.line), String(payload.base))
-        if (isUnknown(f)) throw new Error(f.what) // i18n-ignore: an action's failure, recorded on the action
-        return
-      }
+      case 'prepareSlot':
       case 'pin':
-        await G.pin(this.cfg.project, String(payload.ref), String(payload.revision))
+        await this.platformOf(card).perform(kind, payload)
         return
       case 'endLaneIfDone': {
         if (!card.lane) return
         const l = this.lane(card.lane)
         if (!l || l.ended) return
         const cards = l.pending ?? l.cards
-        if (!cards.every((c) => this.doneByFacts(c))) return
+        if (!cards.every((c) => this.laneDone(c))) return
         const results = cards.map((c) => this.state(c).integrated?.result ?? null)
         this.saveLane({ ...l, ended: true, current: null })
         this.store.deliver({ action: id, kind: 'laneEnded', target: l.id, payload: { results } })

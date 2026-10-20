@@ -221,7 +221,7 @@ keeping the boundaries.
 **The core spike (P2, #1118)** built the core in these places, **isolated: nothing in the app imports it** (no IPC, no
 Agent API route, no `boardWrite`): `src/shared/platform/descriptors.ts`; `src/shared/workflow/` (`facts.ts` with the
 fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as messages, `cardRefs.ts`, `laneList.ts`);
-`src/main/platform/` (`git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
+`src/main/platform/` (`adapter.ts`, `gitPlatform.ts` and `nonePlatform.ts` behind it, `git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
 a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table; `runtime.ts`;
 `reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
 scenarios on real temporary repositories. Whether it becomes P3's base or is rewritten is Darren's decision on #1118;
@@ -244,6 +244,12 @@ changed during a run" read from stat snapshots and the HEAD reflog (P3's watcher
   per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts:430`) auto-commits and doesn't
   return the merge commit; squash detection is `alreadyMerged` (`:417`). The Git view's actions fence the folder
   (`folderFence.ts`, `gitRepo.ts:343`) and take a `.git/hive-merge` lock.
+
+**The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
+(`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a
+moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
+ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
+`nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
 
 **Layers and modules (planned):**
 

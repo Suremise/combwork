@@ -90,8 +90,9 @@ describe('workflow scenarios, Git', () => {
     expect(s.stage).toBe('approved')
     expect(s.entries.at(-1)?.state).toBe('cancelled')
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('stale'))).toBe(true)
-    // Nothing for the queue to merge.
+    // Nothing for the queue to merge, and no way back into it unchanged: the user's Retry merge is refused too.
     expect(await e.queue().runOnce('main')).toBeNull()
+    refusedBy(await e.wf.retryMerge(card.key, 'just merge it'), 'move.notFromHere')
     moved(await e.wf.submit(card.key, B1, { summary: 'amended' }))
     expect(e.wf.state(card).stage).toBe('review')
   })
@@ -178,7 +179,8 @@ describe('workflow scenarios, Git', () => {
     const s = e.wf.state(second)
     expect(s.stage).toBe('active')
     expect(s.started).toMatchObject({ builder: 'B2' })
-    expect(s.overrides).toMatchObject([{ rules: ['start.dependenciesIntegrated', 'start.notBlocked', 'start.slotAvailable'], reason: 'it only needs the API' }])
+    // The override names exactly the rule that refused.
+    expect(s.overrides).toEqual([expect.objectContaining({ rules: ['start.dependenciesIntegrated'], reason: 'it only needs the API' })])
   })
 
   it('S15: a commit authored with a personal email refuses submit with the fix', async () => {
@@ -207,8 +209,9 @@ describe('workflow scenarios, Git', () => {
     // Recorded actions still run: no Integrated is faked.
     expect(s.integrated).toBeNull()
     // A drag to Review is a submit at the card's revision (across its rules), so the reviewer has something to review.
-    const { card: other } = await started(e, 'Dragged to review')
-    expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ ask: true, rules: expect.arrayContaining(['submit.clean']) })
+    const { card: other, folder } = await started(e, 'Dragged to review')
+    writeFileSync(join(folder, 'wip.txt'), 'not committed\n')
+    expect(await e.wf.move(other.key, 'review', 'user')).toEqual({ ask: true, card: other.key, rules: ['submit.clean'] })
     moved(await e.wf.move(other.key, 'review', 'user', { confirm: true, reason: 'have a look' }))
     expect(e.wf.state(other)).toMatchObject({ stage: 'review', latest: { summary: '' } })
     moved(await e.wf.startReview(other.key, R1))
@@ -278,10 +281,13 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
     expect(e.wf.state(card).stage).toBe('done')
     const other = e.wf.createCard({ title: 'Anything' })
-    for (const to of ['done', 'review', 'todo', 'approved'] as const) {
+    for (const to of ['done', 'todo', 'active', 'todo', 'done'] as const) {
       const r = await e.wf.move(other.key, to, 'user')
       expect(r).toMatchObject({ ok: true })
     }
+    // Every stage all off has; a stage it doesn't (no review: no Review column) isn't a place to drag to.
+    expect(e.wf.currentRuleset().stages.map((x) => x.id)).toEqual(['hold', 'todo', 'active', 'done'])
+    expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ refused: true, rule: 'move.notFromHere' })
   })
 
   it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', async () => {

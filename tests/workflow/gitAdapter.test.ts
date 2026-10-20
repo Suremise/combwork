@@ -67,6 +67,37 @@ describe('Git adapter', () => {
     expect(await G.sameChange(repo, { base, revision: r1 }, { base, revision: bin })).toBe(false)
   })
 
+  it('on a new base with an equal key, the replay decides: whitespace and a moved edit are other changes; a hunk split with other content differs by key (S30)', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    commit(repo, { 'p.py': 'def f():\n    return 1\n\ndef g():\n    return 1\n' }, 'setup')
+    const b1 = sh(repo, 'rev-parse', 'HEAD')
+    sh(repo, 'checkout', '-q', '-b', 'card')
+    const r1 = commit(repo, { 'p.py': 'def f():\n    return 2\n\ndef g():\n    return 1\n', 'add.py': 'if x:\n    y = 1\n' }, 'card')
+    sh(repo, 'checkout', '-q', 'main')
+    const b2 = commit(repo, { 'other.txt': 'target moved\n' }, 'target')
+    const on = (name: string, files: Record<string, string>) => {
+      sh(repo, 'checkout', '-q', '-b', name, b2)
+      const r = commit(repo, files, name)
+      sh(repo, 'checkout', '-q', 'main')
+      return r
+    }
+    // The clean rebase: same change.
+    const clean = on('clean', { 'p.py': 'def f():\n    return 2\n\ndef g():\n    return 1\n', 'add.py': 'if x:\n    y = 1\n' })
+    expect(await G.sameChange(repo, { base: b1, revision: r1 }, { base: b2, revision: clean })).toBe(true)
+    // Whitespace in the added line: an equal key, a different replay.
+    const ws = on('ws', { 'p.py': 'def f():\n    return 2\n\ndef g():\n    return 1\n', 'add.py': 'if x:\n  y = 1\n' })
+    expect(await G.candidateKey(repo, b2, ws)).toBe(await G.candidateKey(repo, b1, r1))
+    expect(await G.sameChange(repo, { base: b1, revision: r1 }, { base: b2, revision: ws })).toBe(false)
+    // The edit moved to the second identical block: an equal key, a different replay.
+    const moved = on('moved', { 'p.py': 'def f():\n    return 1\n\ndef g():\n    return 2\n', 'add.py': 'if x:\n    y = 1\n' })
+    expect(await G.candidateKey(repo, b2, moved)).toBe(await G.candidateKey(repo, b1, r1))
+    expect(await G.sameChange(repo, { base: b1, revision: r1 }, { base: b2, revision: moved })).toBe(false)
+    // Hunks split differently, with other content: another key, ruled out at once.
+    const split = on('split', { 'p.py': 'def f():\n    return 2\n\ndef g():\n    return 3\n', 'add.py': 'if x:\n    y = 1\n' })
+    expect(await G.candidateKey(repo, b2, split)).not.toBe(await G.candidateKey(repo, b1, r1))
+    expect(await G.sameChange(repo, { base: b1, revision: r1 }, { base: b2, revision: split })).toBe(false)
+  })
+
   it('a conflicted rebase whose resolution differs is another change; one resolving to the replay is the same (S10)', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     const [b1, r1] = branchWith('card', { 'src/a.txt': 'one\nCARD\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' })

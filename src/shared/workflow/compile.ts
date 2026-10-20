@@ -88,7 +88,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
     g.verdict.push('review.decisionsReceived')
   }
   if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
-  if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
+  if (o.finish === 'agentMerges') g.reportMerge.push(...(o.okBefore.mode !== 'never' ? (['approval.given'] as const) : []), 'done.contained')
   if (o.finish === 'hiveMerges') {
     if (review) g.integrate.push('integrate.approved')
     if (o.strict) g.integrate.push('integrate.upToDate')

@@ -5,7 +5,7 @@
 //
 // P2 spike (#1118): called by the tests where P3's watcher (refs, HEAD, packed-refs, the deliverables) will call it.
 
-import { openEntry, passingReviewers, type CardState, type Fact } from '../../shared/workflow/facts'
+import { foldCard, openEntry, passingReviewers, type CardState, type Fact } from '../../shared/workflow/facts'
 import { hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -55,13 +55,16 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x)
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
     const how = byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed'
-    if (!wf.store.recordFolderCommit(project, c.commit, card?.id ?? null, how)) continue
-    if (!card) continue
-    const s = wf.state(card)
-    await wf.write(card, null, 'outside', (w) => {
-      w.tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${c.commit}`, data: { commit: c.commit, how: how as 'trailer' | 'onlyCard' } })
-      // A shared-folder card's revision is its newest commit: working revisions, never an integration.
-      if (UNFINISHED.includes(card.stage) || card.stage === 'todo') w.tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
+    // The folder's record, the card's facts and the cursor in one transaction: a crash keeps all or none of them.
+    wf.store.tx((tx) => {
+      if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return
+      if (card) {
+        const s = foldCard(tx.facts(card.id))
+        tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${c.commit}`, data: { commit: c.commit, how: how as 'trailer' | 'onlyCard' } })
+        // A shared-folder card's revision is its newest commit: working revisions, never an integration.
+        if (UNFINISHED.includes(card.stage) || card.stage === 'todo') tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
+      }
+      tx.setMeta(seenKey, c.commit)
     })
   }
   wf.store.setMeta(seenKey, head)
@@ -91,16 +94,22 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
   }
 }
 
-/** Reconciles one card with the platform (§16.4.4's table). */
-export async function reconcile(wf: Workflow, card0: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
+/** Reconciles one card with its platform (§16.4.4's table): the card's platform adapter observes and records. */
+export async function reconcile(wf: Workflow, card: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
+  const c = wf.store.card(card.id)
+  const s = wf.state(c)
+  if (!s.started) return
+  return wf.platformOf(c, s).reconcile(c, hooks)
+}
+
+/** The Git adapter's reconciliation: observed heads, attribution in a shared folder, containment, carry-over and stale. */
+export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
   let card = wf.store.card(card0.id)
   let s = wf.state(card)
   if (!s.started) return
   const r = wf.rulesetOf(card, s)
   const o = r.options
   const project = wf.cfg.project
-
-  if (o.platform === 'none') return reconcileNone(wf, card, s)
 
   if (!wf.ownLine(s)) {
     // A shared folder: attribution; its commits are working revisions, never an integration (§16.4.4).
@@ -157,13 +166,32 @@ export async function reconcile(wf: Workflow, card0: CardRecord, hooks: Reconcil
   }
 
   if (card.stage === 'active' && wf.ownLine(s) && s.head && base && s.head !== base) {
-    // Some of its work in the target (a partial hand merge): a mark; the card stays where it is.
+    // Some of its own work in the target (a partial hand merge): a mark; the card stays where it is. Its own commits
+    // are its line's first-parent history since its base: the target merged into the card (an update) isn't its work.
     const th = await G.lineHead(project, target)
     if (isUnknown(th) || !th) return
-    const mb = await G.mergeBase(project, th, s.head)
-    if (isUnknown(mb) || !mb || mb === base) return
-    if ((await G.isAncestor(project, base, mb)) !== true) return
-    await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'MergedInPart', actor: 'outside', source: 'observed', dedupe: `part:${s.cycle}:${mb}`, data: { revision: mb, target } }))
+    const own = await G.firstParents(project, base, s.head)
+    if (isUnknown(own)) return
+    let found: string | null = null
+    for (const c of own) if ((await G.isAncestor(project, c, th)) === true) found = found ?? c
+    if (!found) return
+    const part = found
+    await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'MergedInPart', actor: 'outside', source: 'observed', dedupe: `part:${s.cycle}:${part}`, data: { revision: part, target } }))
+    return
+  }
+
+  if (card.stage === 'done' && !s.integrated && !s.accepted && wf.ownLine(s)) {
+    // Done with no integration (the user's override, or Not checked's report): a later merge is observed and recorded,
+    // without moving the card (§16.8.4). Its change: the submitted endpoints, else its line's head from its base.
+    // (A Done card's head isn't observed any more, so an unsubmitted one is read from its line now, if it still exists.)
+    const lineNow = s.latest?.revision ? null : await G.lineHead(project, s.started!.line!)
+    const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
+    const from = s.latest?.base ?? base
+    if (!revision || !from || revision === from) return
+    const c = await G.contains(project, target, { base: from, revision, key: s.latest?.key })
+    if (isUnknown(c) || !c) return
+    const th = await G.lineHead(project, target)
+    await wf.write(card, null, 'outside', (w) => w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
     return
   }
 
@@ -196,7 +224,7 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
 }
 
 /** None: an edit to a card's paths after a pass makes the pass stale (§16.3.3); files outside its paths never do. */
-async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState): Promise<void> {
+export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState): Promise<void> {
   if (card.stage !== 'review' || !passingReviewers(s).length || s.stale) return
   const now = wf.none.revision(card.paths ?? [])
   if (isUnknown(now) || now.revision === s.approved?.revision) return

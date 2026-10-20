@@ -1269,7 +1269,7 @@ on window focus, when a card is read for a rule, and once at start. Its rules:
 | **Integration needs a change** [answering HB3's round 1 finding 2] | Containment and observed integration count only a card with a **non-empty change**: its revision differs from `Started.base` and isn't an ancestor of it. A card just started (its revision is its base, an ancestor of the target) is never found "in the target". |
 | A card with its own line, in **Approved**: the approved revision (or one that replays to it) found in the target, not by Hive | `Integrated` (observed, `by: outside`) → Done; the queue cancels its entry; the lane counts it [#1112 C]. |
 | A card with its own line, in **Review**, whose revision was merged by hand before its review passed | `Integrated` (observed) → Done, with an **outside the rules** mark naming the rules skipped (shown like an override). Hive never moves it back (OP-25) [#1112 C]. |
-| A card in **Active** (or Todo) with some of its work found in the target (a partial hand merge) | A **merged outside, in part** mark with the revision; the card stays where it is and its agent goes on. Its later change is computed from its line as usual; the merged part is then in the target and drops out of the diff [HB3's round 1 finding 2]. |
+| A card in **Active** (or Todo) with some of its work found in the target (a partial hand merge) | A **merged outside, in part** mark with the revision; the card stays where it is and its agent goes on. Its work is its line's own commits (first-parent since its base): the target merged into the card (an update) is not its work in the target [P2]. Its later change is computed from its line as usual; the merged part is then in the target and drops out of the diff [HB3's round 1 finding 2]. |
 | A card's line deleted **after** Done | Nothing: its facts and pin (§16.9.3) keep what was reviewed, and no slot is recreated [HB3's round 1 finding 11]. |
 | A **shared-folder** card whose line is the target: its commits | `HeadMoved` only. These are working revisions, on the target by construction, never an integration: the card reaches Done only through its rules (§16.7.2's "Committed is done" row), so a Pair project working in its folder still reviews before Done [P1, answering HR2's round 1 finding 1]. |
 | A shared-folder card's commits interleaved with another card's | Each card's change is its own trailer's commits (§16.3.2); the other card's commits are in neither change. |
@@ -1661,7 +1661,8 @@ Changing the kind later is the user's, recorded as an override.
   Hive-merges ruleset is queued again. A held Active card keeps its lease too; the lane pauses ("AM-12 on hold").
 - **Your approvals carry over** by the same rule as passes (G4): a clean rebase by the queue keeps them.
 - **Dependencies and per-card targets** (OP-12): `start.dependenciesIntegrated` checks each `blockedBy` card in **the
-  dependent card's target**.
+  dependent card's target**: integrated into that target, or found in it by containment (merged into `release`,
+  then `release` into `main`); a card integrated only elsewhere still blocks [P2].
 - **A new project before a preset is chosen:** the detected platform's all-off options (§16.6.4), the free flow of
   today, until the user picks a preset or sets an option.
 
@@ -1743,10 +1744,15 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   are never invisible [#1120 c].
 - **Recorded actions still run:** a user moving a card to Done without a merge writes `Override` and `Moved`; it
   doesn't fake an `Integrated` fact. A later observed integration adds it.
-- **A drag that stands for an intent runs it** [P2]: Todo → Active is Start (its guards, or across them as an override:
-  either way `Started`, its line and base, so the card can be submitted later); Active → Review is a submit at the
-  card's revision, by the user, so the reviewer has a submission to start a review of. A bare `Moved` there would leave
-  a card in Active with no start, or in Review with nothing to review.
+- **A drag that stands for an intent runs it** [P2]: a forward drag into Active, Review, Approved or Merging runs the
+  intents it stands for, in order: Start (`Started`, its line and base), then submit at the card's revision (by the
+  user, with an empty summary; a no-code card too), then, past Review, an `Override` naming `integrate.approved`,
+  which counts as approved for that submission (the queue merges it). A step that skips nothing just happens; one
+  whose guards refuse **asks first, naming only the rules that refuse**, and its `Override` names exactly those. A
+  step refused for something no override can make true (nothing to submit, a fact that couldn't be read) stops the
+  drag there, so a card never sits in Active with no start, in Review with nothing to review or in Merging with no
+  entry. Done is a plain move (no `Integrated` faked), and a stage the card's ruleset doesn't have isn't a place to
+  drag to.
 
 #### 16.8.5 For you
 
@@ -1756,7 +1762,10 @@ board filter, a count on the activity bar and in the Progress panel's paused rea
 decision, a reply) clears it and **wakes the waiting agent**. Kinds (OP-11, agreed 20 Oct): **Approve**,
 **Decide**, **Test**, **Sign in**, **Other**; only an Approve satisfies an approval gate. A "Test" request may carry a
 checklist (what to try, on which build) [P1]. The field records a person (`for: 'user'`) so "for <person>" can be
-added later [#439].
+added later [#439]. **A request belongs to its submission** [P2]: a new submission retires the requests made for an
+earlier one, and an answer is checked under the transaction (the request still open, the card where it was, the
+generation current then), and its gate evaluated before anything moves on, so an old request can never approve
+newer work.
 
 #### 16.8.6 A refused commit (#907)
 
@@ -1776,7 +1785,9 @@ report it this way rather than retry.
 1. Take the next entry (`IntegrationRequested` not cancelled, failed or integrated, in order).
 2. Check `integrate.approved` (quorum, approvals, not stale), and **check containment first**: if the change is
    already in the target (merged by hand meanwhile), record `Integrated` (observed) instead of making an empty merge
-   [HB3's round 1 finding 19].
+   [HB3's round 1 finding 19]. An entry that isn't approved any more gets an outcome, never a skip that leaves it
+   open (it would hold up every card behind it): `IntegrationCancelled` (stale), the card back to Review (or Active
+   with no review), its builder woken [P2].
 3. **Strict** (G8), redefined [P1, answering HB3's round 1 finding 4 and round 2 finding B]: if the revision
    doesn't contain the target's head, the queue **brings it up to date itself, on its own ref only**: in its worktree
    it merges the target into the approved revision (or rebases it, per the merge style) and keeps the result on
@@ -2023,7 +2034,8 @@ lane ends; a Todo card not in a lane uses the current one.
 #### 16.11.2 One card at a time
 
 [P1, answering HB3's round 1 finding 4; OP-36] A lane's builder keeps one slot (OP-10), and the merge queue is
-asynchronous. So a lane's **next card starts only once the previous card is Done** (merged, or accepted); while it
+asynchronous. So a lane's **next card starts only once the previous card is Done** (merged, or accepted; under Not
+checked, simply Done, which has no `Integrated` to wait for, and `endLaneIfDone` ends such a lane too [P2]); while it
 waits in the queue the lane is paused ("waiting: AM-11 merging"). A card returned by the queue is therefore always
 picked up in a clean slot, by the builder that knows it, and the next card always starts from a target that contains
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and

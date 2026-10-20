@@ -81,10 +81,26 @@ describe('S36: every combination', () => {
       else put(e.project, `c${i}.md`, `${i}\n`)
     }
     moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
-    for (let step = 0; step < 6 && e.wf.state(card).stage === 'review'; step++) {
+    // One round goes wrong first: a decision mid-review, then a failed verdict (or the user's decline); the builder
+    // checks the decision and submits the same work again with a note.
+    let failed = false
+    for (let step = 0; step < 10 && e.wf.state(card).stage === 'review'; step++) {
       const s = e.wf.state(card)
-      const passes = new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest!.id).map((v) => v.reviewer))
+      const passes = new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest!.id && v.generation === s.generation).map((v) => v.reviewer))
       const open = s.requests.find((r) => r.gate === 'review')
+      if (!failed) {
+        failed = true
+        moved(await e.wf.recordDecision(card.key, 'Keep it small'))
+        for (const a of ['B1', 'R1', 'R2']) await e.wf.received(card.key, a)
+        if (open) moved(await e.wf.answer(card.key, open.request, 'declined'))
+        else {
+          moved(await e.wf.startReview(card.key, R1))
+          moved(await e.wf.verdict(card.key, R1, { pass: false, failKind: 'explanation', comment: 'why?' }))
+        }
+        expect(e.wf.state(card).stage).toBe('active')
+        moved(await e.wf.submit(card.key, B1, { summary: 'again', note: 'It is small: see the comment.' }))
+        continue
+      }
       if (open) {
         moved(await e.wf.answer(card.key, open.request, 'approved'))
         continue
@@ -113,5 +129,6 @@ describe('S36: every combination', () => {
     if (c.kind === 'no-code') expect(end.integrated).toBeNull()
     if (c.platform === 'none' && c.kind === 'code') expect(end.accepted?.revision).toBe(end.latest!.revision)
     if (c.review !== 'none' && c.reviewers === 2 && c.review !== 'you') expect(new Set(end.verdicts.filter((v) => v.pass).map((v) => v.reviewer)).size).toBe(2)
+    if (c.review !== 'none') expect(end.rounds, 'one failed round').toBe(1)
   })
 })

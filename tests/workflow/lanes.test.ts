@@ -79,6 +79,9 @@ describe('the upgrade', () => {
     await adopt(e.wf, doing, 'doing', { agent: 'B1', target: 'main' })
     await adopt(e.wf, review, 'review', { agent: 'B2', target: 'main' })
     await adopt(e.wf, passed, 'passed', { agent: 'B1', target: 'main' })
+    // The running lane, in Hive's list: Passed first, then Review, then Doing.
+    e.wf.startLane('L', [passed.id, review.id, doing.id], 'R1')
+    expect(e.wf.laneNext('L')).toBe(passed.id)
     expect(e.wf.state(doing).stage).toBe('active')
     const r = e.wf.state(review)
     expect(r.stage).toBe('review')
@@ -98,5 +101,9 @@ describe('the upgrade', () => {
     moved(done)
     expect(e.wf.state(passed)).toMatchObject({ stage: 'done', integrated: null })
     await reconcile(e.wf, passed)
+    // The lane goes on past a card finished with no Integrated (Not checked).
+    expect(e.wf.laneNext('L')).toBe(review.id)
+    moved(await e.wf.reportMerge(review.key, B2))
+    expect(e.wf.laneNext('L')).toBe(doing.id)
   })
 })

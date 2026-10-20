@@ -41,8 +41,9 @@ export async function adopt(wf: Workflow, card: CardRecord, column: 'doing' | 'r
     if (!isUnknown(c)) ({ files, key } = c)
   }
   await wf.write(card, r, 'hive', (w) => {
-    w.tx.append(card.id, { kind: 'Adopted', actor: 'hive', source: 'observed', ruleset: r.id, data })
-    if (column === 'review') w.tx.append(card.id, { kind: 'Submitted', actor: `agent:${at.agent}`, source: 'observed', ruleset: r.id, data: { revision: head, base, head, key, files, round: 1, generation: 0, sameRevision: false, summary: '', adopted: true } })
+    // Once per card: a rerun of the upgrade, or a second Hive running it, adds nothing.
+    if (!w.tx.appendObserved(card.id, { kind: 'Adopted', actor: 'hive', source: 'observed', ruleset: r.id, dedupe: 'adopted', data })) return
+    if (column === 'review') w.tx.appendObserved(card.id, { kind: 'Submitted', actor: `agent:${at.agent}`, source: 'observed', ruleset: r.id, dedupe: 'adopted', data: { revision: head, base, head, key, files, round: 1, generation: 0, sameRevision: false, summary: '', adopted: true } })
     w.move(stage, 'derived')
   })
 }

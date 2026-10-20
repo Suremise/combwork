@@ -13,6 +13,7 @@ import { join } from 'path'
 import { git } from '../git'
 import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import { notApproved } from '../../shared/workflow/guards'
+import { hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { CardRecord } from './factStore'
@@ -141,7 +142,7 @@ export class MergeQueue {
     let retests = 0
     for (;;) {
       const check = this.stillApproved(card, entry)
-      if (!check.ok) return { card: card.key, entry: entry.id, outcome: 'skipped', why: check.cancelled ? 'cancelled' : 'notApproved' }
+      if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
       const revision = s.approved?.revision ?? entry.revision
       const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
@@ -167,7 +168,8 @@ export class MergeQueue {
       await this.cfg.hooks?.afterChecks?.(entry.id)
 
       // The last check before the target moves: still approved (a decision since cancels the entry).
-      if (!this.stillApproved(card, entry).ok) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' }
+      const last = this.stillApproved(card, entry)
+      if (!last.ok) return this.skip(card, entry, last.cancelled)
       const now = await G.lineHead(this.project, target)
       if (isUnknown(now) || now !== expected) {
         // The target moved since the test: tested again against the new head; never an untested advance.
@@ -189,6 +191,22 @@ export class MergeQueue {
     }
   }
 
+  /**
+   * An entry that isn't approved any more (its pass stale, a pass or approval missing at the current generation) gets
+   * an outcome, so the queue never stalls on it: cancelled, the card back to Review (or Active), its builder woken. An
+   * entry already cancelled (a decision, the user) needs nothing more.
+   */
+  private async skip(card: CardRecord, entry: QueueEntry, cancelled: boolean): Promise<QueueOutcome> {
+    if (!cancelled) {
+      await this.write(card, (w) => {
+        w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' })
+        w.move(w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active', 'derived')
+        this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`)
+      })
+    }
+    return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' }
+  }
+
   private async identity(): Promise<{ name: string; email: string } | null> {
     return this.wf.cfg.options().identity ?? (await G.identity(this.project))
   }
@@ -206,7 +224,8 @@ export class MergeQueue {
       await git(f, ['clean', '-fdq'])
     }
     const r = this.wf.rulesetOf(card, s)
-    const reviewers = [...new Set(s.verdicts.filter((v) => v.pass).map((v) => v.reviewer))].join(', ')
+    // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
+    const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
     const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}`
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
@@ -305,8 +324,12 @@ export class MergeQueue {
     await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'files' }))
     const rt = await git(folder, ['read-tree', '-m', '-u', expected, result])
     if (!rt.ok) {
-      // git refused before writing: the files are as they were. Back to the test merge.
+      // git refused before writing: the files are as they were. The user's edit since the check pauses (named); anything
+      // else is the target moving: back to the test merge.
+      const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
+      const busy = st.out.split(' ').filter(Boolean).map((l) => l.slice(3))
       await this.moved(card, entry, target)
+      if (busy.length) return { pause: 'unstagedChanges', files: busy }
       return 'moved'
     }
     await this.cfg.hooks?.afterFiles?.(entry.id)
@@ -326,12 +349,16 @@ export class MergeQueue {
   /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
   private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash', by: 'hive' | 'outside'): Promise<void> {
     await this.write(card, (w) => {
+      // One Integrated per cycle, whoever writes it (the queue, or another Hive's recovery or observation).
+      const st = w.state()
+      if (st.integrated) return
       const startedAt = this.wf.store.facts(card.id).filter((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === entry.id).at(-1)?.seq ?? Infinity
-      w.fact('Integrated', { entry: entry.id, revision, target, result, method, by })
+      const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'hive', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } })
+      w.written.push(f)
       w.move('done', 'derived')
       w.action('releaseSlot', {})
       w.action('endLaneIfDone', {})
-      if (this.wf.store.facts(card.id).some((f) => f.kind === 'Decision' && f.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', `${card.key} was decided after it merged: does it need a follow-up?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', `${card.key} was decided after it merged: does it need a follow-up?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
     })
   }
 
@@ -378,8 +405,15 @@ export class MergeQueue {
           this.rerun.add(e.id)
           out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
         } else {
+          // The target moved meanwhile: containment decides. Found → Done (observed); not found → tested again.
           await this.write(card, (w) => w.fact('IntegrationFailed', { entry: e.id, revision: e.revision, target: e.target, reason: 'targetMoved', transient: true }))
           await reconcile(this.wf, card)
+          if (this.wf.state(card).stage === 'merging') {
+            await this.write(card, (w) => {
+              const st = w.state()
+              w.fact('IntegrationRequested', { entry: `${card.key}/e${st.lastSeq + 1}`, revision: e.revision, key: st.latest?.key ?? null, target: e.target, style: w.ruleset!.options.style })
+            })
+          }
           out.push({ card: card.key, entry: e.id, outcome: 'failed' })
         }
         continue

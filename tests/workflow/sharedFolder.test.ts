@@ -32,7 +32,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     expect(r.warnings).toEqual([`one.txt is B1's (${cards[0].key})`])
     expect(e.wf.state(cards[2]).stage).toBe('done')
     // The user drags any card anywhere with no question.
-    for (const to of ['review', 'done', 'todo'] as const) expect(await e.wf.move(cards[0].key, to, 'user')).toMatchObject({ ok: true })
+    for (const to of ['done', 'todo', 'active'] as const) expect(await e.wf.move(cards[0].key, to, 'user')).toMatchObject({ ok: true })
     expect(e.store.cards().every((c) => !e.kinds(c.id).includes('Refused'))).toBe(true)
   })
 

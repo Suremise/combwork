@@ -80,6 +80,8 @@ export interface Tx {
   putCard(card: CardRecord): void
   meta(key: string): string | null
   setMeta(key: string, value: string): void
+  /** A commit seen on a shared folder's line, and whose it is: false when it was already recorded. */
+  recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean
 }
 
 export class FactStore {
@@ -227,7 +229,8 @@ export class FactStore {
         this.updateCard(c.id, c)
       },
       meta: (k) => this.meta(k),
-      setMeta: (k, v) => this.setMeta(k, v)
+      setMeta: (k, v) => this.setMeta(k, v),
+      recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
     }
     return transaction(w, () => fn(tx))
   }

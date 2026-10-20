@@ -7,7 +7,7 @@
 
 import { createHash } from 'crypto'
 import { readdirSync, readFileSync, statSync } from 'original-fs'
-import { join, relative, sep } from 'path'
+import { isAbsolute, join, relative, sep } from 'path'
 import type { FileChange, Manifest } from '../../shared/workflow/facts'
 import { isUnknown, unknown, type Maybe } from './types'
 
@@ -87,11 +87,19 @@ export class NoneAdapter {
     return hash
   }
 
+  /** A declared path stays inside the project: no `..` out of it, no absolute path, no `.hive`. */
+  static inside(p: string): boolean {
+    const posix = toPosix(p)
+    return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === '.hive')
+  }
+
   /** The manifest of some paths: each file under them with its content hash; a declared path that's gone is "deleted". */
   manifest(paths: string[]): Maybe<Manifest> {
     const out: Manifest = {}
     const limit = { n: 0 }
     let bytes = 0
+    const outside = paths.find((p) => !NoneAdapter.inside(p))
+    if (outside !== undefined) return unknown(`the path ${outside}, outside the project`)
     for (const p of [...new Set(paths.map(toPosix))].sort()) {
       const found: string[] = []
       this.files(p, found, limit)
