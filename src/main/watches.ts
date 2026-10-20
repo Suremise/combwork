@@ -2358,6 +2358,11 @@ export async function moveOrphanWatches(ws: WorkspaceService, m: { from: string;
   return moved.length
 }
 
+/** For tests: every workspace's watches load under way has finished (those started while waiting too). */
+export async function loadsForTests(): Promise<void> {
+  while (loading.size) await Promise.allSettled([...loading.values()])
+}
+
 export function forgetWatches(ws: WorkspaceService): void {
   if (ws.path && stores.get(ws.path.toLowerCase())?.ws === ws) stores.delete(ws.path.toLowerCase())
 }

@@ -4,7 +4,7 @@
 // Board Backup putting the copy back.
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
@@ -543,13 +543,37 @@ describe("what services read before the database was replaced is read again (#12
 })
 
 describe('a workspace closed right after its database was replaced stays closed (#1207 round 3)', () => {
-  /** Lets whatever the replacement left queued run (immediates, then what they await), as far as it goes. */
-  async function settle(): Promise<void> {
-    const delivery = await import('../src/main/deliveries')
-    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r))
-    await delivery.settledForTests()
-  }
   const markers = (ws: string): string[] => (existsSync(join(hiveOf(ws), PRESENCE_DIR)) ? readdirSync(join(hiveOf(ws), PRESENCE_DIR)) : [])
+
+  /**
+   * Replaces the database and closes the workspace with setImmediate held (only it: Node's I/O runs as usual), so what
+   * they leave queued runs when the test says, not while the close goes on; then runs it, with every deliveries read
+   * held at a gate until then, as a slow disk would hold it; then waits for every load that started, however long its
+   * reads take. What a replacement left queued for a closed workspace (round 3: a reload) has then run to its end.
+   */
+  async function replaceThenClose(w: WS, replace: () => Promise<unknown>): Promise<void> {
+    const delivery = await import('../src/main/deliveries')
+    const watches = await import('../src/main/watches')
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    delivery.setBeforeReadForTests(() => gate)
+    vi.useFakeTimers({ toFake: ['setImmediate'] })
+    try {
+      await replace()
+      await close(w)
+      vi.runAllTimers()
+    } finally {
+      vi.useRealTimers()
+      release()
+    }
+    try {
+      await delivery.loadsForTests()
+      await watches.loadsForTests()
+      await delivery.settledForTests()
+    } finally {
+      delivery.setBeforeReadForTests(null)
+    }
+  }
 
   for (const how of ['upgrade', 'restore'] as const) {
     it(`after ${how === 'upgrade' ? 'the upgrade' : 'Restore'}, closing the workspace at once: its deliveries and watches aren't read again, its database not opened`, async () => {
@@ -564,11 +588,7 @@ describe('a workspace closed right after its database was replaced stays closed 
         // Loaded, so the replacement has something to drop.
         await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
         await inWorkspace(w, () => watches.evaluateAgentWatches(w))
-        if (how === 'upgrade') await inWorkspace(w, () => store.upgradeBoard(w))
-        else await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-        await close(w)
-        expect(store.boardOpen(ws)).toBe(false)
-        await settle()
+        await replaceThenClose(w, () => (how === 'upgrade' ? inWorkspace(w, () => store.upgradeBoard(w)) : inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))))
         expect(store.boardOpen(ws)).toBe(false)
         expect(markers(ws)).toEqual([])
       } finally {
@@ -588,7 +608,6 @@ describe('a workspace closed right after its database was replaced stays closed 
     try {
       await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
       await inWorkspace(w, () => store.upgradeBoard(w))
-      await settle()
       const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'After the upgrade' }))
       expect((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries.map((r) => r.id)).toEqual([made.id])
     } finally {

@@ -291,6 +291,11 @@ let beforePlan: (() => Promise<void> | void) | null = null
 export const setBeforePlanForTests = (fn: (() => Promise<void> | void) | null): void => {
   beforePlan = fn
 }
+/** For tests: awaited as a host's load begins, before anything is read (a read held up, as a slow disk would). */
+let beforeRead: (() => Promise<void> | void) | null = null
+export const setBeforeReadForTests = (fn: (() => Promise<void> | void) | null): void => {
+  beforeRead = fn
+}
 
 /** Transactions not finished yet (also those nothing waits for): what settled() waits for. */
 let running = 0
@@ -323,6 +328,7 @@ export function load(host: string): Promise<Store> {
   const going = loading.get(k)
   if (going) return going
   const p = (async () => {
+    await beforeRead?.()
     const place = await hostPlace(host)
     for (let tries = 1; ; tries++) {
       const gen = dbGeneration(place.workspace)
@@ -1471,6 +1477,10 @@ export async function followAllForTests(): Promise<void> {
 /** For tests: transactions still running finish. */
 export async function settledForTests(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.all([...stores.values()].map((s) => s.lock))
+}
+/** For tests: every host's load under way has finished (those started while waiting too), however long its reads take. */
+export async function loadsForTests(): Promise<void> {
+  while (loading.size) await Promise.allSettled([...loading.values()])
 }
 /** For tests: forgets every host in memory, as a restart of Hive does (transactions finish first); what is on disk stays. */
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
