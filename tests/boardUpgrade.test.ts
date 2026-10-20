@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { as09 } from './boardDb'
 
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -243,11 +244,8 @@ async function board09(): Promise<string> {
   const w = await open(ws)
   await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
   await close(w)
-  // As 0.9 left it: none of the 1.0 group's steps.
-  const raw = new DatabaseSync(store.boardFile(ws))
-  raw.prepare(`DELETE FROM schema_version WHERE version >= ?`).run(Math.min(...upgradeSteps.map((m) => m.version)))
-  raw.exec("DELETE FROM board_meta WHERE key = 'format'")
-  raw.close()
+  // As 0.9 left it: its cards as documents, none of the 1.0 group's steps.
+  as09(store.boardFile(ws))
   return ws
 }
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()

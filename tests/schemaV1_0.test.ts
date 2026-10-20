@@ -23,7 +23,7 @@ function roundTrip(db: DatabaseSync, n: number, doc: Record<string, unknown>): s
   db.exec('BEGIN')
   writeCardRows(db, decomposeCard(n, doc))
   db.exec('COMMIT')
-  const [rows] = readCardRows(db, [n])
+  const [rows] = readCardRows(db, { numbers: [n] })
   return JSON.stringify(composeCard(rows))
 }
 
@@ -138,7 +138,7 @@ describe('the card JSON contract', () => {
     const r = decomposeCard(1, card(1))
     expect(r.card).toMatchObject({ col: 'doing', ord: 3.5, agent: 'a-1', archived: 0, extra: null, layout: null })
     const odd = decomposeCard(6, card(6, { title: 42, order: '2' }))
-    expect(odd.card).toMatchObject({ title: 'Task 6', ord: 6 })
+    expect(odd.card).toMatchObject({ title: 'Task 6', ord: 2 })
     expect(JSON.parse(odd.card.extra!)).toEqual({ title: 42, order: '2' })
   })
 

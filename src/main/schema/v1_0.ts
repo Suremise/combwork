@@ -2,7 +2,7 @@
  * hive.db's 1.0 schema (#1208, SPEC §16.12, §16.4, §16.17; #1025, #704, #1119): every table P3's migration makes, grouped
  * into the steps the storage cards register in `BOARD_MIGRATIONS`, in this order (each takes the next version number when
  * it merges, never out of order: db.ts skips a version below the file's). #1207's 1.0 group runs them in one
- * transaction, after one ask, one backup and one exclusive lock. Nothing imports this module until those cards do.
+ * transaction, after one ask, one backup and one exclusive lock. Registered so far: the cards step (#1209, cardsStep.ts).
  *
  * Each step's `ddl` makes its tables on a file that has today's (0.9) schema: the step that copies data into them
  * (moving today's `cards` aside first, `store_rows` rows into the typed tables) is the registering card's. Which module
@@ -24,7 +24,7 @@ export interface SchemaStep {
 }
 
 /** Cards in typed columns and child tables (#1025), replacing today's `cards` (a JSON document with generated columns). */
-const CARDS: SchemaStep = {
+export const CARDS_STEP: SchemaStep = {
   name: 'cards in tables',
   ddl: [
     // The card itself. `number` is the card's permanent global number (`#N`, never reused; P8 keeps it as the internal id
@@ -446,7 +446,7 @@ const KEYS: SchemaStep = {
 }
 
 /** P3's steps, in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS, KEYS]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS, KEYS]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {

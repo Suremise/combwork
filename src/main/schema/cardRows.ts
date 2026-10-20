@@ -1,4 +1,4 @@
-import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
+import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite'
 
 /**
  * A card's document as rows of the 1.0 tables (#1208, schema in v1_0.ts), and back, byte for byte: the card JSON
@@ -18,6 +18,8 @@ import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
  *
  * The 1.0 fields the API adds to a card (`key`, `stage`) aren't part of the document: they come from the card's columns
  * and are appended after the document's fields (docs/ARCHITECTURE.md, Storage).
+ *
+ * It imports nothing at run time: the e2e helpers (tests/e2e/lib.cjs, evidence.cjs) load it with Node as it is.
  */
 
 export type Sql = SQLInputValue
@@ -181,6 +183,17 @@ function entryOf(spec: EntrySpec, r: EntryRow): unknown {
   return out
 }
 
+/**
+ * A field's value as 0.9's REAL index column held it (`json_extract` stored with REAL affinity): a number, a boolean as
+ * 1 or 0, a string that is a number literal as that number; null for anything else (the index held text, or nothing).
+ */
+function asReal(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'boolean') return v ? 1 : 0
+  if (typeof v === 'string' && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(v)) return Number(v)
+  return null
+}
+
 const strList = (v: unknown): v is string[] => Array.isArray(v) && v.every(isText)
 const intList = (v: unknown): v is number[] => Array.isArray(v) && v.every((x) => Number.isSafeInteger(x))
 const EPOCH = new Date(0).toISOString()
@@ -205,7 +218,9 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
   const isReview = (v: unknown): v is { agent: string; agentName: string; since: string } => isObject(v) && sameKeys(Object.keys(v), ['agent', 'agentName', 'since']) && isText(v.agent) && isText(v.agentName) && isText(v.since)
   const anyJson = (v: unknown): v is unknown => v !== undefined
 
-  for (const k of Object.keys(doc)) if (!KNOWN.has(k)) extra[k] = doc[k]
+  // A field set to undefined is no field (JSON.stringify leaves it out, as the document saved before 1.0 did).
+  const keys = Object.keys(doc).filter((k) => doc[k] !== undefined)
+  for (const k of keys) if (!KNOWN.has(k)) extra[k] = doc[k]
   take('number', isNumber)
   const title = take('title', text)
   const description = take('description', text)
@@ -233,6 +248,8 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
   const createdBy = take('createdBy', text)
   const updatedAt = take('updatedAt', text)
 
+  // A review not of Hive's form (kept in extra) still names its reviewer for queries (cardDocs' reviewers), as clean reads it.
+  const reviewer = review?.agent ?? (isObject(doc.review) && isText(doc.review.agent) && doc.review.agent ? doc.review.agent : null)
   const card: CardRow = {
     number: n,
     // What a reader makes of a missing or damaged field (tasks.ts `clean`), so queries see what readers do; the document keeps its own in extra.
@@ -242,13 +259,14 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
     project_id: projectId ?? null,
     agent: agent || null,
     agent_name: agentName ?? null,
-    review_agent: review?.agent ?? null,
+    review_agent: reviewer,
     review_agent_name: review?.agentName ?? null,
     review_since: review?.since ?? null,
     col: column ?? 'todo',
-    ord: order ?? n,
+    ord: order ?? asReal(doc.order) ?? n,
     blocked: blocked ?? null,
-    archived: archived === true ? 1 : 0,
+    // As 0.9's index had it (`json_extract(doc, '$.archived') = 1`: true or 1), so a query picks the cards it picked.
+    archived: archived === true || doc.archived === 1 ? 1 : 0,
     archived_for: archivedFor ?? null,
     archived_batch: archivedBatch ?? null,
     context_problems: contextProblems === undefined ? null : JSON.stringify(contextProblems),
@@ -272,7 +290,6 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
     holds: (held ?? []).map((e) => entryRow(HOLD, e))
   }
   if (Object.keys(extra).length) card.extra = JSON.stringify(extra)
-  const keys = Object.keys(doc)
   if (card.extra !== null || !sameKeys(keys, canonicalKeys(rows))) card.layout = JSON.stringify(keys)
   return rows
 }
@@ -294,46 +311,68 @@ function canonicalKeys(r: CardRows): string[] {
   return CARD_KEYS.filter((k) => !k.optional || has[k.key]).map((k) => k.key)
 }
 
+/** A field's value from the card's columns and rows (its form in the document aside: extra and layout are the callers'). */
+function columnField(r: CardRows, k: string): unknown {
+  const c = r.card
+  switch (k) {
+    case 'number': return c.number
+    case 'title': return c.title
+    case 'description': return c.description
+    case 'project': return c.project
+    case 'projectId': return c.project_id ?? undefined
+    case 'agent': return c.agent
+    case 'agentName': return c.agent_name ?? undefined
+    case 'review': return c.review_agent === null ? undefined : { agent: c.review_agent, agentName: c.review_agent_name, since: c.review_since }
+    case 'column': return c.col
+    case 'order': return c.ord
+    case 'labels': return r.labels
+    case 'context': return r.context
+    case 'contextProblems': return c.context_problems === null ? undefined : JSON.parse(c.context_problems)
+    case 'blocked': return c.blocked
+    case 'blockedBy': return r.blockedBy
+    case 'links': return r.links
+    case 'comments': return r.comments.map((e) => entryOf(COMMENT, e))
+    case 'history': return r.history.map((e) => entryOf(HISTORY, e))
+    case 'archived': return c.archived === 1
+    case 'archivedFor': return c.archived_for ?? undefined
+    case 'archivedBatch': return c.archived_batch ?? undefined
+    case 'decisions': return r.decisions.map((e) => entryOf(DECISION, e))
+    case 'held': return r.holds.map((e) => entryOf(HOLD, e))
+    case 'createdAt': return c.created_at
+    case 'createdBy': return c.created_by
+    case 'updatedAt': return c.updated_at
+    default: return undefined
+  }
+}
+
 /** A card's document from its rows: the inverse of decomposeCard. */
 export function composeCard(r: CardRows): Record<string, unknown> {
   const c = r.card
   const extra = c.extra === null ? {} : (JSON.parse(c.extra) as Record<string, unknown>)
   const keys = c.layout === null ? canonicalKeys(r) : (JSON.parse(c.layout) as string[])
-  const field = (k: string): unknown => {
-    switch (k) {
-      case 'number': return c.number
-      case 'title': return c.title
-      case 'description': return c.description
-      case 'project': return c.project
-      case 'projectId': return c.project_id ?? undefined
-      case 'agent': return c.agent
-      case 'agentName': return c.agent_name ?? undefined
-      case 'review': return c.review_agent === null ? undefined : { agent: c.review_agent, agentName: c.review_agent_name, since: c.review_since }
-      case 'column': return c.col
-      case 'order': return c.ord
-      case 'labels': return r.labels
-      case 'context': return r.context
-      case 'contextProblems': return c.context_problems === null ? undefined : JSON.parse(c.context_problems)
-      case 'blocked': return c.blocked
-      case 'blockedBy': return r.blockedBy
-      case 'links': return r.links
-      case 'comments': return r.comments.map((e) => entryOf(COMMENT, e))
-      case 'history': return r.history.map((e) => entryOf(HISTORY, e))
-      case 'archived': return c.archived === 1
-      case 'archivedFor': return c.archived_for ?? undefined
-      case 'archivedBatch': return c.archived_batch ?? undefined
-      case 'decisions': return r.decisions.map((e) => entryOf(DECISION, e))
-      case 'held': return r.holds.map((e) => entryOf(HOLD, e))
-      case 'createdAt': return c.created_at
-      case 'createdBy': return c.created_by
-      case 'updatedAt': return c.updated_at
-      default: return undefined
-    }
-  }
   const out: Record<string, unknown> = {}
   // Defined, not assigned, and only the extra's own fields: a key like `__proto__` or `constructor` is a field like any other.
-  for (const k of keys) Object.defineProperty(out, k, { value: Object.hasOwn(extra, k) ? extra[k] : field(k), enumerable: true, writable: true, configurable: true })
+  for (const k of keys) Object.defineProperty(out, k, { value: Object.hasOwn(extra, k) ? extra[k] : columnField(r, k), enumerable: true, writable: true, configurable: true })
   return out
+}
+
+/** The list fields a canonical card has only when they aren't empty (CARD_KEYS' optional lists). */
+const OPTIONAL_LISTS: Record<string, (r: CardRows) => unknown[]> = { context: (r) => r.context, decisions: (r) => r.decisions, held: (r) => r.holds }
+
+/**
+ * One field of a card's document, as composeCard gives it (undefined: the document hasn't it), from rows read with only
+ * the parts that field needs (readCardRows' `parts`): what a reader of a few fields of many cards uses, never parsing the rest.
+ */
+export function cardField(r: CardRows, k: string): unknown {
+  const c = r.card
+  if (c.layout !== null) {
+    if (!(JSON.parse(c.layout) as string[]).includes(k)) return undefined
+    if (c.extra !== null) {
+      const extra = JSON.parse(c.extra) as Record<string, unknown>
+      if (Object.hasOwn(extra, k)) return extra[k]
+    }
+  } else if (OPTIONAL_LISTS[k] && !OPTIONAL_LISTS[k](r).length) return undefined
+  return columnField(r, k)
 }
 
 // ---------------------------------------------------------------------------
@@ -346,54 +385,94 @@ const LIST_TABLES = [
   { table: 'card_context', col: 'ref', of: (r: CardRows) => r.context }
 ] as const
 const ENTRY_TABLES = [
-  { spec: COMMENT, of: (r: CardRows) => r.comments },
-  { spec: HISTORY, of: (r: CardRows) => r.history },
-  { spec: DECISION, of: (r: CardRows) => r.decisions },
-  { spec: HOLD, of: (r: CardRows) => r.holds }
+  { spec: COMMENT, part: 'comments', of: (r: CardRows) => r.comments },
+  { spec: HISTORY, part: 'history', of: (r: CardRows) => r.history },
+  { spec: DECISION, part: 'decisions', of: (r: CardRows) => r.decisions },
+  { spec: HOLD, part: 'holds', of: (r: CardRows) => r.holds }
 ] as const
+
+/** Statements made once per connection (a card's save and read run many times a second in a lane's round). */
+const statements = new WeakMap<DatabaseSync, Map<string, StatementSync>>()
+function stmt(db: DatabaseSync, sql: string): StatementSync {
+  let byDb = statements.get(db)
+  if (!byDb) statements.set(db, (byDb = new Map()))
+  let s = byDb.get(sql)
+  if (!s) byDb.set(sql, (s = db.prepare(sql)))
+  return s
+}
 
 /** Writes a card's rows, replacing whatever it had (inside the caller's transaction). */
 export function writeCardRows(db: DatabaseSync, r: CardRows): void {
   const n = r.card.number
-  db.prepare(`INSERT INTO cards (${CARD_COLS.join(', ')}) VALUES (${CARD_COLS.map(() => '?').join(', ')}) ON CONFLICT(number) DO UPDATE SET ${CARD_COLS.slice(1).map((c) => `${c} = excluded.${c}`).join(', ')}`).run(...CARD_COLS.map((c) => r.card[c] as Sql))
+  stmt(db, `INSERT INTO cards (${CARD_COLS.join(', ')}) VALUES (${CARD_COLS.map(() => '?').join(', ')}) ON CONFLICT(number) DO UPDATE SET ${CARD_COLS.slice(1).map((c) => `${c} = excluded.${c}`).join(', ')}`).run(...CARD_COLS.map((c) => r.card[c] as Sql))
   for (const t of LIST_TABLES) {
-    db.prepare(`DELETE FROM ${t.table} WHERE card = ?`).run(n)
-    const ins = db.prepare(`INSERT INTO ${t.table} (card, ord, ${t.col}) VALUES (?, ?, ?)`)
+    stmt(db, `DELETE FROM ${t.table} WHERE card = ?`).run(n)
+    const ins = stmt(db, `INSERT INTO ${t.table} (card, ord, ${t.col}) VALUES (?, ?, ?)`)
     t.of(r).forEach((v, i) => ins.run(n, i, v))
   }
-  db.prepare('DELETE FROM card_links WHERE card = ?').run(n)
-  const link = db.prepare('INSERT INTO card_links (card, kind, ord, target) VALUES (?, ?, ?, ?)')
+  stmt(db, 'DELETE FROM card_links WHERE card = ?').run(n)
+  const link = stmt(db, 'INSERT INTO card_links (card, kind, ord, target) VALUES (?, ?, ?, ?)')
   r.blockedBy.forEach((v, i) => link.run(n, 'blockedBy', i, v))
   r.links.forEach((v, i) => link.run(n, 'link', i, v))
   for (const t of ENTRY_TABLES) {
     const cols = t.spec.fields.map((f) => f.col)
-    db.prepare(`DELETE FROM ${t.spec.table} WHERE card = ?`).run(n)
-    const ins = db.prepare(`INSERT INTO ${t.spec.table} (card, ord, ${cols.join(', ')}, raw) VALUES (?, ?, ${cols.map(() => '?').join(', ')}, ?)`)
+    stmt(db, `DELETE FROM ${t.spec.table} WHERE card = ?`).run(n)
+    const ins = stmt(db, `INSERT INTO ${t.spec.table} (card, ord, ${cols.join(', ')}, raw) VALUES (?, ?, ${cols.map(() => '?').join(', ')}, ?)`)
     t.of(r).forEach((e, i) => ins.run(n, i, ...cols.map((c) => e.cols[c] ?? null), e.raw))
   }
 }
 
-/** Cards' rows read back, by number (in number order): every card's when `numbers` is left out. */
-export function readCardRows(db: DatabaseSync, numbers?: number[]): CardRows[] {
-  const where = numbers ? ' WHERE number IN (SELECT value FROM json_each(?))' : ''
-  const args: Sql[] = numbers ? [JSON.stringify(numbers)] : []
-  const cards = db.prepare(`SELECT ${CARD_COLS.join(', ')} FROM cards${where} ORDER BY number`).all(...args) as unknown as CardRow[]
+/** A card's child tables, by the CardRows list they fill. */
+export type CardPart = 'labels' | 'context' | 'links' | 'comments' | 'history' | 'decisions' | 'holds'
+const ALL_PARTS: CardPart[] = ['labels', 'context', 'links', 'comments', 'history', 'decisions', 'holds']
+
+/**
+ * Which cards readCardRows reads: these numbers, or those a condition on `cards` picks (SQL of this module's callers,
+ * never of user text; its arguments bound), every card when neither; and which of their child tables (all when left out).
+ */
+export interface CardSelection {
+  numbers?: number[]
+  where?: string
+  args?: Sql[]
+  parts?: CardPart[]
+  /**
+   * Only these of the card's own columns (with its number, archived, extra and layout, which cardField needs), for a reader of a
+   * few fields of many cards: the others are left out of the row (never read for a field they hold).
+   */
+  columns?: (keyof CardRow)[]
+}
+
+/** Cards' rows read back, in number order, as the selection asks; the lists of parts left out stay empty. */
+export function readCardRows(db: DatabaseSync, sel: CardSelection = {}): CardRows[] {
+  const parts = new Set(sel.parts ?? ALL_PARTS)
+  const where = sel.numbers ? 'number IN (SELECT value FROM json_each(?))' : (sel.where ?? null)
+  const args: Sql[] = sel.numbers ? [JSON.stringify(sel.numbers)] : (sel.args ?? [])
+  const cardCols = sel.columns ? [...new Set<keyof CardRow>(['number', 'archived', ...sel.columns, 'extra', 'layout'])] : CARD_COLS
+  const cards = stmt(db, `SELECT ${cardCols.join(', ')} FROM cards${where ? ` WHERE ${where}` : ''} ORDER BY number`).all(...args) as unknown as CardRow[]
   const byCard = new Map<number, CardRows>()
   for (const card of cards) byCard.set(card.number, { card: { ...card }, labels: [], context: [], blockedBy: [], links: [], comments: [], history: [], decisions: [], holds: [] })
-  const childWhere = numbers ? ' WHERE card IN (SELECT value FROM json_each(?))' : ''
+  if (!byCard.size) return []
+  // One card: by its key. More: the children of the cards the condition picks (every card's when there is none).
+  const one = byCard.size === 1 ? [...byCard.keys()][0] : null
+  const childWhere = one !== null ? ' WHERE card = ?' : where ? ` WHERE card IN (SELECT number FROM cards WHERE ${where})` : ''
+  const childArgs: Sql[] = one !== null ? [one] : args
   for (const t of LIST_TABLES) {
-    for (const row of db.prepare(`SELECT card, ${t.col} AS v FROM ${t.table}${childWhere} ORDER BY card, ord`).all(...args) as { card: number; v: string }[]) {
+    if (!parts.has(t.table === 'card_labels' ? 'labels' : 'context')) continue
+    for (const row of stmt(db, `SELECT card, ${t.col} AS v FROM ${t.table}${childWhere} ORDER BY card, ord`).all(...childArgs) as { card: number; v: string }[]) {
       const r = byCard.get(row.card)
       if (r) t.of(r).push(row.v)
     }
   }
-  for (const row of db.prepare(`SELECT card, kind, target FROM card_links${childWhere} ORDER BY card, kind, ord`).all(...args) as { card: number; kind: string; target: number }[]) {
-    const r = byCard.get(row.card)
-    if (r) (row.kind === 'blockedBy' ? r.blockedBy : r.links).push(row.target)
+  if (parts.has('links')) {
+    for (const row of stmt(db, `SELECT card, kind, target FROM card_links${childWhere} ORDER BY card, kind, ord`).all(...childArgs) as { card: number; kind: string; target: number }[]) {
+      const r = byCard.get(row.card)
+      if (r) (row.kind === 'blockedBy' ? r.blockedBy : r.links).push(row.target)
+    }
   }
   for (const t of ENTRY_TABLES) {
+    if (!parts.has(t.part)) continue
     const cols = t.spec.fields.map((f) => f.col)
-    for (const row of db.prepare(`SELECT card, ${cols.join(', ')}, raw FROM ${t.spec.table}${childWhere} ORDER BY card, ord`).all(...args) as Record<string, string | number | null>[]) {
+    for (const row of stmt(db, `SELECT card, ${cols.join(', ')}, raw FROM ${t.spec.table}${childWhere} ORDER BY card, ord`).all(...childArgs) as Record<string, string | number | null>[]) {
       const r = byCard.get(row.card as number)
       if (r) t.of(r).push({ cols: Object.fromEntries(cols.map((c) => [c, row[c] as string | null])), raw: row.raw as string | null })
     }

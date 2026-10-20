@@ -529,7 +529,7 @@
   "board.toolbar.more": "Board: mehr",
   "board.toolbar.search": "Karten suchen (#12, Wörter, Labels)",
   "board.upgrade.askDetail": "Schließ zuerst jedes andere Hive, das diesen Arbeitsbereich geöffnet hat. Bis zur Aktualisierung ist sein Board hier schreibgeschützt und seine Agenten können nicht starten.",
-  "board.upgrade.askMessage": "Hive 1.0 muss die Daten dieses Arbeitsbereichs aktualisieren. Ein Hive 0.9 kann ihn danach nur noch schreibgeschützt öffnen; eine Sicherung wird aufbewahrt, und „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ spielt sie zurück.",
+  "board.upgrade.askMessage": "Hive 1.0 muss die Daten dieses Arbeitsbereichs aktualisieren. Ein Hive 0.9 kann ihn danach nicht mehr öffnen; eine Sicherung wird aufbewahrt, und „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ spielt sie zurück.",
   "board.upgrade.askTitle": "Das Board dieses Arbeitsbereichs auf 1.0 aktualisieren?",
   "board.upgrade.banner": "Dieser Arbeitsbereich stammt aus Hive 0.9: Bis er auf 1.0 aktualisiert ist, ist sein Board hier schreibgeschützt und seine Agenten können nicht starten.",
   "board.upgrade.bannerButton": "Aktualisieren…",
