@@ -1282,6 +1282,109 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
   })
 })
 
+describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #1253)', () => {
+  type Lib = { ROOT: string; ELECTRON: string; PACKAGED_ARGS: string[]; testExecutable: (exe: string) => string; keepPackagedQuiet: (m: object) => string[] }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+
+  it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Hive and any other are refused", () => {
+    expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
+    expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
+    expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'builds', 'Hive.exe'))).toBe('packaged')
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
+    expect(() => lib.testExecutable('C:\\Elsewhere\\Hive.exe')).toThrow(/never C:\\Elsewhere\\Hive\.exe/)
+    // Started hidden: no window is shown before keepPackagedQuiet reaches it.
+    expect(lib.PACKAGED_ARGS).toContain('--hidden')
+  })
+
+  /** A stand-in for Electron's main-process modules, with one window. */
+  const electron = (visible: boolean) => {
+    const calls: string[] = []
+    const listeners: Record<string, (...a: unknown[]) => void> = {}
+    class BrowserWindow {
+      static all: BrowserWindow[] = []
+      static getAllWindows = () => BrowserWindow.all
+      bounds = { x: 100, y: 100, width: 1200, height: 800 }
+      visible = visible
+      isDestroyed = () => false
+      isVisible = () => this.visible
+      getTitle = () => 'Hive Desktop'
+      getBounds = () => this.bounds
+      setPosition = (x: number, y: number) => void (this.bounds = { ...this.bounds, x, y })
+      setFocusable = (on: boolean) => void calls.push(`focusable ${on}`)
+      setSkipTaskbar = (on: boolean) => void calls.push(`skipTaskbar ${on}`)
+      on = () => undefined
+      once = () => undefined
+    }
+    Object.assign(BrowserWindow.prototype, {
+      show: () => calls.push('show'),
+      showInactive: function (this: BrowserWindow) {
+        this.visible = true
+        calls.push('showInactive')
+      },
+      focus: () => calls.push('focus'),
+      maximize: () => calls.push('maximize'),
+      flashFrame: () => calls.push('flashFrame')
+    })
+    BrowserWindow.all.push(new BrowserWindow())
+    class Notification {
+      show() {
+        calls.push('notification')
+      }
+    }
+    const dialog = { showMessageBox: () => calls.push('dialog'), showErrorBox: () => calls.push('errorBox') }
+    const app = { on: (e: string, f: (...a: unknown[]) => void) => void (listeners[e] = f) }
+    const screen = { getAllDisplays: () => [{ bounds: { x: 0, y: 0, width: 2560, height: 1440 } }, { bounds: { x: -1920, y: 200, width: 1920, height: 1080 } }] }
+    const state = { ready: true }
+    // Electron's screen isn't usable before the app is ready (0.9.3 in Windows Sandbox: "getAllDisplays is not a function").
+    const modules = {
+      app,
+      BrowserWindow,
+      Notification,
+      dialog,
+      get screen() {
+        if (!state.ready) throw new Error('screen before ready')
+        return screen
+      }
+    }
+    return { modules, state, calls, win: BrowserWindow.all[0] as unknown as { bounds: { x: number }; visible: boolean } & Record<string, () => void>, listeners, BrowserWindow }
+  }
+
+  it('reached before the app is ready (no window yet), it uses the screen only once a window is made', () => {
+    const e = electron(false)
+    e.BrowserWindow.all.length = 0
+    e.state.ready = false
+    expect(lib.keepPackagedQuiet(e.modules)).toEqual([])
+    e.state.ready = true
+    const win = new e.BrowserWindow()
+    e.listeners['browser-window-created']({}, win)
+    expect(win.bounds.x).toBe(-1920 - 1200 - 8000)
+  })
+
+  it('its windows go off screen, unfocusable and off the taskbar, then show without the focus; nothing shows, focuses or notifies after', async () => {
+    const e = electron(false)
+    expect(lib.keepPackagedQuiet(e.modules)).toEqual([])
+    expect(e.win.bounds.x).toBe(-1920 - 1200 - 8000)
+    expect(e.calls).toEqual(['focusable false', 'skipTaskbar true', 'showInactive'])
+    e.calls.length = 0
+    e.win.show()
+    e.win.focus()
+    e.win.maximize()
+    e.win.flashFrame()
+    expect(e.calls).toEqual(['showInactive'])
+    e.calls.length = 0
+    ;(new (e.modules.Notification as new () => { show: () => void })()).show()
+    e.modules.dialog.showErrorBox()
+    expect(await (e.modules.dialog.showMessageBox as unknown as (o: object) => Promise<{ response: number }>)({ cancelId: 2 })).toEqual({ response: 2, checkboxChecked: false })
+    expect(e.calls).toEqual([])
+    expect(e.listeners['browser-window-created']).toBeTypeOf('function')
+  })
+
+  it('a window already shown when it is reached is said (the launch then fails)', () => {
+    expect(lib.keepPackagedQuiet(electron(true).modules)).toEqual(['Hive Desktop'])
+  })
+})
+
 describe('whether a process still runs (lib.processRunning, #339)', () => {
   const { processRunning } = createRequire(import.meta.url)('./e2e/lib.cjs') as { processRunning: (pid: number) => boolean }
   const failing = (code: string) => () => {
@@ -1704,6 +1807,13 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     const env = ctx.childEnv({ HIVE_API_URL: 'http://127.0.0.1:1', ELECTRON_RUN_AS_NODE: '1' }, parent)
     expect(Object.keys(env).sort()).toEqual(['ELECTRON_RUN_AS_NODE', 'HIVE_API_URL', 'LOCALAPPDATA', 'Path', 'SystemRoot', 'USERPROFILE', 'https_proxy'])
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
+  })
+
+  it("no child gets the user's Hives' hive-progress shims on its PATH: they run the installed Hive.exe (#1253)", () => {
+    const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other' }
+    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, shell)]) {
+      expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other')
+    }
   })
 
   it('every child the runners and the harness start themselves is given its environment, never left to inherit the shell (#208)', () => {

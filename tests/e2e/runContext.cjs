@@ -103,9 +103,25 @@ function apply(env, vars) {
   return env
 }
 
+/**
+ * PATH without the folders of the hive-progress shims the user's Hives install (`%APPDATA%\Hive\bin`, `Hive-Dev\bin`),
+ * which an agent's session has on its PATH (#1253): they run the installed Hive.exe (or the main checkout's dev build), so
+ * a test's `hive-progress` would start another Hive than its own, and report to the user's. A test Hive puts its own
+ * shims on its sessions' PATH.
+ */
+function withoutHiveShims(env, parent) {
+  if (!parent.APPDATA) return env
+  const shims = ['Hive', 'Hive-Dev'].map((p) => path.win32.join(parent.APPDATA, p, 'bin').toLowerCase())
+  const same = (d) => path.win32.normalize(d).replace(/[\\/]+$/, '').toLowerCase()
+  for (const k of Object.keys(env)) {
+    if (k.toUpperCase() === 'PATH') env[k] = env[k].split(';').filter((d) => !shims.includes(same(d))).join(';')
+  }
+  return env
+}
+
 /** The allowlisted environment, and nothing else: for a child that isn't Hive (git, a test server). */
 function baseEnv(parent = process.env) {
-  return pick(parent, ALLOW)
+  return withoutHiveShims(pick(parent, ALLOW), parent)
 }
 
 /**

@@ -69,6 +69,25 @@ record is marked not valid. So `npm run dist`, then
 `npm run e2e -- packaged packaged-mcp packaged-progress --record`, gives a valid record without `--build`; a `dist` from
 another commit, or from before an edit, is reported.
 
+**Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
+(`testQuiet`: off screen, unfocusable, no notifications). A packaged Hive isn't, unless it is 1.0 with
+`HIVE_TEST_QUIET=1` (which `hiveEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
+does it from outside for every packaged Hive a suite starts (`packaged`, `packaged-transcript`, `boardupgrade` and
+`upgradelane`'s 0.9 from `HIVE_E2E_HIVE09` or the main checkout's `dist\win-unpacked`, `plan` with `HIVE_EXE`). It
+starts with `--hidden` (Hive makes its windows but shows none, as when started at sign-in). As soon as Playwright
+reaches its main process, `keepPackagedQuiet` moves its windows off screen, makes them unfocusable and keeps them off
+the taskbar, then shows them inactive so they draw for screenshots. From then on, showing, focusing, maximising,
+raising or flashing a window keeps it off screen, Windows notifications are dropped, and message boxes answer as
+cancelled. A window already shown when it is reached fails the launch, saying so. Only its tray icon can appear.
+`packaged-progress` and `packaged-mcp` run Hive.exe as Node and show nothing. Checked in Windows Sandbox (0.9.3, a
+watcher of on-screen windows and the foreground: none from Hive) and on the host for these suites (the card says how).
+
+Nor does a test ever start the installed Hive (`%LOCALAPPDATA%\Programs\Hive`): `lib.cjs` refuses it and any Hive.exe
+outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `HIVE_E2E_HIVE09` and `HIVE_EXE`. And
+children of the run context get no `%APPDATA%\Hive\bin` or `Hive-Dev\bin` on their PATH (an agent session has them):
+those `hive-progress` shims run the installed Hive.exe. A `hive-progress` run seen in a process list is itself
+`Programs\Hive\Hive.exe` (as Node, no window), not the app.
+
 **Several at once.** Suites run four at a time (`--jobs N` for another number; `--jobs 1` runs them one after
 another). Each gets its own profile, folders and Agent API port: the runner sets `HIVE_E2E_PORT` and `HIVE_API_PORT`,
 and suites read the port with `lib.port(<default>)` (the default is used when a suite runs on its own). Suites that

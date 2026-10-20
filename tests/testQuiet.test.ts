@@ -42,6 +42,24 @@ describe('quiet test copies', () => {
     expect(testQuiet()).toBe(false)
   })
 
+  it('a packaged build is quiet only with HIVE_TEST_QUIET=1, never for its test profile alone (#1253)', async () => {
+    const { app } = await import('electron')
+    const packaged = app as { isPackaged: boolean }
+    packaged.isPackaged = true
+    try {
+      process.env.HIVE_USER_DATA = join(tempRoot(), 'hive-quiet-profile')
+      delete process.env.HIVE_TEST_QUIET
+      expect(testQuiet()).toBe(false)
+      process.env.HIVE_TEST_QUIET = '0'
+      expect(testQuiet()).toBe(false)
+      // The packaged suites' copies: hiveEnv sets it.
+      process.env.HIVE_TEST_QUIET = '1'
+      expect(testQuiet()).toBe(true)
+    } finally {
+      packaged.isPackaged = false
+    }
+  })
+
   it('every e2e suite and scenario starts Hive with a test profile, and none turns quiet off', () => {
     // A suite that needs a real window (one taking the focus, a native maximise) turns quiet off: list it here.
     const LOUD = ['tests/e2e/carddialog.cjs'] // only with HIVE_E2E_NATIVE=1, its native maximise check

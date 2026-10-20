@@ -6,12 +6,14 @@ import { app, screen, type BrowserWindow } from 'electron'
  * Windows notifications, taskbar flashes and the chime don't happen. What would have happened is appended to
  * HIVE_TEST_NOTIFY_LOG (one JSON line each), so suites can check it. A test copy is an unpackaged build with a test
  * profile (HIVE_USER_DATA, which every suite, scenario and verification script sets, however it is started), or one
- * started with HIVE_TEST_QUIET=1; HIVE_TEST_QUIET=0 turns it off, for a test that needs a real window. Never on in
- * normal use: `npm run dev` has no HIVE_USER_DATA, and the installed app is packaged.
+ * started with HIVE_TEST_QUIET=1; HIVE_TEST_QUIET=0 turns it off, for a test that needs a real window. A packaged build
+ * is quiet only with HIVE_TEST_QUIET=1 (#1253: the packaged suites start dist\win-unpacked with it, hiveEnv); its test
+ * profile alone doesn't make it so. Never on in normal use: `npm run dev` has no HIVE_USER_DATA, and the installed app
+ * is started without HIVE_TEST_QUIET.
  */
 export function testQuiet(): boolean {
-  if (app.isPackaged) return false
   const quiet = process.env.HIVE_TEST_QUIET
+  if (app.isPackaged) return quiet === '1'
   return quiet === '1' || (quiet !== '0' && !!process.env.HIVE_USER_DATA)
 }
 
@@ -46,9 +48,9 @@ export function keepOffScreen(win: BrowserWindow): void {
   win.on('resize', check)
 }
 
-/** One line to HIVE_TEST_NOTIFY_LOG, if set (unpackaged builds only). */
+/** One line to HIVE_TEST_NOTIFY_LOG, if set (unpackaged builds and quiet packaged ones only). */
 export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' | 'dialog'; title?: string; body?: string; projectPath?: string; on?: boolean }): void {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_NOTIFY_LOG : undefined
+  const file = !app.isPackaged || testQuiet() ? process.env.HIVE_TEST_NOTIFY_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)
