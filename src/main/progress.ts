@@ -153,10 +153,39 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       expectedMs: keptNumber(r.expectedMs),
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
-      ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {})
+      ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...runFor(keptFor(r))
     })
   }
   return out
+}
+
+/** What a run runs for (#1220): each part only when it has one. */
+export type RunFor = Partial<Record<'revision' | 'testedCheckout' | 'check' | 'folder', string | null>> & { card?: number | null }
+
+/** The fields a run gets for `f`, leaving out what it hasn't. */
+function runFor(f: RunFor): Pick<ProgressRun, 'card' | 'revision' | 'testedCheckout' | 'check' | 'folder'> {
+  return {
+    ...(f.card ? { card: f.card } : {}),
+    ...(f.revision ? { revision: f.revision } : {}),
+    ...(f.testedCheckout ? { testedCheckout: f.testedCheckout } : {}),
+    ...(f.check ? { check: f.check } : {}),
+    ...(f.folder ? { folder: f.folder } : {})
+  }
+}
+
+const COMMIT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
+
+/** What a kept run ran for, checked like the rest of the file: a commit id is a full one, a card a whole number. */
+function keptFor(r: Record<string, unknown>): RunFor {
+  const commit = (v: unknown): string | null => (typeof v === 'string' && COMMIT_ID.test(v) ? v : null)
+  return {
+    card: Number.isSafeInteger(r.card) && (r.card as number) > 0 ? (r.card as number) : null,
+    revision: commit(r.revision),
+    testedCheckout: commit(r.testedCheckout),
+    check: typeof r.check === 'string' && /^[\w.:-]{1,60}$/.test(r.check) ? r.check : null,
+    folder: keptText(r.folder, 1000)
+  }
 }
 
 /** A workspace's list (newest first) with at most RECENT_KEPT ended runs: the oldest ended ones go; open ones stay. */
@@ -271,7 +300,8 @@ export class ProgressStore {
     return null
   }
 
-  start(caller: ProgressCaller, body: Record<string, unknown>): ProgressRun {
+  /** `link`: what it runs for (#1220: its card, revision, check and folder), resolved and checked by the caller. */
+  start(caller: ProgressCaller, body: Record<string, unknown>, link: RunFor = {}): ProgressRun {
     // Every field is checked before anything changes.
     const title = text(body.title, 'title', MAX_TITLE)
     if (!title) throw new ProgressError(400, 'title is required') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
@@ -321,7 +351,8 @@ export class ProgressStore {
       expectedMs: estimateMs ?? null,
       exitCode: null,
       logPath: null,
-      ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {})
+      ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])
     this.flush(caller.workspacePath, [run.id])

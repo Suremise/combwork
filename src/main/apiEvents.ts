@@ -1,6 +1,7 @@
 import { dirname, resolve as resolvePath } from 'path'
 import type { HiveEvent, LiveSessionState, ProgressRun } from '../shared/types'
 import { activityFields, publicReason } from '../shared/assistantActivity'
+import { cardRefText } from '../shared/progress'
 
 /**
  * What the Agent API's event stream (`GET /v1/events`) sends of Hive's events, and to whom (#620). Pure, so it is unit
@@ -105,7 +106,12 @@ export function publicRun(r: ProgressRun): Record<string, unknown> {
     dismissed: r.dismissed,
     startedAt: r.startedAt,
     updatedAt: r.updatedAt,
-    finishedAt: r.finishedAt
+    finishedAt: r.finishedAt,
+    // What it ran for (#1220), when it says: the card by its reference, the commits, the check's name (not its folder).
+    ...(r.card ? { card: cardRefText(r.card) } : {}),
+    ...(r.revision ? { revision: r.revision } : {}),
+    ...(r.testedCheckout ? { testedCheckout: r.testedCheckout } : {}),
+    ...(r.check ? { check: r.check } : {})
   }
 }
 

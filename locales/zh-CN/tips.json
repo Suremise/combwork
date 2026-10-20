@@ -208,6 +208,8 @@
   "tips.performance.title": "Hive 本身的开销",
   "tips.permissionMode.text": "点击智能体底部栏中的模式，或按 {key}，即可在先询问、接受编辑和计划之间切换。",
   "tips.permissionMode.title": "切换权限模式",
+  "tips.progressCard.text": "进度面板中的运行会在智能体下方显示它对应的卡片和运行时的修订版本，例如 #1061 · a3f2c1d：点击卡片可打开它，点击修订版本可复制它。",
+  "tips.progressCard.title": "那次运行是为哪张卡片？",
   "tips.progressCommand.text": "智能体通过 hive-progress 运行测试、构建等耗时命令，因此进度面板会在智能体名下显示它们，从第二次运行起还会显示大约剩余多少时间。也可以在设置中让它们只在你要求时这样做。",
   "tips.progressCommand.title": "任何命令都能显示进度",
   "tips.progressDetails.text": "点击进度面板中的某次运行，或“最近”下的一次运行，即可查看详情：完整命令、运行时间和耗时、退出代码、它写入的日志，以及失败原因。",
