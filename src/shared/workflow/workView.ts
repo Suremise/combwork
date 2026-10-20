@@ -1,0 +1,254 @@
+// A card's work, read (#1223): the fold of its facts (facts.ts) as the window and the Agent API show it. The line, base
+// and folder; each revision submitted with its round, files, time and builder; the verdicts tied to their submission
+// and round; the checks per revision, counted or not; the marks (carried over, stale, outside the rules, merged in part,
+// left the target); the integration; the decisions' generations; and whether the card is from before 1.0 or adopted.
+// Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
+// descriptor (`revisionShort`), never by switching on a platform's id.
+
+import { foldCard, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type StageId } from './facts'
+
+export interface WorkRevision {
+  /** The submission's id (its fact's seq): what verdicts name. */
+  submission: number
+  /** Null for a no-code card. */
+  revision: string | null
+  base: string | null
+  round: number
+  files: FileChange[]
+  at: string
+  /** The builder agent who submitted it (null: not an agent). */
+  by: string | null
+  /** The decision generation the builder had received. */
+  generation: number
+  sameRevision: boolean
+  adopted: boolean
+  /** Warnings that didn't refuse it. */
+  warnings: string[]
+  /** The builder's summary with it. */
+  summary: string
+}
+
+export interface WorkVerdict {
+  submission: number
+  revision: string | null
+  reviewer: string
+  pass: boolean
+  failKind?: 'content' | 'explanation'
+  round: number
+  generation: number
+  at: string
+  /** On the latest submission at the card's current decision generation: a verdict that still counts. */
+  current: boolean
+}
+
+export interface WorkCheck {
+  name: string
+  /** The card's revision the run was for, and what was checked out where it ran. */
+  revision: string
+  tested: string
+  result: CheckRanData['result']
+  counted: boolean
+  whyNot?: CheckRanData['whyNot']
+  run: string
+  by: string
+  durationMs: number
+  at: string
+}
+
+export interface WorkMarks {
+  /** Passes kept for a later revision that is the same change. */
+  carriedOver: { from: string; to: string; how: FactData['CarriedOver']['how']; at: string }[]
+  /** A content-stale pass, until the builder submits again. */
+  stale: FactData['Stale'] | null
+  /** Rules skipped when it was merged by hand before they passed: outside the rules. */
+  outsideRules: string[]
+  /** Some of the unfinished card's work found in the target. */
+  mergedInPart: FactData['MergedInPart'] | null
+  /** A Done card's revision no longer in its target. */
+  leftTarget: FactData['LeftTarget'] | null
+  /** The user (or the Assistant) moved the latest submission past its review and approvals. */
+  overridden: boolean
+}
+
+export interface WorkIntegration {
+  revision: string
+  target: string
+  /** The target's revision with the change in it. */
+  result: string
+  method: FactData['Integrated']['method']
+  by: FactData['Integrated']['by']
+  /** The merge's own revision when it was merged with one (`method` merge): the result. */
+  mergeCommit: string | null
+  at: string
+}
+
+/** The merge queue's newest entry for the card this cycle, and how it stands. */
+export interface WorkQueueEntry {
+  entry: string
+  revision: string
+  target: string
+  state: 'open' | 'started' | 'cancelled' | 'failed' | 'integrated'
+  failure?: FactData['IntegrationFailed']['reason']
+  cancelled?: FactData['IntegrationCancelled']['reason']
+}
+
+export interface WorkView {
+  card: number
+  stage: StageId
+  /** A card from before 1.0: no facts are invented for it (§16.4.1). */
+  preWorkflow: boolean
+  /** Started by the upgrade from what could be read (an `Adopted` fact), and the column it was in. */
+  adopted: boolean
+  adoptedFrom?: 'doing' | 'review' | 'passed'
+  kind: CardKind | null
+  /** Where the card works: `project`, or the slot's folder. */
+  folder: string | null
+  /** The line it works on (Git: its branch); null for None. */
+  line: string | null
+  /** The revision its change starts from. */
+  base: string | null
+  target: string | null
+  builder: string | null
+  /** The last head seen in its folder. */
+  head: string | null
+  /** The revision the latest submission's passes now cover, and its base. */
+  approved: { revision: string | null; base: string | null } | null
+  /** This cycle's submissions, oldest first. */
+  revisions: WorkRevision[]
+  verdicts: WorkVerdict[]
+  checks: WorkCheck[]
+  marks: WorkMarks
+  integration: WorkIntegration | null
+  queue: WorkQueueEntry | null
+  /** The card's newest decision generation (0: none) and the one each agent has received. */
+  decisions: { generation: number; received: Record<string, number> }
+  /** Failed verdicts and the user's declines, over the card's whole history. */
+  rounds: number
+  /** Open requests to the user (For you). */
+  forYou: number
+  /** The newest fact's seq: a view is newer than another when this is higher. */
+  lastSeq: number
+}
+
+/** What a view is made of beside its facts: the card's cached stage and whether it is from before 1.0. */
+export interface WorkCard {
+  card: number
+  stage: StageId
+  preWorkflow: boolean
+}
+
+/** A card's work view from its facts, in seq order. Only the current cycle's (since its latest Started or Adopted). */
+export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
+  const s = foldCard(facts, c.stage)
+  const cycle = facts.filter((f) => f.seq >= s.cycle)
+  const at = new Map(facts.map((f) => [f.seq, f.at]))
+  const latest = s.latest?.id ?? null
+  const revisions = s.submissions.map(
+    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary })
+  )
+  const verdicts = s.verdicts
+    .filter((v) => v.seq >= s.cycle)
+    .map(
+      (v): WorkVerdict => ({ submission: v.submission, revision: v.revision, reviewer: v.reviewer, pass: v.pass, ...(v.failKind ? { failKind: v.failKind } : {}), round: v.round, generation: v.generation, at: at.get(v.seq) ?? '', current: v.submission === latest && v.generation === s.generation })
+    )
+  const checks = cycle
+    .filter((f) => f.kind === 'CheckRan')
+    .map((f) => {
+      const d = f.data as CheckRanData
+      return { name: d.name, revision: d.revision, tested: d.tested, result: d.result, counted: d.counted, ...(d.whyNot ? { whyNot: d.whyNot } : {}), run: d.run, by: d.by, durationMs: d.durationMs, at: f.at } satisfies WorkCheck
+    })
+  const carriedOver = cycle
+    .filter((f) => f.kind === 'CarriedOver')
+    .map((f) => {
+      const d = f.data as FactData['CarriedOver']
+      return { from: d.from, to: d.to, how: d.how, at: f.at }
+    })
+  const integrated = [...facts].reverse().find((f) => f.kind === 'Integrated')
+  const entry = s.entries.at(-1)
+  const started = s.started
+  return {
+    card: c.card,
+    stage: c.stage,
+    preWorkflow: c.preWorkflow,
+    adopted: !!started?.adopted,
+    ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
+    kind: started?.cardKind ?? null,
+    folder: started?.folder ?? null,
+    line: started?.line ?? null,
+    base: started?.base ?? null,
+    target: started?.target ?? null,
+    builder: started?.builder ?? null,
+    head: s.head,
+    approved: s.approved,
+    revisions,
+    verdicts,
+    checks,
+    marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden },
+    integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
+    queue: entry ? { entry: entry.id, revision: entry.revision, target: entry.target, state: entry.state, ...(entry.failure ? { failure: entry.failure.reason } : {}), ...(entry.cancelled ? { cancelled: entry.cancelled } : {}) } : null,
+    decisions: { generation: s.generation, received: s.received },
+    rounds: s.rounds,
+    forYou: s.requests.length,
+    lastSeq: s.lastSeq
+  }
+}
+
+/** The revision a card's work stands at now: what its passes cover, else the latest submitted. */
+export const currentRevision = (v: WorkView): string | null => v.approved?.revision ?? v.revisions.at(-1)?.revision ?? null
+
+/** The checks run on a revision, newest last. */
+export const checksOn = (v: WorkView, revision: string): WorkCheck[] => v.checks.filter((c) => c.revision === revision)
+
+/** What a card's badges on the board need of its work (`workBadge`): little, for every live card at once. */
+export interface WorkBadge {
+  card: number
+  stage: StageId
+  preWorkflow: boolean
+  adopted: boolean
+  /** The revision under review or approved (`currentRevision`). */
+  revision: string | null
+  /** The newest verdict this cycle, on which revision, and whether it still counts. */
+  verdict: { pass: boolean; revision: string | null; current: boolean } | null
+  /** The checks on `revision`: the newest run of each check, by result, and the runs not counted. */
+  checks: { passed: number; failed: number; notCounted: number }
+  stale: boolean
+  overridden: boolean
+  outsideRules: boolean
+  mergedInPart: boolean
+  leftTarget: boolean
+  forYou: number
+  /** A decision was recorded since the latest submission was made. */
+  decisionSince: boolean
+  lastSeq: number
+}
+
+export function workBadge(v: WorkView): WorkBadge {
+  const revision = currentRevision(v)
+  const newest = new Map<string, WorkCheck>()
+  let notCounted = 0
+  for (const c of revision ? checksOn(v, revision) : []) {
+    if (!c.counted) notCounted++
+    else newest.set(c.name, c)
+  }
+  const runs = [...newest.values()]
+  const verdict = v.verdicts.at(-1)
+  const latest = v.revisions.at(-1)
+  return {
+    card: v.card,
+    stage: v.stage,
+    preWorkflow: v.preWorkflow,
+    adopted: v.adopted,
+    revision,
+    verdict: verdict ? { pass: verdict.pass, revision: verdict.revision, current: verdict.current } : null,
+    checks: { passed: runs.filter((c) => c.result === 'passed').length, failed: runs.filter((c) => c.result !== 'passed').length, notCounted },
+    stale: !!v.marks.stale,
+    overridden: v.marks.overridden,
+    outsideRules: v.marks.outsideRules.length > 0,
+    mergedInPart: !!v.marks.mergedInPart,
+    leftTarget: !!v.marks.leftTarget,
+    forYou: v.forYou,
+    decisionSince: !!latest && v.decisions.generation > latest.generation,
+    lastSeq: v.lastSeq
+  }
+}
+
