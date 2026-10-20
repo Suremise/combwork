@@ -735,7 +735,8 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       } catch {
         // Closed meanwhile (the workspace closed): nothing was committed.
       }
-      throw e
+      // Undone part way by SQLite: said so, whichever error the change passed on (a batch's storage error, #1216).
+      throw state.lost ?? e
     } finally {
       state.open = false
       if (state.changed) emit({ type: 'tasks-changed', workspacePath: path })

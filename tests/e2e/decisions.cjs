@@ -307,6 +307,14 @@ const check = (name, ok, extra = '') => {
   ).result
   check('…and hive_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
   await asCoder(`/v1/tasks/${n}`)
+  // Its read in full is recorded as a fact (#1216): the decision generation that reply gave it, the card's newest.
+  const received = await until(async () => {
+    const facts = await inv('tasks:facts', n)
+    const newest = Math.max(0, ...facts.filter((f) => f.kind === 'Decision').map((f) => f.data.generation))
+    const got = facts.filter((f) => f.kind === 'DecisionsReceived' && f.data.agent === coder.id).at(-1)
+    return got && newest > 0 && got.data.generation === newest ? got : null
+  }, 10000)
+  check('the read in full records DecisionsReceived at the generation the reply gave (#1216)', !!received, JSON.stringify(received))
   check('read in full, it is no longer flagged', (await asCoder('/v1/projects/alpha')).notice === null)
   // The call that moves the card on (to Review) still hears of a decision it hasn't read: the card was its own when the
   // call began.

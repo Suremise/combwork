@@ -10,12 +10,11 @@
 // its field is null and the fact names it, with why, in `platform.unknown`.
 
 import { AsyncLocalStorage } from 'async_hooks'
-import { createHash } from 'crypto'
 import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
-import type { Actor, Fact, FactData, FileChange, StageId } from '../../shared/workflow/facts'
+import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import { agentActor, foldCard } from '../../shared/workflow/facts'
@@ -184,15 +183,42 @@ const roundOf = (card: TaskCard): number => {
  * a card and its facts never diverge).
  */
 export function recordChange(ws: WorkspaceService, before: TaskCard | null, after: TaskCard): void {
-  write(ws, context.getStore(), before, after)
+  try {
+    write(ws, context.getStore(), before, after)
+  } catch (e) {
+    throw e instanceof FactWriteError ? e : new FactWriteError(e)
+  }
 }
 
-/** A card's decisions as an agent can see them, as a short digest: what a receipt of them is matched with. */
-export const decisionsDigest = (ds: readonly { id?: string; text: string }[] | undefined): string =>
-  createHash('sha256')
-    .update(JSON.stringify((ds ?? []).map((d) => [d.id ?? '', d.text])))
-    .digest('hex')
-    .slice(0, 16)
+/** A card's facts couldn't be written: its change fails whole, a batch's too (never a card without its facts). */
+export class FactWriteError extends Error {
+  constructor(cause: unknown) {
+    super(`The card's facts couldn't be saved (${cause instanceof Error ? cause.message : String(cause)}): nothing of the change was saved`) // i18n-ignore: an error from the database's side, shown as the reason a change failed like a system error
+    this.cause = cause
+  }
+}
+
+/**
+ * Whether an error is the board's storage failing (a card's facts, or SQLite itself), not a refusal of the change: a
+ * batch that skips a refused card fails whole on this, since part of the card may have been written (HR4's #1216 round 2).
+ */
+export const isStorageError = (e: unknown): boolean => e instanceof FactWriteError || (e as { code?: unknown } | null)?.code === 'ERR_SQLITE_ERROR'
+
+/**
+ * Cards' decision generations (the newest `Decision` fact's; 0 for none, or a board without facts), read in the snapshot
+ * the caller is in: what a reply or a line gives an agent is bound to the generation read with it (HR4's round 2).
+ */
+export function decisionGenerations(ws: WorkspaceService, numbers: number[]): Map<number, number> {
+  const out = new Map<number, number>()
+  if (!numbers.length) return out
+  try {
+    const rows = boardRead(ws, (db) => db.prepare("SELECT card, max(json_extract(data, '$.generation')) AS g FROM card_facts WHERE kind = 'Decision' AND card IN (SELECT value FROM json_each(?)) GROUP BY card").all(JSON.stringify(numbers)) as { card: number; g: number }[]) // i18n-ignore: SQL
+    for (const r of rows) out.set(r.card, Number(r.g) || 0)
+  } catch {
+    // A board waiting for its upgrade has no facts: none.
+  }
+  return out
+}
 
 function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard | null, after: TaskCard): void {
   const n = after.number
@@ -300,7 +326,8 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} })
     }
     // Each change of its decisions, a new generation each (HR4's round 1 finding 3): added, its words changed, removed.
-    const had = new Map((record.preWorkflow ? [] : (before?.decisions ?? [])).map((d) => [d.id, d.text]))
+    // Compared with what it had (a card starting from before 1.0: as just recorded above, once).
+    const had = new Map((before?.decisions ?? []).map((d) => [d.id, d.text]))
     const now = new Map((after.decisions ?? []).map((d) => [d.id, d.text]))
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
@@ -327,14 +354,14 @@ function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<strin
 
 /**
  * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (hive_read_task), or a line
- * telling it of new decisions (a decision delivery) received. Bound to what it was given (HR4's round 1 finding 4): the
- * generation whose decisions are exactly those it saw (`digest`), never a later one written meanwhile; once per
- * generation, in a board change of its own, only while the workspace (and the card's project, when given) is the one
- * the receipt was for. In the background: never in the read's way.
+ * telling it of new decisions (a decision delivery) received. Bound to what it was given (HR4's #1216 rounds 1 and 2):
+ * `generation` is the card's decision generation read in the same snapshot as the decisions it was given, never one
+ * looked up later. Recorded once per generation, in a board change of its own, only while the workspace (and the card's
+ * project, when given) is the one the receipt was for. In the background: never in the read's way.
  */
-export async function recordDecisionsReceived(ws: WorkspaceService, agentId: string, n: number, digest: string, project?: string): Promise<void> {
+export async function recordDecisionsReceived(ws: WorkspaceService, agentId: string, n: number, generation: number, project?: string): Promise<void> {
   const path = ws.path
-  if (!path) return
+  if (!path || !(generation > 0)) return
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   try {
@@ -345,19 +372,8 @@ export async function recordDecisionsReceived(ws: WorkspaceService, agentId: str
         const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined)
         if (!card || card.pre_workflow || (project !== undefined && card.project.toLowerCase() !== project.toLowerCase())) return
         const store = FactStore.forBoard(ws, { project: card.project, key: '' })
-        const facts = store.facts(n)
-        // The decisions after each generation, in the card's order: the newest whose digest is what the agent saw.
-        const state = new Map<string, string>()
-        let seen = 0
-        for (const f of facts) {
-          if (f.kind !== 'Decision') continue
-          const d = f.data as FactData['Decision']
-          if (d.removed) state.delete(d.decision)
-          else state.set(d.decision, d.text)
-          if (decisionsDigest([...state].map(([id, text]) => ({ id, text }))) === digest) seen = Math.max(seen, d.generation)
-        }
-        if (!seen || (foldCard(facts).received[agentId] ?? 0) >= seen) return
-        store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation: seen } }))
+        if ((foldCard(store.facts(n)).received[agentId] ?? 0) >= generation) return
+        store.tx((tx) => tx.append(n, { kind: 'DecisionsReceived', actor: agentActor(agentId), source: 'recorded', data: { agent: agentId, generation } }))
       },
       { alive }
     )

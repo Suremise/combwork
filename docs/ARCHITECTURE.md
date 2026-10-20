@@ -490,10 +490,12 @@ summary comment's id; a no-code card's has no revision, base, head, key or files
 and its verdict `Verdict` on the latest submission, with the generation its reviewer had received; `Blocked` and
 `Unblocked`; and each change of the card's decisions, added, its words changed or removed (`removed`), a `Decision`
 with the next generation (monotonic, from the facts). **Receipts** (`DecisionsReceived`) record what an agent was
-given, never more: a card read in full (`GET /v1/tasks/:n`) and a decision line received (`decisionWakes.ts`, whose
-delivery's `meta.digests` saves the decisions each line was made from) carry a digest of the card's decisions as
-given, and the receipt credits the newest generation whose decisions are exactly those, once, in a change of its own,
-while the workspace (and the card's project) is still the one it was for. The actor is the change's
+given, never more (HR4's rounds 1 and 2): a card read in full (`GET /v1/tasks/:n`, `tasks.readTaskSeen`) and a decision
+line received (`decisionWakes.ts`: `newDecisionsOn` reads the board with `tasks.allTasksSeen`, and the delivery's
+`meta.gens` saves each card's) carry the card's decision generation **read in the same snapshot as the decisions
+given** (`decisionGenerations`), and the receipt records that generation, never one looked up later (a decision
+changed back to earlier words is still a later generation), once, in a change of its own, while the workspace (and the
+card's project) is still the one it was for. The actor is the change's
 (`recording`/`recordingAs`, an AsyncLocalStorage set by every tasks.ts entry point that takes one): `user`,
 `assistant`, `agent:<id>`, or `hive` for Hive's own; a move's cause `user` from the window, `intent` from an agent's
 or the Assistant's tools and the API, `derived` for Hive's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
@@ -503,8 +505,11 @@ target, files, candidate key); a batch's are made before its lock and its cards 
 runs inside a change. A fact whose reads are missing or for another agent records them as not read. A read that fails
 never refuses: its field is null and `platform.unknown` names it with what couldn't be read (a project with no options
 yet names its ruleset so). A card from before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts,
-which clears the mark (Darren, #1119 decision 4) and records the decisions it has then. **A fact that fails to write
-fails the change whole** (HR4's round 1): a card and its facts never diverge. The window reads a card's facts with
+which clears the mark (Darren, #1119 decision 4) and records the decisions it has then, once. **A fact that fails to
+write fails the change whole** (HR4's round 1), a batch's too (`FactWriteError`; `isStorageError`, which the batches'
+per-card catches pass on, as SQLite's own errors: part of the card may be written): a card and its facts never
+diverge. `boardWrite` then says the change was undone part way when SQLite undid it, whichever error the change passed
+on. The window reads a card's facts with
 `tasks:facts`. Not yet: None's manifests (P5).
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every

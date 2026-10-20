@@ -13,8 +13,8 @@ import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAs
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { gatherReads, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
-import { afterBoardWrite, archiveBatchDocs, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
+import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, hasCard, holdDocs, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -309,6 +309,37 @@ export async function readTask(n: number, actor: TaskActor): Promise<TaskCard> {
   const c = await getTask(n)
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
   return c
+}
+
+/**
+ * readTask, with the card's decision generation read in the same snapshot as the card (#1216): what an agent reading it
+ * in full is given, for its receipt (never a decision written after the read).
+ */
+export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number }> {
+  const ws = workspace
+  if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
+  const ids = await ws.projectIds()
+  if (!ws.path) throw unknownTask(n)
+  const { raw, generation } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0 }))
+  if (!raw) throw unknownTask(n)
+  const c = withoutGone(clean(raw, n, ids), (x) => hasCard(ws, x))
+  if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+  return { card: c, generation }
+}
+
+/**
+ * allTasks, with each card's decision generation read in the same snapshot as the cards (#1216): decision lines tell an
+ * agent of the decisions read here, and their receipts record these generations.
+ */
+export async function allTasksSeen(ws: WorkspaceService, q: CardQuery = {}): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
+  if (!ws.path) return { cards: [], generations: new Map() }
+  const ids = await ws.projectIds()
+  if (!ws.path) return { cards: [], generations: new Map() }
+  const { docs, numbers, generations } = boardRead(ws, () => {
+    const read = cardDocs(ws, q)
+    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)) }
+  })
+  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x)))), generations }
 }
 
 /** The cards `refs` names that are outside the scope (another project's, or the workspace's): a confined agent sees only their numbers. */
@@ -1204,6 +1235,8 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
       const card = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
       items.push({ number: n, card, said, error: null })
     } catch (e) {
+      // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.
+      if (isStorageError(e)) throw e
       items.push({ number: n, card: null, said: [], error: (e as Error).message })
     }
   }
@@ -1586,13 +1619,14 @@ async function releaseAgentCardsUnbatched(project: string, agentId: string, acto
   const out: number[] = []
   for (const c of await agentCards(project, agentId)) {
     try {
-      await updateTask(c.number, { agent: null, ...(c.column === 'doing' ? { column: 'todo' as const } : {}) }, actor, {
+      await updateTaskLocked(c.number, { agent: null, ...(c.column === 'doing' ? { column: 'todo' as const } : {}) }, actor, {
         check: (now) => {
           if (now.agent !== agentId || now.archived || now.column === 'done') throw new Error('changed meanwhile') // i18n-ignore: only logged
         }
       })
       out.push(c.number)
     } catch (e) {
+      if (isStorageError(e)) throw e
       log.info(`#${c.number} left as it is: ${userText((e as Error).message)}`)
     }
   }

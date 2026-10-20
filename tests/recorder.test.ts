@@ -19,7 +19,8 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { decisionsDigest, recordDecisionsReceived, recorderTestHooks } = await import('../src/main/workflow/recorder')
+const { recordDecisionsReceived, recorderTestHooks } = await import('../src/main/workflow/recorder')
+const { newDecisionsOn } = await import('../src/main/decisionNotices')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
 const { mustCompile } = await import('../src/shared/workflow/compile')
@@ -101,10 +102,12 @@ describe('recording facts from the board’s moves (#1216)', () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Decided', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Use SQLite' }, user))
-    const both = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Keep the JSON identical' }, user))).decisions
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Keep the JSON identical' }, user))
     expect(factsOf(w, card).filter((f) => f.kind === 'Decision').map((f) => (f.data as { generation: number }).generation)).toEqual([1, 2])
-    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(both))
-    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(both))
+    const seen = await inWorkspace(w, () => tasks.readTaskSeen(card, builder))
+    expect(seen.generation).toBe(2)
+    await recordDecisionsReceived(w, 'a1', card, seen.generation)
+    await recordDecisionsReceived(w, 'a1', card, seen.generation)
     expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 2 }])
   })
 
@@ -203,7 +206,7 @@ describe('recording facts, round 2 (#1216)', () => {
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Decisions', project: 'p' }, user))).number
     const a = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'A' }, builder))).decisions![0]
     // The agent reads it at generation 1.
-    await recordDecisionsReceived(w, 'a1', card, decisionsDigest([a]))
+    await recordDecisionsReceived(w, 'a1', card, 1)
     await inWorkspace(w, () => tasks.editDecision(card, a.id, 'A, changed', user))
     await inWorkspace(w, () => tasks.editDecision(card, a.id, null, user))
     const b = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'B' }, user))).decisions![0]
@@ -216,20 +219,21 @@ describe('recording facts, round 2 (#1216)', () => {
     ])
     // What the agent had received stays generation 1 until it is given B.
     expect(foldCard(factsOf(w, card)).received.a1).toBe(1)
-    await recordDecisionsReceived(w, 'a1', card, decisionsDigest([b]))
+    await recordDecisionsReceived(w, 'a1', card, (await inWorkspace(w, () => tasks.readTaskSeen(card, builder))).generation)
     expect(foldCard(factsOf(w, card)).received.a1).toBe(4)
   })
 
   it('a receipt records what the agent was given, never a decision written after it; a verdict, what its reviewer had received', async () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Given', project: 'p' }, user))).number
-    const given = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'First' }, user))).decisions!
-    // A second decision is written after the reply was made, before its receipt is recorded.
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'First' }, user))
+    // The agent's read (the API's), then a second decision is written before its receipt is recorded.
+    const given = await inWorkspace(w, () => tasks.readTaskSeen(card, builder))
     await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Second' }, user))
-    await recordDecisionsReceived(w, 'a1', card, decisionsDigest(given))
+    await recordDecisionsReceived(w, 'a1', card, given.generation)
     expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 1 }])
     // Another project's view of it (the card moved meanwhile): nothing.
-    await recordDecisionsReceived(w, 'a2', card, decisionsDigest(given), 'elsewhere')
+    await recordDecisionsReceived(w, 'a2', card, given.generation, 'elsewhere')
     expect(foldCard(factsOf(w, card)).received.a2).toBeUndefined()
     // The reviewer, who read none of them, gives a verdict: on generation 0.
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'review', agent: 'a1' }, user))
@@ -292,5 +296,71 @@ describe('recording facts, round 2 (#1216)', () => {
     const s2 = factsOf(other, c2).find((f) => f.kind === 'Started')!
     expect(s2.ruleset).toBeUndefined()
     expect((s2.data as { platform: { unknown: Record<string, string> } }).platform.unknown.ruleset).toMatch(/no options yet/)
+  })
+})
+
+// HR4's #1216 round 2: a receipt carries the generation read with what was given (a decision changed back to its earlier
+// words is still a later generation), a batch fails whole when a card's facts can't be written, and a card from before
+// 1.0 has its decisions recorded once as it starts.
+describe('recording facts, round 3 (#1216)', () => {
+  it('a decision changed and changed back after an agent read it: its receipt is the generation it read, not the later one', async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'A to B to A', project: 'p' }, user))).number
+    const a = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'A' }, user))).decisions![0]
+    // The Agent API's read: the card and its generation in one snapshot; its reply strips the decisions' ids.
+    const seen = await inWorkspace(w, () => tasks.readTaskSeen(card, builder))
+    expect([seen.generation, seen.card.decisions!.map((d) => d.text)]).toEqual([1, ['A']])
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, 'B', user))
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, 'A', user))
+    await recordDecisionsReceived(w, 'a1', card, seen.generation)
+    expect(foldCard(factsOf(w, card)).received.a1).toBe(1)
+  })
+
+  it("a decision line's generation is read with the decisions it tells, and its receipt records that one", async () => {
+    const { w, ws } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Told', project: 'p', agent: 'a1', column: 'doing' }, user))).number
+    const a = (await inWorkspace(w, () => tasks.updateTask(card, { decision: 'A' }, user))).decisions![0]
+    // What the line is made from: the new decisions and the generation read with them.
+    const line = await inWorkspace(w, () => newDecisionsOn(w, { projectPath: join(ws, 'p'), agentId: 'a1' }, 'Builder (p)'))
+    expect(line.get(card)).toMatchObject({ count: 1, generation: 1 })
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, 'B', user))
+    await inWorkspace(w, () => tasks.editDecision(card, a.id, 'A', user))
+    await recordDecisionsReceived(w, 'a1', card, line.get(card)!.generation)
+    expect(foldCard(factsOf(w, card)).received.a1).toBe(1)
+  })
+
+  it("a batch whose card's facts can't be written fails whole: no card moved, no fact", async () => {
+    const { ws, w } = await workspace()
+    const [one, two] = await inWorkspace(w, async () => [(await tasks.createTask({ title: 'One', project: 'p' }, user)).number, (await tasks.createTask({ title: 'Two', project: 'p' }, user)).number])
+    const db = new DatabaseSync(store.boardFile(ws))
+    db.exec(`CREATE TRIGGER refuse_moved BEFORE INSERT ON card_facts WHEN new.kind = 'Moved' AND new.card = ${two} BEGIN SELECT RAISE(ABORT, 'no moves (test)'); END`)
+    db.close()
+    await expect(inWorkspace(w, () => tasks.updateTasks([one, two], { column: 'doing', agent: 'a1' }, user))).rejects.toThrow('no moves (test)')
+    for (const c of [one, two]) {
+      expect((await inWorkspace(w, () => tasks.getTask(c, w))).column).toBe('todo')
+      expect(kinds(w, c)).toEqual([])
+    }
+    // A refusal is still the card's own: the batch goes on without it.
+    const items = await inWorkspace(w, () => tasks.updateTasks([one, 999], { column: 'review' }, user))
+    expect(items.map((i) => [i.number, i.error === null])).toEqual([[one, true], [999, false]])
+  })
+
+  it('a card from before 1.0 has its decisions recorded once as it starts, and one added with the start once more', async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Old, decided', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { decision: 'Kept from 0.9' }, user))
+    // As the upgrade leaves it: marked, no facts.
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ?').run(card)
+        db.prepare('DELETE FROM card_facts WHERE card = ?').run(card)
+      })
+    )
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1', decision: 'New at the start' }, user))
+    const decided = factsOf(w, card).filter((f) => f.kind === 'Decision').map((f) => f.data as { text: string; generation: number })
+    expect(decided.map((d) => [d.text, d.generation])).toEqual([
+      ['Kept from 0.9', 1],
+      ['New at the start', 2]
+    ])
   })
 })

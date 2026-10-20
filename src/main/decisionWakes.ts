@@ -121,8 +121,8 @@ registerSource('decision', {
     const v = ++versions
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
-    // `digests`: each card's decisions as this line was made from them, what its receipt records as received (#1216).
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, digests: [...cards].map(([n, d]) => `${n}:${d.digest}`).join(',') } }
+    // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
+    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(',') } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
@@ -143,9 +143,9 @@ registerSource('decision', {
     if (told.size > 500) told.delete(told.keys().next().value!)
     log.info(`Told ${userText(self)} of new decisions on ${[...cards.keys()].map((n) => `#${n}`).join(', ')}`)
     // What it received, as a fact on each card (#1216): the decisions the line was made from.
-    for (const x of typeof r.meta?.digests === 'string' && r.meta.digests ? r.meta.digests.split(',') : []) {
-      const [n, digest] = x.split(':')
-      if (Number.isInteger(Number(n)) && digest) void recordDecisionsReceived(ws, r.agentId, Number(n), digest)
+    for (const x of typeof r.meta?.gens === 'string' && r.meta.gens ? r.meta.gens.split(',') : []) {
+      const [n, g] = x.split(':').map(Number)
+      if (Number.isInteger(n) && Number.isInteger(g) && g > 0) void recordDecisionsReceived(ws, r.agentId, n, g)
     }
     void Promise.all([...cards].map(([n, d]) => noteOnCard(n, storedText(HISTORY.decisionsTold, { agent: self, count: d.count }), ws).catch((e) => log.warn(`noting on #${n} that decisions were told`, e))))
   },
