@@ -38,6 +38,12 @@ afterAll(() => {
  * guessing how long that takes on a loaded machine.
  */
 const calls: { method: string; path: string; auth: string; body: Record<string, unknown> }[] = []
+/**
+ * What a run is for, asked before its command starts (#1220: POST /v1/progress/resolve), kept apart from `calls`; the
+ * stand-in answers as `resolveReply` says: by default 404, as a Hive from before it does (the run isn't linked).
+ */
+const resolves: Record<string, unknown>[] = []
+let resolveReply: { status: number; body: Record<string, unknown> } = { status: 404, body: { error: 'No such route' } }
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 const seenFile = join(dir, 'seen.json')
@@ -49,6 +55,11 @@ beforeAll(async () => {
     let raw = ''
     req.on('data', (d) => (raw += d))
     req.on('end', () => {
+      if (req.url === '/v1/progress/resolve') {
+        resolves.push(raw ? JSON.parse(raw) : {})
+        res.setHeader('Content-Type', 'application/json')
+        return res.writeHead(resolveReply.status).end(JSON.stringify(resolveReply.body))
+      }
       calls.push({ method: req.method ?? '', path: req.url ?? '', auth: req.headers.authorization ?? '', body: raw ? JSON.parse(raw) : {} })
       writeFileSync(seenFile, JSON.stringify(calls))
       res.setHeader('Content-Type', 'application/json')
@@ -62,6 +73,8 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((r) => server.close(() => r())))
 beforeEach(() => {
   calls.length = 0
+  resolves.length = 0
+  resolveReply = { status: 404, body: { error: 'No such route' } }
   refuse = false
   rmSync(seenFile, { force: true })
 })
@@ -96,6 +109,19 @@ describe('the hive-progress command line', () => {
     expect(parseArgs([])).toHaveProperty('error')
     expect(parseArgs(['--'])).toHaveProperty('error')
     expect(parseArgs(['--colour', 'x'])).toHaveProperty('error')
+  })
+
+  it('reads what a run is for: --card, --revision and --check (#1220), with --check taking no command of its own', () => {
+    expect(parseArgs(['--card', '#12', '--revision', 'a3f2c1d', '--', 'npm', 'test'])).toEqual({ card: '#12', revision: 'a3f2c1d', command: ['npm', 'test'] })
+    expect(parseArgs(['--card=#12', 'npm', 'test'])).toEqual({ card: '#12', command: ['npm', 'test'] })
+    expect(parseArgs(['--check', 'typecheck'])).toEqual({ check: 'typecheck', command: [] })
+    expect(parseArgs(['--check=typecheck', '--title', 'types', '--card', '#12'])).toEqual({ check: 'typecheck', title: 'types', card: '#12', command: [] })
+    expect(parseArgs(['--check', 'typecheck', '--', 'npm', 'run', 'typecheck'])).toEqual({ error: "--check runs the project's command for typecheck: give no command of your own." })
+    // --isolated needs check copies (a later Hive): refused, saying so.
+    expect(parseArgs(['--check', 'test', '--isolated'])).toMatchObject({ error: expect.stringContaining('--isolated') })
+    // A shell took an unquoted "#12" for a comment: say how to quote it.
+    expect(parseArgs(['--card'])).toMatchObject({ error: expect.stringContaining('--card "#1061"') })
+    expect(parseArgs(['--card', '#12'])).toEqual({ error: 'No command given.' })
   })
 
   it('reads wait lines: what it waits for (the rest of the line), or nothing when it waits no more (#549)', () => {
@@ -214,6 +240,65 @@ describe.runIf(process.platform === 'win32')('starting a command on Windows', ()
     const got = spawnSync(spec.file, spec.args, { windowsVerbatimArguments: true, encoding: 'utf8' }).stdout
     expect(JSON.parse(got)).toEqual(args)
     expect(cmdEscapeArgument('a"b')).toBe('^"a\\^"b^"')
+  })
+})
+
+describe('what a run is for (#1220): its card, revision and check, asked before the command starts', () => {
+  const id = 'c'.repeat(40)
+
+  it("starts the run with what Hive resolved, asking with the folder and what was named", async () => {
+    resolveReply = { status: 200, body: { card: '#12', revision: id, testedCheckout: id, check: null, folder: dir } }
+    expect(await wrap(['--card', '#12', '--', node, '-e', "console.log('ran')"], env(), 0)).toEqual({ code: 0, out: 'ran\n', err: '' })
+    expect(resolves).toEqual([{ folder: dir, card: '#12' }])
+    expect(calls[0].body).toMatchObject({ card: '#12', revision: id, testedCheckout: id, folder: dir })
+    expect(calls[0].body).not.toHaveProperty('check')
+  })
+
+  it('a run Hive gives no card says so (card: null), so none is defaulted at the start', async () => {
+    resolveReply = { status: 200, body: { card: null, revision: null, testedCheckout: null, check: null, folder: dir } }
+    await wrap(['--', node, '-e', '0'], env(), 0)
+    expect(resolves).toEqual([{ folder: dir }])
+    expect(calls[0].body).toMatchObject({ card: null, folder: dir })
+    expect(calls[0].body).not.toHaveProperty('revision')
+  })
+
+  it('a refusal (a revision that is not checked out) ends it at once: the command never runs and nothing is reported', async () => {
+    resolveReply = { status: 400, body: { error: "a3f2c1d isn't what's checked out here (b71e09a is): check it out first, or leave revision out" } }
+    const marker = join(dir, 'ran-refused.txt')
+    const r = await wrap(['--revision', 'a3f2c1d', '--', node, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`], env(), 0)
+    expect(r).toEqual({ code: 2, out: '', err: "hive-progress: a3f2c1d isn't what's checked out here (b71e09a is): check it out first, or leave revision out\n" })
+    expect(existsSync(marker)).toBe(false)
+    expect(calls).toEqual([])
+  })
+
+  it("--check runs the project's configured command, titled by the check's name", async () => {
+    const marker = join(dir, 'ran-check.txt')
+    const command = `"${node}" -e "require('fs').writeFileSync(process.argv[1], 'checked')" "${marker}"`
+    resolveReply = { status: 200, body: { card: '#12', revision: id, testedCheckout: id, check: { name: 'typecheck', command }, folder: dir } }
+    const r = await wrap(['--check', 'typecheck'], env(), 0)
+    expect(r.code).toBe(0)
+    expect(readFileSync(marker, 'utf8')).toBe('checked')
+    expect(resolves).toEqual([{ folder: dir, check: 'typecheck' }])
+    expect(calls[0].body).toMatchObject({ title: 'typecheck', command, check: 'typecheck', card: '#12' })
+    expect(calls[0].body).not.toHaveProperty('titleFromCommand')
+    // Its exit code is the command's.
+    resolveReply = { status: 200, body: { card: null, revision: null, testedCheckout: null, check: { name: 'test', command: `"${node}" -e "process.exit(4)"` }, folder: dir } }
+    expect((await wrap(['--check', 'test'], env(), 0)).code).toBe(4)
+  })
+
+  it('--check with no command configured, Hive unreachable or outside Hive runs nothing and says why', async () => {
+    resolveReply = { status: 400, body: { error: 'hive has no command configured for the check "lint", so nothing was run.' } }
+    expect(await wrap(['--check', 'lint'], env(), 0)).toEqual({ code: 2, out: '', err: 'hive-progress: hive has no command configured for the check "lint", so nothing was run.\n' })
+    // A Hive from before (no resolve call: 404) doesn't know the command either.
+    resolveReply = { status: 404, body: { error: 'No such route' } }
+    expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Hive couldn't be reached to look up the command for lint") })
+    expect(await wrap(['--check', 'lint'], env({ HIVE_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Hive knows') })
+    expect(calls).toEqual([])
+  })
+
+  it('a Hive from before (no resolve call) still gets the run, as before, unlinked', async () => {
+    expect(await wrap(['--card', '#12', '--', node, '-e', '0'], env(), 0)).toMatchObject({ code: 0 })
+    for (const k of ['card', 'revision', 'testedCheckout', 'check', 'folder']) expect(calls[0].body).not.toHaveProperty(k)
   })
 })
 

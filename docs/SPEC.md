@@ -2147,7 +2147,10 @@ running again when the deliverables are quiet, which the refusal says. Hive runn
 
 The Progress panel stays; its 1.0 changes per phase are on the phase cards and are part of this spec:
 - **P3** [#1119 c]: run rows show "AM-12 · a3f2c1d" (links the card, copies the revision); details show Card, Revision
-  and "counts as check: typecheck"; the lane hover gains the revision under review, the last verdict and on which
+  and "counts as check: typecheck"; a run's default card is the agent's card in Doing only when it has exactly one (a
+  run counted for the wrong card is worse than none); hive-progress resolves the card, revision and check before the
+  command starts (`POST /v1/progress/resolve`), so a refusal runs nothing; `--isolated` is refused until P7's check
+  copies [#1220]; the lane hover gains the revision under review, the last verdict and on which
   revision, checks on it and the merge commit.
 - **P4** [#1120 c]: a refused move marks the segment (a notch, red, by pattern and colour) with the one-line reason and
   next step; a stale pass is marked ("Pass was for a3f2c1d; now at b71e09a"); overrides marked with who, rule and why;

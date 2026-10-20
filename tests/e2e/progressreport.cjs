@@ -130,6 +130,52 @@ const check = (name, ok, extra = '') => {
   const late2 = await until(async () => (await runs()).find((r) => r.id === live2?.id && r.state === 'passed'), 10000)
   check('…and it passes with its bar full', end2?.code === 0 && late2?.total === 4 && late2?.step === 4, JSON.stringify({ end2, late2 }))
 
+  // --- A run for a card (#1220): it defaults to the agent's card in Doing and what's checked out in its folder; the row
+  // shows "#N · a3f2c1d" under the agent (the card opens it), and its details the card and the whole revision.
+  const gitIn = (...a) => require('child_process').execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.baseEnv(), encoding: 'utf8' }).trim()
+  fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 2\n')
+  gitIn('add', 'b.ts')
+  gitIn('commit', '-qm', 'second')
+  const head = gitIn('rev-parse', 'HEAD')
+  const card = await inv('tasks:create', { title: 'Run for a card', project: 'alpha', agent: builder.id, column: 'doing' })
+  known = (await runs()).map((r) => r.id)
+  const forCard = await startShell(builder.id, `hive-progress --title "For a card" -- node -e "setTimeout(() => process.exit(0), 6000)"`)
+  const live3 = await newRun(known, (r) => r.title === 'For a card')
+  check("a run names the agent's card in Doing and the folder's head by default", live3?.card === card.number && live3?.revision === head && live3?.testedCheckout === head && live3?.folder?.toLowerCase() === alpha.toLowerCase(), JSON.stringify(live3))
+  const cardRow = panel.locator(`.progress-run[data-run="${live3?.id}"]`)
+  const forText = async () => (await cardRow.locator('.progress-run-for').textContent().catch(() => '')) ?? ''
+  check('…and its row shows "#N · a3f2c1d" under the agent', !!(await until(async () => (await forText()).replace(/\s+/g, ' ').trim() === `#${card.number} · ${head.slice(0, 7)}`, 10000)), await forText())
+  await cardRow.locator('.progress-title').click()
+  const details = cardRow.locator('.progress-details')
+  const detailsText = async () => (await details.textContent().catch(() => '')) ?? ''
+  check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card#${card.number}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
+  for (const theme of ['light', 'dark']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 10000)
+    await page.screenshot({ path: path.join(lib.WORK, `progressreport-card-${theme}.png`) })
+  }
+  await cardRow.locator('.progress-run-card').click()
+  // The dialog has the card's title in its title box.
+  check('…and its card opens the card', !!(await until(() => page.locator('[role="dialog"] input').evaluateAll((els) => els.some((e) => e.value === 'Run for a card')), 10000)))
+  await page.keyboard.press('Escape')
+  const end3 = await forCard()
+  check('…and it passes', end3?.code === 0, JSON.stringify(end3))
+
+  // A revision that isn't what's checked out is refused before the command runs; a check runs the project's command.
+  const refused = await shell(builder.id, `hive-progress --card "#${card.number}" --revision HEAD~1 -- node -e "require('fs').writeFileSync('refused-ran.txt', 'x')"`)
+  check("a --revision that isn't checked out is refused, and the command never runs", refused?.code === 2 && /isn't what's checked out here/.test(refused?.stderr ?? '') && !fs.existsSync(path.join(alpha, 'refused-ran.txt')), JSON.stringify(refused))
+  const projectFile = path.join(alpha, '.hive', 'project.json')
+  const pj = JSON.parse(fs.readFileSync(projectFile, 'utf8'))
+  pj.workflow = { options: { commands: { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` } } }
+  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  known = (await runs()).map((r) => r.id)
+  const checked = await shell(builder.id, 'hive-progress --check quick')
+  const quick = (await runs()).find((r) => !known.includes(r.id) && r.check === 'quick')
+  check("--check runs the project's command for it, titled by its name", checked?.code === 0 && fs.readFileSync(path.join(alpha, 'check-ran.txt'), 'utf8') === 'yes' && quick?.title === 'quick' && quick?.card === card.number && quick?.state === 'passed', JSON.stringify({ checked, quick }))
+  const unknown = await shell(builder.id, 'hive-progress --check lint')
+  check('…and with no command for the name, runs nothing and says so', unknown?.code === 2 && /no command configured for the check "lint"/.test(unknown?.stderr ?? ''), JSON.stringify(unknown))
+  await inv('tasks:update', card.number, { column: 'todo' }).catch(() => undefined)
+
   // --- Hive's own runners in an agent's session: shown in this Hive's panel as the agent's, with steps and estimates.
   const root = lib.ROOT
   const unitCmd = `cd /d "${root}" && npx vitest run tests/tips.test.ts tests/e2esuites.test.ts`

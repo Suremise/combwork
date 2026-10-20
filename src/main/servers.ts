@@ -17,6 +17,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
+import { commitIn, folderHead, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -2485,9 +2486,39 @@ route('GET', '/v1/progress', async () => {
   return { workspacePath, enabled: progressGate.on(), runs: runs.map(publicRun) }
 })
 
-route('POST', '/v1/progress', async ({ body }) =>
-  progressCall<{ id: string; ignored?: true }>({ id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true }, (caller) => ({ id: progress.start(caller, bodyObject(body)).id }))
-)
+/** How a run's card, revision and check are looked up (#1220): the board, git in its folder, the project's options. */
+const runLinkDeps: RunLinkDeps = {
+  card: (n) => tasks.getTask(n).then((c) => (c.archived ? null : { project: c.project, column: c.column, agent: c.agent }), () => null),
+  doing: (projectPath, agentId) => tasks.agentCards(basename(projectPath), agentId).then((cs) => cs.filter((c) => c.column === 'doing').map((c) => c.number)),
+  head: folderHead,
+  commitOf: commitIn,
+  projectName: (projectPath) => basename(projectPath),
+  // The options' check commands (SPEC §16.6.6: project.json's `workflow.options`), until #1218 resolves them with defaults.
+  checkCommand: async (project, name) => {
+    const cfg = (await workspace.projectConfig(join(requireWorkspace().path!, project)).catch(() => null)) as { workflow?: { options?: { commands?: Record<string, unknown> } } } | null
+    const command = cfg?.workflow?.options?.commands?.[name]
+    return typeof command === 'string' && command.trim() ? command.trim() : null
+  }
+}
+
+/** What a progress request says it runs for, resolved and checked (runLink.ts): its 400s as the API's. */
+async function runLinkOf(body: Record<string, unknown>) {
+  try {
+    return await resolveRunLink(await progressCallerIn(requireWorkspace().path!), body, runLinkDeps)
+  } catch (e) {
+    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+  }
+}
+
+// What a run would run for (#1220), checked before its command starts: hive-progress calls it first, so a revision that
+// isn't checked out, an unknown card or a check with no command is refused before anything runs. Changes nothing.
+route('POST', '/v1/progress/resolve', async ({ body }) => publicLink(await runLinkOf(bodyObject(body))))
+
+route('POST', '/v1/progress', async ({ body }) => {
+  const b = bodyObject(body)
+  const link = progressGate.on() ? await runLinkOf(b) : null
+  return progressCall<{ id: string; ignored?: true }>({ id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true }, (caller) => ({ id: progress.start(caller, b, link ? { ...link, check: link.check?.name ?? null } : {}).id }))
+})
 
 route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {

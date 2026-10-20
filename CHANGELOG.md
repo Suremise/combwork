@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **Runs say which card and revision they were for.** A run in the Progress panel now shows the card and the commit it ran on under the agent (**#1061 · a3f2c1d**): click the card to open it, or the revision to copy it; its details have both in full. An agent's run is for its card in Doing and what is checked out in its folder, unless it names others: `hive-progress --card "#1061" --revision <commit>`, where a revision that isn't checked out is refused before the command runs. `hive-progress --check <name>` runs the project's own command for a check. The Agent API's runs carry `card`, `revision`, `testedCheckout` and `check`, and `POST /v1/progress/resolve` checks them first (#1220).
+
 ## 0.9.3 — 2026-10-20
 
 - **The Assistant's modes are in `.hive/modes`.** Modes were once called personas, and their files still were: each workspace's are now in `.hive/modes`, where Hive moves its `.hive/personas` folder when the workspace opens, your own modes and edits with it, and the mode you chose stays chosen. If the folder can't be moved yet (a file in it open), Hive uses it where it is and moves it next time (#1084).
