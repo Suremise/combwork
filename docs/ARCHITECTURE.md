@@ -319,6 +319,10 @@ once), each repository and folder watched once however many projects share it:
   then fall back to their stat snapshots (`checks.ts` `snapshot`).
 - **#964:** a watched folder deleted makes Windows send its full path in an endless stream; that watch ends at once and
   is tried again every 3 s until the folder is back. An error does the same.
+- **Letting go:** a folder being deleted or removed (Delete project, `git worktree remove`) is held by no watch meanwhile:
+  `observer.suspend(paths)` / `unwatchedWhile` close every watch on or inside it, like `files.ts`'s `suspendWatching`.
+  A Git project is watched only at the repository root its detection named: one whose repository is gone watches
+  nothing, never a repository above it.
 - Measured idle: following this repository (1 repository, 7 working folders), 0 ms of CPU over 20 s idle.
 - The adapters' `observe(onChange)` subscribe to it; None's drops a written deliverable's cached hash first
   (§16.3.3). The Files tab's own watcher (`files.ts`) stays as it is, for the tab.

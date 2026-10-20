@@ -373,7 +373,9 @@ class RepoWatch {
 
   constructor(
     readonly common: string,
-    private tell: (e: { kind: 'lineMoved'; line: string; from: string | null; to: string | null } | { kind: 'folderMoved'; folder: string; from: string | null; to: string | null } | { kind: 'written'; folder: string; paths: string[] }) => void
+    private tell: (e: { kind: 'lineMoved'; line: string; from: string | null; to: string | null } | { kind: 'folderMoved'; folder: string; from: string | null; to: string | null } | { kind: 'written'; folder: string; paths: string[] }) => void,
+    /** A folder being deleted or removed (`Observer.suspend`): not watched meanwhile. */
+    private held: (folder: string) => boolean = () => false
   ) {
     this.watches.push(new DirWatch(common, false, (n) => this.event(n, '')))
     for (const sub of ['refs', 'logs', 'worktrees']) {
@@ -439,9 +441,14 @@ class RepoWatch {
       l.close()
       this.logs.delete(k)
     }
+    for (const [k, l] of this.logs) {
+      if (!this.held(l.folder)) continue
+      l.close()
+      this.logs.delete(k)
+    }
     for (const f of folders) {
       const k = f.folder.toLowerCase()
-      if (!this.logs.has(k)) this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths })))
+      if (!this.logs.has(k) && !this.held(f.folder)) this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths })))
     }
   }
 
@@ -468,6 +475,8 @@ function readHeadRef(gitDir: string): string | null {
 export interface ObservedProject {
   path: string
   platform: PlatformId
+  /** Git: the repository's root, as detected (§16.3.5); absent, its repository is gone, and nothing is watched for it. */
+  root?: string
 }
 
 /** The question checks ask of the write log, answered: the folder's writes that count, or unknown. */
@@ -492,34 +501,73 @@ export class Observer {
 
   /** Follows exactly these projects: new ones are watched, those gone stop being. */
   follow(list: readonly ObservedProject[]): void {
+    this.list = list
     const want = new Map<string, { path: string; platform: PlatformId; repo: string | null }>()
     for (const p of list) {
       const path = resolve(p.path)
-      const repo = p.platform === 'git' ? commonDirOf(gitRoot(path) ?? path) : null
+      // Never a repository found above a Git project whose own is gone: only the one detection named.
+      const repo = p.platform === 'git' && p.root ? commonDirOf(p.root) : null
       want.set(path.toLowerCase(), { path, platform: p.platform, repo: repo && resolve(repo) })
     }
     this.projects = want
     const repos = new Set([...want.values()].flatMap((p) => (p.repo ? [p.repo.toLowerCase()] : [])))
     const folders = new Set([...want.values()].flatMap((p) => (p.platform === 'none' ? [p.path.toLowerCase()] : [])))
     for (const [k, r] of this.repos) {
-      if (repos.has(k)) continue
+      if (repos.has(k) && !this.held(r.common)) continue
       r.close()
       this.repos.delete(k)
     }
     for (const [k, f] of this.folders) {
-      if (folders.has(k)) continue
+      if (folders.has(k) && !this.held(f.folder)) continue
       f.close()
       this.folders.delete(k)
     }
+    // Worktrees being removed lose their write logs.
+    for (const r of this.repos.values()) r.read(false)
     for (const p of want.values()) {
-      if (p.repo && !this.repos.has(p.repo.toLowerCase())) {
+      if (p.repo && !this.repos.has(p.repo.toLowerCase()) && !this.held(p.repo)) {
         const repo = p.repo
-        this.repos.set(repo.toLowerCase(), new RepoWatch(repo, (e) => this.fan(repo, e)))
+        this.repos.set(repo.toLowerCase(), new RepoWatch(repo, (e) => this.fan(repo, e), (f) => this.held(f)))
       }
-      if (p.platform === 'none' && !this.folders.has(p.path.toLowerCase())) {
+      if (p.platform === 'none' && !this.folders.has(p.path.toLowerCase()) && !this.held(p.path)) {
         const path = p.path
         this.folders.set(path.toLowerCase(), new FolderLog(path, (paths) => this.fanProject(path, { kind: 'written', project: path, folder: path, paths })))
       }
+    }
+  }
+
+  /** What `follow` was last given, to follow again once a suspension ends. */
+  private list: readonly ObservedProject[] = []
+  /** Folders being deleted or removed (lower-cased) → how many suspensions hold them. */
+  private suspended = new Map<string, number>()
+
+  /** Whether a folder is, or is inside, one being deleted or removed. */
+  private held(folder: string): boolean {
+    if (!this.suspended.size) return false
+    const f = resolve(folder).toLowerCase()
+    for (const s of this.suspended.keys()) if (f === s || f.startsWith(s.endsWith(sep) ? s : s + sep)) return true
+    return false
+  }
+
+  /**
+   * Closes every watch on or inside these folders, which Windows can't delete or move while a watch holds them (a
+   * project deleted, a worktree removed), and watches nothing there until the function returned is called: then they
+   * are followed again as before (whatever is still there). Its record restarts, so the time between is unknown.
+   */
+  suspend(paths: readonly string[]): () => void {
+    const keys = paths.map((p) => resolve(p).toLowerCase())
+    for (const k of keys) this.suspended.set(k, (this.suspended.get(k) ?? 0) + 1)
+    this.follow(this.list)
+    let done = false
+    return () => {
+      if (done) return
+      done = true
+      for (const k of keys) {
+        const n = (this.suspended.get(k) ?? 1) - 1
+        if (n > 0) this.suspended.set(k, n)
+        else this.suspended.delete(k)
+      }
+      this.follow(this.list)
     }
   }
 
@@ -630,6 +678,7 @@ export class Observer {
     this.folders.clear()
     this.projects.clear()
     this.subscribers.clear()
+    this.list = []
   }
 }
 
@@ -639,17 +688,6 @@ function identity(path: string): bigint | null {
     return statSync(path, { bigint: true }).ino
   } catch {
     return null
-  }
-}
-
-/** The root of the Git repository holding a folder (where `.git` is), or null. */
-function gitRoot(folder: string): string | null {
-  let dir = resolve(folder)
-  for (;;) {
-    if (existsSync(join(dir, '.git'))) return dir
-    const up = dirname(dir)
-    if (up === dir) return null
-    dir = up
   }
 }
 
@@ -668,3 +706,13 @@ async function settle(l: FolderLog): Promise<number> {
 
 /** The app's watcher: the open workspaces' projects follow it (watching.ts); adapters subscribe and ask it. */
 export const observer = new Observer()
+
+/** Runs fn with no watch on or inside these folders (a worktree being removed: Windows can't while one holds it). */
+export async function unwatchedWhile<T>(paths: readonly string[], fn: () => Promise<T>): Promise<T> {
+  const resume = observer.suspend(paths)
+  try {
+    return await fn()
+  } finally {
+    resume()
+  }
+}

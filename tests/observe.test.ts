@@ -60,7 +60,7 @@ describe('the watcher on a Git repository', () => {
     p = repo()
     events.length = 0
     o = new Observer()
-    o.follow([{ path: p, platform: 'git' }])
+    o.follow([{ path: p, platform: 'git', root: p }])
     o.subscribe(p, (e) => events.push(e))
     await armed(o, p)
   })
@@ -167,7 +167,7 @@ describe('the watcher on a Git repository', () => {
     // Just started: not armed yet.
     const fresh = new Observer()
     const q = repo()
-    fresh.follow([{ path: q, platform: 'git' }])
+    fresh.follow([{ path: q, platform: 'git', root: q }])
     expect(isUnknown(await fresh.changedBetween(q, Date.now() - 1, Date.now()))).toBe(true)
     fresh.dispose()
     expect(isUnknown(await o.changedBetween(tempDir('hive-observe-not-'), Date.now(), Date.now()))).toBe(true)
@@ -248,12 +248,45 @@ describe("the app's watcher follows the open workspaces", () => {
     }
   })
 
+  it('a folder being deleted or removed is let go meanwhile, and watched again after', async () => {
+    const o = new Observer()
+    const p = repo()
+    const wt = join(tempDir('hive-observe-sus-'), 'wt')
+    run(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
+    o.follow([{ path: p, platform: 'git', root: p }])
+    expect(o.size).toEqual({ repos: 1, folders: 2 })
+    // A worktree being removed: only its write log goes.
+    const resume = o.suspend([wt])
+    expect(o.size).toEqual({ repos: 1, folders: 1 })
+    run(p, 'worktree', 'remove', '--force', wt)
+    resume()
+    expect(o.size).toEqual({ repos: 1, folders: 1 })
+    // The project being deleted: everything in it goes, until resumed.
+    const again = o.suspend([p])
+    expect(o.size).toEqual({ repos: 0, folders: 0 })
+    again()
+    again()
+    expect(o.size).toEqual({ repos: 1, folders: 1 })
+    await armed(o, p)
+    o.dispose()
+  })
+
+  it("a Git project whose repository is gone watches nothing, never a repository above it", () => {
+    const o = new Observer()
+    const outer = repo()
+    const p = join(outer, 'inner')
+    mkdirSync(p)
+    o.follow([{ path: p, platform: 'git' }])
+    expect(o.size).toEqual({ repos: 0, folders: 0 })
+    o.dispose()
+  })
+
   it('follow() closes what it no longer needs; dispose closes everything', () => {
     const o = new Observer()
     const p = repo()
     const n = tempDir('hive-observe-n-')
     o.follow([
-      { path: p, platform: 'git' },
+      { path: p, platform: 'git', root: p },
       { path: n, platform: 'none' }
     ])
     expect(o.size).toEqual({ repos: 1, folders: 2 })

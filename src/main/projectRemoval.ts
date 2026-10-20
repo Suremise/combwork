@@ -7,6 +7,7 @@ import { forgetPtys } from './ptyHost'
 import type { AgentDef, ProjectRemoval, ProjectRemovalInfo, TaskCard } from '../shared/types'
 import { config } from './config'
 import { suspendWatching } from './files'
+import { observer } from './platform/observe'
 import { containsPlace, readJson, realPath, removePath, samePlace, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { handoversFor } from './notes'
@@ -208,10 +209,13 @@ async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemov
   // The folder first: it is what Windows most often can't move (a program has it open), and until it has gone
   // nothing else is touched, so a refusal leaves the project as it was.
   const resume = suspendWatching([p, ...trees])
+  // The platform watcher's too (#1214), until the worktrees have gone as well; a refresh then stops following them.
+  const resumeObserving = observer.suspend([p, ...trees])
   try {
     await trash(p)
   } catch (e) {
     resume()
+    resumeObserving()
     throw new Error(
       tr(msg({ id: 'main.removal.trashFailed', defaultMessage: 'Could not move {project} to the Recycle Bin: {why}. Close any program using its folder (a terminal, an editor), then try again. Nothing was deleted.', description: "Why Delete failed: the project's folder couldn't go to the Recycle Bin. {why} is the system's message." }), { project: name, why: (e as Error).message }),
       { cause: e }
@@ -222,6 +226,7 @@ async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemov
   for (const t of trees) {
     await trash(t).catch((e) => warnings.push(tr(msg({ id: 'main.removal.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message." }), { path: t, why: (e as Error).message })))
   }
+  resumeObserving()
   for (const rel of info.handovers) {
     await trash(join(ws.sharedDir, rel)).catch((e) => warnings.push(tr(msg({ id: 'main.removal.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message." }), { path: rel, why: (e as Error).message })))
   }

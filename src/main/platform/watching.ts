@@ -17,7 +17,7 @@ function projects(closing?: string): ObservedProject[] {
   return openWorkspaces()
     .filter((w) => w.path && w.path.toLowerCase() !== c)
     .flatMap((w) => w.info()?.projects ?? [])
-    .flatMap((p) => (p.platform ? [{ path: p.path, platform: p.platform.id }] : []))
+    .flatMap((p) => (p.platform ? [{ path: p.path, platform: p.platform.id, ...(p.platform.detected.root ? { root: p.platform.detected.root } : {}) }] : []))
 }
 
 let lastFocus = 0
