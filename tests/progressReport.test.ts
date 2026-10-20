@@ -43,7 +43,7 @@ const calls: { method: string; path: string; auth: string; body: Record<string, 
  * stand-in answers as `resolveReply` says: by default 404, as a Hive from before it does (the run isn't linked).
  */
 const resolves: Record<string, unknown>[] = []
-let resolveReply: { status: number; body: Record<string, unknown> } = { status: 404, body: { error: 'No such route' } }
+let resolveReply: { status: number; body: Record<string, unknown> } | 'hang' = { status: 404, body: { error: 'No such route' } }
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 const seenFile = join(dir, 'seen.json')
@@ -57,6 +57,8 @@ beforeAll(async () => {
     req.on('end', () => {
       if (req.url === '/v1/progress/resolve') {
         resolves.push(raw ? JSON.parse(raw) : {})
+        // 'hang': it never answers (the wrapper's own timeout ends the wait).
+        if (resolveReply === 'hang') return
         res.setHeader('Content-Type', 'application/json')
         return res.writeHead(resolveReply.status).end(JSON.stringify(resolveReply.body))
       }
@@ -85,10 +87,10 @@ const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.en
  * Runs the wrapper, collecting what it writes. By default the run is reported only at a step line with the total, or at
  * the end, however long the command takes to start; `startWaitMs` 0 reports it at once, before the command's output.
  */
-async function wrap(argv: string[], e: Record<string, string | undefined>, startWaitMs = 60_000) {
+async function wrap(argv: string[], e: Record<string, string | undefined>, startWaitMs = 60_000, cwd = dir) {
   let out = ''
   let err = ''
-  const code = await runWrapped(argv, { env: e, cwd: dir, stdout: { write: (b) => (out += String(b)) }, stderr: { write: (b) => (err += String(b)) }, stdin: 'ignore', minIntervalMs: 100, startWaitMs })
+  const code = await runWrapped(argv, { env: e, cwd, stdout: { write: (b) => (out += String(b)) }, stderr: { write: (b) => (err += String(b)) }, stdin: 'ignore', minIntervalMs: 100, startWaitMs, resolveTimeoutMs: 1000 })
   return { code, out, err }
 }
 /**
@@ -247,10 +249,12 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
   const id = 'c'.repeat(40)
 
   it("starts the run with what Hive resolved, asking with the folder and what was named", async () => {
-    resolveReply = { status: 200, body: { card: '#12', revision: id, testedCheckout: id, check: null, folder: dir } }
+    resolveReply = { status: 200, body: { link: 'L1', card: '#12', revision: id, testedCheckout: id, check: null, folder: dir } }
     expect(await wrap(['--card', '#12', '--', node, '-e', "console.log('ran')"], env(), 0)).toEqual({ code: 0, out: 'ran\n', err: '' })
     expect(resolves).toEqual([{ folder: dir, card: '#12' }])
-    expect(calls[0].body).toMatchObject({ card: '#12', revision: id, testedCheckout: id, folder: dir })
+    // The link Hive gave is passed back (Hive keeps what it read then); no checkout is sent as if it were proof.
+    expect(calls[0].body).toMatchObject({ link: 'L1', card: '#12', revision: id, folder: dir })
+    expect(calls[0].body).not.toHaveProperty('testedCheckout')
     expect(calls[0].body).not.toHaveProperty('check')
   })
 
@@ -294,6 +298,42 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Hive couldn't be reached to look up the command for lint") })
     expect(await wrap(['--check', 'lint'], env({ HIVE_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Hive knows') })
     expect(calls).toEqual([])
+  })
+
+  it("a --revision is checked with git when Hive can't check it: reporting off, outside Hive, an older Hive, an error, no answer (round 1's finding 2)", async () => {
+    const repoDir = join(dir, 'revision-repo')
+    const g = (...a: string[]) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: repoDir, encoding: 'utf8' }).stdout.trim()
+    spawnSync('git', ['init', '-q', '-b', 'main', repoDir])
+    writeFileSync(join(repoDir, 'a.txt'), 'a\n')
+    g('add', '-A')
+    g('commit', '-qm', 'one')
+    writeFileSync(join(repoDir, 'a.txt'), 'b\n')
+    g('commit', '-qam', 'two')
+    const head = g('rev-parse', 'HEAD')
+    const marker = join(dir, 'ran-revision.txt')
+    const ran = ['--', node, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]
+    const ways: [string, () => Record<string, string | undefined>][] = [
+      ['reporting off', () => env({ HIVE_PROGRESS: '0' })],
+      ['outside Hive', () => env({ HIVE_API_URL: undefined })],
+      ['an older Hive (404)', () => ((resolveReply = { status: 404, body: { error: 'No such route' } }), env())],
+      ['an error (500)', () => ((resolveReply = { status: 500, body: { error: 'boom' } }), env())],
+      ['no answer', () => ((resolveReply = 'hang'), env())],
+      ['nothing listening', () => env({ HIVE_API_URL: 'http://127.0.0.1:9' })]
+    ]
+    for (const [way, e] of ways) {
+      rmSync(marker, { force: true })
+      const wrong = await wrap(['--revision', 'HEAD~1', ...ran], e(), 0, repoDir)
+      expect({ way, ...wrong }).toEqual({ way, code: 2, out: '', err: `hive-progress: HEAD~1 isn't what's checked out here (${head.slice(0, 7)} is): check it out first, or leave --revision out\n` })
+      expect(existsSync(marker)).toBe(false)
+      expect((await wrap(['--revision', 'not-a-commit', ...ran], e(), 0, repoDir)).err).toContain("not-a-commit isn't a commit in")
+      expect((await wrap(['--revision', '--all', ...ran], e(), 0, repoDir)).err).toContain('revision is a commit')
+      // Where git has nothing to compare with, it isn't taken either.
+      expect((await wrap(['--revision', head, ...ran], e(), 0, dir)).err).toContain('Nothing is checked out')
+      expect(existsSync(marker)).toBe(false)
+      // The revision checked out runs.
+      expect({ way, code: (await wrap(['--revision', head.slice(0, 7), ...ran], e(), 0, repoDir)).code }).toEqual({ way, code: 0 })
+      expect(existsSync(marker)).toBe(true)
+    }
   })
 
   it('a Hive from before (no resolve call) still gets the run, as before, unlinked', async () => {

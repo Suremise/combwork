@@ -5,7 +5,7 @@ import { execFileSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { commitIn, folderHead, publicLink, resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
+import { commitIn, folderHead, IssuedLinks, LINK_TTL_MS, linkOwner, MAX_LINKS, publicLink, resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { keptRuns, ProgressStore, type ProgressCaller } from '../src/main/progress'
 import { publicRun } from '../src/main/apiEvents'
 import { runDetails } from '../src/shared/progress'
@@ -56,7 +56,7 @@ describe("a run's card, revision and check (#1220)", () => {
     const r = repo()
     const link = await resolveRunLink(agent, { folder: r.dir }, deps({ doing: [1061] }))
     expect(link).toEqual({ card: 1061, revision: r.head(), testedCheckout: r.head(), check: null, folder: r.dir })
-    expect(publicLink(link)).toMatchObject({ card: '#1061', revision: r.head() })
+    expect(publicLink(link, 'L1')).toMatchObject({ link: 'L1', card: '#1061', revision: r.head() })
   })
 
   it('names no card by default when the agent has none in Doing, or several (a run for the wrong card is worse than none)', async () => {
@@ -98,14 +98,23 @@ describe("a run's card, revision and check (#1220)", () => {
     await expect(resolveRunLink(agent, { folder: plain, revision: head }, deps())).rejects.toThrow('Nothing is checked out')
   })
 
-  it('a folder with nothing checked out has no revision, and a start that passes on the tested checkout is not read again', async () => {
+  it('a folder with nothing checked out has no revision', async () => {
     const plain = join(base, `plain${++n}`)
     mkdirSync(plain)
     expect(await resolveRunLink(agent, { folder: plain }, deps())).toMatchObject({ revision: null, testedCheckout: null, folder: plain })
-    const id = 'a'.repeat(40)
-    expect(await resolveRunLink(agent, { folder: plain, testedCheckout: id }, deps())).toMatchObject({ revision: id, testedCheckout: id })
-    await expect(resolveRunLink(agent, { folder: plain, testedCheckout: 'abc' }, deps())).rejects.toThrow('testedCheckout is a full commit id')
     await expect(resolveRunLink(agent, { folder: 'relative/path' }, deps())).rejects.toThrow('folder is the absolute path')
+  })
+
+  it("what is checked out is always read, never taken from the request (round 1's finding 1)", async () => {
+    // An older commit named as both revision and testedCheckout: the checkout is read, and the older one refused.
+    const r = repo(true)
+    const head = r.head()
+    const before = r.run('rev-parse', 'HEAD~1')
+    let reads = 0
+    const d = { ...deps(), head: (f: string) => (reads++, folderHead(f)) }
+    await expect(resolveRunLink(agent, { folder: r.dir, revision: before, testedCheckout: before } as Record<string, unknown>, d)).rejects.toThrow(`isn't what's checked out here (${head.slice(0, 7)} is)`)
+    expect(reads).toBe(1)
+    expect(await resolveRunLink(agent, { folder: r.dir, testedCheckout: before } as Record<string, unknown>, d)).toMatchObject({ revision: head, testedCheckout: head })
   })
 
   it("--check runs the project's configured command for the name, and says so when there is none", async () => {
@@ -116,6 +125,33 @@ describe("a run's card, revision and check (#1220)", () => {
     // A script's check is its card's project's; with no card, there's no project to ask.
     expect((await resolveRunLink(script, { check: 'test', card: '#40' }, d)).check).toEqual({ name: 'test', command: 'npm test' })
     await expect(resolveRunLink(script, { check: 'test' }, d)).rejects.toThrow('name the card too')
+  })
+})
+
+describe("links resolve gives out, for the run's start (round 1's finding 1)", () => {
+  const link = { card: 12, revision: 'd'.repeat(40), testedCheckout: 'd'.repeat(40), check: null, folder: PROJECT }
+
+  it("a start gets what was resolved (the checkout before the command ran) once, and only its own caller's", () => {
+    const links = new IssuedLinks()
+    const id = links.issue(linkOwner(agent), link)
+    expect(links.take(linkOwner(script), id)).toBeNull()
+    expect(links.take(linkOwner({ ...agent, agentId: 'r1' }), id)).toBeNull()
+    expect(links.take(linkOwner(agent), id)).toEqual(link)
+    expect(links.take(linkOwner(agent), id)).toBeNull()
+    expect(links.take(linkOwner(agent), 'made-up')).toBeNull()
+    expect(links.take(linkOwner(agent), undefined)).toBeNull()
+  })
+
+  it('a link waits LINK_TTL_MS for its start, and at most MAX_LINKS are kept (the oldest go)', () => {
+    let now = 0
+    const links = new IssuedLinks(() => now)
+    const old = links.issue(linkOwner(agent), link)
+    now = LINK_TTL_MS + 1
+    expect(links.take(linkOwner(agent), old)).toBeNull()
+    const first = links.issue(linkOwner(agent), link)
+    const rest = Array.from({ length: MAX_LINKS }, () => links.issue(linkOwner(agent), link))
+    expect(links.take(linkOwner(agent), first)).toBeNull()
+    expect(links.take(linkOwner(agent), rest[rest.length - 1])).toEqual(link)
   })
 })
 

@@ -17,7 +17,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
-import { commitIn, folderHead, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
+import { commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -2501,22 +2501,34 @@ const runLinkDeps: RunLinkDeps = {
   }
 }
 
-/** What a progress request says it runs for, resolved and checked (runLink.ts): its 400s as the API's. */
-async function runLinkOf(body: Record<string, unknown>) {
+/** The links resolve gave out, for the starts that pass them back (runLink.ts). */
+const issuedLinks = new IssuedLinks()
+
+/**
+ * What a progress request says it runs for, resolved and checked (runLink.ts): its 400s as the API's. A start that
+ * passes back the `link` resolve gave its caller gets what was resolved then (the checkout before its command started).
+ */
+async function runLinkOf(body: Record<string, unknown>, issued = false) {
   try {
-    return await resolveRunLink(await progressCallerIn(requireWorkspace().path!), body, runLinkDeps)
+    const caller = await progressCallerIn(requireWorkspace().path!)
+    const given = issued ? issuedLinks.take(linkOwner(caller), body.link) : null
+    return { caller, link: given ?? (await resolveRunLink(caller, body, runLinkDeps)) }
   } catch (e) {
     throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
   }
 }
 
 // What a run would run for (#1220), checked before its command starts: hive-progress calls it first, so a revision that
-// isn't checked out, an unknown card or a check with no command is refused before anything runs. Changes nothing.
-route('POST', '/v1/progress/resolve', async ({ body }) => publicLink(await runLinkOf(bodyObject(body))))
+// isn't checked out, an unknown card or a check with no command is refused before anything runs. Its `link` is for the
+// start: the only way a start gets the checkout seen here rather than read again.
+route('POST', '/v1/progress/resolve', async ({ body }) => {
+  const { caller, link } = await runLinkOf(bodyObject(body))
+  return publicLink(link, issuedLinks.issue(linkOwner(caller), link))
+})
 
 route('POST', '/v1/progress', async ({ body }) => {
   const b = bodyObject(body)
-  const link = progressGate.on() ? await runLinkOf(b) : null
+  const link = progressGate.on() ? (await runLinkOf(b, true)).link : null
   return progressCall<{ id: string; ignored?: true }>({ id: `ignored-${randomBytes(6).toString('hex')}`, ignored: true }, (caller) => ({ id: progress.start(caller, b, link ? { ...link, check: link.check?.name ?? null } : {}).id }))
 })
 

@@ -204,6 +204,31 @@ export function spawnSpec(command: string[], env: Record<string, string | undefi
   return { file: env.ComSpec ?? env.COMSPEC ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], verbatim: true }
 }
 
+/** A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1 (as Hive checks it). */
+const REVISION = /^[\w./@^~{}-]{1,100}$/
+
+/**
+ * Why `revision` isn't what's checked out in `cwd`, or null when it is: checked with git itself when Hive can't check it,
+ * in the same words as Hive's refusal. A folder git can't read refuses too: a revision that can't be checked isn't taken.
+ */
+export function revisionProblem(cwd: string, revision: string, env: Record<string, string | undefined>): string | null {
+  const named = revision.trim()
+  if (!named || named.startsWith('-') || !REVISION.test(named)) return 'revision is a commit (its id, or a name git knows)'
+  const parse = (rev: string): string | null => {
+    try {
+      const r = spawnSync('git', ['rev-parse', '--verify', '--quiet', rev], { cwd, env, encoding: 'utf8', windowsHide: true, timeout: 10_000 })
+      return r.status === 0 ? String(r.stdout).trim() || null : null
+    } catch {
+      return null
+    }
+  }
+  const head = parse('HEAD')
+  if (!head) return `Nothing is checked out in ${cwd} to compare ${named} with (or git can't read it): leave --revision out`
+  const id = parse(`${named}^{commit}`)
+  if (!id) return `${named} isn't a commit in ${cwd}`
+  return id === head ? null : `${named} isn't what's checked out here (${head.slice(0, 7)} is): check it out first, or leave --revision out`
+}
+
 /** How to start a check's configured command (a command line, as the project's options give it): through the shell. */
 export function shellSpec(command: string, env: Record<string, string | undefined>, platform = process.platform): { file: string; args: string[]; verbatim: boolean } {
   if (platform !== 'win32') return { file: '/bin/sh', args: ['-c', command], verbatim: false }
@@ -229,6 +254,8 @@ export interface WrapperIo {
   /** For tests: the API calls (report.mts's fetch) and the update interval. */
   fetch?: Fetch
   minIntervalMs?: number
+  /** How long it waits for Hive to say what the run is for (default 5 s). */
+  resolveTimeoutMs?: number
   /** How long the run waits for a step line with the total before it is reported without (default 2 s). */
   startWaitMs?: number
   /** Whether hive-progress runs in Hive's executable as Node (default: whether it does); tests set it. */
@@ -445,7 +472,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   // with no command is refused here. An older Hive, or one that doesn't answer, just doesn't link it.
   let link: RunLink | null = null
   if (target) {
-    const r = await resolveRun(target, { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}) }, { fetch: io.fetch })
+    const r = await resolveRun(target, { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}) }, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
     if ('refused' in r) {
       io.stderr.write(`hive-progress: ${r.refused}\n`)
       return 2
@@ -453,6 +480,14 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     if ('link' in r) link = r.link
     else if (parsed.check !== undefined) {
       io.stderr.write(`hive-progress: Hive couldn't be reached to look up the command for ${parsed.check}, so nothing was run.\n`)
+      return 2
+    }
+  }
+  // A revision named is checked whether or not Hive can (reporting off, outside Hive, Hive unreachable): here, with git.
+  if (!link && parsed.revision !== undefined) {
+    const wrong = revisionProblem(io.cwd, parsed.revision, io.env)
+    if (wrong) {
+      io.stderr.write(`hive-progress: ${wrong}\n`)
       return 2
     }
   }
@@ -472,7 +507,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   // A check is titled by its name (not its command line) unless given a title.
   const title = parsed.title?.trim() || link?.check?.name
   const linked: Partial<ProgressStart> = link
-    ? { card: link.card, ...(link.revision ? { revision: link.revision } : {}), ...(link.testedCheckout ? { testedCheckout: link.testedCheckout } : {}), ...(link.check ? { check: link.check.name } : {}), ...(link.folder ? { folder: link.folder } : {}) }
+    ? { ...(link.link ? { link: link.link } : {}), card: link.card, ...(link.revision ? { revision: link.revision } : {}), ...(link.check ? { check: link.check.name } : {}), ...(link.folder ? { folder: link.folder } : {}) }
     : {}
   const report = new WrappedRun(
     () => ({ title: title || label, command: label, titleFromCommand: !title, estimateMs: timings ? estimateFor(timings, key) : undefined, started, link: linked }),

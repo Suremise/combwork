@@ -6,6 +6,7 @@
 // P3: the run only shows what it ran for; recording `CheckRan` from it comes next (#1119's item 2). The folder's head is
 // read with git until #1213's platform layer gives it.
 
+import { randomUUID } from 'crypto'
 import { isAbsolute } from 'path'
 import { gitReading } from '../git'
 import { ProgressError, type ProgressCaller } from '../progress'
@@ -18,8 +19,6 @@ export interface RunLinkAsked {
   revision?: unknown
   check?: unknown
   folder?: unknown
-  /** What the resolve step found checked out (hive-progress passes it on to the start), so the start doesn't read it again. */
-  testedCheckout?: unknown
 }
 
 export interface RunLink {
@@ -48,7 +47,6 @@ export interface RunLinkDeps {
 const MAX_FOLDER = 1000
 const MAX_REVISION = 100
 const CHECK_NAME = /^[\w.:-]{1,60}$/
-const FULL_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
 // A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1.
 const REVISION = /^[\w./@^~{}-]+$/
 
@@ -92,10 +90,8 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     if (doing.length === 1) card = doing[0]
   }
 
-  let tested: string | null = null
-  if (typeof asked.testedCheckout === 'string' && FULL_ID.test(asked.testedCheckout)) tested = asked.testedCheckout
-  else if (asked.testedCheckout !== undefined && asked.testedCheckout !== null) throw refused('testedCheckout is a full commit id')
-  else if (folder) tested = await deps.head(folder)
+  // Always read here, never taken from the request: what was checked out is what a run is checked against.
+  const tested = folder ? await deps.head(folder) : null
 
   let revision = tested
   if (asked.revision !== undefined && asked.revision !== null) {
@@ -123,9 +119,50 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
   return { card, revision, testedCheckout: tested, check, folder }
 }
 
-/** A link as the Agent API gives it: the card by its reference, the commits in full. */
-export function publicLink(l: RunLink): Record<string, unknown> {
-  return { card: l.card === null ? null : cardRefText(l.card), revision: l.revision, testedCheckout: l.testedCheckout, check: l.check, folder: l.folder }
+/** A link as the Agent API gives it: the card by its reference, the commits in full, and the id its start passes back. */
+export function publicLink(l: RunLink, id: string): Record<string, unknown> {
+  return { link: id, card: l.card === null ? null : cardRefText(l.card), revision: l.revision, testedCheckout: l.testedCheckout, check: l.check, folder: l.folder }
+}
+
+/** Who a link was given to: an agent, or a workspace's Assistant or scripts. */
+export const linkOwner = (c: ProgressCaller): string => (c.source === 'agent' ? `agent|${c.projectPath.toLowerCase()}|${c.agentId}` : `${c.source}|${c.workspacePath.toLowerCase()}`)
+
+/** How long a link resolve gave out waits for its start (hive-progress starts its run within seconds). */
+export const LINK_TTL_MS = 10 * 60_000
+/** Links kept at most: past it, the oldest go. */
+export const MAX_LINKS = 200
+
+/**
+ * The links resolve gave out, so a run's start carries what was checked out when hive-progress asked, before its command
+ * started, rather than reading it again seconds later (the command may have changed it) or taking a commit id from the
+ * request (#1220 round 2: that is no proof of the checkout). Each is its caller's own, taken once, and gone after
+ * LINK_TTL_MS; a start whose link is unknown, expired or someone else's is resolved again from what it names.
+ */
+export class IssuedLinks {
+  private links = new Map<string, { owner: string; link: RunLink; at: number }>()
+  constructor(private readonly now: () => number = Date.now) {}
+
+  issue(owner: string, link: RunLink): string {
+    this.sweep()
+    while (this.links.size >= MAX_LINKS) this.links.delete(this.links.keys().next().value!)
+    const id = randomUUID()
+    this.links.set(id, { owner, link, at: this.now() })
+    return id
+  }
+
+  take(owner: string, id: unknown): RunLink | null {
+    this.sweep()
+    if (typeof id !== 'string') return null
+    const e = this.links.get(id)
+    if (!e || e.owner !== owner) return null
+    this.links.delete(id)
+    return e.link
+  }
+
+  private sweep(): void {
+    const cut = this.now() - LINK_TTL_MS
+    for (const [id, e] of this.links) if (e.at < cut) this.links.delete(id)
+  }
 }
 
 /** What's checked out in a folder (git; #1213's platform layer takes this over), or null where nothing is. */

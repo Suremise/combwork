@@ -60,10 +60,13 @@ export interface ProgressStart {
   titleFromCommand?: boolean
   /** What it waits for before it can begin (#549): no time left is shown meanwhile. */
   waiting?: string
-  /** What it runs for (#1220), as `resolveRun` gave it: the card's reference (null: none), the commits, the check, the folder. */
+  /**
+   * What it runs for (#1220), as `resolveRun` gave it: `link`, the id Hive gave what it resolved (the checkout before the
+   * command started), and what it names, for a Hive that no longer has the link to resolve it again.
+   */
+  link?: string
   card?: string | null
   revision?: string
-  testedCheckout?: string
   check?: string
   folder?: string
 }
@@ -146,7 +149,7 @@ export class ProgressRun {
       ...(start.waiting ? { waiting: clip(start.waiting, MAX_TITLE) } : {}),
       ...(start.card !== undefined ? { card: start.card } : {}),
       ...(start.revision ? { revision: start.revision } : {}),
-      ...(start.testedCheckout ? { testedCheckout: start.testedCheckout } : {}),
+      ...(start.link ? { link: start.link } : {}),
       ...(start.check ? { check: start.check } : {}),
       ...(start.folder ? { folder: start.folder } : {}),
       // Its process (#549): once it is gone without a finish, Hive says the run ended without a report.
@@ -263,6 +266,8 @@ export interface RunAsk {
 
 /** What Hive resolved a run to be for: the card's reference, the commits, the check and its configured command. */
 export interface RunLink {
+  /** The id its start passes back, so the run gets what was resolved here. */
+  link: string | null
   card: string | null
   revision: string | null
   testedCheckout: string | null
@@ -290,6 +295,7 @@ export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fe
       const check = body.check && typeof body.check === 'object' ? (body.check as Record<string, unknown>) : null
       return {
         link: {
+          link: text(body.link),
           card: text(body.card),
           revision: text(body.revision),
           testedCheckout: text(body.testedCheckout),
