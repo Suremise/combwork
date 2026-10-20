@@ -333,7 +333,12 @@ tracked files and reflog; None: the card's declared paths' revision and the deli
 until the run starts, then by the run's id (at most 200 at once). Its finish (`checkEnd`) reads the end and writes
 `CheckRan` in the card's facts inside a board change, counted or with why not (the rules in the module's header; the
 write log decides "nothing changed", the snapshots where its record isn't complete), and the run keeps how it counted
-(`ProgressRun.counts`) for its details. In a shared folder the card's revision is its newest attributed commit.
+(`ProgressRun.counts`) for its details. A `--check` run counts only if it reported the command its link resolved for
+that check. The card's revision is read from where it works when the run starts: its own line's folder head (which the
+tested checkout must be), or in a shared folder its newest attributed commit (which it must contain); a card with no
+start in its facts yet is checked on the run's own checkout. None hashes with the options' exclusions, and its end
+reads the card's declared paths again: a list changed during the run is a new revision. The fact is written only while
+the card is still its project's (and None's declaration the one the end read), in the board change.
 
 **The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
 `Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at

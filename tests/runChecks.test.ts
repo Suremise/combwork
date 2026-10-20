@@ -22,6 +22,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { cardWork } = await import('../src/main/workflow/cardWork')
+const { FactStore } = await import('../src/main/workflow/factStore')
 type RunFor = import('../src/main/workflow/runChecks').CheckRunFor
 type Obs = InstanceType<typeof Observer>
 
@@ -50,7 +51,7 @@ const commit = (p: string, file: string, text: string): string => {
 const armed = (o: Obs, folder: string) => vi.waitFor(async () => expect(isUnknown(await o.changedBetween(folder, Date.now(), Date.now()))).toBe(false), { timeout: HUNG_MS })
 
 const COMMANDS = { typecheck: 'npm run typecheck' }
-const forGit = (p: string, over: Partial<RunFor> = {}): RunFor => ({ card: 7, folder: p, project: p, platform: 'git', tested: git(p, 'rev-parse', 'HEAD'), check: 'typecheck', command: 'npm run typecheck', commands: COMMANDS, facts: [], paths: [], ...over })
+const forGit = (p: string, over: Partial<RunFor> = {}): RunFor => ({ card: 7, folder: p, project: p, platform: 'git', tested: git(p, 'rev-parse', 'HEAD'), check: 'typecheck', checkCommand: 'npm run typecheck', command: 'npm run typecheck', commands: COMMANDS, facts: [], paths: [], excluded: [], ...over })
 const end = (result: 'passed' | 'failed' | 'stopped' = 'passed') => ({ at: Date.now(), result, run: 'r1', by: 'B1', title: 'typecheck' })
 
 /** Brackets a run: what was read at its start, `during` as its command, then its CheckRan. */
@@ -123,6 +124,14 @@ describe('a run as a check on Git (#1222)', () => {
     expect(await bracket(o, forGit(p))).toMatchObject({ counted: false, whyNot: 'dirty' })
   })
 
+  it("a check that reported another command than its configured one doesn't count, and its own command is recorded (HR5's round 1 finding 1)", async () => {
+    await watched()
+    expect(await bracket(o, forGit(p, { check: 'typecheck', command: 'echo skipped' }))).toMatchObject({ name: 'typecheck', command: 'echo skipped', counted: false, whyNot: 'notCheck' })
+    // The command is the one configured when the run was resolved: the configuration changing meanwhile changes nothing.
+    expect(await bracket(o, forGit(p, { commands: { typecheck: 'tsc -b' } }))).toMatchObject({ name: 'typecheck', command: 'npm run typecheck', counted: true })
+    expect(await bracket(o, forGit(p, { checkCommand: null }))).toMatchObject({ counted: false, whyNot: 'notCheck' })
+  })
+
   it("a run that wasn't started as a check counts only if its command is exactly a configured one", async () => {
     await watched()
     expect(await bracket(o, forGit(p, { check: null, command: 'npx tsc --noEmit' }))).toMatchObject({ name: 'typecheck', counted: false, whyNot: 'notCheck' })
@@ -145,6 +154,21 @@ describe('a run as a check on Git (#1222)', () => {
     expect(await bracket(o, forGit(p, { tested: other, facts }))).toMatchObject({ revision: mine, counted: false, whyNot: 'notContained' })
   })
 
+  it("a card on its own line counts only on its line's revision, not on an older checkout elsewhere (HR5's round 1 finding 2)", async () => {
+    await watched()
+    const a = git(p, 'rev-parse', 'HEAD')
+    const wt = join(tempDir('hive-run-checks-wt-'), 'card')
+    git(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
+    const b = commit(wt, 'feature.txt', 'feature\n')
+    const facts: Fact[] = [{ seq: 1, card: 7, kind: 'Started', at: '2026-10-20T10:00:00.000Z', actor: 'agent:B1', source: 'recorded', data: { folder: wt, line: 'feature', base: a, target: 'main', builder: 'B1', cardKind: 'code' } }]
+    // Run in main, at A: the card's revision is B, which A isn't.
+    expect(await bracket(o, forGit(p, { tested: a, facts }))).toMatchObject({ revision: b, tested: a, counted: false, whyNot: 'notContained' })
+    // Run in its own folder, at B: counted.
+    o.follow([{ path: p, platform: 'git', root: p }, { path: wt, platform: 'git', root: wt }])
+    await armed(o, wt)
+    expect(await bracket(o, forGit(wt, { project: p, tested: b, facts }))).toMatchObject({ revision: b, tested: b, counted: true })
+  })
+
   it("a folder the watcher doesn't follow: its stat snapshots decide", async () => {
     p = repo()
     o = new Observer()
@@ -164,7 +188,7 @@ describe('a run as a check on None (#1222)', () => {
     o = new Observer()
     o.follow([{ path: p, platform: 'none' }])
     await armed(o, p)
-    return { card: 7, folder: p, project: p, platform: 'none', tested: null, check: 'typecheck', command: null, commands: COMMANDS, facts: [], paths: ['doc.md'] }
+    return { card: 7, folder: p, project: p, platform: 'none', tested: null, check: 'typecheck', checkCommand: 'npm run typecheck', command: 'npm run typecheck', commands: COMMANDS, facts: [], paths: ['doc.md'], excluded: ['node_modules', '.venv', 'out'] }
   }
 
   it("counts when the card's paths hash the same at both ends and no deliverable was written", async () => {
@@ -178,6 +202,15 @@ describe('a run as a check on None (#1222)', () => {
   it("an edit to a declared path during the run: the card's revision changed", async () => {
     const r = await folder()
     expect(await bracket(o, r, () => writeFileSync(join(p, 'doc.md'), 'edited\n'))).toMatchObject({ counted: false, whyNot: 'revisionChanged' })
+  })
+
+  it("a write to a folder the options leave out of the deliverables still counts (HR5's round 1 finding 3)", async () => {
+    const r = await folder()
+    expect(await bracket(o, r, () => {
+      mkdirSync(join(p, 'out'), { recursive: true })
+      writeFileSync(join(p, 'out', 'bundle.js'), 'built')
+    })).toMatchObject({ counted: true })
+    expect(await bracket(o, { ...r, excluded: [] }, () => writeFileSync(join(p, 'out', 'bundle.js'), 'built again'))).toMatchObject({ counted: false, whyNot: 'changed' })
   })
 
   it('a write to another deliverable during the run is a change', async () => {
@@ -217,5 +250,42 @@ describe("a run's bracket in the app (#1222)", () => {
     expect(cardWork(w, card)!.checks).toMatchObject([{ name: 'typecheck', revision: head, tested: head, result: 'passed', counted: true, run: 'run-1', by: 'Agent 1' }])
     // Once only: its bracket is gone.
     expect(await bracketFinished(run)).toBeNull()
+    // A start that names the check but reports another command: recorded as run, not counted.
+    bracketStarted('run-2', (await bracketFor(w, link))!)
+    expect(await bracketFinished({ ...(run as object), id: 'run-2', command: 'echo skipped' } as never)).toMatchObject({ name: 'typecheck', command: 'echo skipped', counted: false, whyNot: 'notCheck' })
+  })
+
+  it("None: the options' exclusions and the card's declared paths as they are at the end (HR5's round 1 findings 3 and 4)", async () => {
+    const ws = join(base, 'ws-none')
+    const p = join(ws, 'n')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none', workflow: { options: { commands: COMMANDS, excluded: ['out'] } } }))
+    writeFileSync(join(p, 'a.txt'), 'a\n')
+    writeFileSync(join(p, 'b.txt'), 'b\n')
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'None', project: 'n' }, { kind: 'user' }))).number
+    const facts = FactStore.forBoard(w, { project: 'n', key: 'N' })
+    const declare = (paths: string[]) => store.boardWrite(w, async () => void facts.updateCard(card, { paths }))
+    await declare(['a.txt'])
+    const link = { card, revision: null, testedCheckout: null, check: { name: 'typecheck', command: 'npm run typecheck' }, folder: p }
+    let n = 0
+    const finish = (during: () => void | Promise<void>) =>
+      bracketFor(w, link).then(async (b) => {
+        const id = `none-${++n}`
+        bracketStarted(id, b!)
+        await during()
+        return bracketFinished({ id, finishedAt: Date.now(), state: 'passed', source: 'agent', agentId: 'a1', agentName: 'Agent 1', title: 'typecheck', command: 'npm run typecheck' } as never)
+      })
+    // Its output in an excluded folder counts; a write to a deliverable doesn't.
+    expect(await finish(() => {
+      mkdirSync(join(p, 'out'), { recursive: true })
+      writeFileSync(join(p, 'out', 'bundle.js'), 'built')
+    })).toMatchObject({ counted: true })
+    expect(await finish(() => writeFileSync(join(p, 'b.txt'), 'b, a longer text\n'))).toMatchObject({ counted: false, whyNot: 'changed' })
+    // The declaration changed during the run, no file touched: a new revision.
+    expect(await finish(() => declare(['b.txt']))).toMatchObject({ counted: false, whyNot: 'revisionChanged' })
+    expect(cardWork(w, card)!.checks.map((c) => [c.counted, c.whyNot])).toEqual([[true, undefined], [false, 'changed'], [false, 'revisionChanged']])
   })
 })
