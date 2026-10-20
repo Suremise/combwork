@@ -806,6 +806,40 @@ export function boardRead<T>(ws: WorkspaceService, fn: (db: Db['reader']) => T):
   return readSnapshot(ws, (_b, db) => fn(db))
 }
 
+/** What the upgrade's adoption (#1218, workflow/adoption.ts) needs of a card: where it is, whose it is, and whether it has facts. */
+export interface AdoptionCard {
+  number: number
+  project: string
+  column: string
+  archived: boolean
+  agent: string | null
+  preWorkflow: boolean
+  facts: boolean
+}
+
+/** Every card's AdoptionCard, in number order, on one snapshot ([] on a board still 0.9's, waiting for its upgrade). */
+export function adoptionCards(ws: WorkspaceService): AdoptionCard[] {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy || b.db.pending) return []
+    const rows = db.prepare('SELECT number, project, col, archived, agent, pre_workflow, EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number) AS facts FROM cards ORDER BY number').all() as { number: number; project: string; col: string; archived: number; agent: string | null; pre_workflow: number; facts: number }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, project: r.project, column: r.col, archived: r.archived === 1, agent: r.agent, preWorkflow: r.pre_workflow === 1, facts: r.facts === 1 }))
+  })
+}
+
+/**
+ * Marks cards as from before 1.0 (#1218, SPEC §16.4.1: no facts), inside boardWrite: those of `numbers` that have no
+ * facts and aren't marked yet, so a card a Hive has meanwhile started or adopted is left alone. Returns how many.
+ */
+export function markPreWorkflow(ws: WorkspaceService, numbers: number[]): number {
+  if (!numbers.length) return 0
+  return writeOp(ws, (b) => Number(b.db.writer.prepare('UPDATE cards SET pre_workflow = 1 WHERE number IN (SELECT value FROM json_each(?)) AND pre_workflow = 0 AND NOT EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)').run(JSON.stringify(numbers)).changes)) // i18n-ignore: SQL
+}
+
+/** A value the board keeps of its own (board_meta), or null. */
+export const boardValue = (ws: WorkspaceService, key: string): string | null => readSnapshot(ws, (_b, db) => meta(db, key))
+/** Sets one of the board's own values (inside boardWrite). */
+export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
+
 /** A write to the board's database: inside a change of `ws`'s board only, and only while its transaction is live (writeOp). */
 export function boardWriteOp<T>(ws: WorkspaceService, fn: (db: Db['writer']) => T): T {
   return writeOp(ws, (b) => fn(b.db.writer))

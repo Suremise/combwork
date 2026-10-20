@@ -25,6 +25,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/db.ts`, `src/main/boardStore.ts`, `src/main/presence.ts` | Hive's SQLite layer (`node:sqlite`: connections, settings, migrations, a group of steps run as one: #1207), and the board's database (`.hive/hive.db`): its one write path (`boardWrite`, a transaction told once), the move in from the cards' files, export (#1017), the 1.0 upgrade (asked first, `upgradeBoard`, `restoreBoardBackup`), and the workspace presence marker (`.hive/open`) |
 | `src/main/schema/` | hive.db's 1.0 tables (`v1_0.ts`, #1208) and the cards in them (#1209): `cardRows.ts`, a card's document as rows and back byte for byte (the card JSON contract), and `cardsStep.ts`, the 1.0 group's step that moves 0.9's cards into the tables |
 | `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each delivered once |
+| `src/main/workflow/adoption.ts`, `src/main/workflow/upgrade.ts` | The 1.0 upgrade's adoption (#1218): each project's options as it works today, cards from before 1.0 marked, cards in flight adopted from what their folder shows (`adoptionInputs` outside the board's lock, `writeAdoption` inside); in the background after the upgrade and at each open until it has run once |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
 | `src/main/transcripts.ts`, `src/main/providers/conversation.ts` | Sessions tab transcript viewer: per-provider incremental parsers, search, Markdown export |
@@ -460,6 +461,8 @@ transaction (`BEGIN IMMEDIATE`: another Hive's write waits for it), which what t
 synchronous, and nothing else uses the connection), and fails whole once SQLite has undone it; a read outside one is
 a read transaction of its own. Either way a record, a list, a lane or a pause is read on one snapshot, never mixing
 two commits. An observed fact whose dedupe key is there already returns null, and the caller reads again.
+
+**The adoption** (`workflow/adoption.ts`, SPEC §16.17): `adoptWorkspace` runs after `board:upgrade` and at each open (`WorkspaceService.onOpened`), one at a time per workspace, until board_meta `adoption` says it has handled every card once. Per project: its options through `mutateProjectConfig` (only when project.json has none) and its compiled ruleset; its cards in flight read with git first, then written in one board change, each in a fact-store transaction (`writeAdoption`, deduplicated `adopted`); the rest marked `pre_workflow` (`markPreWorkflow`, only cards with no facts). Like the actions worker, a run belongs to the workspace as it began (`alive`, passed to `boardWrite`).
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for

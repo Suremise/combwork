@@ -1,0 +1,161 @@
+// The upgrade's adoption (#1218, SPEC §16.17 "Old cards" and "Options at the upgrade"): after the 1.0 migration
+// commits, the "idempotent observations" half of the one upgrade. Each project gets options matching how it works
+// today (its platform recorded, `workflow` in project.json, the compiled ruleset stored); every card that has no facts
+// yet is either marked as from before 1.0 (Done, On Hold, Todo, archived: `pre_workflow`, no facts) or, in flight
+// (Doing, Review, Passed), adopted: `Adopted` (and a Review card's adopted `Submitted`) from what its folder shows now.
+//
+// Safe to repeat: run at each workspace open until it has finished once (board_meta `adoption`), and right after the
+// upgrade. A card adopted or started meanwhile (another Hive, a rerun) is left as it is: the dedupe `adopted` and the
+// marks' "no facts yet" make a second run add nothing. Nothing moves on the board and nothing is refused (S53): the
+// columns stay as they were; only the stage cache follows them.
+
+import { basename } from 'path'
+import { compile } from '../../shared/workflow/compile'
+import type { StageId } from '../../shared/workflow/facts'
+import type { ProjectConfig } from '../../shared/types'
+import type { PlatformId } from '../../shared/platform/descriptors'
+import { adoptionCards, boardValue, boardWrite, markPreWorkflow, setBoardValue, upgradeWaiting, type AdoptionCard } from '../boardStore'
+import { coalesced } from '../coalesce'
+import { listLanes } from '../lanes'
+import { createLogger, userText } from '../logger'
+import * as G from '../platform/git'
+import { projectPlatform } from '../platform/registry'
+import { isUnknown } from '../platform/types'
+import type { WorkspaceService } from '../workspace'
+import { FactStore } from './factStore'
+import { adoptionInputs, upgradeOptions, writeAdoption, type AdoptionAt, type AdoptionInputs, type InFlight } from './upgrade'
+
+const log = createLogger('workflow')
+
+/** board_meta's mark that a workspace's adoption has finished (every card handled once). */
+const DONE_KEY = 'adoption'
+
+/** The columns of cards in flight at the upgrade. */
+const IN_FLIGHT = new Set<string>(['doing', 'review', 'passed'])
+
+/** Whether an agent is a reviewer (its role or, without one, its name says so: "Reviewer", "HR1 (reviewer)"). */
+const isReviewer = (a: { name: string; role?: string }): boolean => /review/i.test(a.role || a.name)
+
+export interface AdoptionResult {
+  /** Cards adopted (in flight). */
+  adopted: number
+  /** Cards marked as from before 1.0. */
+  marked: number
+  /** Projects whose options were recorded. */
+  configured: number
+  /** Cards that couldn't be handled (an error: tried again at the next run). */
+  failed: number
+}
+
+/** Runs a workspace's adoption, one at a time per workspace (a second call while one runs waits for it). */
+export function adoptWorkspace(ws: WorkspaceService): Promise<void> {
+  const path = ws.path
+  if (!path) return Promise.resolve()
+  return coalesced(`adoption:${path.toLowerCase()}`, async () => {
+    try {
+      const r = await adoptNow(ws)
+      if (r && (r.adopted || r.marked || r.configured || r.failed)) log.info(`1.0 adoption in ${userText(path)}: ${r.adopted} card(s) in flight adopted, ${r.marked} marked as from before 1.0, ${r.configured} project(s) given their options${r.failed ? `, ${r.failed} failed (tried again at the next start)` : ''}`)
+    } catch (e) {
+      log.warn(`adopting the cards of ${userText(path)} (tried again at the next start)`, e)
+    }
+  })
+}
+
+/** The adoption itself; null when there is nothing to do (the upgrade waits, or it finished before). */
+export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | null> {
+  const path = ws.path
+  if (!path || upgradeWaiting(path) || boardValue(ws, DONE_KEY) !== null) return null
+  // The workspace as it was when the run began: once it closes, or its window opens another, the run stops (checked
+  // after each wait, and inside each board change before the board is touched), never writing another workspace's.
+  const life = ws.lifetime
+  const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
+  const write = <T>(fn: () => T): Promise<T> => boardWrite(ws, async () => fn(), { alive })
+  const out: AdoptionResult = { adopted: 0, marked: 0, configured: 0, failed: 0 }
+  const cards = adoptionCards(ws).filter((c) => !c.facts && !c.preWorkflow)
+  // Projects by their name on the board (the cards' `project`), with their folder: hidden ones too (their cards stay).
+  const folders = new Map<string, string>()
+  for (const p of [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]) folders.set(basename(p).toLowerCase(), p)
+  const lanes = await listLanes(ws, { all: true }).catch(() => [])
+  if (!alive()) return null
+  const byProject = new Map<string, AdoptionCard[]>()
+  const toMark: number[] = []
+  for (const c of cards) {
+    const folder = c.project ? folders.get(c.project.toLowerCase()) : undefined
+    // A workspace card, or a removed project's: no folder or platform to read, so from before 1.0 whatever its column.
+    if (!folder || c.archived || !IN_FLIGHT.has(c.column)) toMark.push(c.number)
+    else byProject.set(folder, [...(byProject.get(folder) ?? []), c])
+  }
+  // Every project gets its options, cards in flight or not (the ruleset its next card starts under).
+  for (const folder of new Set(folders.values())) {
+    const name = basename(folder)
+    const r = await projectOptions(ws, folder, lanes.some((l) => l.project.toLowerCase() === name.toLowerCase()), alive)
+    if (!r) return null
+    if (r.configured) out.configured++
+    const inFlight = byProject.get(folder) ?? []
+    // What each card's folder shows now: read before the board's lock (git), never inside it.
+    const reads: { card: AdoptionCard; column: InFlight; at: AdoptionAt; inputs: AdoptionInputs }[] = []
+    for (const c of inFlight) {
+      try {
+        const at = await whereItWorks(folder, r.cfg, c, r.platform)
+        reads.push({ card: c, column: c.column as InFlight, at, inputs: await adoptionInputs(folder, r.platform, c.column as InFlight, at) })
+      } catch (e) {
+        out.failed++
+        log.warn(`reading card #${c.number}'s folder for its adoption`, e)
+      }
+    }
+    if (!alive()) return null
+    await write(() => {
+      const store = FactStore.forBoard(ws, { project: name, key: name })
+      const compiled = compile(r.cfg.workflow!.options)
+      if (!compiled.ok) throw new Error(`the upgrade's options for ${name} contradict each other: ${compiled.contradictions.join(', ')}`) // i18n-ignore: a mistake in Hive's code, logged
+      store.saveRuleset(compiled.ruleset)
+      for (const x of reads) {
+        store.tx((tx) => {
+          const card = tx.card(x.card.number)
+          // The stage its column stands for: a card no 1.0 rule has moved is at its column's already, so this writes nothing
+          // unless the card's stage was set otherwise meanwhile.
+          const move = (to: StageId): void => {
+            if (to === card.stage) return
+            tx.append(card.id, { kind: 'Moved', actor: 'hive', source: 'recorded', ruleset: compiled.ruleset.id, data: { from: card.stage, to, cause: 'derived' } })
+            tx.setStage(card.id, to)
+          }
+          if (writeAdoption(tx, card, compiled.ruleset, x.column, x.at, x.inputs, move)) out.adopted++
+        })
+      }
+    })
+  }
+  if (toMark.length) out.marked = await write(() => markPreWorkflow(ws, toMark))
+  // Finished once every card was handled; a failure leaves it for the next start.
+  if (!out.failed) await write(() => setBoardValue(ws, DONE_KEY, JSON.stringify({ at: new Date().toISOString(), ...out })))
+  return out
+}
+
+/**
+ * A project's options at the upgrade (§16.17): those project.json has, else the upgrade's from how it works today
+ * (its platform as recorded, else detected; a reviewer agent if it has reviewer agents or a lane; slots if an agent has
+ * a worktree), written once through mutateProjectConfig with the platform recorded too (#1213's note).
+ */
+async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boolean, alive: () => boolean): Promise<{ cfg: ProjectConfig; platform: PlatformId; configured: boolean } | null> {
+  const before = await ws.projectConfig(folder)
+  if (before.workflow) return { cfg: before, platform: before.workflow.platform, configured: false }
+  if (!alive()) return null
+  let configured = false
+  const cfg = await ws.mutateProjectConfig(folder, (c) => {
+    // Under the lock, from the file as it is now: another Hive (or a rerun) may have written them meanwhile.
+    if (c.workflow) return {}
+    configured = true
+    const platform = projectPlatform(folder, c.platform).id
+    const agents = c.agents ?? []
+    const options = upgradeOptions(platform, { reviewers: hasLane || agents.some(isReviewer), worktrees: agents.some((a) => !!a.worktree) })
+    return { platform: c.platform ?? platform, workflow: { platform, preset: null, options } }
+  })
+  return { cfg, platform: cfg.workflow!.platform, configured }
+}
+
+/** Where a card in flight works: its agent's worktree (merging into the branch it came from), else the project folder's line. */
+async function whereItWorks(folder: string, cfg: ProjectConfig, c: AdoptionCard, platform: PlatformId): Promise<AdoptionAt> {
+  const agent = c.agent ? (cfg.agents ?? []).find((a) => a.id === c.agent) : undefined
+  if (agent?.worktree) return { agent: agent.id, worktree: agent.worktree.path, target: agent.worktree.base }
+  const line = platform === 'git' ? await G.branch(folder) : null
+  return { agent: c.agent ?? 'user', target: line && !isUnknown(line) ? line : null }
+}

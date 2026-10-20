@@ -94,6 +94,7 @@ import { capturedText, HiveError, hiveError, windowError } from './hiveError'
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
+import { adoptWorkspace } from './workflow/adoption'
 import { msg, tr } from '../shared/i18n'
 
 /**
@@ -291,6 +292,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       .catch((e) => log.warn('archiving old Done cards', e))
     // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
     void runActions(contextWorkspace()!)
+    // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once.
+    void adoptWorkspace(contextWorkspace()!)
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
@@ -590,7 +593,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:forget': (name) => removal.forgetHidden(name),
     'project:takeRemovedData': (p, keep) => removal.takeRemovedData(p, keep),
     'board:state': () => boardState(currentWorkspace()),
-    'board:upgrade': () => upgradeBoard(currentWorkspace()),
+    'board:upgrade': async () => {
+      const ws = currentWorkspace()
+      const out = await upgradeBoard(ws)
+      // Then the upgrade's adoption, in the background (#1218).
+      void adoptWorkspace(ws)
+      return out
+    },
     'board:restore09': () => {
       const ws = currentWorkspace()
       return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))

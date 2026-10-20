@@ -2306,6 +2306,15 @@ an invented history:
 | Review | `Adopted` and an **adopted submission**: a `Submitted` fact marked `source: observed, adopted: true` at the line's head, with endpoints and keys computed then | its reviewer reviews that revision as usual. If the head isn't what the builder meant, the review says so. |
 | Passed | `Adopted` with `passedBefore1_0: true` (what the column said), **no `Verdict`**: a pass can't be tied to a revision history doesn't prove | under the upgrade's options (G5 Not checked, below) nothing needs a verdict: the builder reports its merge or the user moves it. A later stricter ruleset applies only from the next card [#1112 down]. |
 
+The adoption (#1218, `workflow/adoption.ts`) runs in the background once the migration has committed, and again at each
+start until it has handled every card once (board_meta `adoption`). Archived cards, workspace cards and the cards of a
+project no longer in the workspace are **before 1.0** whatever their column. A card's folder is its agent's worktree
+(target: the branch it came from) or the project folder (target: its branch); git is read outside the board's lock. It
+is safe to repeat and to run in two Hives at once: `Adopted` is deduplicated (`adopted`), a card is marked only while it
+has no facts, so a card started under 1.0 meanwhile is left alone, and a project's options are written only when
+project.json has none. Nothing moves on the board: each adopted card is already at the stage its column stands for. A
+project's agents count as reviewer agents when a role or name says *review*.
+
 **Options at the upgrade** [#1122 c: "options matching how they work today, so nothing changes overnight"]:
 - Git projects get Git with G5 **Not checked**, G11 as their agents work (slots if any agent has a worktree, else the
   project folder), every check off, and **G1 = A reviewer agent if the project has reviewer agents or a lane**, else No
