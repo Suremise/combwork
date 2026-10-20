@@ -104,6 +104,7 @@ import { trash } from './trash'
 import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
 import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
+import { observer } from './platform/observe'
 
 const log = createLogger('sessions')
 
@@ -3640,6 +3641,8 @@ class SessionManager {
     const mode = this.lockMode(l.state.projectPath)
     const base = typeof body.cwd === 'string' && body.cwd ? body.cwd : l.state.cwd
     const files = hook.editedPaths.map((f) => resolve(isAbsolute(f) ? f : join(base, f)))
+    // The folder's write log (#1214): a check running there meanwhile doesn't count, whatever the lock mode.
+    observer.markEdits(files)
     if (mode === 'off') return this.editAccepted(id, files, null)
     const now = Date.now()
     for (const abs of files) {

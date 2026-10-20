@@ -15,6 +15,7 @@ import { snapshot } from '../workflow/checks'
 import { slugOf, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
+import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
@@ -230,7 +231,9 @@ export class GitPlatform implements PlatformAdapter {
 
   /**
    * A Git check (§16.13): the tested checkout contains the card's revision, the folder clean at the start and the end,
-   * and nothing written to a tracked file and no HEAD reflog entry in between (a stat snapshot here; P3's watcher).
+   * and nothing written to a tracked file and no HEAD reflog entry in between: the watcher's write log (observe.ts), or,
+   * where it has no complete record of the run (the folder not watched, the watch down meanwhile), a stat snapshot of the
+   * tracked files and the reflog's length taken at the start and the end.
    */
   async checkRun(card: CardRecord, s: CardState, run: { command: string | undefined; revision?: string; isolated?: string; exec: (command: string, folder: string) => Promise<{ ok: boolean }> }): Promise<CheckBracket | GuardRefusal> {
     const folder = run.isolated ?? this.wf.folderOf(s)
@@ -244,7 +247,9 @@ export class GitPlatform implements PlatformAdapter {
     const gitDir = gd.ok ? gd.out.trim() : null
     const dirtyA = await G.dirty(folder)
     const snapA = await snapshot(folder, files, gitDir)
+    const t0 = Date.now()
     const ok = run.command ? (await run.exec(run.command, folder)).ok : false
+    const seen = await observer.changedBetween(folder, t0, Date.now())
     const snapB = await snapshot(folder, files, gitDir)
     const dirtyB = await G.dirty(folder)
     const headB = await G.head(folder)
@@ -254,8 +259,12 @@ export class GitPlatform implements PlatformAdapter {
     else if (!contained) whyNot = 'notContained'
     else if (isUnknown(dirtyA) || isUnknown(dirtyB) || dirtyA.length || dirtyB.length) whyNot = 'dirty'
     else if (headB !== h) whyNot = 'moved'
-    else if (snapA !== snapB) whyNot = 'changed'
+    else if (isUnknown(seen) ? snapA !== snapB : seen.changed) whyNot = 'changed'
     return { revision: rev, tested: h, ok, ...(whyNot ? { whyNot } : {}) }
+  }
+
+  observe(onChange: (e: ObserveEvent) => void): Disposable {
+    return observer.subscribe(this.project, onChange)
   }
 
   async checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null> {

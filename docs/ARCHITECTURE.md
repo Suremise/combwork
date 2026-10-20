@@ -227,8 +227,7 @@ a database file of its own with `card_facts`, `card_actions`, `rulesets` and a s
 scenarios on real temporary repositories. **Darren decided (#1118, 20 Oct)** that it is P3's base in part: `shared/workflow` and
 the platform adapters as they are, the runtime, reconciliation, queue and checks as P4's and P5's starting point, and
 the fact store replaced by hive.db tables;
-where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), "nothing
-changed during a run" read from stat snapshots and the HEAD reflog (P3's watcher), card folders as plain worktrees
+where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), card folders as plain worktrees
 (P7's slots), no repository lock or signing pauses in the queue (P5), refusal text in English only (P4 translates).
 
 **Today, where it attaches** (read on 20 Oct, 1.0.0 at edbf9b33):
@@ -257,7 +256,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 
 | Layer | Shared (pure, unit-tested) | Main |
 |---|---|---|
-| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce) |
+| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
@@ -296,6 +295,33 @@ shared folder, `CommitAttributed` facts record which card each commit belongs to
 last verdict, stale, overrides, For you). The same fold runs in the spike (P2), main and tests. The card's stored
 `column` is a cache of the fold's category, written in the same transaction, so existing readers (watches, lanes, the
 Agent API, the board's queries on generated columns) keep working.
+
+**The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
+`Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at
+once), each repository and folder watched once however many projects share it:
+- **Git, per repository** (its common git dir): non-recursive on the dir itself (`HEAD`, `packed-refs`), recursive on
+  `refs`, `logs` and `worktrees` (each started as soon as a fresh repository makes it). A burst is read once (150 ms
+  quiet, at most 1 s), from the ref files with no git process (`linesOf`, `refSync`), and said to subscribers as
+  `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a working folder's
+  HEAD). The minute and window focus read the refs again (`rescan`), for what a watch missed.
+- **Every working folder** (a repository's worktrees, at most 64, and a None project's folder) has a **write log**: a
+  non-recursive watch on its top level and a recursive one per top-level folder but `.git` and `node_modules`. Not one
+  recursive watch: Windows hands a watch its changes in a small buffer, and one seeing `.git` overflowed on any commit
+  (Node then names no file), losing the folder's own writes. A folder made counts as written itself, since what is
+  written in it before its watch is armed isn't seen. Each HEAD reflog entry (`:reflog`) and each agent's edit hook
+  (`:edit`, `sessions.ts` `preToolUse` → `markEdits`) goes in too. Kept 6 hours and at most 20,000 entries a folder.
+- **`changedBetween(folder, t0, t1)`** answers checks (§16.13): it lets the folder's events arrive first (until 150 ms
+  quiet, at most 2 s), counts those arriving until then (an event is timed on arrival, after its write: the safe
+  side), and drops what git ignores (`check-ignore --stdin`; None's adapter passes its deliverables instead). It is
+  **unknown** when the record isn't complete for the whole time: the folder not watched, a watch armed less than
+  250 ms before t0, an unnamed event (lost events, a watch restarted), a watch down, the folder replaced (a watch
+  follows its folder renamed away, silently, so each answer checks the folder's file id). The adapters' `checkRun`
+  then fall back to their stat snapshots (`checks.ts` `snapshot`).
+- **#964:** a watched folder deleted makes Windows send its full path in an endless stream; that watch ends at once and
+  is tried again every 3 s until the folder is back. An error does the same.
+- Measured idle: following this repository (1 repository, 7 working folders), 0 ms of CPU over 20 s idle.
+- The adapters' `observe(onChange)` subscribe to it; None's drops a written deliverable's cached hash first
+  (§16.3.3). The Files tab's own watcher (`files.ts`) stays as it is, for the tab.
 
 **Reconciliation.** `observe.ts` turns platform events into observed facts per affected card (a commit in a slot, a
 target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.

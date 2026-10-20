@@ -3,8 +3,9 @@
 // and nothing changed in between. Otherwise it is recorded with `counted: false` and why, so the gate and the window
 // read the same facts. The card's platform adapter brackets the run (Git: the checkout; None: the declared paths).
 //
-// P2 spike (#1118): "nothing changed in between" is read from a stat snapshot of the tracked files (Git) or the
-// deliverables (None) and the HEAD reflog, taken at the start and the end; P3's watcher records every write instead.
+// "Nothing changed in between" is the watcher's write log (platform/observe.ts: every write and HEAD reflog entry, with
+// times). Where it has no complete record of a run (the folder not watched, the watch down meanwhile), the stat snapshot
+// below is the fallback: the tracked files (Git) or the deliverables (None) and the HEAD reflog, at the start and the end.
 
 import { randomUUID } from 'crypto'
 import { existsSync, readFileSync, statSync } from 'original-fs'

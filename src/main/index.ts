@@ -46,6 +46,7 @@ import { startTaskbarFlash } from './taskbar'
 import { setTitleBarColors, trackTitleBar } from './titleBar'
 import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
+import { startObserving, stopObserving } from './platform/watching'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
@@ -958,6 +959,8 @@ app.whenReady().then(async () => {
   await startApiServer()
   wireSettingsEffects()
   startBranchWatch()
+  // The platform watcher (#1214): the open workspaces' repositories and folders.
+  startObserving()
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()
@@ -1070,6 +1073,7 @@ app.on('will-quit', () => {
   killAll()
   closeProcessTracking()
   unwatchAll()
+  stopObserving()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()
