@@ -47,6 +47,12 @@ export interface StartedData {
   manifest?: Manifest
   /** None: every deliverable's hash at the start, which unclaimed changes are found against (§16.4.2). */
   deliverables?: Manifest
+  /**
+   * `Adopted` only: the folder's head observed at the upgrade (null when it couldn't be read), apart from `base` (§16.17:
+   * the card's work so far is base..head). A `Started` fact, and an `Adopted` one written before #1218 round 2, has
+   * none: its head is its base.
+   */
+  head?: string | null
   /** `Adopted` only: the column it was in at the upgrade (§16.17). */
   adoptedFrom?: 'doing' | 'review' | 'passed'
   passedBefore1_0?: boolean
@@ -278,7 +284,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.cycle = f.seq
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
-        s.head = d.base
+        s.head = d.head !== undefined ? d.head : d.base
         s.builders = addOnce(s.builders, d.builder)
         break
       }

@@ -75,7 +75,7 @@ export async function adoptionInputs(project: string, platform: PlatformId, colu
  * another Hive, and nothing is written.
  */
 export function writeAdoption(tx: Tx, card: CardRecord, ruleset: Ruleset, column: InFlight, at: AdoptionAt, inp: AdoptionInputs, move: (to: StageId) => void): boolean {
-  const data: FactData['Adopted'] = { folder: at.worktree ? join(at.worktree) : 'project', line: inp.line, base: inp.base, target: at.target, builder: at.agent, cardKind: card.kind, adoptedFrom: column, ...(column === 'passed' ? { passedBefore1_0: true } : {}) }
+  const data: FactData['Adopted'] = { folder: at.worktree ? join(at.worktree) : 'project', line: inp.line, base: inp.base, head: inp.head, target: at.target, builder: at.agent, cardKind: card.kind, adoptedFrom: column, ...(column === 'passed' ? { passedBefore1_0: true } : {}) }
   if (!tx.appendObserved(card.id, { kind: 'Adopted', actor: 'hive', source: 'observed', ruleset: ruleset.id, dedupe: 'adopted', data })) return false
   if (column === 'review') tx.appendObserved(card.id, { kind: 'Submitted', actor: `agent:${at.agent}`, source: 'observed', ruleset: ruleset.id, dedupe: 'adopted', data: { revision: inp.head, base: inp.base, head: inp.head, key: inp.key, files: inp.files, round: 1, generation: 0, sameRevision: false, summary: '', adopted: true } })
   move(column === 'doing' ? 'active' : column === 'review' ? 'review' : 'approved')
