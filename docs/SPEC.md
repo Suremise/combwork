@@ -546,6 +546,8 @@ If "Provide Hive tools to sessions" is on (default), every session, of every pro
 
 ## 8. Git
 
+**1.0 (on the `1.0.0` branch):** the workflow layer (§16) retires "Git only": Git becomes the first platform under a capability model, beside None (no version control), with Jujutsu and Mercurial to follow. What follows describes 0.9.x until each 1.0 phase updates it.
+
 - Project: `.hive/` is kept out of version control (#345, `hiveVcs.ts`): Hive adds `/<path>/.hive/` to the `.git/info/exclude` of the nearest git repository holding the project (its own: `/.hive/`; or one in a folder above, such as a workspace kept in git; a worktree's common git dir), the path's pattern characters escaped (`/project\[1\]/.hive/`), idempotent, never a tracked `.gitignore`. Whether it is excluded is **git's own answer** (`git check-ignore -q --no-index -- .hive/` in the project, kept until the exclude file changes or for a minute), not the line Hive wrote: a `.gitignore` rule (`!/.hive/`) can bring it back, and then it is `not-excluded`; only when git can't be asked (not installed), the line. It is ensured when the project is set up, at every refresh (`projectInfo`) and before every launch, so a repository made later (`git init`) is covered. `ProjectInfo.hiveVcs` says how it stands: `excluded`; `not-excluded` (a git repository whose exclude file Hive couldn't write); `other-vcs` (the nearest is Mercurial, Subversion, Jujutsu, Bazaar or Fossil, which Hive doesn't configure); `none`; and `sync` when the folder is in OneDrive (Windows' `OneDrive*` variables) or Dropbox (its `info.json`), which copies `.hive` whatever version control does. Unless excluded and unsynced, the project's Overview and Project Settings show a notice saying why it matters, with **Exclude** for `not-excluded` (`project:excludeHive`) and Learn more; the Overview's can be dismissed for that situation (`ui.hiveVcsNotice`, a project preference), and shows again when it changes.
 - **Committed before it was excluded** (#364): an exclude rule keeps only untracked files out, so files under the project's `.hive` committed earlier (a `git add -A` before Hive set it up) stay tracked. `trackedHiveFiles()` asks `git ls-files -z -- .hive` in the project (its own `.hive` only, also in a repository above it), again only when the repository's index changes (its index file's time and size: a commit, a `git rm --cached`), not at every refresh; only git's answer is kept, so a failed read says nothing (no `tracked`) and is asked again at the next refresh, never remembered as none. `HiveVcs.tracked` is how many. The notice (Overview and Project Settings, its own dismissal key) says how many files are committed, why excluding doesn't untrack them, and the command (`git rm -r --cached .hive`, then commit; the files stay on disk), and offers **Untrack…**: a confirmation listing the files git tracks there now (`project:hiveTracked`, read afresh; at most 50 shown), then `project:untrackHive` with exactly those files: main asks git again and, unless it tracks exactly those, untracks nothing (a file staged or untracked meanwhile: "changed since you were shown them"); otherwise `git --literal-pathspecs rm --cached --quiet -- <each file>` (never the folder, so nothing added in the last moment is touched), which stages their removal and leaves the commit to the user. Hive never changes the user's index unasked.
 - Workspace: `.hive/` is **not** excluded; it is meant to be committed.
@@ -862,3 +864,982 @@ A light theme uses the same accent with VS Code Light neutrals.
 22. Conversations never move between providers: a resume reopens one in the provider that recorded it, whatever its agent runs now (#506); **Hand Over to…** moves work through a handover. Projects that mix providers can share one `AGENTS.md`, imported by `CLAUDE.md`.
 23. Agents are all equal and a project starts with none; the provider is stored on each agent. Upgrading from 0.1 clears existing agents (their sessions stay).
 24. Hive keeps a last good copy of its own JSON files and never silently replaces a damaged one.
+
+## 16. Workflow layer (1.0)
+
+**Status:** the 1.0 design, written in P1 (#1117, 20 Oct 2026) for the builders of P2–P8. It describes what 1.0
+builds on the `1.0.0` branch; the rest of this spec describes 0.9.x as built, and each phase updates the sections it
+changes (§8, §6.6, §12, §13) as it merges. Where this section and an older one disagree about 1.0, this one wins.
+
+**Sources and how decisions are cited.** Every rule carries its source in brackets. Darren's recorded decisions win;
+then the shared note's decisions; then the phase cards' comments (the Assistant's carry-overs); then this spec's own
+choices, which are marked **[P1]** and are the builders' to keep or to change with evidence. What the design doesn't
+settle is an **open point** (OP-n), listed in §16.20 with a recommendation; the spec says which way it is written
+until Darren answers.
+
+| Tag | Source |
+|---|---|
+| **[#1112 A]**…**[#1112 E]** | #1112's core decisions (Darren, 19 Oct): A fixed categories, stages are columns; B the whole change is reviewed, same change carries over; C work outside Hive counts; D templates are data built from code pieces; E agents act by intent |
+| **[#1112 plan]** | #1112: "this is the plan", clean cut-over with no warn mode, platform-agnostic, templates without version control |
+| **[#1112 UI]** | #1112: no user-facing templates; options under the chosen version control in the Version Control tab; None and Git now; Solo/Pair/Team presets |
+| **[#1112 down]** | #1112: None is no version control, not no workflow; outcomes not mechanics; defaults are the product; switching warns and applies from the next card; scales fully down |
+| **[#1117 solo]** | #1117: 1.0 works fully without the Assistant |
+| **[#1117 git]** | #1117: Git support is fleshed out as 1.0 goes; a missing capability goes into the phase or On Hold labelled git-support |
+| **[#1122 detect]** | #1122: version control is detected, never switched silently |
+| **[#1123 tpl]**, **[#1123 names]** | #1123: agent templates wiped and replaced by shipped defaults; agent names unique, patterns from the project key |
+| **[#704]** | #704's decisions (14 Oct) on project keys, and of 19 Oct: branches named after cards |
+| **[#1025]** | #1025: proper tables throughout hive.db, one migration with the fact log and keys |
+| **[#966]** | #966's decisions (20 Oct) on which overrides get switches, and where |
+| **[#1177]** | #1177: Resume's busy state in 1.0 |
+| **[note §n]** | The shared note `URGENT/2026-10-19-workflow-layer.md`, section n (a proposal; binding only where a decision adopted it) |
+| **[#11nn c]** | A comment on that phase card (the Assistant's carry-overs, 19–20 Oct) |
+
+**Reading order for a phase's builder:** §16.1 (principles), §16.2 (the model), then your phase's sections (the table
+in §16.19), §16.18 (the scenarios your phase must pass) and §16.20 (open points that touch you).
+
+### 16.1 Principles
+
+1. **Facts, not claims** [note §3, #1112 E]. A card's stage comes from facts Hive recorded or observed: revisions,
+   check runs, verdicts, approvals and merges. An agent asks for a move with an intent; Hive's rules decide and move
+   the card. A lane's merge commit, a verdict's revision and a Done are never an agent's say-so.
+2. **The work owns the branch** [note §3, #1123]. A card (or a lane) owns its branch and borrows a slot; agents are
+   sessions attached to the work, never owners of a folder.
+3. **A verdict is tied to a revision** [#1112 B]. A review covers the whole change (from the card's base to its
+   revision). Hive always stores the exact revision; by default an approval carries over to a later revision that is
+   the same change.
+4. **Options, not a workflow editor** [#1112 UI, D]. The user picks the version control and sets outcome-worded
+   options (or a preset). The options compile into stages and rules from a fixed library of pieces written and tested
+   in code. Users never see or edit a template.
+5. **Every refusal is an instruction** [note §3]: it names the rule, the next step and where the rule is changed.
+6. **Overrides are explicit and recorded** [note §3, #1120]: the user always, the Assistant within Control, agents
+   never; the reason goes on the card, and the card and lane show it.
+7. **Work done outside Hive counts** [#1112 C]. A commit or merge made in a terminal or another tool is observed and
+   reconciled; the rules never fight it.
+8. **It scales fully down** [#1112 down]. With Git, every check and balance can be off; several agents can build in
+   the project folder with no worktrees. *Off is really off*: only data-safety protections stay (§16.6.4).
+9. **Without the Assistant** [#1117 solo]. Everything here works with the Assistant turned off: gates, the merge
+   queue, lanes (started from the window), slots, overrides and questions to the user. The Assistant is a convenience
+   on top.
+10. **Every gate and override has an off switch** [#966, #737's principle, note §3]. For the workflow, the off switch
+    of a rule is its option; for Hive's overrides of the CLIs, a setting in Advanced (§16.15).
+11. **Clean cut-over** [#1112 plan]. No warn-mode period: on upgrade every project moves to the layer, with options
+    that match how it works today (§16.17).
+12. **The skills describe, Hive enforces** [note §3, #1124]. Once a rule is a gate, guidance only explains it (P8).
+
+### 16.2 The model in one page
+
+Five layers [note "Core model v2"], from the bottom:
+
+1. **Platform** (§16.3): where the content lives (None or Git now; Jujutsu and Mercurial later). It declares
+   **capabilities** and answers facts about the content.
+2. **Facts** (§16.4): a typed, append-only log per card, recorded by Hive or observed from the platform.
+3. **Workflow** (§16.5, §16.6): the project's options, compiled into a **ruleset**: stages (in six fixed
+   categories), and for every move the guards that must hold and the actions Hive then takes.
+4. **Roles** (§16.10.6): builder, reviewer and either for agents; approver (the user); integrator (Hive).
+5. **Runtime** (§16.7, §16.8): intents from agents and moves from the user pass through one place
+   (`tasks.ts` → `boardWrite`); guards are evaluated there; the card's stage is derived from its facts; observed
+   facts that contradict recorded ones are reconciled.
+
+```
+ agent ──intent──▶ Agent API ──▶ workflow runtime ──guards──▶ boardWrite (one transaction:
+ user  ──move────▶ IPC        ─┘        ▲   │                   fact rows + card stage cache)
+                                        │   └─actions──▶ platform adapter (git / none)
+ platform watcher ──observed facts──────┘                merge queue, slots, wakes
+```
+
+### 16.3 Platform layer
+
+#### 16.3.1 Capabilities
+
+A platform is a descriptor (shared, pure) and an adapter (main), in a registry, mirroring providers (§10) [note §4].
+The descriptor lists the platform's **capabilities**; an option that needs a capability the platform lacks isn't
+offered, and its row says why [#1112 plan, note "Core model v2"].
+
+| Capability | Question it answers / operation | Git | None |
+|---|---|---|---|
+| **revisions** | Name an exact state of the work; read the current one. | A commit id (`rev-parse HEAD` in the card's folder). | A content hash of the card's deliverables (§16.3.3). |
+| **isolation** | Parallel working folders for cards. | Worktrees: slots (§16.10). | Not in 1.0 (OP-16): everyone works in the project folder. |
+| **integration** | Combine an approved change into the target. | Merge (merge commit or squash) by Hive's merge queue (§16.9) or the agent. | **Acceptance**: an approved revision is recorded as accepted; nothing is copied (OP-16). |
+| **containment** | Is revision R (or its change) in target T? | Ancestor of the target, or a target commit with the same change (a squash) (§16.3.4). | R has an Accepted fact. |
+| **sameness** | Is R2 the same change as R1? | Same patch-id of the whole change (§16.3.4). | Same hash (any edit is a new revision) [#1112 B]. |
+| **authorship** | Who made the change? | Hive's records of which agent worked the card, plus each commit's author identity (§16.3.4). | Hive's records (edits attributed by hooks and file locks). |
+| **observe** | Tell Hive when the content changes outside an intent. | Watch the repository's refs and HEAD (§16.4.4). | Watch the deliverables (the Files tab's watcher). |
+
+Every adapter answer is a value or **unknown** (git missing, a failed read, a folder gone). **Unknown never satisfies
+a rule** [P1, following §8's "fail safe"]: a gate whose fact is unknown refuses, saying what couldn't be read and the
+fix (Agent Setup, Retry).
+
+The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
+
+```ts
+interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string }
+interface PlatformAdapter {
+  detect(folder): Detection                               // §16.3.5
+  head(where: Folder): Revision | Unknown                 // revisions
+  dirty(where: Folder, paths?: string[]): Dirty | Unknown // the folder's uncommitted state, optionally only some paths
+  change(where: Folder, base: Revision, head: Revision): Change | Unknown   // files changed + sameness key
+  contains(target: Target, rev: Revision, change?: Change): Containment | Unknown
+  authors(change: Change): Author[] | Unknown
+  isolate?(card, base): Folder; release?(folder)          // isolation (slots, §16.10)
+  testIntegrate?(target, rev, style): TestResult; advance?(target, result): Revision   // integration (§16.9)
+  observe(onChange): Disposable
+}
+```
+
+All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypasses move onto it in P3:
+`checkGit`'s `git --version` (`gitTool.ts:57`) and `excludeCopies`'s `rev-parse --git-common-dir`
+(`providers/common.ts:344`) [#1119]. SPEC §8's "Git only" is retired: Git is the first platform [#1112 plan].
+
+#### 16.3.2 Git adapter
+
+- **Revision:** the commit id of HEAD in the card's folder (its slot, or the project folder). Shown as 7 characters.
+- **The change** of a card: `merge-base(target, head)..head`, the whole diff (decision B: the change, not single
+  commits). **Files changed** per revision (`git diff --name-status -z <mb> <head>`) are part of the Submitted fact
+  (#945) [#1119 c].
+- **Shared-folder cards** (no slot: several agents commit on one branch): a card's commits are those since its
+  Started fact whose message carries the card's trailer (`Hive-Card: AM-12`, §16.12; OP-14). Its change is the
+  combined diff of those commits; its revision is the newest of them. A commit with no trailer (the user's, another
+  tool's) belongs to no card. The submit intent refuses when the agent's commits since its last submit lack the
+  trailer, with the fix (`git commit --amend --trailer "Hive-Card: AM-12"` before submitting) [P1].
+- **Dirty:** `git status --porcelain=v2 -z` (already `--no-optional-locks`, §8). In a shared folder only the paths
+  the agent holds or held file locks on since the card started count; others' changes are listed as "not yours" and
+  don't refuse [P1, from #1112 down's "commit only your own changes"].
+- **Sameness key:** `git patch-id --stable` over the whole change's diff (`git diff --binary <mb> <head>`). An empty
+  change has no key, and submitting it is refused ("nothing to review") unless the card is no-code [P1].
+- **Containment,** in order: `merge-base --is-ancestor <rev> <target>` (a merge, or a fast-forward); else a commit on
+  the target since the card's base whose own patch-id equals the change's key (a squash, or a cherry-pick of the
+  whole change); else the existing tree test (`alreadyMerged`, `worktrees.ts:417`, `merge-tree --write-tree` equal to
+  the target's tree) for a squash with a different split. The first that answers yes says how (`method: merge |
+  fast-forward | squash | same-tree`) [P1, extending `branchWatch`'s detection].
+- **Authorship:** for no-self-review, the agents Hive recorded working the card (Started, Submitted, build holds), not
+  the commit author, since agents often share one identity [P1]. For the identity rule, each commit's author email
+  (`%ae`) against the project's identity (§16.6.2, G12).
+- **Observe:** a watcher on the repository's `HEAD`, `refs/heads`, `packed-refs` and `logs/HEAD` (common git dir and
+  each worktree's), debounced, plus today's minute refresh and window focus (§8). Events are reconciled (§16.4.4).
+
+#### 16.3.3 None adapter
+
+- **Deliverables:** the files a card's revisions are made of. A project option (N4, §16.6.1): by default the project
+  folder except `.hive`, files git would ignore if there were a repository (none), and `node_modules`-like folders
+  listed in the option; a card can narrow it to paths [P1; OP-17].
+- **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content) of the deliverables, computed when
+  the builder submits (and on observe). Shown as 7 hex characters. Any edit is a new revision: sameness is equality
+  [#1112 B].
+- **Change:** the files whose hashes differ from the card's Started snapshot (a manifest stored with the Started fact,
+  paths and hashes, never contents).
+- **Containment:** an Accepted fact for the revision. **Integration** is acceptance: nothing is copied or published in
+  1.0 (OP-16).
+- **Authorship:** agents whose edits (hooks' PostToolUse, file locks) touched the deliverables since Started.
+- **Bounded:** at most 20,000 files and 2 GB hashed per revision; over that the revision is unknown and the option row
+  says to narrow the deliverables [P1].
+
+#### 16.3.4 Paper check: Jujutsu, Mercurial, Subversion
+
+The capability model must take these later without changing facts or rules [#1117, note "Core model v2"].
+
+| Capability | Jujutsu (jj) | Mercurial (hg) | Subversion (svn) |
+|---|---|---|---|
+| revisions | Commit id (not the change id, which survives amends with new content) | Changeset hash | Revision number (a working copy at a revision; local changes have none until committed) |
+| isolation | `jj workspace add` | `hg share` (or a clone) | A second checkout |
+| integration | Rebase or a merge commit onto the target bookmark | `hg merge` + commit, or `hg rebase` | `svn merge` + commit (or commit straight to trunk) |
+| containment | `jj log -r 'R & ::T'` (ancestry) | `hg log -r 'R and ancestors(T)'` | R ≤ the target's HEAD on the same branch path; merges via `svn:mergeinfo` |
+| sameness | **The same diff** (patch-id over `jj diff --git`), plus the change id as a hint [#1112 B] | Patch-id over `hg diff --git`, or `hg export` without headers | A diff over the change's paths; no rebase concept, so mostly exact |
+| authorship | Author field + Hive's records | Same | Same |
+| observe | `.jj/repo/op_heads` | `.hg/store`, `.hg/dirstate`, `.hg/bookmarks` | `.svn/wc.db` |
+
+**Fits:** jj and hg fit every capability. Subversion has no local commits, so "submit a revision" means committing
+to a branch path, and isolation is a checkout per slot: it fits with a "revisions are server commits" note, and is not
+planned. Nothing in the facts or the piece library mentions commits, branches or merges by those names: they say
+revision, folder, target and integrate [P1].
+
+#### 16.3.5 Detecting version control
+
+[#1122 detect] Version control is a fact, detected, and never switched silently.
+
+| Case | What Hive does |
+|---|---|
+| A project is added in a Git repository | Git is selected, and the tab says "This folder is a Git repository at <root>". One step asks "How do you work? Solo / Pair / Team", suggesting a preset from the project's agents (Solo for one or none, Pair for a builder and a reviewer, Team for more). Nothing is applied until the user chooses. |
+| A project is added in a folder with no version control | None, with its own preset step. |
+| Upgrading to 1.0 | Git projects get Git and None projects None, with options matching how they work today (§16.17); a one-time notice offers the presets. |
+| A None project gets `git init` (by the user or an agent) | Hive notices (the refresh that ensures `.hive`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
+| The repository disappears (`.git` removed or moved) | Hive says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
+| Mercurial, Jujutsu or another system is found (`hiveVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." A colocated jj+git repository is treated as Git with a note that jj operations outside Hive are observed only as git sees them. |
+| A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Hive's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
+
+Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
+
+### 16.4 Facts
+
+#### 16.4.1 The log
+
+Each card has an append-only **fact log** [note §4, #1119]. A fact is `{ seq, card, kind, at, actor, source, data }`:
+- `seq`: per card, increasing; `at`: when Hive wrote it.
+- `actor`: who caused it: `user`, `assistant`, `agent:<id>` (with its name then), `hive` (Hive's own action, e.g. the
+  merge queue), `outside` (observed, no actor known). From the token as today (`taskActor`, `servers.ts:1737`).
+- `source`: `recorded` (Hive saw it happen, through an intent, a move or its own action) or `observed` (read back from
+  the platform). Observed facts are always checked again when used; recorded ones aren't rewritten.
+- `ruleset`: the id of the compiled options the fact was decided under (§16.5.4).
+
+The log lives in hive.db in its own table (`card_facts`), written in the **same transaction** as the card change it
+causes (`boardWrite`, `boardStore.ts:536`), so a fact and the move it caused can't diverge [#1025, #1119]. Facts are
+never edited or deleted, except with the card itself (Delete permanently) [P1]. Old cards have no facts and are marked
+**before 1.0** (`preWorkflow: true`); Hive invents none [note §11].
+
+#### 16.4.2 Kinds
+
+| Kind | Data | Written when |
+|---|---|---|
+| `Started` | folder (slot id or `project`), branch, base revision, target, ruleset, builder agent, None: manifest | The start intent or the user's Start passes its rules. |
+| `Submitted` | revision, base, sameness key, files changed (#945), round, clean (true), summary comment id | The submit intent passes. |
+| `CheckRan` | name, command, revision, result (passed/failed/stopped), run id, duration, by, counted (bool, why not) | A run naming the card finishes (§16.13, P3) [#1119 c]. |
+| `ReviewStarted` | reviewer, revision, review copy | A reviewer starts (`review: start` today). |
+| `Verdict` | reviewer, revision, pass/fail, round, comment id | The verdict intent passes. |
+| `CarriedOver` | from revision, to revision, sameness key | A pass is kept for a later revision that is the same change. |
+| `Stale` | approved revision, current revision, why | A newer revision that isn't the same change appears after a pass. |
+| `ApprovalRequested` | kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent. |
+| `Approval` | user, gate, revision?, answer (approved/declined/answered), note | The user answers (also a Decision recorded, a pane reply counted under #922). |
+| `IntegrationRequested` | revision, target, style | The card enters the merge queue (or an agent reports its merge). |
+| `IntegrationFailed` | revision, target, reason (conflict, checks, target moved, folder busy), files, log | The queue's test merge or checks fail. |
+| `Integrated` | revision, target, result revision (the merge commit), method, by (hive, agent, outside) | The target moved with the change in it (recorded) or containment found it (observed). |
+| `Accepted` | revision | None's integration. |
+| `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
+| `Refused` | intent or move, rule, message id, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
+| `Override` | rule(s) skipped, move, by (user / assistant), reason | §16.8.4. |
+| `Blocked` / `Unblocked` | reason | As today's `blocked`. |
+| `Decision` | decision id | A decision is recorded (the decision itself stays on the card). |
+| `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
+| `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
+| `HeadMoved` (observed) | branch, from, to | A commit in the card's folder outside an intent. |
+| `TargetMoved` (observed) | target, from, to | |
+| `Gone` (observed) | what (branch, folder, repository, deliverables) | |
+| `LaneChanged` | lane, cards before/after | Hive owns lane lists (§16.11). |
+| `Undone` | the fact or change undone, by | §16.14. |
+
+A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the data [note §4].
+
+#### 16.4.3 Derived state
+
+- The card's **stage** is a function of its ruleset and facts: the last `Moved` fact's stage, where every `Moved` is
+  written only by the runtime after its guards [#1112 E, note §14 q8]. The `cards` table keeps the stage and its
+  category as columns (a cache, written in the same transaction), so the board, watches, lanes and the Agent API keep
+  reading a column: `column` stays the **category id** (`hold`, `todo`, `doing`, `review`, `passed`, `done`) for
+  compatibility, and a new `stage` field carries the stage id [P1].
+- Badges and marks on the card come from facts: revision under review, last verdict and on which revision, checks on
+  it, stale, override, returned, For you, outside Hive.
+- **Restart** resumes from the log; the merge queue rebuilds its order from `IntegrationRequested` facts not yet
+  followed by `Integrated` or `IntegrationFailed` [note §4].
+
+#### 16.4.4 Reconciliation
+
+[#1112 C] Observed facts are reconciled against recorded ones, never refused. Reconciliation runs on an observe event,
+on window focus, when a card is read for a gate, and once at start. Its rules:
+
+| Observed | Then |
+|---|---|
+| A new commit in the card's folder while it is Active | `HeadMoved`; nothing else. The card shows its current revision. |
+| A new commit after Submitted, while in Review | `HeadMoved`. The review is of the submitted revision; a verdict naming it is still accepted unless the new head isn't the same change, in which case the verdict is refused ("the builder changed the work since a3f2c1d") and the builder is told to submit again [P1]. |
+| A new revision after a pass that **is** the same change (a clean rebase, a squash) | `CarriedOver`; the card stays Approved [#1112 B]. With "Exact revision only" (G4), it is `Stale`. |
+| A new revision after a pass that isn't the same change | `Stale`; the card stays in Approved with a **stale** mark until the builder submits again (it then goes to Review); the merge queue refuses it [#1120 c]. |
+| The approved revision (or the same change) found in the target, not by Hive | `Integrated` (observed, `by: outside`) → Done, and the lane counts it [#1112 C]. |
+| An **unapproved** revision of the card found in the target (a hand merge before review) | `Integrated` (observed) → Done, with an **outside the rules** mark naming the skipped rules (an implicit override by `outside`, shown like an override). Hive never moves it back [#1112 C; P1]. |
+| A Done card's revision no longer in the target (the target was reset) | A warning mark "no longer in main"; the card stays Done [P1]. |
+| The card's branch deleted, its slot folder gone | `Gone`. A slot is recreated from the last known revision if the commit exists (§16.10.2); otherwise the card shows the problem and its rules hold. |
+| The repository gone | `Gone`; rules hold; §16.3.5. |
+| A commit with a card's trailer, on the target, while the card is in Todo | `HeadMoved` on that card; it isn't moved [P1]. |
+
+### 16.5 Stages, categories and the piece library
+
+#### 16.5.1 Categories
+
+[#1112 A] Six fixed categories, the board's machinery works on them (lanes, watches, the start view, the Overview,
+the Agent API's columns). Their ids are today's column ids, unchanged in the Agent API: `hold`, `todo`, `doing`,
+`review`, `passed`, `done`. English names (OP-1, written as recommended): **On Hold, Todo, Active, Review, Approved,
+Done** (`locales/glossary-1.0.md` §2.2).
+
+| Category | Meaning (every platform) |
+|---|---|
+| On Hold | Parked by the user. Only the user and the Assistant move cards in or out (today's rule, `checkHold`, `tasks.ts:681`). |
+| Todo | Not started. |
+| Active | Being built. |
+| Review | A revision is submitted and waits for, or is in, review or the user's approval. |
+| Approved | The current revision is approved and isn't integrated yet. |
+| Done | Integrated (Git: in the target), or accepted (None), or for a no-code card accepted by its reviewer or the user. |
+
+#### 16.5.2 Stages
+
+A **stage** is a column of the board [#1112 A]. Each sits in one category; a category may hold several stages; a
+category the options don't use is hidden. The options produce the stages (§16.6); the user may rename a stage
+(OP-30). Default stage names and when they exist:
+
+| Stage (English, proposed) | Category | Exists when |
+|---|---|---|
+| On Hold | On Hold | Always. |
+| Todo | Todo | Always. |
+| Active | Active | Always. |
+| Review | Review | A reviewer or the user's approval is required (G1/N1 not "No review"). |
+| Approved | Approved | Review exists and something follows it (a merge, or an approval before merging). |
+| Merging | Approved | Hive merges (G5). Shown while the card is in the queue. |
+| Done | Done | Always. |
+
+Stage ids are stable strings (`active`, `review`, `approved`, `merging`…), the names messages. The panel and board
+keep the category's colour and pattern; hovers and accessible names use the stage name [#1122 c].
+
+#### 16.5.3 The piece library
+
+[#1112 D] Rules are built only from these pieces, implemented and unit-tested in code. A piece declares the
+capabilities it needs. Options pick pieces and their parameters; nothing else can run.
+
+**Guards** (refuse unless…), each with its rule id, the capability it needs and the option that turns it on:
+
+| Rule id | Holds when | Needs | Option |
+|---|---|---|---|
+| `start.notBlocked` | The card isn't blocked. | — | Always (today's behaviour). |
+| `start.dependenciesIntegrated` | Every `blockedBy` card is **Done by facts** (integrated or accepted), not just Approved. | containment | G14 / N7 |
+| `start.slotAvailable` | A slot can be lent (or the project folder is the card's folder). | isolation | G11 |
+| `submit.newRevision` | The revision differs from the last Submitted (or, after a fail, any new revision). | revisions | Always with review |
+| `submit.clean` | The card's folder has no uncommitted changes (shared folder: none in the agent's own paths). | revisions | G1 ≠ No review, or G5 = Committed is done |
+| `submit.trailer` | Shared-folder commits carry the card's trailer. | revisions | Shared folder (G11 = project folder) with several agents |
+| `submit.checksPassed` | Every configured pre-review check has a passing, counted `CheckRan` on this exact revision. | revisions | G3 / N3 |
+| `submit.identity` | Every commit of the change is authored with the project's identity. | authorship | G12 |
+| `submit.ownRunsStopped` | The agent has no runs or background processes it started still running (Progress, background tasks). | — | G13 |
+| `verdict.notAuthor` | The reviewer isn't among the card's builders (Hive's records). | authorship | G2 / N2 (forced on with a reviewer) |
+| `verdict.currentRevision` | The verdict names the latest Submitted revision, and the folder's head is it or the same change. | revisions, sameness | Always with review |
+| `verdict.reviewing` | The reviewer started a review of that revision (today's `review` state). | — | Always with review |
+| `approval.given` | An `Approval` for the gate (and revision, when the gate is per revision) is recorded. | — | G10 / N1 "and you" |
+| `integrate.approved` | The revision to integrate has a pass (or carried-over pass) and isn't stale. | sameness | G1 ≠ No review |
+| `integrate.upToDate` | The revision contains the target's current head. | containment | G8 (strict) |
+| `integrate.checksPassed` | The merge checks passed on the test merge (target + change). | integration | G9 |
+| `done.contained` | The approved revision (or the same change) is in the target. | containment | G5 ≠ Not checked |
+| `done.accepted` | None: an `Accepted` fact for the current revision. | — | None, always |
+| `lane.betweenCards` | A lane's card list changes only while no card of it is Active or in Review. | — | Always (lanes) |
+
+**Actions** (Hive does…):
+
+| Action | Does |
+|---|---|
+| `recordStart` | Writes `Started` (folder, branch, base, target, ruleset). |
+| `prepareSlot` | Lends a slot; creates the card's branch from the target's head; runs setup (and installs when the lock file changed) [note §5]. |
+| `recordSubmitted` | Writes `Submitted` with files and sameness key. |
+| `wakeReviewer` | Tells the lane's reviewer or the pool (§16.10.5). |
+| `prepareReviewCopy` | Checks the revision out in a review copy (§16.10.5). |
+| `recordVerdict` | Writes `Verdict`; a pass moves on, a fail moves to Active and wakes the builder. |
+| `askUser` | Writes `ApprovalRequested`, sets For you, notifies. |
+| `enqueue` | Writes `IntegrationRequested`, adds the card to the target's queue. |
+| `testIntegrate`, `runMergeChecks`, `advanceTarget` | The merge queue (§16.9). |
+| `returnToBuilder` | Writes `IntegrationFailed`, moves to Active, wakes the builder with the output. |
+| `recordIntegrated` | Writes `Integrated`, moves to Done. |
+| `releaseSlot` | Returns the slot when the card (or lane) ends (§16.10.2). |
+| `wakeOnDecision` | On a `Decision`: wakes the builder; the reviewer too if the card is in Review [note §5, closes #587's manual step]. |
+| `endLaneIfDone` | Ends the lane when every card is Done **by facts**, with the merge commits from `Integrated` facts (no agent-supplied `mergeCommit`) [note §5]. Emits the verified lane-end event (#1088) [#1120 c]. |
+| `notify` | A banner or Windows notification per the user's settings. |
+
+#### 16.5.4 Compilation
+
+- The project's options (§16.6), resolved global → workspace → project (§16.6.6), compile to a **ruleset**: the stages,
+  and per move (start, submit, verdict, ask, integrate, done, and the user's direct move to each stage) the ordered
+  guards and actions. A ruleset is plain data with a content hash as its id, stored once in hive.db (`rulesets`).
+- Options that contradict each other are refused when saved, with the reason, e.g. "No self-review can't be off while
+  a reviewer is required"; "Hive merges needs Git" [note §6].
+- **Every card keeps the ruleset it started with** (`Started.ruleset`) until it's Done; a card in Todo uses the current
+  one. A lane started under the old options keeps its ruleset until it ends ("old rules") [#1112 UI, #1122 c].
+- A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
+  (a ruleset from a newer Hive opens read-only, like hive.db, §4) [#1112 D].
+
+### 16.6 The Version Control tab: options and presets
+
+The project's **Git** tab becomes **Version Control** [#1112 UI]. Its id stays `changes`, so saved tabs keep working
+(§8 kept it for the Git rename too). At the top: the version control (None or Git), detected (§16.3.5), with the
+header "Workflow: Git · Team" (or "· Custom"), also linked from the board [#1122 c]. Under it, **Workflow** (the
+options, this section), then for Git the platform's own sections: Changes, History, Branches & remotes (each branch
+next to its card and the revision under review), and the **merge queue** (§16.9) [#1122]. The whole page changes
+with the selection [#1112 down].
+
+**Labels below are the proposed English** [#1117 c "outcome wording first"]: they are settled with Darren (OP-2)
+before any translation, then translated once into the 7 locales per `locales/glossary-1.0.md`.
+
+#### 16.6.1 None's options
+
+| # | Option (outcome) | Values | Notes |
+|---|---|---|---|
+| N1 | **Who checks the work before it's done** | No one · A reviewer agent · You · A reviewer agent, then you | Produces Review (and Approved when "then you"). |
+| N2 | **Nobody reviews their own work** | On (fixed while a reviewer agent checks) | Off only with no reviewer. |
+| N3 | **Checks pass before review** | A list of named commands (empty: none) | Each a check (§16.13). |
+| N4 | **What the work is** (deliverables) | Paths and patterns in the project; default the whole folder except `.hive` | OP-17. |
+| N5 | **Stage names** | Rename any shown stage | OP-30. |
+| N6 | **Cards start only when the cards they wait for are done** | On / Off | `start.dependenciesIntegrated`. |
+| N7 | **File locks** | Today's setting (§5 Agents), shown here | Its owner stays Settings → Agents & Worktrees; shown read-only with a link [#966: one owner per switch]. |
+
+Done for None: an `Accepted` revision; with no review, the builder's "done" intent accepts the current revision.
+
+#### 16.6.2 Git's options
+
+| # | Option (outcome) | Values | Rules it switches |
+|---|---|---|---|
+| G1 | **Work is reviewed before it's merged** | No review · A reviewer agent · A reviewer agent, then you · You | Review stage; `verdict.*`; `integrate.approved`; `approval.given` |
+| G1b | Reviewers per card | 1 · 2 | With two, both must pass the same revision (or same change). |
+| G2 | **Nobody reviews their own work** | On (fixed with a reviewer) | `verdict.notAuthor` [note §6] |
+| G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
+| G4 | **An approval survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B] |
+| G5 | **Who merges** | Hive merges (queue) · The agent merges, Hive checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the card works on, so a commit on it is Done once approved (if reviewed). "Not checked": Done moves freely. |
+| G6 | **Merge style** | Merge commit · Squash | Owned here, not by the Merge dialog (OP-13). |
+| G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
+| G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
+| G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Hive merges only) |
+| G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate; Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
+| G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
+| G12 | **Commits use the project's identity** | Off · On (the identity shown, from `git config --local`, else global) | `submit.identity` (#809) |
+| G13 | **Agents stop what they started before review** | On / Off | `submit.ownRunsStopped` |
+| G14 | **Cards start only when the cards they wait for are merged** | On / Off | `start.dependenciesIntegrated` |
+| G15 | **Slots are brought up to date before each card** | On / Off (and "install when the lock file changed") | `prepareSlot` [note §5] |
+| G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
+| G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
+| — | Rounds, wait, loop wakes | Today's Card loops settings, shown here with a link | Owner stays Card loops [§5]. |
+
+An option the platform's capabilities can't support isn't shown (None has no G5–G9, G11, G15). Every option shows
+where its value came from: the preset, the workspace, the project [note §6].
+
+#### 16.6.3 Presets
+
+[#1112 UI, down] "Defaults are the product." Solo, Pair and Team fill every option in one click; changing any option
+afterwards makes it **Custom** (the header says which preset it started from). The values below are the proposal
+(OP-3), with why:
+
+| Option | Solo | Pair | Team | Why |
+|---|---|---|---|---|
+| G1 review | No review | A reviewer agent | A reviewer agent | Solo users review by reading the card's work; a pair exists to review. |
+| G1b reviewers | — | 1 | 1 | Two doubles cost; offered, not default. |
+| G2 no self-review | — | On | On | Fixed with a reviewer. |
+| G3 checks before review | None | The project's quick checks (suggested from its scripts: typecheck, lint) | Quick checks + unit tests | Cheap checks catch most rounds lost; teams add tests. |
+| G4 carry-over | Same change | Same change | Same change | [#1112 B]. |
+| G5 who merges | Committed is done | Hive merges | Hive merges | Note q1: two red merges reached main through hand merges. |
+| G6 style | — | Merge commit | Merge commit | Today's default (§5 Agents, §15.12). |
+| G7 target | The branch the project is on | `main` | `main` | |
+| G8 strict | — | Off | On | Note q2: the queue tests target + change anyway; Team wants the reviewed and merged content to match. |
+| G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests | #1010's merge gate. |
+| G10 your OK | Never | Never | Cards labelled `ui` or `release` | Darren's practice (screenshots, release steps). |
+| G11 where | Project folder | Slots | Slots | Pairs and teams build in parallel. |
+| G12 identity | Off | On | On | #809. |
+| G13 stop own runs | Off | On | On | |
+| G14 deps merged | On | On | On | Cheap, prevents building on unmerged work. |
+| G15 slots up to date | — | On | On | |
+| G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
+| G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
+
+None's presets: Solo = N1 No one; Pair = A reviewer agent; Team = A reviewer agent, then you; N3 as Git's G3.
+
+The Version Control tab documents each preset's choices and why (P6, from this table) [#1122].
+
+#### 16.6.4 All off, and several agents in one folder
+
+[#1112 down] With Git, every option can be off: no review, Not checked, project folder, no checks. Then:
+- **Off is really off.** Cards move freely, as today. Hive still records facts (commits, who did what), so the card
+  shows them, but it gates nothing.
+- **What never turns off** (data safety): file locks (their own setting; Off there is the user's), never deleting
+  `index.lock`, no destructive git (checkout, reset, branch switch, pull) while an agent works in the folder (§8's
+  fence, #646), and the merge queue's compare-and-swap on the target (§16.9) [note "What all off means"].
+- **Several agents in one folder.** File locks stop two agents editing one file. The remaining risks and helpers:
+  commits sweeping in another agent's half-done files (G16 warns, from file-lock records); which card a commit
+  belongs to (the `Hive-Card:` trailer, §16.3.2); builds and tests seeing others' unfinished changes (inherent: the
+  option's description says so and suggests slots); branch switches and pulls (already held, #646).
+
+#### 16.6.5 Switching
+
+[#1112 down, #1112 UI, #1122 c] Changing the version control or any option shows a warning first: what changes, that
+it applies from the next card, and the running lanes and cards in flight it won't affect yet (they finish under their
+ruleset, marked "old rules"). Confirming saves the options; nothing running is changed. Switching Git → None (or
+back) works the same: cards in flight keep their platform's ruleset; a Git card can't finish under None's rules.
+
+#### 16.6.6 Where options live
+
+- **Storage** (OP-5): the project's options in `project.json` (`workflow: { platform, preset, options }`), written with
+  `workspace.mutateProjectConfig()`; workspace defaults in `workspace.json`, global defaults in config — resolved
+  global → workspace → project like other settings (§5; `loopRounds` resolves project → workspace → constant today,
+  `src/shared/lanes.ts:58`) [note §11]. An option unset at a level inherits.
+- The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
+  by the Assistant within Control (as settings are, `hive_change_setting`), never by project agents [note §3].
+- **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
+
+### 16.7 Moves and gates
+
+Every change to a card's stage goes through the runtime at the single place every card change passes
+(`tasks.ts` update → `boardWrite`) [note §11]. Today any column can go to any column (`isTaskColumn` alone,
+`tasks.ts:1002`), and an agent's unplaced `column: 'done'` patch isn't refused (only creates, placements and reorders
+are, `tasks.ts:854`, `:705`, `:752`): 1.0 closes that.
+
+#### 16.7.1 Who moves cards
+
+| Actor | How | Refused |
+|---|---|---|
+| Project agent | Intents only (§16.8). `hive_update_task` keeps edits that aren't moves (comments, labels, blocked, description, links); its `column` is refused with the intent to use instead [#1112 E]. | Always by the rules; never overrides. |
+| The user (window) | Drag or menu, as today. | Never refused: a move that skips a rule asks first, then records an `Override` (§16.8.4) [#1112 C]. |
+| The Assistant | `hive_update_task` column moves, within Control, as today; a move that skips a rule needs `override: { reason }` explicitly, else refused with the rules it would skip [note §3]. | |
+| Hive | Actions (§16.5.3) and reconciliation. | — |
+
+#### 16.7.2 Git, per move
+
+| Move | Guards (in order) | Then |
+|---|---|---|
+| Todo → Active (start) | `start.notBlocked`, `start.dependenciesIntegrated`, `start.slotAvailable` | `recordStart`, `prepareSlot` |
+| Active → Review (submit) | `submit.newRevision`, `submit.clean`, `submit.trailer`, `submit.identity`, `submit.checksPassed`, `submit.ownRunsStopped` | `recordSubmitted`, `prepareReviewCopy`, `wakeReviewer` (or `askUser` when "You" review) |
+| Review: verdict pass | `verdict.reviewing`, `verdict.notAuthor`, `verdict.currentRevision` | `recordVerdict` → Approved; then `askUser` if G10 applies, else `enqueue` if Hive merges [note §5] |
+| Review: verdict fail | the same | `recordVerdict` → Active, wake the builder (a round, §16.11.3) |
+| Approved → Merging (enqueue) | `integrate.approved`, `approval.given` (G10) | `enqueue` |
+| Merging → Done | `integrate.upToDate`, `integrate.checksPassed`, `done.contained` (by Hive's own merge) | `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
+| Merging → Active (returned) | (queue result) | `returnToBuilder` |
+| Approved → Done (agent merges, Hive checks) | `done.contained` | `recordIntegrated` (by agent) |
+| Active → Done (no review, Committed is done) | `submit.clean`, `done.contained` | `recordIntegrated` |
+| Approved (stale) | (observed) | Stays with the stale mark; enqueue refused; submit again → Review |
+| A decision recorded | — | `wakeOnDecision` |
+
+#### 16.7.3 None, per move
+
+| Move | Guards | Then |
+|---|---|---|
+| Todo → Active | `start.notBlocked`, `start.dependenciesIntegrated` | `recordStart` (manifest) |
+| Active → Review | `submit.newRevision`, `submit.checksPassed` | `recordSubmitted`; wake the reviewer, or `askUser` |
+| Verdict pass | `verdict.*` | → Approved and `askUser` ("then you"), else `Accepted` → Done |
+| Approval given | `approval.given` | `Accepted` → Done |
+| Active → Done (no review) | — | `Accepted` of the current revision → Done |
+
+#### 16.7.4 No-code cards
+
+[#1112 plan "no-code kind… from day one", note §5] A card's **kind** is `code` (default) or `no-code`, set when the
+card is created, by the user or the Assistant (the kind is adopted "from day one" [#1112 plan]; OP-6 confirms who
+sets it, and OP-7 whether agents may propose it in the create call for the user or the Assistant to confirm). No-code cards skip `submit.newRevision`, `submit.clean`, `submit.checksPassed`,
+`done.contained` and the queue; submit carries a summary only; Done means accepted by the reviewer's pass (Approved →
+Done at once) or by the user's approval. Changing the kind later is the user's, recorded as an override.
+
+### 16.8 The Agent API: intents, refusals, overrides
+
+#### 16.8.1 Intents
+
+[#1112 E] Agents act by intent; Hive moves the card. Each intent is an Agent API route and a hive tool (the tool
+packaging, one tool per intent or one tool with actions, is P4's to settle by the scenarios' results: §16.20 OP-8).
+Each takes a card reference (§16.12) and replies with what moved, lean (`shared/toolReplies.ts`), or a refusal
+(§16.8.3).
+
+| Intent | Who | Arguments | Effect |
+|---|---|---|---|
+| **start** | The card's builder (or an agent given it) | card | Todo → Active. Replies with the folder (slot path), branch, base and target. |
+| **submit** | The builder | card, summary (comment), revision (optional: default the folder's head; must equal it) | → Review |
+| **verdict** | A reviewer | card, revision, pass/fail, comment | §16.7 |
+| **report merge** | The builder (G5 = the agent merges) | card, merge revision | Hive checks containment, then Done |
+| **ask the user** | Builder or reviewer | card, kind (approve, decide, test, sign-in, other), text, revision? | For you (§16.8.5) |
+| **couldn't within the rules** | Builder or reviewer | card, rule, why | `CannotWithinRules`: a For you of kind decide; never a failed round, never a stall [#1120 c, #686] |
+| **request to builder** | The reviewer | card, text | `ReviewerRequest`; wakes the builder now (#912) [#1120 c]. Codex reviewers get the tool (#913). |
+| **done** | The builder (None with no review; no-code with no review) | card | Accepted → Done |
+
+The `review` parameter of `hive_update_task` (start, passed, failed) maps onto verdict for one release (P4) and is
+retired in P8 with the skills [P1]. Tool descriptions say the arguments and side effects; skills say the workflow
+(AGENTS.md's one owner per rule).
+
+#### 16.8.2 Card loops on intents
+
+- The builder's watch wakes on a verdict, a `Moved` into Approved or Done, a `ReviewerRequest`, a `Decision`, and the
+  user's pane reply when relayed (#922) [#1120 c].
+- **A late message can't reopen a pass** (#699, #703): only a Submitted fact (a new revision) moves an Approved card
+  back to Review; comments and messages never do [note §10].
+- **Verified lane end:** `endLaneIfDone` replaces the agent's `mergeCommit` (`servers.ts:1556` checks only its format
+  today). `hive_lane end` keeps `abandoned` for the user and the Assistant; `mergeCommit` is ignored with a note [P1].
+
+#### 16.8.3 Refusals as instructions
+
+[note §3, #1120] A refusal is HTTP 409 with:
+
+```json
+{ "refused": true, "rule": "submit.checksPassed",
+  "message": "Review refused: checks failed on a3f2c1d (unit: 3 failures).",
+  "next": "Fix the failures, commit, run `npm test` with hive-progress --card AM-12, then submit again.",
+  "change": "Version Control → Checks pass before review (the user's)",
+  "override": "the user" }
+```
+
+- `message`, `next` and `change` are one message each (`msg()`), with placeholders; the agent gets the English, the
+  user sees the same message translated (Progress hover, card, notification) [#1120 c, glossary §1 rule 3].
+- `next` is the exact next step the agent can take; `override` says who can override (never the agent).
+- A refused intent writes a `Refused` fact (so the lane shows it) [#1120 c]. Repeated identical refusals within a
+  minute write one fact with a count [P1].
+
+#### 16.8.4 Overrides
+
+[note §3, #1120, #1112 C]
+- **Who:** the user always; the Assistant when Settings → Assistant → Control allows card changes, with a reason it
+  must give; agents never (OP-9 asks Darren to confirm).
+- **How:** the user's drag across a rule shows "This skips: <rules>. Reason (optional)" with **Move anyway**; the
+  Assistant passes `override: { reason }`. One `Override` fact names every rule skipped.
+- **Shown:** an override mark on the card and its lane segment, with who, which rule and why in the hover; overrides
+  are never invisible [#1120 c].
+- **Recorded actions still run:** a user moving a card to Done without a merge writes `Override` and `Moved`; it
+  doesn't fake an `Integrated` fact. A later observed integration adds it.
+
+#### 16.8.5 For you
+
+[#439, #1120 c] Cards waiting on the user carry **For you**, from `ApprovalRequested`, a blocked question
+(`CannotWithinRules`), or a gate waiting on the user's approval (G10). It shows as a chip on the card, a **For you**
+board filter, a count on the activity bar and in the Progress panel's paused reasons; answering (Approve/Decline, a
+decision, a reply) clears it and **wakes the waiting agent**. Kinds (OP-11, written as recommended): **Approve**,
+**Decide**, **Test**, **Sign in**, **Other**; only an Approve satisfies an approval gate. A "Test" request may carry a
+checklist (what to try, on which build) [P1]. The field records a person (`for: 'user'`) so "for <person>" can be
+added later [#439].
+
+#### 16.8.6 A refused commit (#907)
+
+[#1117 c3] When the agent's CLI refuses its own commit (Claude Code's auto-mode check, "Modify Shared Resources"),
+the commit never reaches Hive, so no intent is refused. The agent uses **couldn't within the rules** with the
+refusal's text; Hive shows a For you of kind **Approve** with the fix: approve in the agent's pane, or add an allow
+rule for `git commit` in the agent's folder (`.claude/settings.local.json`, never Hive's edit of the CLI's config,
+§10). After P5 merges are Hive's, so only commits and release pushes remain [#907]. Guidance (P8) tells agents to
+report it this way rather than retry.
+
+### 16.9 The merge queue
+
+[note §9, #1121] Hive performs merges. The merge slot becomes a **queue per target** (a project and target branch):
+
+1. Take the next entry (`IntegrationRequested`, in order).
+2. Check `integrate.approved` (not stale), `approval.given`, and with strict `integrate.upToDate` (else return the
+   card: "Update AM-12 from main, then submit": a clean update keeps the approval by carry-over).
+3. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
+   at the target's head; `git merge --no-ff <rev>` (or `merge --squash` + commit) with the message
+   `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`; the result
+   on a temporary ref `refs/hive/queue/<card>` [P1].
+4. **Merge checks** (G9) run on that worktree as runs attributed to "Hive (merge queue)", named for the card and the
+   result revision (§16.13).
+5. **Advance the target only on green**, compare-and-swap: if the target isn't checked out anywhere,
+   `git update-ref refs/heads/<target> <result> <expected>`; if it is checked out (the project folder usually has
+   `main`), `git merge --ff-only <result>` in that folder, inside the folder fence (#646) and only while no agent works
+   there, else the entry waits with "paused: <target> is in use in the project folder" [P1]. If the target moved since
+   the test (the expected head differs), the entry is tested again (step 3), once per move.
+6. Record `Integrated` (the result revision, method), move the card to Done, release its slot, end the lane if done.
+7. **Conflict or red checks:** `IntegrationFailed` with the files or the check output and log; the card goes to
+   Active, back to its builder, who resolves it; the result goes through review again unless it's the same change
+   (carry-over) [note §9].
+
+**Locks:** one queue run per repository at a time across processes (the dev and installed Hive can't merge at once):
+a lock file in the repository's common git dir (`hive-merge.lock`: pid, process start time, Hive's profile), taken
+with exclusive create, stale when its process is gone [note §12]. The Git view's actions (§8) take the same lock.
+
+**`mergeWorktree`** (`worktrees.ts:430`) changes [note §9, #1121]: it returns the merge commit, takes a target, and
+never auto-commits a dirty folder (today it `add -A` + commits, `:435-439`): a dirty slot refuses submit instead.
+The **Merge… dialog** stays for the user's own merges outside cards; for a card's branch it shows the queue instead
+(OP-13).
+
+**"The agent merges, Hive checks"** (G5): the builder merges itself (as today's merge-ready), then reports the merge;
+Hive checks containment (`done.contained`) before Done, and refuses with the fix if the approved revision isn't in the
+target [note §9 alternative].
+
+**Observed merges:** a merge done by hand is observed (§16.4.4); the queue drops that entry.
+
+**User controls:** **Pause queue** / **Resume** (the user; the Assistant within Control), saved and shown; **Remove
+from queue** on an entry, recorded as an override. The slot's **Release** goes away [#1121 c].
+
+**None:** no queue; Accepted is immediate [#1121 c, OP-16].
+
+Later, not 1.0: batching, speculative merges, stacked cards [note §13].
+
+### 16.10 Slots, review copies and sessions
+
+#### 16.10.1 The pool
+
+[note §7, #1123] A project's **slots** are worktrees at `<Workspace>.worktrees/<Project>/<slot>` (today's location,
+§15.12) with generic names (OP-31: `slot-a`, `slot-b`… recommended). A slot is **lent** to a card or a lane and
+returned when it ends; free slots stay **ready** (set up, dependencies installed). Branches are named after the
+**card**, `hive/<KEY>/<KEY>-<n>-<slug>` [#704 19 Oct] (slug: the title, lower case ASCII letters, digits and hyphens,
+at most 40 characters) [P1].
+
+#### 16.10.2 Lifecycle
+
+- **Setup and archive scripts** per project (today's `worktreeSetup` and `worktreeCopy`, moved into the Version
+  Control tab's slot options), and a per-slot name and port range in the environment (`HIVE_SLOT`, `HIVE_SLOT_PORT_BASE`
+  with a block of 10 ports) [note §7].
+- **Warming** a slot is a run attributed to "Hive (slot <name>)" [#1123 c].
+- **Guarded clean-up:** never with a live session in it, unmerged commits (by containment), or a queue entry in
+  flight [note §7].
+- **Squash merges** are detected (§16.3.2); a slot **gone from disk** is recreated (today's `recreateWorktree`,
+  `agentWorktree.ts:77`).
+- **One writer per slot,** enforced: a second builder session in a lent slot is refused at launch [note §7].
+- **Pool size:** as many slots as the project has builder agents, at most the project's agent cap; idle slots beyond
+  that are removed after a day [P1].
+
+#### 16.10.3 Agents unbound from folders
+
+[note §7, #1123] Agents lose their `worktree` field (`AgentDef.worktree`, `types.ts:964`) and gain "in slot X" while
+working. **An agent keeps its slot for a whole lane or card** (OP-10, recommended yes): CLIs file conversations by
+folder and Hive refuses to resume from another folder, so work in another slot starts a fresh conversation. Hive
+records session → provider → folder; every session resumes where it was made; Resume All, `sessionFolders` and
+pending copies use the recorded folder [note §12].
+
+#### 16.10.4 Fresh conversations and hand-overs
+
+Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap
+(#1087, partly answered: another slot means a fresh conversation), the nudge at natural breaks (#1088, firing on the
+verified lane end), the Assistant's save-and-start-fresh (#1089, #1090), and the queued hand-over (#1067: "after this
+card" means after its Done fact; its merge-slot case goes away with P5). They are open in P7, not here.
+
+#### 16.10.5 Reviewers and review copies
+
+[note §8, #1112 c] Reviewers aren't tied to slots. A reviewer reviews the **exact revision** in a **review copy**: a
+detached worktree at that revision from a small warm pool (default 2 per project, OP-32), with dependencies installed
+by the setup script (not junctions into a slot: AGENTS.md's junction gotcha). Its runs name the card and revision, so
+they are checks of that revision (§16.13). **G17**: one reviewer per lane, or a shared pool that takes the next
+Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
+repeating them (#533) [note §8].
+
+#### 16.10.6 Agent templates and roles
+
+[#1123 tpl, names] Template format v2 (`TEMPLATE_VERSION` 2, `src/shared/templates.ts:13`):
+- `worktree` removed; `role` becomes the **workflow role** `builder | reviewer | either`, used by lanes, the reviewer
+  pool and no-self-review; a new optional `note` keeps today's free text [#1123 c].
+- Kept: name, provider, model, effort, permission mode, 200k context, MCP servers, layout, description. New optional:
+  `suggestedPreset` (loading offers it, never applies it silently) and `pairs`.
+- v1 templates are wiped at upgrade and refused on import with a clear message; release notes say so [#1123 tpl].
+- **Names** use patterns `{key}-B{n}`, `{key}-R{n}`, `{key}-A{n}` [#704, #1123 names]; the load dialog lists the names
+  it will create, every one editable to any name unique in the workspace, with a free name pre-filled on a clash.
+- **Shipped defaults** (OP-19 for the exact set): Solo (1 builder), Pair (builder Claude Code + reviewer Codex), Pair:
+  one provider, Team 3×3, Team 6×6 (Darren's setup), Team 6 + pool (2 pooled reviewers) [#1123 c].
+- **The workflow role is not #686's guidance role** (None, Generalist, Builder, Reviewer, Researcher, QA, built after
+  1.0): two fields, kept apart in the data model [#1117 c2].
+
+#### 16.10.7 What reaches agents in slots
+
+- **Workspace notes** (#873): git-ignored, machine-specific notes must reach agents in slots and review copies on every
+  CLI; designed in P7 with Darren [#1123 c].
+- **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
+  are cleaned up safely, and the user chooses which skills are delivered [#966].
+- **Carrying on** (#966 row 16, P7): a switch that separates inbox availability, checkpoints, Stop continuation and
+  idle wakes, without dropping deliveries [#966].
+
+#### 16.10.8 Migration
+
+[#1123] Existing agent worktrees (HB1–HB6) become slots, keeping their branches until their current card ends; their
+agents lose `worktree` and are lent the slot they were in. Tested on a copy of Darren's workspace.
+
+### 16.11 Lanes, with or without the Assistant
+
+#### 16.11.1 Hive owns the lane's card list
+
+[note §5, #1120] A lane's cards are Hive's record, and the loop reads its next card from Hive, not from its brief.
+Changing the list is allowed between cards (`lane.betweenCards`); the builder is told. "No cards into a running lane"
+stops being a rule agents keep.
+
+#### 16.11.2 Starting a lane from the window
+
+[#1117 c "Without the Assistant"] **Start lane…** on the board and in the Progress panel: pick the builder, the
+reviewer (or the pool, per G17) and the cards in order (dragged from the board). Hive starts both agents in fresh
+conversations with a **generated brief**: the cards, the slot, the reviewer, what the options require, the target, how
+to report, and the user's optional note. Under 1.0 most of a brief (commit before review, checks, merging, Done) is the
+rules themselves. The Assistant's briefs become the same brief plus its notes.
+
+#### 16.11.3 Rounds and following a lane
+
+- Rounds count `Verdict` facts with fail; the limit and wait are the Card loops settings, unchanged.
+- **Overlaps:** Hive warns when two lanes' cards are likely to touch the same files (the cards' references, and past
+  revisions' files, #945), and suggests one lane. Advice, not a rule.
+- **Following to the end** without the Assistant: the Progress panel and notifications cover what the Assistant's lane
+  watch does today (failed review, blocked, stalled, merge due, paused with why).
+- **Paused reasons** (P4): "waiting for you (approval: ui)", "waiting: AM-11 not merged", "waiting for a reviewer",
+  "waiting for a slot", "<target> in use" [#1120 c, #1123 c].
+
+### 16.12 Project keys and card references
+
+[#704, #1025, #1119] Built in P3 in one migration:
+- **Keys:** 2–4 letters A–Z, starting with a letter, unique in the workspace, none a prefix of another; Hive suggests
+  2 letters (on a clash, other 2-letter pairs first). Chosen in the new-project dialog; a folder opened gets one from its
+  name; existing projects get suggested keys at upgrade with one quiet notice; changeable in Project Settings, the old
+  key kept as an alias [#704].
+- **Cards:** `AM-12`, counters per project; today's `#N` stay permanent aliases that resolve everywhere (cards,
+  commits, notes, memory). A card moved to another project gets a new key, the old one kept as an alias [#704].
+- **Agent names** pre-filled `AM-B1`, `AM-R1`; any unique name allowed [#704, #1123 names].
+- **Always a hyphen**, never an em dash; the activity bar tiles show the key, shrinking 3–4 letters to fit [#704].
+- **Branches** `hive/AM/AM-12-<slug>` [#704 19 Oct].
+- **Commit trailer** (OP-14, written as recommended): `Hive-Card: AM-12`, added by agents in a shared folder (and by
+  Hive's merge commits, with `Hive-Revision` and `Hive-Reviewed-By`). Commit subjects `AM-12: …` are a convention, not a
+  rule.
+- **Card references in intents** (OP-14): a key string (`"AM-12"`), an old alias (`"#1061"`), or a number with the
+  caller's project implied. A plain number from an agent means its own project's per-project number after the
+  migration; `#N` with the hash is always the old global alias [P1].
+- **Tables** [#1025]: cards with typed columns; comments, history, decisions, links, holds, and facts in their own
+  tables; aliases; `store_rows` retired (sessions, lanes, watches, deliveries get typed tables); the Agent API's JSON
+  kept identical or versioned; a backup first (`db.ts` backs up before migrating, `:124`). Holds in their own table
+  bring the cost reads down (#1107's measurement) [#1119 c].
+
+### 16.13 Checks and the Progress panel
+
+**Runs become checks** [#1119 c]. A run can name its card and revision (`hive-progress --card AM-12 [--revision …]`,
+`/v1/progress` fields; default from the agent's current card and its folder's head at start; backwards compatible).
+A finished run naming a card and revision writes `CheckRan`. A run **counts** for a configured check when its command
+equals the check's command, the folder was clean at start and its head unchanged at the end; otherwise it's recorded
+with `counted: false` and why [P1]. The gates read the same facts the panel shows, so they agree by construction.
+
+The Progress panel stays; its 1.0 changes per phase are on the phase cards and are part of this spec:
+- **P3** [#1119 c]: run rows show "AM-12 · a3f2c1d" (links the card, copies the revision); details show Card, Revision
+  and "counts as check: typecheck"; the lane hover gains the revision under review, the last verdict and on which
+  revision, checks on it and the merge commit.
+- **P4** [#1120 c]: a refused move marks the segment (a notch, red, by pattern and colour) with the one-line reason and
+  next step; a stale pass is marked ("Pass was for a3f2c1d; now at b71e09a"); overrides marked with who, rule and why;
+  no-code cards say so; paused lanes say why; a failed run that blocks a gate says so ("blocks review for AM-12").
+- **P5** [#1121 c]: the merge slot card becomes the queue's summary per target (testing now, queued, just merged,
+  returned with Open card and Show log), Pause/Resume and Remove from queue, the queue's runs attributed to Hive, the
+  full queue view in the Version Control tab, state changes announced politely.
+- **P6** [#1122 c]: stage names in hovers and accessible names over the categories' colours and patterns; the legend
+  by stage; Solo shows no lanes section unless a loop runs; links to the Version Control tab; "old rules" marks.
+- **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
+  copies' runs as checks of the revision; slot warming as runs; "waiting for a slot".
+
+### 16.14 Undo for the Assistant's changes
+
+[#1120 c, #1170] The Assistant's 30-changes-per-message cap (`MAX_ACTIONS_PER_TURN`, `assistantControl.ts:24`) goes,
+with its refusals and every text that states it; `MAX_CHANGE_BATCH` (100 cards per call) stays. In its place, **undo**,
+built on the fact log and the Assistant's activity list:
+- **What:** card edits (labels, column, blocked, title, description, links, agent), cards it created (archived on
+  undo), lane records, agent settings and Hive settings (settings already have Revert).
+- **Not:** prompts and messages sent, and work an agent did after it was started; undo can stop an agent it started.
+  The panel says so.
+- **Changed since:** if the user or an agent changed the same thing afterwards, undo skips it and says so; it never
+  overwrites a later change.
+- **Grouped** by the user's message ("Your message at 08:14: 61 changes · Undo"), with Undo per change. Kept on disk
+  across restarts for **7 days** (OP-15; the card says "at least a day").
+- **The Assistant can undo its own** changes with a tool limited to them, recorded in its panel; never the user's or
+  agents' changes.
+
+### 16.15 Override switches for the CLIs
+
+[#966, #1120 c, #1123 c, #1167, #1174] Every Hive override of a CLI's own behaviour has a switch, or a recorded reason
+it can't. One owner per switch; each defaults to today's behaviour; never written into the user's CLI config.
+
+| Group / rows | What | Phase |
+|---|---|---|
+| A (1, 3–8) | Inherit the CLI's own permission policy (badges, resume state and Control kept honest); pre-approval of Hive's tools (Copilot `--allow-tool=hive`, Claude Assistant `--allowedTools`), separating availability, CLI trust and API authorization; MCP isolation per CLI (Claude `--strict-mcp-config`, Codex `.enabled=false`, Copilot `--disable-builtin-mcps`/`--disable-mcp-server`); the Assistant's non-Hive servers; Copilot's `GH_TOKEN`/`GITHUB_TOKEN` strip (displayed and running account agree) | P4 |
+| B (10–14) | Claude's `--settings` merge, widened hook allowlists and the `disableAllHooks` refusal; Codex's hook replacement and trust; Claude's status line (keep or chain the user's); guidance and the Assistant's role injection (Codex `developer_instructions`). Several need a defined **reduced, hooks-free mode** per provider, with visible limits (no status, locks or inbox notices from hooks; the pane says so) | P4 |
+| E (24, 26–30) | Ctrl+C/V passthrough; all-keys passthrough; the OSC 52 policy; prompt fidelity (Ctrl+U clearing a draft, collapsed whitespace, stripped characters); raw variants of Hive's wrapped prompts | P4 |
+| #1167 (19–23, 25, 34) | Copilot auto-update (both suppressors, every path); right-click for Claude Code and Codex; Codex terminal title omitted; `--system-prompt-snapshot off`; `--allow-all-mcp-server-instructions`; Codex `--no-daemon` (only if verified); model/effort flags (check first) | P4 |
+| #1174 | Codex: the Assistant pre-approves only its Control subset of Hive tools (parity) | P4 |
+| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
+| F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
+| 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
+
+### 16.16 Other 1.0 rules
+
+- **Resume's busy state** [#1177]: every button that starts a session (Resume, Resume All, Start, the Sessions tab,
+  the Assistant's panel, tiles, the agent list) is disabled and shows that it's working ("Resuming…") from the click
+  until the launch; a launch never waits for the one-time usage import.
+- **Translations** [#1117 c]: every phase ships its text in all 7 locales in the same change, using
+  `locales/glossary-1.0.md`; a final review (#1126) before 1.0.0.
+- **Logical CSS** in every new 1.0 rule (#908) [#1117 c6].
+- **Stable user-guide anchors** (#860) and **builds as facts** (#1062) in P8 [#1124 c].
+- **Every phase ends with an RC** for Darren to install, except P2 (a spike with no UI) [#1112 release plan, #1118].
+
+### 16.17 Upgrading to 1.0
+
+[#1112 plan, #1122 c, #1123 tpl, #704, #1025]
+- One migration (backed up first): card tables, keys and aliases, the fact log, typed tables for sessions, lanes,
+  watches and deliveries. Old cards are **before 1.0**; open cards in Active or Review get a `Started` fact from what
+  can be read (their agent's folder and branch, `base` from its worktree), marked observed, so they can finish [P1].
+- **Options matching today** [#1122 c]: Git projects get Git with G1 No review, G5 Not checked, G11 as their agents
+  work (slots if any agent has a worktree), everything else off; None projects None with no review. "Nothing changes
+  overnight": cards move as before until the user picks a preset from the one-time notice. (This reads the clean
+  cut-over as "everyone moves to the layer at once, no warn mode", with options starting where the project is.)
+- Templates v1 wiped; agents' worktrees become slots (§16.10.8); keys suggested.
+
+### 16.18 Acceptance scenarios
+
+Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite), and P4–P7 pass against the real app
+(e2e) where the phase builds the behaviour. **Assistant off** in every scenario unless it says otherwise
+[#1117 solo]. Incidents from the note's section 1 are named; together they are every costly failure it lists.
+
+| # | Scenario (given → when → then) | Incident | Platform |
+|---|---|---|---|
+| S1 | Pair. The builder has uncommitted changes → submit → refused `submit.clean`, with the next step; the card stays Active. | #1006, #1034 | Git |
+| S2 | A card is Approved → the builder (or anyone) comments or messages → the card stays Approved; only a new Submitted moves it. | #699, #703 | Git, None |
+| S3 | A lane with cards 1–3; card 2 is Active → the user adds card 4 → refused `lane.betweenCards` until card 2 is done; added then; the loop takes it from Hive. No card is dropped. | #384, #596, #599 | Git |
+| S4 | Team. An approved change breaks the target in combination → the queue's merge checks fail → the target doesn't move; `IntegrationFailed`; the card returns to its builder with the output. | #1094, #1097 | Git |
+| S5 | A card in Review → the user records a decision → the builder and the reviewer are woken; a verdict after it is still accepted. | #587 | Git, None |
+| S6 | Pair. The builder's agent tries a verdict on its own card → refused `verdict.notAuthor`. | self-review | Git, None |
+| S7 | Approved → the user merges by hand in a terminal → observed `Integrated (outside)` → Done; the queue drops the entry; the lane counts it. | manual merge | Git |
+| S8 | Approved → the builder amends with new content → `Stale`; enqueue refused; the builder submits → Review. | rewritten approval | Git |
+| S9 | Approved → a clean rebase onto a newer target → `CarriedOver`; stays Approved; with "Exact revision only", Stale. | carry-over | Git |
+| S10 | Approved → a rebase that resolves conflicts → `Stale`. | carry-over | Git |
+| S11 | All off; three agents in the project folder on one branch → they commit with trailers; cards move freely; facts recorded; G16 warns when one commit includes another agent's file; no refusal. | all off | Git |
+| S12 | A card blocked by AM-11 (Approved, not merged) → start → refused `start.dependenciesIntegrated`. | dependencies | Git |
+| S13 | Team. Merge checks include installing dependencies → a dependency missing from the lock file → the test merge's checks fail; the target doesn't move. | #187 | Git |
+| S14 | Team, G10 "release" label → an approved release card → enqueue waits on For you (Approve); the user approves → merged. | #389, 0.4.0 | Git |
+| S15 | G12 on → a commit authored with a personal email → submit refused `submit.identity` with the fix (`git commit --amend --reset-author` after setting the identity). | #809 | Git |
+| S16 | An agent moves a card to Done with `hive_update_task` → refused with the intent to use. The user drags it to Done with no merge → asked, `Override` recorded, mark shown. | Done = merged | Git |
+| S17 | The agent merges, Hive checks → the builder reports a merge whose commit isn't in the target → refused `done.contained`. | lane mergeCommit | Git |
+| S18 | None, review by "a reviewer agent, then you" → pass → For you → the user approves → Accepted → Done. An edit to a deliverable after the pass → a new revision → Stale. | None | None |
+| S19 | The options change while a lane runs → the lane's cards keep their ruleset ("old rules"); the next card started after the lane ends uses the new one. | switching | Git |
+| S20 | `.git` is removed → Git's rules hold (unknown); the tab offers None. A None project gets `git init` → offered Git, from the next card. | detection | Git, None |
+| S21 | Assistant off: the user starts a lane from the board, the loop runs to a pass, the queue merges, the lane ends verified; a blocked card is answered from the card. | #1117 solo | Git |
+| S22 | The builder's CLI refuses its commit → it reports couldn't-within-the-rules → For you (Approve) with the fix; no failed round, no stall. | #907, #686 | Git |
+| S23 | The reviewer sends a request to the builder mid-review → the builder is woken at once. | #912 | Git |
+| S24 | Assistant on: it relabels 70 cards in one message (no cap); the user undoes the group; one card the user edited since is skipped and reported. | #1170 | — |
+| S25 | A no-code card → submit with a summary (no commit) → pass → Done; no queue. | no-code | Git |
+| S26 | Pair. A pre-review check fails on the revision → submit refused `submit.checksPassed`; the failing run row says it blocks review. | checks | Git |
+| S27 | The target moves between the queue's test and its advance → the entry is tested again; it never advances an untested target. | queue race | Git |
+| S28 | The dev and the installed Hive both try to merge into one repository → one waits on the lock. | cross-process | Git |
+
+### 16.19 What each phase builds
+
+| Phase | Card | Builds (sections) | Ends with |
+|---|---|---|---|
+| P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation; no UI; S1–S20, S25, S27 at the core | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC. |
+| P3 Facts | #1119 | Platform layer in main; the one migration (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
+| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4 | RC |
+| P5 Hive merges | #1121 | The merge queue (§16.9), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
+| P6 Version Control tab | #1122 | The tab, options, presets, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6 | RC |
+| P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7 | RC |
+| Translation review | #1126 | §16.16 | — |
+| P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0 | 1.0.0 |
+
+Git capabilities found missing go into the phase that needs them or On Hold labelled git-support [#1117 git]
+(P1's list: §16.20's last table).
+
+### 16.20 Open points for Darren
+
+Each is written into this section as recommended until answered.
+
+| # | Question | Recommendation |
+|---|---|---|
+| OP-1 | Category names in English: rename Doing → **Active** and Passed → **Approved** (ids unchanged)? | Yes: the note and phase cards use them, most translations already say "approved", and Polish wants "Aktywne" (#1104). |
+| OP-2 | The option labels (§16.6.1, §16.6.2) and stage names (§16.5.2) as worded? | Yes, then translate once. |
+| OP-3 | The presets' values (§16.6.3)? In particular Solo = "Committed is done", Team = strict on and your OK for `ui`/`release` cards. | As in the table. |
+| OP-4 | Who merges by default for Pair and Team (note q1)? | Hive merges. |
+| OP-5 | Where options live (note q4)? | `project.json`, with copy/paste as JSON; no repo file in 1.0. |
+| OP-6 | No-code kind (note q6)? | Yes (adopted by "from day one"; confirm who sets it). |
+| OP-7 | May agents propose `no-code` when creating a card? | Yes, shown as proposed until the user or the Assistant confirms. |
+| OP-8 | Intent tools: one tool each, or one tool with actions? | Decide in P4 by the scenarios and trials; one tool each is the starting point. |
+| OP-9 | Override authority (note q7): user always, the Assistant within Control (reason required), agents never? | Yes. |
+| OP-10 | Slot pinning (note q5): an agent keeps its slot for a lane? | Yes. |
+| OP-11 | For you kinds (#439): Approve, Decide, Test, Sign in, Other as one ask-the-user intent? | Yes; only Approve satisfies a gate. |
+| OP-12 | A per-card target (release and integration branches, RELEASING.md)? | Yes: a card may name a target branch; set by the user or the Assistant; the lane's cards default to the lane's. |
+| OP-13 | Who owns target and merge style (#1117 c1)? | The Git options; a slot records only its base; the Merge dialog stays for merges outside cards. |
+| OP-14 | Commit trailer `Hive-Card: AM-12`, and card references in intents (key string, `#N` alias, or number)? | As in §16.12. |
+| OP-15 | Undo retention? | 7 days on disk. |
+| OP-16 | None: isolation and integration in 1.0? | None works in the project folder; integration is acceptance (no copying); folder copies and publishing later. |
+| OP-17 | None's deliverables default? | The project folder except `.hive`, with paths per project and card. |
+| OP-18 | Strict default (note q2)? | Team on, Pair off. |
+| OP-19 | Shipped agent templates: the set, names, providers, efforts (#1123 c)? | Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool; models "provider's default". |
+| OP-20 | #1123's decision example says "HB1…HR6 in hive"; #704 gives `HI-B1`. Correct the example? | Yes, `HI-B1…HI-R6`. |
+| OP-21 | Two reviewers per card in Team? | Offered, default 1. |
+| OP-22 | Upgrade options (§16.17): existing projects start with everything off until a preset is picked? | Yes, with the one-time notice; Darren's hive project moves to Team in P6's RC. |
+| OP-23 | The UI-screenshot gate as "your OK for cards labelled `ui`" (G10)? | Yes: a label rule is generic and needs no new card field. |
+| OP-24 | Pre-review and merge check commands: suggested from the project's scripts, never guessed silently? | Yes. |
+| OP-25 | An unapproved revision merged by hand: Done with an "outside the rules" mark (§16.4.4)? | Yes (decision C: the rules never fight it). |
+| OP-26 | A stale pass: stays in Approved with a mark until resubmitted (not moved back to Review)? | Yes (#1120's panel comment). |
+| OP-27 | Pre-review checks: the agent runs them through hive-progress and Hive verifies, rather than Hive running them? | Yes; Hive runs only the merge checks. |
+| OP-28 | Lane overlap warnings (§16.11.3): advice only, never a rule? | Yes. |
+| OP-29 | A project inside a larger repository: Hive's merges into the parent's branches? | Allowed only when the options name the target explicitly; the tab warns it's the whole repository. |
+| OP-30 | Users may rename stages? | Yes, per project; categories can't be renamed. |
+| OP-31 | Slot names? | `slot-a`, `slot-b`… |
+| OP-32 | Review copies per project? | 2, configurable. |
+
+**Git support (P1's list)** [#1117 git]. Capabilities the spec needs, and where they go:
+
+| Capability | Where |
+|---|---|
+| Patch-id sameness, squash containment, refs watcher | P3 (in scope) |
+| `mergeWorktree` returns the merge commit, takes a target, no auto-commit; cross-process merge lock | P5 (in scope) |
+| Branches shown next to their cards and revisions | P6 (in scope) |
+| Push the target after Hive merges (an option) | On Hold, git-support: #1179 |
+| Update a branch from its target (merge or rebase) as a user action in the Version Control tab | On Hold, git-support: #1180 |
+| Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
+| Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
