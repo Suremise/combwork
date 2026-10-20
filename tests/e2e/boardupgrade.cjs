@@ -179,6 +179,7 @@ async function themes(dev, name) {
     // Its cards can be read, not changed (#1230): no dragging, and the card dialog's changes off, saying why.
     const tile = dev.page.locator('.task-card', { hasText: 'Still 0.9' })
     check('…its cards can not be dragged', (await tile.getAttribute('draggable')) === 'false', String(await tile.getAttribute('draggable')))
+    check('…saying why on the card', /its board is read-only here/.test((await tile.getAttribute('title')) ?? ''), (await tile.getAttribute('title')) ?? 'no title')
     await tile.click()
     const dialog = dev.page.locator('.dialog', { has: dev.page.locator('.task-title-input') })
     check('…its card dialog opens', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
@@ -188,6 +189,13 @@ async function themes(dev, name) {
     const saveBtn = dialog.locator('.dialog-footer .btn.primary', { hasText: 'Save' })
     check("…with Save, the comment box and the decision box off", (await saveBtn.isDisabled()) && (await dialog.getByRole('textbox', { name: 'New comment' }).isDisabled()) && (await dialog.getByRole('textbox', { name: 'New decision' }).isDisabled()) && (await dialog.locator('.task-title-input').getAttribute('readonly')) !== null)
     await themes(dev, '3-dialog')
+    // Typing changes nothing (the card has no description: its box is shown, read-only, round 2).
+    const descBox = dialog.locator('.task-description-input')
+    await descBox.click()
+    await dev.page.keyboard.type('typed')
+    await dialog.locator('.task-title-input').click()
+    await dev.page.keyboard.type('typed')
+    check('…typing in its description or title changes nothing', (await descBox.inputValue()) === '' && (await dialog.locator('.task-title-input').inputValue()) === 'Still 0.9', `${await descBox.inputValue()} | ${await dialog.locator('.task-title-input').inputValue()}`)
     await dev.page.keyboard.press('Escape')
     check('…and it closes with nothing to discard', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
 

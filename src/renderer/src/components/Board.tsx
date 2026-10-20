@@ -402,6 +402,8 @@ function CardTile({
   const props = {
     className: cx('task-card', folded && 'folded', c.blocked && 'blocked', finished && 'finished', stalled && !c.blocked && 'stalled'),
     draggable: !c.archived && !readOnly,
+    // Why it doesn't drag (#1230 round 2).
+    title: readOnly ?? undefined,
     onDragStart,
     onClick: () => set({ taskOpen: c.number }),
     onContextMenu: (e: React.MouseEvent) => menu.open(e, cardMenu(c, readOnly)),
@@ -1867,7 +1869,7 @@ export function TaskDialog() {
             {description.trim() ? <Markdown source={description} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
-          <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} />
         )}
         {card && (
           <>
