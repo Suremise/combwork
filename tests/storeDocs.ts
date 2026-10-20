@@ -1,7 +1,13 @@
-import { readStore, saveStore, type StoreName } from '../src/main/storeRows'
+import { readStore, saveStore, saveTable, type StoreName } from '../src/main/storeRows'
+import { workspaceDb } from '../src/main/boardStore'
+import { addDeliveries, readDeliveries } from '../src/main/schema/storeTables'
 
-/** A store's entries as the workspace database keeps them (#1018), in order: what its file held before. */
-export const storeDocs = <T = Record<string, unknown>>(workspacePath: string, store: StoreName, scope = ''): T[] => readStore(workspacePath, store, scope).rows.map((r) => JSON.parse(r.doc) as T)
+/**
+ * A store's entries as the workspace database keeps them (#1018), in order: what its file held before. Deliveries are in
+ * their own table since 1.0 (#1211), in the order of their seq.
+ */
+export const storeDocs = <T = Record<string, unknown>>(workspacePath: string, store: StoreName, scope = ''): T[] =>
+  store === 'deliveries' ? (readDeliveries(workspaceDb(workspacePath).reader, scope) as T[]) : readStore(workspacePath, store, scope).rows.map((r) => JSON.parse(r.doc) as T)
 
 /** A store's value kept beside its entries (e.g. watches' and deliveries' `invalid`), parsed; undefined when there is none. */
 export const storeMeta = <T = unknown>(workspacePath: string, store: StoreName, key: string, scope = ''): T | undefined => {
@@ -17,6 +23,16 @@ export async function putStoreDocs(workspacePath: string, store: StoreName, docs
   const key = o.key ?? ((d: unknown, i: number) => (d && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string' ? (d as { id: string }).id : `row-${i}`))
   const meta: Record<string, string | null> = { imported: JSON.stringify({ at: new Date().toISOString(), rows: 0, file: null }) }
   for (const [k, v] of Object.entries(o.meta ?? {})) meta[k] = v === null ? null : JSON.stringify(v)
+  if (store === 'deliveries') {
+    // Their table (#1211): the host's rows replaced; an entry Hive wouldn't read back goes with those kept aside, as the
+    // 1.0 step puts it.
+    const scope = o.scope ?? ''
+    await saveTable(workspacePath, store, scope, (db) => {
+      db.prepare('DELETE FROM deliveries WHERE host = ?').run(scope)
+      addDeliveries(db, scope, docs)
+    }, meta)
+    return
+  }
   await saveStore(workspacePath, store, o.scope ?? '', docs.map((d, i) => ({ key: key(d, i), doc: JSON.stringify(d) })), meta)
 }
 

@@ -153,6 +153,78 @@ function saveRows(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName
   })
 }
 
+type Writer = ReturnType<typeof workspaceDb>['writer']
+
+/**
+ * Saves a store kept in a typed table of its own (#1211: sessions' and deliveries' tables, not `store_rows`), as saveStore
+ * does a row store: under the board's lock, `guard` just before, then `write` and the values given (null removes one) in
+ * one transaction. All of it or none.
+ */
+export async function saveTable(workspacePath: string, store: StoreName, scope: string, write: (db: Writer) => void, meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
+  const path = resolve(workspacePath)
+  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  await storeTestHooks.beforeSave?.(store, scope)
+  await withFileLock(boardLock(path), async () => {
+    guard?.()
+    const wasOpen = boardOpen(path)
+    const db = workspaceDb(path).writer
+    try {
+      transaction(db, () => {
+        write(db)
+        for (const [k, v] of Object.entries(meta)) setMeta(db, store, scope, k, v)
+        if (storeTestHooks.failSave?.(store, scope)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
+      })
+    } finally {
+      if (!wasOpen) closeBoard(path)
+    }
+  })
+}
+
+/** A store's value kept beside its entries (`store_meta`), or null. */
+export function storeValue(db: Writer | ReturnType<typeof workspaceDb>['reader'], store: StoreName, scope: string, key: string): string | null {
+  const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key) as { value: string } | undefined // i18n-ignore: SQL
+  return r?.value ?? null
+}
+
+/** A typed table's side of a store's move in (openTable): how many entries a scope has, and the writing of a file's. */
+export interface StoreTable<T> {
+  count(db: Writer, scope: string): number
+  /** In the move's transaction: writes the file's entries (those not of Hive's form kept aside); returns how many it wrote. */
+  put(db: Writer, scope: string, got: T): number
+}
+
+/**
+ * openStore for a store kept in a typed table of its own (#1211): its file moved in the first time (and, `whenEmpty`,
+ * when found while the scope has none), in one transaction marked `imported` and checked there (the table has what was
+ * written), the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
+ * upgrade to 1.0 waits. The caller reads the table after.
+ */
+export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean } = {}): Promise<void> {
+  const path = resolve(workspacePath)
+  if (upgradeWaiting(path)) return
+  const toMove = (db: Writer): boolean => storeValue(db, store, scope, 'imported') === null || (!!opts.whenEmpty && table.count(db, scope) === 0 && existsSync(file))
+  const first = toMove(workspaceDb(path).writer)
+  if (first) {
+    const got = await readFile()
+    await withFileLock(boardLock(path), async () => {
+      const db = workspaceDb(path).writer
+      if (!toMove(db)) return
+      let written = 0
+      transaction(db, () => {
+        written = got ? table.put(db, scope, got) : 0
+        const now = table.count(db, scope)
+        if (now !== written) throw new Error(`${now} ${store} entries in the database, ${written} moved in: nothing was moved in`) // i18n-ignore: an internal check's error, logged
+        setMeta(db, store, scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: written, file: got ? file : null }))
+      })
+      if (got) log.info(`moved ${written} ${store} entr${written === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
+    })
+  }
+  if (existsSync(file)) {
+    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
+    keepAsBackup(file)
+  }
+}
+
 function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName, scope: string, key: string, value: string | null): void {
   if (value === null) db.prepare('DELETE FROM store_meta WHERE store = ? AND scope = ? AND key = ?').run(store, scope, key) // i18n-ignore: SQL
   else db.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run(store, scope, key, value) // i18n-ignore: SQL

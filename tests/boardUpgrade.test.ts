@@ -240,14 +240,16 @@ async function board09(): Promise<string> {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
   writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
-  const w = await open(ws)
-  await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
-  await close(w)
-  // As 0.9 left it: none of the 1.0 group's steps.
-  const raw = new DatabaseSync(store.boardFile(ws))
-  raw.prepare(`DELETE FROM schema_version WHERE version >= ?`).run(Math.min(...upgradeSteps.map((m) => m.version)))
-  raw.exec("DELETE FROM board_meta WHERE key = 'format'")
-  raw.close()
+  // As 0.9 makes it: its steps only, its cards moved in from files (none here), and card #1 saved as 0.9 saves one.
+  const db = openDb(store.boardFile(ws), { migrations: store.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' })
+  try {
+    const at = '2026-10-20T10:00:00.000Z'
+    const doc = { number: 1, title: 'From 0.9', description: '', project: 'p', projectId: null, agent: null, column: 'todo', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at, by: 'You', what: 'Created in Todo' }], archived: false, createdAt: at, createdBy: 'You', updatedAt: at }
+    db.writer.prepare('INSERT INTO cards (number, doc) VALUES (1, ?)').run(JSON.stringify(doc))
+    db.writer.prepare("INSERT INTO board_meta (key, value) VALUES ('imported', ?), ('next', '2')").run(JSON.stringify({ at, cards: 0, damaged: [], hiveVersion: '0.9.3', folder: 'tasks.imported-2026-10-20' }))
+  } finally {
+    db.close()
+  }
   return ws
 }
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()

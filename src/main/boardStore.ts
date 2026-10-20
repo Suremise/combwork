@@ -15,6 +15,7 @@ import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
+import { moveStoreRows } from './schema/storeTables'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('board')
@@ -90,6 +91,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: '1.0 upgrade',
     group: UPGRADE_GROUP_ID,
     up: (db) => db.prepare("INSERT INTO board_meta (key, value) VALUES ('format', '1.0') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run() // i18n-ignore: SQL
+  },
+  {
+    // #1211: sessions and deliveries out of store_rows, into their typed tables (schema/storeTables.ts).
+    version: 4,
+    name: 'sessions and deliveries in tables', // i18n-ignore: a schema step's name, recorded in schema_version
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      const n = moveStoreRows(db)
+      log.info(`moved ${n.sessions} session record(s) and ${n.deliveries} deliveries into their tables`)
+    }
   }
 ]
 

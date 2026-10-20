@@ -65,10 +65,13 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     expect(f.deletedUsage?.map((u) => u.id)).toEqual(['gone1', 'gone2'])
     expect(files(p).some((n) => n.startsWith('sessions.json.imported-'))).toBe(true)
     expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
-    // In the database under the project's id, with the mark that it moved in.
-    const data = readStore(wsPath, 'sessions', idOf(p))
-    expect(data.rows.map((r) => r.key)).toEqual(expect.arrayContaining(['s:s1', 's:s2', 's:s3', 'd:gone1', 'd:gone2', 'u:gone1', 'u:gone2']))
-    expect(JSON.parse(data.meta.get('imported')!)).toMatchObject({ rows: 7 })
+    // In the database's tables under the project's id (#1211), with the mark that it moved in.
+    const db = workspaceDb(wsPath).reader
+    const ids = (sql: string): string[] => (db.prepare(sql).all(idOf(p)) as { id: string }[]).map((r) => r.id)
+    expect(ids('SELECT id FROM sessions WHERE host = ? ORDER BY ord')).toEqual(['s1', 's2', 's3'])
+    expect(ids('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord')).toEqual(['gone1', 'gone2'])
+    expect(ids('SELECT id FROM sessions_deleted_usage WHERE host = ? ORDER BY ord')).toEqual(['gone1', 'gone2'])
+    expect(JSON.parse(readStore(wsPath, 'sessions', idOf(p)).meta.get('imported')!)).toMatchObject({ rows: 3 })
     // Opening the workspace made no new file in its place.
     expect(existsSync(join(wsPath, 'eps', '.hive', 'sessions.json'))).toBe(false)
   })
@@ -115,13 +118,20 @@ describe('changes', () => {
     await run(() => workspace.sessionsFile(p))
     // Every row written from here is counted, on the connection Hive writes with.
     const db = workspaceDb(wsPath).writer
-    db.exec("CREATE TEMP TABLE IF NOT EXISTS written (key TEXT); DELETE FROM written; CREATE TEMP TRIGGER IF NOT EXISTS w_upd AFTER UPDATE ON store_rows WHEN new.store = 'sessions' BEGIN INSERT INTO written VALUES (new.key); END; CREATE TEMP TRIGGER IF NOT EXISTS w_ins AFTER INSERT ON store_rows WHEN new.store = 'sessions' BEGIN INSERT INTO written VALUES (new.key); END;")
+    // Its tables' rows (#1211): a record's, its cards', the deleted lists'.
+    const watched = ['sessions', 'session_cards', 'sessions_deleted', 'sessions_deleted_usage']
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS written (key TEXT); DELETE FROM written;')
+    for (const t of watched) {
+      const id = t === 'session_cards' ? 'new.session' : 'new.id'
+      db.exec(`CREATE TEMP TRIGGER IF NOT EXISTS w_upd_${t} AFTER UPDATE ON ${t} BEGIN INSERT INTO written VALUES ('${t}:' || ${id}); END; CREATE TEMP TRIGGER IF NOT EXISTS w_ins_${t} AFTER INSERT ON ${t} BEGIN INSERT INTO written VALUES ('${t}:' || ${id}); END;`)
+    }
     await run(() => workspace.upsertSession(p, { id: 's2', lastActiveAt: '2026-10-19T11:00:00.000Z' }))
-    expect((db.prepare('SELECT key FROM written').all() as { key: string }[]).map((r) => r.key)).toEqual(['s:s2'])
+    expect((db.prepare('SELECT key FROM written').all() as { key: string }[]).map((r) => r.key)).toEqual(['sessions:s2'])
     db.exec('DELETE FROM written')
     await run(() => workspace.upsertSession(p, { id: 'new1' }))
-    expect((db.prepare('SELECT key FROM written').all() as { key: string }[]).map((r) => r.key)).toEqual(['s:new1'])
-    db.exec('DELETE FROM written; DROP TRIGGER w_upd; DROP TRIGGER w_ins;')
+    expect((db.prepare('SELECT key FROM written').all() as { key: string }[]).map((r) => r.key)).toEqual(['sessions:new1'])
+    db.exec('DELETE FROM written;')
+    for (const t of watched) db.exec(`DROP TRIGGER w_upd_${t}; DROP TRIGGER w_ins_${t};`)
     const f = await run(() => workspace.sessionsFile(p))
     expect(f.sessions.map((s) => s.id)).toEqual(['s1', 's2', 's3', 'new1'])
     expect(f.sessions[1].lastActiveAt).toBe('2026-10-19T11:00:00.000Z')
@@ -171,7 +181,7 @@ describe('following the project', () => {
     const p = join(wsPath, 'delta')
     const before = await run(() => workspace.sessionsFile(p))
     expect(await run(() => w.exportSessions(p))).toBe(3)
-    expect(readStore(wsPath, 'sessions', idOf(p)).rows).toEqual([])
+    expect(workspaceDb(wsPath).reader.prepare('SELECT id FROM sessions WHERE host = ?').all(idOf(p))).toEqual([])
     const written = JSON.parse(readFileSync(join(p, '.hive', 'sessions.json'), 'utf8'))
     expect(written.sessions.map((s: { id: string }) => s.id)).toEqual(['s1', 's2', 's3'])
     // Read during the removal (a refresh): nothing, and the file stays for the folder to take.
@@ -216,8 +226,7 @@ describe('following the project', () => {
       fileHooks.afterWrite = null
       const db = new DatabaseSync(join(wsPath, '.hive', 'hive.db'), { timeout: 0 })
       try {
-        const doc = JSON.stringify(rec('one', { name: 'committed elsewhere' }))
-        db.prepare("UPDATE store_rows SET doc = ? WHERE store = 'sessions' AND scope = ? AND key = 's:one'").run(doc, idOf(p))
+        db.prepare("UPDATE sessions SET name = 'committed elsewhere' WHERE host = ? AND id = 'one'").run(idOf(p))
         wrote = 'committed'
       } catch {
         wrote = 'blocked'
@@ -296,7 +305,7 @@ describe('following the project', () => {
   it("the Assistant's records are its own", async () => {
     const home = w.assistantHome
     await run(() => workspace.upsertSession(home, { id: 'assistant-1' }))
-    expect(readStore(wsPath, 'sessions', 'assistant').rows.map((r) => r.key)).toEqual(['s:assistant-1'])
+    expect((workspaceDb(wsPath).reader.prepare("SELECT id FROM sessions WHERE host = 'assistant'").all() as { id: string }[]).map((r) => r.id)).toEqual(['assistant-1'])
     expect((await run(() => workspace.sessionsFile(join(wsPath, 'eps')))).sessions).toEqual([])
   })
 })

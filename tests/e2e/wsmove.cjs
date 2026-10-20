@@ -56,7 +56,8 @@ const sessionsWritable = (host, writable) => {
     for (const op of ['INSERT', 'UPDATE', 'DELETE']) {
       const name = `test_sessions_readonly_${op.toLowerCase()}`
       const row = op === 'INSERT' ? 'NEW' : 'OLD'
-      db.exec(writable ? `DROP TRIGGER IF EXISTS ${name}` : `CREATE TRIGGER ${name} BEFORE ${op} ON store_rows WHEN ${row}.store = 'sessions' AND ${row}.scope = '${scope.replace(/'/g, "''")}' BEGIN SELECT RAISE(ABORT, 'attempt to write a readonly database (test)'); END`)
+      // The sessions table since 1.0 (#1211).
+      db.exec(writable ? `DROP TRIGGER IF EXISTS ${name}` : `CREATE TRIGGER ${name} BEFORE ${op} ON sessions WHEN ${row}.host = '${scope.replace(/'/g, "''")}' BEGIN SELECT RAISE(ABORT, 'attempt to write a readonly database (test)'); END`)
     }
   } finally {
     db.close()

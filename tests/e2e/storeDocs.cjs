@@ -3,6 +3,10 @@
 const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
+const codec = require('./storeCodec.cjs')
+
+/** Whether the file has a table (sessions' and deliveries' are 1.0's, #1211: a 0.9 file keeps them in store_rows). */
+const hasTable = (db, name) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name)
 
 /** A store's entries, in order (what its file's array held); [] while the workspace has no database yet. */
 function storeDocs(ws, store, scope = '') {
@@ -10,6 +14,8 @@ function storeDocs(ws, store, scope = '') {
   if (!fs.existsSync(file)) return []
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
+    // Deliveries in their own table since 1.0 (#1211), in the order of their seq.
+    if (store === 'deliveries' && hasTable(db, 'deliveries')) return db.prepare('SELECT * FROM deliveries WHERE host = ? ORDER BY seq, id').all(scope).map(codec.deliveryFromRow)
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'store_rows'").get()) return []
     return db.prepare('SELECT doc FROM store_rows WHERE store = ? AND scope = ? ORDER BY ord').all(store, scope).map((r) => JSON.parse(r.doc))
   } finally {
@@ -56,6 +62,16 @@ function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
+    if (store === 'deliveries' && hasTable(db, 'deliveries')) {
+      // Its table (#1211): the delivery's row, by its id.
+      const row = codec.deliveryToRow(scope, doc)
+      if (!row) throw new Error(`not a delivery Hive keeps: ${JSON.stringify(doc)}`)
+      db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?').run(scope, doc.id)
+      codec.insert(db, 'deliveries', row)
+      for (const [k, v] of Object.entries(meta)) db.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run(store, scope, k, JSON.stringify(v))
+      db.exec('COMMIT')
+      return
+    }
     const had = db.prepare('SELECT ord FROM store_rows WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key)
     const ord = had ? had.ord : (db.prepare('SELECT coalesce(max(ord), -1) + 1 AS o FROM store_rows WHERE store = ? AND scope = ?').get(store, scope).o)
     db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET ord = excluded.ord, doc = excluded.doc').run(store, scope, key, ord, JSON.stringify(doc))
@@ -80,6 +96,17 @@ function sessionsOf(host) {
   if (!fs.existsSync(file)) return out
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
+    if (hasTable(db, 'sessions')) {
+      // Their own tables since 1.0 (#1211).
+      const cards = new Map()
+      for (const c of db.prepare('SELECT * FROM session_cards WHERE host = ? ORDER BY session, ord').all(p.scope)) cards.set(c.session, [...(cards.get(c.session) ?? []), c])
+      out.sessions = db.prepare('SELECT * FROM sessions WHERE host = ? ORDER BY ord, id').all(p.scope).map((r) => codec.sessionFromRows(r, cards.get(r.id) ?? []))
+      const deleted = db.prepare('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord, id').all(p.scope).map((r) => r.id)
+      const usage = db.prepare('SELECT * FROM sessions_deleted_usage WHERE host = ? ORDER BY ord, id').all(p.scope).map(codec.keptUsageFromRow)
+      if (deleted.length) out.deleted = deleted
+      if (usage.length) out.deletedUsage = usage
+      return out
+    }
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'store_rows'").get()) return out
     const deleted = []
     const usage = []
@@ -106,6 +133,21 @@ function putSessions(host, f) {
   const db = new DatabaseSync(path.join(p.ws, '.hive', 'hive.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
+    if (hasTable(db, 'sessions')) {
+      // Their own tables since 1.0 (#1211).
+      for (const t of ['sessions', 'sessions_deleted', 'sessions_deleted_usage']) db.prepare(`DELETE FROM ${t} WHERE host = ?`).run(p.scope)
+      ;(f.sessions ?? []).forEach((rec, i) => {
+        const r = codec.sessionToRows(p.scope, i, rec)
+        if (!r) throw new Error(`not a session record Hive keeps: ${JSON.stringify(rec)}`)
+        codec.insert(db, 'sessions', r.row)
+        for (const c of r.cards) codec.insert(db, 'session_cards', c)
+      })
+      ;(f.deleted ?? []).forEach((id, i) => codec.insert(db, 'sessions_deleted', { host: p.scope, id, ord: i }))
+      ;(f.deletedUsage ?? []).forEach((k, i) => codec.insert(db, 'sessions_deleted_usage', codec.keptUsageToRow(p.scope, i, k)))
+      db.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('sessions', ?, 'imported', ?) ON CONFLICT(store, scope, key) DO NOTHING").run(p.scope, JSON.stringify({ at: new Date().toISOString(), rows: 0, file: null }))
+      db.exec('COMMIT')
+      return
+    }
     db.prepare("DELETE FROM store_rows WHERE store = 'sessions' AND scope = ?").run(p.scope)
     const put = db.prepare("INSERT INTO store_rows (store, scope, key, ord, doc) VALUES ('sessions', ?, ?, ?, ?)")
     const group = (prefix, list, idOf) => list.forEach((e, i) => put.run(p.scope, prefix + (idOf(e) || `#${i}`), i, JSON.stringify(e)))
