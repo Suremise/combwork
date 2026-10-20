@@ -269,7 +269,10 @@ const check = (name, ok, extra = '') => {
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
-  check('the board changes are listed', (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started #${cardNo} on a new agent, Writer`)))
+  // The list names cards by key with the number the tools take (#1219): each card's own key, from the board.
+  const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key} (#${n})`
+  const cardName = await named(cardNo)
+  check('the board changes are listed, the card by its key', /^[A-Z]{2,4}-\d+ /.test(cardName) && (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started ${cardName} on a new agent, Writer`)), cardName)
   // Putting cards in order: listed in Done by the Assistant; the order of Done is the user's, refused without asking.
   const o1 = (await api('POST', '/v1/tasks', { title: 'Order one', project: 'alpha' })).body.number
   const o2 = (await api('POST', '/v1/tasks', { title: 'Order two', project: 'alpha' })).body.number
@@ -279,7 +282,8 @@ const check = (name, ok, extra = '') => {
   const top = await api('PATCH', `/v1/tasks/${o1}`, { position: 'top' })
   check('and one card to the top', top.status === 200 && (await api('GET', '/v1/tasks?column=todo')).body[0]?.number === o1, JSON.stringify(top.body))
   const listed = (await inv('assistant:actions')).map((x) => x.ok && x.text)
-  check('both are listed in Done by the Assistant', listed.includes(`Put #${o2}, #${o1} at the top of Todo`) && listed.some((t) => t && t.startsWith(`#${o1} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify(listed.slice(-3)))
+  const [o1Name, o2Name] = [await named(o1), await named(o2)]
+  check('both are listed in Done by the Assistant, by key', listed.includes(`Put ${o2Name}, ${o1Name} at the top of Todo`) && listed.some((t) => t && t.startsWith(`${o1Name} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify({ o1Name, o2Name, listed: listed.slice(-3) }))
   const doneTop = await api('PATCH', `/v1/tasks/${cardNo}`, { position: 'top' })
   check("the Assistant can't put Done in order, and the user isn't asked", doneTop.status === 403 && (await page.locator('.assistant-question').count()) === 0, JSON.stringify(doneTop))
   // A lane the Assistant starts unwatched (#402; its changes count towards the limit below): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
