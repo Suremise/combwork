@@ -988,6 +988,8 @@ Fetch, pull and push use your git's own sign-in (Git Credential Manager may open
 
 A project that isn't a git repository keeps working in its project folder, without worktrees, merging or a Git view: its **Git** tab says so, with **Initialise repository…** to make it one. Without git itself, the tab says so, with the fix (see [Git](#git)).
 
+Git isn't required: each project has a **version control**, found when Hive first sees it. A Git repository (the project's own, or one in a folder above) is **Git**; any other folder, or one kept in Mercurial or Jujutsu (not supported yet), works **without version control**. Hive never switches it by itself: when a project's folder changes (you run `git init` in it, or its repository goes), a notice says so and the project keeps the version control it had.
+
 ### Initialise repository
 
 **Initialise repository…** on the Git tab of a project without git makes it a repository in one click, ready for agents' worktrees. Its dialog:

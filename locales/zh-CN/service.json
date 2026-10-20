@@ -150,6 +150,10 @@
   "service.workspace.notProject": "不是打开的工作区中的项目：{path}",
   "service.workspace.notRoot": "不是打开的工作区中的项目或智能体工作树：{path}",
   "service.workspace.openElsewhere": "{folder} 已在另一个窗口中打开。",
+  "service.workspace.platformGitFound": "{project} 现在是 Git 仓库。Hive 仍将其视为没有版本控制的项目：Hive 绝不会自行切换。",
+  "service.workspace.platformOtherFound": "在 {project} 中发现了 {vcs}。Hive 尚不支持它，因此仍将该项目视为 Git 项目。",
+  "service.workspace.platformRepositoryGone": "{project} 的 Git 仓库不见了。Hive 仍将其视为 Git 项目，因此在仓库恢复之前，无法读取需要 Git 的内容。",
+  "service.workspace.platformTitle": "{project} 的版本控制已变化",
   "service.workspace.renameAgent": "重命名 {project} 的 {agent}…",
   "service.workspace.sharedNames": "智能体名称现在在整个工作区中唯一，以便区分每个智能体。{shared}：它们仍可正常工作，但请在每组同名智能体中重命名一个，例如将 {project} 的 {agent} 改为 {suggestion}。",
   "service.workspace.twoCalled": "有两个智能体都叫 {name}"

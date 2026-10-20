@@ -1,22 +1,12 @@
 // Detecting version control (SPEC §16.3.5): a fact, detected, never switched silently. Hive offers a switch; the user
-// confirms it, and it applies from the next card.
-//
-// P2 spike (#1118): not wired into the app yet.
+// confirms it, and it applies from the next card. A project's platform is recorded in its project.json as Hive makes it
+// (workspace.ts ensureProject), and each refresh compares what detection finds with it (`projectPlatform`).
 
 import { resolve } from 'path'
 import { otherVcsOf, vcsOf } from '../hiveVcs'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { PLATFORMS, type Detection, type PlatformId, type PlatformOffer, type ProjectPlatform } from '../../shared/platform/descriptors'
 
-export interface Detection {
-  /** The platform the folder can use: Git for a Git repository, else None (no version control, or one not supported yet). */
-  platform: PlatformId
-  /** The repository's root, for Git. */
-  root?: string
-  /** Another system found (Mercurial, Jujutsu…): not supported yet, so None. A colocated jj+git repository is Jujutsu. */
-  other?: string
-  /** The project is a subfolder of a larger repository: its actions affect that whole repository. */
-  subfolder?: boolean
-}
+export type { Detection } from '../../shared/platform/descriptors'
 
 export function detect(folder: string): Detection {
   const other = otherVcsOf(folder)
@@ -31,8 +21,19 @@ export function detect(folder: string): Detection {
  * that got `git init`, None for a Git project whose repository is gone (whose Git rules hold meanwhile: their facts are
  * unknown). Null when they agree.
  */
-export function offer(current: PlatformId, found: Detection): { offer: PlatformId; why: 'gitFound' | 'repositoryGone' | 'otherFound' } | null {
+export function offer(current: PlatformId, found: Detection): PlatformOffer | null {
   if (current === found.platform) return null
   if (current === 'none') return found.platform === 'git' ? { offer: 'git', why: 'gitFound' } : null
   return { offer: 'none', why: found.other ? 'otherFound' : 'repositoryGone' }
+}
+
+/**
+ * A project's platform for ProjectInfo: the recorded one (`current`; a project Hive hasn't recorded yet takes what
+ * detection finds), its descriptor's capabilities, the detection, and the offer when they differ.
+ */
+export function projectPlatform(folder: string, current: PlatformId | undefined): ProjectPlatform {
+  const detected = detect(folder)
+  const id = current ?? detected.platform
+  const o = offer(id, detected)
+  return { id, capabilities: PLATFORMS[id].capabilities, detected, ...(o ? { offer: o } : {}) }
 }
