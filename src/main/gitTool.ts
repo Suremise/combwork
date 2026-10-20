@@ -1,8 +1,8 @@
-import { execFile } from 'child_process'
 import { existsSync } from 'original-fs'
 import { delimiter, join } from 'path'
 import { gitProblemEnglish, gitStateOf, parseGitVersion, type GitTool } from '../shared/gitTool'
 import { emit } from './events'
+import { git } from './git'
 import { createLogger } from './logger'
 
 const log = createLogger('git')
@@ -11,7 +11,7 @@ const log = createLogger('git')
  * Whether git itself runs (#346), separate from whether a folder is a repository: `git --version` on Hive's own PATH
  * (a Start-menu launch can have a different PATH from a terminal), kept until checked again. Every git call Hive makes
  * keeps it true: one that can't start git marks it missing at once, and one that runs while it says missing checks
- * again. Not in git.ts, which reports to it.
+ * again. Not in git.ts, which reports to it (and runs its check: the two import each other, used only in calls).
  */
 let current: GitTool = { state: 'unknown' }
 let checking: Promise<GitTool> | null = null
@@ -51,21 +51,18 @@ export function gitOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
   return null
 }
 
-/** Runs `git --version` (one check at a time) and records what it found. */
+/** Runs `git --version` through `git()`, like every git call Hive makes (SPEC §16.3.1), one check at a time, and records what it found. */
 export function checkGit(): Promise<GitTool> {
-  checking ??= new Promise<GitTool>((res) => {
-    execFile('git', ['--version'], { windowsHide: true, timeout: 10_000, encoding: 'utf8' }, (err, stdout) => {
-      const path = gitOnPath() ?? undefined
-      const version = parseGitVersion(stdout ?? '')
-      const code = (err as NodeJS.ErrnoException | null)?.code
-      const next: GitTool = version
-        ? { state: gitStateOf(version), version, ...(path ? { path } : {}) }
-        : typeof code === 'string' && code !== 'ETIMEDOUT' && code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
-          ? { state: 'missing' }
-          : { state: 'unknown', error: err ? err.message.split(/\r?\n/)[0] : `git --version said "${(stdout ?? '').trim().slice(0, 80)}"` } // i18n-ignore: git's own answer, quoted as git's errors are (it is logged too)
-      set(next)
-      res(next)
-    })
+  checking ??= git(process.cwd(), ['--version'], undefined, undefined, { timeout: 10_000 }).then((r) => {
+    const path = gitOnPath() ?? undefined
+    const version = parseGitVersion(r.out)
+    const next: GitTool = version
+      ? { state: gitStateOf(version), version, ...(path ? { path } : {}) }
+      : r.missing
+        ? { state: 'missing' }
+        : { state: 'unknown', error: r.timedOut ? 'git --version took too long' : r.ok ? `git --version said "${r.out.trim().slice(0, 80)}"` : (r.err.split(/\r?\n/)[0] || `exit code ${r.code}`) } // i18n-ignore: git's own answer, quoted as git's errors are (it is logged too)
+    set(next)
+    return next
   }).finally(() => {
     checking = null
   })

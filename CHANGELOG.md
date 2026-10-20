@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Runs say which card and revision they were for.** A run in the Progress panel now shows the card and the commit it ran on under the agent (**#1061 · a3f2c1d**): click the card to open it, or the revision to copy it; its details have both in full. An agent's run is for its card in Doing and what is checked out in its folder, unless it names others: `hive-progress --card "#1061" --revision <commit>`, where a revision that isn't checked out is refused before the command runs. `hive-progress --check <name>` runs the project's own command for a check. The Agent API's runs carry `card`, `revision`, `testedCheckout` and `check`, and `POST /v1/progress/resolve` checks them first (#1220).
+- **Git isn't required.** Each project now has a version control, found when Hive first sees it: Git for a Git repository, or none for any other folder (Mercurial and Jujutsu aren't supported yet, so their projects work without version control). Hive never switches it by itself: when a project's folder changes, say you run `git init` in it or its repository goes, a notice tells you and the project keeps what it had.
 
 ## 0.9.3 — 2026-10-20
 
