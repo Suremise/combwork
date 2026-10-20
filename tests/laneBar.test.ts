@@ -2,7 +2,7 @@
 // rounds), the hover text, folding a long lane's finished cards, and the header's numbers; an ended lane's segments as it
 // left them, the card being worked, and the panel's order of lanes (#512).
 import { describe, expect, it } from 'vitest'
-import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, segmentName, segmentsThatFit, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
+import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 import type { LaneCard, LaneState, TaskCard, TaskColumn } from '../src/shared/types'
 import { fmt, tr } from '../src/shared/i18n'
@@ -381,5 +381,17 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(workNotes(undefined, 'done', 'merged by hand', short, tr)).toEqual(['Merged as merged by hand'])
     expect(workNotes(undefined, 'review', 'abc1234def5678', short, tr)).toEqual([])
     expect(workNotes(badge({ revision: null }), 'todo', null, short, tr)).toEqual([])
+  })
+
+  it("an ended lane's card taken on again later: its segment says the lane's merge only, never the later cycle's work (HR5's round 1)", () => {
+    // #7 was Done (merged as a1a1a1a) when its lane ended; reopened in another lane, it is under review at B, its check
+    // failed, and later integrated as C.
+    const frozen = { frozen: [{ number: 7, title: 'Reused', column: 'done' as const, blocked: null, round: 1, reviewing: false }], mergeCommit: 'a1a1a1a' }
+    const seg = frozenSegment(frozen.frozen[0])
+    const later = badge({ stage: 'review', revision: 'b2b2b2b2b2b2', verdict: { pass: false, revision: 'b2b2b2b2b2b2', current: true }, checks: { passed: 0, failed: 1, notCounted: 0 } })
+    expect(laneSegmentWork(frozen, later, seg, short, tr)).toEqual(['Merged as a1a1a1a'])
+    expect(laneSegmentWork(frozen, badge({ stage: 'done', merged: 'c3c3c3c3c3c3c3' }), seg, short, tr)).toEqual(['Merged as a1a1a1a'])
+    // The lane that has it now reads its facts.
+    expect(laneSegmentWork({ frozen: null, mergeCommit: null }, later, cardSegment(7, card(7, 'review')), short, tr)).toEqual(['Under review: b2b2b2b', 'Last verdict: failed on b2b2b2b', 'Checks on it: 0 passed, 1 failed'])
   })
 })

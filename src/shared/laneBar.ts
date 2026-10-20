@@ -147,6 +147,16 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
   return out
 }
 
+/**
+ * A lane segment's work lines (#1225), as the lane's row shows them. A running lane's card reads its facts now (`badge`,
+ * this cycle's). An ended or abandoned lane shows its cards as it left them (#512): a card taken on again later is in a
+ * later cycle whose revision, verdicts, checks and merge aren't this lane's (HR5's #1225 round 1), so its segments say
+ * only the lane's own record of its merge.
+ */
+export function laneSegmentWork(lane: { frozen: unknown; mergeCommit: string | null }, badge: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr): string[] {
+  return workNotes(lane.frozen ? undefined : badge, s.state, lane.mergeCommit, short, tr)
+}
+
 /** A card segment's accessible name: its label and its notes (#706). */
 export function segmentName(s: CardSegment): string {
   return [s.label, ...s.notes].join('. ')

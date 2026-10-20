@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, segmentName, segmentsThatFit, workNotes, type LaneSegment } from '@shared/laneBar'
+import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, segmentName, segmentsThatFit, laneSegmentWork, type LaneSegment } from '@shared/laneBar'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
@@ -418,7 +418,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       </Tooltip>
       <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
-          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? workNotes(badges.get(s.number), s.state, l.mergeCommit, shortFor(s.number), tr) : []} />
+          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr) : []} />
         ))}
       </div>
     </div>
