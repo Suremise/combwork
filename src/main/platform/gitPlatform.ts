@@ -14,7 +14,7 @@ import type { CardRecord } from '../workflow/factStore'
 import { reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { slugOf, type Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
@@ -168,6 +168,14 @@ export class GitPlatform implements PlatformAdapter {
     if (card.kind === 'no-code') return null
     if (this.wf.ownLine(s)) return G.head(this.wf.folderOf(s))
     return s.attributed.at(-1) ?? s.started?.base ?? null
+  }
+
+  /** The card's revision (its folder's head, or its newest attributed commit), and what's checked out where the run runs. */
+  async runRevision(card: CardRecord, s: CardState, folder: string | null, named: string | null): Promise<RunRevision> {
+    const known = (v: Maybe<string | null>): string | null => (isUnknown(v) ? null : v)
+    const revision = known(await this.revisionNow(card, s))
+    const tested = folder ? known(await G.head(folder)) : null
+    return { revision, tested, testedIs: 'checkout', ...(named !== null ? { named: folder ? known(await G.resolve(folder, named)) : null } : {}) }
   }
 
   async submission(card: CardRecord, s0: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan> {

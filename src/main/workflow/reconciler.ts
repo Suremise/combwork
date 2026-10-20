@@ -133,8 +133,8 @@ function runFor(f: Followed): Promise<void> {
 }
 
 /** The project's options (`project.json`'s `workflow`, SPEC §16.6), or its platform's defaults (#1218 records them). */
-async function optionsOf(f: Followed): Promise<WorkflowOptions> {
-  const cfg = await f.ws.projectConfig(f.path)
+export async function projectOptionsOf(ws: WorkspaceService, path: string, platform: PlatformId): Promise<WorkflowOptions> {
+  const cfg = await ws.projectConfig(path)
   const o = (cfg as { workflow?: { options?: unknown } }).workflow?.options
   if (o && typeof o === 'object') {
     try {
@@ -143,7 +143,7 @@ async function optionsOf(f: Followed): Promise<WorkflowOptions> {
       // Unreadable: the defaults.
     }
   }
-  return allOff(f.platform)
+  return allOff(platform)
 }
 
 async function reconcileProject(f: Followed): Promise<void> {
@@ -152,7 +152,7 @@ async function reconcileProject(f: Followed): Promise<void> {
   const asked = [...f.cards]
   f.lines.clear()
   f.cards.clear()
-  const options = await optionsOf(f)
+  const options = await projectOptionsOf(f.ws, f.path, f.platform)
   if (!f.alive()) return
   const wf = new Workflow({
     // The project's cards by their keys (a Hive-Card trailer): its name until the keys (#1219), as the adoption's store.

@@ -3,13 +3,15 @@
 // the folder it runs in, at the start. hive-progress asks for it before it starts the command
 // (`POST /v1/progress/resolve`), so a revision that isn't what's checked out is refused before anything runs.
 //
-// P3: the run only shows what it ran for; recording `CheckRan` from it comes next (#1119's item 2). The folder's head is
-// read with git: the platform adapters (#1213) read a card's revision from its state, which comes with the fact store.
+// A run for a card with a start in its facts reads its revisions through the card's platform adapter (#1233): Git, the
+// card's revision (its folder's head, or its newest attributed commit) and what's checked out where the run runs;
+// None, its declared paths' hash. Any other run reads its folder's head with git.
 
 import { randomUUID } from 'crypto'
 import { isAbsolute } from 'path'
 import { gitReading } from '../git'
 import { ProgressError, admitReport, type ProgressCaller, type ProgressGate } from '../progress'
+import type { RunRevision } from '../platform/adapter'
 import type { TaskColumn } from '../../shared/types'
 import { cardRefText, shortRevision } from '../../shared/progress'
 
@@ -34,6 +36,12 @@ export interface RunLinkDeps {
   card: (n: number) => Promise<{ project: string; column: TaskColumn; agent: string | null } | null>
   /** The cards in Doing given to an agent of a project. */
   doing: (projectPath: string, agentId: string) => Promise<number[]>
+  /**
+   * A card's run read through its platform adapter (#1233): its revision now, what the run in `folder` is tested on, and
+   * `named` as the platform reads it; null when the card has no start in its facts yet (from before 1.0, not started),
+   * so the folder is read with `head` instead.
+   */
+  cardRun: (card: number, folder: string | null, named: string | null) => Promise<RunRevision | null>
   /** What's checked out in a folder (a full commit id), or null where nothing is (no repository, no commit yet). */
   head: (folder: string) => Promise<string | null>
   /** The commit a revision names in a folder (a full id), or null when it names none there. */
@@ -71,7 +79,8 @@ function cardNumber(v: unknown, deps: RunLinkDeps, scope: string | null): number
 /**
  * Resolves what a run is for, checking what it names: a card the caller may see, a revision that is what's checked out
  * in the folder, a check the project has a command for. Defaults: the agent's one card in Doing (none when it has
- * several: a run counted for the wrong card is worse than none), and the folder's head. Throws a ProgressError (400)
+ * several: a run counted for the wrong card is worse than none), and the card's revision (else the folder's head). A
+ * named revision must be what the run is tested on (Git: what's checked out; None: the paths' hash). Throws a ProgressError (400)
  * with what to do instead.
  */
 export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked, deps: RunLinkDeps): Promise<RunLink> {
@@ -98,19 +107,31 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     if (doing.length === 1) card = doing[0]
   }
 
-  // Always read here, never taken from the request: what was checked out is what a run is checked against.
-  const tested = folder ? await deps.head(folder) : null
-
-  let revision = tested
+  let named: string | null = null
   if (asked.revision !== undefined && asked.revision !== null) {
     if (typeof asked.revision !== 'string' || !asked.revision.trim() || asked.revision.length > MAX_REVISION || asked.revision.startsWith('-') || !REVISION.test(asked.revision.trim())) throw refused('revision is a commit (its id, or a name git knows)')
-    const named = asked.revision.trim()
+    named = asked.revision.trim()
     if (!folder) throw refused('A revision is checked against what is checked out where the run runs: give folder too')
-    if (!tested) throw refused(`Nothing is checked out in ${folder} to compare ${named} with: leave revision out`)
-    const id = await deps.commitOf(folder, named)
-    if (!id) throw refused(`${named} isn't a commit in ${folder}`)
-    if (id !== tested) throw refused(`${named} isn't what's checked out here (${shortRevision(tested)} is): check it out first, or leave revision out`)
-    revision = id
+  }
+
+  // Always read here, never taken from the request: what was checked out is what a run is checked against. A card with
+  // a start in its facts is read through its platform's adapter (#1233): its revision now, and what the run is tested
+  // on; any other run, the folder's head with git.
+  const viaCard = card !== null ? await deps.cardRun(card, folder, named) : null
+  const tested = viaCard ? viaCard.tested : folder ? await deps.head(folder) : null
+  let revision = viaCard ? viaCard.revision : tested
+  if (named !== null && folder) {
+    if (viaCard?.testedIs === 'content') {
+      // None: the card's content is its revision, so a name must be that hash.
+      if (!tested) throw refused(`${cardRefText(card!)} has no revision to compare ${named} with: leave revision out`)
+      if (named !== tested) throw refused(`${named} isn't ${cardRefText(card!)}'s revision now (its paths hash to ${shortRevision(tested)}): leave revision out`)
+    } else {
+      if (!tested) throw refused(`Nothing is checked out in ${folder} to compare ${named} with: leave revision out`)
+      const id = viaCard ? (viaCard.named ?? null) : await deps.commitOf(folder, named)
+      if (!id) throw refused(`${named} isn't a commit in ${folder}`)
+      if (id !== tested) throw refused(`${named} isn't what's checked out here (${shortRevision(tested)} is): check it out first, or leave revision out`)
+    }
+    revision = tested
   }
 
   let check: RunLink['check'] = null
@@ -192,7 +213,7 @@ export class IssuedLinks {
   }
 }
 
-/** What's checked out in a folder (git, until runs read it through the card's platform adapter), or null where nothing is. */
+/** What's checked out in a folder (git: a run for no card, or for one with no start yet), or null where nothing is. */
 export const folderHead = (folder: string): Promise<string | null> => gitReading(folder, ['rev-parse', '--verify', '--quiet', 'HEAD']).then((r) => (r.ok ? r.out.trim() || null : null))
 
 /** The commit a revision names in a folder, in full, or null when it names none there. */
