@@ -42,6 +42,17 @@ const TASKS = 'tasks'
 const UPGRADE_GROUP_ID = '1.0'
 
 /** The board's schema, step by step (db.ts runs the steps a file hasn't had). */
+/**
+ * board_meta's highest card number from before 1.0 (#1218): the cards the upgrade's adoption handles (workflow/adoption.ts).
+ * Set by the 1.0 group's last step, in the upgrade's transaction (0 on a board made by 1.0, which has none), and by the
+ * import of card files from before 0.9.
+ */
+export const ADOPTION_UPTO = 'adoption_upto'
+/** The highest card number on the board, as board_meta's ADOPTION_UPTO keeps it. */
+const markAdoptionUpto = (db: Db['writer']): void => {
+  db.prepare("INSERT INTO board_meta (key, value) SELECT ?, CAST(COALESCE(MAX(number), 0) AS TEXT) FROM cards WHERE 1 ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(ADOPTION_UPTO) // i18n-ignore: SQL
+}
+
 export const BOARD_MIGRATIONS: Migration[] = [
   {
     version: 1,
@@ -132,6 +143,9 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of FACTS_STEP.ddl) db.exec(sql)
+      // The cards from before 1.0, for the adoption that follows the upgrade (#1218): in its transaction, so no card made
+      // by 1.0 is ever among them.
+      markAdoptionUpto(db)
     }
   }
 ]
@@ -320,6 +334,8 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
       if (!r || JSON.stringify(composeCard(r)) !== JSON.stringify(c.doc)) throw new Error(`card #${c.n} isn't in the database as its file has it`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
     }
     setMeta(db, 'imported', JSON.stringify(record))
+    // Cards from before 0.9: the adoption marks them as from before 1.0 too (#1218).
+    if (!meta(db, 'adoption')) markAdoptionUpto(db)
     db.exec('COMMIT')
   } catch (e) {
     if (db.isTransaction) db.exec('ROLLBACK')
@@ -735,7 +751,8 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       } catch {
         // Closed meanwhile (the workspace closed): nothing was committed.
       }
-      throw e
+      // Undone part way by SQLite: said so, whichever error the change passed on (a batch's storage error, #1216).
+      throw state.lost ?? e
     } finally {
       state.open = false
       if (state.changed) emit({ type: 'tasks-changed', workspacePath: path })
@@ -806,6 +823,66 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 export function boardRead<T>(ws: WorkspaceService, fn: (db: Db['reader']) => T): T {
   return readSnapshot(ws, (_b, db) => fn(db))
 }
+
+/** What the upgrade's adoption (#1218, workflow/adoption.ts) needs of a card: where it is, whose it is, and whether it has facts. */
+export interface AdoptionCard {
+  number: number
+  project: string
+  column: string
+  archived: boolean
+  agent: string | null
+  preWorkflow: boolean
+  facts: boolean
+}
+
+const ADOPTION_SQL = 'SELECT number, project, col, archived, agent, pre_workflow, EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number) AS facts FROM cards' // i18n-ignore: SQL
+type AdoptionRow = { number: number; project: string; col: string; archived: number; agent: string | null; pre_workflow: number; facts: number }
+const adoptionCardOf = (r: AdoptionRow): AdoptionCard => ({ number: r.number, project: r.project, column: r.col, archived: r.archived === 1, agent: r.agent, preWorkflow: r.pre_workflow === 1, facts: r.facts === 1 })
+
+/** The AdoptionCard of each card up to `upto` (ADOPTION_UPTO), in number order, on one snapshot ([] on a board still 0.9's, waiting for its upgrade). */
+export function adoptionCards(ws: WorkspaceService, upto = Number.MAX_SAFE_INTEGER): AdoptionCard[] {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy || b.db.pending) return []
+    return (db.prepare(`${ADOPTION_SQL} WHERE number <= ? ORDER BY number`).all(upto) as AdoptionRow[]).map(adoptionCardOf) // i18n-ignore: SQL
+  })
+}
+
+/** A card's AdoptionCard as it is now, inside boardWrite (what the adoption checks again before it writes); null when it has gone. */
+export function adoptionCardNow(ws: WorkspaceService, n: number): AdoptionCard | null {
+  return writeOp(ws, (b) => {
+    const r = b.db.writer.prepare(`${ADOPTION_SQL} WHERE number = ?`).get(n) as AdoptionRow | undefined // i18n-ignore: SQL
+    return r ? adoptionCardOf(r) : null
+  })
+}
+
+/**
+ * Marks cards as from before 1.0 (#1218, SPEC §16.4.1: no facts), inside boardWrite: each only while it is as the
+ * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Hive
+ * has meanwhile started, adopted or moved is left alone. `marked`: how many it marked; `changed`: those it left that are
+ * still neither marked nor started (classified again from fresh data by the adoption's next run).
+ */
+export function markPreWorkflow(ws: WorkspaceService, cards: AdoptionCard[]): { marked: number; changed: number } {
+  return writeOp(ws, (b) => {
+    const db = b.db.writer
+    const mark = db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ? AND project = ? AND col = ? AND archived = ? AND pre_workflow = 0 AND NOT EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)') // i18n-ignore: SQL
+    const now = db.prepare(`${ADOPTION_SQL} WHERE number = ?`) // i18n-ignore: SQL
+    let marked = 0
+    let changed = 0
+    for (const c of cards) {
+      if (Number(mark.run(c.number, c.project, c.column, c.archived ? 1 : 0).changes)) marked++
+      else {
+        const r = now.get(c.number) as AdoptionRow | undefined
+        if (r && !r.facts && !r.pre_workflow) changed++
+      }
+    }
+    return { marked, changed }
+  })
+}
+
+/** A value the board keeps of its own (board_meta), or null. */
+export const boardValue = (ws: WorkspaceService, key: string): string | null => readSnapshot(ws, (_b, db) => meta(db, key))
+/** Sets one of the board's own values (inside boardWrite). */
+export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
 
 /** A write to the board's database: inside a change of `ws`'s board only, and only while its transaction is live (writeOp). */
 export function boardWriteOp<T>(ws: WorkspaceService, fn: (db: Db['writer']) => T): T {
@@ -1018,6 +1095,19 @@ export function cardPlaces(ws: WorkspaceService): { number: number; raw: { colum
     if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
     const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  })
+}
+
+/**
+ * These cards' project (as saved), column and agent, each as its document has it (null when it hasn't the field), from
+ * their columns: what a change reads of its cards before it (#1216's reads), no document composed.
+ */
+export function cardHeads(ws: WorkspaceService, numbers: number[]): { number: number; project: unknown; column: unknown; agent: unknown }[] {
+  if (!numbers.length) return []
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, ['project', 'column', 'agent'], { numbers, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, project: fields.project, column: fields.column, agent: fields.agent }))
+    const rows = db.prepare("SELECT number, doc ->> '$.project' AS project, doc ->> '$.column' AS col, doc ->> '$.agent' AS agent FROM cards WHERE number IN (SELECT value FROM json_each(?))").all(JSON.stringify(numbers)) as { number: number; project: unknown; col: unknown; agent: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, project: r.project, column: r.col, agent: r.agent }))
   })
 }
 

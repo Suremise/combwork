@@ -24,7 +24,9 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/workspace.ts` | Workspace/project discovery, `.hive` folders, git exclude; one `WorkspaceService` per window behind the `workspace` stand-in |
 | `src/main/db.ts`, `src/main/boardStore.ts`, `src/main/presence.ts` | Hive's SQLite layer (`node:sqlite`: connections, settings, migrations, a group of steps run as one: #1207), and the board's database (`.hive/hive.db`): its one write path (`boardWrite`, a transaction told once), the move in from the cards' files, export (#1017), the 1.0 upgrade (asked first, `upgradeBoard`, `restoreBoardBackup`), and the workspace presence marker (`.hive/open`) |
 | `src/main/schema/` | hive.db's 1.0 tables (`v1_0.ts`, #1208) and the cards in them (#1209): `cardRows.ts`, a card's document as rows and back byte for byte (the card JSON contract), and `cardsStep.ts`, the 1.0 group's step that moves 0.9's cards into the tables |
+| `src/main/workflow/recorder.ts` | Facts from today's moves (#1216): `saveCard` hands it each card change, as it was and as it is, inside the change; the platform's reads are made before the change by tasks.ts' public entry points (`gatherReads`) and handed in through the change's context (`recording`) |
 | `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each delivered once |
+| `src/main/workflow/adoption.ts`, `src/main/workflow/upgrade.ts` | The 1.0 upgrade's adoption (#1218): each project's options as it works today, cards from before 1.0 marked, cards in flight adopted from what their folder shows (`adoptionInputs` outside the board's lock, `writeAdoption` inside); in the background after the upgrade and at each open until it has run once |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
 | `src/main/transcripts.ts`, `src/main/providers/conversation.ts` | Sessions tab transcript viewer: per-provider incremental parsers, search, Markdown export |
@@ -489,6 +491,43 @@ transaction (`BEGIN IMMEDIATE`: another Hive's write waits for it), which what t
 synchronous, and nothing else uses the connection), and fails whole once SQLite has undone it; a read outside one is
 a read transaction of its own. Either way a record, a list, a lane or a pause is read on one snapshot, never mixing
 two commits. An observed fact whose dedupe key is there already returns null, and the caller reads again.
+
+**The recorder** (`workflow/recorder.ts`, #1216; P3 records, nothing is refused). Every card change is saved by
+tasks.ts' `saveCard`, which hands `recordChange` the card as it was (`updateTaskLocked` keeps a copy before its edits,
+a new card is null, other callers' is read) and as it is now, inside the change: a column change writes `Moved` (its
+stage, from the stage cache, to the column's; a new card's from Todo) and the stage cache; a **start**, `Started`
+(folder, line, base, target, builder, kind, and the ruleset: the project's options in `project.json`'s `workflow`,
+compiled and stored, named on the fact and on every fact of its cycle) only for a new work cycle, none yet or one that
+ended Done: a card back in Doing for its review's fixes, or out of Hold, goes on in its cycle, its base, submissions and
+rounds kept (HR4's round 1); into Review (or returned for review), `Submitted` (revision, base, head, the files changed
+since the cycle's base, the candidate key, round, the builder's received decision generation, same revision, the
+summary comment's id; a no-code card's has no revision, base, head, key or files); a review's start `ReviewStarted`
+and its verdict `Verdict` on the latest submission, with the generation its reviewer had received; `Blocked` and
+`Unblocked`; and each change of the card's decisions, added, its words changed or removed (`removed`), a `Decision`
+with the next generation (monotonic, from the facts). **Receipts** (`DecisionsReceived`) record what an agent was
+given, never more (HR4's rounds 1 and 2): a card read in full (`GET /v1/tasks/:n`, `tasks.readTaskSeen`) and a decision
+line received (`decisionWakes.ts`: `newDecisionsOn` reads the board with `tasks.allTasksSeen`, and the delivery's
+`meta.gens` saves each card's) carry the card's decision generation **read in the same snapshot as the decisions
+given** (`decisionGenerations`), and the receipt records that generation, never one looked up later (a decision
+changed back to earlier words is still a later generation), once, in a change of its own, while the workspace (and the
+card's project) is still the one it was for. The actor is the change's
+(`recording`/`recordingAs`, an AsyncLocalStorage set by every tasks.ts entry point that takes one): `user`,
+`assistant`, `agent:<id>`, or `hive` for Hive's own; a move's cause `user` from the window, `intent` from an agent's
+or the Assistant's tools and the API, `derived` for Hive's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
+`updateTask`, `updateTasks` and `createTask` plan which cards a change may start or submit from the board's columns
+(`cardHeads`, no document read) and read their folders with git (`platform/git.ts`: branch, head, merge base with the
+target, files, candidate key); a batch's are made before its lock and its cards changed by the locked path, so no read
+runs inside a change. A fact whose reads are missing or for another agent records them as not read. A read that fails
+never refuses: its field is null and `platform.unknown` names it with what couldn't be read (a project with no options
+yet names its ruleset so). A card from before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts,
+which clears the mark (Darren, #1119 decision 4) and records the decisions it has then, once. **A fact that fails to
+write fails the change whole** (HR4's round 1), a batch's too (`FactWriteError`; `isStorageError`, which the batches'
+per-card catches pass on, as SQLite's own errors: part of the card may be written): a card and its facts never
+diverge. `boardWrite` then says the change was undone part way when SQLite undid it, whichever error the change passed
+on. The window reads a card's facts with
+`tasks:facts`. Not yet: None's manifests (P5).
+
+**The adoption** (`workflow/adoption.ts`, SPEC §16.17): `adoptWorkspace` runs after `board:upgrade` and at each open (`WorkspaceService.onOpened`), one at a time per workspace, until board_meta `adoption` says it has handled every card once. Per project: its options through `mutateProjectConfig` (only when project.json has none) and its compiled ruleset; its cards in flight read with git first, then written in one board change, each in a fact-store transaction (`writeAdoption`, deduplicated `adopted`); the rest marked `pre_workflow` (`markPreWorkflow`). Only cards up to board_meta `adoption_upto` (written by the 1.0 group's last step, and by the import of card files) are its. Under the lock each card is checked again (`adoptionCardNow`, and the agent's folder in project.json): a card started or marked meanwhile is skipped, one changed meanwhile counts as `changed` and is classified again by another run (`adoptWorkspace` makes up to three), and the done mark waits until none is left. Like the actions worker, a run belongs to the workspace as it began (`alive`, passed to `boardWrite`).
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for

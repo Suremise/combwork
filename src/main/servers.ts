@@ -71,6 +71,7 @@ import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
+import { recordDecisionsReceived } from './workflow/recorder'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -1881,10 +1882,18 @@ route('GET', '/v1/tasks', async ({ query }) => {
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
-  const view = await taskView(await tasks.readTask(taskNumber(params[0]), await taskActor()))
+  // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
+  const seen = await tasks.readTaskSeen(taskNumber(params[0]), await taskActor())
+  const view = await taskView(seen.card)
   // Read in full, decisions included: those aren't new to the agent any more (#357).
   const me = agentCaller()
-  if (me) noteCardRead(me, view.number)
+  if (me) {
+    noteCardRead(me, view.number)
+    // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
+    // reply's decisions, never one written since.
+    const ws = contextWorkspace()
+    if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project)
+  }
   const raw = query.get('comments')
   const n = raw === null ? null : Number(raw)
   if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)

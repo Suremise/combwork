@@ -4,6 +4,7 @@ import { projectAgents } from '../shared/defaults'
 import type { LiveSessionState } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { cardReadsBy, newDecisionsOn } from './decisionNotices'
+import { recordDecisionsReceived } from './workflow/recorder'
 import { onHiveEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
@@ -84,8 +85,8 @@ const decodeCards = (v: unknown): Map<number, { count: number; latest: number }>
     })
   )
 /** The decisions of a line that fit its delivery's context (400 characters): those it says, the rest told by a next line. */
-function fitting(cards: Map<number, { count: number; latest: number }>): Map<number, { count: number; latest: number }> {
-  const out = new Map<number, { count: number; latest: number }>()
+function fitting<T extends { count: number; latest: number }>(cards: Map<number, T>): Map<number, T> {
+  const out = new Map<number, T>()
   for (const [n, d] of cards) {
     const next = new Map(out).set(n, d)
     if (encodeCards(next).length > 400) break
@@ -120,7 +121,8 @@ registerSource('decision', {
     const v = ++versions
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self } }
+    // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
+    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(',') } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
@@ -140,6 +142,11 @@ registerSource('decision', {
     told.set(key, known)
     if (told.size > 500) told.delete(told.keys().next().value!)
     log.info(`Told ${userText(self)} of new decisions on ${[...cards.keys()].map((n) => `#${n}`).join(', ')}`)
+    // What it received, as a fact on each card (#1216): the decisions the line was made from.
+    for (const x of typeof r.meta?.gens === 'string' && r.meta.gens ? r.meta.gens.split(',') : []) {
+      const [n, g] = x.split(':').map(Number)
+      if (Number.isInteger(n) && Number.isInteger(g) && g > 0) void recordDecisionsReceived(ws, r.agentId, n, g)
+    }
     void Promise.all([...cards].map(([n, d]) => noteOnCard(n, storedText(HISTORY.decisionsTold, { agent: self, count: d.count }), ws).catch((e) => log.warn(`noting on #${n} that decisions were told`, e))))
   },
   ended: (r, host) => {

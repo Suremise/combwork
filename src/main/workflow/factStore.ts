@@ -76,6 +76,8 @@ export interface Tx {
   /** An observed fact: null when another writer already recorded the same transition (its dedupe key). */
   appendObserved<K extends FactKind>(card: number, fact: NewFact<K> & { dedupe: string }): Fact<K> | null
   setStage(card: number, stage: StageId): void
+  /** A ruleset stored once by its id (a start's, #1216). */
+  saveRuleset(r: Ruleset): void
   action(card: number, kind: string, payload: Record<string, unknown>, fact: number | null): number
   facts(card: number): Fact[]
   card(id: number): CardRecord
@@ -293,6 +295,7 @@ export class FactStore {
     if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
     return this.conn.write((db) => {
       if (patch.kind !== undefined) db.prepare('UPDATE cards SET kind = ? WHERE number = ?').run(patch.kind, id)
+      if (patch.preWorkflow !== undefined) db.prepare('UPDATE cards SET pre_workflow = ? WHERE number = ?').run(patch.preWorkflow ? 1 : 0, id)
       setColumns(db, id, patch)
       return this.card(id)
     })
@@ -444,6 +447,7 @@ export class FactStore {
           this.conn.write(() => w.prepare('UPDATE cards SET stage = ?, col = ? WHERE number = ?').run(stage, STAGE_CATEGORY[stage], card))
         },
         action: (card, kind, payload, fact) => this.conn.write(() => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid)),
+        saveRuleset: (r) => this.saveRuleset(r),
         facts: (card) => this.facts(card),
         card: (id) => this.card(id),
         putCard: (c) => {
