@@ -187,7 +187,8 @@ const EPOCH = new Date(0).toISOString()
 
 /** Splits a card's document (the row `n` of today's `cards`) into its 1.0 rows. */
 export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows {
-  const extra: Record<string, unknown> = {}
+  // Without a prototype: a field named `__proto__` is kept as a field (HR4's round 1 finding 3).
+  const extra: Record<string, unknown> = Object.create(null)
   /** The field when of the form its column keeps, else undefined (absent) with the field kept in extra. */
   const take = <T>(key: string, ok: (v: unknown) => v is T): T | undefined => {
     const v = doc[key]
@@ -330,7 +331,8 @@ export function composeCard(r: CardRows): Record<string, unknown> {
     }
   }
   const out: Record<string, unknown> = {}
-  for (const k of keys) out[k] = k in extra ? extra[k] : field(k)
+  // Defined, not assigned, and only the extra's own fields: a key like `__proto__` or `constructor` is a field like any other.
+  for (const k of keys) Object.defineProperty(out, k, { value: Object.hasOwn(extra, k) ? extra[k] : field(k), enumerable: true, writable: true, configurable: true })
   return out
 }
 

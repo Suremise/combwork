@@ -81,6 +81,31 @@ describe('the 1.0 schema', () => {
     for (const t of ['card_facts', 'card_comments', 'card_history', 'card_labels', 'card_links']) expect(db.prepare(`SELECT count(*) AS n FROM ${t}`).get()).toEqual({ n: 0 })
     db.close()
   })
+
+  it('never gives an action id again once its card is deleted, while its delivery is kept (HR4 round 1)', () => {
+    const db = schemaDb()
+    writeCardRows(db, decomposeCard(1, card(1)))
+    const first = Number(db.prepare("INSERT INTO card_actions (card, kind, payload) VALUES (1, 'wake', '{}')").run().lastInsertRowid)
+    db.prepare("INSERT INTO deliveries (host, id, seq, agent_id, conversation, kind, sender, body, state, created, expires, received, action) VALUES ('p1', 'm1', 1, 'a1', NULL, 'card-event', '{}', 'x', 'received', '', '', '', ?)").run(first)
+    db.prepare('DELETE FROM cards WHERE number = 1').run()
+    expect(db.prepare('SELECT count(*) AS n FROM card_actions').get()).toEqual({ n: 0 })
+    writeCardRows(db, decomposeCard(2, card(2)))
+    const next = Number(db.prepare("INSERT INTO card_actions (card, kind, payload) VALUES (2, 'wake', '{}')").run().lastInsertRowid)
+    expect(next).toBeGreaterThan(first)
+    db.prepare("INSERT INTO deliveries (host, id, seq, agent_id, conversation, kind, sender, body, state, created, expires, action) VALUES ('p1', 'm2', 2, 'a1', NULL, 'card-event', '{}', 'x', 'queued', '', '', ?)").run(next)
+    expect(db.prepare(QUERIES['deliveries.byAction'].sql).get(first)).toEqual({ id: 'm1' })
+    db.close()
+  })
+
+  it("reads a folder's commits in the order seen, not by SHA (HR4 round 1)", () => {
+    const db = schemaDb()
+    const ins = db.prepare('INSERT INTO folder_commits (folder, sha, card, how) VALUES (?, ?, ?, ?)')
+    ins.run('D:\\ws\\p', 'ffff', 1, 'trailer')
+    ins.run('D:\\ws\\p', 'aaaa', null, 'unattributed')
+    expect(() => ins.run('d:\\WS\\p', 'aaaa', null, 'unattributed')).toThrow(/UNIQUE/)
+    expect((db.prepare(QUERIES['folderCommits.of'].sql).all('d:\\ws\\P') as { sha: string }[]).map((r) => r.sha)).toEqual(['ffff', 'aaaa'])
+    db.close()
+  })
 })
 
 describe('the card JSON contract', () => {
@@ -97,7 +122,10 @@ describe('the card JSON contract', () => {
     ['an empty optional list kept', card(8, { decisions: [] })],
     ['a lone surrogate in text', card(9, { title: 'bad \ud800 title', comments: [{ at: 'x', by: 'y', text: 'half \udc00' }] })],
     ['the wrong number inside', card(10, { number: 11 })],
-    ['numbers of every kind', card(12, { order: -0.000001, links: [9007199254740991] })]
+    ['numbers of every kind', card(12, { order: -0.000001, links: [9007199254740991] })],
+    // As JSON.parse makes them (own fields), never as an object literal would (HR4 round 1).
+    ['fields named like Object.prototype\'s', JSON.parse('{"number":13,"title":"Test","__proto__":{"future":true},"constructor":1,"toString":"x"}')],
+    ['such a field in an entry and inside extra', card(14, { comments: JSON.parse('[{"at":"x","by":"y","text":"z","__proto__":1}]'), worktree: JSON.parse('{"__proto__":[1]}') })]
   ]
   it.each(cases)('%s', (_name, doc) => {
     const want = JSON.stringify(doc)

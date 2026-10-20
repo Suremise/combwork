@@ -385,8 +385,10 @@ const FACTS: SchemaStep = {
     'CREATE UNIQUE INDEX card_facts_dedupe ON card_facts (card, kind, dedupe) WHERE dedupe IS NOT NULL',
     'CREATE INDEX card_facts_kind ON card_facts (kind)',
     // Durable actions (SPEC §16.4.5), written with the facts that cause them; the worker runs pending ones in id order.
+    // AUTOINCREMENT: an id is never given again, even after its card (and the action) is deleted, since the delivery
+    // it made outlives it and deliveries are deduplicated by action id (HR4's round 1 finding 1).
     `CREATE TABLE card_actions (
-      id       INTEGER PRIMARY KEY,
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
       card     INTEGER NOT NULL REFERENCES cards (number) ON DELETE CASCADE,
       kind     TEXT    NOT NULL,
       payload  TEXT    NOT NULL,
@@ -398,14 +400,18 @@ const FACTS: SchemaStep = {
     'CREATE INDEX card_actions_card ON card_actions (card)',
     // A compiled ruleset, stored once by its hash: a document whose pieces are looked up by id, read whole (SPEC §16.5.4).
     'CREATE TABLE rulesets (id TEXT PRIMARY KEY, data TEXT NOT NULL) STRICT, WITHOUT ROWID',
-    // Commits seen on a shared folder's line and whose they are (CommitAttributed, SPEC §16.3.2): each recorded once.
+    // Commits seen on a shared folder's line and whose they are (CommitAttributed, SPEC §16.3.2): each recorded once,
+    // in the order seen (`id`, never reused): the Git adapter reads a folder's commits in that order to find the work
+    // after the last submitted one (gitPlatform.ts), which no order of the SHAs gives (HR4's round 1 finding 2).
     `CREATE TABLE folder_commits (
-      folder TEXT NOT NULL COLLATE NOCASE,
-      sha    TEXT NOT NULL,
+      id     INTEGER PRIMARY KEY AUTOINCREMENT,
+      folder TEXT    NOT NULL COLLATE NOCASE,
+      sha    TEXT    NOT NULL,
       card   INTEGER,
-      how    TEXT NOT NULL,
-      PRIMARY KEY (folder, sha)
-    ) STRICT, WITHOUT ROWID`
+      how    TEXT    NOT NULL,
+      UNIQUE (folder, sha)
+    ) STRICT`,
+    'CREATE INDEX folder_commits_seen ON folder_commits (folder, id)'
   ]
 }
 
@@ -507,7 +513,7 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'actions.pending': { sql: "SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id", args: [], index: 'card_actions_pending' },
   'actions.ofCard': { sql: 'SELECT * FROM card_actions WHERE card = ?', args: [1], index: 'card_actions_card' },
   'rulesets.byId': { sql: 'SELECT data FROM rulesets WHERE id = ?', args: ['r1'], index: 'PRIMARY KEY' },
-  'folderCommits.of': { sql: 'SELECT sha, card, how FROM folder_commits WHERE folder = ?', args: ['D:\\ws\\p'], index: 'PRIMARY KEY' },
+  'folderCommits.of': { sql: 'SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id', args: ['D:\\ws\\p'], index: 'folder_commits_seen' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },
