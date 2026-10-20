@@ -208,6 +208,8 @@
   "tips.performance.title": "Quanto o próprio Hive custa",
   "tips.permissionMode.text": "Clique no modo, no rodapé de um agente, ou pressione {key}, para alternar entre perguntar antes, aceitar edições e planejar.",
   "tips.permissionMode.title": "Troque o modo de permissão",
+  "tips.progressCard.text": "Uma execução no painel Progresso mostra, abaixo do agente, o cartão e a versão em que rodou, como #1061 · a3f2c1d: clique no cartão para abri-lo, ou na versão para copiá-la.",
+  "tips.progressCard.title": "Para qual cartão foi essa execução?",
   "tips.progressCommand.text": "Os agentes rodam comandos longos, como testes e builds, pelo hive-progress, então o painel Progresso os mostra sob o nome do agente, com uma estimativa do tempo restante a partir da segunda vez. As configurações podem fazer com que eles façam isso só quando você pedir.",
   "tips.progressCommand.title": "Progresso para qualquer comando",
   "tips.progressDetails.text": "Clique em uma execução no painel Progresso, ou em uma em Recentes, para ver os detalhes: o comando inteiro, quando rodou e quanto demorou, o código de saída, o log que escreveu e por que falhou.",

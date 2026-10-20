@@ -2581,4 +2581,17 @@ export interface ProgressRun {
    * its program alone, since a command's arguments can hold a token or a prompt.
    */
   titleFromCommand?: true
+  /**
+   * The card it ran for (its number, #1220): named (`hive-progress --card`, `card`), or the reporting agent's card in
+   * Doing when it has one and named none. Absent for a run with no card.
+   */
+  card?: number
+  /** The revision it ran for (a full commit id): named (`--revision`, which must be what's checked out), else the folder's head at the start. */
+  revision?: string
+  /** What was checked out where it ran when it started (a full commit id): the revision it actually tested (SPEC §16.13). */
+  testedCheckout?: string
+  /** The check it was started as (`hive-progress --check <name>`: the project's configured command for that name ran). */
+  check?: string
+  /** The folder it ran in, as its reporter said. */
+  folder?: string
 }
