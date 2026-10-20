@@ -1202,6 +1202,7 @@ head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1
 | `Verdict` | reviewer, submission id, revision, pass/fail, kind of fail (content / explanation), round, decision generation the reviewer had received, comment id | The verdict intent passes. |
 | `CarriedOver` | from revision, to revision, how (replay, same revision) | A pass is kept for a later revision that is the same change. |
 | `Updated` | entry id, from revision, to revision, how (merged target in, rebased), carried (bool) | Strict: the queue brought the approved revision up to date on its own ref (§16.9.1). |
+| `LineMoved` | line, from, to, why (squash continuation) | Hive moved an agent's branch to the target between cards (§16.19.2). |
 | `CommitAttributed` (observed) | commit, card (or none), how (trailer, only card, unattributed, assigned by the user) | A new commit on a shared folder's line (§16.3.2). |
 | `Stale` | approved revision, current revision, why (another change; a decision since; exact-only) | A newer revision that isn't the same change appears after a pass, or a decision is recorded after it (§16.4.6). |
 | `ApprovalRequested` | request id, kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent, or a rule waiting on the user. |
@@ -1938,7 +1939,7 @@ card" means after its Done fact; its merge-slot case goes away with P5). They ar
 #### 16.10.5 Reviewers and review copies
 
 [note §8, #1112 c] Reviewers aren't tied to slots. A reviewer reviews the **exact revision** in a **review copy**: a
-detached worktree at that revision from a small warm pool (default 2 per project, OP-32), with dependencies installed
+detached worktree at that revision from a small warm pool shared with check copies (§16.13), sized per OP-32 (proposed, pending Darren: the larger of 2 and the number of reviewer agents plus one), with dependencies installed
 by the setup script (not junctions into a slot: AGENTS.md's junction gotcha). A review copy is **leased** to one
 reviewer for one submission (start review) and returned at its verdict; it's reset to the next revision only then.
 The reviewer's session stays in the project folder; the review copy is where it reads and runs commands. Its runs name
@@ -2333,8 +2334,8 @@ ancestor of the target (a merge commit or a fast-forward leaves it so). If it is
    approved, stops here: the lane pauses with "HI-B1's branch has work that isn't in main: <commits>", For you
    (Decide), and nothing moves.
 3. **Move it:** today's `moveBranchTo` (`git reset --keep <target>`, `worktrees.ts:479`), which git refuses rather than
-   overwrite a local change; the result is recorded as an `Updated`-style observed fact on the next card's start, and
-   the next card's base is the target's head.
+   overwrite a local change; it is recorded as a `LineMoved` fact (§16.4.2) on the card just Done, written **before** the
+   next card's `Started`, whose `base` is the `to` of that fact [HB3's round 4, HR2's round 4].
 4. If git refuses, the lane pauses with git's reason; nothing else is tried.
 
 So two squashed cards in a row each review only their own work (S54, S55).
