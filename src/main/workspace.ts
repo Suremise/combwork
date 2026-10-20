@@ -20,7 +20,7 @@ import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
-import { changeSessions, exportSessions, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
+import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
 import { ensureHiveExcluded, gitDirOf, hiveVcs } from './hiveVcs'
@@ -943,6 +943,11 @@ export class WorkspaceService {
   /** A session host's records (#1061: in the workspace's database). */
   async sessionsFile(projectPath: string): Promise<SessionsFile> {
     return readSessions(await this.sessionsPlace(projectPath))
+  }
+
+  /** One of a host's session records by its id (#1211: read by its key, not with every record), or undefined. */
+  async sessionRecord(projectPath: string, id: string): Promise<SessionRecord | undefined> {
+    return readSession(await this.sessionsPlace(projectPath), id)
   }
 
   /** Changes a host's session records from what is saved now, one change at a time; only what changed is written. */

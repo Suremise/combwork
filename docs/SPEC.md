@@ -2224,7 +2224,10 @@ labels, links, context, comments, history, decisions and holds in child tables),
 document byte for byte before the group commits (a card that doesn't, or a row that isn't a card's document, stops the
 upgrade naming the card, and the file stays 0.9), and drops the documents: from then on the board's readers compose
 each card's JSON from its rows (`schema/cardRows.ts`), the same bytes as before, so the Agent API's cards and Export
-Board are unchanged. A 0.9 board waiting for its upgrade is read from its documents as before.
+Board are unchanged. A 0.9 board waiting for its upgrade is read from its documents as before. Sessions and deliveries move from `store_rows` into
+typed tables (#1211, v6, the last of its stores: `store_rows` goes with it), every record read back equal as JSON;
+deliveries keep their in-memory store (published after each transaction), the table its durable copy [Darren, 20 Oct,
+#1211].
 - **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? Hive 1.0 needs to upgrade this workspace's
   data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
   back." [the Assistant for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards'
