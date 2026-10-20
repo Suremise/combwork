@@ -246,9 +246,9 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     let generation = earlier.generation
     const decision = (d: { id: string; text: string }, removed = false): void =>
       void tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } })
-    // The ruleset the card's cycle works under (its Started's), on each fact of it.
+    // The ruleset the card's cycle works under (its Started's, or an adopted card's Adopted: #1249), on each fact of it.
     const ruleset = (): { ruleset?: string } => {
-      const id = tx.facts(n).findLast((f) => f.kind === 'Started')?.ruleset
+      const id = tx.facts(n).findLast((f) => f.kind === 'Started' || f.kind === 'Adopted')?.ruleset
       return id ? { ruleset: id } : {}
     }
     if (record.preWorkflow) {
