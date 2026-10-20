@@ -8,9 +8,10 @@ import { V1_0_STEPS } from './v1_0'
  * and the stores' reads and saves (storeTables.ts) use exactly the same mapping.
  *
  * Exactness: an entry is written in columns only if it reads back equal as JSON (`canonical`); one that wouldn't (a field
- * of a type its column can't hold, a value missing, one the store has never written) is kept whole in `extra` as
- * `{ "$doc": <the entry> }`, its columns holding what they can, so nothing an entry says is lost or changed. Fields this
- * build has no column for go in `extra` too, and win on read. An entry no row can hold at all (two metrics buckets of one
+ * of a type its column can't hold, a value missing, one the store has never written) is kept whole in `extra` as a JSON
+ * array of one, `[<the entry>]`, its columns holding what they can, so nothing an entry says is lost or changed. Fields
+ * this build has no column for go in `extra` too, as an object (never an array, so the two can't be confused, whatever
+ * the fields are called), and win on read. An entry no row can hold at all (two metrics buckets of one
  * hour) is kept aside in `board_meta` as `<store>.unmapped` (watches: with their entries that aren't valid, `invalid`).
  */
 
@@ -56,8 +57,11 @@ function extraOf(v: Record<string, unknown>, known: ReadonlySet<string>): string
   }
   return any ? JSON.stringify(rest) : null
 }
-/** `extra` read back: the entry whole (`$doc`), or the fields to add. */
-const parseExtra = (text: Value): Record<string, unknown> => (typeof text === 'string' ? (JSON.parse(text) as Record<string, unknown>) : {})
+/** `extra`'s fields to add, read back (an object; the array of an entry kept whole is read by entryOfRows). */
+function parseExtra(text: Value): Record<string, unknown> {
+  const v: unknown = typeof text === 'string' ? JSON.parse(text) : null
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+}
 const parseJson = (text: Value): unknown => (typeof text === 'string' ? JSON.parse(text) : undefined)
 /** Adds `extra`'s fields to an entry read back (own properties, whatever their names). */
 function withExtra<T extends object>(o: T, extra: Record<string, unknown>): T {
@@ -328,25 +332,27 @@ const METRICS: TableDef = {
 export const TABLE_DEFS: Record<TableStore, TableDef> = { lanes: LANES, watches: WATCHES, metrics: METRICS }
 
 /**
- * The rows an entry is written as: in columns when it reads back equal as JSON, else kept whole in `extra` (`$doc`).
+ * The rows an entry is written as: in columns when it reads back equal as JSON (through entryOfRows, as a read does), else
+ * kept whole in `extra` (`[<the entry>]`).
  */
 export function rowsOfEntry(def: TableDef, doc: unknown, key: string, ord: number): Encoded {
   try {
     const e = def.encode(doc, key, ord)
-    const back = def.decode(e.main, e.children)
+    // Read back through JSON, as the database gives the rows (a column's text, not the object written).
+    const back = entryOfRows(def, JSON.parse(JSON.stringify(e.main)) as Row, JSON.parse(JSON.stringify(e.children)) as Record<string, Row[]>)
     if (canonical(back) === canonical(doc)) return e
   } catch (e) {
     if (!(e instanceof Unfit)) throw e
   }
   const main = def.whole(doc, key, ord)
-  main.extra = JSON.stringify({ $doc: doc })
+  main.extra = JSON.stringify([doc])
   return { main, children: {} }
 }
 
-/** An entry read back from its rows: the one kept whole, or the one its columns hold. */
+/** An entry read back from its rows: the one kept whole (`extra` an array of one), or the one its columns hold. */
 export function entryOfRows(def: TableDef, main: Row, children: Record<string, Row[]>): unknown {
-  const extra = parseExtra(main.extra)
-  return Object.prototype.hasOwnProperty.call(extra, '$doc') ? extra.$doc : def.decode(main, children)
+  const extra: unknown = typeof main.extra === 'string' ? JSON.parse(main.extra) : null
+  return Array.isArray(extra) ? extra[0] : def.decode(main, children)
 }
 
 /**

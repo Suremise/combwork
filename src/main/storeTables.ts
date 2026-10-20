@@ -33,12 +33,29 @@ export const tableTestHooks: { failSave: ((store: TableStore) => boolean) | null
  * the entries that changed (metrics: the hour under way). Kept per workspace and database generation, so a database
  * replaced (the upgrade, a restore) is read again before a save; made by the first save (reads, at a store's open, leave
  * it alone: they can be large, and are made once).
+ *
+ * Bounded (round 1, finding 2): only workspaces whose database is open keep theirs. A closed workspace's last save (its
+ * database opened for it and closed again) keeps nothing, those of workspaces closed since go at each save, and at most
+ * MAX_COMMITTED stores are kept, the least recently saved going first.
  */
-const committed = new Map<string, { gen: number; docs: Map<string, string> }>()
+const committed = new Map<string, { path: string; gen: number; docs: Map<string, string> }>()
+export const MAX_COMMITTED = 3 * 8
 const cacheKey = (path: string, store: TableStore): string => `${path.toLowerCase()}|${store}`
 onDbReplaced((workspacePath) => {
   for (const store of Object.keys(TABLE_DEFS) as TableStore[]) committed.delete(cacheKey(resolve(workspacePath), store))
 })
+
+/** Keeps a store's committed entries, as the most recently saved; drops those of closed workspaces and past the bound. */
+function remember(path: string, store: TableStore, gen: number, docs: Map<string, string>): void {
+  const key = cacheKey(path, store)
+  committed.delete(key)
+  for (const [k, v] of committed) if (!boardOpen(v.path)) committed.delete(k)
+  committed.set(key, { path, gen, docs })
+  while (committed.size > MAX_COMMITTED) committed.delete(committed.keys().next().value!)
+}
+
+/** For tests: the workspaces whose stores' committed entries are kept now. */
+export const committedFor = (): string[] => [...new Set([...committed.values()].map((v) => v.path))]
 
 const hasTable = (db: ReturnType<typeof workspaceDb>['reader'], name: string): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) // i18n-ignore: SQL
 
@@ -84,7 +101,7 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
     // A workspace closed meanwhile (a store's last save as it closes): its database is opened for the save, then closed again.
     const wasOpen = boardOpen(path)
     try {
-      saveEntries(path, store, docs, meta)
+      saveEntries(path, store, docs, meta, wasOpen)
     } finally {
       if (!wasOpen) closeBoard(path)
     }
@@ -92,7 +109,7 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
 }
 
 /** saveTable's transaction. */
-function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>): void {
+function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, keep: boolean): void {
   const db = workspaceDb(path).writer
   const def = TABLE_DEFS[store]
   const gen = dbGeneration(path)
@@ -101,7 +118,7 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
   let had = committed.get(cacheKey(path, store))
   const next = new Map<string, string>()
   transaction(db, () => {
-    if (!had || had.gen !== gen) had = { gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
+    if (!had || had.gen !== gen) had = { path, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
     const before = had.docs
     // Those no longer in the list go first: a new entry may take what one of them held (an agent's one watch).
     const kept = new Set(keys)
@@ -141,7 +158,9 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
     }
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
-  committed.set(cacheKey(path, store), { gen, docs: next })
+  // A closed workspace's last save keeps nothing (its database is closed again at once).
+  if (keep) remember(path, store, gen, next)
+  else committed.delete(cacheKey(path, store))
 }
 
 /** Each lane's or watch's place, by id. */

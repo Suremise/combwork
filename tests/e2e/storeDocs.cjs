@@ -5,10 +5,12 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 
-/** An entry kept whole (`extra`'s `$doc`, src/main/schema/storeCodec.ts), else its columns read back with `extra`'s fields. */
+/** An entry kept whole (`extra` an array of one, src/main/schema/storeCodec.ts), else its columns with `extra`'s fields. */
 const withExtra = (row, entry) => {
   const extra = row.extra ? JSON.parse(row.extra) : {}
-  return Object.prototype.hasOwnProperty.call(extra, '$doc') ? extra.$doc : Object.assign(entry, extra)
+  if (Array.isArray(extra)) return extra[0]
+  for (const k of Object.keys(extra)) Object.defineProperty(entry, k, { value: extra[k], enumerable: true, writable: true, configurable: true })
+  return entry
 }
 
 /** A lane as its tables hold it (storeCodec.ts's decode, for the suites). */

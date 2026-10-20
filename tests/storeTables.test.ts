@@ -82,7 +82,7 @@ const bucket = (start: number) => {
 const roundTrip = (store: TableStore, doc: unknown) => {
   const def = TABLE_DEFS[store]
   const e = rowsOfEntry(def, doc, store === 'metrics' ? 'hour:0' : (doc as { id: string }).id, 0)
-  return { back: entryOfRows(def, e.main, e.children), whole: typeof e.main.extra === 'string' && e.main.extra.startsWith('{"$doc"'), e }
+  return { back: entryOfRows(def, e.main, e.children), whole: typeof e.main.extra === 'string' && e.main.extra.startsWith('['), e }
 }
 
 describe('entries as rows, and back (#1212)', () => {
@@ -280,6 +280,103 @@ describe('reads and saves', () => {
   })
 })
 
+describe("a field named $doc is just a field (round 1, finding 1)", () => {
+  // Each store's entry with a field called $doc (null, text, an object), in columns and kept whole.
+  const odd = (v: unknown): [TableStore, unknown][] => [
+    ['lanes', { ...LANE, $doc: v }],
+    ['lanes', { ...LANE, state: 'running', $doc: v }],
+    ['watches', { ...WATCH, $doc: v }],
+    // Another agent's (an agent has one watch).
+    ['watches', { ...WATCH, id: 'w-2', agentId: 'a-r6', waitSeq: 'four', $doc: v }],
+    ['metrics', { ...JSON.parse(JSON.stringify(bucket(0))), $doc: v }],
+    ['metrics', { ...JSON.parse(JSON.stringify(bucket(3_600_000))), span: 'week', $doc: v }]
+  ]
+  const VALUES = [null, 'text', { later: 'field' }]
+
+  it('reads back as it was, through the reader a read uses', () => {
+    for (const v of VALUES)
+      for (const [store, doc] of odd(v)) {
+        const r = roundTrip(store, doc)
+        expect({ store, v, back: canonical(r.back) }).toEqual({ store, v, back: canonical(doc) })
+      }
+  })
+
+  it('is moved in by the 1.0 step as it was', () => {
+    for (const v of VALUES) {
+      const entries = odd(v)
+      const db = board09(entries.map(([store, doc], i) => [store, '', `k${i}`, i, JSON.stringify(doc)]))
+      db.exec('BEGIN')
+      moveStores(db)
+      db.exec('COMMIT')
+      for (const store of TABLE_STORES) {
+        const want = entries.filter(([s]) => s === store).map(([, d]) => canonical(d))
+        // Metrics read back by their start: the same two buckets.
+        const got = readEntries(db, store).map((e) => canonical(e.doc))
+        expect({ store, v, got: store === 'metrics' ? got.sort() : got }).toEqual({ store, v, got: store === 'metrics' ? [...want].sort() : want })
+      }
+      db.close()
+    }
+  })
+
+  it('is saved and read back as it was, after the database is closed and opened again', async () => {
+    for (const v of VALUES) {
+      const ws = workspace()
+      const entries = odd(v)
+      for (const store of TABLE_STORES) await tables.saveTable(ws, store, entries.filter(([s]) => s === store).map(([, d]) => d))
+      board.closeBoard(ws)
+      for (const store of TABLE_STORES) {
+        const want = entries.filter(([s]) => s === store).map(([, d]) => canonical(d))
+        const got = tables.readTable(ws, store).docs.map((d) => canonical(d))
+        expect({ store, v, got: store === 'metrics' ? got.sort() : got }).toEqual({ store, v, got: store === 'metrics' ? [...want].sort() : want })
+      }
+      board.closeBoard(ws)
+    }
+  })
+})
+
+describe("what saves keep of committed entries is bounded (round 1, finding 2)", () => {
+  it("a closed workspace's last save keeps nothing; one closed since goes at the next save; an open one keeps its own", async () => {
+    const a = workspace()
+    const b = workspace()
+    // Open, as a workspace's are while its window has it.
+    board.workspaceDb(a)
+    board.workspaceDb(b)
+    await tables.saveTable(a, 'lanes', [LANE])
+    expect(tables.committedFor()).toContain(a)
+    // Closed, its stores' last saves open the database for the save and close it again: nothing kept.
+    board.closeBoard(a)
+    await tables.saveTable(a, 'lanes', [{ ...LANE, rounds: 3 }])
+    expect(tables.committedFor()).not.toContain(a)
+    // Kept while open, gone at the next save (anyone's) once closed.
+    board.workspaceDb(a)
+    await tables.saveTable(a, 'watches', [WATCH])
+    expect(tables.committedFor()).toContain(a)
+    board.closeBoard(a)
+    await tables.saveTable(b, 'lanes', [LANE])
+    expect(tables.committedFor()).not.toContain(a)
+    expect(tables.committedFor()).toContain(b)
+    // Still saving only what changed for the open one.
+    const db = board.workspaceDb(b).writer
+    const before = (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n
+    await tables.saveTable(b, 'lanes', [LANE])
+    expect((db.prepare('SELECT total_changes() AS n').get() as { n: number }).n - before).toBe(0)
+  })
+
+  it('at most MAX_COMMITTED stores are kept however many workspaces stay open, the least recently saved going first', async () => {
+    const open: string[] = []
+    for (let i = 0; i < tables.MAX_COMMITTED / 3 + 4; i++) {
+      const ws = workspace()
+      open.push(ws)
+      board.workspaceDb(ws)
+      for (const store of TABLE_STORES) await tables.saveTable(ws, store, [])
+    }
+    expect(tables.committedFor().length).toBeLessThanOrEqual(tables.MAX_COMMITTED / 3)
+    expect(tables.committedFor()).toContain(open[open.length - 1])
+    expect(tables.committedFor()).not.toContain(open[0])
+    for (const ws of open) board.closeBoard(ws)
+  })
+})
+
 describe("0.8's lanes.json moved in (from #1018's tests)", () => {
   it('once, in order; the file kept as a backup, as it was; not read again', async () => {
     const ws = workspace()
@@ -353,7 +450,7 @@ describe.skipIf(!live)("a copy of a live board's hive.db (HIVE_STORE_MIGRATION_D
     }
     for (const [k, v] of oldMeta) expect((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string }).value).toBe(v)
     // Kept whole only where columns couldn't hold one exactly: say how many, for the record.
-    const whole = TABLE_STORES.map((s) => `${s}: ${(db.prepare(`SELECT count(*) AS n FROM ${TABLE_DEFS[s].main} WHERE extra LIKE '{"$doc"%'`).get() as { n: number }).n} kept whole of ${old[s].length}`)
+    const whole = TABLE_STORES.map((s) => `${s}: ${(db.prepare(`SELECT count(*) AS n FROM ${TABLE_DEFS[s].main} WHERE extra LIKE '[%'`).get() as { n: number }).n} kept whole of ${old[s].length}`)
     console.log(`live copy: ${whole.join('; ')}`)
     db.close()
   })
