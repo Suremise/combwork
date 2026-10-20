@@ -73,6 +73,7 @@ import * as skills from './skills'
 import * as storage from './storage'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
+import { cardWork, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
 import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
@@ -642,6 +643,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:start': async (n, target) => {
       const r = await startTask(n, target, { kind: 'user' })
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
+    },
+    'tasks:work': (n) => {
+      const ws = currentWorkspace()
+      return ws.path ? cardWork(ws, n) : null
+    },
+    'tasks:workBadges': () => {
+      const ws = currentWorkspace()
+      return ws.path ? workBadges(ws) : []
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)

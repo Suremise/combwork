@@ -65,6 +65,11 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { cardStages } from './boardStore'
+import { cardFacts, factRow } from './workflow/cardWork'
+import { detect, projectPlatform } from './platform/registry'
+import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
+import { CATEGORY_STAGE } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
@@ -1775,7 +1780,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   // Its decisions first (#357): what the user decided, which agents follow over the description. Its holds (#602) are
   // for its cost in Hive's window: left out.
   const { number, title, decisions, held: _held, ...rest } = c
-  const view: TaskView = {
+  const view: Omit<TaskView, 'stage'> = {
     number,
     title,
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
@@ -1803,7 +1808,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   // A project agent sees the cards of other projects it links to or waits for as numbers, marked as such.
   const scope = callerScope()
   const elsewhere = await tasks.refsOutside([...new Set([...c.blockedBy, ...c.links])], scope)
-  return elsewhere.length ? { ...view, elsewhere } : view
+  // Its 1.0 stage (#1223, SPEC §16.4.3) from the card's row, after the document's fields: additive.
+  const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), stage }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2011,6 +2018,31 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   // summary=true (#532): its first line, with its whole length when there is more.
   return query.get('summary') === 'true' && r.comment ? { ...r, comment: commentSummary(r.comment) } : r
 })
+
+// A card's facts (#1223, SPEC §16.4): a short row each (seq, kind, time, actor and a few words, revisions as its project's
+// platform shows them); view=full gives them as recorded. None for a card from before 1.0, or on a board not upgraded.
+route('GET', '/v1/tasks/:n/facts', async ({ params, query }) => {
+  requireWorkspace()
+  const view = query.get('view') ?? 'short'
+  if (view !== 'short' && view !== 'full') throw new HttpError(400, `Unknown view "${view}": short or full.`)
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const got = cardFacts(workspace, c.number)
+  const head = { number: c.number, stage: got?.card.stage ?? cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column], ...(got?.card.preWorkflow ? { preWorkflow: true } : {}) }
+  const facts = got?.facts ?? []
+  if (view === 'full') return { ...head, facts }
+  const platform = await platformOfCard(c)
+  return { ...head, facts: facts.map((f) => factRow(f, (id) => revisionShort(platform, id))) }
+})
+
+/** The platform of a card's project (the workspace's folder's for a card about the workspace), for its revisions' text. */
+async function platformOfCard(c: TaskCard): Promise<PlatformId> {
+  try {
+    const p = projectByName(c.project)
+    return projectPlatform(p, (await workspace.projectConfig(p)).platform).id
+  } catch {
+    return detect(workspace.path!).platform
+  }
+}
 
 route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   requireWorkspace()

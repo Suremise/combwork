@@ -113,6 +113,7 @@ import type { BoardFoldChange } from './tasks'
 import type { CardCost, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
+import type { WorkBadge, WorkView } from './workflow/workView'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -326,6 +327,10 @@ export interface HiveRequests {
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
   'tasks:start': (n: number, target: TaskStartTarget) => { agentId: string; agentName: string; added: boolean }
+  /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
+  'tasks:work': (n: number) => WorkView | null
+  /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
+  'tasks:workBadges': () => WorkBadge[]
 
   'session:list': (projectPath: string) => SessionListItem[]
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */

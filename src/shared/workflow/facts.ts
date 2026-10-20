@@ -19,6 +19,9 @@ export type Category = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
 export const STAGE_CATEGORY: Record<StageId, Category> = { hold: 'hold', todo: 'todo', active: 'doing', review: 'review', approved: 'passed', merging: 'passed', done: 'done' }
 
+/** The stage a column stands for, for a card no 1.0 rule has moved yet (its `stage` empty). */
+export const CATEGORY_STAGE: Record<Category, StageId> = { hold: 'hold', todo: 'todo', doing: 'active', review: 'review', passed: 'approved', done: 'done' }
+
 export type CardKind = 'code' | 'no-code'
 
 export interface FileChange {

@@ -40,6 +40,7 @@ function view(n: number, extra: Partial<TaskView> = {}): TaskView {
     createdBy: 'You',
     updatedAt: '2026-10-02T00:00:00Z',
     stalled: null,
+    stage: 'todo',
     ...extra
   }
 }
