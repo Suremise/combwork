@@ -290,6 +290,7 @@ export class FactStore {
     if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
     return this.conn.write((db) => {
       if (patch.kind !== undefined) db.prepare('UPDATE cards SET kind = ? WHERE number = ?').run(patch.kind, id)
+      if (patch.preWorkflow !== undefined) db.prepare('UPDATE cards SET pre_workflow = ? WHERE number = ?').run(patch.preWorkflow ? 1 : 0, id)
       setColumns(db, id, patch)
       return this.card(id)
     })

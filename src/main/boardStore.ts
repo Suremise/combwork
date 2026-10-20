@@ -1007,6 +1007,19 @@ export function cardPlaces(ws: WorkspaceService): { number: number; raw: { colum
   })
 }
 
+/**
+ * These cards' project (as saved), column and agent, each as its document has it (null when it hasn't the field), from
+ * their columns: what a change reads of its cards before it (#1216's reads), no document composed.
+ */
+export function cardHeads(ws: WorkspaceService, numbers: number[]): { number: number; project: unknown; column: unknown; agent: unknown }[] {
+  if (!numbers.length) return []
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, ['project', 'column', 'agent'], { numbers, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, project: fields.project, column: fields.column, agent: fields.agent }))
+    const rows = db.prepare("SELECT number, doc ->> '$.project' AS project, doc ->> '$.column' AS col, doc ->> '$.agent' AS agent FROM cards WHERE number IN (SELECT value FROM json_each(?))").all(JSON.stringify(numbers)) as { number: number; project: unknown; col: unknown; agent: unknown }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, project: r.project, column: r.col, agent: r.agent }))
+  })
+}
+
 /** How many archived cards each project has (the board's Archived count, without reading them). */
 export function archivedCounts(ws: WorkspaceService): { project: string; count: number }[] {
   const { db } = readConn(ws)

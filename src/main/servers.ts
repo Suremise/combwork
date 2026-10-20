@@ -1,3 +1,4 @@
+import { recordDecisionsRead } from './workflow/recorder'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
@@ -1876,7 +1877,12 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const view = await taskView(await tasks.readTask(taskNumber(params[0]), await taskActor()))
   // Read in full, decisions included: those aren't new to the agent any more (#357).
   const me = agentCaller()
-  if (me) noteCardRead(me, view.number)
+  if (me) {
+    noteCardRead(me, view.number)
+    // What it has received of the card's decisions, as a fact (#1216), in the background.
+    const ws = contextWorkspace()
+    if (ws) void recordDecisionsRead(ws, me.agentId, view.number)
+  }
   const raw = query.get('comments')
   const n = raw === null ? null : Number(raw)
   if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)

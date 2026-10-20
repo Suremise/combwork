@@ -24,6 +24,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/workspace.ts` | Workspace/project discovery, `.hive` folders, git exclude; one `WorkspaceService` per window behind the `workspace` stand-in |
 | `src/main/db.ts`, `src/main/boardStore.ts`, `src/main/presence.ts` | Hive's SQLite layer (`node:sqlite`: connections, settings, migrations, a group of steps run as one: #1207), and the board's database (`.hive/hive.db`): its one write path (`boardWrite`, a transaction told once), the move in from the cards' files, export (#1017), the 1.0 upgrade (asked first, `upgradeBoard`, `restoreBoardBackup`), and the workspace presence marker (`.hive/open`) |
 | `src/main/schema/` | hive.db's 1.0 tables (`v1_0.ts`, #1208) and the cards in them (#1209): `cardRows.ts`, a card's document as rows and back byte for byte (the card JSON contract), and `cardsStep.ts`, the 1.0 group's step that moves 0.9's cards into the tables |
+| `src/main/workflow/recorder.ts` | Facts from today's moves (#1216): `saveCard` hands it each card change, as it was and as it is, inside the change; the platform's reads are made before the change by tasks.ts' public entry points (`gatherReads`) and handed in through the change's context (`recording`) |
 | `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each delivered once |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
@@ -460,6 +461,27 @@ transaction (`BEGIN IMMEDIATE`: another Hive's write waits for it), which what t
 synchronous, and nothing else uses the connection), and fails whole once SQLite has undone it; a read outside one is
 a read transaction of its own. Either way a record, a list, a lane or a pause is read on one snapshot, never mixing
 two commits. An observed fact whose dedupe key is there already returns null, and the caller reads again.
+
+**The recorder** (`workflow/recorder.ts`, #1216; P3 records, nothing is refused). Every card change is saved by
+tasks.ts' `saveCard`, which hands `recordChange` the card as it was (`updateTaskLocked` keeps a copy before its edits,
+a new card is null, other callers' is read) and as it is now, inside the change: a column change writes `Moved` (its
+stage, from the stage cache, to the column's) and the stage cache; into Doing with an agent, `Started` (folder,
+line, base, target, builder, kind); into Review (or returned for review), `Submitted` (revision, base, head, the
+files changed, the candidate key, round, the builder's received decision generation, same revision, the summary
+comment's id); a review's start `ReviewStarted` and its verdict `Verdict`, on the latest submission; `Blocked` and
+`Unblocked`; each new decision `Decision` with its generation. A card read in full by an agent (`GET /v1/tasks/:n`)
+records `DecisionsReceived`, once per generation, in a change of its own. The actor is the change's
+(`recording`/`recordingAs`, an AsyncLocalStorage): `user`, `assistant`, `agent:<id>`, or `hive` for Hive's own; a
+move's cause `user` from the window, `intent` from an agent's or the Assistant's tools and the API, `derived` for
+Hive's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
+`updateTask`, `updateTasks` and `createTask` plan which cards a change may start or submit from the board's columns
+(`cardHeads`, no document read) and read their folders with git (`platform/git.ts`: branch, head, merge base with the
+target, files, candidate key); a fact whose reads are missing or for another agent records them as not read. A read
+that fails never refuses: its field is null and `platform.unknown` names it with what couldn't be read. A card from
+before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts, which clears the mark (Darren, #1119
+decision 4). A failure in the recorder is logged and the change goes on, except SQLite undoing the transaction, which
+fails the change whole as any write does. The window reads a card's facts with `tasks:facts`. Not yet: the ruleset id
+on `Started` (#1218's options), None's manifests (P5).
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for

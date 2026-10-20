@@ -1201,7 +1201,15 @@ never edited or deleted, except with the card itself (Delete permanently) [P1]: 
 **Cards from before 1.0** [note §11]: a card that is Done, On Hold or Todo at the upgrade gets no facts and is marked
 **before 1.0** (`preWorkflow: true`); Hive invents none. A card in flight gets only observed evidence, marked
 `adopted`: an **`Adopted`** fact (Doing, Review, Passed) and, for a card in Review, an adopted submission at its line's
-head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1 note and HB3's finding 1].
+head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1 note and HB3's finding 1]. Such a card
+that starts after the upgrade loses the mark and is a 1.0 card from then on [Darren, #1119 decision 4].
+
+**P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
+transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change
+`Moved`, cause `user` from the window, `intent` from an agent's or the Assistant's tools; blocked and unblocked; each
+decision; and an agent reading a card in full, `DecisionsReceived`). The platform is read before the change; a value
+that couldn't be read never refuses the move: its field is empty and the fact's `platform.unknown` says what couldn't
+be read.
 
 #### 16.4.2 Kinds
 

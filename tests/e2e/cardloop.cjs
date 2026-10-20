@@ -191,6 +191,14 @@ const check = (name, ok, extra = '') => {
   const h2 = (await card(c2)).history.map((h) => h.what)
   check('c2: failed once, then passed (two rounds)', h2.filter((x) => x === 'Review failed').length === 1 && h2.filter((x) => x === 'Review passed').length === 1, h2.join(' | '))
   check('c1 passed first time', (await card(c1)).history.filter((h) => h.what === 'Review failed').length === 0)
+  // Each move left its facts (#1216), over IPC: c2's start, two submissions, two reviews and their verdicts, its moves.
+  const facts2 = await inv('tasks:facts', c2)
+  const kinds2 = facts2.map((f) => f.kind)
+  const subs2 = facts2.filter((f) => f.kind === 'Submitted')
+  const verdicts2 = facts2.filter((f) => f.kind === 'Verdict')
+  check("c2's facts: Started by the builder, then two submissions (rounds 1, 2), each reviewed and given its verdict", kinds2[0] === 'Started' && facts2[0].data.builder && subs2.length === 2 && subs2.map((f) => f.data.round).join() === '1,2' && kinds2.filter((k) => k === 'ReviewStarted').length === 2 && verdicts2.map((f) => f.data.pass).join() === 'false,true', JSON.stringify(kinds2))
+  check('…each verdict on the submission before it, by the reviewer agent', verdicts2.every((v, i) => v.data.submission === subs2[i].seq && v.actor.startsWith('agent:')), JSON.stringify(verdicts2.map((v) => [v.actor, v.data.submission])))
+  check('…its moves recorded as the agents asked them (intent), ending in Passed (approved)', facts2.filter((f) => f.kind === 'Moved').at(-1)?.data.to === 'approved' && facts2.filter((f) => f.kind === 'Moved').every((f) => f.data.cause === 'intent'), JSON.stringify(facts2.filter((f) => f.kind === 'Moved').map((f) => f.data)))
   const passedAt = (await card(c1)).history.find((h) => h.what === 'Review passed')?.at ?? ''
   const c2Doing = (await card(c2)).history.find((h) => h.what.startsWith('Moved to Doing'))?.at ?? ''
   check('in order: c1 passed before c2 was begun', !!passedAt && !!c2Doing && passedAt < c2Doing, JSON.stringify({ passedAt, c2Doing }))
