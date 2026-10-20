@@ -922,7 +922,7 @@ in §16.19), §16.18 (the scenarios your phase must pass) and §16.20 (open poin
    on top.
 10. **Every gate and override has an off switch** [#966, #737's principle, note §3]. For the workflow, the off switch
     of a rule is its option; a few rules can't be switched off on their own because others depend on them (no
-    self-review while a reviewer is required, a verdict naming its submission, a lane's list changing between cards),
+    self-review while a reviewer is required, a verdict naming its submission, a duplicate submission),
     and for those **the user's override is the switch** (§16.8.4) [HB3's round 1 finding 18]. For Hive's overrides of
     the CLIs, a setting in Advanced (§16.15).
 11. **Clean cut-over** [#1112 plan]. No warn-mode period: on upgrade every project moves to the layer, with options
@@ -964,7 +964,7 @@ offered, and its row says why [#1112 plan, note "Core model v2"].
 | **isolation** | Parallel working folders for cards. | Worktrees: slots (§16.10). | Not in 1.0 (OP-16): everyone works in the project folder. |
 | **integration** | Combine an approved change into the target, and **advance the target atomically**: move it from an expected revision to the result, or fail without changing it. | Merge (merge commit or squash) by Hive's merge queue (§16.9) or the agent; the target is a branch, advanced with compare-and-swap (§16.9.2). | **Acceptance**: an approved revision is recorded as accepted; nothing is copied (OP-16). |
 | **containment** | Is revision R (or its change) in target T? | Ancestor of the target, or a target commit with the same change (a squash) (§16.3.4). | R has an Accepted fact. |
-| **sameness** | Is R2 the same change as R1? | Same exact change key of the whole change (§16.3.2; patch-id as a candidate, OP-33). | Same hash (any edit is a new revision) [#1112 B]. |
+| **sameness** | Is R2 the same change as R1? | Replay equivalence: replaying the reviewed change onto the new base gives exactly the new tree (§16.3.2; patch-id as a first test, OP-33). | Same hash (any edit is a new revision) [#1112 B]. |
 | **authorship** | Who made the change? | Hive's records of which agent worked the card, plus each commit's author identity (§16.3.4). | Hive's records (edits attributed by hooks and file locks). |
 | **observe** | Tell Hive when the content changes outside an intent. | Watch the repository's refs and HEAD (§16.4.4). | Watch the deliverables (the Files tab's watcher). |
 
@@ -982,7 +982,7 @@ interface PlatformAdapter {
   snapshot?(where: Folder): Revision | Unknown            // platforms that record the working copy (jj): explicit, at submit
   readiness(rev: Revision): Ready | Conflicted(files) | Unknown
   dirty(where: Folder, paths?: string[]): Dirty | Unknown // the folder's uncommitted state, optionally only some paths
-  change(base: Revision, head: Revision): Change | Unknown // files changed, exact change key, candidate key
+  change(base: Revision, head: Revision): Change | Unknown // files changed, candidate key (sameness is a replay, §16.3.2)
   contains(target: Target, rev: Revision, change?: Change): Containment | Unknown
   authors(change: Change): Author[] | Unknown
   isolate?(card, line, base): Folder; release?(folder)    // isolation (slots, §16.10)
@@ -1015,44 +1015,57 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   target that moves, contains the change already, or is rewritten doesn't alter what was reviewed [P1, answering
   HR2's round 1 finding 3]. **Files changed** per revision (`git diff --name-status -z <base> <head>`) are part of the
   Submitted fact (#945) [#1119 c].
-- **A later revision** (an amend, a rebase onto a newer target, a squash) is compared with the approved one through
-  their stored keys: the new revision's change is computed against its own merge base at the time it's seen
-  (`Submitted`, or the observed `HeadMoved`), and stored with it.
-- **Exact change key** (sameness) [OP-33]: SHA-256 over a canonical form of the whole change, sensitive to every byte
-  that changes behaviour: for each changed path in path order, the old and new path, the file modes, and either the
-  added and removed lines exactly as written (a zero-context diff, `git diff --no-color --no-ext-diff -U0
-  --full-index --binary <base> <head>`, with hunk positions and `index` lines left out, whitespace kept) or, for a
-  binary file, the new blob id. A clean rebase keeps it (positions and context aren't in it); an edit of any added
-  line, whitespace included, a mode change or a binary change doesn't. `git patch-id --stable` is kept as a cheap
-  **candidate key**: different patch-ids mean a different change at once; equal patch-ids are confirmed with the exact
-  key. (patch-id alone ignores whitespace: HR2 fed it two patches differing only in Python indentation and got the
-  same id, round 1 finding 4; Darren chose patch-id believing it meant "the same change", so the exact key is put to
-  him as OP-33 rather than swapped in silently.) A conflict resolution that happens to give exactly the same change
-  keeps the approval: the change merged is then byte for byte the change reviewed. An empty change has no key, and
-  submitting it is refused ("nothing to review") unless the card is no-code [P1].
-- **Containment,** in order: `merge-base --is-ancestor <rev> <target>` (a merge, or a fast-forward); else a commit on
-  the target since the card's base whose own change has the same exact key (a squash, or a cherry-pick of the whole
-  change); else the existing tree test (`alreadyMerged`, `worktrees.ts:417`: `merge-tree --write-tree` equal to the
-  target's tree) for a squash with a different split. The first that answers yes says how (`method: merge |
-  fast-forward | squash | same-tree`) [P1, extending `branchWatch`'s detection]. Containment reads stored keys and
-  revision ids, so it still answers after the card's branch is deleted: a merged revision stays reachable from the
-  target, and a squash is found by key.
+- **Same change: replay equivalence** (sameness) [OP-33; P1, answering HR2's round 1 finding 4 and round 2 finding 3].
+  A pass on revision R1 (base B1) carries over to a later revision R2 (base B2) only if **replaying R1's change onto
+  B2 with git's own three-way merge gives exactly R2's tree**: `git merge-tree --write-tree --merge-base=<B1> <B2> <R1>`
+  succeeds without conflicts and its tree id equals `<R2>^{tree}`. Trees are compared whole, so whitespace, file modes,
+  binaries and *where* in a file a change lands all count: changing the first of two identical blocks is not the same
+  change as changing the second, because the replay puts R1's edit where git's merge places it, and R2's tree differs.
+  If B2 is B1, it reduces to "the same tree". Anything the replay can't settle (a conflict, a merge base that can't be
+  read, an object gone) is **not** the same change: the pass goes stale (unknown never carries over).
+  - **Candidate key:** `git patch-id --stable` of the whole change, stored with each submission, is a cheap first
+    test only: different patch-ids mean a different change at once; equal ones go on to the replay. patch-id alone
+    ignores whitespace (HR2's probe: two patches differing only in Python indentation share an id), and a hash of the
+    changed lines without their positions can't tell repeated blocks apart (HR2's round 2 finding 3), so neither
+    decides on its own.
+  - **Why replay:** it is the correspondence a rebase itself uses, so a clean rebase or a squash of an unchanged
+    change passes (decision B's intent), and a conflict resolution that yields exactly the replayed tree passes
+    because the merged content is then exactly what the replay of the reviewed change produces. With "Exact revision
+    only" (G4), only R2 = R1 carries over.
+  - **Stored per submission:** base, head, the candidate key and the changed files, so later comparisons use the
+    reviewed endpoints, never the target's current state.
+  An empty change (head = base, or an empty tree diff) has no key, and submitting it is refused ("nothing to review")
+  unless the card is no-code [P1].
+- **Containment,** in order: `merge-base --is-ancestor <rev> <target>` (a merge, or a fast-forward); else a commit C on
+  the target since the card's base whose parent P replays the change exactly (`merge-tree --merge-base=<base> <P>
+  <rev>` gives C's tree: a squash, or a cherry-pick of the whole change; patch-id narrows which commits to try); else
+  the existing whole-target test (`alreadyMerged`, `worktrees.ts:417`) for a squash split across commits. The first
+  that answers yes says how (`method: merge | fast-forward | squash | same-tree`) [P1, extending `branchWatch`'s
+  detection]. Containment reads stored endpoints and pinned revisions (§16.9.3), so it still answers after the card's
+  line is deleted.
 - **Shared-folder cards** (G11 = the project folder: agents commit on the folder's line, often the target itself)
-  [P1, answering HR2's round 1 finding 1 and HB3's finding 5]:
-  - **One card Active in the folder** (Solo, or one agent at a time): the card's commits are `base..HEAD` since its
-    `Started`; no trailer is needed. Its revision is HEAD, its change `base..HEAD`.
-  - **Two or more cards Active in the folder:** each card's commits are those since its `Started` whose message carries
-    its trailer (`Hive-Card: AM-12`, §16.12, OP-14); a commit with no trailer (the user's, another tool's) belongs to no
-    card, and a commit made while only one card was Active belongs to that card. The card's change is the **ordered
-    list** of its commits: its exact key is the list of each commit's own exact key, in order; its revision (what a
-    verdict names) is its newest commit, not the folder's head; containment needs every one of its commits.
-    `submit.trailer` holds when two or more cards are Active in the folder, with the fix
-    `git commit --amend --trailer "Hive-Card: AM-12"` for the newest commit, or a non-interactive
-    `git rebase --exec` for older ones.
-  - **Review and checks see the folder as it is:** a review copy at the card's newest commit contains other cards'
-    earlier commits, and a check run there tests them too. The reviewer reviews the card's own commits (their diff is
-    what `start review` lists), and the option's description says the checks cover everyone's work in the folder; slots
-    are the answer when that matters.
+  [P1, answering HR2's round 1 finding 1, round 2 finding 2 and HB3's findings 5, F, G]:
+  - **Attribution is recorded once, when a commit is seen,** and never recomputed: Hive writes `CommitAttributed`
+    (commit, card, how) for each new commit on the folder's line. The rule, in order: a commit whose message carries a
+    card's trailer (`Hive-Card: AM-12`, §16.12, OP-14) is that card's; otherwise, if exactly one card of the folder is
+    **unfinished** (Active, Review or Approved: not just Active) it is that card's (`how: only card`); otherwise it
+    belongs to no card (`how: unattributed`) and is listed in the Version Control tab for the user to assign or leave.
+    So A entering Review never hands A's commits to B: they were attributed when made, and a commit made while A and
+    B are both unfinished needs a trailer.
+  - **A card's change** is the ordered list of its attributed commits. With one card unfinished since its start, that
+    list is exactly `base..HEAD`, and Hive uses that range as a shortcut. With several, the change is the combined
+    diff of its own commits applied in order (sameness: each commit replays, §16.3.2); containment needs every one.
+  - **Two revisions, kept apart:** the card's **revision** (what is submitted and what a verdict names) is its newest
+    attributed commit, which needn't be the folder's head; a **tested checkout** is the revision a check or a review
+    copy actually had (§16.13). Submit takes the card's revision, not the folder's head (§16.8.1's "must equal the
+    head" applies only to a card with its own line).
+  - `submit.trailer` holds when an unfinished other card shares the folder and the agent's commits since its last
+    submission include one attributed to no card, with the fix `git commit --amend --trailer "Hive-Card: AM-12"` for
+    the newest commit, or a non-interactive `git rebase --exec` for older ones (not on the target line itself once
+    other agents' commits follow: then the user assigns it in the tab).
+  - **Review and checks see the folder as it is:** a review copy at the card's revision contains other cards' earlier
+    commits, and a check run on it tests them too; the reviewer reviews the card's own commits (their diff is what
+    `start review` lists). The option's description says so; slots are the answer when that matters.
   - When the folder's line is the card's target, its commits are **working revisions**, not integrations: they are on
     the target by construction, and Done waits for the card's rules (review, approval) instead (§16.4.4, §16.7.2).
 - **Dirty:** `git status --porcelain=v2 -z` (already `--no-optional-locks`, §8), tracked changes and untracked files
@@ -1071,26 +1084,39 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
 
 #### 16.3.3 None adapter
 
-[P1, answering HB3's round 1 finding 6]
+[P1, answering HB3's round 1 finding 6 and round 2 finding C, HR2's round 2 finding 6]
 - **Deliverables** (N4, §16.6.1): where a None project's work may be. By default the project folder except `.hive`
   and folders the option excludes (pre-filled with `node_modules`, `.venv`, build output folders it finds); a card can
   narrow it to paths (OP-17).
-- **A card's files:** the deliverable files its own agents touched since `Started` (edits seen by Hive's hooks and file
-  locks: the same records as authorship). Another card's edits are never part of this card's work, so two agents in
-  one None project don't make each other's passes stale.
+- **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, which the
+  builder confirms at submit (`submit`'s `paths`) and the user can edit on the card. Hive **pre-fills** it from what
+  it saw: edits by the card's agents through Hive's hooks and file locks, and deliverable writes the watcher saw while
+  that agent's turn ran and no other agent or the user was active in the folder. Everything else written in the
+  deliverables since the card started (a formatter's output during overlapping turns, the user's editor, a
+  hooks-free session, §16.15) is listed at submit as **unclaimed changes**, for the builder to add or leave out, and
+  in the Version Control tab for the user. Hooks only make the pre-fill better; they are never needed for a
+  correct revision. In a hooks-free session the list starts empty and the builder declares it.
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
-  files**, computed at submit and when the watcher sees one of them change. Shown as 7 hex characters. Any edit to one
-  of the card's files is a new revision: sameness is equality [#1112 B].
-- **Change:** the card's files with their content hashes at `Started` (a manifest stored with the fact: paths and
+  paths** (a folder means every deliverable file under it), computed at submit. Any edit to one of them is a new
+  revision: sameness is equality [#1112 B]. Whoever made it (the card's agent, another card's, the user) doesn't
+  matter: the content is the revision.
+- **A file in two cards' paths** (two cards working on one file in turn) belongs to both: an edit to it after A's pass
+  makes A's pass stale (its content changed), which is correct; files outside A's paths never affect A.
+- **No dirty state, no snapshot step:** None has nothing between "edited" and "submitted", so `submit.clean`,
+  `submit.ready` and `submit.trailer` aren't in None rulesets (they need the Git capabilities `dirty` and
+  `revisions` with commits); the revision is computed when submitted.
+- **Change:** the card's paths with their content hashes at `Started` (a manifest stored with the fact: paths and
   hashes, never contents) and at the revision.
-- **Containment:** an `Accepted` fact for the revision. **Integration** is acceptance of the **approved** revision
-  (the one that passed, or that you approved), not the folder's state at the moment of acceptance; nothing is copied
-  or published in 1.0 (OP-16). A later edit to the card's files after acceptance belongs to no card until a card
-  starts on them.
-- **Authorship:** the agents whose edits made the card's files (above).
-- **Hashing is incremental:** a cache of (path, size, modification time) → content hash per project, so only files
-  whose size or time changed are read again. At most 20,000 files and 2 GB per card; beyond that the revision is
-  unknown and the option row says to narrow the deliverables.
+- **Acceptance** (None's integration): the approved revision is accepted only if **the card's paths still hash to it
+  when it is accepted**; if anything in them changed since the pass or the approval, the pass is stale and the card
+  goes back to Review (an edit before your approval means you'd approve something you haven't seen). So `Accepted`
+  always names content that was reviewed and is what's in the folder at that moment [HR2's round 2 finding 6].
+  Nothing is copied or published in 1.0 (OP-16). After acceptance, a later edit to those paths belongs to no card
+  until a card starts on them.
+- **Authorship:** the agents whose edits the pre-fill saw; for no-self-review, Hive's records of who worked the card.
+- **Hashing is incremental and write-driven:** a cache of (path, size, modification time) → content hash per
+  project, which a watcher write event for a path invalidates even when size and time didn't change. At most 20,000
+  files and 2 GB per card; beyond that the revision is unknown and the option row says to narrow the paths.
 
 #### 16.3.4 Paper check: Jujutsu, Mercurial, Subversion
 
@@ -1104,8 +1130,8 @@ says how the platform would answer, and where it is weaker than Git.
 | isolation | `jj workspace add` (each workspace has its own working-copy commit). | `hg share -B` (bookmarks shared with the source: without `-B` a share keeps its own bookmarks and the target couldn't be read; [share](https://www.mercurial-scm.org/help/commands/share)). | A second checkout. |
 | integration | Rebase onto, or a merge commit with, the target bookmark; the **result revision** is the new commit. | `hg merge` + commit (or `hg rebase`); the result is the new changeset. | `svn merge` + commit (or commit straight to trunk). |
 | advance (atomic) | `jj bookmark set <target> -r <result>`: jj operations are atomic, and two concurrent ones never lose an update; a racing change leaves a **conflicted bookmark**, which `advance` reports as `Moved(actual)`. | **Weaker:** no compare-and-swap for a bookmark on the command line ([bookmarks](https://www.mercurial-scm.org/help/commands/bookmarks)). The adapter checks the bookmark, moves it, reads it back, and reports `Moved(actual)` if another writer moved it; it holds Hive's repository lock, which excludes Hive but not other clients. To settle when hg is built (git-support's sibling list). | The commit itself is the advance, and the server refuses an out-of-date working copy (`svn: E155011`), which is a compare-and-swap. |
-| containment | jj integrates by **rebase**, which rewrites revision ids, so ancestry (`jj log -r 'R & ::T'`) answers only for a merge; the main test is a target commit with the same exact key (the change id as a hint), as Git's squash row. | Ancestry for `hg merge`; after `hg rebase`, the obsolescence markers (`hg log -r 'successors(R)'`, with evolve) or the same exact key. | R ≤ the target's head on the same branch path; merges through `svn:mergeinfo`. |
-| sameness | **The same diff** (the exact change key over `jj diff --git`), the change id only a hint [#1112 B]. | The exact key over `hg diff --git` (or `hg export` without headers). | The exact key over the change's paths; there is no rebase, so mostly exact. |
+| containment | jj integrates by **rebase**, which rewrites revision ids, so ancestry (`jj log -r 'R & ::T'`) answers only for a merge; the main test is a target commit that replays the change exactly (the change id as a hint), as Git's squash row. | Ancestry for `hg merge`; after `hg rebase`, the obsolescence markers (`hg log -r 'successors(R)'`, with evolve) or an exact replay. | R ≤ the target's head on the same branch path; merges through `svn:mergeinfo`. |
+| sameness | Replay: rebase R1's change onto the new base in a temporary workspace and compare trees (the change id only a hint) [#1112 B]. | Replay with `hg graft` or a merge in a temporary share, comparing manifests. | Exact revision; there is no rebase. |
 | dirty | **jj has no dirty state:** the working copy is a commit that commands snapshot. `submit.clean` means the working-copy commit `@` is empty (its changes were moved into the card's revision), and the watcher debounces `op_heads` so every snapshot isn't a new revision. | `hg status`. | `svn status`. |
 | authorship | Author field + Hive's records. | Same. | Same. |
 | observe | `.jj/repo/op_heads` (each operation), read with `--ignore-working-copy`. | `.hg/store`, `.hg/dirstate`, `.hg/bookmarks`. | `.svn/wc.db`. |
@@ -1166,20 +1192,22 @@ head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1
 |---|---|---|
 | `Started` | folder (slot lease or `project`), line, base revision, target, ruleset, builder agent, kind (code / no-code); None: manifest | The start intent or the user's Start passes its rules. |
 | `Adopted` (observed) | as `Started`, what could be read | The upgrade, for a card in flight (§16.4.1). |
-| `Submitted` | **submission id** (its seq), revision (none for no-code), base, head, exact key, candidate key, files changed (#945), round, the decision generation the builder had received, same-revision (bool), summary comment id | The submit intent passes (§16.8.1). |
+| `Submitted` | **submission id** (its seq), revision (none for no-code), base, head, candidate key, files changed (#945), round, the decision generation the builder had received, same-revision (bool), summary comment id | The submit intent passes (§16.8.1). |
 | `CheckRan` | name, command, revision, result (passed/failed/stopped), run id, duration, by, counted (bool), why not counted | A run naming the card finishes (§16.13, P3) [#1119 c]. |
 | `ReviewStarted` | reviewer, submission id, revision, review copy | The start-review intent (§16.8.1). |
 | `Verdict` | reviewer, submission id, revision, pass/fail, kind of fail (content / explanation), round, decision generation the reviewer had received, comment id | The verdict intent passes. |
-| `CarriedOver` | from revision, to revision, exact key | A pass is kept for a later revision that is the same change. |
+| `CarriedOver` | from revision, to revision, how (replay, same revision) |
+| `Updated` | entry id, from revision, to revision, how (merged target in, rebased), carried (bool) | Strict: the queue brought the approved revision up to date on its own ref (§16.9.1). |
+| `CommitAttributed` (observed) | commit, card (or none), how (trailer, only card, unattributed, assigned by the user) | A new commit on a shared folder's line (§16.3.2). | A pass is kept for a later revision that is the same change. |
 | `Stale` | approved revision, current revision, why (another change; a decision since; exact-only) | A newer revision that isn't the same change appears after a pass, or a decision is recorded after it (§16.4.6). |
 | `ApprovalRequested` | request id, kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent, or a rule waiting on the user. |
-| `Approval` | request id, user, gate, revision?, answer (approved / declined / answered), note | The user answers (also a Decision recorded, a pane reply counted under #922). |
-| `IntegrationRequested` | **entry id**, revision, exact key, target, style | The card enters the merge queue (again, after a failure, with a new entry id). |
+| `Approval` | request id, user, gate, submission?, answer (approved / declined / answered), note, decision generation | The user answers the request (in the card, the For you list, or a pane reply counted under #922). An answer is never a `Decision` (§16.4.6). |
+| `IntegrationRequested` | **entry id**, revision, candidate key, target, style | The card enters the merge queue (again, after a failure, with a new entry id). |
 | `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user. |
 | `IntegrationStarted` | entry id, expected target revision, result revision | The queue is about to advance the target (written **before** it does, §16.9.2). |
 | `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool) | The queue's test merge or checks fail. |
 | `Integrated` | entry id?, revision, target, result revision, method, by (hive, agent, outside) | The target moved with the change in it (recorded) or containment found it (observed). |
-| `Accepted` | revision | None's integration. |
+| `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
 | `Refused` | intent or move, rule, message ids, values | A refused intent or move (agents' and the Assistant's; the user's refused drags are not logged unless overridden). |
 | `Override` | rule(s) skipped, move, by (user / assistant), reason | §16.8.4. |
@@ -1188,7 +1216,7 @@ head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1
 | `DecisionsReceived` | agent, generation | The agent received the card's decisions up to that generation (§16.4.6). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
-| `HeadMoved` (observed) | line, from, to, exact key of the new change | A new revision in the card's folder outside an intent. |
+| `HeadMoved` (observed) | line, from, to, candidate key of the new change | A new revision in the card's folder outside an intent. |
 | `TargetMoved` (observed) | target, from, to | |
 | `Gone` (observed) | what (line, folder, repository, deliverables) | |
 | `LaneChanged` | lane, cards before/after | Hive owns lane lists (§16.11). |
@@ -1221,7 +1249,7 @@ on window focus, when a card is read for a rule, and once at start. Its rules:
 | A new revision after a pass that **is** the same change (a clean rebase, a squash) | `CarriedOver`; the card stays Approved [#1112 B]. With "Exact revision only" (G4), it is `Stale`. |
 | A new revision after a pass that isn't the same change | `Stale`; the card stays in Approved with a **stale** mark until the builder submits again (it then goes to Review); its queue entry is cancelled (`IntegrationCancelled`); the builder is woken, and its lane shows "paused: stale, submit again" [#1120 c; HB3's round 1 finding 8]. |
 | **Integration needs a change** [answering HB3's round 1 finding 2] | Containment and observed integration count only a card with a **non-empty change**: its revision differs from `Started.base` and isn't an ancestor of it. A card just started (its revision is its base, an ancestor of the target) is never found "in the target". |
-| A card with its own line, in **Review or Approved**: the approved or submitted revision (or the same change) found in the target, not by Hive | `Integrated` (observed, `by: outside`) → Done; the queue cancels its entry; the lane counts it [#1112 C]. |
+| A card with its own line, in **Approved**: the approved revision (or one that replays to it) found in the target, not by Hive | `Integrated` (observed, `by: outside`) → Done; the queue cancels its entry; the lane counts it [#1112 C]. |
 | A card with its own line, in **Review**, whose revision was merged by hand before its review passed | `Integrated` (observed) → Done, with an **outside the rules** mark naming the rules skipped (shown like an override). Hive never moves it back (OP-25) [#1112 C]. |
 | A card in **Active** (or Todo) with some of its work found in the target (a partial hand merge) | A **merged outside, in part** mark with the revision; the card stays where it is and its agent goes on. Its later change is computed from its line as usual; the merged part is then in the target and drops out of the diff [HB3's round 1 finding 2]. |
 | A card's line deleted **after** Done | Nothing: its facts and pin (§16.9.3) keep what was reviewed, and no slot is recreated [HB3's round 1 finding 11]. |
@@ -1249,9 +1277,10 @@ side effects touch git, processes and other agents), so they are tied by **durab
 - **The target advance** is the one step that can't be repeated blindly. The queue writes `IntegrationStarted`
   (expected target revision, result revision) and commits it, **then** advances the target, **then** writes
   `Integrated`. After a restart, an entry with `IntegrationStarted` and no outcome is reconciled from the platform,
-  never assumed: the target at the result revision (or containing the change) → `Integrated` with `source: observed`;
-  the target still at the expected revision → the entry runs again from the test merge; the target anywhere else →
-  `IntegrationFailed` (reason target moved), and the card's containment decides as usual.
+  never assumed: for a target not checked out, the ref at the result → `Integrated` (`source: observed`), at the
+  expected revision → the entry runs again from the test merge, anywhere else → `IntegrationFailed` (target moved) and
+  containment decides; for a checked-out target, the journal's phases and §16.9.2's recovery table, whose last row is
+  a terminal "needs you" state that pauses the queue for that target.
 - **Removing an entry** writes `IntegrationCancelled`; a rebuilt queue skips it, so a removed card can't merge after a
   restart.
 
@@ -1267,15 +1296,33 @@ these moments).
   (`submit.decisionsReceived`): "AM-12 has a decision you haven't read: read it, check your work against it, then
   submit."
 - **Verdict** records the reviewer's received generation, and is refused if the reviewer hasn't received the newest
-  (`verdict.decisionsReceived`). A submission made before a newer decision shows "decided since this was submitted"
+  (`review.decisionsReceived`). A submission made before a newer decision shows "decided since this was submitted"
   to the reviewer, who judges whether the work meets it (passing it says it does).
-- **A decision after a pass** makes the pass stale (`Stale`, why: decision since): the card returns to Review for the
-  same revision. The reviewer confirms it with a new verdict on the same submission, or fails it; no new commit is
-  needed (§16.8.1's same-revision rules). Its queue entry is cancelled until then; a test merge already running
-  finishes its checks but doesn't advance the target.
+- **Approvals are not decisions** [HR2's round 2 finding 5]: answering a request (Approve, Decline, a test result, a
+  sign-in) writes `Approval`, never `Decision`, so it can't make the work it approves stale. Only a decision the user
+  records on the card (the card's Decisions) bumps the generation.
+- **Passes and approvals belong to a generation:** each `Verdict` and `Approval` records the generation current when
+  it was given. They count only at the **current** generation: the quorum (G1b) is the number of **distinct reviewers**
+  with a pass on this submission (or a change that replays to it) at the current generation, never the number of
+  `Verdict` rows; `approval.given` needs an `Approval` at the current generation.
+- **A decision after a pass or an approval** makes them stale (`Stale`, why: decision since):
+  - with review in the ruleset, the card returns to **Review** for the same submission; the reviewers confirm it with
+    new verdicts at the new generation (no new commit needed, §16.8.1), and the user's approval, if the ruleset needs
+    one, is asked again after them;
+  - with no review in the ruleset, the card returns to **Active**, its builder woken to check the work against the
+    decision and submit again;
+  - its queue entry is cancelled; a test merge already running finishes its checks but doesn't advance the target.
+- **The last check before the target moves:** the queue re-checks `integrate.approved` (generation included) inside
+  the advance, after the merge checks and before writing `IntegrationStarted` (§16.9.2). A decision recorded after
+  `IntegrationStarted` is too late to stop that merge: the merge completes, and the card gets For you (Decide:
+  "decided after it merged: does it need a follow-up?").
+- **Content-stale and decision-stale differ** [HB3's round 2 finding G]: a new revision that isn't the same change
+  keeps the card in Approved with the stale mark until its builder submits (the builder has work to do); a decision
+  sends it back to Review (the reviewers have work to do). The Approved category reads "approved, or its pass is stale
+  and waits for its builder".
 - **Checks** aren't affected: they are about content, not decisions.
-- The rule is part of review (on whenever a reviewer or the user checks the work) and can't be switched off apart from
-  review [P1].
+- The rule is part of review and approval (on whenever a reviewer or the user checks the work) and can't be switched
+  off apart from them [P1].
 
 ### 16.5 Stages, categories and the piece library
 
@@ -1292,7 +1339,7 @@ Done** (`locales/glossary-1.0.md` §2.2).
 | Todo | Not started. |
 | Active | Being built. |
 | Review | A revision is submitted and waits for, or is in, review or the user's approval. |
-| Approved | The current revision is approved and isn't integrated yet. |
+| Approved | The current revision is approved and isn't integrated yet, or its pass is stale and waits for its builder to submit again (§16.4.6). |
 | Done | Integrated (Git: in the target), or accepted (None), or for a no-code card accepted by its reviewer or the user. |
 
 #### 16.5.2 Stages
@@ -1327,7 +1374,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `start.notBlocked` | The card isn't blocked. | — | G14 / N6 (with "Cards start only when…"); off in all-off, where a blocked card starts with a warning |
 | `start.dependenciesIntegrated` | Every `blockedBy` card is **Done by facts** (integrated or accepted), not just Approved. | containment | G14 / N6 |
 | `start.slotAvailable` | A slot can be lent (or the project folder is the card's folder). | isolation | G11 = slots |
-| `submit.notDuplicate` | This revision (or, for no-code, this card) has no submission still waiting for review or approval, and isn't already approved and unstale. A revision that failed review may be submitted again unchanged, with a note (§16.8.1) [answering HR2's round 1 finding 7]. | revisions | Always |
+| `submit.notDuplicate` | This revision (or, for no-code, this card) has no submission still waiting for review or approval, and no open queue entry. A revision that failed review may be submitted again unchanged, with a note (§16.8.1) [answering HR2's round 1 finding 7 and round 2 finding 1]. | revisions | Always (it can't refuse an ordinary move: it only stops a second copy of a submission already waiting) |
+| `requeue.allowed` | Re-entering the queue with an **unchanged** approved, unstale revision: its last entry ended with `IntegrationFailed` marked `transient` (or was cancelled by a hold or by the user), and fewer than **2** unchanged requeues have followed the last new revision. A conflict, red checks or a failing hook need a new revision. At the limit the card gets For you (Decide: retry once more, take it over, or send it back) [HB3's round 2 finding E]. | integration | Hive merges |
 | `submit.ready` | The revision is ready (no stored conflicts; jj's snapshot taken) (§16.3.1). | revisions | Always (code cards) |
 | `submit.clean` | The card's folder has no uncommitted changes (shared folder: none in the agent's own paths). | revisions | Any rule that needs the card's change: review, "Committed is done", Hive merges, the agent merges |
 | `submit.trailer` | Shared-folder commits carry the card's trailer. | revisions | G11 = project folder, another agent works in the folder, and a rule needs the card's change |
@@ -1339,12 +1387,11 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `review.decisionsReceived` | The reviewer has received every decision on the card (§16.4.6). | — | Any review |
 | `verdict.reviewing` | The reviewer started a review (`ReviewStarted`) of the submission it names. | — | Any reviewer agent |
 | `verdict.currentSubmission` | The verdict names the latest submission. (A head that moved since is handled by recording the verdict and then `Stale`, §16.4.4, not by refusing it.) | revisions | Any reviewer agent |
-| `approval.given` | An `Approval` (approved) answers the request the rule made, for this submission. | — | G1/N1 "You" or "…then you", G10 |
-| `integrate.approved` | The revision has the required passes (quorum, G1b) and approvals, none stale. | sameness | G1 ≠ No review |
+| `approval.given` | An `Approval` (approved) answers the request the rule made, for this submission (or one that replays to it), at the current decision generation. | — | G1/N1 "You" or "…then you", G10 |
+| `integrate.approved` | The revision has passes from the required number of distinct reviewers (G1b) and the approvals its ruleset needs, all at the current decision generation, none stale. | sameness | G1 ≠ No review |
 | `integrate.upToDate` | The revision contains the target's current head. | containment | G8 (strict) |
 | `integrate.checksPassed` | The merge checks passed on the test merge (target + change). | integration | G9 |
 | `done.contained` | The revision to finish (the approved one, else the submitted one) or the same change is in the target, and the change is non-empty (§16.4.4). | containment | G5 = Hive merges, the agent merges, or Committed is done |
-| `lane.betweenCards` | A lane's card list changes only while no card of it is Active or in Review. | — | Always (lanes) |
 
 **Actions** (Hive does…):
 
@@ -1410,7 +1457,7 @@ before any translation, then translated once into the 7 locales per `locales/glo
 | N6 | **Cards start only when the cards they wait for are done** | On / Off | `start.dependenciesIntegrated`. |
 | N7 | **File locks** | Today's setting (§5 Agents), shown here | Its owner stays Settings → Agents & Worktrees; shown read-only with a link [#966: one owner per switch]. |
 
-Done for None: an `Accepted` revision; with no review, the builder's "done" intent accepts the current revision.
+Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's **submit** accepts the revision it submits (§16.7.2's Finish).
 
 #### 16.6.2 Git's options
 
@@ -1511,7 +1558,7 @@ are, `tasks.ts:854`, `:705`, `:752`): 1.0 closes that.
 
 | Actor | How | Refused |
 |---|---|---|
-| Project agent | Intents only (§16.8). `hive_update_task` keeps edits that aren't moves (comments, labels, blocked, description, links); its `column` is refused with the intent to use instead [#1112 E]. | By the ruleset's guards; never overrides. With every option off the ruleset has no guards on these moves, so intents always succeed: start → submit → Done, the free flow of today [#1112 down]. |
+| Project agent | Intents only (§16.8). `hive_update_task` keeps edits that aren't moves (comments, labels, blocked, description, links); its `column` is refused with the intent to use instead [#1112 E]. | By the ruleset's guards; never overrides. With every option off the ruleset has no guard that can refuse an ordinary move (only `submit.notDuplicate`, which stops a second copy of a waiting submission, and `submit.ready`, never false for Git or None), so intents always succeed: start → submit → Done, the free flow of today [#1112 down]. |
 | The user (window) | Drag or menu, as today. | Never refused: a move that skips a rule asks first, then records an `Override` (§16.8.4) [#1112 C]. A move that skips nothing just moves. |
 | The Assistant | `hive_update_task` column moves, within Control, as today; a move that skips a rule needs `override: { reason }` explicitly, else refused with the rules it would skip [note §3]. | |
 | Hive | Actions (§16.5.3) and reconciliation. | — |
@@ -1529,7 +1576,7 @@ path to Done, and the rest are contradictions refused when the options are saved
 | **F** folder (G11) | slots · project folder (Git); project folder (None) |
 | **K** card kind | code · no-code |
 
-**Contradictions:** M = Hive merges or the agent merges needs F = slots; M = committed is done needs F = project
+**Contradictions:** M = Hive merges or the agent merges needs each card in its own folder (F = slots, or before P7 an agent's worktree, §16.19.1); M = committed is done needs F = project
 folder (the folder's line is the target); G10 is hidden when R includes you; Q = 2 needs R with an agent.
 
 **The moves**, for every combination (a move not listed for the current stage is refused with the move that is):
@@ -1549,8 +1596,8 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Approved | **submit** after a stale pass | as Active's submit | Review |
 | Merging | queue: merged | `integrate.*`, `done.contained` | Done · `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
 | Merging | queue: returned | — | Active · `returnToBuilder` (§16.9) |
-| Active | **submit** after a queue failure, same approved unstale revision | `submit.notDuplicate`, `integrate.approved` | Merging · `enqueue` (no review, no round) |
-| any | a decision recorded | — | `wakeOnDecision`; an Approved or Merging card: Review (stale, why: decision since) and `cancelEntry` |
+| Active | **submit** after a queue failure, same approved unstale revision | `submit.notDuplicate`, `requeue.allowed`, `integrate.approved` | Merging · `enqueue` (no review, no round) |
+| any | a decision recorded | — | `wakeOnDecision`; an Approved or Merging card: Review if the ruleset has review, else Active (stale, why: decision since), and `cancelEntry` (§16.4.6) |
 
 **Finish** (after review, or straight after submit with R = none):
 
@@ -1560,8 +1607,9 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | code, the agent merges | Approved; the builder merges and reports (above). G10 asks first, as above. |
 | code, committed is done | `done.contained` on the folder's line (its revision is on the target by construction) → Done · `recordIntegrated (method: committed)`. A Pair project in its folder thus reviews before Done; the work is on the target meanwhile, which the option's description says. |
 | code, not checked | R ≠ none: Approved, then report merge (unchecked) or the user's move. R = none: Done. |
-| None (any K) | `accept` → Done. |
-| no-code (Git) | Done · `recordIntegrated` is not written; the card is Done by its accepted submission. |
+| None, code | `accept`: `Accepted` of the submitted revision if the card's paths still hash to it, else Stale → Review (§16.3.3) → Done. |
+| None, no-code | `Accepted` of the submission → Done. |
+| no-code (Git) | `Accepted` of the submission → Done; no `Integrated` fact. |
 
 **Stale passes:** an Approved card whose pass becomes stale (§16.4.4) stays Approved with the mark (a Merging one's
 entry is cancelled and it shows in Approved), until its builder submits again → Review.
@@ -1605,7 +1653,7 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 |---|---|---|---|
 | **start** | The card's builder (or an agent given it) | card | Todo → Active. Replies with the folder (slot path), line, base and target. |
 | **put back** | The builder | card, why | Active → Todo; the slot is released. |
-| **submit** | The builder | card, summary (comment), revision (optional: default the folder's head; must equal it), note (required when the revision was already reviewed: what changed in the answer, if not the code) | → Review, or → Finish without review, or → Merging after a queue failure. |
+| **submit** | The builder | card, summary (comment), revision (optional: default the card's revision: its folder's head for a card with its own line, its newest attributed commit in a shared folder, §16.3.2), note (required when the revision was already reviewed: what changed in the answer, if not the code), paths (None: the card's paths, pre-filled, with any unclaimed changes to add or leave, §16.3.3) | → Review, or → Finish without review, or → Merging after a queue failure. |
 | **start review** | A reviewer | card, submission (optional: default the latest) | `ReviewStarted`; replies with the review copy's path, the revision, base and files. |
 | **verdict** | A reviewer | card, submission, pass/fail, kind of fail (content / explanation), comment | §16.7.2 |
 | **report merge** | The builder (M = the agent merges, or not checked) | card, result revision | Hive checks containment (unless not checked), then Done. |
@@ -1616,9 +1664,10 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 **The same revision again** [P1, answering HR2's round 1 finding 7]: a revision that failed review may be submitted
 again unchanged, with a note (the reviewer asked for an explanation, or a check failed for a reason outside the
 code); it is a new submission and its review a new round. After a **queue failure**, an approved and unstale revision
-is submitted again straight into the queue: no review, no round (a transient check, a network failure). A strict
-return (not up to date) is answered by updating the line; the new revision is the same change, so its approval carries
-over and it goes back into the queue. Only verdicts count as rounds, fails of either kind; queue failures and the
+is submitted again straight into the queue, no review, no round, but only after a failure marked transient (a check
+that didn't start, a network error, a timeout) and at most twice in a row (`requeue.allowed`); a red check is a result,
+so it needs a new revision, or the user's **Retry merge** on the queue card (recorded as an override) for a check the
+user knows is flaky [HR2's round 2 finding 1, HB3's E]. Only verdicts count as rounds, fails of either kind; queue failures and the
 user's approvals don't (a user's decline does).
 
 The `review` parameter of `hive_update_task` maps onto the intents for one release (P4): `start` onto **start review**
@@ -1698,10 +1747,13 @@ report it this way rather than retry.
 2. Check `integrate.approved` (quorum, approvals, not stale), and **check containment first**: if the change is
    already in the target (merged by hand meanwhile), record `Integrated` (observed) instead of making an empty merge
    [HB3's round 1 finding 19].
-3. **Strict** (G8), redefined [P1, answering HB3's round 1 finding 4]: if the revision doesn't contain the target's
-   head, the queue **brings it up to date itself** in its worktree (merging the target into the card's line, or
-   rebasing it, per the merge style); if the result is the same change, the pass carries over (G4) and the entry goes
-   on; a conflict returns the card. The builder is no longer sent round on every merge race. (OP-18: Team's default.)
+3. **Strict** (G8), redefined [P1, answering HB3's round 1 finding 4 and round 2 finding B]: if the revision
+   doesn't contain the target's head, the queue **brings it up to date itself, on its own ref only**: in its worktree
+   it merges the target into the approved revision (or rebases it, per the merge style) and keeps the result on
+   `refs/hive/queue/<entry>`, pinned; it **never moves the card's line**, which is checked out in the builder's leased
+   slot. If the result replays to the approved change (§16.3.2), the pass carries over (an `Updated` fact records the
+   new revision and why) and the entry goes on with it; a conflict returns the card. The builder's slot is unchanged,
+   and when the card is Done its line is no longer needed. (OP-18: Team's default.)
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
    at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
    message `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`;
@@ -1725,50 +1777,76 @@ report it this way rather than retry.
 7. Record `Integrated` (the result revision, method), move the card to Done, release its slot, end the lane if done.
 8. **Conflict or red checks:** `IntegrationFailed` with the files or the check output and log, `transient` when the
    failure was the environment (a check that failed to start, a network error, a timeout) rather than a result; the
-   card goes to Active, back to its builder. A conflict needs a new revision (review again unless it's the same
-   change); a transient failure or a flaky check is resubmitted unchanged, straight into the queue (§16.8.1)
+   card goes to Active, back to its builder. A conflict, red checks or a hook failure need a new revision (review
+   again unless it's the same change); a transient failure is resubmitted unchanged, straight into the queue, at most
+   twice (`requeue.allowed`, §16.8.1)
    [note §9; answering HR2's round 1 finding 7]. **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target
 
-[P1, answering HR2's round 1 finding 9] The advance is a compare-and-swap: the target moves from the expected
-revision to the result, or not at all, and nothing else changes.
+[P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected
+revision to the result, or leaves it where it was. Two cases, with different guarantees, stated exactly.
 
-- **Target not checked out in any folder:** `git update-ref refs/heads/<target> <result> <expected>`, which fails if
-  the ref isn't at `<expected>`.
-- **Target checked out in a folder** (the project folder usually has `main`). Hive holds the repository lock and the
-  folder fence (#646: nothing of Hive's is typed into the folder meanwhile), and waits while an agent **builds**
-  there: holds file locks in that folder or has a run going with that folder as its working folder. An idle agent, or a
-  reviewer whose session lives there but works in a review copy, doesn't hold the queue up [HB3's round 1 finding 3].
-  Then:
-  1. `git symbolic-ref -q HEAD` names `refs/heads/<target>`, else the entry waits ("main isn't checked out in the
-     project folder any more") and the queue looks again where the target is checked out;
-  2. `git rev-parse refs/heads/<target>` is `<expected>`, else back to the test merge;
-  3. `git read-tree -m -u <expected> <result>`: a two-tree update of the index and the files the merge changes. Git
-     refuses it, changing nothing, if any of those files has local changes, so the user's uncommitted edits are never
-     touched; the entry then waits with "your uncommitted changes in tasks.ts block the merge into main";
-  4. `git update-ref refs/heads/<target> <result> <expected>`: the swap itself. If another client moved the target
-     between 2 and 4, the swap fails; Hive undoes step 3 (`git read-tree -m -u <result> <expected>`, refused the same
-     way if anything changed meanwhile) and goes back to the test merge;
-  5. it checks the folder afterwards: HEAD still names the target, at `<result>`, and the index matches it for the
-     merged files.
-- **What can't be excluded:** another git client acting in the same instant between steps 1 and 4 (Hive's lock and
-  fence exclude Hive's own actions only). Steps 3 and 4 refuse rather than overwrite in every such race except one: a
-  branch switch to a branch whose files match the expected revision's exactly, between steps 1 and 3. Step 5 detects
-  it; then the queue stops (paused), records what it found, and tells the user with the exact state, and never
-  repairs on its own. `git merge --ff-only` is not used: it moves whatever HEAD the folder has, with no expected
-  value [HR2's round 1 finding 9].
+**Target not checked out in any folder** (`git worktree list` shows no folder on it): one command,
+`git update-ref refs/heads/<target> <result> <expected>`, which git applies only if the ref is at `<expected>`. This is
+a true compare-and-swap: nothing else is touched, and a crash leaves the ref either moved or not.
+
+**Target checked out in a folder** (the project folder usually has `main`). Moving the branch means updating that
+folder's index and files too, which git can't do in one atomic step with an expected value (`read-tree` updates the
+index and files, `update-ref` moves the ref; HR2's probe showed the state between them: HEAD at the expected revision,
+index and files at the result). So it is a **journaled** operation, with conditions checked before anything is
+touched:
+
+- **Before touching the folder** (Hive holds the repository lock and the folder fence: #646, nothing of Hive's is typed
+  into the folder meanwhile), all of these must hold, else the entry **pauses** with the reason and nothing is
+  changed:
+  - no agent **builds** there: holds file locks in that folder or has a run going with it as its working folder (an
+    idle agent, or a reviewer whose session lives there but works in a review copy, doesn't count) [HB3's round 1
+    finding 3];
+  - `git symbolic-ref -q HEAD` names `refs/heads/<target>`, and the ref is at `<expected>`;
+  - **the index equals the expected revision's tree** (`git diff --cached --quiet <expected>`: nothing staged), and none
+    of the files the merge changes has unstaged changes (the rest of the user's edits are left as they are). The
+    journal records the list of files the merge changes.
+- **The journal** is the `IntegrationStarted` fact (§16.4.5) plus its phase, written and committed before each step:
+  1. `phase: files`, then `git read-tree -m -u <expected> <result>` (index and the listed files to the result);
+  2. `phase: ref`, then `git update-ref refs/heads/<target> <result> <expected>`;
+  3. `Integrated`.
+- **Failures while running** (git refuses, or the swap finds the ref moved): Hive rolls the files back with
+  `git read-tree -m -u <result> <expected>` (`phase: rollback`), which git refuses rather than overwrite if anything
+  changed meanwhile; then back to the test merge. A rollback git refuses is a **terminal state** (below).
+- **Recovery after a crash,** from the journal, never assumed: Hive reads HEAD's branch, the ref, the index tree for the
+  listed files and their working copies.
+
+  | Journal phase | Found | Then |
+  |---|---|---|
+  | `files` | ref at `<expected>`, index and files at `<expected>` (read-tree never ran) | Run from step 1 again. |
+  | `files` or `ref` | ref at `<expected>`, index and listed files at `<result>` (read-tree ran, swap didn't) | Re-check the conditions for the swap (branch, ref); if they hold, run step 2 (the result is the journaled commit, never a new merge, so hooks or time can't make it differ). If the ref moved meanwhile, roll the files back as above. |
+  | `ref` | ref at `<result>` | Write `Integrated` (observed). |
+  | `rollback` | index and files at `<expected>` | Back to the test merge. |
+  | any | anything else (the branch switched, files edited, a rollback refused) | **Terminal: needs you.** The queue pauses for that target, the card shows the exact state (branch, ref, the listed files and which side each is at) and the commands that finish or undo it; Hive changes nothing more on its own. |
+
+- **What this does not guarantee** [HR2's round 2 finding 4]: another git client acting in the same instant, between
+  Hive's checks and `read-tree`, is outside Hive's lock. git's index lock and `read-tree`'s refusals stop it from
+  overwriting a changed file; the one case they don't stop is **a branch switch in that instant to a branch whose
+  index matches the expected tree for every listed file**: then the merged files would be written into that other
+  branch's working copy, as uncommitted changes (no commit or ref of it moves). Hive detects it right after (HEAD no
+  longer names the target), pauses with the terminal state above, and lists the files to restore. Whether to accept
+  that residue for automatic merges into a checked-out target, or to ask the user before each such update, is
+  **OP-40**; P5 ships the journal and its crash-injection tests (before and after each step and the rollback) either
+  way, and until they pass the checked-out case asks the user (**Update main now** on the queue card).
+- `git merge --ff-only` is not used: it has no expected value [HR2's round 1 finding 9].
 
 #### 16.9.3 Around the queue
 
-**Locks** [note §12; HB3's round 1 finding 3]: a **repository lock** across processes (the dev and installed Hive
-can't merge at once): a lock file in the repository's common git dir (`hive-merge.lock`: pid, process start time,
-Hive's profile), taken with exclusive create, stale when its process is gone. It **replaces** today's `.git/hive-merge`
-lock, which is in-process only (`withFileLock`, `fsutil.ts:512`), and the Git view's actions (§8) take it too. It is
-held only while the queue **writes**: creating the test merge (step 4) and advancing the target (§16.9.2), seconds
-each. The merge checks run without it (they can take an hour on Team), so the user's Git actions aren't held up; the
-compare-and-swap catches anything that moved meanwhile. One queue per target still runs one entry at a time.
+**Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G]: a **repository lock** across processes (the dev
+and installed Hive can't advance a target at once): a lock file in the repository's common git dir
+(`hive-merge.lock`: pid, process start time, Hive's profile), taken with exclusive create, stale when its process is
+gone. It **replaces** today's `.git/hive-merge` lock, which is in-process only (`withFileLock`, `fsutil.ts:512`), and
+the Git view's actions (§8) take it too. It is held **only for the advance** (§16.9.2), seconds. The test merge
+(which runs the repository's hooks and may wait on signing) and the merge checks (an hour on Team) run without it:
+they write only the queue's worktree and `refs/hive/queue/*`, and the advance's expected value catches anything that
+moved meanwhile. A paused entry holds no lock. One queue per target still runs one entry at a time.
 
 **Pins** [HB3's round 1 finding 11]: every submitted revision is pinned by a ref, `refs/hive/cards/<key>/<n>` (the
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose
@@ -1980,27 +2058,35 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
 A finished run naming a card and revision writes `CheckRan`. The gates read the same facts the panel shows, so they
 agree by construction.
 
-**When a run counts for a revision** [P1, answering HR2's round 1 finding 5]: a green run proves something only about
-content it ran on, so a run counts for a configured check only if all of these hold, and is otherwise recorded with
+**When a run counts for a revision** [P1, answering HR2's round 1 finding 5 and round 2 finding 2, HB3's F]: a green
+run proves something only about content it ran on. A run records its **tested checkout** (the revision checked out
+where it ran) and counts for a card's submission only if all of these hold; otherwise it is recorded with
 `counted: false` and why:
 - it was started as that check: `hive-progress --check <name> [--card AM-12]` runs **the project's configured command
   for that name** (the agent doesn't pass the command), so `npm run typecheck && npm run lint` or `npx vitest run`
   never has to match a string; a run without `--check` counts only if its command is exactly the configured one
   [HB3's round 1 finding 17];
-- an explicit `--revision` equals the folder's head when the run starts (else it is refused at once, "a3f2c1d isn't
-  what's checked out here");
-- the folder was clean when it started (§16.3.2's dirty), and is clean and at the same head when it ends;
+- **the tested checkout contains the card's revision:** for a card with its own line, it *is* the revision; in a
+  shared folder, the card's revision is an ancestor of it (other cards' later commits may be in it too, which the
+  option's description says). An explicit `--revision` must equal the checkout at the start (else refused at once,
+  "a3f2c1d isn't what's checked out here");
+- the folder was clean when it started (§16.3.2's dirty), and is clean and at the same checkout when it ends;
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
-  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it;
-- **None:** the deliverables' hash at the start and at the end equal the revision, and the watcher saw no write to a
-  deliverable in between.
+  agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it.
+  Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them;
+- **None:** the card's files (§16.3.3) hash to the submitted revision at the start and at the end, and the watcher saw
+  no write to a deliverable in between.
 
-**Where checks run.** Merge checks always run in the queue's own worktree, which no one else writes in (§16.9.1).
-Pre-review checks run where the builder runs them (its slot, or the shared folder) and count under the rules above;
-in a shared folder, another agent's edit during the run makes it uncounted, which is the honest answer. A reviewer's
-runs in a review copy count for the revision it holds (a review copy is leased to one reviewer for one submission and
-no one else writes in it, §16.10.5). Hive running pre-review checks itself in a review copy is OP-27.
+**Where checks run, and the remedy when a folder is busy.** Merge checks always run in the queue's own worktree, which
+no one else writes in (§16.9.1). Pre-review checks run where the builder runs them (its slot, or the shared folder)
+and count under the rules above. In a shared folder, another agent's edit during a run makes it uncounted, which is
+the honest answer, so a refusal always offers a remedy that can be met: **`hive-progress --check <name> --isolated`**
+runs the check in a **check copy**, a detached worktree at the card's revision from the same warm pool as review
+copies (§16.10.5), leased to that run and written by nothing else, so it counts whatever happens in the folder. The
+refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
+review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
+running again when the deliverables are quiet, which the refusal says. Hive running pre-review checks itself is OP-27.
 
 The Progress panel stays; its 1.0 changes per phase are on the phase cards and are part of this spec:
 - **P3** [#1119 c]: run rows show "AM-12 · a3f2c1d" (links the card, copies the revision); details show Card, Revision
@@ -2067,13 +2153,29 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 **The migration.** One schema step, backed up first (`db.ts`, `.hive/backups`): card tables, keys and aliases, the
 fact log, actions, rulesets, typed tables for sessions, lanes, watches and deliveries.
 - **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? A 0.9 Hive can then open it read-only. A
-  backup is kept."), and refuses while another Hive process has the workspace open (its lock in the workspace's
-  `.hive`), saying which.
+  backup is kept.").
+- **No other Hive may have the workspace open while it runs** [HB3's round 2 finding D, HR2's round 2 finding 10].
+  0.9.x writes no workspace presence marker, and its single-instance lock is per profile (`index.ts:115`), so the dev
+  and installed Hive can't see each other that way. What every running Hive does hold is a connection to the
+  workspace's `hive.db` for as long as the workspace is open. So the migration opens `hive.db` with SQLite's
+  `locking_mode=EXCLUSIVE` and takes the exclusive lock **for the whole migration**, not one transaction: SQLite grants
+  it only when no other connection has the file open, and while it is held no other process can open it. If it can't
+  be had, the migration doesn't start and says "Another Hive has this workspace open: close it first". After the
+  migration, a 0.9 Hive opening the file sees a newer schema and opens it read-only (`db.ts:147`), as today. P3
+  proves this with a two-process test (a 0.9 build holding the workspace, a 1.0 build migrating) before relying on
+  it; if SQLite's lock can't be relied on for the WAL setup Hive uses, the fallback is a presence marker added to
+  0.9.3 while it is still in RC, which is outside this lane and needs Darren's say (OP-41).
+- From 1.0 on, every Hive also writes a **workspace presence marker** (`.hive/open/<profile>.json`, pid and a
+  heartbeat), so later migrations and the queue's lock have a second signal.
 - **A way back:** Help → **Restore the 0.9 board backup…** puts the pre-migration backup back (after its own backup of
   the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted.
 - **Two Hives on one workspace** (the dev and the installed one, after the migration): both observe the platform, so
-  observed facts are idempotent: a unique key (card, kind, revision, target) makes a second identical observation a
-  no-op.
+  an observation is deduplicated as **the same transition**, not the same value [HR2's round 2 finding 7, HB3's G]:
+  every observed fact names the observed fact it follows for that card and kind (`prev`: its seq, or the cycle's
+  `Started` for the first), and (card, kind, prev) is unique. Two processes seeing the same change compute the same
+  `prev`, so the second write is a no-op; a real later change (A→B→A→B) follows a different fact and is written. An
+  observed `Integrated` is also unique per cycle and entry (card, the cycle's `Started` seq, entry id or revision), so
+  reopening a card and merging the same revision in a new cycle is recorded again.
 
 **Old cards** (§16.4.1): Done, On Hold and Todo cards get no facts (**before 1.0**). Cards in flight get evidence, never
 an invented history:
@@ -2128,7 +2230,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S15 | G12 on → a commit authored with a personal email → submit refused `submit.identity` with the fix (after setting the identity: `git commit --amend --no-edit --reset-author` for the newest commit; for several, `git rebase --exec "git commit --amend --no-edit --reset-author" <base>`). | #809 | Git |
 | S16 | An agent moves a card to Done with `hive_update_task` → refused with the intent to use. The user drags it to Done with no merge → asked, `Override` recorded, mark shown. | Done = merged | Git |
 | S17 | The agent merges, Hive checks → the builder reports a merge whose commit isn't in the target → refused `done.contained`. | lane mergeCommit | Git |
-| S18 | None, review by "a reviewer agent, then you" → pass → For you → the user approves → Accepted → Done. An edit to a deliverable after the pass → a new revision → Stale. | None | None |
+| S18 | None, review by "a reviewer agent, then you" → pass → For you → the user approves → Accepted → Done. An edit to one of the card's paths after the pass and before the approval → acceptance refused, Stale → Review; an edit outside its paths changes nothing. | None, HR2 r2 f6 | None |
 | S19 | The options change while a lane runs → the lane's cards keep their ruleset ("old rules"); the next card started after the lane ends uses the new one. | switching | Git |
 | S20 | `.git` is removed → Git's rules hold (unknown); the tab offers None. A None project gets `git init` → offered Git, from the next card. | detection | Git, None |
 | S21 | Assistant off: the user starts a lane from the board, the loop runs to a pass, the queue merges, the lane ends verified; a blocked card is answered from the card. | #1117 solo | Git |
@@ -2140,11 +2242,11 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S27 | The target moves between the queue's test and its advance → the entry is tested again; it never advances an untested target. Both with the target checked out nowhere and checked out in the project folder. | queue race | Git |
 | S28 | The dev and the installed Hive both try to merge into one repository → one waits on the lock. | cross-process | Git |
 | S29 | Pair, everyone in the project folder (line = target), Assistant off; two cards, their agents' commits interleaved, each with its trailer → no commit moves either card to Done; each card's change is only its own commits; each is reviewed, then Done. A commit without a trailer while the other agent works there → submit refused `submit.trailer` with the amend command. | HR2 r1 f1 | Git |
-| S30 | Approved → an amend that changes only whitespace in an added line → `Stale` (exact key differs although patch-id is equal). The same for a file mode change and a binary file change. | HR2 r1 f4 | Git |
+| S30 | Approved → an amend that changes only whitespace in an added line → `Stale` (the replay's tree differs although patch-id is equal). The same for a file mode change, a binary file change, an edit moved from the first of two identical blocks to the second, and a hunk split differently with different content; a clean rebase onto a target that changed other files → `CarriedOver`. | HR2 r1 f4, r2 f3 | Git |
 | S31 | A pre-review check run: (a) a tracked file edited and restored during it; (b) HEAD moved and moved back during it; (c) `--revision` naming another commit → (a), (b) recorded `counted: false` with why, and submit still refused `submit.checksPassed`; (c) refused at start. None: a deliverable written during the run → uncounted. | HR2 r1 f5 | Git, None |
-| S32 | A review fails for an explanation only → the builder submits the same revision with a note → a new submission and round, reviewed, passed. A merge check fails transiently → the builder submits the approved revision again → straight into the queue, no review, no round. | HR2 r1 f7 | Git |
+| S32 | A review fails for an explanation only → the builder submits the same revision with a note → a new submission and round, reviewed, passed. A merge check fails to start (transient) → the builder submits the approved revision again → `requeue.allowed` holds → straight into the queue, no review, no round; after two unchanged requeues → refused, For you (Decide). A red check → requeue refused (needs a new revision); the user's Retry merge (an override) requeues it once. | HR2 r1 f7, r2 f1; HB3 r2 E | Git |
 | S33 | Restarts: (a) after **Remove from queue** → the entry never merges; (b) after the fact commit and before the reviewer's wake → the wake is delivered once after the restart; (c) after the target advanced and before `Integrated` was written → reconciled as `Integrated` (observed), never merged twice. | HR2 r1 f8 | Git |
-| S34 | Target checked out in the project folder: (a) another client resets `main` between the checks and the swap → the swap fails, step 3 is undone, the entry is tested again; (b) the folder switched to another branch → the entry waits, nothing in that branch changes; (c) the user has uncommitted edits in a file the merge changes → the entry waits with the file named, and the edits are untouched; edits in other files stay too. | HR2 r1 f9 | Git |
+| S34 | Target checked out in the project folder: (a) another client resets `main` between the checks and the swap → the swap fails, the files are rolled back, the entry is tested again; (b) the folder is on another branch at the check → paused before anything is touched; (c) the user has uncommitted edits in a file the merge changes, or anything staged → paused before anything is touched, with the files named, and the edits are untouched; (d) **crash injection** before and after `read-tree`, before and after `update-ref`, and during a rollback → each recovers per §16.9.2's table, or stops in the terminal "needs you" state, never merging twice or leaving the queue running over a half-done folder. | HR2 r1 f9, r2 f4 | Git |
 | S35 | Slot reuse: AM-12's lease on slot-b ends, AM-14 gets slot-b → Resume of AM-12's builder session is refused with why; Resume All skips it and lists it; two launches for slot-b at once → one refused; a restart with AM-14's lease open resumes AM-14's session in slot-b. | HR2 r1 f10 | Git |
 | S36 | Every combination of review, quorum, who finishes, folder and kind (§16.7.2) → walked from Todo to Done, through each refusal's next step, approvals and a quorum of two; every contradiction refused when saved. | HR2 r1 f2 | Git, None |
 | S37 | A lane with AM-12 and AM-13: AM-12 is squash-merged by hand and its line deleted; AM-13 started from the target meanwhile → AM-13's change excludes AM-12's work; AM-12's containment still answers from its stored key; the target is then reset before AM-12 → AM-12 stays Done with the "no longer in main" mark. | HR2 r1 f3 | Git |
@@ -2155,7 +2257,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S42 | Team, target checked out in the project folder; a reviewer's session lives there, idle, reviewing in a review copy → the queue advances. The user has uncommitted edits in a file the merge changes → paused (not returned) with the file named. While an hour of merge checks runs, the user commits from the Git view → not held up; the swap afterwards catches the moved target and retests. | HB3 r1 f3 | Git |
 | S43 | A lane: AM-11 waits in the queue → AM-12 doesn't start ("waiting: AM-11 merging"); AM-11 is returned → its builder fixes it in the same clean slot; AM-12 starts after AM-11 is Done, from a target that contains it. | HB3 r1 f4 | Git |
 | S44 | Solo, Assistant off: one agent in the project folder, no trailers → start, commit, submit → Done ("Committed is done"); its change is `base..HEAD`. | HB3 r1 f5 | Git |
-| S45 | None with two agents on two cards in one folder: B edits files after A's pass → A's pass stays (B's files aren't A's); you accept A's approved revision; A's files changed later belong to no card. | HB3 r1 f6 | None |
+| S45 | None with two agents on two cards in one folder: B edits its own files after A's pass → A's pass stays; B then edits a file in both cards' paths → A's pass goes stale. A formatter run by A's agent writes files while B's agent is active, and the user edits a file in an editor → both listed as unclaimed changes at A's submit; A claims the formatter's files. A hooks-free session's card → an empty pre-fill, its paths declared at submit. | HB3 r1 f6, r2 C; HR2 r2 f6 | None |
 | S46 | Observed squash: an approved card is squash-merged by hand and its line deleted → `Integrated` (method squash) from the stored key; the pin keeps the reviewed revision; deleting the line after Done changes nothing. | HB3 r1 f11, f19 | Git |
 | S47 | Hive's merge with no commit identity → paused, not failed; a commit-msg hook rejecting the message → returned with the hook's output; `commit.gpgsign` waiting for a passphrase → paused with "signing waits for you". | HB3 r1 f11 | Git |
 | S48 | An agent passes `1061` as a card in an intent → refused with the forms `AM-12` and `#1061`. | HB3 r1 f13 | Git |
@@ -2163,19 +2265,44 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S50 | The dev and the installed Hive both open a migrated workspace and observe the same merge → one `Integrated` fact. The migration asks first and refuses while a 0.9 Hive has the workspace open; Restore the 0.9 board backup puts it back. | HB3 r1 f9 | Git |
 | S51 | A Claude Code, a Codex and a Copilot reviewer each build and run tests in a review copy (outside their folder) within their permission mode. | HB3 r1 f10 | Git |
 | S52 | The target moves during every test for an hour → after 3 retests the entry pauses with its reason; a hand merge of the change during a test → recorded as observed, no empty merge commit. | HB3 r1 f19 | Git |
+| S53 | **P3's RC** (facts only): an upgraded workspace with running lanes works as on 0.9.3; cards show their work section; nothing is refused. | HB3 r2 A | Git |
+| S54 | **P4's RC**, Assistant off: the hive project set to "Pair (the agent merges)" with today's agent worktrees; a lane runs: submit (checks counted), review, pass, the builder merges and reports, `done.contained` checks it, the next card starts only then. | HB3 r2 A | Git |
+| S55 | **P5's RC**: the same lane with Hive merges against the agent worktrees: the queue merges the agent's branch at the approved revision; the next card's base is the new merge base. Strict on: the queue updates its own ref, the builder's worktree is untouched, and the builder resumes in it cleanly after a return. | HB3 r2 A, B | Git |
+| S56 | **P7's RC**: a lane running on an agent worktree at the upgrade finishes there; the next lane gets a slot and per-card lines. | HB3 r2 A | Git |
+| S57 | Decisions and approvals: (a) "a reviewer agent, then you": the user's Approve doesn't create a decision and doesn't make the work stale; (b) a real decision after the user's approval → back to Review, the reviewer confirms, the user is asked again, and the old approval no longer counts; (c) two passes from the same reviewer don't make a quorum of 2; (d) You-only and G10 likewise; (e) a decision after the merge checks and before the advance → no advance; after `IntegrationStarted` → merged, then For you; (f) a decision on a no-review card in Merging → back to Active. | HR2 r2 f5 | Git |
+| S58 | Shared folder: A and B unfinished; A submits (its revision is its own newest commit, not HEAD) and goes to Review; B commits → B's change excludes A's commits; A resubmits after a fail; A's check run while B edits → uncounted, refusal offers `--isolated`; the isolated run counts. A commit with no trailer while both are unfinished → unattributed, listed for the user. | HR2 r2 f2; HB3 r2 F, G | Git |
+| S59 | Observations: two Hives watch the same workspace; HEAD goes A→B→A→B → four `HeadMoved` facts, each once; a card reopened and merged again at the same revision → a second `Integrated` in the new cycle. | HR2 r2 f7 | Git |
+| S60 | Migration while a 0.9 Hive (another profile) has the workspace open → refused with "close it first"; with it closed → migrates; the 0.9 Hive opened afterwards → read-only. | HB3 r2 D | Git |
 
 ### 16.19 What each phase builds
 
 | Phase | Card | Builds (sections) | Ends with |
 |---|---|---|---|
-| P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50 at the core (S34, S35, S42, S43, S47, S49, S51, S52 need the queue, slots or the window: P4, P5, P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. |
+| P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. |
 | P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
-| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_change_setting`; the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair. | RC |
+| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_change_setting`; the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
 | P5 Hive merges | #1121 | The merge queue (§16.9), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
 | P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6 | RC |
 | P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7 | RC |
 | Translation review | #1126 | §16.16 | — |
 | P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0 | 1.0.0 |
+
+#### 16.19.1 What each RC offers
+
+[P1, answering HB3's round 2 finding A and HR2's round 2 finding 8] The options exist before all their pieces do, so
+each RC states which values it offers; a value whose piece hasn't shipped isn't shown, and no RC's preset needs a
+later phase. Lanes keep working, and everything works with the Assistant off, in every RC.
+
+| RC | Where cards are built (G11) | Who finishes (G5) | Hive moves to | Scenario |
+|---|---|---|---|---|
+| P3 | (no rules yet: facts only) | (no rules yet) | — | S53 |
+| P4 | **An agent's worktree stands in for a slot**: a builder's existing worktree (one branch per agent, as today) is the card's folder; a card's base is the merge base of that branch with the target when the card starts, which is sound because a lane's next card starts only once the previous one is Done (§16.11.2). Or everyone in the project folder. | Not checked · Committed is done · **The agent merges, Hive checks** (the builder merges each card through today's merge-ready, then reports it; `done.contained` checks it). Hive merges isn't offered. | "Pair (the agent merges)": a reviewer agent, the agent merges, agent worktrees, quick checks before review | S54 |
+| P5 | As P4. | Adds **Hive merges**: the queue merges the agent's branch at the approved revision; after Done the agent's branch carries on, and the next card's base is the new merge base. | Pair (Hive merges) | S55 |
+| P6 | As P4. | As P5. | Pair, set through the Version Control tab; Team offered | — |
+| P7 | **Slots**: per-card lines in leased slots; agent worktrees become slots (§16.10.8): a running lane keeps its folder until it ends. | As P5. | Team (6×6) | S56 |
+
+So the contradiction "Hive merges and the agent merges need each card in its own folder" (§16.7.2) is met before P7
+by an agent's worktree, and "Committed is done" still needs the project folder.
 
 Git capabilities found missing go into the phase that needs them or On Hold labelled git-support [#1117 git]
 (P1's list: §16.20's last table).
@@ -2207,7 +2334,7 @@ Each is written into this section as recommended until answered.
 | OP-19 | Shipped agent templates: the set, names, providers, efforts (#1123 c)? | Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool; models "provider's default". |
 | OP-20 | #1123's decision example says "HB1…HR6 in hive"; #704 gives `HI-B1`. Correct the example? | Yes, `HI-B1…HI-R6`. |
 | OP-21 | Two reviewers per card in Team? | Offered, default 1. |
-| OP-22 | Upgrade options (§16.17): Not checked and no checks, with a reviewer agent where the project has reviewers or lanes (else no review), until a preset is picked? | Yes, with the one-time notice (everything off would strand running lanes: HB3's finding 1). The hive project moves to Pair in P4's RC and to Team in P6's. |
+| OP-22 | Upgrade options (§16.17): Not checked and no checks, with a reviewer agent where the project has reviewers or lanes (else no review), until a preset is picked? | Yes, with the one-time notice (everything off would strand running lanes: HB3's finding 1). The hive project moves to Pair (the agent merges) in P4's RC, Pair in P5's and Team in P7's (§16.19.1). |
 | OP-23 | The UI-screenshot gate as "your OK for cards labelled `ui`" (G10)? | Yes: a label rule is generic and needs no new card field. |
 | OP-24 | Pre-review and merge check commands: suggested from the project's scripts, never guessed silently? | Yes. |
 | OP-25 | Work merged by hand before its rules: a card in Review → Done with an "outside the rules" mark; an Active card → a "merged outside, in part" mark and it stays Active (§16.4.4)? | Yes (decision C: the rules never fight it; HB3's finding 2). |
@@ -2218,13 +2345,15 @@ Each is written into this section as recommended until answered.
 | OP-30 | Users may rename stages? | Yes, per project; categories can't be renamed. |
 | OP-31 | Slot names? | `slot-a`, `slot-b`… |
 | OP-32 | Review copies per project? | 2, configurable. |
-| OP-33 | **Same change**: #1112 B chose `git patch-id --stable`, but patch-id ignores whitespace (HR2 showed two patches differing only in Python indentation share an id), so an amend that changes indentation or a string's spaces would keep its approval. Use an exact change key (whitespace, modes and binaries included) with patch-id only as a quick first test? | Yes (§16.3.2): it keeps the decision's intent (a clean rebase or a squash keeps the approval) without its blind spot. |
+| OP-33 | **Same change**: #1112 B chose `git patch-id --stable`, but patch-id ignores whitespace (HR2 showed two patches differing only in Python indentation share an id), and any hash of changed lines without their positions can't tell which of two identical blocks was changed (HR2, round 2). Decide sameness by **replay** instead: replay the reviewed change onto the new base with git's three-way merge and require exactly the new tree, with patch-id only as a quick first test, and anything unsettled counting as not the same? | Yes (§16.3.2): it keeps the decision's intent (a clean rebase or a squash keeps the approval) and is exact about content and place; its cost is one `merge-tree` per comparison. The fallback, "exact revision only", stays as G4's stricter value. |
 | OP-34 | A lane's cards: separate lines, each from the target's head, reviewed and merged one by one (a card needing an earlier one waits for its merge), rather than one cumulative lane branch merged at the lane's end as today? | Separate lines: the queue merges each approved card, and review covers one card's change. Stacked cards come later. |
 | OP-35 | A decision recorded after a pass makes it stale, so the reviewer confirms the same revision before it merges (§16.4.6)? | Yes: it closes #587 for work already passed; the confirmation needs no new commit. |
 | OP-36 | A lane's next card waits until the previous one is Done (merged), rather than starting while it is in the queue (§16.11.2)? | Yes: a returned card is fixed in a clean slot by the builder who knows it, and the next card starts from a target that has the previous one. The cost is idle time during merge checks; the alternative is a second slot and a fresh conversation for a returned card. |
 | OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 Hive has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | Yes. |
 | OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | Yes, the user only, per change, with the cards listed first. |
 | OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | No RC for P2: there's nothing to install that differs from 0.9.3. |
+| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). |
+| OP-41 | The migration detects a running 0.9 Hive by SQLite's exclusive lock (§16.17). If P3's two-process test shows that can't be relied on, add a workspace presence marker to 0.9.3 (a fix on main, merged forward)? | Yes, only if needed; P3 reports which. |
 
 **Git support (P1's list)** [#1117 git]. Capabilities the spec needs, and where they go:
 

@@ -257,9 +257,11 @@ the side effects as `card_actions` rows (wakes, notifications, the queue, slot w
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
 happens for a write that rolled back, and nothing is lost to a crash after the commit (SPEC §16.4.5).
 
-**Change keys.** The Git adapter computes, per change, the exact key (SHA-256 of the zero-context diff without
-positions, modes and binary blob ids) and the candidate key (`git patch-id --stable`) once, from the endpoints stored
-with `Submitted`, and never recomputes a submitted change from the target's current state (SPEC §16.3.2).
+**Same change.** The Git adapter stores each submission's endpoints (base, head), its candidate key
+(`git patch-id --stable`) and its files, and never recomputes a submitted change from the target's current state.
+Sameness is a **replay**: `git merge-tree --write-tree --merge-base=<B1> <B2> <R1>` must succeed and give `<R2>`'s
+tree; patch-id only rules out a different change quickly; anything unsettled is not the same (SPEC §16.3.2). In a
+shared folder, `CommitAttributed` facts record which card each commit belongs to when it is seen.
 
 **Facts and derived state.** `facts.ts` folds a card's facts into its derived state (stage, revision under review,
 last verdict, stale, overrides, For you). The same fold runs in the spike (P2), main and tests. The card's stored
@@ -278,10 +280,18 @@ with an entry id; cancelled, failed and integrated entries are skipped); the ord
 after reconciling any entry with `IntegrationStarted` and no outcome. The test merge happens in the queue's own
 worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Hive; the target advances by
 compare-and-swap (`update-ref` with the expected old value), and when the target is checked out in a folder, by the
-read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence (never `merge --ff-only`, which has no expected
-value). The repository lock (a lock file in the common git dir, replacing the in-process `.git/hive-merge` lock of
-`withFileLock`, `fsutil.ts:512`) is held only while the queue writes (the test merge, the swap), never across merge
-checks. Every submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived.
+**journaled** read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence: conditions checked before the
+folder is touched (branch, ref, nothing staged, no unstaged changes in the merged files), each phase written to the
+`IntegrationStarted` fact before it runs, a recovery table on restart, and a terminal "needs you" state that pauses
+the queue (never `merge --ff-only`, which has no expected value). The repository lock (a lock file in the common git
+dir, replacing the in-process `.git/hive-merge` lock of `withFileLock`, `fsutil.ts:512`) is held only for the
+advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
+submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
+the queue's ref.
+
+**Checks.** A run records its tested checkout and counts for a card's submission under SPEC §16.13's rules (the
+checkout contains the card's revision; nothing written in the tracked tree during the run). `hive-progress --check
+<name> --isolated` runs in a **check copy** from the review-copy pool, the remedy when a shared folder is busy.
 
 **Slots and sessions.** `slots.ts` owns the worktrees under `<Workspace>.worktrees/<Project>/` and lends them by
 **lease** (a `slot_leases` row: slot, card or lane, builder, from, to), one open lease per slot, taken under the slot's
@@ -297,7 +307,8 @@ never the CLI's config.
 `project_keys`, `rulesets`, `slot_leases` (P7); typed tables for sessions, lanes, watches and deliveries replacing `store_rows`. The Agent API's card JSON
 is rebuilt from rows, identical or versioned. One schema step, backed up first, asked before it runs and refused while
 another Hive process has the workspace open; Help restores the 0.9 backup; a newer file opens read-only. Observed
-facts have a unique key (card, kind, revision, target), so two Hives observing one workspace write each fact once.
+facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
+workspace write each transition once, while a later repeat of the same values is still recorded (SPEC §16.17).
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
