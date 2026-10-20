@@ -2,7 +2,7 @@
 // uncommitted edit or a checkout during submit, a commit during a requeue), and a trip to On Hold keeps a card able to
 // go on: its gate asked again on return, a move out of it counted from where it was.
 import { afterEach, describe, expect, it } from 'vitest'
-import { writeFileSync } from 'fs'
+import { statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
@@ -65,6 +65,86 @@ describe("the card's folder is part of the evidence", () => {
     during(e, 'submit', () => void commit(folder, { 'a.txt': 'unreviewed\n' }, 'sneaked in'))
     refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'evidence.changed')
     expect(e.wf.state(card).stage).toBe('active')
+  })
+})
+
+// #1206: the evidence is content, not cached stat data. Git and the files can't be one transaction with SQLite, so a
+// change after the transaction's own read is reconciliation's (stale marks), never claimed excluded.
+describe('an index refreshed or a file touched meanwhile is no change', () => {
+  /** A file's time moved, its content as it was. */
+  const touch = (file: string): void => {
+    const later = new Date(Date.now() + 5000)
+    utimesSync(file, later, later)
+  }
+
+  it("an outside git status during the submit (the index's stat data refreshed) → submitted", async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    // Touched before: the index's stat data is stale, so the status rewrites the index.
+    touch(join(folder, 'a.txt'))
+    const index = join(sh(folder, 'rev-parse', '--path-format=absolute', '--git-dir'), 'index')
+    const before = statSync(index).mtimeMs
+    during(e, 'submit', () => void sh(folder, 'status', '--porcelain'))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    expect(statSync(index).mtimeMs).not.toBe(before)
+    expect(e.wf.state(card).stage).toBe('review')
+  })
+
+  it('a file only touched during the submit → submitted', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => touch(join(folder, 'a.txt')))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it('a file touched, then edited and put back during the submit → submitted (the same content)', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => {
+      writeFileSync(join(folder, 'a.txt'), 'other\n')
+      writeFileSync(join(folder, 'a.txt'), 'a\n')
+      touch(join(folder, 'a.txt'))
+    })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("in a shared folder, another agent staging its own file during the submit → submitted; the builder's own → refused", async () => {
+    const locks: Record<string, string[]> = { B1: ['mine.txt'], B2: ['theirs.txt'] }
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }, { locksOf: (a) => locks[a] ?? [] }))
+    const card = e.wf.createCard({ title: 'Mine', reviewer: 'R1' })
+    moved(await e.wf.start(card.key, B1))
+    commit(e.project, { 'theirs.txt': 'theirs\n' }, 'theirs')
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
+    // An edit to a file already there (a new file would change the folder's own time, which the evidence covers).
+    during(e, 'submit', () => {
+      writeFileSync(join(e.project, 'theirs.txt'), 'theirs, edited\n')
+      sh(e.project, 'add', 'theirs.txt')
+    })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const other = e.wf.createCard({ title: 'Mine too', reviewer: 'R1' })
+    moved(await e.wf.start(other.key, B1))
+    commit(e.project, { 'mine.txt': 'mine again\n' }, 'mine again', { trailer: other.key })
+    during(e, 'submit', () => void sh(e.project, 'rm', '-q', '--cached', 'mine.txt'))
+    refusedBy(await e.wf.submit(other.key, B1, { summary: 'y' }), 'evidence.changed')
+  })
+
+  it('a change staged during the submit (the index entries, not the files) → refused', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    during(e, 'submit', () => void sh(folder, 'rm', '-q', '--cached', 'a.txt'))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
+  })
+
+  it('an edit of the same size during the submit, its time kept → refused (content, not stat)', async () => {
+    const e = (env = setup(pairOpts))
+    const { card, folder } = await startedIn(e, 'a')
+    const file = join(folder, 'a.txt')
+    during(e, 'submit', () => {
+      const st = statSync(file)
+      writeFileSync(file, 'b\n')
+      utimesSync(file, st.atime, st.mtime)
+    })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
   })
 })
 

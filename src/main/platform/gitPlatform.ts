@@ -3,7 +3,8 @@
 //
 // P2 spike (#1118): not wired into the app yet.
 
-import { existsSync, statSync } from 'original-fs'
+import { createHash } from 'crypto'
+import { existsSync, readFileSync, statSync } from 'original-fs'
 import { dirname, join } from 'path'
 import { git } from '../git'
 import type { CardState, FileChange } from '../../shared/workflow/facts'
@@ -15,8 +16,45 @@ import { snapshot } from '../workflow/checks'
 import { slugOf, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
+import { readIndex, statMatches, type IndexEntry } from './gitIndex'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
+
+/** A file this size or larger isn't hashed in the fingerprint: its size and time stand for it (the safe side). */
+const HASH_MAX_BYTES = 16 * 1024 * 1024
+
+/**
+ * A tracked file's content for a fingerprint (#1206), with no process: its index entry's object id while its stat shows
+ * it, else the object id `prime` hashed at this size and time. Otherwise (touched or edited since) it is hashed here as
+ * git stores a blob and compared with the id expected: the same content is that id (a touch changes nothing); with
+ * `core.autocrlf` on, its CRLF content with LF too. Anything else is its size and time ("gone" when it isn't there).
+ */
+function contentLine(abs: string, e: IndexEntry | undefined, hashed: { size: number; mtimeMs: number; oid: string } | undefined, writtenMs: number, p: Pick<Primed, 'oidBytes' | 'autocrlf'>): string {
+  let st
+  try {
+    st = statSync(abs)
+  } catch {
+    return 'gone'
+  }
+  if (e && statMatches(e, st.size, st.mtimeMs, writtenMs)) return e.oid
+  if (hashed && hashed.size === st.size && hashed.mtimeMs === st.mtimeMs) return hashed.oid
+  const expected = hashed?.oid ?? e?.oid
+  if (expected && st.size < HASH_MAX_BYTES) {
+    try {
+      const body = readFileSync(abs)
+      if (blobId(body, p.oidBytes) === expected) return expected
+      if (p.autocrlf && body.includes(13) && blobId(Buffer.from(body.toString('latin1').replace(/\r\n/g, '\n'), 'latin1'), p.oidBytes) === expected) return expected
+    } catch {
+      // Unreadable now: its size and time stand for it.
+    }
+  }
+  return `${st.size}:${st.mtimeMs}`
+}
+
+/** A blob's object id as git computes it. */
+function blobId(body: Buffer, oidBytes: 20 | 32): string {
+  return createHash(oidBytes === 32 ? 'sha256' : 'sha1').update(`blob ${body.length}\0`).update(body).digest('hex')
+}
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -29,6 +67,23 @@ function statLine(p: string): string {
 }
 
 const unknownRefusal = (card: CardRecord, what: string, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what, rule } })
+
+/** What `prime` reads once per intent for the evidence: the card's folder, the files it covers, and their content. */
+interface Primed {
+  gitDir: string | null
+  folder: string | null
+  /** The tracked files the evidence covers (the builder's own paths in a shared folder). */
+  files: string[]
+  /** A shared folder's own paths (the index entries covered), or null: the whole index. */
+  own: string[] | null
+  oidBytes: 20 | 32
+  /** `core.autocrlf` is on: a file's CRLF content is stored with LF, so its object id is of that. */
+  autocrlf: boolean
+  /** Files whose stat didn't show the index's content when primed: their content's object id, at that size and time. */
+  hashed: Map<string, { size: number; mtimeMs: number; oid: string }>
+}
+
+const covers = (own: string[] | null, f: string): boolean => !own || own.some((p) => f === p || f.startsWith(`${p}/`))
 
 export class GitPlatform implements PlatformAdapter {
   readonly id = 'git' as const
@@ -67,35 +122,96 @@ export class GitPlatform implements PlatformAdapter {
       if (!isUnknown(c)) this.common = c
     }
     // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
-    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [] }
+    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [], own: null, oidBytes: 20, autocrlf: false, hashed: new Map() } satisfies Primed
     const folder = this.wf.folderOf(s)
     const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
     const ls = await git(folder, ['ls-files', '-z'])
     if (!gd.ok || !ls.ok) return null
+    const fmt = await git(folder, ['rev-parse', '--show-object-format'])
+    const oidBytes = fmt.ok && fmt.out.trim() === 'sha256' ? 32 : 20
+    const crlf = await git(folder, ['config', '--type=bool', 'core.autocrlf'])
     // In a shared folder only the builder's own paths count (others' edits are "not yours", §16.3.2's dirty).
     const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
-    const all = ls.out.split('\0').filter(Boolean)
-    const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
-    return { gitDir: gd.out.trim(), folder, files }
+    const files = ls.out.split('\0').filter(Boolean).filter((f) => covers(own, f))
+    const gitDir = gd.out.trim()
+    return { gitDir, folder, files, own, oidBytes, autocrlf: crlf.ok && crlf.out.trim() === 'true', hashed: await this.contentOfChanged(folder, gitDir, files, oidBytes) } satisfies Primed
+  }
+
+  /**
+   * The content's object id of each covered file whose stat doesn't show the index's (#1206): edited, or only touched.
+   * Hashed by git itself (its filters, line endings), once per intent, so a fingerprint can tell a touched file, or an
+   * index whose stat data an outside `git status` refreshed meanwhile, from an edit.
+   */
+  private async contentOfChanged(folder: string, gitDir: string, files: string[], oidBytes: 20 | 32): Promise<Primed['hashed']> {
+    const out: Primed['hashed'] = new Map()
+    const idxFile = join(gitDir, 'index')
+    let written = 0
+    try {
+      written = statSync(idxFile).mtimeMs
+    } catch {
+      return out
+    }
+    const idx = readIndex(idxFile, oidBytes, written)
+    if (!idx) return out
+    const entries = new Map(idx.entries.filter((e) => e.stage === 0).map((e) => [e.path, e]))
+    const todo: { path: string; size: number; mtimeMs: number }[] = []
+    for (const f of files) {
+      try {
+        const st = statSync(join(folder, f))
+        const e = entries.get(f)
+        if (!e || !statMatches(e, st.size, st.mtimeMs, idx.writtenMs)) todo.push({ path: f, size: st.size, mtimeMs: st.mtimeMs })
+      } catch {
+        // Gone: the fingerprint says so.
+      }
+    }
+    if (!todo.length) return out
+    const r = await git(folder, ['hash-object', '--stdin-paths'], undefined, todo.map((t) => t.path).join('\n') + '\n')
+    const oids = r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []
+    if (oids.length !== todo.length) return out
+    todo.forEach((t, i) => out.set(t.path, { size: t.size, mtimeMs: t.mtimeMs, oid: oids[i] }))
+    return out
   }
 
   /**
    * The state a card's guards read (ARCHITECTURE "The one path"): the target's and the line's refs, the folder's own
-   * HEAD (a checkout or reset elsewhere shows), its index and any merge, rebase or cherry-pick under way, and each
-   * covered tracked file's and folder's size and time (an edit, or a new file beside them, shows). Null when unreadable.
+   * HEAD (a checkout or reset elsewhere shows), any merge, rebase or cherry-pick under way, the index's entries (mode,
+   * object id, stage, path: a staged change shows), each covered tracked file's content and each folder's size and time
+   * (an edit, or a new file beside them, shows). Content, not cached stat data (#1206): an outside `git status` rewriting
+   * the index to refresh its stat data, or a file only touched, changes nothing. A file's content is its index entry's
+   * object id while its stat shows it (git's own test), else what `prime` hashed at that size and time, else its size
+   * and time (changed since: refused, the safe side). An index this can't read falls back to the file's stat. Null when
+   * unreadable.
    */
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
-    const p = primed as { gitDir: string | null; folder: string | null; files: string[] } | null
+    const p = primed as Primed | null
     if (!this.common || !p) return null
     const target = s.started?.target ?? card.target ?? o.target
     const line = s.stage === 'todo' ? null : s.started?.line
     const parts = [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : '']
     if (p.gitDir && p.folder) {
-      parts.push(`HEAD:${G.refSync(p.gitDir, 'HEAD') ?? ''}`, statLine(join(p.gitDir, 'index')))
+      parts.push(`HEAD:${G.refSync(p.gitDir, 'HEAD') ?? ''}`)
       for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) parts.push(existsSync(join(p.gitDir, m)) ? m : '')
+      const idxFile = join(p.gitDir, 'index')
+      let written = 0
+      try {
+        written = statSync(idxFile).mtimeMs
+      } catch {
+        // No index: read as none below.
+      }
+      const idx = written ? readIndex(idxFile, p.oidBytes, written) : null
+      const entries = new Map<string, IndexEntry>()
+      if (idx) {
+        const h = createHash('sha256')
+        for (const e of idx.entries) {
+          if (!covers(p.own, e.path)) continue
+          h.update(`${e.mode.toString(8)} ${e.oid} ${e.stage} ${e.path}\n`)
+          if (e.stage === 0) entries.set(e.path, e)
+        }
+        parts.push(`index:${h.digest('hex')}`)
+      } else parts.push(statLine(idxFile))
       const dirs = new Set<string>(['.'])
       for (const f of p.files) {
-        parts.push(statLine(join(p.folder, f)))
+        parts.push(idx ? contentLine(join(p.folder, f), entries.get(f), p.hashed.get(f), idx.writtenMs, p) : statLine(join(p.folder, f)))
         dirs.add(dirname(f))
       }
       for (const d of [...dirs].sort()) parts.push(statLine(join(p.folder, d)))

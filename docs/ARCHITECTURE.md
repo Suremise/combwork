@@ -256,7 +256,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 
 | Layer | Shared (pure, unit-tested) | Main |
 |---|---|---|
-| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
+| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `gitIndex.ts` (the index read with no process), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
@@ -275,10 +275,17 @@ tracked file's and folder's size and time (the builder's own paths in a shared f
 the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
 so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
 platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
-intent is refused `evidence.changed`, "try again". It is a best-effort snapshot, not one transaction with git and the
-files: a change after the last read, or one that keeps every size and time, isn't excluded, so P3's watcher and
-reconciliation (stale marks, observed facts) remain what settles those. #1206: an outside `git status` refreshing the
-index's stat data refuses falsely today; fingerprint the index's content, or read once more before refusing); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+intent is refused `evidence.changed`, "try again". **Content, not cached stat data** (#1206, `gitIndex.ts`): the index
+is fingerprinted by its entries (mode, object id, stage, path; a shared folder's, the builder's own paths), and each
+covered tracked file by its content: its index entry's object id while its stat shows it (size and time match, not
+racy), else the object id `prime` had git hash (`hash-object --stdin-paths`, git's own filters), else hashed in the
+fingerprint itself as git stores a blob (with `core.autocrlf`, its CRLF form with LF too). So an outside `git status`
+rewriting the index to refresh its stat data, an editor's git integration, or a file only touched changes nothing,
+while a staged change, an edit, a checkout or an operation under way still refuses. An index it can't read (a split
+index) falls back to the file's stat, the safe side. **The practical guarantee:** git, the files and SQLite can't be
+one transaction, so the fingerprint proves only that nothing it covers changed between its two reads; a change after
+the transaction's read, or one it doesn't cover, is caught afterwards by the watcher and reconciliation (stale marks,
+observed facts), never claimed excluded); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside
