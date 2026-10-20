@@ -38,13 +38,18 @@ interface RunOf {
   alive: () => boolean
 }
 
-/** Per workspace file: the run going on, and whether another was asked for meanwhile. */
-const runs = new Map<string, { again: boolean; done: Promise<void> }>()
+/**
+ * Per workspace file, the run going on: whether another was asked for meanwhile, and the workspaces (windows) that asked
+ * for it, each as it was when it asked. The run goes on in the newest of them still open: one whose window closed or
+ * switched hands what is left to another that asked (HR4's #1215 round 2), never ending a request still wanted.
+ */
+const runs = new Map<string, { again: boolean; by: RunOf[]; done: Promise<void> }>()
 
 /**
- * Runs the workspace's pending actions, in the order written: one run at a time per workspace, and a run asked for while
- * one goes on runs again after it (a change that committed meanwhile may have written more). Resolves when no run is
- * left; never throws (a failure is logged, and an action not marked stays for the next run).
+ * Runs the workspace's pending actions, in the order written: one run at a time per workspace file, and a run asked for
+ * while one goes on runs again after it (a change that committed meanwhile may have written more), in a workspace still
+ * open on that file. Resolves when no run is left; never throws (a failure is logged, and an action not marked stays
+ * for the next run).
  */
 export function runActions(ws: WorkspaceService): Promise<void> {
   const path = ws.path
@@ -54,18 +59,31 @@ export function runActions(ws: WorkspaceService): Promise<void> {
   const key = boardFile(path).toLowerCase()
   const running = runs.get(key)
   if (running) {
+    running.by.push(at)
     running.again = true
     return running.done
   }
-  const run = { again: false, done: Promise.resolve() }
+  const run = { again: false, by: [at], done: Promise.resolve() }
   run.done = (async () => {
     try {
-      do {
+      for (;;) {
+        run.by = run.by.filter((x) => x.alive())
+        const current = run.by.at(-1)
+        if (!current) return
         run.again = false
-        await drain(at)
-      } while (run.again && at.alive())
-    } catch (e) {
-      if (at.alive()) log.warn('running the cards’ actions', e)
+        try {
+          await drain(current)
+        } catch (e) {
+          // Its workspace closed or switched under it: another that asked goes on. Else a failure: logged, and the run ends.
+          if (current.alive()) {
+            log.warn('running the cards’ actions', e)
+            return
+          }
+          continue
+        }
+        // Done in a workspace still open, nothing more asked for: the run ends. Stopped by a close or a switch, or asked again: once more.
+        if (current.alive() && !run.again) return
+      }
     } finally {
       runs.delete(key)
     }
@@ -92,10 +110,9 @@ async function drain(at: RunOf): Promise<void> {
     const first = await change(at, () =>
       boardWriteOp(ws, (db) => (db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null))
     )
-    if (first === null) {
-      if (!at.alive()) return
-      continue
-    }
+    // Closed or switched while the claim committed (a listener of that commit may close it): no handler runs for it.
+    if (!at.alive()) return
+    if (first === null) continue
     let state: ActionRow['state'] = 'done'
     if (first && handler) {
       try {

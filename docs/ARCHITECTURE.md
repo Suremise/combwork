@@ -470,8 +470,11 @@ runs (`onAction(kind, fn)`), then it is marked done (failed when the handler thr
 no handler: nothing wakes, notifies or merges yet, and an action without one is marked done as the no-op it is. A
 run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
 opens another, the run stops, checked after every wait and inside each board change before the board is touched
-(`boardWrite`'s `alive`), so it never opens a closed board again nor writes another workspace's (whose actions are
-numbered from 1 too).
+(`boardWrite`'s `alive`), and between an action's claim and its handler (a listener of the claim's commit may close
+it), so it never opens a closed board again nor writes another workspace's (whose actions are numbered from 1 too),
+and no handler runs for a workspace that has gone. A run asked for while one goes on joins it with its own workspace
+(HR4's #1215 round 2): when the run's workspace has gone, the newest that asked and is still open takes over what is
+left, so a window still open on the board never loses its request to one that switched away.
 **`delivered` is transitional:** #1211's typed `deliveries` (unique `action`) replace it when P4 wires wakes (#1120).
 
 Observed facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one

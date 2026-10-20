@@ -385,3 +385,83 @@ describe('the fact store, owned writes and one snapshot (#1215 round 1)', () => 
     }
   })
 })
+
+// HR4's #1215 round 2: who a run belongs to. No handler runs once its workspace has gone, also when it went as the claim
+// committed; and a request from a window still open on the board is never dropped because the run it joined belonged
+// to a window that has gone.
+describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
+  /** Two pending actions on a card of the workspace, written by another connection (no run of ours started for them). */
+  async function twoActions(ws: string, w: WS): Promise<[number, number]> {
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Actions', project: 'p' }, user))).number
+    const own = FactStore.open(store.boardFile(ws), scope)
+    const ids = own.tx((tx) => [tx.action(card, 'notice', { n: 1 }, null), tx.action(card, 'notice', { n: 2 }, null)] as [number, number])
+    own.close()
+    return ids
+  }
+  const statesIn = (ws: string): { id: number; state: string; delivered: number }[] => {
+    const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
+    try {
+      return (raw.prepare('SELECT id, state, delivered IS NOT NULL AS delivered FROM card_actions ORDER BY id').all() as { id: number; state: string; delivered: number }[]).map((r) => ({ ...r }))
+    } finally {
+      raw.close()
+    }
+  }
+
+  it('closed as its claim commits: the handler never runs', async () => {
+    const { ws, w } = await workspace()
+    const [first] = await twoActions(ws, w)
+    const ran: number[] = []
+    worker.onAction('notice', (a) => void ran.push(a.id))
+    let closing: Promise<void> | null = null
+    // The first claim's commit closes the workspace (a listener of that commit, as anything after a change may).
+    const off = store.onBoardCommitted(() => {
+      if (closing || !store.boardOpen(ws)) return
+      const claimed = store.workspaceDb(ws).reader.prepare('SELECT 1 FROM card_actions WHERE id = ? AND delivered IS NOT NULL').get(first)
+      if (claimed) closing = w.close()
+    })
+    try {
+      await worker.runActions(w)
+      await closing
+    } finally {
+      off()
+    }
+    expect(closing).not.toBeNull()
+    expect(ran).toEqual([])
+    expect(store.boardOpen(ws)).toBe(false)
+    // Its delivery recorded (at most once: it isn't run again), the other untouched.
+    expect(statesIn(ws)).toEqual([
+      { id: first, state: 'pending', delivered: 1 },
+      { id: first + 1, state: 'pending', delivered: 0 }
+    ])
+  })
+
+  it('a window still open on the board takes over a run whose window switched away: no request is dropped', async () => {
+    const { ws, w } = await workspace()
+    const other = join(base, `ws-${++n}`)
+    mkdirSync(other, { recursive: true })
+    const [first, second] = await twoActions(ws, w)
+    const ran: number[] = []
+    let second$: Promise<void> | null = null
+    let w2: WS | null = null
+    worker.onAction('notice', async (a) => {
+      ran.push(a.id)
+      if (a.id !== first) return
+      // The old window opens another workspace; a new window opens this one and asks for a run while the old one is
+      // still registered.
+      await w.open(other)
+      w2 = createWorkspaceService()
+      await w2.open(ws)
+      opened.push(w2)
+      second$ = worker.runActions(w2)
+    })
+    await worker.runActions(w)
+    await second$
+    expect(w2).not.toBeNull()
+    // The first ran once (its delivery recorded, then marked by the run that took over); the second ran in the new window.
+    expect(ran).toEqual([first, second])
+    expect(statesIn(ws)).toEqual([
+      { id: first, state: 'done', delivered: 1 },
+      { id: second, state: 'done', delivered: 1 }
+    ])
+  })
+})

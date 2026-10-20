@@ -761,10 +761,11 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
 const committedListeners = new Set<(ws: WorkspaceService) => void>()
 /**
  * Runs `fn` after every board change that commits, outside it (as afterBoardWrite's), with the change's workspace: what
- * follows any change, whoever made it (the actions worker, #1215: a change may have written actions to run).
+ * follows any change, whoever made it (the actions worker, #1215: a change may have written actions to run). Returns its removal.
  */
-export function onBoardCommitted(fn: (ws: WorkspaceService) => void): void {
+export function onBoardCommitted(fn: (ws: WorkspaceService) => void): () => void {
   committedListeners.add(fn)
+  return () => void committedListeners.delete(fn)
 }
 
 /**
