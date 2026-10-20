@@ -2220,7 +2220,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const from = new Map(cond.cards.map((n) => [n, base?.get(n) ?? start.get(n)!]))
     // A column condition already met when the wait begins answers at once.
     const met = cond.column && !base ? cond.cards.filter((n) => alreadyThere(start.get(n)!, cond)) : []
-    if (met.length) return { changes: await Promise.all(met.map(async (n) => cardChange(n, await read(n), ['column']))), timedOut: false, since: encodeSince(start) }
+    if (met.length) return { changes: await Promise.all(met.map(async (n) => cardChange(n, await read(n), ['column']))), timedOut: false, since: encodeSince(start), ...withNames(met) }
     const check = async (): Promise<{ changes: CardChange[]; now: Map<number, CardMark> }> => {
       const now = await marksOf()
       const changes: CardChange[] = []

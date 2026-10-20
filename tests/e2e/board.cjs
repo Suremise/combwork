@@ -214,7 +214,7 @@ const check = (name, ok, extra = '') => {
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
-  check('the agent got the card as its prompt', /Work on task #1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'))
+  check('the agent got the card as its prompt, named by key (#1219)', /Work on task [A-Z]{2,4}-1 \(#1\) from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
   check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 

@@ -938,6 +938,14 @@ function pathWithoutStoreAliases(parent = process.env) {
 }
 
 /** A real PNG (a w×h gradient) for image previews, pastes and drops. */
+/**
+ * Text agents read with its cards named as before keys (#1219): "AL-1 (#1)" becomes "#1", so a suite's checks of card
+ * numbers stay as they were; each suite checks the keyed form itself (KEYED).
+ */
+const unkey = (text) => (typeof text === 'string' ? text.replace(/\b[A-Z]{2,4}-\d+ \((#\d+)\)/g, '$1') : text)
+/** A card named by key with the number the tools take, in agents' text: "AL-1 (#1)". */
+const KEYED = /\b[A-Z]{2,4}-\d+ \(#\d+\)/
+
 function samplePng(w = 64, h = 40) {
   const zlib = require('zlib')
   const raw = Buffer.alloc((w * 3 + 1) * h)
@@ -1097,4 +1105,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { unkey, KEYED, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }

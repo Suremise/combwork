@@ -76,12 +76,14 @@ const check = (name, ok, extra = '') => {
     const reordered = await call('POST', '/v1/tasks/reorder', { column: 'todo', cards: ['AL-1', 'AL-2'], reply: 'short' })
     check('a reorder takes keys, and names them in its reply', reordered.status === 200 && JSON.stringify(reordered.body?.top) === JSON.stringify([a1?.number, a2?.number]) && reordered.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(reordered))
     const waited = await call('POST', '/v1/tasks/wait', { cards: ['AL-1'], column: 'todo' })
-    check('a wait takes a key', waited.status === 200 && waited.body?.already?.number === a1?.number, JSON.stringify(waited))
+    // Already in Todo: it answers at once, with the card, named by key for the hive tools' words.
+    check('a wait takes a key', waited.status === 200 && [waited.body?.already, ...(waited.body?.changes ?? [])].some((c) => c?.number === a1?.number) && waited.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(waited))
 
     // --- A key changed: the cards show it, the old one still finds them.
     const changed = await inv('project:setKey', alpha, 'alp')
-    const after = (await call('GET', '/v1/tasks/AL-1')).body
-    check('a key changed: the card shows the new key, the old one still finds it', changed === 'ALP' && after?.number === a1?.number && after?.key === 'ALP-1', JSON.stringify({ changed, key: after?.key }))
+    const afterReply = await call('GET', '/v1/tasks/AL-1')
+    const after = afterReply.body
+    check('a key changed: the card shows the new key, the old one still finds it', changed === 'ALP' && after?.number === a1?.number && after?.key === 'ALP-1', JSON.stringify({ changed, status: afterReply.status, key: after?.key, number: after?.number, error: after?.error }))
     const refusedKey = await inv('project:setKey', beta, 'ALP').then(() => 'changed', (e) => String(e.message ?? e))
     check("another project's key is refused, saying why", /another project’s key/.test(refusedKey), refusedKey)
 

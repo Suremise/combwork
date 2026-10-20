@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   }
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => ({ ...w, raw: w.text, text: lib.unkey(w.text) }))
   }
   const script = (agent, lines) => fs.writeFileSync(path.join(claudeHome, `fake-wakes-${agent}.txt`), lines.join('\n') + '\n')
   /** The fake drops the next n Enters that would send a line from Hive ("[Hive]…"), as Codex did once (#376). */
@@ -103,7 +103,9 @@ const check = (name, ok, extra = '') => {
     }
   }
   const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: [n], ...extra, wake: true })}`
-  const stalledOf = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
+  // As its checks read it, the card by number (it names it by key too, #1219: checked below).
+  const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
+  const stalledOf = async (n) => lib.unkey(await rawStalled(n))
   const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
   const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
 
@@ -139,6 +141,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c1, { column: 'review' })
   const reason = `Reviewer hasn't taken the wake Hive typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
+  check('…naming the card by key, with the number the tools take (#1219)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
   check('…the line was never sent, and Hive says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()

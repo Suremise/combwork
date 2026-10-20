@@ -324,9 +324,9 @@ export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card:
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
   if (!ws.path) throw unknownTask(n)
-  const { raw, generation } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0 }))
+  const { raw, generation, key } = boardRead(ws, () => ({ raw: cardDoc(ws, n), generation: decisionGenerations(ws, [n]).get(n) ?? 0, key: cardKeys(ws, [n]).get(n) }))
   if (!raw) throw unknownTask(n)
-  const c = withoutGone(clean(raw, n, ids), (x) => hasCard(ws, x))
+  const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
   return { card: c, generation }
 }
@@ -339,11 +339,11 @@ export async function allTasksSeen(ws: WorkspaceService, q: CardQuery = {}): Pro
   if (!ws.path) return { cards: [], generations: new Map() }
   const ids = await ws.projectIds()
   if (!ws.path) return { cards: [], generations: new Map() }
-  const { docs, numbers, generations } = boardRead(ws, () => {
+  const { docs, numbers, generations, keys } = boardRead(ws, () => {
     const read = cardDocs(ws, q)
-    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)) }
+    return { docs: read, numbers: cardNumbers(ws), generations: decisionGenerations(ws, read.map((d) => d.number)), keys: cardKeys(ws, read.map((d) => d.number)) }
   })
-  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids), (x) => numbers.has(x)))), generations }
+  return { cards: sortCards(docs.map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x)))), generations }
 }
 
 /** The cards `refs` names that are outside the scope (another project's, or the workspace's): a confined agent sees only their numbers. */

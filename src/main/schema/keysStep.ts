@@ -72,7 +72,8 @@ export function numberCard(db: Sql, n: number, was: { projectId: string | null; 
   if (to !== null && to === from && now.project_number !== null) return
   if (from !== null && fromNumber !== null && from !== to) db.prepare('INSERT OR IGNORE INTO card_aliases (project_id, number, card) VALUES (?, ?, ?)').run(from, fromNumber, n) // i18n-ignore: SQL
   if (to === null) {
-    db.prepare('UPDATE cards SET project_number = NULL WHERE number = ?').run(n) // i18n-ignore: SQL
+    // Only when it had one: a save that changes nothing writes nothing (#1210).
+    if (now.project_number !== null) db.prepare('UPDATE cards SET project_number = NULL WHERE number = ?').run(n) // i18n-ignore: SQL
     return
   }
   // Back in a project it was in: its number there again (that key names it already).
