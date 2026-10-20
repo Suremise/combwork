@@ -1201,7 +1201,17 @@ never edited or deleted, except with the card itself (Delete permanently) [P1]: 
 **Cards from before 1.0** [note §11]: a card that is Done, On Hold or Todo at the upgrade gets no facts and is marked
 **before 1.0** (`preWorkflow: true`); Hive invents none. A card in flight gets only observed evidence, marked
 `adopted`: an **`Adopted`** fact (Doing, Review, Passed) and, for a card in Review, an adopted submission at its line's
-head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1 note and HB3's finding 1].
+head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1 note and HB3's finding 1]. Such a card
+that starts after the upgrade loses the mark and is a 1.0 card from then on [Darren, #1119 decision 4].
+
+**P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
+transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change
+`Moved`, cause `user` from the window, `intent` from an agent's or the Assistant's tools; blocked and unblocked; each
+decision change, each a new generation; and what an agent was given of the decisions, by reading the card or receiving
+a decision line, `DecisionsReceived`). A card's work cycle starts once (none yet, or reopened from Done): fixes after a
+failed review, through Doing or not, go on in it. The platform is read before the change; a value that couldn't be
+read never refuses the move: its field is empty and the fact's `platform.unknown` says what couldn't be read. A fact
+that can't be written fails the change whole.
 
 #### 16.4.2 Kinds
 
@@ -2232,7 +2242,10 @@ labels, links, context, comments, history, decisions and holds in child tables),
 document byte for byte before the group commits (a card that doesn't, or a row that isn't a card's document, stops the
 upgrade naming the card, and the file stays 0.9), and drops the documents: from then on the board's readers compose
 each card's JSON from its rows (`schema/cardRows.ts`), the same bytes as before, so the Agent API's cards and Export
-Board are unchanged. A 0.9 board waiting for its upgrade is read from its documents as before.
+Board are unchanged. A 0.9 board waiting for its upgrade is read from its documents as before. Sessions and deliveries move from `store_rows` into
+typed tables (#1211, v6, the last of its stores: `store_rows` goes with it), every record read back equal as JSON;
+deliveries keep their in-memory store (published after each transaction), the table its durable copy [Darren, 20 Oct,
+#1211].
 - **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? Hive 1.0 needs to upgrade this workspace's
   data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
   back." [the Assistant for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards'
@@ -2310,6 +2323,21 @@ an invented history:
 | Doing | `Adopted` (agent, folder, line, head, base = merge base with the target) | it can be submitted. |
 | Review | `Adopted` and an **adopted submission**: a `Submitted` fact marked `source: observed, adopted: true` at the line's head, with endpoints and keys computed then | its reviewer reviews that revision as usual. If the head isn't what the builder meant, the review says so. |
 | Passed | `Adopted` with `passedBefore1_0: true` (what the column said), **no `Verdict`**: a pass can't be tied to a revision history doesn't prove | under the upgrade's options (G5 Not checked, below) nothing needs a verdict: the builder reports its merge or the user moves it. A later stricter ruleset applies only from the next card [#1112 down]. |
+
+The adoption (#1218, `workflow/adoption.ts`) runs in the background once the migration has committed, and again at each
+start until it has handled every card once (board_meta `adoption`). It handles only the cards from before 1.0: the
+upgrade's transaction records the highest card number (board_meta `adoption_upto`; 0 on a board made by 1.0, which so
+adopts nothing), so a card made since is never marked. Archived cards, workspace cards and the cards of a project no
+longer in the workspace are **before 1.0** whatever their column. A card's folder is its agent's worktree (target: the
+branch it came from) or the project folder (target: its branch); git is read outside the board's lock. `Adopted` keeps
+the folder's head as observed (`head`, null when unknown) apart from `base`, and the fold's head is that head (a
+`Started` fact's head is its base). Each card is checked again inside the change that writes it: one started, adopted
+or marked meanwhile (by another Hive, or a rerun) is left as it is; one changed meanwhile (moved, archived, given another
+agent, its agent's folder changed) is never written from the stale reads but classified again by another run (up to
+three in a row, else at the next start), and the adoption isn't finished until none is left. So it is safe to repeat
+and to run in two Hives at once, and a project's options are written only when project.json has none. Nothing moves on
+the board: each adopted card is already at the stage its column stands for. A project's agents count as reviewer agents
+when a role or name says *review*.
 
 **Options at the upgrade** [#1122 c: "options matching how they work today, so nothing changes overnight"]:
 - Git projects get Git with G5 **Not checked**, G11 as their agents work (slots if any agent has a worktree, else the

@@ -9,14 +9,14 @@ import { createLogger, userText } from './logger'
 const log = createLogger('stores')
 
 /**
- * The workspace's small stores in its database (#1018): sessions and deliveries (lanes, watches and metrics until #1212), each a row per entry in
- * `store_rows` (the board's `.hive/hive.db`, migration 2) with a few values of its own in `store_meta`. A store keeps its
- * entries in memory and its own lock as before; only where they are kept changed. A save is one transaction that writes
- * the rows that changed (no temp file, no rename: #990's EPERM class goes), under the board's lock, so it never runs
- * inside one of the board's transactions on their shared connection. Each store tells its own events, as before.
+ * Sessions' and deliveries' storage plumbing (#1018, #1211). Since 1.0 each has typed tables of its own
+ * (schema/sessionDeliveryTables.ts; lanes, watches and metrics theirs: storeTables.ts, #1212), and `store_rows` is gone;
+ * their few values stay in `store_meta`, per scope (a session host). Here: the move in of a store's old JSON file
+ * (`openTable`), a typed save's lock and transaction (`saveTable`, `writeStore`, `withStoreLock`: under the board's lock,
+ * so never inside one of the board's transactions on their shared connection), the values (`storeValue`), and the read
+ * of a 0.9 file's `store_rows` while its upgrade to 1.0 waits (`readStore`). Each store tells its own events, as before.
  *
- * `scope` keeps a store's entries apart where it has more than one set in a workspace (deliveries, a set per session
- * host); '' where it has one.
+ * `scope` keeps a store's entries apart where it has more than one set in a workspace (a set per session host).
  */
 
 /** The stores still here: lanes, watches and metrics are in their typed tables (#1212, storeTables.ts). */
@@ -55,52 +55,16 @@ export function rowKeys(entries: readonly unknown[]): string[] {
   })
 }
 
-/** Rows for a store's entries: each its key (rowKeys) and its JSON. */
-export const rowsOf = (entries: readonly unknown[]): { key: string; doc: string }[] => {
-  const keys = rowKeys(entries)
-  return entries.map((e, i) => ({ key: keys[i], doc: JSON.stringify(e) }))
-}
-
-/** A mistake in Hive's code: two rows of a change with one key (the second would replace the first). */
-function assertUnique(store: StoreName, rows: readonly { key: string }[]): void {
-  if (new Set(rows.map((r) => r.key)).size !== rows.length) throw new Error(`Two of the ${store} have the same key: nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
-}
-
 /** For tests: a save that fails as it is written (a full disk); a save held before it takes the lock (to race it); a read that fails. */
 export const storeTestHooks: { failSave: ((store: StoreName, scope: string) => boolean) | null; beforeSave: ((store: StoreName, scope: string) => Promise<void>) | null; failRead: ((store: StoreName) => boolean) | null } = { failSave: null, beforeSave: null, failRead: null }
 
-/** A store's entries and values as last committed. */
+/** A 0.9 file's store entries and values as last committed (`store_rows`: read only while its upgrade to 1.0 waits). */
 export function readStore(workspacePath: string, store: StoreName, scope = ''): StoreData {
   if (storeTestHooks.failRead?.(store)) throw new Error(`SQLITE_IOERR: disk I/O error (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   const db = workspaceDb(resolve(workspacePath)).reader
   const rows = db.prepare('SELECT key, doc FROM store_rows WHERE store = ? AND scope = ? ORDER BY ord, key').all(store, scope) as { key: string; doc: string }[] // i18n-ignore: SQL
   const meta = new Map((db.prepare('SELECT key, value FROM store_meta WHERE store = ? AND scope = ?').all(store, scope) as { key: string; value: string }[]).map((r) => [r.key, r.value])) // i18n-ignore: SQL
   return { rows: rows.map((r) => ({ key: r.key, doc: r.doc })), meta }
-}
-
-/**
- * Saves a store's entries (all of them, in order) and the values given (null removes one), in one transaction: rows
- * whose document or place changed are written, rows not given removed. All of it or none. `guard` runs just before
- * the transaction, with nothing awaited between them: a store whose owner went away meanwhile (a closed workspace)
- * throws there, and nothing is written.
- */
-export async function saveStore(workspacePath: string, store: StoreName, scope: string, rows: StoreRow[], meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
-  const path = resolve(workspacePath)
-  // Its lock is the board's: inside a board change it would wait for itself.
-  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
-  assertUnique(store, rows)
-  await storeTestHooks.beforeSave?.(store, scope)
-  await withFileLock(boardLock(path), async () => {
-    guard?.()
-    // A workspace closed meanwhile (a store's last save as it closes): its database is opened for the save, then closed again.
-    const wasOpen = boardOpen(path)
-    const db = workspaceDb(path).writer
-    try {
-      saveRows(db, store, scope, rows, meta)
-    } finally {
-      if (!wasOpen) closeBoard(path)
-    }
-  })
 }
 
 /**
@@ -136,23 +100,76 @@ export async function withStoreLock<T>(workspacePath: string, store: StoreName, 
   })
 }
 
-/** saveStore's transaction. */
-function saveRows(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName, scope: string, rows: StoreRow[], meta: Record<string, string | null>): void {
-  transaction(db, () => {
-    const had = new Map((db.prepare('SELECT key, ord, doc FROM store_rows WHERE store = ? AND scope = ?').all(store, scope) as { key: string; ord: number; doc: string }[]).map((r) => [r.key, r])) // i18n-ignore: SQL
-    const put = db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET ord = excluded.ord, doc = excluded.doc') // i18n-ignore: SQL
-    const keys = new Set<string>()
-    rows.forEach((r, i) => {
-      keys.add(r.key)
-      const ord = r.ord ?? i
-      const was = had.get(r.key)
-      if (!was || was.ord !== ord || was.doc !== r.doc) put.run(store, scope, r.key, ord, r.doc)
-    })
-    const del = db.prepare('DELETE FROM store_rows WHERE store = ? AND scope = ? AND key = ?') // i18n-ignore: SQL
-    for (const k of had.keys()) if (!keys.has(k)) del.run(store, scope, k)
-    for (const [k, v] of Object.entries(meta)) setMeta(db, store, scope, k, v)
-    if (storeTestHooks.failSave?.(store, scope)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
+type Writer = ReturnType<typeof workspaceDb>['writer']
+
+/**
+ * Saves a store kept in a typed table of its own (#1211: sessions' and deliveries' tables, not `store_rows`), as saveStore
+ * does a row store: under the board's lock, `guard` just before, then `write` and the values given (null removes one) in
+ * one transaction. All of it or none.
+ */
+export async function saveTable(workspacePath: string, store: StoreName, scope: string, write: (db: Writer) => void, meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
+  const path = resolve(workspacePath)
+  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  await storeTestHooks.beforeSave?.(store, scope)
+  await withFileLock(boardLock(path), async () => {
+    guard?.()
+    const wasOpen = boardOpen(path)
+    const db = workspaceDb(path).writer
+    try {
+      transaction(db, () => {
+        write(db)
+        for (const [k, v] of Object.entries(meta)) setMeta(db, store, scope, k, v)
+        if (storeTestHooks.failSave?.(store, scope)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
+      })
+    } finally {
+      if (!wasOpen) closeBoard(path)
+    }
   })
+}
+
+/** A store's value kept beside its entries (`store_meta`), or null. */
+export function storeValue(db: Writer | ReturnType<typeof workspaceDb>['reader'], store: StoreName, scope: string, key: string): string | null {
+  const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key) as { value: string } | undefined // i18n-ignore: SQL
+  return r?.value ?? null
+}
+
+/** A typed table's side of a store's move in (openTable): how many entries a scope has, and the writing of a file's. */
+export interface StoreTable<T> {
+  count(db: Writer, scope: string): number
+  /** In the move's transaction: writes the file's entries (those not of Hive's form kept aside); returns how many it wrote. */
+  put(db: Writer, scope: string, got: T): number
+}
+
+/**
+ * openStore for a store kept in a typed table of its own (#1211): its file moved in the first time (and, `whenEmpty`,
+ * when found while the scope has none), in one transaction marked `imported` and checked there (the table has what was
+ * written), the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
+ * upgrade to 1.0 waits. The caller reads the table after.
+ */
+export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean } = {}): Promise<void> {
+  const path = resolve(workspacePath)
+  if (upgradeWaiting(path)) return
+  const toMove = (db: Writer): boolean => storeValue(db, store, scope, 'imported') === null || (!!opts.whenEmpty && table.count(db, scope) === 0 && existsSync(file))
+  const first = toMove(workspaceDb(path).writer)
+  if (first) {
+    const got = await readFile()
+    await withFileLock(boardLock(path), async () => {
+      const db = workspaceDb(path).writer
+      if (!toMove(db)) return
+      let written = 0
+      transaction(db, () => {
+        written = got ? table.put(db, scope, got) : 0
+        const now = table.count(db, scope)
+        if (now !== written) throw new Error(`${now} ${store} entries in the database, ${written} moved in: nothing was moved in`) // i18n-ignore: an internal check's error, logged
+        setMeta(db, store, scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: written, file: got ? file : null }))
+      })
+      if (got) log.info(`moved ${written} ${store} entr${written === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
+    })
+  }
+  if (existsSync(file)) {
+    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
+    keepAsBackup(file)
+  }
 }
 
 function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName, scope: string, key: string, value: string | null): void {
@@ -161,48 +178,3 @@ function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName,
 }
 
 export { keepAsBackup }
-
-/**
- * Opens a store, moving its file in the first time (#1018): `readFile` reads the file as the store always has and gives
- * its entries (rowsOf), null only when there is no file; one that can't be read now (held open, no permission) throws, and
- * nothing is marked, so the next open tries again (round 1); a damaged or too-big one it sets aside itself and gives none.
- * They go into the database in one transaction with the mark that they did, checked there (every entry a row, as read),
- * and the file is then renamed `<file>.imported-<time>`, kept as a backup. A
- * file found there after that (a rename refused before, or one an older Hive wrote since) is renamed the same way and
- * not read again: the store's entries are the database's. `whenEmpty` (#1061, sessions): a file found while the store has
- * no entries is moved in as at the first open (one its folder brought from another workspace). Returns the store's entries.
- */
-export async function openStore(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<{ rows: StoreRow[]; meta?: Record<string, string> } | null>, opts: { whenEmpty?: boolean } = {}): Promise<StoreData> {
-  const path = resolve(workspacePath)
-  const toMove = (now: StoreData): boolean => !now.meta.has('imported') || (!!opts.whenEmpty && !now.rows.length && existsSync(file))
-  const first = toMove(readStore(path, store, scope))
-  // The workspace's upgrade to 1.0 waits (#1207): the database takes no writes, so nothing is moved in and the file is left
-  // where it is, for the move once it is upgraded. Read meanwhile: what the database has (a 0.9 Hive moved in what it had).
-  if (upgradeWaiting(path)) return readStore(path, store, scope)
-  if (first) {
-    const got = await readFile()
-    if (got) assertUnique(store, got.rows)
-    // Moved in under the lock, checked again there: a second open meanwhile moved it already.
-    await withFileLock(boardLock(path), async () => {
-      if (!toMove(readStore(path, store, scope))) return
-      const db = workspaceDb(path).writer
-      transaction(db, () => {
-        const put = db.prepare('INSERT OR REPLACE INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)') // i18n-ignore: SQL
-        got?.rows.forEach((r, i) => put.run(store, scope, r.key, r.ord ?? i, r.doc))
-        // Checked before it commits: each entry read is a row, as it was read (and nothing else is there).
-        const now = db.prepare('SELECT key, doc FROM store_rows WHERE store = ? AND scope = ? ORDER BY ord, key').all(store, scope) as { key: string; doc: string }[] // i18n-ignore: SQL
-        const want = got?.rows ?? []
-        const read = new Map(want.map((r) => [r.key, r.doc]))
-        if (now.length !== want.length || now.some((r) => read.get(r.key) !== r.doc)) throw new Error(`${now.length} ${store} rows in the database, ${want.length} entries read: nothing was moved in`) // i18n-ignore: an internal check's error, logged
-        for (const [k, v] of Object.entries(got?.meta ?? {})) setMeta(db, store, scope, k, v)
-        setMeta(db, store, scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: got?.rows.length ?? 0, file: got ? file : null }))
-      })
-      if (got) log.info(`moved ${got.rows.length} ${store} entr${got.rows.length === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
-    })
-  }
-  if (existsSync(file)) {
-    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
-    keepAsBackup(file)
-  }
-  return readStore(path, store, scope)
-}

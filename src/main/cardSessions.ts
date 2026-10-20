@@ -28,7 +28,7 @@ export async function recordCards(ws: WorkspaceService, projectPath: string, age
   // Worked on and reviewed are kept apart: an agent can review a card it once worked on.
   const has = (list: { number: number; review?: true }[] | undefined, c: { number: number; review?: true }): boolean => !!list?.some((h) => h.number === c.number && !!h.review === !!c.review)
   // Most board changes add nothing (a comment, another agent's card): check before taking the file's lock.
-  const now = (await ws.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+  const now = await ws.sessionRecord(projectPath, sessionId)
   if (!now || cards.every((c) => has(now.cards, c))) return
   await ws.mutateSessions(projectPath, (f) => {
     const rec = f.sessions.find((s) => s.id === sessionId)

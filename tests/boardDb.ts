@@ -52,7 +52,7 @@ export function writeCardOutside(workspacePath: string, n: number, doc: Record<s
 
 /**
  * Puts a 1.0 board's file back as 0.9 left it (#1209): its cards as JSON documents in 0.9's `cards` table (from the
- * board's own first step), every table of the 1.0 group's steps dropped (#1212's too), and none of them recorded. For a board made by
+ * board's own first step), every table of the 1.0 group's steps dropped (#1212's too), 0.9's tables it no longer has made again (store_rows, #1211), and none of them recorded. For a board made by
  * this Hive (a new file takes every step) that a test needs from before its upgrade. The file must be closed.
  */
 export function as09(file: string): void {
@@ -65,6 +65,9 @@ export function as09(file: string): void {
     const tablesOf = (d: DatabaseSync): string[] => (d.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((r) => r.name)
     const keep = new Set([...tablesOf(v09), 'schema_version'])
     const ddl = (v09.prepare("SELECT sql FROM sqlite_master WHERE tbl_name = 'cards' AND sql IS NOT NULL ORDER BY type DESC").all() as { sql: string }[]).map((r) => r.sql)
+    // 0.9's tables a 1.0 file no longer has (#1211's step drops store_rows), made again empty, with their indexes.
+    const had = new Set(tablesOf(db))
+    const missing = (v09.prepare("SELECT tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND tbl_name <> 'cards' ORDER BY type DESC").all() as { tbl_name: string; sql: string }[]).filter((r) => !had.has(r.tbl_name)).map((r) => r.sql)
     v09.close()
     const cardTables = CARDS_STEP.ddl.map((sql) => /^CREATE TABLE (\w+)/.exec(sql)?.[1]).filter((t): t is string => !!t)
     db.exec('PRAGMA foreign_keys = OFF')
@@ -73,6 +76,7 @@ export function as09(file: string): void {
     for (const t of cardTables.reverse()) db.exec(`DROP TABLE ${t}`)
     for (const t of tablesOf(db)) if (!keep.has(t)) db.exec(`DROP TABLE "${t}"`)
     for (const sql of ddl) db.exec(sql)
+    for (const sql of missing) db.exec(sql)
     const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)')
     for (const [n, doc] of docs) put.run(n, doc)
     db.prepare('DELETE FROM schema_version WHERE version >= ?').run(Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === '1.0').map((m) => m.version)))

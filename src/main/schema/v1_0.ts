@@ -363,7 +363,7 @@ const LANES_WATCHES_METRICS: SchemaStep = {
 }
 
 /** The fact log, durable actions and rulesets (SPEC §16.4), from the P2 spike's factStore.ts, in hive.db. */
-const FACTS: SchemaStep = {
+export const FACTS_STEP: SchemaStep = {
   name: 'facts',
   ddl: [
     // A fact: `seq` per card from 1; `dedupe` only on observed facts (`prev:<seq>`, `cycle:<seq>`, `commit:<id>`, a mark's
@@ -411,7 +411,67 @@ const FACTS: SchemaStep = {
       how    TEXT    NOT NULL,
       UNIQUE (folder, sha)
     ) STRICT`,
-    'CREATE INDEX folder_commits_seen ON folder_commits (folder, id)'
+    'CREATE INDEX folder_commits_seen ON folder_commits (folder, id)',
+    // What the runtime keeps of a card besides its document (#1215; the Assistant for Darren, 20 Oct: typed, never JSON).
+    // Columns of the card's row outside its JSON document, as `stage`: the Agent API's card is unchanged, and tasks.ts'
+    // saves of the document keep them. `kind` code or no-code (§16.4.2); `target` a per-card target (OP-12); `lane` the
+    // runtime's lane whose ruleset the card uses and `lane_reviewer` its reviewer to wake (§16.11.1), until P4 wires the
+    // runtime to lanes.ts; `paths_declared` whether None's declared paths were ever set (an empty list is a declaration).
+    "ALTER TABLE cards ADD COLUMN kind TEXT NOT NULL DEFAULT 'code' CHECK (kind IN ('code', 'no-code'))",
+    'ALTER TABLE cards ADD COLUMN target TEXT',
+    'ALTER TABLE cards ADD COLUMN lane TEXT',
+    'ALTER TABLE cards ADD COLUMN lane_reviewer TEXT',
+    'ALTER TABLE cards ADD COLUMN paths_declared INTEGER NOT NULL DEFAULT 0 CHECK (paths_declared IN (0, 1))',
+    // None's paths of a card (§16.3.3): those it declared, and the pre-fill Hive saw it edit; the watcher and None's
+    // checks ask which cards hold a path.
+    `CREATE TABLE card_paths (
+      card INTEGER NOT NULL REFERENCES cards (number) ON DELETE CASCADE,
+      kind TEXT    NOT NULL CHECK (kind IN ('declared', 'prefill')),
+      ord  INTEGER NOT NULL,
+      path TEXT    NOT NULL,
+      PRIMARY KEY (card, kind, path)
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE INDEX card_paths_path ON card_paths (path)',
+    // The runtime's lanes (§16.11.1: their cards in order, the ruleset they started with, the card in flight, a list
+    // change queued for the next boundary), per project, until P4 makes lanes.ts' lanes the runtime's.
+    `CREATE TABLE workflow_lanes (
+      project     TEXT    NOT NULL COLLATE NOCASE,
+      id          TEXT    NOT NULL,
+      ruleset     TEXT    NOT NULL,
+      current     INTEGER,
+      ended       INTEGER NOT NULL DEFAULT 0 CHECK (ended IN (0, 1)),
+      has_pending INTEGER NOT NULL DEFAULT 0 CHECK (has_pending IN (0, 1)),
+      PRIMARY KEY (project, id)
+    ) STRICT, WITHOUT ROWID`,
+    `CREATE TABLE workflow_lane_cards (
+      project TEXT    NOT NULL COLLATE NOCASE,
+      lane    TEXT    NOT NULL,
+      list    TEXT    NOT NULL CHECK (list IN ('cards', 'pending')),
+      ord     INTEGER NOT NULL,
+      card    INTEGER NOT NULL,
+      PRIMARY KEY (project, lane, list, ord),
+      FOREIGN KEY (project, lane) REFERENCES workflow_lanes (project, id) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    // A target's merge queue paused (P7's queue, §16.9): why, by which card, the files a conflict named.
+    `CREATE TABLE workflow_queue_pauses (
+      project TEXT NOT NULL COLLATE NOCASE,
+      target  TEXT NOT NULL,
+      reason  TEXT NOT NULL,
+      card    TEXT NOT NULL,
+      PRIMARY KEY (project, target)
+    ) STRICT, WITHOUT ROWID`,
+    `CREATE TABLE workflow_queue_pause_files (
+      project TEXT    NOT NULL COLLATE NOCASE,
+      target  TEXT    NOT NULL,
+      ord     INTEGER NOT NULL,
+      path    TEXT    NOT NULL,
+      PRIMARY KEY (project, target, ord),
+      FOREIGN KEY (project, target) REFERENCES workflow_queue_pauses (project, target) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    // Each action's delivery, recorded once before its effect runs, so a run twice delivers once (§16.4.5). Transitional:
+    // #1211's typed deliveries (unique `action`) replace it when P4 wires wakes.
+    'ALTER TABLE card_actions ADD COLUMN delivered TEXT',
+    'CREATE INDEX card_actions_delivered ON card_actions (id) WHERE delivered IS NOT NULL'
   ]
 }
 
@@ -446,7 +506,7 @@ const KEYS: SchemaStep = {
 }
 
 /** P3's steps, in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS, KEYS]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -510,10 +570,18 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'facts.nextSeq': { sql: 'SELECT max(seq) FROM card_facts WHERE card = ?', args: [1], index: 'sqlite_autoindex_card_facts_1' },
   'facts.dedupe': { sql: 'SELECT 1 FROM card_facts WHERE card = ? AND kind = ? AND dedupe = ?', args: [1, 'HeadMoved', 'prev:1'], index: 'card_facts_dedupe' },
   'facts.ofKind': { sql: 'SELECT card, seq FROM card_facts WHERE kind = ? ORDER BY rowid', args: ['IntegrationRequested'], index: 'card_facts_kind' },
+  // cardWork.ts: the live cards' facts for the board's badges (#1223), an archived card's never read.
+  'facts.live': { sql: 'SELECT f.* FROM cards c JOIN card_facts f ON f.card = c.number WHERE c.archived = 0 ORDER BY f.card, f.seq', args: [], index: 'sqlite_autoindex_card_facts_1' },
   'actions.pending': { sql: "SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id", args: [], index: 'card_actions_pending' },
   'actions.ofCard': { sql: 'SELECT * FROM card_actions WHERE card = ?', args: [1], index: 'card_actions_card' },
   'rulesets.byId': { sql: 'SELECT data FROM rulesets WHERE id = ?', args: ['r1'], index: 'PRIMARY KEY' },
   'folderCommits.of': { sql: 'SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id', args: ['D:\\ws\\p'], index: 'folder_commits_seen' },
+  'paths.ofCard': { sql: 'SELECT path FROM card_paths WHERE card = ? AND kind = ? ORDER BY ord', args: [1, 'declared'], index: 'PRIMARY KEY' },
+  'paths.cardsOf': { sql: 'SELECT card FROM card_paths WHERE path = ?', args: ['src/a.txt'], index: 'card_paths_path' },
+  'workflowLanes.of': { sql: 'SELECT * FROM workflow_lanes WHERE project = ? AND id = ?', args: ['p', 'L'], index: 'PRIMARY KEY' },
+  'workflowLanes.cards': { sql: 'SELECT list, card FROM workflow_lane_cards WHERE project = ? AND lane = ? ORDER BY list, ord', args: ['p', 'L'], index: 'PRIMARY KEY' },
+  'queuePauses.of': { sql: 'SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'actions.delivered': { sql: 'SELECT id, delivered FROM card_actions WHERE delivered IS NOT NULL ORDER BY id', args: [], index: 'card_actions_delivered' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },

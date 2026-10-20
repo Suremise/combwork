@@ -130,7 +130,7 @@ const versionOf = (file: string): number => {
 }
 
 describe('the cards step (#1209)', () => {
-  it('is in the 1.0 group, before the keys step (#1219) that numbers its cards', () => {
+  it("is in the 1.0 group, after #1212's step, before the keys step (#1219) that numbers its cards", () => {
     const step = store.BOARD_MIGRATIONS.find((m) => m.name === 'cards in tables')
     expect(step).toMatchObject({ version: 5, group: '1.0' })
     expect(store.BOARD_MIGRATIONS.find((m) => m.name === 'project keys')!.version).toBeGreaterThan(5)

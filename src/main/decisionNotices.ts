@@ -3,7 +3,7 @@ import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { onHiveEvent } from './events'
-import { allTasks } from './tasks'
+import { allTasksSeen } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 
@@ -35,10 +35,10 @@ export const cardReadsBy = (agent: { projectPath: string; agentId: string }): nu
 
 // The board's live cards as last read, per workspace, until it changes: an agent's every board call shouldn't read every
 // card, and never the archived ones (#1107: 945 of them, 13 MB, on a busy board), which have no decisions to tell.
-const boards = new Map<string, Promise<TaskCard[]>>()
+const boards = new Map<string, Promise<{ cards: TaskCard[]; generations: Map<number, number> }>>()
 let changes = 0
 let listening = false
-function board(ws: WorkspaceService): Promise<TaskCard[]> {
+function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
   if (!listening) {
     listening = true
     onHiveEvent((e) => {
@@ -51,7 +51,8 @@ function board(ws: WorkspaceService): Promise<TaskCard[]> {
   let p = boards.get(key)
   if (!p) {
     const at = changes
-    p = allTasks(ws, { archived: false })
+    // With each card's decision generation read with it (#1216): what a line tells, its receipt records.
+    p = allTasksSeen(ws, { archived: false })
     boards.set(key, p)
     // A read the board changed under isn't kept for the next call.
     void p.then(
@@ -98,19 +99,21 @@ export async function newDecisions(ws: WorkspaceService, agent: { projectPath: s
  * newDecisions, each card with when its newest such decision was made (ms): for a line that tells them (#401). `told`:
  * per card, what an earlier line already told (the latest decision time it covered): only later ones count.
  */
-export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>): Promise<Map<number, { count: number; latest: number }>> {
-  const out = new Map<number, { count: number; latest: number }>()
+export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>): Promise<Map<number, { count: number; latest: number; generation: number }>> {
+  const out = new Map<number, { count: number; latest: number; generation: number }>()
   if (!ws.path) return out
   const project = basename(agent.projectPath).toLowerCase()
   const seen = reads.get(keyOf(agent))
   const t = (iso: string | undefined): number => Date.parse(iso ?? '') || 0
-  for (const c of await board(ws)) {
+  const { cards, generations } = await board(ws)
+  for (const c of cards) {
     if (!c.decisions?.length || c.project.toLowerCase() !== project) continue
     const base = baseline(c, agent.agentId, self, seen?.get(c.number))
     if (base === null) continue
     const since = Math.max(base, told?.get(c.number) ?? 0)
     const fresh = c.decisions.filter((d) => t(d.editedAt) > since || (d.recordedBy !== self && t(d.at) > since))
-    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))) })
+    // The card's decision generation, read with its decisions: what a receipt of this line records (#1216).
+    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))), generation: generations.get(c.number) ?? 0 })
   }
   return out
 }

@@ -7,7 +7,6 @@ import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { MergeQueue } from '../../src/main/workflow/mergeQueue'
-import { FactStore } from '../../src/main/workflow/factStore'
 import { Workflow } from '../../src/main/workflow/runtime'
 
 let env: Env | null = null
@@ -191,7 +190,7 @@ describe('the merge queue', () => {
     const a = await queued(e, 'Removed')
     moved(await e.wf.removeFromQueue(a.card.key, 'not now'))
     const restarted = () => {
-      const store = new FactStore(join(e.home, 'workflow.db'))
+      const store = e.reopen()
       const wf = new Workflow({ ...e.wf.cfg, store, autoRun: false })
       return { wf, store, q: new MergeQueue(wf, { folder: join(e.home, 'queue'), runCheck: async () => ({ ok: true, output: '' }) }) }
     }

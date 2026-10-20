@@ -100,6 +100,7 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { MetricsQuery, MetricsReport } from './metrics'
+import type { Fact } from './workflow/facts'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDeleted, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
@@ -112,6 +113,7 @@ import type { BoardFoldChange } from './tasks'
 import type { CardCost, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
+import type { WorkBadge, WorkView } from './workflow/workView'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -313,6 +315,8 @@ export interface HiveRequests {
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   'tasks:update': (n: number, patch: TaskPatch) => TaskCard
+  /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
+  'tasks:facts': (n: number) => Fact[]
   'tasks:comment': (n: number, text: string) => TaskCard
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
   'tasks:editDecision': (n: number, id: string, text: string | null) => TaskCard
@@ -327,6 +331,10 @@ export interface HiveRequests {
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
   'tasks:start': (n: number, target: TaskStartTarget) => { agentId: string; agentName: string; added: boolean }
+  /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
+  'tasks:work': (n: number) => WorkView | null
+  /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
+  'tasks:workBadges': () => WorkBadge[]
 
   'session:list': (projectPath: string) => SessionListItem[]
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */

@@ -480,6 +480,12 @@ const prose = (seed, n) => {
   check('API: GET /v1/projects still has settings', apiProjects.every((x) => x.settings && x.path))
   const apiShort = (await api('GET', '/v1/tasks?column=todo&view=short')).body
   check('API: ?view=short gives rows', apiShort.length === 50 && !('description' in apiShort[0]) && typeof apiShort[0].comments === 'number')
+  // 1.0 (#1223): a card ends with its stage, additive; its facts are short rows (none here: no 1.0 rule has run on it).
+  check('API: a card ends with its 1.0 stage', Object.keys(apiCard).at(-1) === 'stage' && apiCard.stage === 'todo' && apiCard.column === 'todo', JSON.stringify({ stage: apiCard.stage, last: Object.keys(apiCard).at(-1) }))
+  const factsText = await route('GET /v1/tasks/n/facts', 'GET', `/v1/tasks/${todo[41]}/facts`)
+  const facts = JSON.parse(factsText)
+  check("API: a card's facts, lean", facts.number === todo[41] && facts.stage === 'todo' && Array.isArray(facts.facts) && factsText.length <= 200, factsText.slice(0, 200))
+  check('API: facts in a view it has not is 400', (await api('GET', `/v1/tasks/${todo[41]}/facts?view=long`)).status === 400)
 
   // --- Performance metrics (#115): what the bridge reports is the model's text exactly, attributed by the caller's own
   // token; the API counts route templates, never paths asked for; the bridge's reports aren't API traffic.

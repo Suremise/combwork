@@ -19,6 +19,9 @@ export type Category = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
 export const STAGE_CATEGORY: Record<StageId, Category> = { hold: 'hold', todo: 'todo', active: 'doing', review: 'review', approved: 'passed', merging: 'passed', done: 'done' }
 
+/** The stage a column stands for, for a card no 1.0 rule has moved yet (its `stage` empty). */
+export const CATEGORY_STAGE: Record<Category, StageId> = { hold: 'hold', todo: 'todo', doing: 'active', review: 'review', passed: 'approved', done: 'done' }
+
 export type CardKind = 'code' | 'no-code'
 
 export interface FileChange {
@@ -44,6 +47,12 @@ export interface StartedData {
   manifest?: Manifest
   /** None: every deliverable's hash at the start, which unclaimed changes are found against (§16.4.2). */
   deliverables?: Manifest
+  /**
+   * `Adopted` only: the folder's head observed at the upgrade (null when it couldn't be read), apart from `base` (§16.17:
+   * the card's work so far is base..head). A `Started` fact, and an `Adopted` one written before #1218 round 2, has
+   * none: its head is its base.
+   */
+  head?: string | null
   /** `Adopted` only: the column it was in at the upgrade (§16.17). */
   adoptedFrom?: 'doing' | 'review' | 'passed'
   passedBefore1_0?: boolean
@@ -127,7 +136,8 @@ export interface FactData {
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
-  Decision: { decision: string; generation: number; text: string }
+  /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
+  Decision: { decision: string; generation: number; text: string; removed?: boolean }
   DecisionsReceived: { agent: string; generation: number }
   CannotWithinRules: { rule: string; why: string; request: string }
   ReviewerRequest: { text: string }
@@ -275,7 +285,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.cycle = f.seq
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
-        s.head = d.base
+        s.head = d.head !== undefined ? d.head : d.base
         s.builders = addOnce(s.builders, d.builder)
         break
       }
