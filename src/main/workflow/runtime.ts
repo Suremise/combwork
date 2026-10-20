@@ -41,6 +41,12 @@ export interface Ask {
 
 export type Reply = Moved | Refusal
 
+/** What an intent decided on, fingerprinted (`evidenceOf`): the adapter's primed reads and the fingerprint then. */
+export interface Evidence {
+  primed: unknown
+  value: string | null
+}
+
 /** The user's (or the Assistant's) drag running an intent: asking first, or across the rules that refuse, with a reason. */
 export interface Drag {
   by: 'user' | 'assistant'
@@ -341,17 +347,20 @@ export class Workflow {
    * None's paths' hash) and the facts of the cards it waits for. Taken before the slow reads and again inside the
    * transaction (`evidenceChanged`), so nothing is written on evidence that changed meanwhile.
    */
-  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<string> {
-    await this.platform(o).prime()
-    return this.evidenceNow(card, s, o)
+  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<Evidence> {
+    const primed = await this.platform(o).prime(card, s, o)
+    return { primed, value: this.evidenceNow(card, s, o, primed) }
   }
 
-  private evidenceNow(card: CardRecord, s: CardState, o: WorkflowOptions): string {
-    return [this.platform(o).evidence(card, s, o), ...card.blockedBy.map((id) => `${id}:${this.state(id).lastSeq}`)].join('#')
+  private evidenceNow(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
+    const platform = this.platform(o).evidence(card, s, o, primed)
+    return platform === null ? null : [platform, ...card.blockedBy.map((id) => `${id}:${this.state(id).lastSeq}`)].join('#')
   }
 
-  private evidenceChanged(w: Write, o: WorkflowOptions, before: string): GuardRefusal | null {
-    return this.evidenceNow(w.card, w.state(), o) === before ? null : { rule: 'evidence.changed', values: { card: w.card.key } }
+  /** Refused when the evidence changed since it was taken, or can't be read now or then (unknown never satisfies). */
+  private evidenceChanged(w: Write, o: WorkflowOptions, before: Evidence): GuardRefusal | null {
+    const now = this.evidenceNow(w.card, w.state(), o, before.primed)
+    return before.value !== null && now === before.value ? null : { rule: 'evidence.changed', values: { card: w.card.key } }
   }
 
   /** Is a card Done by facts: integrated, or accepted (§16.5.3 `start.dependenciesIntegrated`), not just Approved. */
@@ -415,6 +424,22 @@ export class Workflow {
     w.fact('ApprovalRequested', { request, kind, gate, text, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
     w.action('notify', { text })
     return request
+  }
+
+  /**
+   * Asks the user again for a gate still unmet where the card now is (its request was retired by a trip to On Hold):
+   * the review under "You" (or "…, then you" once the reviewers passed it) in Review, the OK before merging in Approved.
+   */
+  reask(w: Write): void {
+    const r = w.ruleset
+    const s = w.state()
+    if (!r || !s.latest || s.stale || s.requests.some((x) => x.gate === 'review' || x.gate === 'okBefore')) return
+    const o = r.options
+    if (w.current === 'review' && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
+      this.askUser(w, 'approve', 'review', `${w.card.key} waits for your review`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+    } else if (w.current === 'approved' && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
+      this.askUser(w, 'approve', 'okBefore', `${w.card.key} is approved: OK to merge?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+    }
   }
 
   /** Wakes an agent: a durable action delivered once (§16.4.5). */
@@ -514,11 +539,13 @@ export class Workflow {
     const last = s.entries.at(-1)
     // (A decision's cancel isn't a queue failure: the builder resubmits as usual, with a note for the same revision.)
     if (from === 'active' && o.finish === 'hiveMerges' && card.kind === 'code' && last && (last.state === 'failed' || (last.state === 'cancelled' && last.cancelled !== 'decision')) && !s.stale) {
+      // The same evidence protocol as an ordinary submit: taken before the revision is read, checked at the write.
+      const evidence = await this.evidenceOf(card, s, o)
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
         const g = await this.write(card, r, actor, (w) => {
-          const bad = this.stillAt(w, s, 'submit') ?? this.check(w, 'requeue', { agent, revision: now })
+          const bad = this.stillAt(w, s, 'submit') ?? this.evidenceChanged(w, o, evidence) ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
           this.enqueue(w, 'transient')
           return null
@@ -894,6 +921,8 @@ export class Workflow {
           const requeue = to === was && (was === 'merging' || (was === 'approved' && r.options.finish === 'hiveMerges' && !s.stale && !notApproved(s, r, card.labels)))
           w.move(requeue ? 'approved' : was, 'user')
           if (requeue) this.enqueue(w)
+          // The trip to On Hold retired the gate's request (it belongs to its stage): asked again, if still unmet.
+          else this.reask(w)
           return null
         })
         if (out) return this.refuse(card, by, 'move', out)
@@ -906,7 +935,9 @@ export class Workflow {
     // submit, then the review skipped): never a bare move that leaves a card with no start, nothing to review or no
     // queue entry. Each step that skips nothing just happens; one that would skip a rule asks first (§16.8.4).
     if (from !== 'hold' && ORDER.indexOf(to) > ORDER.indexOf(from) && to !== 'done') return this.dragForward(card, from, to, by, opts)
-    const skipped = this.skippedRules(card, r, from === 'hold' ? 'todo' : from, to)
+    // Out of On Hold, the rules a move skips count from where the card was, not from Todo.
+    const heldFrom = from === 'hold' ? ([...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')?.data.from ?? 'todo') : from
+    const skipped = this.skippedRules(card, r, heldFrom, to)
     if (skipped.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules: skipped }
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant')
     const out = await this.write(card, r, by, (w) => {
@@ -941,8 +972,14 @@ export class Workflow {
     }
     const s = this.state(card)
     if (ORDER.indexOf(s.stage) >= ORDER.indexOf(to)) return this.ok(card, from, s.stage)
-    // Past Review (or the user's OK): the review and approvals are skipped, named, and the change counts as approved.
     const rs = this.rulesetOf(card, s)
+    // Already approved (back from On Hold, or the OK given): Merging is just the queue, nothing skipped.
+    if (s.latest && !s.stale && !notApproved(s, rs, card.labels)) {
+      if (to !== 'merging' || rs.options.finish !== 'hiveMerges') return this.ok(card, from, s.stage)
+      const out = await this.write(card, rs, by, (w) => this.stillAt(w, s, 'move') ?? (this.enqueue(w), null))
+      return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
+    }
+    // Past Review (or the user's OK): the review and approvals are skipped, named, and the change counts as approved.
     const rules = ['integrate.approved']
     if (asking) return by === 'user' ? { ask: true, card: card.key, rules } : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant')
     const out = await this.write(card, rs, by, (w) => {
@@ -996,13 +1033,18 @@ export class Workflow {
     const s = this.state(card)
     const e = openEntry(s)
     const r = this.rulesetOf(card, s)
-    await this.write(card, r, 'user', (w) => {
-      if (!e || this.stillAt(w, s, 'remove from queue')) return
+    await this.cfg.hooks?.beforeWrite?.('remove from queue')
+    const out = await this.write(card, r, 'user', (w) => {
+      const changed = this.stillAt(w, s, 'remove from queue')
+      if (changed) return changed
+      if (!e) return null
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by: 'user', reason })
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' })
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
+      return null
     })
+    if (out) return this.refuse(card, 'user', 'remove from queue', out)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 

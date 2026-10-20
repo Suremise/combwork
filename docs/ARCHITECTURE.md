@@ -270,9 +270,13 @@ actor)`. It asks the platform adapter for the facts the guards need first, outsi
 containment, check facts: slow reads). Then, inside one `boardWrite` transaction, it reads the card, its facts and
 its ruleset, **re-reads the cheap folder state the guards depend on** (head and dirty for Git; for None the stored
 hash against the watcher's write log since it was computed), refusing if it differs from what the slow reads used
-rather than racing (P2's protocol: the adapter's `evidence()`, a fingerprint read with no process, refs from their
-files and None's paths' hash, plus the facts of the cards it waits for, taken before the slow reads and again in the
-transaction; if it changed, the intent is refused `evidence.changed`, "try again"); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
+rather than racing (P2's protocol: the adapter's `evidence()`, a fingerprint read with no process: Git, the target's
+and line's refs from their files, the card folder's own HEAD, its index, an operation under way and each covered
+tracked file's and folder's size and time (the builder's own paths in a shared folder); None, its paths' hash; plus
+the facts of the cards it waits for. `prime()` lists what it covers once per intent; a card in Todo has no folder yet,
+so a start covers its target alone. Taken before the slow reads and again in the transaction, in every intent with
+platform inputs (start, submit and its requeue, verdict, answer, report merge); if it changed, or can't be read, the
+intent is refused `evidence.changed`, "try again"); runs the guards in the ruleset's order; on a refusal appends `Refused` (agents and the Assistant)
 and returns the refusal; else writes the facts and `Moved`, updates the card's `column`/`stage` cache, and writes
 the side effects as `card_actions` rows (wakes, notifications, the queue, slot work) in the same transaction. A worker
 runs them after the commit (`afterBoardWrite` starts it) and again at start for any left pending, so nothing outside

@@ -73,12 +73,14 @@ export interface PlatformAdapter {
   /** A platform's durable action (a card's folder, a pin): false when the kind isn't this platform's. */
   perform(kind: string, payload: Record<string, unknown>): Promise<boolean>
   /**
-   * The evidence an intent decides on, as a fingerprint read synchronously (refs from their files, None's paths'
-   * hash): read before the slow reads and again inside the transaction; if it changed, the intent is refused, never
-   * written on stale evidence. `prime` does the slow part once (Git: finding the repository's git folder).
+   * The evidence an intent decides on, as a fingerprint read synchronously, with no process: Git, the target's and
+   * line's refs, the card folder's own HEAD, its index, an operation under way and every tracked file and folder it
+   * covers (the agent's own paths in a shared folder); None, its paths' hash. Read before the slow reads and again
+   * inside the transaction: if it changed, or can't be read (null), the intent is refused, never written on stale
+   * evidence. `prime` does the slow part once per intent (the git folders, the tracked files) and hands it on.
    */
-  prime(): Promise<void>
-  evidence(card: CardRecord, s: CardState, o: WorkflowOptions): string
+  prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown>
+  evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
 }

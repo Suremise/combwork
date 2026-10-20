@@ -3,7 +3,8 @@
 //
 // P2 spike (#1118): not wired into the app yet.
 
-import { join } from 'path'
+import { existsSync, statSync } from 'original-fs'
+import { dirname, join } from 'path'
 import { git } from '../git'
 import type { CardState, FileChange } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
@@ -15,6 +16,16 @@ import { slugOf, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
 import { isUnknown, type Containment, type Maybe } from './types'
+
+/** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
+function statLine(p: string): string {
+  try {
+    const s = statSync(p)
+    return `${s.size}:${s.mtimeMs}`
+  } catch {
+    return 'gone'
+  }
+}
 
 const unknownRefusal = (card: CardRecord, what: string, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what, rule } })
 
@@ -48,18 +59,47 @@ export class GitPlatform implements PlatformAdapter {
 
   private common: string | null = null
 
-  async prime(): Promise<void> {
-    if (this.common) return
-    const c = await G.commonDir(this.project)
-    if (!isUnknown(c)) this.common = c
+  /** The slow part of the evidence, once per intent: the git folders, and the tracked files (and their folders) it covers. */
+  async prime(card: CardRecord, s: CardState): Promise<unknown> {
+    if (!this.common) {
+      const c = await G.commonDir(this.project)
+      if (!isUnknown(c)) this.common = c
+    }
+    // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
+    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [] }
+    const folder = this.wf.folderOf(s)
+    const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
+    const ls = await git(folder, ['ls-files', '-z'])
+    if (!gd.ok || !ls.ok) return null
+    // In a shared folder only the builder's own paths count (others' edits are "not yours", §16.3.2's dirty).
+    const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
+    const all = ls.out.split('\0').filter(Boolean)
+    const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
+    return { gitDir: gd.out.trim(), folder, files }
   }
 
-  /** The heads a card's guards read: its target's and its line's (or the shared folder's), from the ref files. */
-  evidence(card: CardRecord, s: CardState, o: WorkflowOptions): string {
-    if (!this.common) return 'unknown'
+  /**
+   * The state a card's guards read (ARCHITECTURE "The one path"): the target's and the line's refs, the folder's own
+   * HEAD (a checkout or reset elsewhere shows), its index and any merge, rebase or cherry-pick under way, and each
+   * covered tracked file's and folder's size and time (an edit, or a new file beside them, shows). Null when unreadable.
+   */
+  evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
+    const p = primed as { gitDir: string | null; folder: string | null; files: string[] } | null
+    if (!this.common || !p) return null
     const target = s.started?.target ?? card.target ?? o.target
-    const line = s.started?.line
-    return [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : ''].join('|')
+    const line = s.stage === 'todo' ? null : s.started?.line
+    const parts = [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : '']
+    if (p.gitDir && p.folder) {
+      parts.push(`HEAD:${G.refSync(p.gitDir, 'HEAD') ?? ''}`, statLine(join(p.gitDir, 'index')))
+      for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) parts.push(existsSync(join(p.gitDir, m)) ? m : '')
+      const dirs = new Set<string>(['.'])
+      for (const f of p.files) {
+        parts.push(statLine(join(p.folder, f)))
+        dirs.add(dirname(f))
+      }
+      for (const d of [...dirs].sort()) parts.push(statLine(join(p.folder, d)))
+    }
+    return parts.join('|')
   }
 
   async revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {

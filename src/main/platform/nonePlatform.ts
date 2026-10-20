@@ -31,12 +31,14 @@ export class NonePlatform implements PlatformAdapter {
     return { folder: 'project', line: null, base: rev.revision, target: null, manifest: rev.manifest, ...(deliverables && !isUnknown(deliverables) ? { deliverables } : {}) }
   }
 
-  async prime(): Promise<void> {}
+  async prime(): Promise<unknown> {
+    return null
+  }
 
-  /** The card's paths' hash now (the hash cache follows writes, so an edit since shows). */
-  evidence(card: CardRecord): string {
+  /** The card's paths' hash now (the hash cache follows writes and file times, so an edit since shows). */
+  evidence(card: CardRecord): string | null {
     const r = this.hashing.revision(this.wf.store.card(card.id).paths ?? [])
-    return isUnknown(r) ? 'unknown' : r.revision
+    return isUnknown(r) ? null : r.revision
   }
 
   async revisionNow(card: CardRecord): Promise<Maybe<string | null>> {

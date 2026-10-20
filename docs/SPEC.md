@@ -1756,8 +1756,10 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   step refused for something no override can make true (nothing to submit, a fact that couldn't be read) stops the
   drag there, so a card never sits in Active with no start, in Review with nothing to review or in Merging with no
   entry. Done is a plain move (no `Integrated` faked), and a stage the card's ruleset doesn't have isn't a place to
-  drag to. Out of On Hold, a drag back to where the card was returns it there (queued again if it was queued); a drag
-  past it returns it there first and then runs the intents of a drag from there.
+  drag to. Out of On Hold, a drag back to where the card was returns it there (queued again if it was queued, its
+  gate asked again if still unmet); a drag past it returns it there first and then runs the intents of a drag from
+  there; a move behind it counts the rules it skips from where the card was, not from Todo. A drag into Merging of a
+  card already approved just queues it (nothing skipped).
 
 #### 16.8.5 For you
 
@@ -1773,7 +1775,8 @@ generation current then), and its gate evaluated before anything moves on, so an
 newer work. A gate's request (the user's review, or the OK before merging) is bound to its submission, the stage it
 was asked in and the decision generation it was asked at: a new submission, the card leaving that stage or a newer
 decision retires it, and an answer begun before that is refused. The user is asked again when the gate is reached
-again: at once under "You" review in Review, after the reviewers' confirmation under "…, then you" [P2].
+again: at once under "You" review in Review, after the reviewers' confirmation under "…, then you", and when the card
+comes back from On Hold to the stage whose gate is still unmet [P2].
 
 #### 16.8.6 A refused commit (#907)
 
