@@ -18,7 +18,7 @@ const base = tempDir('hive-metrics-')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const metrics = await import('../src/main/metrics')
-const { storeTestHooks } = await import('../src/main/storeRows')
+const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
 const { closeAllBoards } = await import('../src/main/boardStore')
 afterAll(() => {
   closeAllBoards()

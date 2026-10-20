@@ -9,6 +9,7 @@ import { HIVE_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { withFileLock } from './fsutil'
 import { trash } from './trash'
@@ -90,6 +91,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: '1.0 upgrade',
     group: UPGRADE_GROUP_ID,
     up: (db) => db.prepare("INSERT INTO board_meta (key, value) VALUES ('format', '1.0') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run() // i18n-ignore: SQL
+  },
+  {
+    // #1212: lanes, watches and metrics out of `store_rows` into their typed tables (schema/storeCodec.ts, storeTables.ts),
+    // their values into board_meta.
+    version: 4,
+    name: STORES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => moveStores(db)
   }
 ]
 

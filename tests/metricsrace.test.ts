@@ -1,7 +1,7 @@
 // A workspace's metrics file has one writer at a time, across workspace lifetimes: a save still going after the
 // workspace closed (held here at the write) is followed, not overtaken, by what a reopened workspace does next (a
 // Reset, new records), whether it is reopened by the same window, another window, or by its path written in other case.
-// The gate is storeRows' hook at the start of a save to the workspace database (#1019: metrics.json's atomic write before).
+// The gate is storeTables' hook at the start of a save to the workspace database (#1019: metrics.json's atomic write before).
 import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -15,7 +15,7 @@ const base = tempDir('hive-metrics-race-')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const metrics = await import('../src/main/metrics')
-const { storeTestHooks } = await import('../src/main/storeRows')
+const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
 const { closeAllBoards } = await import('../src/main/boardStore')
 afterAll(() => {
   storeTestHooks.beforeSave = null
