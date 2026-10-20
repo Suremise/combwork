@@ -154,7 +154,9 @@ interface HiveMessageValues {
   'board.delete.title': { card: string | number }
   'board.details.agent': undefined
   'board.details.card': undefined
+  'board.details.check': undefined
   'board.details.command': undefined
+  'board.details.countsAsCheck': { name: string | number }
   'board.details.ended': undefined
   'board.details.exitCode': undefined
   'board.details.gone': undefined
@@ -162,6 +164,7 @@ interface HiveMessageValues {
   'board.details.lastStep': { step: string | number }
   'board.details.line': { label: string | number; text: string | number }
   'board.details.log': undefined
+  'board.details.notCounted': { name: string | number; why: string }
   'board.details.provider': undefined
   'board.details.revision': undefined
   'board.details.run': undefined

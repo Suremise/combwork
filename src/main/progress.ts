@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import type { ProgressRun, ProgressSource, ProviderId } from '../shared/types'
+import type { CheckWhyNot, ProgressRun, ProgressSource, ProviderId, RunCheck } from '../shared/types'
 import { MAX_COMMAND, MAX_ESTIMATE_MS, MAX_LOG_PATH, MAX_OPEN_PER_OWNER, MAX_OPEN_PER_WORKSPACE, MAX_STEP_NAME, MAX_SUMMARY, MAX_TITLE, MAX_TOTAL, RECENT_KEPT, isOpenRun, isOverdue, timeLeft } from '../shared/progress'
 import { PROVIDERS } from '../shared/providers'
 
@@ -154,7 +154,8 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
       ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
-      ...runFor(keptFor(r))
+      ...runFor(keptFor(r)),
+      ...keptCounts(r.counts)
     })
   }
   return out
@@ -172,6 +173,18 @@ function runFor(f: RunFor): Pick<ProgressRun, 'card' | 'revision' | 'testedCheck
     ...(f.check ? { check: f.check } : {}),
     ...(f.folder ? { folder: f.folder } : {})
   }
+}
+
+const WHY_NOT = new Set<string>(['notCheck', 'notContained', 'dirty', 'changed', 'moved', 'revisionChanged'])
+
+/** How a kept run counted as a check (#1222), checked: a check's name, counted or a known reason. */
+function keptCounts(v: unknown): Pick<ProgressRun, 'counts'> {
+  if (!v || typeof v !== 'object') return {}
+  const c = v as Record<string, unknown>
+  const name = keptText(c.name, MAX_TITLE)
+  if (!name || typeof c.counted !== 'boolean') return {}
+  if (c.counted) return { counts: { name, counted: true } }
+  return typeof c.whyNot === 'string' && WHY_NOT.has(c.whyNot) ? { counts: { name, counted: false, whyNot: c.whyNot as CheckWhyNot } } : {}
 }
 
 const COMMIT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
@@ -429,6 +442,15 @@ export class ProgressStore {
     if (run.state === 'failed') this.unseenFailure.add(key(run.workspacePath))
     this.ended(run.workspacePath)
     return run
+  }
+
+  /** How a finished run counted as a check (#1222): kept with it, and the window hears. */
+  noteCheck(workspacePath: string, id: string, c: RunCheck): void {
+    const run = this.runs.get(key(workspacePath))?.find((r) => r.id === id)
+    if (!run || run.finishedAt === null) return
+    run.counts = c.counted ? { name: c.name, counted: true } : { name: c.name, counted: false, ...(c.whyNot ? { whyNot: c.whyNot } : {}) }
+    this.mark(key(workspacePath), [id])
+    this.ended(workspacePath)
   }
 
   /**

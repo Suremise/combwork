@@ -111,7 +111,9 @@ export function publicRun(r: ProgressRun): Record<string, unknown> {
     ...(r.card ? { card: cardRefText(r.card) } : {}),
     ...(r.revision ? { revision: r.revision } : {}),
     ...(r.testedCheckout ? { testedCheckout: r.testedCheckout } : {}),
-    ...(r.check ? { check: r.check } : {})
+    ...(r.check ? { check: r.check } : {}),
+    // How it counted as a check of its card (#1222), once it finished.
+    ...(r.counts ? { counts: r.counts } : {})
   }
 }
 
