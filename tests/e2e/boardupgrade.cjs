@@ -164,6 +164,9 @@ async function themes(dev, name) {
     check('Not Now leaves a banner at the top of the window', !!(await lib.until(async () => (await banner.count()) === 1 && (await ask.count()) === 0, HUNG_MS)))
     check("…which says the board is read-only and agents can't start", /its board is read-only here and its agents can't start/.test(await banner.innerText().catch(() => '')), await banner.innerText().catch(() => ''))
     await dev.page.screenshot({ path: path.join(shots, '3-banner-session.png') })
+    // New Session is off too, saying why (#1230): a start would be refused.
+    const newSession = dev.page.locator('.session-empty-card .btn.act-start')
+    check('…New Session is off, saying why', !!(await lib.until(async () => (await newSession.count()) === 1 && (await newSession.isDisabled()), HUNG_MS)) && /its agents can't start/.test((await newSession.getAttribute('title')) ?? ''), (await newSession.getAttribute('title').catch(() => null)) ?? 'no title')
     await refusesStart(dev, 'while the upgrade waits')
     await dev.page.locator('.activity-btn[aria-label="Task Board"]').click()
     check('the banner is there above the board too', !!(await lib.until(async () => (await banner.count()) === 1 && (await dev.page.locator('.board-toolbar').count()) === 1, HUNG_MS)))
@@ -173,6 +176,17 @@ async function themes(dev, name) {
     const refusedWrite = await failure(dev.inv('tasks:create', { title: 'Too soon', project: 'alpha' }))
     check('the dev build refuses a change meanwhile', /read-only until it is upgraded to 1\.0/.test(refusedWrite ?? ''), refusedWrite ?? 'accepted')
     check('…and shows the 0.9 cards', !!(await lib.until(async () => (await dev.page.locator('.task-card', { hasText: 'Still 0.9' }).count()) === 1, HUNG_MS)))
+    // Its cards can be read, not changed (#1230): no dragging, and the card dialog's changes off, saying why.
+    const tile = dev.page.locator('.task-card', { hasText: 'Still 0.9' })
+    check('…its cards can not be dragged', (await tile.getAttribute('draggable')) === 'false', String(await tile.getAttribute('draggable')))
+    await tile.click()
+    const dialog = dev.page.locator('.dialog', { has: dev.page.locator('.task-read-only') })
+    check('…its card dialog opens, saying the card is read-only', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)) && /its board is read-only here/.test(await dialog.locator('.task-read-only').innerText().catch(() => '')))
+    const saveBtn = dialog.locator('.dialog-footer .btn.primary', { hasText: 'Save' })
+    check("…with Save, the comment box and the decision box off", (await saveBtn.isDisabled()) && (await dialog.getByRole('textbox', { name: 'New comment' }).isDisabled()) && (await dialog.getByRole('textbox', { name: 'New decision' }).isDisabled()) && (await dialog.locator('.task-title-input').getAttribute('readonly')) !== null)
+    await themes(dev, '3-dialog')
+    await dev.page.keyboard.press('Escape')
+    check('…and it closes with nothing to discard', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
 
     // 5. The 0.9 Hive closed: the banner's Upgrade… runs it.
     await close(old1)

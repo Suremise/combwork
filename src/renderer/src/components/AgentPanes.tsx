@@ -19,7 +19,7 @@ import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call, errorMessage } from '../api'
-import { NO_IDS, NO_PROJECTS, agentPage, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, showGit, showInOverview, showPage, shownLayout, useLanguage, useStore } from '../store'
+import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, showGit, showInOverview, showPage, shownLayout, useLanguage, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
@@ -36,6 +36,7 @@ import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
 import { unknownStateText } from '@shared/runtime'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
+import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
 
 /** Height of an agent pane's header (who it is, its controls) and footer (its session's details). */
 export const PANE_HEADER = 26
@@ -195,17 +196,19 @@ const STOP = msg({ id: 'panes.agent.stop', defaultMessage: 'Stop', description: 
 export function ResumeButton({ project, a, className, label }: { project: ProjectInfo; a: AgentInfo; className?: string; label?: string }) {
   useLanguage()
   const picker = useSessionPicker()
+  // Its workspace's 1.0 upgrade waits (#1230): no session can start.
+  const blocked = useStartBlocked()
   const choose = tr(msg({ id: 'panes.resume.choose', defaultMessage: 'Choose a session to resume', description: "Tooltip and accessible name of the ▾ beside an agent's Resume button: opens the session picker." }))
   return (
     <span className="split-btn">
-      <Tooltip content={resumeTip(project, a)}>
+      <Tooltip content={blocked ?? resumeTip(project, a)}>
         {/* Its label can fold away in a very narrow bar (#890): the name stays for screen readers. */}
-        <button className={cx('btn', className)} disabled={!a.resume} onClick={() => void actions.resumeLast(project.path, a.id)} aria-label={label ?? tr(RESUME)}>
+        <button className={cx('btn', className)} disabled={!a.resume || !!blocked} onClick={() => void actions.resumeLast(project.path, a.id)} aria-label={label ?? tr(RESUME)}>
           <Icon name="debug-continue" /> <span className="btn-label">{label ?? tr(RESUME)}</span>
         </button>
       </Tooltip>
-      <Tooltip content={choose}>
-        <button className={cx('btn', 'split-caret', className)} onClick={(e) => picker.openBelow(e.currentTarget, project, a)} aria-label={choose}>
+      <Tooltip content={blocked ?? choose}>
+        <button className={cx('btn', 'split-caret', className)} disabled={!!blocked} onClick={(e) => picker.openBelow(e.currentTarget, project, a)} aria-label={choose}>
           <Icon name="chevron-down" />
         </button>
       </Tooltip>
@@ -431,6 +434,9 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
   // What is left to merge, under Merge… (its count was the header's Merge button's before #977).
   const unmerged = worktree ? unmergedWork(useStore.getState().branchStatus[projectKey(project.path, a.id)], tr) : null
   const blocked = mergeBlocked(a.name, a.live?.status, tr)
+  // Its workspace's 1.0 upgrade waits (#1230): no session can start, said under each way to start one.
+  const startBlocked = startBlockedReason(get().boardState?.readOnly)
+  const noStart = startBlocked ? { disabled: true, detail: startBlocked } : {}
   return [
     ...(a.live
       ? [
@@ -439,9 +445,9 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
           archiveItem
         ]
       : [
-          { label: tr(RESUME), icon: 'debug-continue', action: 'resume' as const, disabled: !a.resume, onClick: () => void actions.resumeLast(project.path, a.id) },
-          { label: tr(RESUME_SESSION), icon: 'history', action: 'resume' as const, onClick: pick },
-          { label: tr(NEW_SESSION), icon: 'add', action: 'start' as const, onClick: () => void actions.newSession(project.path, a.id) }
+          { label: tr(RESUME), icon: 'debug-continue', action: 'resume' as const, disabled: !a.resume, ...noStart, onClick: () => void actions.resumeLast(project.path, a.id) },
+          { label: tr(RESUME_SESSION), icon: 'history', action: 'resume' as const, ...noStart, onClick: pick },
+          { label: tr(NEW_SESSION), icon: 'add', action: 'start' as const, ...noStart, onClick: () => void actions.newSession(project.path, a.id) }
         ]),
     ...(a.live?.status === 'watching'
       ? [{ label: tr(msg({ id: 'panes.menu.cancelWatch', defaultMessage: 'Cancel Card Watch', description: "Menu item (a watching agent's menu): ends its watch, so nothing wakes it." })), icon: 'eye-closed', onClick: () => void call('watch:cancel', project.path, a.id).catch((e) => notify('error', tr(CANCEL_WATCH_FAILED), String((e as Error).message ?? e))) }]
@@ -1180,6 +1186,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
   const live = a.live
   const failure = useStartFailure(project, a)
   const removing = useStore((s) => !!s.running[`removeAgent:${project.path}#${a.id}`])
+  const startBlocked = useStartBlocked()
   const cards = useAgentCards(project, a.id)
   const state = agentState(live, { blocked: cards.some((c) => !!c.blocked) })
   // For Compact… in ⋯: unavailable while the conversation is empty, recommended once its context passes the threshold.
@@ -1290,8 +1297,8 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       {live
         ? btn('stop-circle', tr(STOP), () => void actions.stopSession(project.path, a.id), 'act-stop', tr(msg({ id: 'panes.header.stopTip', defaultMessage: 'Stop this agent (the conversation is kept; resume it any time)', description: "Tooltip of a pane's Stop button." })))
         : a.resume
-          ? btn('debug-continue', tr(RESUME), () => void actions.resumeLast(project.path, a.id), 'act-resume', resumeTip(project, a))
-          : btn('add', tr(NEW_SESSION), () => void actions.newSession(project.path, a.id), 'act-start', tr(NEW_SESSION))}
+          ? btn('debug-continue', tr(RESUME), () => void actions.resumeLast(project.path, a.id), 'act-resume', startBlocked ?? resumeTip(project, a), !!startBlocked)
+          : btn('add', tr(NEW_SESSION), () => void actions.newSession(project.path, a.id), 'act-start', startBlocked ?? tr(NEW_SESSION), !!startBlocked)}
       <Tooltip content={alert.length ? <span style={{ whiteSpace: 'pre-line' }}>{[tr(MORE), ...alert].join('\n')}</span> : tr(MORE)}>
         <button
           ref={more}
@@ -1690,6 +1697,7 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   useLanguage()
   const failure = useStartFailure(project, a)
   const limit = useAgentLimit()
+  const startBlocked = useStartBlocked()
   if (!a) {
     // A single empty pane is a project without agents: its "No agents yet" (SessionEmpty) shows, not covered (#227).
     if (single) return null
@@ -1723,8 +1731,8 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
           // Together, so in a narrow pane they wrap under the text as one row (#890).
           <span className="session-ended-actions">
             <ResumeButton project={project} a={a} className={cx('act-resume', 'solid', !single && 'small')} />
-            <Tooltip content={tr(NEW_SESSION)}>
-              <button className={cx('btn', 'act-start', !single && 'small')} onClick={() => void actions.newSession(project.path, a.id)} aria-label={tr(NEW_SESSION)}>
+            <Tooltip content={startBlocked ?? tr(NEW_SESSION)}>
+              <button className={cx('btn', 'act-start', !single && 'small')} disabled={!!startBlocked} onClick={() => void actions.newSession(project.path, a.id)} aria-label={tr(NEW_SESSION)}>
                 <Icon name="add" /> <span className="btn-label">{tr(NEW_SESSION)}</span>
               </button>
             </Tooltip>
@@ -1740,9 +1748,11 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
       {a.worktree && <p className="faint">{ownWorktreeText(a.worktree.branch)}</p>}
       {setupPending && <p className="faint">{tr(msg({ id: 'panes.body.setupFirst', defaultMessage: 'Its setup command runs first.', description: "A stopped worktree agent's pane: its worktree setup command runs before its next session." }))}</p>}
       <div className="btns">
-        <button className="btn act-start solid small" onClick={() => void actions.newSession(project.path, a.id)}>
-          <Icon name="add" /> {tr(NEW_SESSION)}
-        </button>
+        <Tooltip content={startBlocked}>
+          <button className="btn act-start solid small" disabled={!!startBlocked} onClick={() => void actions.newSession(project.path, a.id)}>
+            <Icon name="add" /> {tr(NEW_SESSION)}
+          </button>
+        </Tooltip>
         <ResumeButton project={project} a={a} className={cx(RESUME_TINT, 'small')} />
       </div>
     </div>

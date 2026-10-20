@@ -135,7 +135,7 @@ function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'pr
 }
 
 /** The menu item that opens Archive All: a column's, or the board's (column null). Counted, and off with nothing shown. */
-function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest): MenuEntry {
+function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest, readOnly: string | null): MenuEntry {
   const { shown, total } = archiveScope(all, r)
   const where = r.column === null ? null : columnName(r.column, tr)
   let label: string
@@ -143,7 +143,7 @@ function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest): MenuEntry {
   else if (shown.length < total) label = tr(msg({ id: 'board.archiveAll.menuShown', defaultMessage: '{n, plural, one {Archive the # Shown Card (of {total, number})…} other {Archive the # Shown Cards (of {total, number})…}}', description: "Menu item in the board's ⋯ menu, when a search hides some cards: archive the {n} cards shown, of the board's {total}. Opens a dialog (…)." }), { n: shown.length, total })
   else if (where) label = tr(msg({ id: 'board.archiveAll.menuColumn', defaultMessage: 'Archive All in {column} ({total, number})…', description: "Menu item in a board column's ⋯ menu: archive all {total} cards of the column ({column}, its name). Opens a dialog (…)." }), { column: where, total })
   else label = tr(msg({ id: 'board.archiveAll.menuAll', defaultMessage: 'Archive All Cards ({total, number})…', description: "Menu item in the board's ⋯ menu: archive all {total} cards. Opens a dialog (…)." }), { total })
-  return { label, icon: 'archive', disabled: !shown.length, onClick: () => set({ boardArchiveAll: r }) }
+  return { label, icon: 'archive', disabled: !shown.length || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ boardArchiveAll: r }) }
 }
 
 /** Changes a card; a failure is a toast titled `what` (default: Could not change the card). */
@@ -189,23 +189,23 @@ function remove(c: TaskCard): Promise<boolean> {
   })
 }
 
-/** The right-click menu of a card. */
-function cardMenu(c: TaskCard): MenuEntry[] {
+/** The right-click menu of a card; on a read-only board (readOnly: why) only Open can be chosen. */
+function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
   return [
     { label: tr(msg({ id: 'board.menu.open', defaultMessage: 'Open', description: "Menu item on a card (right-click): opens the card's dialog." })), icon: 'go-to-file', onClick: () => set({ taskOpen: c.number }) },
     ...(c.archived
       ? []
       : [
-          { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project, onClick: () => set({ taskStartFor: c.number }) },
+          { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
-          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void change(c.number, { column: x.id })) })),
+          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void change(c.number, { column: x.id })) })),
           // A failed card still in Review goes back to its reviewer for the next round (#214).
-          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', onClick: () => void change(c.number, { column: 'review' }) }] : []),
+          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void change(c.number, { column: 'review' }) }] : []),
           { separator: true }
         ]),
-    { label: c.archived ? tr(BRING_BACK) : tr(ARCHIVE), icon: c.archived ? 'discard' : 'archive', onClick: () => void archive(c, !c.archived) },
-    { label: tr(msg({ id: 'board.menu.delete', defaultMessage: 'Delete…', description: 'Menu item on a card (right-click): deletes it after asking.' })), icon: 'trash', danger: true, onClick: () => void remove(c) }
+    { label: c.archived ? tr(BRING_BACK) : tr(ARCHIVE), icon: c.archived ? 'discard' : 'archive', disabled: !!readOnly, onClick: () => void archive(c, !c.archived) },
+    { label: tr(msg({ id: 'board.menu.delete', defaultMessage: 'Delete…', description: 'Menu item on a card (right-click): deletes it after asking.' })), icon: 'trash', danger: true, disabled: !!readOnly, onClick: () => void remove(c) }
   ]
 }
 
@@ -366,7 +366,8 @@ function CardTile({
   showProject,
   folded,
   onDragStart,
-  dropHere
+  dropHere,
+  readOnly
 }: {
   c: TaskCard
   projects: ProjectInfo[]
@@ -375,6 +376,8 @@ function CardTile({
   folded: boolean
   onDragStart: (e: React.DragEvent) => void
   dropHere: boolean
+  /** Why the board takes no changes (it can't be dragged then), or null. */
+  readOnly: string | null
 }) {
   const menu = useContextMenu()
   const { agent } = cardAgent(projects, c)
@@ -398,10 +401,10 @@ function CardTile({
   const stalledText = stalled ? tr(msg({ id: 'board.card.stalled', defaultMessage: 'Stalled: {why}', description: 'On a stalled card (and its tooltip when folded): nobody is getting on with it, and why ({why}, a sentence).' }), { why: stalled }) : ''
   const props = {
     className: cx('task-card', folded && 'folded', c.blocked && 'blocked', finished && 'finished', stalled && !c.blocked && 'stalled'),
-    draggable: !c.archived,
+    draggable: !c.archived && !readOnly,
     onDragStart,
     onClick: () => set({ taskOpen: c.number }),
-    onContextMenu: (e: React.MouseEvent) => menu.open(e, cardMenu(c)),
+    onContextMenu: (e: React.MouseEvent) => menu.open(e, cardMenu(c, readOnly)),
     'data-task': c.number
   }
   if (folded) {
@@ -669,7 +672,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
     { separator: true },
     { label: collapseLabel(tr(COLUMN_TEXT[col.id].label)), icon: 'chevron-left', onClick: () => collapseColumn(col.id, true) },
     { separator: true },
-    archiveAllItem(all, { column: col.id, project, scope, query })
+    archiveAllItem(all, { column: col.id, project, scope, query }, readOnly)
   ]
 
   return (
@@ -735,6 +738,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
                   showProject={project === null}
                   folded={folded.has(c.number)}
                   dropHere={!!drag && drag.column === col.id && drag.before === c.number && drag.n !== c.number}
+                  readOnly={readOnly}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', `#${c.number}`)
@@ -989,7 +993,7 @@ export function BoardToolbar({
           onClick={(e) => {
             const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
             menu.openAt(b.left, b.bottom, [
-              archiveAllItem(get().tasks, { column: null, project, scope, query }),
+              archiveAllItem(get().tasks, { column: null, project, scope, query }, readOnly),
               { label: tr(EXPORT_BOARD), icon: 'export', onClick: () => void exportBoard() },
               ...(aside ? [{ label: tr(SET_ASIDE_ITEM, { n: aside }), icon: 'archive', onClick: () => set({ setAsideOpen: true }) }] : [])
             ])
@@ -1177,7 +1181,8 @@ function Decisions({
   setDraft,
   editing,
   setEditing,
-  setBusy
+  setBusy,
+  readOnly
 }: {
   card: TaskCard
   draft: string
@@ -1185,6 +1190,8 @@ function Decisions({
   editing: DecisionEdit | null
   setEditing: (v: DecisionEdit | null) => void
   setBusy: (busy: boolean) => void
+  /** Why the board takes no changes (#1230): nothing can be added, changed or removed then. */
+  readOnly: string | null
 }) {
   const action = useBusy()
   // The card dialog waits for a decision being saved before it closes.
@@ -1247,8 +1254,8 @@ function Decisions({
                 <span className="grow" />
                 {!card.archived && (
                   <>
-                    <IconButton icon="edit" title={tr(msg({ id: 'board.decision.change', defaultMessage: 'Change this decision', description: 'Tooltip on the pencil button beside a decision (card dialog).' }))} onClick={() => setEditing({ id: d.id, text: d.text, was: d.text })} />
-                    <IconButton icon="trash" title={tr(msg({ id: 'board.decision.removeTip', defaultMessage: 'Remove this decision', description: 'Tooltip on the bin button beside a decision (card dialog).' }))} onClick={() => removeDecision(d)} />
+                    <IconButton icon="edit" title={readOnly ?? tr(msg({ id: 'board.decision.change', defaultMessage: 'Change this decision', description: 'Tooltip on the pencil button beside a decision (card dialog).' }))} disabled={!!readOnly} onClick={() => setEditing({ id: d.id, text: d.text, was: d.text })} />
+                    <IconButton icon="trash" title={readOnly ?? tr(msg({ id: 'board.decision.removeTip', defaultMessage: 'Remove this decision', description: 'Tooltip on the bin button beside a decision (card dialog).' }))} disabled={!!readOnly} onClick={() => removeDecision(d)} />
                   </>
                 )}
               </div>
@@ -1258,13 +1265,15 @@ function Decisions({
       ))}
       {!card.archived && (
         <div className="task-decision-new">
-          <textarea className="input" aria-label={tr(msg({ id: 'board.decision.newLabel', defaultMessage: 'New decision', description: 'Accessible name of the box where a new decision is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.decision.newPlaceholder', defaultMessage: 'Record a decision you made about this card (agents follow it over the description)', description: 'Placeholder of the box where a new decision is written (card dialog).' }))} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && draft.trim() && add()} />
+          <textarea className="input" aria-label={tr(msg({ id: 'board.decision.newLabel', defaultMessage: 'New decision', description: 'Accessible name of the box where a new decision is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.decision.newPlaceholder', defaultMessage: 'Record a decision you made about this card (agents follow it over the description)', description: 'Placeholder of the box where a new decision is written (card dialog).' }))} title={readOnly ?? undefined} disabled={!!readOnly} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && draft.trim() && add()} />
           {/* Easy to see once there is something to add (#432), and the dialog's Save adds it too. */}
           <div className="task-new-actions">
             {draft.trim() && <span className="faint">{tr(msg({ id: 'board.decision.saveAddsIt', defaultMessage: 'Save adds it too', description: "Beside Add Decision once something is written: the card dialog's Save button adds the decision as well." }))}</span>}
-            <BusyButton className={cx('small', draft.trim() && 'primary')} busy={action.busy === 'add'} busyLabel={tr(ADDING)} disabled={!draft.trim()} onClick={add}>
-              <Icon name="law" /> {tr(msg({ id: 'board.decision.add', defaultMessage: 'Add Decision', description: 'Button in the card dialog: records the decision written above.' }))}
-            </BusyButton>
+            <Tooltip content={readOnly}>
+              <BusyButton className={cx('small', draft.trim() && 'primary')} busy={action.busy === 'add'} busyLabel={tr(ADDING)} disabled={!draft.trim() || !!readOnly} onClick={add}>
+                <Icon name="law" /> {tr(msg({ id: 'board.decision.add', defaultMessage: 'Add Decision', description: 'Button in the card dialog: records the decision written above.' }))}
+              </BusyButton>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -1413,6 +1422,9 @@ export function TaskDialog() {
   useLanguage()
   const card = useStore((s) => (typeof s.taskOpen === 'number' ? (s.tasks.find((c) => c.number === s.taskOpen) ?? null) : null))
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
+  const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
+  const ro = !!readOnly
   const isNew = open !== null && typeof open === 'object'
   // An archived card in full while its dialog is open (#1017): the board has it in short until then, and the dialog's
   // fields are filled once it is in full.
@@ -1695,11 +1707,13 @@ export function TaskDialog() {
           <>
             {card && (
               <>
-                <button className="btn subtle danger-text" onClick={() => void remove(card).then((ok) => ok && close())}>
+                <button className="btn subtle danger-text" disabled={ro} title={readOnly ?? undefined} onClick={() => void remove(card).then((ok) => ok && close())}>
                   <Icon name="trash" /> {tr(msg({ id: 'board.dialog.delete', defaultMessage: 'Delete', description: "Button in the card dialog: deletes the card (after asking)." }))}
                 </button>
+                <Tooltip content={readOnly}>
                 <BusyButton
                   className="subtle"
+                  disabled={ro}
                   busy={action.busy === 'archive'}
                   busyLabel={card.archived ? tr(msg({ id: 'board.dialog.bringingBack', defaultMessage: 'Bringing back…', description: 'The Bring Back button while the archived card is being brought back.' })) : tr(ARCHIVING)}
                   onClick={() =>
@@ -1713,9 +1727,10 @@ export function TaskDialog() {
                 >
                   <Icon name={card.archived ? 'discard' : 'archive'} /> {card.archived ? tr(BRING_BACK) : tr(ARCHIVE)}
                 </BusyButton>
+                </Tooltip>
                 {!card.archived && (
-                  <Tooltip content={!card.project ? tr(NEEDS_PROJECT) : edited.length ? tr(msg({ id: 'board.dialog.startTipSave', defaultMessage: 'Save your changes, then give it to an agent with the card as its prompt.', description: "Tooltip on the card dialog's Save and Start… button." })) : tr(msg({ id: 'board.dialog.startTip', defaultMessage: 'Give it to an agent, with the card as its prompt.', description: "Tooltip on the card dialog's Start… button." }))}>
-                    <BusyButton className="subtle" busy={action.busy === 'start'} busyLabel={tr(SAVING)} disabled={!card.project || !title.trim()} onClick={() => void start()}>
+                  <Tooltip content={readOnly ?? (!card.project ? tr(NEEDS_PROJECT) : edited.length ? tr(msg({ id: 'board.dialog.startTipSave', defaultMessage: 'Save your changes, then give it to an agent with the card as its prompt.', description: "Tooltip on the card dialog's Save and Start… button." })) : tr(msg({ id: 'board.dialog.startTip', defaultMessage: 'Give it to an agent, with the card as its prompt.', description: "Tooltip on the card dialog's Start… button." })))}>
+                    <BusyButton className="subtle" busy={action.busy === 'start'} busyLabel={tr(SAVING)} disabled={!card.project || !title.trim() || ro} onClick={() => void start()}>
                       <Icon name="play" /> {edited.length ? tr(msg({ id: 'board.dialog.saveAndStart', defaultMessage: 'Save and Start…', description: 'Button in the card dialog with unsaved changes: saves them, then asks which agent starts the card.' })) : tr(msg({ id: 'board.dialog.start', defaultMessage: 'Start…', description: 'Button in the card dialog: asks which agent starts the card.' }))}
                     </BusyButton>
                   </Tooltip>
@@ -1726,24 +1741,32 @@ export function TaskDialog() {
             <button className="btn subtle" onClick={() => void tryClose()}>
               {tr(CANCEL)}
             </button>
-            <BusyButton className="primary" busy={action.busy === 'save'} busyLabel={isNew ? tr(ADDING) : tr(SAVING)} disabled={!title.trim() || card?.archived} onClick={() => void save()}>
-              {isNew ? tr(msg({ id: 'board.dialog.addCard', defaultMessage: 'Add Card', description: 'The New Card dialog\'s main button: adds the card.' })) : tr(SAVE)}
-            </BusyButton>
+            <Tooltip content={readOnly}>
+              <BusyButton className="primary" busy={action.busy === 'save'} busyLabel={isNew ? tr(ADDING) : tr(SAVING)} disabled={!title.trim() || card?.archived || ro} onClick={() => void save()}>
+                {isNew ? tr(msg({ id: 'board.dialog.addCard', defaultMessage: 'Add Card', description: 'The New Card dialog\'s main button: adds the card.' })) : tr(SAVE)}
+              </BusyButton>
+            </Tooltip>
           </>
         }
       >
+        {readOnly && (
+          <div className="banner warn task-read-only" role="status">
+            <Icon name="warning" /> {readOnly}
+          </div>
+        )}
         {card?.archived && (
           <div className="banner info">
             <Icon name="archive" />{' '}
             {tr(msg({ id: 'board.dialog.archivedBanner', defaultMessage: '{cause, select, hidden {Archived when {project} was hidden.} removed {Archived when {project} was removed from Hive.} done {Archived automatically after its days in Done (Settings → Board).} other {Archived.}} Bring it back to change it.', description: "A banner in an archived card's dialog: why it was archived (its project {project} hidden or removed, or after its days in the Done column: Settings → Board is where that is set), and that it must be brought back to be changed." }), { cause: card.archivedFor === 'project-hidden' ? 'hidden' : card.archivedFor === 'project-removed' ? 'removed' : card.archivedFor === 'done' ? 'done' : 'user', project: card.project })}
           </div>
         )}
-        <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+        <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
           <label>{tr(msg({ id: 'board.dialog.project', defaultMessage: 'Project', description: "A field label in the card dialog: the card's project." }))}</label>
           <select
             className="select"
             value={project}
+            disabled={ro}
             onChange={(e) => {
               setProject(e.target.value)
               setAgent('')
@@ -1758,7 +1781,7 @@ export function TaskDialog() {
             {project && !proj && <option value={project}>{tr(msg({ id: 'board.dialog.projectGone', defaultMessage: '{project} (not in the workspace)', description: "The card dialog's project choice when the card's project ({project}) is no longer in the workspace." }), { project })}</option>}
           </select>
           <label>{tr(msg({ id: 'board.dialog.agent', defaultMessage: 'Agent', description: "A field label in the card dialog: the agent the card is given to." }))}</label>
-          <select className="select" value={agent} disabled={!proj} onChange={(e) => setAgent(e.target.value)}>
+          <select className="select" value={agent} disabled={!proj || ro} onChange={(e) => setAgent(e.target.value)}>
             <option value="">{tr(NOBODY_YET)}</option>
             {proj?.agents.map((a) => (
               <option key={a.id} value={a.id}>
@@ -1768,7 +1791,7 @@ export function TaskDialog() {
             {agent && proj && !proj.agents.some((a) => a.id === agent) && <option value={agent}>{tr(REMOVED_AGENT, { agent: card?.agentName ?? agent })}</option>}
           </select>
           <label>{tr(msg({ id: 'board.dialog.column', defaultMessage: 'Column', description: 'A field label in the card dialog: the board column the card is in.' }))}</label>
-          <select className="select" value={column} onChange={(e) => setColumn(e.target.value as TaskColumn)}>
+          <select className="select" value={column} disabled={ro} onChange={(e) => setColumn(e.target.value as TaskColumn)}>
             {TASK_COLUMNS.map((c) => (
               <option key={c.id} value={c.id}>
                 {tr(COLUMN_TEXT[c.id].label)}
@@ -1776,7 +1799,7 @@ export function TaskDialog() {
             ))}
           </select>
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
-          <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} onChange={(e) => setLabels(e.target.value)} />
+          <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>
           {/* One line of text, wrapped to show all of a long reason (#372): Enter adds no line break. */}
           <textarea
@@ -1785,15 +1808,16 @@ export function TaskDialog() {
             aria-label={tr(BLOCKED_FIELD)}
             placeholder={tr(msg({ id: 'board.dialog.blockedPlaceholder', defaultMessage: "Why it can't go on (empty: not blocked)", description: "Placeholder of the card dialog's Blocked box: why the card can't go on; empty means it isn't blocked." }))}
             value={blocked}
+            readOnly={ro}
             onChange={(e) => setBlocked(e.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault()
             }}
           />
           <label>{tr(msg({ id: 'board.dialog.dependsOn', defaultMessage: 'Depends on', description: 'A field label in the card dialog: the cards to finish before this one.' }))}</label>
-          <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. #3 #5', description: "Placeholder of the card dialog's Depends on box: card numbers (#3 #5 are examples)." }))} value={blockedBy} onChange={(e) => setBlockedBy(e.target.value)} />
+          <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. #3 #5', description: "Placeholder of the card dialog's Depends on box: card numbers (#3 #5 are examples)." }))} value={blockedBy} readOnly={ro} onChange={(e) => setBlockedBy(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.related', defaultMessage: 'Related', description: 'A field label in the card dialog: related cards.' }))}</label>
-          <input className="input" placeholder={tr(msg({ id: 'board.dialog.relatedPlaceholder', defaultMessage: 'Related cards, e.g. #7', description: "Placeholder of the card dialog's Related box: card numbers (#7 is an example)." }))} value={links} onChange={(e) => setLinks(e.target.value)} />
+          <input className="input" placeholder={tr(msg({ id: 'board.dialog.relatedPlaceholder', defaultMessage: 'Related cards, e.g. #7', description: "Placeholder of the card dialog's Related box: card numbers (#7 is an example)." }))} value={links} readOnly={ro} onChange={(e) => setLinks(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.context', defaultMessage: 'Read first', description: "A field label in the card dialog (#818): doc sections the card's agent reads before starting, given in its start prompt." }))}</label>
           <div className="task-context">
             <textarea
@@ -1801,6 +1825,7 @@ export function TaskDialog() {
               rows={Math.min(4, Math.max(1, splitDocRefs(context).length))}
               placeholder={tr(msg({ id: 'board.dialog.contextPlaceholder', defaultMessage: 'Doc sections, one a line: docs/PLAN.md#setup, shared:plans/notes.md#open-questions', description: "Placeholder of the card dialog's Read first box (#818): references to doc sections, one a line (keep the examples as they are)." }))}
               value={context}
+              readOnly={ro}
               onChange={(e) => setContext(e.target.value)}
             />
             {/* Each reference opens its section in Hive's viewer (#818). */}
@@ -1830,7 +1855,7 @@ export function TaskDialog() {
         <div className="task-section-h">
           {tr(msg({ id: 'board.dialog.description', defaultMessage: 'Description', description: "A heading in the card dialog: the card's description." }))}
           <span className="grow" />
-          <button className={cx('btn small subtle', !preview && 'active') /* i18n-ignore: class names, not text */} onClick={() => setPreview(false)}>
+          <button className={cx('btn small subtle', !preview && 'active') /* i18n-ignore: class names, not text */} disabled={ro} title={readOnly ?? undefined} onClick={() => setPreview(false)}>
             {tr(msg({ id: 'board.dialog.write', defaultMessage: 'Write', description: "A tab button in the card dialog: edit the description's Markdown." }))}
           </button>
           <button className={cx('btn small subtle', preview && 'active') /* i18n-ignore: class names, not text */} onClick={() => setPreview(true)}>
@@ -1838,7 +1863,7 @@ export function TaskDialog() {
           </button>
         </div>
         {preview ? (
-          <div className="task-description" onDoubleClick={() => setPreview(false)}>
+          <div className="task-description" onDoubleClick={() => !ro && setPreview(false)}>
             {description.trim() ? <Markdown source={description} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
@@ -1846,7 +1871,7 @@ export function TaskDialog() {
         )}
         {card && (
           <>
-            <Decisions card={card} draft={decision} setDraft={setDecision} editing={decisionEdit} setEditing={setDecisionEdit} setBusy={setDecisionBusy} />
+            <Decisions card={card} draft={decision} setDraft={setDecision} editing={decisionEdit} setEditing={setDecisionEdit} setBusy={setDecisionBusy} readOnly={readOnly} />
             <div className="task-section-h">{tr(msg({ id: 'board.dialog.comments', defaultMessage: 'Comments ({n})', description: "A heading in the card dialog: the card's comments, and how many ({n})." }), { n: card.comments.length })}</div>
             {card.comments.map((c, i) => (
               <div key={i} className="task-comment">
@@ -1858,12 +1883,14 @@ export function TaskDialog() {
             ))}
             {!card.archived && (
               <div className="task-comment-new">
-                <textarea className="input" aria-label={tr(msg({ id: 'board.dialog.newComment', defaultMessage: 'New comment', description: 'Accessible name of the box where a comment is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.dialog.commentPlaceholder', defaultMessage: 'Add a comment', description: "Placeholder of the card dialog's comment box." }))} value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && void addComment()} />
+                <textarea className="input" aria-label={tr(msg({ id: 'board.dialog.newComment', defaultMessage: 'New comment', description: 'Accessible name of the box where a comment is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.dialog.commentPlaceholder', defaultMessage: 'Add a comment', description: "Placeholder of the card dialog's comment box." }))} title={readOnly ?? undefined} disabled={ro} value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && void addComment()} />
                 <div className="task-new-actions">
                   {comment.trim() && <span className="faint">{tr(msg({ id: 'board.dialog.savePostsIt', defaultMessage: 'Save posts it too', description: "Beside the Comment button once something is written: the card dialog's Save button posts the comment as well." }))}</span>}
-                  <BusyButton className={cx('small', comment.trim() && 'primary')} busy={action.busy === 'comment'} busyLabel={tr(msg({ id: 'board.dialog.posting', defaultMessage: 'Posting…', description: 'The Comment button while the comment is being posted.' }))} disabled={!comment.trim()} onClick={() => void addComment()}>
+                  <Tooltip content={readOnly}>
+                  <BusyButton className={cx('small', comment.trim() && 'primary')} busy={action.busy === 'comment'} busyLabel={tr(msg({ id: 'board.dialog.posting', defaultMessage: 'Posting…', description: 'The Comment button while the comment is being posted.' }))} disabled={!comment.trim() || ro} onClick={() => void addComment()}>
                     <Icon name="comment" /> {tr(msg({ id: 'board.dialog.comment', defaultMessage: 'Comment', description: 'Button in the card dialog: posts the comment written above.' }))}
                   </BusyButton>
+                  </Tooltip>
                 </div>
               </div>
             )}
