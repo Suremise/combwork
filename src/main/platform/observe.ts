@@ -148,101 +148,49 @@ interface WriteEntry {
   path: string
 }
 
-/** Top-level folders never watched: git's own (a commit anywhere writes its objects there), and installs' output. */
-const UNWATCHED = new Set(['.git', 'node_modules'])
-/** At most this many top-level folders of a working folder are watched: beyond, its record is never complete. */
-const MAX_TOP_FOLDERS = 256
-
 /**
- * A working folder's writes, as its watches saw them. Not one recursive watch: Windows hands a watch its changes in a
- * small buffer, and one that also saw `.git` (every commit, in any worktree of the repository, writes objects there)
- * overflowed on a commit, losing the folder's own writes with git's. So the folder's top level has a watch of its own,
- * and each top-level folder but `.git` and `node_modules` a recursive one, added and dropped as folders come and go.
+ * A working folder's writes, as its watch saw them: one recursive watch, which holds only the folder itself (Windows
+ * can't rename a folder while a handle is open on anything inside it, so no watch is ever put inside a project folder).
+ * The repository's own events come through it too: a main folder holds its `.git`, whose changes go to `git` (its
+ * RepoWatch), not into the log. Windows hands a watch its changes in a small buffer: a burst (a commit writing objects
+ * into `.git`) can overflow it, and Node then names no file. Nothing before then is known complete (`since`): a check
+ * over that moment is unknown, and falls back to its snapshot.
  */
 class FolderLog {
-  /** Writes are complete from this time on (the watch's start, a restart, the last dropped entry). */
+  /** Writes are complete from this time on (the watch's start, a restart, lost events, the last dropped entry). */
   since: number
   /** When the last event came in, for `settle`. */
   lastEvent = 0
   private entries: WriteEntry[] = []
-  private root: DirWatch
-  /** Top-level folder (lower-cased) → its recursive watch. */
-  private subs = new Map<string, DirWatch>()
-  /** More top-level folders than MAX_TOP_FOLDERS: some aren't watched, so nothing is known complete. */
-  private partial = false
+  private watch: DirWatch
 
   constructor(
     readonly folder: string,
-    private written: (paths: string[]) => void
+    private written: (paths: string[]) => void,
+    /** The main folder's `.git` events (relative to `.git`), or null when events were lost; else they're dropped. */
+    private gitEvent: ((rel: string | null) => void) | null = null
   ) {
     this.since = Date.now() + ARM_MS
-    this.root = new DirWatch(folder, false, (name) => this.rootEvent(name))
-    this.scan()
+    this.watch = new DirWatch(folder, true, (name) => this.event(name))
   }
 
-  /** Watches each top-level folder not watched yet. */
-  private scan(): void {
-    let list
-    try {
-      list = readdirSync(this.folder, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const e of list) if (e.isDirectory()) this.addSub(e.name)
-  }
-
-  private addSub(name: string): boolean {
-    const k = name.toLowerCase()
-    if (UNWATCHED.has(k) || this.subs.has(k)) return false
-    if (this.subs.size >= MAX_TOP_FOLDERS) {
-      if (!this.partial) log.warn(`${userText(this.folder)} has over ${MAX_TOP_FOLDERS} top-level folders: its writes aren't all watched`)
-      this.partial = true
-      return false
-    }
-    this.subs.set(k, new DirWatch(join(this.folder, name), true, (m) => this.subEvent(name, m)))
-    return true
-  }
-
-  private unnamed(now: number): void {
-    // Unnamed (a watch started again, or Windows lost events): nothing before now is known complete.
-    this.since = now + ARM_MS
-  }
-
-  private rootEvent(name: string | null): void {
+  private event(name: string | null): void {
     const now = Date.now()
     this.lastEvent = now
     if (name === null) {
-      this.unnamed(now)
-      return this.scan()
+      // Unnamed (the watch started again, or Windows lost events): nothing before now is known complete.
+      this.since = now + ARM_MS
+      this.gitEvent?.(null)
+      return
     }
-    const k = name.toLowerCase()
-    if (UNWATCHED.has(k)) return
-    let dir = false
-    try {
-      dir = statSync(join(this.folder, name)).isDirectory()
-    } catch {
-      // Gone: a folder's watch goes with it.
-      const sub = this.subs.get(k)
-      sub?.close()
-      this.subs.delete(k)
+    const rel = name.split(sep).join('/')
+    if (rel === '.git' || rel.startsWith('.git/')) {
+      this.gitEvent?.(rel.slice(5))
+      return
     }
-    // A folder made: what is written in it before its watch is armed isn't seen, so the folder itself counts as written.
-    if (dir) this.addSub(name)
-    this.record(now, name.split(sep).join('/'))
-  }
-
-  private subEvent(top: string, name: string | null): void {
-    const now = Date.now()
-    this.lastEvent = now
-    if (name === null) return this.unnamed(now)
-    const rel = `${top}/${name.split(sep).join('/')}`
     // An install writes thousands of files there, always ignored: not worth a record each.
-    if (rel.includes('/node_modules/') || rel.endsWith('/node_modules')) return
-    this.record(now, rel)
-  }
-
-  private record(at: number, rel: string): void {
-    this.push({ at, path: rel })
+    if (rel === 'node_modules' || rel.startsWith('node_modules/') || rel.includes('/node_modules/')) return
+    this.push({ at: now, path: rel })
     this.written([rel])
   }
 
@@ -261,21 +209,17 @@ class FolderLog {
 
   /** The entries between t0 and t1 (inclusive), or null when the record isn't complete for all of it. */
   between(t0: number, t1: number): WriteEntry[] | null {
-    if (!this.root.verify() || this.partial || t0 < this.since) return null
-    for (const s of this.subs.values()) if (!s.live) return null
+    if (!this.watch.verify() || t0 < this.since) return null
     return this.entries.filter((e) => e.at >= t0 && e.at <= t1)
   }
 
-  /** Checks its watches still watch their folders (the minute's rescan). */
+  /** Checks its watch still watches its folder (the minute's rescan). */
   verify(): void {
-    this.root.verify()
-    for (const s of this.subs.values()) s.verify()
+    this.watch.verify()
   }
 
   close(): void {
-    this.root.close()
-    for (const s of this.subs.values()) s.close()
-    this.subs.clear()
+    this.watch.close()
   }
 }
 
@@ -338,7 +282,7 @@ function linesOf(common: string): Heads {
 function foldersOf(common: string): { folder: string; gitDir: string }[] {
   const out: { folder: string; gitDir: string }[] = []
   // A repository's main folder holds its common dir as `.git`; a bare one has none.
-  if (common.toLowerCase().endsWith(`${sep}.git`) || common.toLowerCase().endsWith('/.git')) out.push({ folder: dirname(common), gitDir: common })
+  if (isMainGitDir(common)) out.push({ folder: dirname(common), gitDir: common })
   let names: string[] = []
   try {
     names = readdirSync(join(common, 'worktrees'))
@@ -357,11 +301,14 @@ function foldersOf(common: string): { folder: string; gitDir: string }[] {
   return out
 }
 
-/** A repository's ref watch, its working folders' write logs, and what it last read. */
+/**
+ * A repository's ref events, its working folders' write logs, and what it last read. Its events come from its main
+ * folder's watch (which holds its `.git`), never from watches inside `.git` (they'd stop the project folder being
+ * renamed); a bare repository, with no main folder, has a watch of its own on its git dir.
+ */
 class RepoWatch {
-  private watches: DirWatch[] = []
-  /** The watches of `refs`, `logs` and `worktrees`, which a fresh repository makes later. */
-  private subs = new Map<string, DirWatch>()
+  /** A bare repository's own watch. */
+  private bare: DirWatch | null = null
   private timer: NodeJS.Timeout | null = null
   private first = 0
   private lines: Heads = new Map()
@@ -370,6 +317,8 @@ class RepoWatch {
   readonly logs = new Map<string, FolderLog>()
   /** git dir (lower-cased) → its working folder, for a reflog entry. */
   private reflogFolder = new Map<string, string>()
+  /** git dir (lower-cased) → its HEAD reflog's size at the last read: an entry whose event was lost still counts. */
+  private reflogSize = new Map<string, number>()
 
   constructor(
     readonly common: string,
@@ -377,18 +326,12 @@ class RepoWatch {
     /** A folder being deleted or removed (`Observer.suspend`): not watched meanwhile. */
     private held: (folder: string) => boolean = () => false
   ) {
-    this.watches.push(new DirWatch(common, false, (n) => this.event(n, '')))
-    for (const sub of ['refs', 'logs', 'worktrees']) {
-      const w = new DirWatch(join(common, sub), true, (n) => this.event(n, sub))
-      this.subs.set(sub, w)
-      this.watches.push(w)
-    }
+    if (!isMainGitDir(common)) this.bare = new DirWatch(common, true, (n) => this.event(n === null ? null : n.split(sep).join('/')))
     this.read(false)
   }
 
-  private event(name: string | null, under: string): void {
-    const rel = name === null ? null : (under ? `${under}/${name}` : name).split(sep).join('/')
-    if (rel !== null && !under) this.subs.get(rel)?.poke()
+  /** An event in the git dir (its path relative to it, with `/`), or null: events were lost, so the refs are read. */
+  private event(rel: string | null): void {
     if (rel !== null) {
       // The index, objects, a worktree's index: nothing the refs or HEADs say.
       if (!/^(HEAD|packed-refs|refs(\/heads(\/.*)?)?|logs(\/HEAD)?|worktrees(\/[^/]+(\/(HEAD|gitdir|logs(\/HEAD)?))?)?)$/.test(rel)) return
@@ -423,10 +366,22 @@ class RepoWatch {
     const folders = foldersOf(this.common).slice(0, MAX_FOLDERS)
     const heads: Heads = new Map()
     this.reflogFolder.clear()
+    const sizes = new Map<string, number>()
     for (const f of folders) {
       heads.set(f.folder, refSync(f.gitDir, 'HEAD') ?? refSync(this.common, readHeadRef(f.gitDir) ?? 'HEAD'))
-      this.reflogFolder.set(f.gitDir.toLowerCase(), f.folder)
+      const g = f.gitDir.toLowerCase()
+      this.reflogFolder.set(g, f.folder)
+      let size = 0
+      try {
+        size = statSync(join(f.gitDir, 'logs', 'HEAD')).size
+      } catch {
+        // No reflog yet.
+      }
+      sizes.set(g, size)
+      const was = this.reflogSize.get(g)
+      if (was !== undefined && was !== size) this.reflog(f.gitDir)
     }
+    this.reflogSize = sizes
     if (say) {
       for (const [line, to] of lines) if (this.lines.get(line) !== to) this.tell({ kind: 'lineMoved', line, from: this.lines.get(line) ?? null, to })
       for (const [line, from] of this.lines) if (!lines.has(line)) this.tell({ kind: 'lineMoved', line, from, to: null })
@@ -448,17 +403,24 @@ class RepoWatch {
     }
     for (const f of folders) {
       const k = f.folder.toLowerCase()
-      if (!this.logs.has(k) && !this.held(f.folder)) this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths })))
+      if (this.logs.has(k) || this.held(f.folder)) continue
+      const main = f.gitDir.toLowerCase() === this.common.toLowerCase()
+      this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths }), main ? (rel) => this.event(rel) : null))
     }
   }
 
   close(): void {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
-    for (const w of this.watches) w.close()
+    this.bare?.close()
     for (const l of this.logs.values()) l.close()
     this.logs.clear()
   }
+}
+
+/** Whether a common git dir is a main folder's `.git` (not a bare repository). */
+function isMainGitDir(common: string): boolean {
+  return /[\\/]\.git$/i.test(common)
 }
 
 /** What a git dir's HEAD names (`refs/heads/x`), when it is a symbolic ref. */

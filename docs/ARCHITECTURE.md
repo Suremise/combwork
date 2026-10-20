@@ -299,17 +299,20 @@ Agent API, the board's queries on generated columns) keep working.
 **The watcher** (`src/main/platform/observe.ts`, #1214; its lifetime in `watching.ts`, started in `index.ts`). One
 `Observer` follows the open workspaces' projects (each refresh's `ProjectInfo.platform`; a closing workspace's go at
 once), each repository and folder watched once however many projects share it:
-- **Git, per repository** (its common git dir): non-recursive on the dir itself (`HEAD`, `packed-refs`), recursive on
-  `refs`, `logs` and `worktrees` (each started as soon as a fresh repository makes it). A burst is read once (150 ms
-  quiet, at most 1 s), from the ref files with no git process (`linesOf`, `refSync`), and said to subscribers as
-  `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a working folder's
-  HEAD). The minute and window focus read the refs again (`rescan`), for what a watch missed.
-- **Every working folder** (a repository's worktrees, at most 64, and a None project's folder) has a **write log**: a
-  non-recursive watch on its top level and a recursive one per top-level folder but `.git` and `node_modules`. Not one
-  recursive watch: Windows hands a watch its changes in a small buffer, and one seeing `.git` overflowed on any commit
-  (Node then names no file), losing the folder's own writes. A folder made counts as written itself, since what is
-  written in it before its watch is armed isn't seen. Each HEAD reflog entry (`:reflog`) and each agent's edit hook
-  (`:edit`, `sessions.ts` `preToolUse` → `markEdits`) goes in too. Kept 6 hours and at most 20,000 entries a folder.
+- **Git, per repository** (its common git dir): its events come from its main folder's watch (which holds `.git`),
+  never from watches inside `.git`: Windows won't rename a folder while a handle is open on anything inside it, so a
+  watch there (or on any subfolder) stopped the project being renamed. A bare repository has one watch on its git dir.
+  `HEAD`, `packed-refs`, `refs/heads`, `logs/HEAD` and `worktrees/<n>/{HEAD,gitdir,logs/HEAD}` count. A burst is read
+  once (150 ms quiet, at most 1 s), from the ref files with no git process (`linesOf`, `refSync`), and said to
+  subscribers as `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a
+  working folder's HEAD). Each read also compares each folder's `logs/HEAD` size, so a reflog entry whose event was lost
+  still counts. The minute and window focus read again (`rescan`), for what a watch missed.
+- **Every working folder** (a repository's worktrees, at most 64, and a None project's folder) has a **write log**
+  from one recursive watch on it (`.git` and `node_modules` left out of the log). Windows hands a watch its changes in
+  a small buffer: a burst (a commit writing objects into the main folder's `.git`, from any worktree) can overflow it,
+  and Node names no file. The record then restarts, so a check over that moment is unknown and falls back to its
+  snapshot. Each HEAD reflog entry (`:reflog`) and each agent's edit hook (`:edit`, `sessions.ts` `preToolUse` →
+  `markEdits`) goes in too. Kept 6 hours and at most 20,000 entries a folder.
 - **`changedBetween(folder, t0, t1)`** answers checks (§16.13): it lets the folder's events arrive first (until 150 ms
   quiet, at most 2 s), counts those arriving until then (an event is timed on arrival, after its write: the safe
   side), and drops what git ignores (`check-ignore --stdin`; None's adapter passes its deliverables instead). It is
@@ -323,7 +326,8 @@ once), each repository and folder watched once however many projects share it:
   `observer.suspend(paths)` / `unwatchedWhile` close every watch on or inside it, like `files.ts`'s `suspendWatching`.
   A Git project is watched only at the repository root its detection named: one whose repository is gone watches
   nothing, never a repository above it.
-- Measured idle: following this repository (1 repository, 7 working folders), 0 ms of CPU over 20 s idle.
+- Measured (`process.cpuUsage` over 20 s, nothing done by the test): following Hive's own repository (1 repository, 7
+  working folders) while other agents worked in it, 31 ms of CPU (0.16% of one core).
 - The adapters' `observe(onChange)` subscribe to it; None's drops a written deliverable's cached hash first
   (§16.3.3). The Files tab's own watcher (`files.ts`) stays as it is, for the tab.
 

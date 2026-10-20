@@ -135,8 +135,10 @@ describe('the watcher on a Git repository', () => {
     await seen({ kind: 'folderMoved', folder: wt, from, to })
     const inWt = await o.changedBetween(wt, t0, Date.now())
     expect(isUnknown(inWt) ? inWt : inWt.paths).toEqual(expect.arrayContaining([':reflog', 'w.txt']))
-    // The main folder saw neither.
-    expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // The main folder saw neither: nothing changed, or unknown (its watch, which holds the shared .git, may overflow on
+    // the objects the commit wrote there), never a change.
+    const main = await o.changedBetween(p, t0, Date.now())
+    expect(isUnknown(main) ? null : main).toEqual(isUnknown(main) ? null : { changed: false, paths: [] })
     expect(events.some((e) => e.kind === 'folderMoved' && e.folder === p)).toBe(false)
   })
 
@@ -160,6 +162,16 @@ describe('the watcher on a Git repository', () => {
     await seen({ kind: 'lineMoved', line: 'gone', to: at })
     run(p, 'branch', '-q', '-D', 'gone')
     await seen({ kind: 'lineMoved', line: 'gone', from: at, to: null })
+  })
+
+  it('never stops the project folder being renamed (no watch inside it holds a handle)', async () => {
+    mkdirSync(join(p, 'src', 'deep'), { recursive: true })
+    writeFileSync(join(p, 'src', 'deep', 'x.ts'), 'x')
+    commit(p, 'src/y.ts', 'y\n')
+    await seen({ kind: 'lineMoved', line: 'main' })
+    const moved = `${p}-renamed`
+    renameSync(p, moved)
+    renameSync(moved, p)
   })
 
   it('a time before the watch started, or a folder not watched, is unknown', async () => {
