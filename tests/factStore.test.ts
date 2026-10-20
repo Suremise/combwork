@@ -6,7 +6,9 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
+import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { writeCardOutside } from './boardDb'
 
 const base = tempDir('hive-fact-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
@@ -17,7 +19,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
-const { FactStore } = await import('../src/main/workflow/factStore')
+const { FactStore, factStoreTestHooks } = await import('../src/main/workflow/factStore')
 const worker = await import('../src/main/workflow/actionWorker')
 
 const user = { kind: 'user' } as const
@@ -32,6 +34,7 @@ afterAll(async () => {
 afterEach(() => {
   for (const s of stores.splice(0)) s.close()
   worker.clearActionHandlers()
+  factStoreTestHooks.afterCards = null
 })
 
 async function workspace(): Promise<{ ws: string; w: WS }> {
@@ -44,7 +47,8 @@ async function workspace(): Promise<{ ws: string; w: WS }> {
   return { ws, w }
 }
 const scope = { project: 'p', key: 'P' }
-const factsOf = (s: InstanceType<typeof FactStore>, card: number): string[] => s.facts(card).map((f) => f.kind)
+type Store = import('../src/main/workflow/factStore').FactStore
+const factsOf = (s: Store, card: number): string[] => s.facts(card).map((f) => f.kind)
 const actionsOf = (ws: string): { id: number; kind: string; state: string; delivered: string | null }[] =>
   store.workspaceDb(ws).reader.prepare('SELECT id, kind, state, delivered FROM card_actions ORDER BY id').all() as { id: number; kind: string; state: string; delivered: string | null }[]
 
@@ -62,7 +66,7 @@ describe('the facts step (#1215)', () => {
 describe('the fact store in hive.db (#1215)', () => {
   it("writes inside the caller's board change: undone with it, a fact, an action and the stage leave nothing", async () => {
     const { ws, w } = await workspace()
-    const facts = new FactStore(store.workspaceDb(ws), scope)
+    const facts = FactStore.forBoard(w, scope)
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Undone', project: 'p' }, user))).number
     await expect(
       store.boardWrite(w, async () => {
@@ -84,7 +88,7 @@ describe('the fact store in hive.db (#1215)', () => {
 
   it('commits with the change: the fact, the stage and its column, and the action, which the worker then runs once', async () => {
     const { ws, w } = await workspace()
-    const facts = new FactStore(store.workspaceDb(ws), scope)
+    const facts = FactStore.forBoard(w, scope)
     const ran: number[] = []
     worker.onAction('notice', (a) => void ran.push(a.id))
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Moved', project: 'p' }, user))).number
@@ -156,9 +160,10 @@ describe('the fact store in hive.db (#1215)', () => {
   })
 
   it("keeps the runtime's columns of a card through the board's saves, and the card's JSON as it was", async () => {
-    const { ws, w } = await workspace()
-    const facts = new FactStore(store.workspaceDb(ws), scope)
-    const made = facts.createCard({ title: 'The runtime’s', kind: 'no-code', labels: ['x'], blockedBy: [], target: 'release', paths: ['docs/a.md'], lane: 'L', reviewer: 'R1' })
+    const { w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    // The board's store writes inside a change of the board only.
+    const made = await store.boardWrite(w, async () => facts.createCard({ title: 'The runtime’s', kind: 'no-code', labels: ['x'], blockedBy: [], target: 'release', paths: ['docs/a.md'], lane: 'L', reviewer: 'R1' }))
     expect(made).toMatchObject({ key: `P-${made.id}`, kind: 'no-code', target: 'release', paths: ['docs/a.md'], lane: 'L', reviewer: 'R1', stage: 'todo', category: 'todo' })
     expect(facts.cardByKey(`p-${made.id}`)?.id).toBe(made.id)
     const before = await inWorkspace(w, () => tasks.getTask(made.id, w))
@@ -166,17 +171,20 @@ describe('the fact store in hive.db (#1215)', () => {
     await inWorkspace(w, () => tasks.updateTask(made.id, { title: 'Renamed', addLabels: ['y'] }, user, { comment: 'Saved by the board' }))
     expect(facts.card(made.id)).toMatchObject({ title: 'Renamed', labels: ['x', 'y'], kind: 'no-code', target: 'release', paths: ['docs/a.md'], lane: 'L', reviewer: 'R1' })
     // Declared paths: an empty declaration is one (§16.3.3), and the pre-fill is apart from it.
-    facts.updateCard(made.id, { paths: [] })
-    facts.addPrefill(made.id, 'docs/b.md')
-    facts.addPrefill(made.id, 'docs/b.md')
+    await store.boardWrite(w, async () => {
+      facts.updateCard(made.id, { paths: [] })
+      facts.addPrefill(made.id, 'docs/b.md')
+      facts.addPrefill(made.id, 'docs/b.md')
+    })
     expect(facts.card(made.id).paths).toEqual([])
     expect(facts.prefill(made.id)).toEqual(['docs/b.md'])
   })
 
   it("keeps each project's lanes, queue pauses and values apart", async () => {
     const { ws } = await workspace()
-    const p = new FactStore(store.workspaceDb(ws), scope)
-    const q = new FactStore(store.workspaceDb(ws), { project: 'q', key: 'Q' })
+    const p = FactStore.open(store.boardFile(ws), scope)
+    const q = FactStore.open(store.boardFile(ws), { project: 'q', key: 'Q' })
+    stores.push(p, q)
     p.saveLane({ id: 'L', cards: [3, 1], ruleset: 'r1', pending: null, current: 3, ended: false })
     q.saveLane({ id: 'L', cards: [9], ruleset: 'r2', pending: [], current: null, ended: true })
     expect(p.lane('L')).toEqual({ id: 'L', cards: [3, 1], ruleset: 'r1', pending: null, current: 3, ended: false })
@@ -189,5 +197,191 @@ describe('the fact store in hive.db (#1215)', () => {
     p.setMeta('seen:main', 'abc')
     expect(q.meta('seen:main')).toBeNull()
     expect(p.meta('seen:main')).toBe('abc')
+  })
+})
+
+// HR4's #1215 round 1: the board's store writes only inside the caller's own change, and never past a transaction SQLite
+// undid; each read is one snapshot; and the worker stops with its workspace, never opening its board again.
+describe('the fact store, owned writes and one snapshot (#1215 round 1)', () => {
+  const moved = { kind: 'Moved' as const, actor: 'user' as const, source: 'recorded' as const, data: { from: 'todo' as const, to: 'active' as const, cause: 'user' as const } }
+  /** A trigger, made by another connection, that has SQLite undo the transaction writing a card's second fact (as a full disk would). */
+  const undoSecondFact = (ws: string): void => {
+    const db = new DatabaseSync(store.boardFile(ws))
+    db.exec("CREATE TRIGGER undo_test BEFORE INSERT ON card_facts WHEN new.seq = 2 BEGIN SELECT RAISE(ROLLBACK, 'disk I/O error (test)'); END")
+    db.close()
+  }
+
+  it("another change's transaction is never the store's: outside it, reads see what was committed and writes fail", async () => {
+    const { w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Committed', project: 'p' }, user))).number
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let inside!: () => void
+    const entered = new Promise<void>((r) => (inside = r))
+    // Change A: an uncommitted title, then it waits, then fails.
+    const a = store.boardWrite(w, async () => {
+      store.putCard(w, card, { ...store.cardDoc(w, card)!, title: 'Uncommitted' })
+      inside()
+      await held
+      throw new Error('change A fails')
+    })
+    await entered
+    // Not inside A (another async context): what was committed, and no write.
+    expect(facts.card(card).title).toBe('Committed')
+    expect(() => facts.tx((tx) => tx.append(card, moved))).toThrow('A board write outside boardWrite')
+    release()
+    await expect(a).rejects.toThrow('change A fails')
+    expect(factsOf(facts, card)).toEqual([])
+    expect(facts.card(card).title).toBe('Committed')
+  })
+
+  it('a change SQLite undid part way writes no more facts, and the change fails whole', async () => {
+    const { ws, w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Lost', project: 'p' }, user))).number
+    undoSecondFact(ws)
+    let third: unknown = null
+    await expect(
+      store.boardWrite(w, async () => {
+        facts.tx((tx) => {
+          tx.append(card, moved)
+          // The caller makes nothing of the second's error, and goes on: the third must not be written on its own.
+          try {
+            tx.append(card, moved)
+          } catch {
+            // undone
+          }
+          try {
+            tx.append(card, moved)
+          } catch (e) {
+            third = e
+          }
+        })
+      })
+    ).rejects.toThrow(/undone part way/)
+    expect(String(third)).toMatch(/undone part way/)
+    expect(factsOf(facts, card)).toEqual([])
+  })
+
+  it("on a connection of the store's own: a transaction SQLite undid part way writes no more, and fails whole", async () => {
+    const { ws, w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Own', project: 'p' }, user))).number
+    const own = FactStore.open(store.boardFile(ws), scope)
+    stores.push(own)
+    undoSecondFact(ws)
+    expect(() =>
+      own.tx((tx) => {
+        tx.append(card, moved)
+        try {
+          tx.append(card, moved)
+        } catch {
+          // undone
+        }
+        tx.append(card, moved)
+      })
+    ).toThrow(/undone part way/)
+    expect(factsOf(own, card)).toEqual([])
+  })
+
+  for (const on of ['the board', 'its own connection'] as const) {
+    it(`reads a card on one snapshot (${on}): another process changing its title and labels between the statements isn't mixed in`, async () => {
+      const { ws, w } = await workspace()
+      const facts = on === 'the board' ? FactStore.forBoard(w, scope) : FactStore.open(store.boardFile(ws), scope)
+      stores.push(facts)
+      const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Original', project: 'p', labels: ['old'] }, user))).number
+      const doc = store.cardDoc(w, card)!
+      let hits = 0
+      factStoreTestHooks.afterCards = () => {
+        if (++hits === 1) writeCardOutside(ws, card, { ...doc, title: 'Changed', labels: ['new'] })
+      }
+      expect(facts.card(card)).toMatchObject({ title: 'Original', labels: ['old'] })
+      expect(hits).toBe(1)
+      factStoreTestHooks.afterCards = null
+      expect(facts.card(card)).toMatchObject({ title: 'Changed', labels: ['new'] })
+    })
+  }
+
+  it("a project's cards on one snapshot: a card leaving it meanwhile keeps the lists of the read that picked it", async () => {
+    const { ws, w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const [a, b] = await inWorkspace(w, async () => [(await tasks.createTask({ title: 'A', project: 'p', labels: ['a'] }, user)).number, (await tasks.createTask({ title: 'B', project: 'p', labels: ['b'] }, user)).number])
+    const before = facts.cards()
+    factStoreTestHooks.afterCards = () => {
+      factStoreTestHooks.afterCards = null
+      writeCardOutside(ws, a, { ...store.cardDoc(w, a)!, project: 'q', labels: ['moved'] })
+      writeCardOutside(ws, b, { ...store.cardDoc(w, b)!, labels: ['b', 'later'] })
+    }
+    expect(facts.cards()).toEqual(before)
+    expect(facts.cards().map((c) => [c.id, c.labels])).toEqual([[b, ['b', 'later']]])
+  })
+
+  it('the worker stops when its workspace switches while a handler runs: the old board is neither opened again nor written', async () => {
+    const { ws, w } = await workspace()
+    // The other workspace has an action of the same id (each file numbers its own from 1): a run that went on after the
+    // switch would mark it.
+    const { ws: other, w: ow } = await workspace()
+    const otherCard = (await inWorkspace(ow, () => tasks.createTask({ title: 'Other', project: 'p' }, user))).number
+    const theirs = FactStore.open(store.boardFile(other), scope)
+    const otherId = theirs.tx((tx) => tx.action(otherCard, 'other', {}, null))
+    theirs.close()
+    await ow.close()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Switched', project: 'p' }, user))).number
+    const own = FactStore.open(store.boardFile(ws), scope)
+    const id = own.tx((tx) => tx.action(card, 'notice', {}, null))
+    own.close()
+    expect(id).toBe(otherId)
+    let openWhileRunning: boolean | null = null
+    worker.onAction('notice', async () => {
+      await w.open(other)
+      openWhileRunning = store.boardOpen(ws)
+    })
+    await worker.runActions(w)
+    expect(openWhileRunning).toBe(false)
+    expect(store.boardOpen(ws)).toBe(false)
+    // Its delivery recorded before the switch, its mark left for its next run there.
+    const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
+    try {
+      expect({ ...(raw.prepare('SELECT state, delivered IS NOT NULL AS delivered FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending', delivered: 1 })
+    } finally {
+      raw.close()
+    }
+    // And the workspace it switched to is untouched.
+    const there = store.workspaceDb(other).reader
+    expect({ ...(there.prepare('SELECT state, delivered FROM card_actions WHERE id = ?').get(otherId) as object) }).toEqual({ state: 'pending', delivered: null })
+  })
+
+  it('the worker stops when its workspace closes while it waits for the board: nothing opened or written', async () => {
+    const { ws, w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Closed', project: 'p' }, user))).number
+    const own = FactStore.open(store.boardFile(ws), scope)
+    const id = own.tx((tx) => tx.action(card, 'notice', {}, null))
+    own.close()
+    const ran: number[] = []
+    worker.onAction('notice', (a) => void ran.push(a.id))
+    // A change holds the board's lock; the run waits behind it, and the workspace closes meanwhile.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let inside!: () => void
+    const entered = new Promise<void>((r) => (inside = r))
+    const holding = store.boardWrite(w, async () => {
+      inside()
+      await held
+    })
+    await entered
+    const run = worker.runActions(w)
+    const closing = w.close()
+    release()
+    await holding.catch(() => undefined)
+    await closing
+    await run
+    expect(ran).toEqual([])
+    expect(store.boardOpen(ws)).toBe(false)
+    const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
+    try {
+      expect({ ...(raw.prepare('SELECT state, delivered FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending', delivered: null })
+    } finally {
+      raw.close()
+    }
   })
 })

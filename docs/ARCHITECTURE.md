@@ -449,11 +449,17 @@ them and the Agent API's card is unchanged. `stage` empty (a card no 1.0 rule ha
 `setStage` writes the stage and the column, its category (§16.4.3). The runtime's lanes and a target's queue pause are
 tables of their own per project (`workflow_lanes`, `workflow_queue_pauses`) until P4 and P7 make them `lanes.ts`' and
 the queue's; scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
-`workflow:<project>:<key>`. `tx(fn)` joins the transaction its connection is in (the caller's `boardWrite`: a fact
-commits with the card change it causes, and is undone with it) and otherwise runs in one of its own (`BEGIN
-IMMEDIATE`: another Hive's write waits for it); an observed fact whose dedupe key is there already returns null, and
-the caller reads again. `FactStore.open(file)` is another connection to the file, opened through the board's
-migrations (another Hive, a restart; `tests/workflow`, whose first store is the board's own `workspaceDb`).
+`workflow:<project>:<key>`. A store reaches the database one of two ways (HR4's #1215 round 1: a connection's open
+transaction is no sign it is the caller's). **On the board** (`FactStore.forBoard(ws)`): its writes go through the
+board's own guard (`boardWriteOp`, writeOp's): only inside the caller's change of that board, in that change's async
+context, and only while its transaction is live, so a fact commits with the card change it causes and is undone with
+it, and once SQLite has undone the change nothing more is written; its reads are the board's (`boardRead`): the
+change's own inside one, else the reader, each on one snapshot. **On a connection of its own** (`FactStore.open(file)`,
+opened through the board's migrations: another Hive, a restart, `tests/workflow`'s runtime): a write is its own
+transaction (`BEGIN IMMEDIATE`: another Hive's write waits for it), which what the store does inside it joins (it is
+synchronous, and nothing else uses the connection), and fails whole once SQLite has undone it; a read outside one is
+a read transaction of its own. Either way a record, a list, a lane or a pause is read on one snapshot, never mixing
+two commits. An observed fact whose dedupe key is there already returns null, and the caller reads again.
 
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for
@@ -461,7 +467,11 @@ meanwhile runs after) in id order; the workspace's open (`WorkspaceService.onOpe
 pending. For each action, in a board change of its own, its delivery is recorded once (`card_actions.delivered`, by a
 conditional update: an action delivered already, by another run or before a crash, isn't run again), then its handler
 runs (`onAction(kind, fn)`), then it is marked done (failed when the handler throws; never tried again). P3 registers
-no handler: nothing wakes, notifies or merges yet, and an action without one is marked done as the no-op it is.
+no handler: nothing wakes, notifies or merges yet, and an action without one is marked done as the no-op it is. A
+run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
+opens another, the run stops, checked after every wait and inside each board change before the board is touched
+(`boardWrite`'s `alive`), so it never opens a closed board again nor writes another workspace's (whose actions are
+numbered from 1 too).
 **`delivered` is transitional:** #1211's typed `deliveries` (unique `action`) replace it when P4 wires wakes (#1120).
 
 Observed facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one

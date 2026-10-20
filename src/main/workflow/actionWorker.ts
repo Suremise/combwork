@@ -4,8 +4,12 @@
 // recorded once before its effect runs (`card_actions.delivered`), so an action run twice (a crash between its effect
 // and its mark, two runs at once) delivers once. P3 has no effects yet: nothing wakes, notifies or merges; the kinds
 // P4 on adds register a handler here. A kind with none is marked done, its delivery recorded, as the no-op it is in P3.
+//
+// A run belongs to the workspace as it was when it began (HR4's #1215 round 1): once that workspace closes, or its window
+// opens another, the run stops, checked after every wait and inside each board change, before the board is touched,
+// so a closed board is never opened again for it nor another workspace's written.
 
-import { boardFile, boardReadOnly, boardWrite, onBoardCommitted, workspaceDb } from '../boardStore'
+import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardCommitted } from '../boardStore'
 import { createLogger } from '../logger'
 import type { WorkspaceService } from '../workspace'
 import { deliverOnce, pendingActionsOf, type ActionRow } from './factStore'
@@ -27,17 +31,27 @@ export function clearActionHandlers(): void {
   handlers.clear()
 }
 
+/** A run's workspace as it began: whether it is still that one, open. */
+interface RunOf {
+  ws: WorkspaceService
+  path: string
+  alive: () => boolean
+}
+
 /** Per workspace file: the run going on, and whether another was asked for meanwhile. */
 const runs = new Map<string, { again: boolean; done: Promise<void> }>()
 
 /**
  * Runs the workspace's pending actions, in the order written: one run at a time per workspace, and a run asked for while
  * one goes on runs again after it (a change that committed meanwhile may have written more). Resolves when no run is
- * left; never throws (a failure is logged, and the action stays for the next run when it wasn't marked).
+ * left; never throws (a failure is logged, and an action not marked stays for the next run).
  */
 export function runActions(ws: WorkspaceService): Promise<void> {
-  if (!ws.path) return Promise.resolve()
-  const key = boardFile(ws.path).toLowerCase()
+  const path = ws.path
+  if (!path) return Promise.resolve()
+  const life = ws.lifetime
+  const at: RunOf = { ws, path, alive: () => !life.aborted && ws.lifetime === life && ws.path === path }
+  const key = boardFile(path).toLowerCase()
   const running = runs.get(key)
   if (running) {
     running.again = true
@@ -48,10 +62,10 @@ export function runActions(ws: WorkspaceService): Promise<void> {
     try {
       do {
         run.again = false
-        await drain(ws)
-      } while (run.again)
+        await drain(at)
+      } while (run.again && at.alive())
     } catch (e) {
-      log.warn('running the cards’ actions', e)
+      if (at.alive()) log.warn('running the cards’ actions', e)
     } finally {
       runs.delete(key)
     }
@@ -60,22 +74,29 @@ export function runActions(ws: WorkspaceService): Promise<void> {
   return run.done
 }
 
-async function drain(ws: WorkspaceService): Promise<void> {
-  const path = ws.path
+/** A change of the run's board, only while its workspace is the one the run began in (checked again inside the lock). */
+function change<T>(at: RunOf, fn: () => T): Promise<T | null> {
+  if (!at.alive()) return Promise.resolve(null)
+  return boardWrite(at.ws, async () => fn(), { alive: at.alive })
+}
+
+async function drain(at: RunOf): Promise<void> {
+  const { ws } = at
   // A board that takes no writes (waiting for its upgrade, or a newer Hive's): nothing can be marked.
-  if (!path || boardReadOnly(ws)) return
-  // Each action read again as it is now: another Hive's run, or ours, may have marked it meanwhile.
-  for (const a of pendingActionsOf(workspaceDb(path).reader)) {
-    if (ws.path !== path) return
+  if (!at.alive() || boardReadOnly(ws)) return
+  const pending = boardRead(ws, (db) => pendingActionsOf(db))
+  for (const a of pending) {
+    if (!at.alive()) return
     const handler = handlers.get(a.kind)
+    // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile.
+    const first = await change(at, () =>
+      boardWriteOp(ws, (db) => (db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null))
+    )
+    if (first === null) {
+      if (!at.alive()) return
+      continue
+    }
     let state: ActionRow['state'] = 'done'
-    const first = await boardWrite(ws, async () => {
-      const db = workspaceDb(path).writer
-      const still = db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id)
-      return still ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null
-    })
-    // Marked by another run meanwhile: nothing to do.
-    if (first === null) continue
     if (first && handler) {
       try {
         await handler(a, ws)
@@ -84,9 +105,9 @@ async function drain(ws: WorkspaceService): Promise<void> {
         log.warn(`action ${a.id} (${a.kind}) of #${a.card} failed`, e)
       }
     }
-    await boardWrite(ws, async () => {
-      workspaceDb(path).writer.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(state, a.id)
-    })
+    // Closed or switched while the handler ran: its mark waits for the next run there (its delivery is recorded, so it
+    // isn't run again).
+    await change(at, () => boardWriteOp(ws, (db) => db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(state, a.id)))
   }
 }
 
@@ -95,7 +116,7 @@ onBoardCommitted((ws) => {
   if (!ws.path) return
   let pending = false
   try {
-    pending = !!workspaceDb(ws.path).reader.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get()
+    pending = boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get())
   } catch {
     // A board without the facts step's tables (not upgraded): no actions.
     return

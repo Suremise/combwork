@@ -80,9 +80,11 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   else mkdirSync(project, { recursive: true })
   if (extra.files) for (const [f, c] of Object.entries(extra.files)) put(project, f, c)
   const o: WorkflowOptions = { ...allOff(options.platform), ...options }
-  // The workspace's hive.db, opened through the board's open path (#1215): the project's cards are the board's.
+  // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
+  // runtime, outside any board change, has a connection of its own to it, as another Hive would.
   const scope = { project: 'project', key: 'AM' }
-  const store = new FactStore(workspaceDb(home), scope)
+  workspaceDb(home)
+  const store = FactStore.open(boardFile(home), scope)
   const wakes: Env['wakes'] = []
   const notes: Env['notes'] = []
   const stores: FactStore[] = [store]
