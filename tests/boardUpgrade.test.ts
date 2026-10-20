@@ -248,6 +248,7 @@ async function board09(): Promise<string> {
   as09(store.boardFile(ws))
   return ws
 }
+
 const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
 
 describe("the board's upgrade to 1.0 (#1207)", () => {
@@ -393,7 +394,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     // A store's open the same way: nothing moved, nothing marked.
     const probe = join(ws, '.hive', 'never-a-store.json')
     writeFileSync(probe, '[]')
-    const data = await storeRows.openStore(ws, 'watches', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
+    const data = await storeRows.openStore(ws, 'sessions', 'probe', probe, async () => ({ rows: [{ key: 'k', doc: '{}' }] }))
     expect(data.rows).toEqual([])
     expect(data.meta.has('imported')).toBe(false)
     expect(existsSync(probe)).toBe(true)
@@ -528,10 +529,10 @@ describe("what services read before the database was replaced is read again (#12
       expect(told).toEqual([ws])
       // A save planned in the generation before: its guard refuses it, nothing written.
       const gen = before
-      await expect(storeRows.saveStore(ws, 'watches', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
+      await expect(storeRows.saveStore(ws, 'sessions', 'probe', [{ key: 'k', doc: '{}' }], {}, () => {
         if (gen !== store.dbGeneration(ws)) throw new Error('stale')
       })).rejects.toThrow('stale')
-      expect(storeRows.readStore(ws, 'watches', 'probe').rows).toEqual([])
+      expect(storeRows.readStore(ws, 'sessions', 'probe').rows).toEqual([])
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
       expect(store.dbGeneration(ws)).toBe(before + 2)
     } finally {

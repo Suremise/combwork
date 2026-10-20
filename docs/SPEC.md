@@ -2219,7 +2219,7 @@ one** [Darren, 20 Oct, #1119 decision 3]: each part is its own step in the board
 group runs **all of its pending steps in one transaction**, after one ask, one backup and one exclusive lock: to the
 user it is one upgrade, and a crash leaves the file at 0.9. The group's first step (#1207, v3) records
 `board_meta.format = 1.0`. A new file has nothing to upgrade: it takes every step unasked. **The cards step** (#1209,
-v4, `schema/cardsStep.ts`) moves every card out of its JSON document into #1208's tables (typed columns in `cards`,
+v5, `schema/cardsStep.ts`) moves every card out of its JSON document into #1208's tables (typed columns in `cards`,
 labels, links, context, comments, history, decisions and holds in child tables), checks each card composes back to its
 document byte for byte before the group commits (a card that doesn't, or a row that isn't a card's document, stops the
 upgrade naming the card, and the file stays 0.9), and drops the documents: from then on the board's readers compose

@@ -438,13 +438,12 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // Running again, it sorts with the running lanes, newest first (it was started after B1's and B3's).
   check('…and moves up among the running lanes', !!(await until(async () => (await order()).join() === [l7, l6, l3, l2, l1, l4, l5].join(), HUNG_MS)), JSON.stringify(await order()))
   // A lane ended without a record of its cards (ended before #512 kept one, or the record damaged): B5's merged lane,
-  // its record taken out of what is saved (#1018: the workspace's database). Its card #2 moving on in B1's lane shows there
+  // its record taken out of what is saved (#1018, #1212: the workspace's database). Its card #2 moving on in B1's lane shows there
   // only; B5's says not recorded.
-  const { storeDocs, putStoreDoc } = require('./storeDocs.cjs')
+  const { storeDocs, forgetLaneCards } = require('./storeDocs.cjs')
   const old = storeDocs(ws, 'lanes').find((x) => x.id === l4)
   check("an ended lane's cards are kept with it", Array.isArray(old?.frozen) && old.frozen.map((c) => c.column).join() === 'done,passed', JSON.stringify(old?.frozen))
-  delete old.frozen
-  putStoreDoc(ws, 'lanes', l4, old)
+  forgetLaneCards(ws, l4)
   await inv('tasks:update', n2, { column: 'review' })
   const row4 = section.locator(`.progress-lane[data-lane="${l4}"]`)
   const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''

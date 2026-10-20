@@ -1,8 +1,33 @@
-// The workspace's small stores as its database keeps them (#1018: lanes, watches, deliveries in .hive/hive.db), read by
-// the suites that checked their files before: a read-only connection, opened and closed for each read.
+// The workspace's small stores as its database keeps them (#1018: deliveries and sessions in .hive/hive.db's store_rows;
+// #1212: lanes and watches in typed tables), read by the suites that checked their files before: a read-only connection,
+// opened and closed for each read.
 const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
+
+/** An entry kept whole (`extra` an array of one, src/main/schema/storeCodec.ts), else its columns with `extra`'s fields. */
+const withExtra = (row, entry) => {
+  const extra = row.extra ? JSON.parse(row.extra) : {}
+  if (Array.isArray(extra)) return extra[0]
+  for (const k of Object.keys(extra)) Object.defineProperty(entry, k, { value: extra[k], enumerable: true, writable: true, configurable: true })
+  return entry
+}
+
+/** A lane as its tables hold it (storeCodec.ts's decode, for the suites). */
+function laneOf(db, l) {
+  const cards = db.prepare('SELECT card FROM lane_cards WHERE lane = ? ORDER BY ord').all(l.id).map((r) => r.card)
+  const frozen = db.prepare('SELECT * FROM lane_frozen WHERE lane = ? ORDER BY ord').all(l.id).map((r) => ({ number: r.card, title: r.title, column: r.col, blocked: r.blocked, round: r.round, reviewing: r.reviewing === 1 }))
+  return withExtra(l, { id: l.id, project: l.project, ...(l.project_id !== null ? { projectId: l.project_id } : {}), name: l.name, builder: { id: l.builder_id, name: l.builder_name }, reviewer: l.reviewer_id === null ? null : { id: l.reviewer_id, name: l.reviewer_name }, cards, rounds: l.rounds, waitMinutes: l.wait_minutes, state: l.state, startedBy: l.started_by, startedAt: l.started_at, updatedAt: l.updated_at, endedAt: l.ended_at, mergeCommit: l.merge_commit, ...(frozen.length ? { frozen } : {}) })
+}
+
+/** A watch as its table holds it: its columns, and the fields it keeps as JSON. */
+function watchOf(w) {
+  const json = { cond: 'cond', marks: 'marks', agents: 'agents', agentMarks: 'agent_marks', lanes: 'lanes', laneMarks: 'lane_marks', seen: 'seen', on: 'on_cards', released: 'released', fired: 'fired' }
+  const out = { id: w.id, projectPath: w.project_path, ...(w.project_id !== null ? { projectId: w.project_id } : {}), agentId: w.agent_id }
+  for (const [k, col] of Object.entries(json)) if (w[col] !== null) out[k] = JSON.parse(w[col])
+  for (const [k, col] of Object.entries({ since: 'since', limitMinutes: 'limit_minutes', limitAt: 'limit_at', waitSeq: 'wait_seq', laneSince: 'lane_since', self: 'self', replySeq: 'reply_seq', watcherName: 'watcher_name' })) if (w[col] !== null) out[k] = w[col]
+  return withExtra(w, out)
+}
 
 /** A store's entries, in order (what its file's array held); [] while the workspace has no database yet. */
 function storeDocs(ws, store, scope = '') {
@@ -10,7 +35,10 @@ function storeDocs(ws, store, scope = '') {
   if (!fs.existsSync(file)) return []
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
-    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'store_rows'").get()) return []
+    const has = (t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t)
+    if (store === 'lanes' && has('lanes')) return db.prepare('SELECT * FROM lanes ORDER BY ord, id').all().map((l) => laneOf(db, l))
+    if (store === 'watches' && has('watches')) return db.prepare('SELECT * FROM watches ORDER BY ord, id').all().map(watchOf)
+    if (!has('store_rows')) return []
     return db.prepare('SELECT doc FROM store_rows WHERE store = ? AND scope = ? ORDER BY ord').all(store, scope).map((r) => JSON.parse(r.doc))
   } finally {
     db.close()
@@ -122,4 +150,14 @@ function putSessions(host, f) {
   }
 }
 
-module.exports = { storeDocs, storeMeta, putStoreDoc, deliveriesPlace, deliveriesOf, sessionsOf, putSessions }
+/** Takes out what an ended lane kept of its cards (a lane ended before #512 kept it, or its record damaged). */
+function forgetLaneCards(ws, laneId) {
+  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  try {
+    db.prepare('DELETE FROM lane_frozen WHERE lane = ?').run(laneId)
+  } finally {
+    db.close()
+  }
+}
+
+module.exports = { storeDocs, storeMeta, putStoreDoc, forgetLaneCards, deliveriesPlace, deliveriesOf, sessionsOf, putSessions }

@@ -12,6 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardRows, typ
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { CARDS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { withFileLock } from './fsutil'
 import { trash } from './trash'
@@ -96,8 +97,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => db.prepare("INSERT INTO board_meta (key, value) VALUES ('format', '1.0') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run() // i18n-ignore: SQL
   },
   {
-    // #1209: cards out of their JSON document into typed columns and child tables (#1208's schema, cardRows.ts's contract).
+    // #1212: lanes, watches and metrics out of `store_rows` into their typed tables (schema/storeCodec.ts, storeTables.ts),
+    // their values into board_meta.
     version: 4,
+    name: STORES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => moveStores(db)
+  },
+  {
+    // #1209: cards out of their JSON document into typed columns and child tables (#1208's schema, cardRows.ts's contract).
+    version: 5,
     name: CARDS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: moveCardsIntoTables

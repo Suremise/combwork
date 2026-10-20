@@ -10,7 +10,7 @@ import { HiveError } from './hiveError'
 import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { renameRetrying, withFileLock } from './fsutil'
-import { openStore, readStore, rowsOf, saveStore } from './storeRows'
+import { openTable, readTable, saveTable } from './storeTables'
 import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName } from '../shared/projectIds'
 import { coalesced } from './coalesce'
@@ -29,7 +29,7 @@ const log = createLogger('lanes')
  *
  * Bookkeeping, never a gate: nothing here refuses or holds up work on a card, and a loop with no lane runs as before.
  * Changes to a workspace's lanes happen under their lock, read and written whole. They are kept in the workspace database
- * (#1018: a row a lane, storeRows.ts), moved in from `.hive/lanes.json` the first time.
+ * (#1212: a row a lane in its typed tables, storeTables.ts), moved in from `.hive/lanes.json` the first time.
  */
 
 /** The lanes' file before #1018 (moved in at the first open, then kept as a backup); its path is also the lanes' lock. */
@@ -97,7 +97,7 @@ onDbReplaced((workspacePath) => opened.delete(workspacePath.toLowerCase()))
  * isn't JSON lanes is set aside (`lanes.json.damaged-<time>`, renamed, never deleted) and none are moved in, or, if it
  * can't be set aside, that is an error too and it is left as it is.
  */
-export async function readLanesFile(file: string): Promise<{ rows: { key: string; doc: string }[] } | null> {
+export async function readLanesFile(file: string): Promise<{ docs: unknown[] } | null> {
   let text: string
   try {
     text = await readFile(file, 'utf8')
@@ -119,25 +119,25 @@ export async function readLanesFile(file: string): Promise<{ rows: { key: string
       throw new Error(`The lanes file is damaged and couldn't be set aside (${(e as Error).message}): it was left as it is`, { cause: e }) // i18n-ignore: as above
     }
     log.warn(`The lanes file was damaged: set aside as ${userText(to)}`)
-    return { rows: [] }
+    return { docs: [] }
   }
-  return { rows: rowsOf((v as { lanes?: unknown[] }).lanes ?? []) }
+  return { docs: (v as { lanes?: unknown[] }).lanes ?? [] }
 }
 
 /**
- * The lanes as saved, in the form lanes.json had (`{ version, lanes }`): the workspace database's rows, after moving the
- * file in the first time (#1018). Read under the lanes' lock.
+ * The lanes as saved, in the form lanes.json had (`{ version, lanes }`): the workspace database's tables, after moving
+ * the file in the first time (#1018, #1212). Read under the lanes' lock.
  */
 async function savedLanes(ws: WorkspaceService): Promise<{ version: 1; lanes: Record<string, unknown>[] }> {
   const path = ws.path!
   const key = path.toLowerCase()
   const file = fileOf(ws)
   const data = opened.has(key)
-    ? readStore(path, 'lanes')
-    : await openStore(path, 'lanes', '', file, () => readLanesFile(file))
+    ? readTable(path, 'lanes')
+    : await openTable(path, 'lanes', file, () => readLanesFile(file))
   // While the upgrade to 1.0 waits nothing was moved in: looked for again once it is upgraded.
   if (!upgradeWaiting(path)) opened.add(key)
-  return { version: 1, lanes: data.rows.map((r) => JSON.parse(r.doc) as Record<string, unknown>) }
+  return { version: 1, lanes: data.docs as Record<string, unknown>[] }
 }
 
 /** The lanes as saved: each with its project's id beside its name (the id it had, for a project the workspace doesn't have now). */
@@ -163,7 +163,7 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[]): Promise<void> {
   // Read from a database since replaced (the upgrade to 1.0, a restore): never written over the file as it is now.
   const gen = readGens.get(lanes)
   const path = ws.path!
-  await saveStore(path, 'lanes', '', rowsOf(stamped), {}, () => {
+  await saveTable(path, 'lanes', stamped, {}, () => {
     if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
   })
   for (const fn of writtenListeners) fn()

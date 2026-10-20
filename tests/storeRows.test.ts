@@ -1,7 +1,7 @@
-// The workspace's small stores in its database (#1018, storeRows.ts): a store's file moved in once and kept as a backup,
+// The workspace's small stores in its database (#1018, storeRows.ts; sessions and deliveries since #1212): a store's file moved in once and kept as a backup,
 // a file found after that kept and never read, saves that write only what changed and are all or nothing, never inside a
 // change of the board, and a database from before (the board's schema 1) migrated with its cards kept.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -16,7 +16,6 @@ const HUNG_MS = 10_000
 
 const rows = await import('../src/main/storeRows')
 const board = await import('../src/main/boardStore')
-const lanes = await import('../src/main/lanes')
 const { openDb, schemaVersion } = await import('../src/main/db')
 
 let n = 0
@@ -46,7 +45,7 @@ describe("a store's file moved in", () => {
       const v = JSON.parse(readFileSync(file, 'utf8')) as { lanes: { id: string }[] }
       return { rows: v.lanes.map((l) => ({ key: l.id, doc: JSON.stringify(l) })), meta: { next: '7' } }
     }
-    const got = await rows.openStore(ws, 'lanes', '', file, read)
+    const got = await rows.openStore(ws, 'sessions', '', file, read)
     expect(got.rows.map((r) => r.key)).toEqual(['b', 'a'])
     expect(got.meta.get('next')).toBe('7')
     expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: 2, file })
@@ -54,17 +53,17 @@ describe("a store's file moved in", () => {
     const backup = files(ws).find((f) => f.startsWith('lanes.json.imported-'))!
     expect(readFileSync(join(ws, '.hive', backup), 'utf8')).toBe(text)
     // Opened again: not read again.
-    await rows.openStore(ws, 'lanes', '', file, read)
+    await rows.openStore(ws, 'sessions', '', file, read)
     expect(reads).toBe(1)
   })
 
   it('a file found after the move (an older Hive wrote one) is kept as a backup and never read: the database is the store', async () => {
     const ws = workspace()
     const file = join(ws, '.hive', 'watches.json')
-    await rows.openStore(ws, 'watches', '', file, async () => null)
-    await rows.saveStore(ws, 'watches', '', [{ key: 'w1', doc: '{"id":"w1"}' }])
+    await rows.openStore(ws, 'sessions', '', file, async () => null)
+    await rows.saveStore(ws, 'sessions', '', [{ key: 'w1', doc: '{"id":"w1"}' }])
     writeFileSync(file, JSON.stringify({ version: 1, watches: [{ id: 'older' }] }))
-    const got = await rows.openStore(ws, 'watches', '', file, async () => {
+    const got = await rows.openStore(ws, 'sessions', '', file, async () => {
       throw new Error('read again')
     })
     expect(got.rows.map((r) => r.key)).toEqual(['w1'])
@@ -83,59 +82,24 @@ describe("a store's file moved in", () => {
     const ws = workspace()
     await rows.saveStore(ws, 'deliveries', 'p-1', [{ key: 'm1', doc: '{"a":1}' }])
     await rows.saveStore(ws, 'deliveries', 'assistant', [{ key: 'm1', doc: '{"a":2}' }])
-    await rows.saveStore(ws, 'lanes', '', [{ key: 'm1', doc: '{"a":3}' }])
-    expect([docs(ws, 'deliveries', 'p-1'), docs(ws, 'deliveries', 'assistant'), docs(ws, 'lanes')]).toEqual([[{ a: 1 }], [{ a: 2 }], [{ a: 3 }]])
+    await rows.saveStore(ws, 'sessions', '', [{ key: 'm1', doc: '{"a":3}' }])
+    expect([docs(ws, 'deliveries', 'p-1'), docs(ws, 'deliveries', 'assistant'), docs(ws, 'sessions')]).toEqual([[{ a: 1 }], [{ a: 2 }], [{ a: 3 }]])
   })
 })
 
-describe('moving a file in, when it goes wrong (#1018 round 1)', () => {
-  it("a file that can't be read now is not marked moved: it stays, and the next open moves it in", async () => {
-    const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
-    // A folder where the file is: reading it fails as a file Windows holds open would (not "there is none").
-    mkdirSync(file)
-    await expect(rows.openStore(ws, 'lanes', '', file, () => lanes.readLanesFile(file))).rejects.toThrow(/Could not read the lanes/)
-    expect(rows.readStore(ws, 'lanes').meta.has('imported')).toBe(false)
-    expect(existsSync(file)).toBe(true)
-    rmSync(file, { recursive: true })
-    writeFileSync(file, JSON.stringify({ version: 1, lanes: [{ id: 'lane-a', state: 'running' }] }))
-    const got = await rows.openStore(ws, 'lanes', '', file, () => lanes.readLanesFile(file))
-    expect(got.rows.map((r) => JSON.parse(r.doc))).toEqual([{ id: 'lane-a', state: 'running' }])
-  })
-
-  it('a damaged lanes file is set aside, kept as it was, and none are moved in', async () => {
-    const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
-    writeFileSync(file, '{ not json')
-    const got = await rows.openStore(ws, 'lanes', '', file, () => lanes.readLanesFile(file))
-    expect(got.rows).toEqual([])
-    const aside = files(ws).find((f) => f.startsWith('lanes.json.damaged-'))!
-    expect(readFileSync(join(ws, '.hive', aside), 'utf8')).toBe('{ not json')
-  })
-
-  it("every entry moved in has a row of its own, whatever ids the file gives (one another's fallback, the same twice, none)", async () => {
-    const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
-    const list = [{ id: '#1', n: 0 }, { n: 1 }, { id: 'a', n: 2 }, { id: 'a', n: 3 }, { id: '#1', n: 4 }, { id: '#3', n: 5 }]
-    writeFileSync(file, JSON.stringify({ version: 1, lanes: list }))
-    const got = await rows.openStore(ws, 'lanes', '', file, () => lanes.readLanesFile(file))
-    expect(got.rows.map((r) => JSON.parse(r.doc))).toEqual(list)
-    expect(new Set(got.rows.map((r) => r.key)).size).toBe(list.length)
-    expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: list.length })
-  })
-
+describe('moving a file in, when it goes wrong (#1018 round 1; lanes.json: storeTables.test.ts)', () => {
   it('two rows of one change with the same key are refused, nothing saved (the second would replace the first)', async () => {
     const ws = workspace()
-    await expect(rows.saveStore(ws, 'lanes', '', [{ key: 'k', doc: '1' }, { key: 'k', doc: '2' }])).rejects.toThrow(/same key/)
-    await expect(rows.openStore(ws, 'lanes', '', join(ws, '.hive', 'none.json'), async () => ({ rows: [{ key: 'k', doc: '1' }, { key: 'k', doc: '2' }] }))).rejects.toThrow(/same key/)
-    expect(rows.readStore(ws, 'lanes').meta.has('imported')).toBe(false)
+    await expect(rows.saveStore(ws, 'sessions', '', [{ key: 'k', doc: '1' }, { key: 'k', doc: '2' }])).rejects.toThrow(/same key/)
+    await expect(rows.openStore(ws, 'sessions', '', join(ws, '.hive', 'none.json'), async () => ({ rows: [{ key: 'k', doc: '1' }, { key: 'k', doc: '2' }] }))).rejects.toThrow(/same key/)
+    expect(rows.readStore(ws, 'sessions').meta.has('imported')).toBe(false)
   })
 })
 
 describe('saves', () => {
   it('write only the rows that changed, keep the order given, and remove those left out', async () => {
     const ws = workspace()
-    const put = (list: [string, string][]) => rows.saveStore(ws, 'lanes', '', list.map(([key, doc]) => ({ key, doc })))
+    const put = (list: [string, string][]) => rows.saveStore(ws, 'sessions', '', list.map(([key, doc]) => ({ key, doc })))
     await put([['a', '1'], ['b', '2'], ['c', '3']])
     const db = board.workspaceDb(ws).writer
     const before = db.prepare('SELECT total_changes() AS n').get() as { n: number }
@@ -144,7 +108,7 @@ describe('saves', () => {
     // c changed, and b and c changed places: two rows, nothing else.
     expect(after.n - before.n).toBe(2)
     await put([['c', '9']])
-    expect(docs(ws, 'lanes')).toEqual([9])
+    expect(docs(ws, 'sessions')).toEqual([9])
   })
 
   it('are all or nothing: one that fails as it is written leaves the rows and values as they were', async () => {
@@ -159,17 +123,17 @@ describe('saves', () => {
   it('a guard that throws stops the save before anything is written (a workspace closed meanwhile)', async () => {
     const ws = workspace()
     await expect(
-      rows.saveStore(ws, 'watches', '', [{ key: 'w', doc: '{}' }], {}, () => {
+      rows.saveStore(ws, 'sessions', '', [{ key: 'w', doc: '{}' }], {}, () => {
         throw new Error('The workspace was closed')
       })
     ).rejects.toThrow(/closed/)
-    expect(docs(ws, 'watches')).toEqual([])
+    expect(docs(ws, 'sessions')).toEqual([])
   })
 
   it("never run inside a change of the board (they'd wait for its lock): refused there; outside, they wait for it", async () => {
     const ws = workspace()
     const w = { path: ws } as never
-    await expect(board.boardWrite(w, () => rows.saveStore(ws, 'lanes', '', []))).rejects.toThrow(/inside a change of the board/)
+    await expect(board.boardWrite(w, () => rows.saveStore(ws, 'sessions', '', []))).rejects.toThrow(/inside a change of the board/)
     // A save while the board's change is under way waits for its commit, then goes in a transaction of its own.
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
@@ -177,12 +141,12 @@ describe('saves', () => {
       board.boardChanged(w)
       await held
     })
-    const save = rows.saveStore(ws, 'lanes', '', [{ key: 'l', doc: '1' }])
+    const save = rows.saveStore(ws, 'sessions', '', [{ key: 'l', doc: '1' }])
     await expect.poll(() => board.workspaceDb(ws).writer.isTransaction, { timeout: HUNG_MS }).toBe(true)
-    expect(docs(ws, 'lanes')).toEqual([])
+    expect(docs(ws, 'sessions')).toEqual([])
     release()
     await Promise.all([change, save])
-    expect(docs(ws, 'lanes')).toEqual([1])
+    expect(docs(ws, 'sessions')).toEqual([1])
   })
 })
 

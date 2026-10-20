@@ -12,7 +12,7 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { config } from './config'
 import { onHiveEvent } from './events'
 import { readCapped, renameRetrying } from './fsutil'
-import { openStore, rowsOf, saveStore } from './storeRows'
+import { openTable, saveTable } from './storeTables'
 import { dbGeneration, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
@@ -266,7 +266,7 @@ const stores = new Map<string, Store>()
 const loading = new Map<string, Promise<Store>>()
 /**
  * A workspace's watches file before #1018, by the folder it was loaded from (a window's service can open another
- * workspace later): moved into the workspace database the first time (storeRows.ts), then kept as a backup.
+ * workspace later): moved into the workspace database the first time (storeTables.ts), then kept as a backup.
  */
 const fileOf = (path: string): string => join(path, '.hive', 'watches.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
@@ -406,18 +406,17 @@ type FileRead = { list: { rec: WatchRecord; raw: unknown }[]; invalid: unknown[]
 type Saved = { watches: unknown[]; invalid: unknown[] }
 
 /**
- * A workspace's watches as saved in its database (#1018), moved in from watches.json the first time. Entries that aren't
+ * A workspace's watches as saved in its database (#1018; its typed tables since #1212), moved in from watches.json the first time. Entries that aren't
  * valid watches, and any over the limit, are kept aside as they were.
  */
 async function readSaved(path: string, open: () => boolean): Promise<FileRead> {
-  const data = await openStore(path, 'watches', '', fileOf(path), async () => {
+  const data = await openTable(path, 'watches', fileOf(path), async () => {
     const got = await readFileOf(path, open)
     if (!got) return null
-    const rows = rowsOf(got.watches)
     const meta: Record<string, string> = got.invalid.length ? { invalid: JSON.stringify(got.invalid) } : {}
-    return { rows, meta }
+    return { docs: got.watches, meta }
   })
-  const raw = data.rows.map((r) => JSON.parse(r.doc) as unknown)
+  const raw = data.docs
   const kept = data.meta.get('invalid')
   const invalid: unknown[] = kept ? (JSON.parse(kept) as unknown[]) : []
   const list: { rec: WatchRecord; raw: unknown }[] = []
@@ -646,15 +645,15 @@ async function setAside(store: Store, watches: WatchRecord[] = []): Promise<bool
 
 /**
  * Saves a workspace's watches (under its lock) to the workspace they came from, only while it is open there: one
- * transaction in its database (#1018), whose rows are the watches, checked against the workspace's lifetime just before
- * it, with nothing awaited between: a save can't land after the workspace closed. Too big: refused.
+ * transaction in its database (#1018, #1212: storeTables.ts), whose rows are the watches, checked against the
+ * workspace's lifetime just before it, with nothing awaited between: a save can't land after the workspace closed. Too
+ * big: refused.
  */
 async function save(store: Store): Promise<void> {
   checkAlive(store)
   const text = fileText(store, store.list)
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('Too many card watches to keep in this workspace')
-  const rows = rowsOf(store.list.map(entryOf))
-  await saveStore(store.path, 'watches', '', rows, { invalid: store.invalid.length ? JSON.stringify(store.invalid) : null }, () => checkAlive(store))
+  await saveTable(store.path, 'watches', store.list.map(entryOf), { invalid: store.invalid.length ? JSON.stringify(store.invalid) : null }, () => checkAlive(store))
   store.dirty = false
 }
 
