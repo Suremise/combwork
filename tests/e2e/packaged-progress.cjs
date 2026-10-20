@@ -51,19 +51,22 @@ const wrap = (args, apiUrl) =>
   const url = `http://127.0.0.1:${srv.address().port}`
   const cmd = ['--title', 'Packaged check', '--', 'node', '-e', "console.log('hello'); console.log('##hive-progress step=1 total=2 name=one'); console.log('##hive-progress step=2 name=two'); setTimeout(() => process.exit(0), 700)"]
 
+  // The run's start (POST /v1/progress); before it, the wrapper asks what the run is for (/v1/progress/resolve, #1220).
+  const started = () => calls.find((c) => c.method === 'POST' && c.path === '/v1/progress')
   const r = await wrap(cmd, url)
   check('output passes through, step lines taken out; exit code 0', r.code === 0 && r.out === 'hello\n' && r.err === '', JSON.stringify(r))
-  check('the run is started as the agent, with its title and command', calls[0]?.method === 'POST' && calls[0]?.path === '/v1/progress' && calls[0]?.auth === 'Bearer agent-token' && calls[0]?.body?.title === 'Packaged check' && /node -e/.test(calls[0]?.body?.command), JSON.stringify(calls[0]))
+  check('it asks Hive what the run is for first, as the agent, from its folder', calls[0]?.method === 'POST' && calls[0]?.path === '/v1/progress/resolve' && calls[0]?.auth === 'Bearer agent-token' && !!calls[0]?.body?.folder, JSON.stringify(calls[0]))
+  check('the run is started as the agent, with its title and command', started()?.auth === 'Bearer agent-token' && started()?.body?.title === 'Packaged check' && /node -e/.test(started()?.body?.command), JSON.stringify(calls))
   // Step lines name the step starting; the API counts those finished.
-  check('…with the total and first step from its first step line', calls[0]?.body?.total === 2 && calls[0]?.body?.step === 0 && calls[0]?.body?.stepName === 'one', JSON.stringify(calls[0]?.body))
+  check('…with the total and first step from its first step line', started()?.body?.total === 2 && started()?.body?.step === 0 && started()?.body?.stepName === 'one', JSON.stringify(started()?.body))
   const steps = Object.assign({}, ...calls.filter((c) => c.method === 'PATCH').map((c) => c.body))
   check('its next step is reported', steps.step === 1 && steps.stepName === 'two', JSON.stringify(calls))
   check('it is finished as passed', calls.at(-1)?.path === '/v1/progress/r1/finish' && calls.at(-1)?.body?.ok === true, JSON.stringify(calls.at(-1)))
-  check('no estimate the first time', calls[0]?.body?.estimateMs === undefined)
+  check('no estimate the first time', started() && started().body?.estimateMs === undefined)
 
   calls.length = 0
   await wrap(cmd, url)
-  check('the second run has an estimate (the time left as it starts)', calls[0]?.body?.estimateMs >= 300, JSON.stringify(calls[0]?.body))
+  check('the second run has an estimate (the time left as it starts)', started()?.body?.estimateMs >= 300, JSON.stringify(started()?.body))
 
   calls.length = 0
   const failing = await wrap(['--', 'node', '-e', "console.error('bad'); process.exit(3)"], url)

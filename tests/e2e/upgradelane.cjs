@@ -6,7 +6,7 @@
 //
 // The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. Throwaway profiles, workspace and
-// CLAUDE_CONFIG_DIR.
+// CLAUDE_CONFIG_DIR. lib.cjs keeps the 0.9 Hive's windows off screen and unfocused (#1253).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
