@@ -10411,3 +10411,80 @@ button.progress-run-show:focus-visible {
 :lang(zh) .settings-nav .row .label {
   white-space: normal;
 }
+
+/* Project Settings → Workflow (#1278): P4's plain options form, its rows the settings' own. */
+.workflow-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-form > .setting {
+  margin-inline: 0;
+}
+/* The form's own rows highlight as they are hovered, not the whole section's row around them. */
+.setting.wide:has(.workflow-form):hover {
+  background: none;
+}
+.workflow-form .workflow-note {
+  margin-block-end: 8px;
+}
+.workflow-form .workflow-origin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workflow-form .workflow-platform {
+  color: var(--fg-strong);
+}
+.workflow-form .workflow-unavailable {
+  font-style: italic;
+}
+.workflow-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.workflow-checks .btn.small {
+  align-self: flex-start;
+}
+.workflow-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.workflow-check .input {
+  min-width: 0;
+}
+.workflow-check .input:first-child {
+  flex: 0 0 35%;
+}
+.workflow-problems {
+  color: var(--error);
+  margin-block: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+.workflow-actions .workflow-spacer {
+  flex: 1;
+}
+.workflow-save ul {
+  margin-block: 4px 8px;
+  padding-inline-start: 20px;
+}
+.workflow-save .workflow-card {
+  display: block;
+  padding-block: 2px;
+}
+.workflow-paste {
+  width: 100%;
+  box-sizing: border-box;
+}

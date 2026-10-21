@@ -321,6 +321,8 @@
   "tips.unusedWorktrees.title": "Ordena los worktrees conservados",
   "tips.viewerTokens.text": "Una aplicación que muestra lo que hacen tus agentes, como Apiary, solo necesita un token de lectura: Configuración → Agent API → Tokens de lectura crea uno que puede leerlo todo y no cambiar nada, y lo revoca después.",
   "tips.viewerTokens.title": "Deja que otra aplicación observe Hive",
+  "tips.workflowOptions.text": "Configuración del proyecto → Flujo de trabajo define quién revisa el trabajo de una tarjeta, qué comprobaciones pasan antes y quién lo fusiona. Elige un ajuste predefinido o configura cada opción: un cambio se aplica desde la siguiente tarjeta que empiece.",
+  "tips.workflowOptions.title": "Elige cómo llegan las tarjetas a Hecho",
   "tips.workspaceMoved.text": "¿Moviste la carpeta del espacio de trabajo, por ejemplo a otra unidad? Ábrela desde su nueva ubicación y elige Reparar… en el banner: los worktrees de los agentes, sus sesiones, y las conversaciones y la memoria de Claude Code la siguen.",
   "tips.workspaceMoved.title": "Mueve un espacio de trabajo sin perder sus agentes",
   "tips.worktreeReuse.text": "¿Agregas un agente con un worktree nuevo que se llama como uno que conservaste (B4, y el worktree de B4 está sin usar)? Si está fusionado y limpio, Hive le da al agente esa carpeta, actualizada con main: su node_modules ya está ahí.",

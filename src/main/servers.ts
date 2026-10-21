@@ -68,6 +68,7 @@ import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor,
 import { cardStages } from './boardStore'
 import { cardFacts, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
+import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE } from '../shared/workflow/facts'
@@ -457,6 +458,8 @@ async function projectSummary(p: string) {
     })),
     // The workspace's MCP servers (#713): all available to the project, on only where turned on.
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), on: mcpOn },
+    // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
+    workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
     settings: info.config
   }
 }

@@ -321,6 +321,8 @@
   "tips.unusedWorktrees.title": "Tidy kept worktrees",
   "tips.viewerTokens.text": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
   "tips.viewerTokens.title": "Let another app watch Hive",
+  "tips.workflowOptions.text": "Project Settings → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
+  "tips.workflowOptions.title": "Choose how cards get to Done",
   "tips.workspaceMoved.text": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",
   "tips.workspaceMoved.title": "Move a workspace without losing its agents",
   "tips.worktreeReuse.text": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",

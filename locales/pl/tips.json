@@ -321,6 +321,8 @@
   "tips.unusedWorktrees.title": "Uporządkuj zachowane worktree",
   "tips.viewerTokens.text": "Aplikacja pokazująca, co robią Twoi agenci, np. Apiary, potrzebuje tylko tokenu podglądu: Ustawienia → Agent API → Tokeny podglądu tworzą token, który może wszystko czytać i niczego nie zmienia, i potrafią go znowu unieważnić.",
   "tips.viewerTokens.title": "Pozwól innej aplikacji obserwować Hive",
+  "tips.workflowOptions.text": "Ustawienia projektu → Przepływ pracy określają, kto recenzuje pracę karty, jakie sprawdzenia muszą przejść najpierw i kto ją scala. Wybierz ustawienie wstępne albo ustaw każdą opcję: zmiana obowiązuje od następnej karty, która się zacznie.",
+  "tips.workflowOptions.title": "Wybierz, jak karty dochodzą do Gotowe",
   "tips.workspaceMoved.text": "Przeniesiono folder obszaru roboczego, np. na inny dysk? Otwórz go z nowego miejsca i wybierz Napraw… na banerze: worktree agentów, ich sesje oraz rozmowy i pamięć Claude Code pójdą za nim.",
   "tips.workspaceMoved.title": "Przenieś obszar roboczy bez utraty agentów",
   "tips.worktreeReuse.text": "Dodajesz agenta z nowym worktree o nazwie takiej jak zachowany (B4, a worktree B4 jest nieużywany)? Jeśli jest scalony i czysty, Hive daje agentowi ten folder, zaktualizowany do main: jego node_modules już tam są.",

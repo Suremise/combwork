@@ -17,7 +17,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { PresetId, WorkflowOptions } from './workflow/options'
+import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -898,11 +898,58 @@ export type Inherit<T> = 'inherit' | T
  */
 export type WorkflowDefaults = Partial<Record<PlatformId, Partial<Omit<WorkflowOptions, 'platform'>>>>
 
-/** A project's workflow options as project.json keeps them (SPEC §16.6.6). */
+/**
+ * A project's workflow options as project.json keeps them (SPEC §16.6.6): the options it sets itself (an option it
+ * doesn't set inherits the workspace's, then Hive's, then the platform's all-off), and the preset they started from.
+ */
 export interface ProjectWorkflow {
   platform: PlatformId
   preset: PresetId | null
+  options: Partial<WorkflowOptions>
+}
+
+/** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
+export type WorkflowOptionOrigin = 'platform' | 'global' | 'workspace' | 'project'
+
+/** The Workflow section of Project Settings (#1278): the project's options, what they inherit, and the presets on offer. */
+export interface WorkflowForm {
+  platform: PlatformId
+  /** The preset the project's options started from (null: none chosen). */
+  preset: PresetId | null
+  /** The options the project sets itself. */
+  own: Partial<WorkflowOptions>
+  /** The options in force, with where each came from; `invalid` when they fell back to all-off (English, why). */
   options: WorkflowOptions
+  origins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
+  invalid: string | null
+  /** What each option would be without the project's own value (the workspace's, Hive's, or all-off), and from where. */
+  inherited: WorkflowOptions
+  inheritedOrigins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
+  /** The presets offered, in order, each with its options for this project; `needs`: shown unavailable, with why. */
+  presets: { id: PresetId; needs?: PresetNeeds; options: WorkflowOptions }[]
+  /** The project's commit identity from its git config (G12), or null. */
+  identity: { name: string; email: string } | null
+  /** Settings → Advanced → Workflow rules are enforced: off, the options are saved but no rule applies. */
+  enforced: boolean
+}
+
+/** A change to a project's workflow options: the preset they start from and the options the project sets itself. */
+export interface WorkflowChange {
+  preset: PresetId | null
+  options: Partial<WorkflowOptions>
+}
+
+/** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */
+export type WorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | { kind: 'bad'; why: string }
+
+/** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
+export interface WorkflowCheck {
+  problems: WorkflowProblem[]
+  changed: (keyof WorkflowOptions)[]
+  /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
+  lanes: { id: string; name: string | null; builder: string }[]
+  /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
+  inFlight: { number: number; title: string }[]
 }
 
 export interface ProjectConfig {

@@ -26,6 +26,9 @@ import { isUnknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 
+/** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
+export const APPLY_OPTIONS = 'applyOptions'
+
 export interface Moved {
   ok: true
   card: string
@@ -202,12 +205,15 @@ export class Workflow {
   }
 
   /**
-   * The ruleset a card works under (§16.5.4): the one it started with until it's Done; a card in Todo uses its lane's
-   * (the one in force when the lane started), else the current one.
+   * The ruleset a card works under (§16.5.4): the one it started with until it's Done, unless the user applied changed
+   * options to it since (an Override, §16.11.4: the latest one's); a card in Todo uses its lane's (the one in force when
+   * the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
     if (s.started) {
-      const f = this.store.facts(card.id).find((x) => x.seq === s.cycle)
+      const facts = this.store.facts(card.id)
+      const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
+      const f = applied ?? facts.find((x) => x.seq === s.cycle)
       if (f?.ruleset) return this.store.ruleset(f.ruleset)
     }
     if (card.lane) {

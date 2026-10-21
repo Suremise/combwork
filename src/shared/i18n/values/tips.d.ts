@@ -323,6 +323,8 @@ interface HiveMessageValues {
   'tips.unusedWorktrees.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.workflowOptions.text': undefined
+  'tips.workflowOptions.title': undefined
   'tips.workspaceMoved.text': undefined
   'tips.workspaceMoved.title': undefined
   'tips.worktreeReuse.text': undefined

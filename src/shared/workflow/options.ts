@@ -62,7 +62,31 @@ export interface WorkflowOptions {
   commands: Record<string, string>
 }
 
-export type PresetId = 'solo' | 'pair' | 'team'
+/**
+ * The presets: Solo, Pair and Team (§16.6.3), and P4's Pair, in which the agent merges (`pairAgent`, §16.19.1): what an
+ * RC offers before Hive merges (P5) and slots (P7) exist.
+ */
+export type PresetId = 'solo' | 'pair' | 'team' | 'pairAgent'
+
+/** Why a preset isn't offered yet: the piece it needs comes in a later version (§16.19.1). */
+export type PresetNeeds = 'hiveMerges' | 'slots'
+
+/**
+ * The presets the form offers for a platform, in order, and those it shows unavailable with why (§16.19.1: no RC's preset
+ * needs a later phase; shown, not hidden, so the choice reads as P6's will).
+ */
+export const PRESETS: Record<PlatformId, { id: PresetId; needs?: PresetNeeds }[]> = {
+  git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair', needs: 'hiveMerges' }, { id: 'team', needs: 'slots' }],
+  none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
+}
+
+/** What a preset fills in from the project: its suggested checks (OP-24) with their commands, and the identity G12 shows. */
+export interface PresetInputs {
+  quick: string[]
+  tests: string[]
+  commands?: Record<string, string>
+  identity?: { name: string; email: string } | null
+}
 
 const BASE: Omit<WorkflowOptions, 'platform'> = {
   review: 'none',
@@ -98,15 +122,33 @@ export function allOff(platform: PlatformId): WorkflowOptions {
  * The presets (§16.6.3, OP-3). `quick` and `tests` are the project's suggested check names (OP-24: suggested from its
  * scripts, never guessed silently), passed in by whoever offers the preset.
  */
-export function preset(platform: PlatformId, id: PresetId, checks: { quick: string[]; tests: string[] } = { quick: [], tests: [] }): WorkflowOptions {
+export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs = { quick: [], tests: [] }): WorkflowOptions {
   const quickAndTests = [...checks.quick, ...checks.tests]
+  // The commands of the checks it names (§16.13: a run counts as a check only as its command).
+  const commandsOf = (names: string[]): Record<string, string> => Object.fromEntries(names.filter((n) => checks.commands?.[n]).map((n) => [n, checks.commands![n]]))
   if (platform === 'none') {
     const solo: WorkflowOptions = { ...allOff('none'), dependenciesDone: true }
     if (id === 'solo') return solo
-    if (id === 'pair') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick }
-    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests }
+    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick) }
+    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests) }
   }
   if (id === 'solo') return { ...allOff('git'), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
+  // §16.19.1: a reviewer agent, the agent merges (merge-ready, then reported), each card in the agent's worktree, the
+  // quick checks before review; the repository's default branch as the target.
+  if (id === 'pairAgent')
+    return {
+      ...allOff('git'),
+      review: 'agent',
+      noSelfReview: true,
+      preChecks: checks.quick,
+      finish: 'agentMerges',
+      style: 'merge',
+      folder: 'slots',
+      identity: checks.identity ?? null,
+      stopOwnRuns: true,
+      dependenciesDone: true,
+      commands: commandsOf(checks.quick)
+    }
   const pair: WorkflowOptions = {
     ...allOff('git'),
     review: 'agent',
@@ -155,5 +197,68 @@ export function contradictions(o: WorkflowOptions): Contradiction[] {
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
+  return out
+}
+
+export type OptionKey = Exclude<keyof WorkflowOptions, 'platform'>
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const strings = (v: unknown): boolean => Array.isArray(v) && v.every((x) => typeof x === 'string')
+const oneOf =
+  <T extends string>(choices: readonly T[]) =>
+  (v: unknown): boolean =>
+    typeof v === 'string' && (choices as readonly string[]).includes(v)
+const bool = (v: unknown): boolean => typeof v === 'boolean'
+
+/**
+ * What each option takes: its type and, for a choice, one of its values (HR2's #1263 round 1: compiling checks only
+ * contradictions). Every option has its check (a new one fails the typecheck until it has).
+ */
+export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
+  review: oneOf<ReviewBy>(['none', 'agent', 'agentThenYou', 'you']),
+  reviewers: (v) => v === 1 || v === 2,
+  noSelfReview: bool,
+  preChecks: strings,
+  sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
+  finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
+  style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
+  target: (v) => typeof v === 'string',
+  strict: bool,
+  mergeChecks: strings,
+  okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
+  folder: oneOf<FolderMode>(['slots', 'project']),
+  identity: (v) => v === null || (isRecord(v) && typeof v.name === 'string' && typeof v.email === 'string'),
+  stopOwnRuns: bool,
+  dependenciesDone: bool,
+  slotsUpToDate: bool,
+  sharedFolderWarning: bool,
+  excluded: strings,
+  commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string')
+}
+
+/** Whether a value is one its option takes (false for anything that isn't an option). */
+export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
+
+/**
+ * The options P4's form shows for a platform, in order (§16.6.1, §16.6.2; #1278). P4 offers only what it ships
+ * (§16.19.1): G8 strict, G9 merge checks, G15 and G17 wait for Hive merges and slots, and None's stage names (N5) for the
+ * Version Control tab. The check commands (`commands`) are edited with the checks that name them.
+ */
+export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
+  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
+  none: ['review', 'noSelfReview', 'preChecks', 'excluded', 'dependenciesDone']
+}
+
+/** Why a value can't be set yet: its piece comes in a later version (§16.19.1). */
+export const NOT_OFFERED = {
+  hiveMerges: msg({ id: 'workflow.notOffered.hiveMerges', defaultMessage: '“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.', description: 'Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive.' }),
+  later: msg({ id: 'workflow.notOffered.later', defaultMessage: 'Some of these options aren’t available in this version yet: leave them as they are.', description: 'Why workflow options cannot be saved: an option set (merge checks, up to date before merging, slots kept up to date) comes in a later version of Hive.' })
+} satisfies Record<string, Msg>
+
+/** The values a project sets that this version doesn't offer yet (§16.19.1), by why. */
+export function notOffered(own: Partial<WorkflowOptions>): (keyof typeof NOT_OFFERED)[] {
+  const out: (keyof typeof NOT_OFFERED)[] = []
+  if (own.finish === 'hiveMerges') out.push('hiveMerges')
+  if (own.strict === true || (own.mergeChecks?.length ?? 0) > 0 || own.slotsUpToDate === true) out.push('later')
   return out
 }

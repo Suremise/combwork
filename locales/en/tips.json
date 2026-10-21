@@ -1287,6 +1287,14 @@
     "defaultMessage": "Let another app watch Hive",
     "description": "A tip's title."
   },
+  "tips.workflowOptions.text": {
+    "defaultMessage": "Project Settings → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.workflowOptions.title": {
+    "defaultMessage": "Choose how cards get to Done",
+    "description": "A tip's title (glossary 2.1: workflow)."
+  },
   "tips.workspaceMoved.text": {
     "defaultMessage": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

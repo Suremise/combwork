@@ -97,6 +97,9 @@ import type {
   Transcript,
   TranscriptSearchResult,
   TranscriptTool,
+  WorkflowChange,
+  WorkflowCheck,
+  WorkflowForm,
   WorkspaceInfo
 } from './types'
 import type { MetricsQuery, MetricsReport } from './metrics'
@@ -263,7 +266,18 @@ export interface HiveRequests {
   'project:setKey': (projectPath: string, key: string) => string
   /** The names moved cards keep in the projects they left (`HI-1` → its card's number), #1221. */
   'project:movedCardNames': () => Record<string, number>
+  /** Any of a project's settings but its workflow options, which change only through `workflow:setOptions` (refused here). */
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
+  /** The project's workflow options as Project Settings → Workflow shows them (#1278): its own, what they inherit, the presets. */
+  'workflow:form': (projectPath: string) => WorkflowForm
+  /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
+  'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
+  /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
+  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
+  'workflow:presetsNotice': () => { path: string; name: string }[] | null
+  /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
+  'workflow:presetsNoticeSaid': () => void
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */
