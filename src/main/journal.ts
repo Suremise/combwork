@@ -7,6 +7,7 @@ import { app } from 'electron'
 import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES, inScope, isoWeek, weekStart, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalKind, type JournalPage, type JournalRow, type JournalSettings, type JournalSource, type LinkType } from '../shared/journal'
 import { openDb, transaction, type Db, type Migration } from './db'
 import { createLogger, userText } from './logger'
+import { assertNotFencedOut } from './openingFence'
 import { trash } from './trash'
 
 const log = createLogger('journal')
@@ -126,6 +127,8 @@ function journalOf(home: string): Db {
   if (deleting.has(k)) throw new JournalBusy('The journal is being deleted: try again in a moment.')
   const was = open.get(k)
   if (was) return was
+  // Not opened again by work of its workspace's opening that has closed (#1379): it would hold the folder.
+  assertNotFencedOut(file)
   const db = openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(home, 'backups'), setup })
   open.set(k, db)
   return db

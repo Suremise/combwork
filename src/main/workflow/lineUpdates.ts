@@ -19,6 +19,7 @@ import { advanced } from '../advanced'
 import { onHiveEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { coalesced } from '../coalesce'
+import { gitStep } from '../platform/git'
 import { isUnknown } from '../platform/types'
 import { LINE_GATE } from '../../shared/workflow/facts'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -76,7 +77,8 @@ export async function updateLines(ws: WorkspaceService): Promise<void> {
     for (const id of wf.store.runningLanes()) {
       seen.add(id)
       try {
-        const r = await laneLine(wf, project, id, () => alive() && workflowEnforced())
+        // Each lane's look one git step (#1376).
+        const r = await gitStep(() => laneLine(wf, project, id, () => alive() && workflowEnforced()))
         if (r === null) {
           if (mine.delete(id)) moved = true
         } else if (mine.get(id) !== r) {

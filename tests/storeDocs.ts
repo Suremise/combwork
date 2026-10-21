@@ -1,12 +1,26 @@
 import { saveTable as saveTypedTable, storeValue, type StoreName } from '../src/main/storeRows'
 import { readTable, saveTable } from '../src/main/storeTables'
 import type { TableStore } from '../src/main/schema/storeCodec'
-import { workspaceDb } from '../src/main/boardStore'
+import { boardOpen, closeBoard, transientDb, workspaceDb } from '../src/main/boardStore'
 import { addDeliveries, readDeliveries } from '../src/main/schema/sessionDeliveryTables'
 
 /** Any store: lanes, watches and metrics are in their typed tables (#1212, storeTables.ts), sessions and deliveries in theirs (#1211). */
 type AnyStore = StoreName | TableStore
 const inTables = (store: AnyStore): store is TableStore => store === 'lanes' || store === 'watches' || store === 'metrics'
+
+/**
+ * Runs `read` with the workspace's database open, closing it again after when it wasn't open: a look at a closed
+ * workspace's (Hive doesn't open a closed workspace's database for itself, #1379) that holds nothing open after.
+ */
+function peek<T>(workspacePath: string, read: () => T): T {
+  const wasOpen = boardOpen(workspacePath)
+  transientDb(workspacePath)
+  try {
+    return read()
+  } finally {
+    if (!wasOpen) closeBoard(workspacePath)
+  }
+}
 
 /** Sessions are read through workspace.sessionsFile (sessionStore.ts): a host's records aren't one store's list. */
 const nope = (store: string): never => {
@@ -15,12 +29,12 @@ const nope = (store: string): never => {
 
 /** A store's entries as the workspace database keeps them (#1018, #1211, #1212), in order: what its file held before. Deliveries in the order of their seq. */
 export const storeDocs = <T = Record<string, unknown>>(workspacePath: string, store: AnyStore, scope = ''): T[] =>
-  inTables(store) ? (readTable(workspacePath, store).docs as T[]) : store === 'deliveries' ? (readDeliveries(workspaceDb(workspacePath).reader, scope) as T[]) : nope(store)
+  peek(workspacePath, () => (inTables(store) ? (readTable(workspacePath, store).docs as T[]) : store === 'deliveries' ? (readDeliveries(workspaceDb(workspacePath).reader, scope) as T[]) : nope(store)))
 
 /** A store's value kept beside its entries (e.g. watches' and deliveries' `invalid`), parsed; undefined when there is none. */
 export const storeMeta = <T = unknown>(workspacePath: string, store: AnyStore, key: string, scope = ''): T | undefined => {
   // Sessions' and deliveries' values stay in store_meta (#1211), the others' are board_meta's (#1212).
-  const v = inTables(store) ? readTable(workspacePath, store).meta.get(key) : (storeValue(workspaceDb(workspacePath).reader, store, scope, key) ?? undefined)
+  const v = peek(workspacePath, () => (inTables(store) ? readTable(workspacePath, store).meta.get(key) : (storeValue(workspaceDb(workspacePath).reader, store, scope, key) ?? undefined)))
   return v === undefined ? undefined : (JSON.parse(v) as T)
 }
 
@@ -48,7 +62,7 @@ export async function putStoreDocs(workspacePath: string, store: AnyStore, docs:
 
 /** The performance metrics as saved (#1019, #1212: their tables in the workspace database), in the form metrics.json had; null before any save. */
 export function metricsSaved(workspacePath: string): { version: 1; buckets: Record<string, unknown>[]; observed: [number, number][]; evictedThrough?: number; renamesApplied?: number } | null {
-  const { docs, meta } = readTable(workspacePath, 'metrics')
+  const { docs, meta } = peek(workspacePath, () => readTable(workspacePath, 'metrics'))
   if (!meta.has('imported')) return null
   const num = (k: string): number | undefined => (meta.has(k) ? Number(JSON.parse(meta.get(k)!)) : undefined)
   // As plain JSON (the tables give a bucket's maps without a prototype, as the store makes them).

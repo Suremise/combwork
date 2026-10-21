@@ -149,6 +149,8 @@ export interface FactData {
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
+  /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
+  LineRenamed: { from: string; to: string; why: 'repair' }
   /**
    * A line's move begun (#1271): written before it, so a move with no outcome after it (`LineMoved`, or
    * `LineMoveUndone`) holds the next card until it is settled.
@@ -479,6 +481,12 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'DecisionsReceived': {
         const d = f.data as FactData['DecisionsReceived']
         s.received[d.agent] = Math.max(s.received[d.agent] ?? 0, d.generation)
+        break
+      }
+      case 'LineRenamed': {
+        // Its line is the new name from here on: reconciliation reads the branch by it, and never finds it gone (#1305).
+        const d = f.data as FactData['LineRenamed']
+        if (s.started?.line && s.started.line.toLowerCase() === d.from.toLowerCase()) s.started = { ...s.started, line: d.to }
         break
       }
       case 'HeadMoved': {
