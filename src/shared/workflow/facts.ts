@@ -149,8 +149,13 @@ export interface FactData {
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
-  /** A line's move begun (#1271): written before it, so a move that didn't finish (no LineMoved after it) holds the next card. */
+  /**
+   * A line's move begun (#1271): written before it, so a move with no outcome after it (`LineMoved`, or
+   * `LineMoveUndone`) holds the next card until it is settled.
+   */
   LineMoving: { line: string; from: string; to: string }
+  /** A line's move begun and not made: everything as it was (put back, or found so), the move's outcome (#1271). */
+  LineMoveUndone: { line: string; at: string }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */

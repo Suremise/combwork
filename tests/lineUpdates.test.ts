@@ -562,7 +562,7 @@ describe('a move failing after its first change (#1271 round 4)', () => {
     // The branch moved elsewhere just as Hive swaps it back: the swap back fails.
     let other = ''
     gitTestHooks.started = (_cwd, args) => {
-      if (args[0] !== 'update-ref' || !args.includes(head) || other) return
+      if (args[0] !== 'update-ref' || !args.some((x) => x.includes('put back')) || other) return
       other = git(wt, 'commit-tree', `${head}^{tree}`, '-p', head, '-m', 'elsewhere')
       git(wt, 'update-ref', 'refs/heads/card', other)
     }
@@ -582,5 +582,47 @@ describe('a move failing after its first change (#1271 round 4)', () => {
     expect(kindsOf(w, cards[0])).toContain('LineMoved')
     expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBeNull()
     expect(foldCard(facts(w, cards[1])).started?.base).toBe(git(repo, 'rev-parse', 'main'))
+  })
+
+  // HR2's round 4: the files not put back, the head back where it began (before the ref moved, or after it was swapped
+  // back). The head proves nothing: the move stays unfinished, the user is asked once, and a consistent state settles it.
+  describe('the files not put back, the head where it began', () => {
+    /** Makes the put-back's read-tree refuse: a local change to a file it would take away, as it runs. */
+    const restoreFails = (wt: string, head: string) => {
+      gitTestHooks.started = (_cwd, args) => {
+        if (args[0] === 'read-tree' && args[args.length - 1] === head) writeFileSync(join(wt, 'target-only.txt'), 'changed by hand\n')
+      }
+    }
+    for (const [when, suffix, times] of [
+      ['before the ref moved (the lock rename refused)', '.lock', 1],
+      ['after the ref was swapped back (the index rename refused)', '', 100]
+    ] as const) {
+      it(`${when}: unfinished, asked once, the next card held; settled by hand, recorded as not made, then moved`, async () => {
+        const { w, wt, repo, cards, head } = await squashed()
+        refuseRename(wt, suffix, times)
+        restoreFails(wt, head)
+        await update(w)
+        gitTestHooks.started = undefined
+        renameFault.times = 0
+        expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)
+        expect(git(wt, 'status', '--porcelain')).not.toBe('')
+        expect(kindsOf(w, cards[0]).filter((k) => k.startsWith('LineMov'))).toEqual(['LineMoving'])
+        expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBe('lane.lineBehind')
+        await update(w)
+        await update(w)
+        const asked = forYou(w).items.filter((i) => i.card === cards[1])
+        expect(asked).toHaveLength(1)
+        expect(asked[0].text).toMatch(/didn't finish and couldn't be put back/)
+        // The user puts the worktree back as the head has it, and answers: recorded as not made; the next pass moves it.
+        git(wt, 'reset', '-q', '--hard', head)
+        git(wt, 'clean', '-qfd')
+        await inWorkspace(w, () => tasks.answerTask(cards[1], asked[0].request, { outcome: 'answered', reply: 'Put back as it was.' }))
+        await update(w)
+        expect(kindsOf(w, cards[0]).filter((k) => k.startsWith('LineMov'))).toEqual(['LineMoving', 'LineMoveUndone'])
+        await update(w)
+        consistent(wt, git(repo, 'rev-parse', 'main'))
+        expect(kindsOf(w, cards[0]).filter((k) => k.startsWith('LineMov'))).toEqual(['LineMoving', 'LineMoveUndone', 'LineMoving', 'LineMoved'])
+      })
+    }
   })
 })

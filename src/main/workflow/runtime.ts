@@ -1717,9 +1717,10 @@ export class Workflow {
     // A move begun and not recorded as done (it failed part way, or Hive stopped during it): held until it is settled,
     // unless the line is back where it began.
     const facts = this.store.facts(prev.id)
+    // Its outcome is a fact (HR2's round 4): a head back where it began proves nothing of the files and index.
     const moving = facts.findLast((f) => f.kind === 'LineMoving')
-    const begun = moving && !facts.some((f) => f.kind === 'LineMoved' && f.seq > moving.seq) ? (moving.data as FactData['LineMoving']) : null
-    const unfinished = begun && now.head !== begun.from ? { from: begun.from, to: begun.to } : undefined
+    const begun = moving && !facts.some((f) => (f.kind === 'LineMoved' || f.kind === 'LineMoveUndone') && f.seq > moving.seq) ? (moving.data as FactData['LineMoving']) : null
+    const unfinished = begun ? { from: begun.from, to: begun.to } : undefined
     if (now.inTarget && !unfinished) return null
     return { next: card, prev, builder, folder: own.path, target, ...now, ...(unfinished ? { unfinished } : {}) }
   }
@@ -1772,7 +1773,11 @@ export class Workflow {
         return null
       })
       const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head, target: b.target }, ok)
-      if (moved !== true) return moved
+      // Not made, everything as it was (the platform put it back, or never began): the move's outcome, recorded.
+      if (moved !== true) {
+        await this.lineMoveUndoneRecord(b, b.head)
+        return moved
+      }
       try {
         await this.lineMovedRecord(b, b.head, b.targetHead)
       } catch (e) {
@@ -1784,6 +1789,14 @@ export class Workflow {
     } finally {
       lineMoving.delete(key)
     }
+  }
+
+  /** Records a line's move as not made, everything as it was at `at` (`LineMoveUndone` on the card just Done). */
+  async lineMoveUndoneRecord(b: LineBehind, at: string): Promise<void> {
+    await this.write(b.prev, null, 'hive', (w) => {
+      w.fact('LineMoveUndone', { line: b.line ?? b.folder, at }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
   }
 
   /** Records a line's move as done (`LineMoved` on the card just Done) and tells its builder the next card can start. */

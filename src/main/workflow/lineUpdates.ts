@@ -107,17 +107,25 @@ async function laneLine(wf: Workflow, project: string, id: string, on: () => boo
   const b = await wf.lineBehind(next)
   if (!b) return null
   // Asked about this head already (and answered, or still open): an approval to move it once is all that goes on here.
-  const asked = Object.values(s.made).filter((r) => r.gate === LINE_GATE && r.revision === b.head)
+  // (A question about a move that didn't finish is that move's, not this head's: answered, it doesn't stop the next one.)
+  const unfinishedAsk = (r: { requestText?: { id: string } }): boolean => r.requestText?.id === FOR_YOU.lineUnfinished.id
+  const made = Object.values(s.made).filter((r) => r.gate === LINE_GATE && r.revision === b.head)
+  const asked = made.filter((r) => !unfinishedAsk(r))
   const open = s.requests.some((r) => r.gate === LINE_GATE)
   const approved = asked.some((r) => s.approvals.some((a) => a.request === r.request && a.answer === 'approved'))
-  // A move begun that didn't finish (HR2's round 3): done after all once the line is at its target, clean (recorded
-  // now); else asked of the user once, the next card held meanwhile.
+  // A move begun with no outcome recorded (HR2's rounds 3 and 4): done after all once the line is at its target and
+  // clean, not made once it is back where it began and clean (each recorded now); else asked of the user once, the
+  // next card held meanwhile. A head alone proves nothing of the files and index: clean is checked too.
   if (b.unfinished) {
     if (b.head === b.unfinished.to && !b.dirty.length) {
       await wf.lineMovedRecord(b, b.unfinished.from, b.unfinished.to)
       return null
     }
-    if (!asked.length && !open) await wf.askAboutLine(b, 'decide', text(FOR_YOU.lineUnfinished, b, { to: b.unfinished.to.slice(0, 7) }))
+    if (b.head === b.unfinished.from && !b.dirty.length) {
+      await wf.lineMoveUndoneRecord(b, b.head)
+      return null
+    }
+    if (!made.some(unfinishedAsk) && !open) await wf.askAboutLine(b, 'decide', text(FOR_YOU.lineUnfinished, b, { to: b.unfinished.to.slice(0, 7) }))
     return null
   }
   if (open) return null

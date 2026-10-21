@@ -2812,10 +2812,12 @@ runs, the next card is reserved: its start is refused (`lane.lineBehind`, also i
 `LineMoved` is saved, and a `LineMoved` that can't be saved has the move undone the same way. **A failure after the
 move's first change** [HR2's round 3] is put back conditionally: the new index is staged in the held lock and published
 only once the branch has moved (a refused rename tried a few times); unpublished, the branch is swapped back (only if
-still where the move put it) and the files restored from that index. A `LineMoving` fact is written before the move: one
-with no `LineMoved` after it while the line isn't back where it began (a move that couldn't be put back, or Hive
-stopping during it) holds the next card; the next pass records the `LineMoved` once the line is at its target and clean,
-else asks the user once. What waits is each workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
+still where the move put it) and the files restored from that index. A `LineMoving` fact is written before the move
+and its outcome after it: `LineMoved`, or `LineMoveUndone` when nothing was made (the platform put everything back).
+One with no outcome (a move that couldn't be put back, or Hive stopping during it) holds the next card wherever the head
+is [HR2's round 4: a head back where it began proves nothing of the files and index]; the next pass records `LineMoved`
+once the line is at its target and clean, `LineMoveUndone` once it is back where it began and clean, else asks the user
+once (For you, Decide), that question the unfinished move's (answered, it doesn't stop the next move). What waits is each workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
 (`hive.workflow.updateAgentBranch`, default on): off, the user is asked every time, a For you **Approve** on the next
 card (approve: Hive moves it once, by the steps above; decline: the user does it). With workflow rules off, nothing
 moves, nothing is asked and nothing waits: P3's behaviour (Darren's decision on #1120, point 2; the Assistant on #1271),
