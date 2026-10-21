@@ -811,6 +811,26 @@
     "defaultMessage": "{n, number} s",
     "description": "An advanced setting's value in seconds, short: \"300 s\". {n} is the number."
   },
+  "settings.advanced.unitLabel.agents": {
+    "defaultMessage": "agents",
+    "description": "Beside the box of an advanced setting that is a number of agents (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.captures": {
+    "defaultMessage": "captures",
+    "description": "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.lanes": {
+    "defaultMessage": "lanes",
+    "description": "Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.minutes": {
+    "defaultMessage": "min",
+    "description": "Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in \"10 min\"."
+  },
+  "settings.advanced.unitLabel.seconds": {
+    "defaultMessage": "s",
+    "description": "Beside the box of an advanced setting given in seconds (Settings → Advanced): the unit, short, as in \"300 s\"."
+  },
   "settings.advanced.values.desc": {
     "defaultMessage": "Details Hive relies on that a CLI update can break (the text of its prompts, the fields it sends), and timeouts and limits for power users. Change one only when something doesn't work, or Hive's notes on a CLI update say to.",
     "description": "What the setting \"Advanced settings\" does, under its title (Settings → Advanced)."

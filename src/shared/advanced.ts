@@ -1479,6 +1479,18 @@ const UNITS: Record<string, Msg> = {
   captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." })
 }
 
+/** A number's unit on its own, beside its box in Settings → Advanced ("s"): the unit of the values UNITS writes. */
+const UNIT_LABELS: Record<string, Msg> = {
+  s: msg({ id: 'settings.advanced.unitLabel.seconds', defaultMessage: 's', description: 'Beside the box of an advanced setting given in seconds (Settings → Advanced): the unit, short, as in "300 s".' }),
+  lanes: msg({ id: 'settings.advanced.unitLabel.lanes', defaultMessage: 'lanes', description: 'Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced).' }),
+  agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
+  min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
+  captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." })
+}
+
+/** A number's unit as its box shows it beside it (#1281), in the user's language; null without one. */
+export const advancedUnit = (def: AdvancedDef): string | null => (def.unit && UNIT_LABELS[def.unit] ? tr(UNIT_LABELS[def.unit]) : null)
+
 /** A value as Settings → Advanced's list shows it, in the user's language: "300 s", "on", "4 lanes". */
 export function advancedShown(def: AdvancedDef, v: unknown): string {
   if (typeof v === 'boolean')

@@ -204,6 +204,11 @@ interface HiveMessageValues {
   'settings.advanced.unit.lanes': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
+  'settings.advanced.unitLabel.agents': undefined
+  'settings.advanced.unitLabel.captures': undefined
+  'settings.advanced.unitLabel.lanes': undefined
+  'settings.advanced.unitLabel.minutes': undefined
+  'settings.advanced.unitLabel.seconds': undefined
   'settings.advanced.values.desc': undefined
   'settings.advanced.values.tip': undefined
   'settings.advanced.values.title': undefined
