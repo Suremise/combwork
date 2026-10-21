@@ -217,9 +217,11 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
   }
   return (
     <div className="card-work-rev" data-submission={r.submission}>
+      {/* A revision not read says so on a line of its own (its reason can be long). */}
+      {!r.revision && r.unknown.revision && <div className="card-work-unread">{tr(M.revisionNotRead, { why: r.unknown.revision })}</div>}
       <div className="card-work-rev-head">
         {/* Its parts with middle dots between them; the time relative, the date and time in full on hover, as elsewhere. */}
-        {r.revision ? <RevisionCode id={r.revision} short={short} /> : r.unknown.revision ? <span className="card-work-unread">{tr(M.revisionNotRead, { why: r.unknown.revision })}</span> : <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
+        {r.revision ? <RevisionCode id={r.revision} short={short} /> : !r.unknown.revision && <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
         <span className="faint card-work-dot">{tr(M.round, { round: r.round })}</span>
         {r.by && <span className="faint card-work-dot">{agentName(r.by)}</span>}
         <span className="faint card-work-dot" title={formatDateTime(r.at)}>
