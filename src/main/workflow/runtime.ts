@@ -468,26 +468,49 @@ export class Workflow {
     const reopening = !!opts.reopen && (s.stage === 'done' || (s.stage === 'hold' && !s.started))
     if (s.stage !== 'todo' && !reopening) return this.notFrom(card, actor, s, 'start')
     const from: CardState = reopening ? { ...s, stage: 'todo' } : s
+    // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
+    // user's own drag is theirs to make.
+    const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
+    if (lane) return this.refuse(card, actor, 'start', lane)
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
     await this.cfg.hooks?.beforeWrite?.('start')
     if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+    let laneMoved = false
     const out = await this.writeWhole(card, g.r, actor, (w) => {
       const moved = this.stillAt(w, s, 'start')
       if (moved) return moved
       // Back to Todo first: its evidence was gathered on that state.
       if (reopening) w.move('todo', 'intent')
-      // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept.
+      // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept (a lane's
+      // boundary applied in it too: the next write applies it again).
       const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
       const changed = this.evidenceChanged(w, g.o, g.before)
       if (changed) return undone(changed)
+      // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
+      // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
+      // then refused: the boundary passed either way), then the start is checked against it.
+      if (this.enforced() && !opts.drag) {
+        this.applyLaneBoundary(w, this.store.card(card.id))
+        // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
+        // out, or a lane changed meanwhile): else it is gathered again from the top, once, as what it is now.
+        const now = this.store.card(card.id)
+        const r = this.rulesetOf(now, w.state())
+        if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
+          laneMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
+      }
+      const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
+      if (waits) return undone(waits)
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
       if (bad) return undone(bad)
       this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
       return null
     })
+    if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
     if (out) return this.refuse(card, actor, 'start', out)
     return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
   }
@@ -1250,12 +1273,14 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
+    // `dry` (the user's, #1275): only whether it would ask, and which rules; nothing written (a window Start asks first).
+    if (opts.dry && by !== 'user') throw new Error('a dry move is the user\'s') // i18n-ignore: a programming error, never shown
     // The Assistant's move on, while the card waits for the user at its round limit: only the user's answer resumes it.
     const limit = ORDER.indexOf(to) > ORDER.indexOf(from === 'hold' ? 'active' : from) ? this.atLimit(card, s, by) : null
     if (limit) return this.refuse(card, by, 'move', limit)
@@ -1266,6 +1291,7 @@ export class Workflow {
     if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
     if (to === 'hold') {
+      if (opts.dry) return this.ok(card, from, to)
       const out = await this.write(card, r, by, (w) => {
         const changed = this.stillAt(w, s, 'move')
         if (changed) return changed
@@ -1283,6 +1309,7 @@ export class Workflow {
       // Past where it was: back there and the intents of a drag from there, in one write (dragForward).
       if (forward) return this.dragForward(card, was, to, by, opts, was)
       if (to === was) {
+        if (opts.dry) return this.ok(card, from, to)
         const out = await this.write(card, r, by, (w) => {
           const changed = this.stillAt(w, s, 'move')
           if (changed) return changed
@@ -1308,7 +1335,8 @@ export class Workflow {
     // Out of On Hold, the rules a move skips count from where the card was, not from Todo.
     const heldFrom = from === 'hold' ? ([...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')?.data.from ?? 'todo') : from
     const skipped = this.skippedRules(card, r, heldFrom, to)
-    if (skipped.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules: skipped }
+    if (skipped.length && by === 'user' && (!opts.confirm || opts.dry)) return { ask: true, card: card.key, rules: skipped }
+    if (opts.dry) return this.ok(card, from, to)
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
       // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
@@ -1334,8 +1362,8 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
-    const asking = by === 'user' ? !opts.confirm : !opts.reason
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+    const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
@@ -1349,6 +1377,7 @@ export class Workflow {
       // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
       // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
       if (!gs) return this.refuse(card, by, 'submit', gsub)
+      if (opts.dry) return this.dragForward(card, from, 'active', by, opts, fromHold)
       const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
       return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
     }
@@ -1365,6 +1394,7 @@ export class Workflow {
     if (pastReview && this.enforced()) rules.add('integrate.approved')
     const skipped = [...rules]
     const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+    if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
     if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
     await this.cfg.hooks?.beforeWrite?.('move')
     if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
@@ -1570,6 +1600,58 @@ export class Workflow {
     const next = changeList({ ...l, current }, cards)
     this.saveLane(next)
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
+  }
+
+  /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
+  private laneCardFlying(n: number): boolean {
+    const stage = this.store.card(n).stage
+    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging'
+  }
+
+  /**
+   * A lane's list as a start reads it (#1270; the Assistant's round 4 design, one lane state): the list now, or, once
+   * none of its cards is in flight (the card boundary has passed), the queued list, which `applies` then.
+   */
+  laneNow(l: LaneList): { cards: number[]; applies: boolean } {
+    if (!l.pending?.length || l.cards.some((c) => this.laneCardFlying(c))) return { cards: l.cards, applies: false }
+    return { cards: l.pending, applies: true }
+  }
+
+  /**
+   * The card this one waits for in its running lane, or null (one card at a time, #1270), from the lane's list as a start
+   * reads it (laneNow): a card before it there that isn't Done. A card only in a queued list that hasn't applied (a card
+   * is still in flight) is never eligible: it waits for that card, so no queued card passes an earlier one.
+   */
+  laneWaits(card: CardRecord): CardRecord | null {
+    if (!card.lane) return null
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return null
+    const now = this.laneNow(l)
+    let open: number | undefined
+    if (now.cards.includes(card.id)) open = now.cards.slice(0, now.cards.indexOf(card.id)).find((c) => !this.laneDone(c))
+    else if (l.pending?.includes(card.id)) open = l.cards.find((c) => this.laneCardFlying(c)) ?? l.cards.find((c) => c !== card.id && !this.laneDone(c))
+    return open === undefined ? null : this.store.card(open)
+  }
+
+  /**
+   * Inside a start's write (its board change, #1270): a queued list whose boundary has passed is applied there, before the
+   * start is checked, and the builder is told (a wake, delivered once). lanes.ts's refresh then finds nothing queued.
+   */
+  private applyLaneBoundary(w: Write, card: CardRecord): void {
+    if (!card.lane) return
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return
+    const now = this.laneNow(l)
+    if (!now.applies) return
+    this.saveLane({ ...l, cards: [...now.cards], pending: null })
+    const builder = this.store.laneBuilder(l.id)
+    if (builder) this.wake(w, builder, `Your lane's card list changed, as queued: its cards are now ${now.cards.map((c) => this.store.card(c).key).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: a wake, agent-facing
+  }
+
+  /** A start refused for a card that waits in its lane (laneWaits), or null. */
+  private laneRefusal(card: CardRecord): GuardRefusal | null {
+    const earlier = this.laneWaits(card)
+    return earlier ? { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } } : null
   }
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */

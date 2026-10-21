@@ -150,6 +150,8 @@
   "service.workflowNotice.lane": "Tor {lane}",
   "service.workflowNotice.mergeDue": "Wszystkie karty zaliczyły recenzję: czas na scalenie",
   "service.workflowNotice.mergeStalled": "Scalanie utknęło",
+  "service.workflowNotice.merging": "Karta {card} jest scalana: tor czeka",
+  "service.workflowNotice.notMerged": "Karta {card} przeszła recenzję: tor czeka na jej scalenie",
   "service.workflowNotice.stalled": "{card} utknęła",
   "service.workspace.advancedNotHere": "{setting}: tego ustawienia nie można zmienić dla obszaru roboczego.",
   "service.workspace.agentGone": "Ten agent już nie istnieje.",

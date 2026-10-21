@@ -567,6 +567,22 @@
     "defaultMessage": "Agents per project",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.assistant.otherMcpServers.desc": {
+    "defaultMessage": "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
+    "description": "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
+  },
+  "settings.advanced.hive.assistant.otherMcpServers.title": {
+    "defaultMessage": "The Assistant uses the workspace's other MCP servers",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant."
+  },
+  "settings.advanced.hive.assistant.startView.desc": {
+    "defaultMessage": "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
+    "description": "What the advanced setting \"The Assistant starts with Hive's start view\" does (Settings → Advanced, under Hive)."
+  },
+  "settings.advanced.hive.assistant.startView.title": {
+    "defaultMessage": "The Assistant starts with Hive's start view",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts."
+  },
   "settings.advanced.hive.console.showText.desc": {
     "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -614,6 +630,22 @@
   "settings.advanced.hive.progress.lanesShown.title": {
     "defaultMessage": "Progress panel: lanes shown",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.prompt.asTyped.desc": {
+    "defaultMessage": "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. Other control characters are left out either way: they would press keys.",
+    "description": "What the advanced setting \"Send prompts as typed\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names: keep them."
+  },
+  "settings.advanced.hive.prompt.asTyped.title": {
+    "defaultMessage": "Send prompts as typed",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: the prompts Hive itself types into agents' CLIs."
+  },
+  "settings.advanced.hive.prompt.clearDraft.desc": {
+    "defaultMessage": "Before Hive types a prompt or Compact into an agent's CLI, it presses Ctrl+U, which clears what is in the CLI's input, and it presses it again to take back a prompt it stopped part-way. Turned off, Hive never presses it: text left in the CLI's input stays in front of what Hive types and is sent with it, a prompt stopped part-way stays in the input, and Compact can fail behind a draft. Changing Codex's mode still clears its input first, as its menu needs.",
+    "description": "What the advanced setting \"Clear the CLI's draft before Hive types\" does (Settings → Advanced, under Hive). Ctrl+U names keys: use the key names your language uses. Compact is a command's name: use it as Hive shows it."
+  },
+  "settings.advanced.hive.prompt.clearDraft.title": {
+    "defaultMessage": "Clear the CLI's draft before Hive types",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The draft is text left in the input of an agent's CLI, not sent yet."
   },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
@@ -686,6 +718,14 @@
   "settings.advanced.hive.showDeveloperFeatures.title": {
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.terminal.ctrlCVToCli.desc": {
+    "defaultMessage": "In an agent's pane, Ctrl+C copies the terminal's selection (with nothing selected it goes to the CLI, which stops what it is doing), and Ctrl+V pastes the clipboard's text, or a screenshot as an attachment. Turned on, both keys go to the CLI, as in any other terminal: copy and paste with right-click instead, unless right-click goes to the CLI too (a setting under each CLI).",
+    "description": "What the advanced setting \"Ctrl+C and Ctrl+V go to the CLI\" does (Settings → Advanced, under Hive). Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
+  "settings.advanced.hive.terminal.ctrlCVToCli.title": {
+    "defaultMessage": "Ctrl+C and Ctrl+V go to the CLI",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
     "defaultMessage": "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",

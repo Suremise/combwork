@@ -7,14 +7,18 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
 import { cardLabel, nameWithKey } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
+import { ForYouChip, ForYouSection } from './ForYou'
+import { useForYou } from '../forYou'
+import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
-import { workflowMessage } from '@shared/workflow/texts'
+import { RULE_NAMES, workflowMessage } from '@shared/workflow/texts'
+import { refusalLines, type Refusal, type RefusalFormat } from '@shared/workflow/refusals'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -165,6 +169,76 @@ async function change(n: number, patch: TaskPatch, what?: string): Promise<boole
   }
 }
 
+/** A refusal's sentences in the window's language: names (stages, moves, rules) by their messages (#1264). */
+const IN_WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items) => fmt.list(items, 'unit'), names: true }
+
+const MOVE = {
+  askTitle: msg({ id: 'board.move.askTitle', defaultMessage: 'Move {card} to {column} anyway?', description: "Title of the question before a move that skips some of the card's workflow rules (glossary: rule). {card} is the card's name (its key, such as AM-12, or #12), {column} the board column it is moved to." }),
+  askMessage: msg({ id: 'board.move.askMessage', defaultMessage: '{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}', description: "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives." }),
+  detail: msg({ id: 'board.move.askDetail', defaultMessage: 'Moving it anyway records an override on the card, with your reason.', description: "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
+  reason: msg({ id: 'board.move.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional." }),
+  anyway: msg({ id: 'board.move.anyway', defaultMessage: 'Move Anyway', description: 'The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override).' }),
+  refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Hive couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
+  notMoved: msg({ id: 'board.move.notMoved', defaultMessage: 'Your other changes are saved; the card stays in {column}.', description: "In the card dialog, after Save: the user changed the card's Column, but its move was cancelled or refused (a toast says why); everything else was saved. {column} is the board column it is in." }),
+  stopped: msg({ id: 'board.move.stopped', defaultMessage: '{card} stopped in {column}', description: "A toast's title: a drag went part of the way (the card's work started) and stopped in {column} (a board column), for something no exception to the rules can make true. {card} is the card's name. The toast's text says why and what to do." })
+}
+
+/** A refusal's three sentences, one per line, in the window's language, the card named as the window names it (`name`). */
+const refusalText = (r: Refusal, name: string): string => {
+  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, IN_WINDOW)
+  return [l.message, l.next, ...(l.change ? [l.change] : [])].join('\n')
+}
+
+/**
+ * The question before a move (or a Start) that skips rules (#1275): the rules by name, a reason, Move Anyway. The reason
+ * given (maybe empty), or null when the user cancels.
+ */
+function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): Promise<string | null> {
+  return prompt({
+    title: tr(MOVE.askTitle, { card: name, column: tr(COLUMN_TEXT[column].label) }),
+    message: tr(MOVE.askMessage, { n: rules.length }),
+    list: rules.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
+    listOnly: true,
+    detail: tr(MOVE.detail),
+    fieldLabel: tr(MOVE.reason),
+    confirmLabel: tr(MOVE.anyway)
+  })
+}
+
+/**
+ * Moves a card to a column through its rules (`tasks:move`, #1275, SPEC §16.8.4): a move that skips some asks first
+ * (the rules it skips, a reason, Move Anyway), then records one override; a step no override can make true shows why,
+ * and the card stays where the move stopped. `agent`: the Move to Doing dialog's choice. Whether it reached the column;
+ * the board is read again either way (an optimistic move undone on Cancel or a refusal).
+ */
+export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null } = {}): Promise<boolean> {
+  const name = cardLabelOf(get(), c.number)
+  const where = tr(COLUMN_TEXT[column].label)
+  try {
+    let r = await call('tasks:move', c.number, column, o)
+    if ('ask' in r) {
+      const reason = await askToSkip(name, column, r.ask)
+      if (reason === null) return false
+      r = await call('tasks:move', c.number, column, { ...o, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    }
+    if ('refused' in r) {
+      notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
+      return false
+    }
+    if ('ask' in r) return false
+    if (r.stopped) {
+      notify('warning', tr(MOVE.stopped, { card: name, column: tr(COLUMN_TEXT[r.moved.column].label) }), refusalText(r.stopped, name))
+      return false
+    }
+    return true
+  } catch (e) {
+    notify('error', tr(MOVE_FAILED), errorMessage(e))
+    return false
+  } finally {
+    await loadTasks()
+  }
+}
+
 // Cards being archived from the menu: a second click while one runs is ignored.
 const archiving = new Set<number>()
 
@@ -206,9 +280,9 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
-          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void change(c.number, { column: x.id })) })),
+          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
           // A failed card still in Review goes back to its reviewer for the next round (#214).
-          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void change(c.number, { column: 'review' }) }] : []),
+          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void moveCard(c, 'review') }] : []),
           { separator: true }
         ]),
     { label: c.archived ? tr(BRING_BACK) : tr(ARCHIVE), icon: c.archived ? 'discard' : 'archive', disabled: !!readOnly, onClick: () => void archive(c, !c.archived) },
@@ -267,6 +341,8 @@ const FIELD_NAMES: Record<string, Msg> = {
 /** The New card buttons' tooltip. */
 const NEW_CARD_TIP = msg({ id: 'board.newCard.tip', defaultMessage: 'New card', description: 'Tooltip on the + buttons that add a card (the Todo column, the Board sidebar).' })
 /** A card's move failed. */
+/** What closing the card dialog would lose: an answer to a For you request, written and not sent (#1276). */
+const UNSENT_ANSWER = msg({ id: 'board.discard.answer', defaultMessage: 'the answer you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": an answer to a request for the user (For you) not sent yet. Lower case.' })
 const MOVE_FAILED = msg({ id: 'board.error.move', defaultMessage: 'Could not move the card', description: "An error toast's title: moving a card to another column failed." })
 /** Where a card with no project belongs (on the card, and the archived cards' Project column). */
 const WORKSPACE_CARD = msg({ id: 'board.card.workspace', defaultMessage: 'workspace', description: "Where a card that belongs to no project is (it is about the whole workspace): shown in place of a project's name on the card. Lower case." })
@@ -375,7 +451,8 @@ function CardTile({
   onDragStart,
   dropHere,
   readOnly,
-  work
+  work,
+  forYou
 }: {
   c: TaskCard
   projects: ProjectInfo[]
@@ -388,6 +465,8 @@ function CardTile({
   readOnly: string | null
   /** What its work's facts say, for its badges (#1224). */
   work?: WorkBadge
+  /** What on it waits for the user (#1276): its chip. */
+  forYou?: ForYouItem[]
 }) {
   const menu = useContextMenu()
   const { agent } = cardAgent(projects, c)
@@ -444,6 +523,7 @@ function CardTile({
                 </span>
               </Tooltip>
             )}
+            <ForYouChip items={forYou} />
             <FoldedAgent c={c} projects={projects} />
           </div>
         </div>
@@ -491,6 +571,11 @@ function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} projects={projects} />
+        {!!forYou?.length && (
+          <div className="task-for-you-row">
+            <ForYouChip items={forYou} />
+          </div>
+        )}
         <WorkBadges b={work} card={c} />
         {(c.labels.length > 0 || c.blockedBy.length > 0 || c.comments.length > 0 || !!c.decisions?.length) && (
           <div className="task-meta">
@@ -535,7 +620,7 @@ type DragState = { n: number; column: TaskColumn; before: number | null }
  * (#170), as the user leaves them for this workspace. With archived, the archived cards as a list instead. scope: the
  * board this is part of (a project's Tasks tab: its project), for Archive All's "the n shown (of m)" (#351).
  */
-export function Board({ project, scope = null, query, archived }: { project: string | null; scope?: string | null; query: string; archived: boolean }) {
+export function Board({ project, scope = null, query, archived, forYouOnly = false }: { project: string | null; scope?: string | null; query: string; archived: boolean; forYouOnly?: boolean }) {
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const all = useStore((s) => s.tasks)
@@ -543,6 +628,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   const movedNames = useStore((s) => s.movedCardNames)
   // Each card's work badges (#1224), read with the board.
   const workBadges = useWorkBadges()
+  // What waits for the user on each card (#1276): its chip, and the For you filter.
+  const forYou = useForYou().byCard
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
@@ -556,11 +643,18 @@ export function Board({ project, scope = null, query, archived }: { project: str
     dragNow.current = d
     showDrag(d)
   }
+  // The columns the dragged card can be dropped in under its rules (#1275: tasks:columns, asked as the drag starts);
+  // null until known, or when no rule applies: every column. A column its rules lack is no drop target.
+  const dropsNow = useRef<{ n: number; columns: Set<TaskColumn> | null } | null>(null)
+  const droppable = (column: TaskColumn): boolean => {
+    const d = dropsNow.current
+    return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
+  }
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
-    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query, keys, movedNames)),
-    [all, project, query, archived, keys, movedNames]
+    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && (!forYouOnly || forYou.has(c.number)) && cardMatches(c, query, keys, movedNames)),
+    [all, project, query, archived, keys, movedNames, forYouOnly, forYou]
   )
   const boardRef = useRef<HTMLDivElement>(null)
 
@@ -577,6 +671,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
     const colEl = at?.closest<HTMLElement>('.board-column')
     const column = colEl?.dataset.column as TaskColumn | undefined
     if (!at || !colEl || !column || !boardRef.current?.contains(colEl)) return
+    if (!droppable(column)) return
     const list = cards.filter((c) => c.column === column)
     const tile = at.closest<HTMLElement>('.task-card')
     let before: number | null
@@ -676,9 +771,11 @@ export function Board({ project, scope = null, query, archived }: { project: str
     if (!card || (card.column === column && d.before === d.n)) return
     // Into Doing from another column: who works on it is asked first, and the card stays put until then (Cancel).
     if (column === 'doing' && card.column !== 'doing') return moveToDoing({ n: card.number, project: card.project, agent: card.agent, before: d.before })
-    // Shown moved at once; the board is read again when the change lands.
+    // Shown moved at once; the board is read again when the change lands (back where it was on Cancel or a refusal).
     set((s) => ({ tasks: s.tasks.map((c) => (c.number === d.n ? { ...c, column } : c)) }))
-    await change(d.n, { column, before: d.before }, tr(MOVE_FAILED))
+    // A move within its column is only a new place: no rule is in it.
+    if (card.column === column) await change(d.n, { column, before: d.before }, tr(MOVE_FAILED))
+    else await moveCard(card, column, { before: d.before })
   }
 
   const folded = new Set(fold.cards ?? [])
@@ -702,13 +799,15 @@ export function Board({ project, scope = null, query, archived }: { project: str
           'data-column': col.id,
           style: colored ? ({ '--col': columnColor(colors, col.id) } as React.CSSProperties) : undefined,
           onDragOver: (e: React.DragEvent) => {
-            if (!dragNow.current) return
+            // A column the card's rules don't have takes no drop (no highlight: the drag shows it can't go there).
+            if (!dragNow.current || !droppable(col.id)) return
             e.preventDefault()
             place(e.clientX, e.clientY)
           },
           onDrop: (e: React.DragEvent) => {
             e.preventDefault()
-            void drop(col.id)
+            if (droppable(col.id)) void drop(col.id)
+            else setDrag(null)
           }
         }
         // Collapsed: a narrow strip with its name and count; a card dropped on it goes to its top.
@@ -757,10 +856,17 @@ export function Board({ project, scope = null, query, archived }: { project: str
                   dropHere={!!drag && drag.column === col.id && drag.before === c.number && drag.n !== c.number}
                   readOnly={readOnly}
                   work={workBadges.get(c.number)}
+                  forYou={forYou.get(c.number)}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', cardLabel(c))
                     setDrag({ n: c.number, column: c.column, before: c.number })
+                    dropsNow.current = { n: c.number, columns: null }
+                    void call('tasks:columns', c.number)
+                      .then((cols) => {
+                        if (dropsNow.current?.n === c.number) dropsNow.current = { n: c.number, columns: cols ? new Set(cols) : null }
+                      })
+                      .catch(() => undefined)
                   }}
                 />
               ))}
@@ -964,7 +1070,9 @@ export function BoardToolbar({
   query,
   setQuery,
   archived,
-  setArchived
+  setArchived,
+  forYouOnly,
+  setForYouOnly
 }: {
   project: string | null
   scope?: string | null
@@ -972,6 +1080,9 @@ export function BoardToolbar({
   setQuery: (q: string) => void
   archived: boolean
   setArchived: (v: boolean) => void
+  /** Only the cards something waits on the user for (#1276); with the search, both apply. */
+  forYouOnly: boolean
+  setForYouOnly: (v: boolean) => void
 }) {
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
@@ -990,12 +1101,17 @@ export function BoardToolbar({
     }
   }, [tasks])
   const menu = useContextMenu()
+  const waiting = useForYou().summary.items
+  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size
   return (
     <div className="board-toolbar">
       <div className="board-search">
         <Icon name="search" />
         <SearchInput placeholder={tr(msg({ id: 'board.toolbar.search', defaultMessage: 'Search cards (AM-12, words, labels)', description: "Placeholder of the board's search box: finds cards by name (AM-12: a project key, a hyphen and a number; AM- finds all of that project's; #12 works too), words or labels." }))} value={query} onChange={setQuery} />
       </div>
+      <label className="flex muted board-for-you-filter" style={{ cursor: 'pointer' }}>
+        <input type="checkbox" className="checkbox" checked={forYouOnly} onChange={(e) => setForYouOnly(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.forYou', defaultMessage: 'For you ({n, number})', description: "A checkbox in the board's toolbar: shows only the cards something waits on the user for (an approval, a decision, a question), and how many there are ({n}). Glossary: For you." }), { n: forYouCount })}
+      </label>
       <label className="flex muted" style={{ cursor: 'pointer' }}>
         <input type="checkbox" className="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.archived', defaultMessage: 'Archived ({n, number})', description: "A checkbox in the board's toolbar: shows the archived cards instead (how many there are: {n})." }), { n: count })}
       </label>
@@ -1305,6 +1421,7 @@ export function BoardView() {
   const project = useStore((s) => s.boardProject)
   const query = useStore((s) => s.boardQuery)
   const archived = useStore((s) => s.boardArchived)
+  const forYouOnly = useStore((s) => s.boardForYou)
   const workspace = useStore((s) => s.workspace)
   useLanguage()
   useEffect(() => {
@@ -1321,8 +1438,8 @@ export function BoardView() {
         </h1>
         <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.', description: 'Under the Task Board\'s title. Review and Passed are board columns.' }))}</span>
       </div>
-      <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} />
-      <Board project={project} query={query} archived={archived} />
+      <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
+      <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />
     </div>
   )
 }
@@ -1331,6 +1448,7 @@ export function BoardView() {
 export function ProjectTasksTab({ project }: { project: ProjectInfo }) {
   const [query, setQuery] = useState('')
   const [archived, setArchived] = useState(false)
+  const [forYouOnly, setForYouOnly] = useState(false)
   useLanguage()
   useEffect(() => {
     void loadTasks()
@@ -1338,8 +1456,8 @@ export function ProjectTasksTab({ project }: { project: ProjectInfo }) {
   }, [project.path])
   return (
     <div className="board-view in-tab">
-      <BoardToolbar project={project.name} scope={project.name} query={query} setQuery={setQuery} archived={archived} setArchived={setArchived} />
-      <Board project={project.name} scope={project.name} query={query} archived={archived} />
+      <BoardToolbar project={project.name} scope={project.name} query={query} setQuery={setQuery} archived={archived} setArchived={setArchived} forYouOnly={forYouOnly} setForYouOnly={setForYouOnly} />
+      <Board project={project.name} scope={project.name} query={query} archived={archived} forYouOnly={forYouOnly} />
     </div>
   )
 }
@@ -1444,6 +1562,8 @@ export function TaskDialog() {
   useLanguage()
   const card = useStore((s) => (typeof s.taskOpen === 'number' ? (s.tasks.find((c) => c.number === s.taskOpen) ?? null) : null))
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  // What on it waits for the user (#1276): answered in its For you section.
+  const forYouItems = useForYou().byCard.get(card?.number ?? -1)
   // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
@@ -1480,6 +1600,10 @@ export function TaskDialog() {
   const drafts = useRef<{ decision: string; comment: string; edit: DecisionEdit | null }>({ decision: '', comment: '', edit: null })
   drafts.current = { decision, comment, edit: decisionEdit }
   const action = useBusy()
+  // Answers to its For you requests being written, by request (#1276 round 1): kept here, so closing asks first, as for a
+  // comment; and whether one is being sent (the dialog doesn't close meanwhile).
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
+  const [answering, setAnswering] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
   // The fields as the dialog opened: Save sends only what the user changed since, so a change an agent made
@@ -1496,6 +1620,7 @@ export function TaskDialog() {
   useLayoutEffect(() => {
     if (open === null || !ready) return
     setActionError(null)
+    setAnswerDrafts({})
     const c = typeof open === 'number' ? get().tasks.find((x) => x.number === open) : null
     setTitle(c?.title ?? '')
     setDescription(c?.description ?? '')
@@ -1545,17 +1670,23 @@ export function TaskDialog() {
   // Edits not saved yet: the fields as they opened, or a comment being written.
   const edited = Object.keys(fields).filter((k) => fields[k] !== (orig.current[k] ?? ''))
   const decisionChanged = !!decisionEdit && decisionEdit.text.trim() !== decisionEdit.was
-  const unsaved = edited.length > 0 || !!comment.trim() || !!decision.trim() || decisionChanged
+  // An answer written to a request still open (one answered or retired meanwhile has nothing left to send).
+  const answerUnsent = (forYouItems ?? []).some((i) => !!answerDrafts[i.request]?.trim())
+  const unsaved = edited.length > 0 || !!comment.trim() || !!decision.trim() || decisionChanged || answerUnsent
 
-  /** Closing (Escape, ×, outside, Cancel, or going to a Read first reference): asks first when something would be lost; says whether it closed. */
-  const tryClose = async (): Promise<boolean> => {
-    if (action.busy || decisionBusy) return false
-    if (unsaved) {
-      const what = [
+  /**
+   * Closing (Escape, ×, outside, Cancel, going to a Read first reference, or after Save): asks first when something would
+   * be lost; says whether it closed. `saved`: after Save, which saved the rest: only an unsent answer is left to lose.
+   */
+  const tryClose = async (saved = false): Promise<boolean> => {
+    if (action.busy || decisionBusy || answering) return false
+    if (saved ? answerUnsent : unsaved) {
+      const what = saved ? [tr(UNSENT_ANSWER)] : [
         edited.length ? (isNew ? tr(msg({ id: 'board.discard.newCard', defaultMessage: 'this new card', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a card not added yet. Lower case.' })) : tr(msg({ id: 'board.discard.changes', defaultMessage: 'your changes to the card', description: 'What closing the card dialog would lose, in "Closing loses {what}.": changed fields. Lower case.' }))) : '',
         comment.trim() ? tr(msg({ id: 'board.discard.comment', defaultMessage: 'the comment you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a comment not posted. Lower case.' })) : '',
         decision.trim() ? tr(msg({ id: 'board.discard.decision', defaultMessage: 'the decision you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision not added. Lower case.' })) : '',
-        decisionChanged ? tr(msg({ id: 'board.discard.decisionChange', defaultMessage: 'your change to a decision', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision changed and not saved. Lower case.' })) : ''
+        decisionChanged ? tr(msg({ id: 'board.discard.decisionChange', defaultMessage: 'your change to a decision', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision changed and not saved. Lower case.' })) : '',
+        answerUnsent ? tr(UNSENT_ANSWER) : ''
       ].filter(Boolean)
       const choice = await choose({
         title: tr(msg({ id: 'board.discard.title', defaultMessage: 'Discard unsaved changes?', description: 'Title of the question when the card dialog closes with something not saved.' })),
@@ -1614,8 +1745,19 @@ export function TaskDialog() {
       // A card that changes project leaves its agent; one of the new project's agents is given it afterwards.
       const give = patch.project !== undefined && patch.agent ? patch.agent : null
       if (give) delete patch.agent
+      // The column last, through the card's rules (#1275): asked first when the move skips one.
+      const to = patch.column
+      delete patch.column
       if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
       if (give) await call('tasks:update', card.number, { agent: give })
+      if (to !== undefined && !(await moveCard(card, to))) {
+        // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
+        // the dialog's saved state follows, so Save again or Cancel never claims a column it isn't in.
+        const at = get().tasks.find((t) => t.number === card.number)?.column ?? card.column
+        orig.current = { ...fields, column: at }
+        setColumn(at)
+        throw new Error(tr(MOVE.notMoved, { column: tr(COLUMN_TEXT[at].label) }))
+      }
       if (clashed.length) {
         notify(
           'warning',
@@ -1697,7 +1839,8 @@ export function TaskDialog() {
       await saveDecisions()
       await postComment()
     })
-    if (r) close()
+    // Saved: an answer not sent yet (Save doesn't send it) is asked about before the dialog closes (#1276 round 1).
+    if (r) await tryClose(true)
   }
 
   /** Start…: unsaved edits are saved first, so the agent gets the card as shown (a failed save starts nothing). */
@@ -1783,6 +1926,7 @@ export function TaskDialog() {
             {tr(msg({ id: 'board.dialog.archivedBanner', defaultMessage: '{cause, select, hidden {Archived when {project} was hidden.} removed {Archived when {project} was removed from Hive.} done {Archived automatically after its days in Done (Settings → Board).} other {Archived.}} Bring it back to change it.', description: "A banner in an archived card's dialog: why it was archived (its project {project} hidden or removed, or after its days in the Done column: Settings → Board is where that is set), and that it must be brought back to be changed." }), { cause: card.archivedFor === 'project-hidden' ? 'hidden' : card.archivedFor === 'project-removed' ? 'removed' : card.archivedFor === 'done' ? 'done' : 'user', project: card.project })}
           </div>
         )}
+        {card && !card.archived && <ForYouSection card={card} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
           <label>{tr(msg({ id: 'board.dialog.project', defaultMessage: 'Project', description: "A field label in the card dialog: the card's project." }))}</label>
@@ -2055,10 +2199,20 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
   )
 }
 
-/** Starts a card (the Start and Move to Doing dialogs) and says so, with Show. */
-async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<void> {
-  const r = await call('tasks:start', card.number, target)
+/**
+ * Starts a card (the Start and Move to Doing dialogs) and says so, with Show. A start that skips rules asks first
+ * (#1275), before any agent is added or anything launched: false when the user cancels (nothing done).
+ */
+async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<boolean> {
+  let r = await call('tasks:start', card.number, target)
+  if ('ask' in r) {
+    const reason = await askToSkip(cardLabel(card), 'doing', r.ask)
+    if (reason === null) return false
+    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    if ('ask' in r) return false
+  }
   notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
+  return true
 }
 
 export function TaskStartDialog() {
@@ -2100,9 +2254,13 @@ export function TaskStartDialog() {
 
   const go = async (): Promise<void> => {
     if (!pick.ready) return
-    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here.
-    const r = await action.run('start', () => startCard(card, project, pick.target()))
-    if (!r) return
+    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here. A start the
+    // user cancelled at its question (#1275) leaves it open, nothing done.
+    let started = false
+    const r = await action.run('start', async () => {
+      started = await startCard(card, project, pick.target())
+    })
+    if (!r || !started) return
     close()
     set({ taskOpen: null })
     await loadTasks()
@@ -2150,9 +2308,7 @@ export function moveToDoing(req: DoingRequest): void {
   void (async () => {
     try {
       await req.prepare?.()
-      await call('tasks:update', req.n, { column: 'doing', ...(req.before !== undefined ? { before: req.before } : {}) })
-      await loadTasks()
-      req.done?.()
+      if (await moveCard({ number: req.n, project: req.project }, 'doing', req.before !== undefined ? { before: req.before } : {})) req.done?.()
     } catch (e) {
       notify('error', tr(MOVE_FAILED), errorMessage(e))
       await loadTasks()
@@ -2191,18 +2347,25 @@ export function MoveToDoingDialog() {
 
   const go = async (): Promise<void> => {
     if (!ready) return
+    let moved = true
     const r = await action.run(mode, async () => {
       await req.prepare?.()
       if (mode === 'start') {
-        await startCard(card, project, pick.target())
+        // Cancelled at its question (#1275): nothing done, the card where it was.
+        if (!(await startCard(card, project, pick.target()))) {
+          moved = false
+          return
+        }
         // Start doesn't place the card: where it was dropped, if it still can be (the order only).
         if (req.before !== undefined) await call('tasks:update', card.number, before).catch(() => undefined)
-      } else {
-        await call('tasks:update', card.number, { column: 'doing', agent: mode === 'assign' ? assignee : null, ...before })
+      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before }))) {
+        // Cancelled or refused (its toast says why): the dialog closes, the card where the move left it.
+        moved = false
       }
     })
     if (!r) return
     close()
+    if (!moved) return
     await loadTasks()
     req.done?.()
   }

@@ -101,6 +101,8 @@ interface HiveMessageValues {
   'tips.cardWork.title': undefined
   'tips.cliOverrides.text': undefined
   'tips.cliOverrides.title': undefined
+  'tips.cliOwnMode.text': undefined
+  'tips.cliOwnMode.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
   'tips.commandName': { command: string | number }
@@ -120,6 +122,8 @@ interface HiveMessageValues {
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined
   'tips.copyDiagnostics.title': undefined
+  'tips.ctrlCvToCli.text': undefined
+  'tips.ctrlCvToCli.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined
@@ -134,6 +138,8 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.forYou.text': undefined
+  'tips.forYou.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
   'tips.gitInit.text': undefined
@@ -196,6 +202,8 @@ interface HiveMessageValues {
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }
   'tips.moreAgents.title': { usual: number }
+  'tips.moveAnyway.text': undefined
+  'tips.moveAnyway.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }

@@ -940,6 +940,19 @@ export function markPreWorkflow(ws: WorkspaceService, cards: AdoptionCard[]): { 
 
 /** A value the board keeps of its own (board_meta), or null. */
 export const boardValue = (ws: WorkspaceService, key: string): string | null => readSnapshot(ws, (_b, db) => meta(db, key))
+
+/**
+ * Cards' column, project and whether archived, as committed now, on one snapshot: what lanes.ts checks a decision
+ * against under the board's lock, just before it saves (#1270: a lane ended or its queued list applied only if its
+ * cards are still where the decision read them). A card not on the board is missing from the map.
+ */
+export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { column: string; project: string; archived: boolean }> {
+  if (!numbers.length) return new Map()
+  return readSnapshot(ws, (_b, db) => {
+    const rows = db.prepare(`SELECT number, col, project, archived FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; col: string; project: string; archived: number }[] // i18n-ignore: SQL
+    return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1 }]))
+  })
+}
 /** Sets one of the board's own values (inside boardWrite). */
 export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
 

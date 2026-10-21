@@ -628,8 +628,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
-    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }),
+    // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
+    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
+    'tasks:columns': (n) => tasks.moveColumns(n),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
     'tasks:forYou': (project) => {
       const ws = currentWorkspace()
@@ -667,8 +669,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:addSetAside': (file) => tasks.addSetAsideCard(currentWorkspace(), file),
     'tasks:discardSetAside': (file) => tasks.discardSetAsideCard(currentWorkspace(), file),
     'tasks:delete': (n) => tasks.deleteTask(n),
-    'tasks:start': async (n, target) => {
-      const r = await startTask(n, target, { kind: 'user' })
+    'tasks:start': async (n, target, opts) => {
+      // A start that skips rules asks first (#1275), before any agent is added or anything launched.
+      if (!opts?.confirm) {
+        const ask = await tasks.startAsks(n, target.kind === 'agent' ? target.agentId : null)
+        if (ask.length) return { ask }
+      }
+      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason)
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
     },
     'tasks:work': (n) => {

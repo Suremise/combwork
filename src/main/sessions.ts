@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes } from 'crypto'
+import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -17,7 +18,8 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { agentLaunchSettings, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
@@ -117,6 +119,7 @@ const log = createLogger('sessions')
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
+  assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
@@ -525,6 +528,18 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
     writePty(key, text.slice(i, i + CHUNK))
     if (i + CHUNK < text.length) await new Promise((r) => setTimeout(r, 10))
   }
+}
+
+/**
+ * What Hive writes for a prompt's line (sendPrompt): pasted (bracketed), without control characters, so nothing in it
+ * can end the paste or press a key; typed, as it is. Kept as written (`asTyped`, #1286), its line breaks go into a
+ * paste as the Enter a terminal pastes them with, and typed, each line break or tab becomes a space (typed, a line
+ * break would send the prompt early and a tab complete a word); its other control characters are left out either way.
+ */
+export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
+  if (!asTyped) return paste ? line.replace(/[\x00-\x1f\x7f-\x9f]/g, '') : line
+  const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
+  return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
 }
 
 /**
@@ -1084,14 +1099,16 @@ class SessionManager {
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
     // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
+    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers; with its switch on
+    // (#1284, #966 row 7), the workspace's servers too: those on in the workspace, as it works across every project.
+    const assistantServers = assistant && advanced.get<boolean>(ASSISTANT_OTHER_MCP)
     const mcpServers: Record<string, McpServerDef> = {}
     for (const m of await reads.servers()) {
-      if (serverOnIn(m, pc.mcp) && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
+      const on = assistant ? assistantServers && !!m.globallyEnabled : serverOnIn(m, pc.mcp)
+      if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
     if (hive) mcpServers.hive = hive
-    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers.
-    if (assistant) for (const k of Object.keys(mcpServers)) if (k !== 'hive') delete mcpServers[k]
 
     const l = agentLaunchSettings(forAgent, pc, s)
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
@@ -1219,12 +1236,16 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve() }
     this.starting.set(id, pending)
-    const run = this.startReserved(projectPath, agentId, id, opts)
+    // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
+    const times = new StepTimes()
+    const run = this.startReserved(projectPath, agentId, id, opts, times)
     pending.done = run.catch(() => undefined)
     try {
       return await run
     } finally {
       this.starting.delete(id)
+      const slow = times.slowLine()
+      if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
   }
 
@@ -1279,8 +1300,9 @@ class SessionManager {
     if (this.starting.get(id)?.cancelled) throw hiveError(M.stoppedBeforeStart)
   }
 
-  private async startReserved(projectPath: string, agentId: string, id: string, opts: { resumeId?: string; name?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }): Promise<LiveSessionState> {
+  private async startReserved(projectPath: string, agentId: string, id: string, opts: { resumeId?: string; name?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }, times: StepTimes): Promise<LiveSessionState> {
     const { agent, cfg, count } = await this.agentDef(projectPath, agentId)
+    times.mark('agentDef')
     this.assertStarting(id)
     if (this.live.has(id))
       throw count > 1
@@ -1290,19 +1312,23 @@ class SessionManager {
     if (holder) throw hiveError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
     const assistant = workspace.isAssistantHome(projectPath)
     const existing = opts.resumeId ? (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === opts.resumeId) : undefined
+    times.mark('sessionsFile')
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
     // nor a change of the agent's own re-points one. A new conversation following Automatic waits until Hive knows what
     // is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
+    times.mark('resumeProvider')
     this.assertStarting(id)
     if (!recorded && !agent.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
     this.assertStarting(id)
     const providerId = recorded ?? agentLaunchSettings(agent, cfg, config.settings).provider
     // At start, Hive may still be looking for that CLI.
     await providerService.settle(providerId)
+    times.mark('providerSettle')
     // The PATH a new process gets now, with what was installed since Hive started (#821).
     await refreshPathBeforeStart()
+    times.mark('refreshPath')
     this.assertStarting(id)
     const adapter = providerAdapter(providerId)
     const name = adapter.descriptor.name
@@ -1311,6 +1337,7 @@ class SessionManager {
     const info = providerService.info(providerId)
     if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Agent Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
     await workspace.ensureProject(projectPath)
+    times.mark('ensureProject')
     // The Assistant works in the workspace folder, where it can read every project.
     const cwd = assistant ? workspaceOf(projectPath).path! : (agent.worktree?.path ?? projectPath)
     if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd })
@@ -1318,6 +1345,7 @@ class SessionManager {
     if (existing?.archived) throw hiveError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
     // A sub-session (a Codex guardian review, say) is not a conversation: never resumed (#239).
     const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.listSessions(cwd).catch(() => [])).find((e) => e.id === opts.resumeId)?.sub) : undefined
+    times.mark('recordSub')
     if (sub) throw hiveError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
     this.assertStarting(id)
     // By real paths (#455): the worktree's stored path may have changed form (an 8.3 short name, a junction) since.
@@ -1328,11 +1356,14 @@ class SessionManager {
     const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? randomUUID() : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
+    times.mark('assistantInstructions')
     // A /rename in the CLI since the session was last named in Hive is the newer name: Hive takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      const usage = await this.usage(projectPath, opts.resumeId).catch(() => null)
+      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
+      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      times.mark('usage')
       adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
@@ -1392,7 +1423,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId })
+      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -1457,7 +1488,7 @@ class SessionManager {
   }
 
   /** Starts the agent's CLI for an agent whose live entry already exists. */
-  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }): Promise<void> {
+  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times?: StepTimes): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -1486,6 +1517,7 @@ class SessionManager {
       // A session restarted before anything was typed has no transcript: start it fresh under the same id
       // where the provider allows choosing it, else as a new session.
       resume = !!(await adapter.transcriptPath(cwd, sessionId, recorded))
+      times?.mark('transcript')
       if (!resume) {
         log.info(`No transcript for ${sessionId}; starting it fresh instead of resuming`)
         if (!adapter.descriptor.capabilities.fixedSessionId) state.sessionId = ''
@@ -1493,6 +1525,7 @@ class SessionManager {
     }
 
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
+    times?.mark('effective')
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
@@ -1501,7 +1534,7 @@ class SessionManager {
         : hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in Project Settings or Settings → {provider}.', description: "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)." }), { problem: argsProblem, provider: adapter.descriptor.name })
     l.configuredMode = eff.permissionMode
     let mode = eff.permissionMode
-    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings)) mode = l.modeOverride
+    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings) && !(workspace.isAssistantHome(projectPath) && isCliOwnMode(l.modeOverride))) mode = l.modeOverride
     l.launchMode = mode
     state.permissionMode = mode ?? undefined
     // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
@@ -1513,6 +1546,9 @@ class SessionManager {
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
     // This launch's own hook token (#345): in its environment for HTTP hooks, in a file outside the project for hook commands.
     const hookAuth = await newHookToken(state.runId)
+    times?.mark('tokens')
+    const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    times?.mark('guidance')
     const ctx = {
       projectPath,
       agentId: agent.id,
@@ -1534,7 +1570,7 @@ class SessionManager {
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
-      guidance: await this.hiveGuidance(projectPath).catch(() => ''),
+      guidance,
       instructions: assistantText?.text,
       overrides: overridesNow(adapter.id),
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
@@ -1554,13 +1590,18 @@ class SessionManager {
       }), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
+    times?.mark('prepareLaunch')
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
+    times?.mark('skillSizes')
     if (workspace.isAssistantHome(projectPath)) await this.onAssistantLaunch(projectPath)
+    times?.mark('assistantLaunch')
     // Through its gate when its processes can be tracked (#507), else directly, untracked, as said once.
     const tracked = await this.trackingReady()
+    times?.mark('trackingReady')
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
+    times?.mark('folderSteady')
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
@@ -1850,8 +1891,11 @@ class SessionManager {
       if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }))
     }
     try {
-      writePty(key, '\x15')
-      await pause(150)
+      // Settings → Advanced can leave the CLI's draft in front of it (#1286).
+      if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) {
+        writePty(key, '\x15')
+        await pause(150)
+      }
       const text = l.adapter.descriptor.capabilities.compactFocus ? (focus ?? '').replace(/\s+/g, ' ').trim() : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
@@ -2017,9 +2061,18 @@ class SessionManager {
     if (mode && (mode !== l.state.permissionMode || mode !== l.state.modeObserved)) {
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'footer mode', provider: l.state.provider, raw: { footer: mode }, made: { permissionMode: mode, was: l.state.permissionMode }, safe: { raw: { footer: true }, made: { permissionMode: true, was: true } }, summary: `terminal footer: mode ${mode}` }))
-      l.state.permissionMode = l.state.modeObserved = mode
+      this.observeMode(l, mode)
       this.emitState(l.state)
     }
+  }
+
+  /**
+   * The mode the CLI showed (its footer, a hook, its transcript): the session's mode from now, except in one launched in
+   * the CLI's own setting (#1284), which keeps saying so: only recorded as seen.
+   */
+  private observeMode(l: LiveSession, mode: PermissionMode): void {
+    l.state.modeObserved = mode
+    if (!isCliOwnMode(l.launchMode)) l.state.permissionMode = mode
   }
 
   /**
@@ -2036,9 +2089,11 @@ class SessionManager {
     const p = st.provider
     const name = l.adapter.descriptor.name
     if (st.permissionMode === mode) return { ok: true }
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw hiveError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
     const how = l.adapter.descriptor.capabilities.liveModeSwitch
-    if (how === 'none' || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
+    // Never to or from the CLI's own setting (#1284): Hive doesn't know where such a session started.
+    if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
     if (st.status === 'waiting') throw hiveError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }))
@@ -2364,21 +2419,29 @@ class SessionManager {
     const since = Date.now()
     let typed = false
     let sent: { at: number; prompts: number; from: number } | null = null
+    // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
+    // whether it keeps the prompt as written.
+    const clearDraft = advanced.get<boolean>(PROMPT_CLEAR_DRAFT)
+    const asTyped = advanced.get<boolean>(PROMPT_AS_TYPED)
     try {
       check()
-      writePty(key, '\x15')
-      await new Promise((r) => setTimeout(r, 150))
-      check()
+      if (clearDraft) {
+        writePty(key, '\x15')
+        await new Promise((r) => setTimeout(r, 150))
+        check()
+      }
       typed = true
-      const line = text.replace(/\s+/g, ' ').trim()
+      const line = asTyped ? text : text.replace(/\s+/g, ' ').trim()
       // A CLI busy for a moment reads what Hive typed in one go, Ctrl+U and Enter included: Claude Code takes such a
       // read as a paste with those keys in it as text, and then Enter again doesn't send it either (#597). A bracketed
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, line) : null
-      if (l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')) writePty(key, `\x1b[200~${line.replace(/[\x00-\x1f\x7f-\x9f]/g, '')}\x1b[201~`)
-      else await typeInto(key, line, () => (check(), true))
+      const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
+      const out = promptInput(line, paste, asTyped)
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, out) : null
+      if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
+      else await typeInto(key, out, () => (check(), true))
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -2422,7 +2485,7 @@ class SessionManager {
         writePty(key, '\r')
       }
     } catch (e) {
-      if (typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
+      if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
       throw e
     } finally {
       if (sent && l) l.typed = sent
@@ -2603,6 +2666,7 @@ class SessionManager {
   /** Stops the agent and resumes the same conversation in another permission mode. */
   async restartInMode(projectPath: string, agentId: string, mode: PermissionMode): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
@@ -3172,7 +3236,7 @@ class SessionManager {
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen (a permission request its own reviewer decides is none). */
   private guardCandidate(l: LiveSession, ev: HookEvent): ev is Extract<HookEvent, { kind: 'ask' }> {
     if (ev.kind !== 'ask' || !ev.ask.blocking || !l.adapter.safeguardAsk) return false
-    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === l.state.permissionMode)?.reviewed)
+    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(l.state))?.reviewed)
   }
 
   /**
@@ -3612,7 +3676,7 @@ class SessionManager {
     // The CLI's report is kept; it is shown unless the user chose their prices (#436), and then it isn't an estimate.
     if (d.costUsd != null) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !usesOwnPrices(st.provider, config.settings)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode ?? st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
@@ -3985,7 +4049,7 @@ class SessionManager {
       }
     }
     if (hook.mode && (hook.mode !== st.permissionMode || hook.mode !== st.modeObserved)) {
-      st.permissionMode = st.modeObserved = hook.mode
+      this.observeMode(l, hook.mode)
       this.emitState(st)
     }
     // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.
@@ -4196,7 +4260,8 @@ class SessionManager {
       backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes,
       tasks: l.tasks?.size ?? 0,
       attention: l.titleAttention ? 'title' : 'hooks',
-      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === st.permissionMode)?.reviewed,
+      // The mode the CLI is in: on the CLI's own setting, the one it showed (#1284).
+      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(st))?.reviewed,
       titleAsks: !!l.titleAsks,
       open: l.open ?? [],
       waitingOn: l.waitingOn ?? null,
@@ -4518,7 +4583,7 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
-  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId): Promise<SessionUsage | null> {
+  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
@@ -4529,7 +4594,7 @@ class SessionManager {
         // Unchanged since it was read: priced again after a price change, not read.
         return (seen.usage ??= this.priced(seen.raw))
       }
-      const r = await usageHistory.read(projectPath, path, sessionId, provider)
+      const r = await usageHistory.read(projectPath, path, sessionId, provider, o)
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
@@ -4740,7 +4805,8 @@ class SessionManager {
    * since the last sweep) is read from its transcript as before and queued for the history; with no transcript left,
    * its kept usage, until the history has imported it.
    */
-  async usage(projectPath: string, sessionId: string, ctx?: ListContext): Promise<SessionUsage | null> {
+  /** `noWait`: a transcript the worker is busy with (the import ingesting it) isn't waited for: its kept usage, or none (#1177). */
+  async usage(projectPath: string, sessionId: string, ctx?: ListContext, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
     assertSessionId(sessionId)
     const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
     const rec = records.find((s) => s.id === sessionId)
@@ -4764,7 +4830,7 @@ class SessionManager {
     if (!usage) {
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
       if (!p) return rec?.keptUsage ?? null
-      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx))
+      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), o)
       if (usage && rec && !running) void usageHistory.ingest(projectPath, sessionId, { priority: 2, keepState: 'no' }).catch(() => undefined)
     }
     if (usage) usage = withScreenStopsIn(usage, rec?.screenStops)

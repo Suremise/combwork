@@ -416,7 +416,7 @@ codex [resume <id>] --no-daemon          # options must follow "resume <id>"
 ### 6.5 Hive Assistant
 
 - **What it is.** Each open workspace has one Assistant, its overseer, shown in a panel on the right of the window (Ctrl+Alt+I, the command palette, or clicking the strip it folds into when hidden: a narrow bar down the right edge with a chevron, "Hive Assistant" written downwards and a status dot while it runs; each workspace remembers whether its panel is open and how wide it is, 430 px by default). It answers questions about any project, reports what the agents are doing, plans and reviews, and (as far as **Control** allows, below) runs the agents for the user: adds them, changes their settings, starts, stops and briefs them, and creates projects. It never edits project files itself.
-- **How it runs.** It is a session like an agent's (terminal, hooks, status, usage, transcript backups, quit/close/switch handling, notifications), hosted by `<Workspace>/.hive/assistant`, a home Hive never lists as a project, with one agent (`assistant`). It **works in the workspace folder**, so it can read every project, and gets the hive MCP server scoped to the workspace (no project of its own) and the workspace's skills meant for it (`metadata.audience` `assistant` or `all`, §7.1: `coordinate-agents`, `run-lanes`, `split-work`, `handover`, `pick-up`, `workspace-note` as Hive ships them), not the project agents' skills or the workspace's other MCP servers. Reading a skill grants nothing: its tools and Control decide what it can do. Quit and close dialogs call it "Assistant".
+- **How it runs.** It is a session like an agent's (terminal, hooks, status, usage, transcript backups, quit/close/switch handling, notifications), hosted by `<Workspace>/.hive/assistant`, a home Hive never lists as a project, with one agent (`assistant`). It **works in the workspace folder**, so it can read every project, and gets the hive MCP server scoped to the workspace (no project of its own) and the workspace's skills meant for it (`metadata.audience` `assistant` or `all`, §7.1: `coordinate-agents`, `run-lanes`, `split-work`, `handover`, `pick-up`, `workspace-note` as Hive ships them), not the project agents' skills or the workspace's other MCP servers (unless `hive.assistant.otherMcpServers` is on, §16.15). Reading a skill grants nothing: its tools and Control decide what it can do. Quit and close dialogs call it "Assistant".
 - **What it is told.** Hive's session contract for the Assistant (`hiveInstructions(…, 'assistant')`, the hive MCP server's instructions: use the hive tools for Hive's things, and which skills cover its workflows), then at launch its role (`assistantInstructions`): the workspace and its projects at launch, what Control lets it do and the boundaries it keeps whatever else it reads (`controlRules`), that nothing wakes it but the user and its own tool calls, that its mode never changes what it may do and that it may suggest another mode, and its mode: Claude Code through `--append-system-prompt-file` (a file in its launch folder), Codex through `developer_instructions`. How to run agents and cards well (briefs, starting cards, waiting, handing over, stalled cards) is the `coordinate-agents` skill's, not its prompt's; how to run a team's lanes (planned by files, complete builder and reviewer briefs, a confirmed watch on each lane's last card, a board sweep on each wake, changing a running lane, checking agents' claims against git and the board) is the `run-lanes` skill's (#402, from the coordinator playbook). Its habits fit the setup (Darren's decision on #402): `coordinate-agents` brings in `run-lanes` for three or more agents in a project, builder and reviewer pairs or agents in worktrees, and with one or two agents in the project folder stays light, suggesting more structure in one line at most; the setup changes how it works, never what the user can do. The Coordinator mode puts first a watch on running work (never "they'll tell you") and checking what agents report. The rules on what it may do come from Hive and replace anything a mode says; Hive's four modes carry no procedure or permissions. Its hive tools (below) are pre-approved where the provider allows it, only those its Control allows (Claude Code `--allowedTools`, Copilot `--allow-tool=hive(<tool>)`, Codex a per-tool `tools.<tool>.approval_mode="approve"` on the hive server, #1174, Codex 0.163.0), so writing shared notes still asks: in Codex's Approve for me (the Assistant's default there), its reviewer decides instead, as Claude Code's Auto does.
 - **Control** (Settings → Assistant → Control, for every workspace; default **Control agents and create projects**): **Look and advise** (it reads and suggests; you act; it lists lanes too, #500: `hive_lane` is trusted at every level, its description says that only `list` works there, and the Agent API refuses starting, joining and ending one below Control agents), **Control agents** (also adds agents, changes their settings, starts and stops them, gives idle ones tasks, turns projects on), **Control agents and create projects**. It never removes agents, discards worktrees or deletes projects. Changing it marks a running Assistant for restart.
 - **Hive's settings** (#186). Every setting is described once, in the **settings catalog** (`src/shared/settingsCatalog.ts`): its id (`<section>.<key>`, `<provider>.<key>`, `project.<key>`), scope (app, provider, workspace, project), control and values, default, description, tip, "when it helps", place in Settings, user guide heading, whether a change waits for a restart (agents' sessions, or the Assistant), and whether it is **sensitive**. Settings and Project Settings draw their rows from it (the views add only the custom controls, by id), and the Assistant's tools read it, so the two never drift; a unit test fails when Hive's settings or a project's config gain a field it doesn't describe. The Assistant reads and explains settings at every Control level (`hive_list_settings`, `hive_read_setting`; `GET /v1/settings`). It changes one (`hive_update_setting`; `PATCH /v1/settings/{id}`) only with **Settings → Assistant → Control → Change settings** on (`assistant.changeSettings`, off by default, independent of the level; the tool is offered only then, and turning it on marks a running Assistant for restart, while turning it off refuses at once), when the user asked or agreed (its rules and the `tune-settings` skill: suggest first, one line). The value is checked as Settings checks it and set as Settings sets it (`config.updateSettings`, or the project's config under its lock). **Sensitive settings are read-only to it**, enforced in the API: permission modes and the dangerous-mode switch, the Agent API, what Hive runs (CLI paths, extra arguments, a project's setup command, background sessions, pre-release updates) and its own Settings → Assistant (Control, Change settings, the typing pause, its provider, working mode and launch settings); the Assistant's own provider settings are an entry each (`assistant.<provider>.model`, `.effort`, `.permissionMode`, `.extraArgs`, `.use200kContext`, drawn together as "With <provider>"), readable like the rest. Tables are set whole as JSON: the board's column colours (an object of column → colour, merged), a provider's prices and its fallback model and effort lists (replaced through the same setters as Settings; null puts back Hive's, for prices the shipped models removed from the table too, as Reset to defaults does). An effort level must be one the effort picker offers for the model that would run (or the default). Keybindings are read-only for now; agent settings stay with `hive_update_agent`. The permission and the value it replaces are checked again at the moment of the change, under the project's lock for a project's setting: a change waiting behind the user's own write is refused if Change settings was turned off meanwhile, or if the Assistant session that asked for it has ended (its launch's token isn't the current one: a restart doesn't carry out the old session's changes), and a Revert if the value changed since. A table's change is listed and answered by the entries that changed ("doing: #3b82f6 → doing: #ff0000"). Each change counts towards its 30 a message and is listed with old → new and a **Revert** button, which sets the old value back through the same path (refused if the setting has changed again since) and is listed too.
@@ -604,7 +604,7 @@ Each provider's adapter reads its own transcripts into one usage shape. Codex: r
 - **Who reads it**: the Workspace and project Overviews, deleted sessions' totals, the Sessions list and a session's usage (`session:usage`, `GET …/usage`) for a session that isn't running, Performance's provider usage, cost per card and per lane. The Workspace Overview and Performance read running sessions from the history too (their last turn's end or tick: no transcript is read for them); the Sessions list and the project Overview take a running session's as its pane does (#1157: from the history, a CLI's `/rename` showed there only at the next turn's end or tick), the usage worker's read of its transcript (below), asked only when the file changed, so main reads no transcript for them either; cost per card and per lane first record the running sessions' latest use and share cards out again (and wait for sessions that just ended), as they are read when asked. A running session's own footer and gauge, and its usage asked for alone (`session:usage`), follow each turn from its transcript as it grows, read by the usage worker, never in main (#1147), from where its last read stopped; after a restart (a session resumed) from the session's parser state saved in the history, so only what was added since is read. The worker's jobs for that session go on from the same parser, so a running transcript is parsed once. **Settings → Sessions → Usage cache size** (5,000 transcripts; 100–50,000) bounds the worker's in-memory reads, least recently used first, with the parsers themselves limited to 200; **Clear the usage cache** forgets them (the history and its saved states stay). Lists and views only ever read the history: a session it doesn't have yet (its import under way, one just started, a session started outside Hive whose file changed) is queued for the worker and shows its kept usage, or none, until the worker has it and tells the window (`usage-changed`; such a list item is `pending`, and the project's lists read again 1.5 s after each such word while any is, whatever the update setting), so no transcript is parsed in main for them. A session's usage asked for alone that the history doesn't have yet is read from its transcript, by the worker too.
 - Sessions started outside Hive are kept in it too (source `external`), for the Sessions list, which reads one again only when its file changed; they never count in totals, and one adopted is Hive's from its next record. Purging what Hive keeps is its own card (#1138); it never clears the usage history, which always stays (Darren, 20 Oct).
 
-**Busy actions** (a shared pattern: `useBusy()`, `BusyButton` and `Modal`'s `busy`/`error`; `confirm({ run })`; `runOnce()` for buttons without a dialog): while an action runs its button shows a spinner and an "…ing" label, the dialog's other controls are disabled, Escape, × and clicks outside don't close it, and repeat clicks do nothing; a failure keeps the dialog open with the error (the button offers **Try Again** where it helps). Used by Start, Remove Project (its label says what it does: Hiding…, Removing from Hive…, Moving to the Recycle Bin…; no stages reported), the card's Save, Delete, Archive and Comment, Compact, Agent Settings, Stop All Agents, Delete note and Delete MCP server; Resume All and Remove Agent show a spinner on their button or tab. Questions (confirm, choose, prompt) render above every other dialog, and Escape closes only the topmost dialog.
+**Busy actions** (a shared pattern: `useBusy()`, `BusyButton` and `Modal`'s `busy`/`error`; `confirm({ run })`; `runOnce()` for buttons without a dialog): while an action runs its button shows a spinner and an "…ing" label, the dialog's other controls are disabled, Escape, × and clicks outside don't close it, and repeat clicks do nothing; a failure keeps the dialog open with the error (the button offers **Try Again** where it helps). Used by Start, Remove Project (its label says what it does: Hiding…, Removing from Hive…, Moving to the Recycle Bin…; no stages reported), the card's Save, Delete, Archive and Comment, Compact, Agent Settings, Stop All Agents, Delete note and Delete MCP server; Resume All and Remove Agent show a spinner on their button or tab. **Starting and resuming an agent** (#1177): from the click until `session:start` answers (the session runs, or the start failed) the agent is marked starting in the window (`whileStarting`, `starting` keyed by project and agent, with the session resumed); the button clicked shows a spinner and "Resuming…" or "Starting…" (Retry Setup and Start Without Setup each their own) and is `aria-busy`, and every other way to start that agent (its pane's buttons, its menus, the Assistant's panel and header, the project's menu, the project header's Resume and Agents ▾ starts, the Sessions tab's Resume of a session it would run) is disabled meanwhile; a second start of an agent already starting is ignored. Asking first (a running session to stop, an expired cache) counts as part of it, and so does adding an agent for it (a project without agents, a session no agent can run: held under the project, `ADDING_AGENT`, then under the agent added). In main, a start that takes over a second logs which steps took over a second (`StepTimes`: `[sessions] Resume of <agent> in <project> took 43.1 s: usage 42.0 s`), and the usage worker logs a query (one it answers at once, not after its jobs) that took over a second to answer, so a slow start can be traced to its step. A start never waits for the usage history's import: nothing in it waits for the worker's job queue, and the one read it makes of the session's transcript (for a name given in the CLI) is `noWait`, so the worker answers it with nothing rather than queue it behind the import's turn on that file (the name is then adopted at a later resume) (`tests/startDuringImport.test.ts`, which holds the import inside that turn). Questions (confirm, choose, prompt) render above every other dialog, and Escape closes only the topmost dialog.
 **Dialogs dim the window buttons.** A backdrop (`.overlay`: a dialog, nested or not, or the command palette) dims the whole page, but Windows paints the native minimise, maximise/restore and close buttons over it (`titleBarOverlay`). So the page tells main how many backdrops are up (`useBackdrop()` keeps them per window, in order; `window:setBackdrops`), and main dims the buttons' background and symbols the same way: black at the backdrop's 45% once for each, as the page's layers stack (`shared/titleBar.ts`; a question over a card is two), back to the theme's colours when the last one goes. The same stack decides which backdrop Escape is for: the top one only, so Escape with the palette over a card closes the palette. Main keeps each window's theme colours and dimmed state (`main/titleBar.ts`), so a theme change while a dialog is up stays dimmed in the new theme's colours, each window is on its own, and a page that reloads starts undimmed. The buttons keep working, and Windows still highlights them on hover. The overlay exists on Windows and Linux only; elsewhere there is nothing to dim.
 
 **Footer usage belongs to its conversation**: the usage an agent's footer shows (context, cost) is held with the project and session it was read for (`src/shared/liveUsage.ts`); after a switch it shows `– ctx` until the new conversation's own usage is read, never the previous one's, and a refresh that fails keeps the same conversation's numbers, faded, with a note in the tooltip.
@@ -1904,6 +1904,19 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   gate asked again if still unmet); a drag past it returns it there first and then runs the intents of a drag from
   there; a move behind it counts the rules it skips from where the card was, not from Todo. A drag into Merging of a
   card already approved just queues it (nothing skipped).
+- **In the window (#1275):** every move the user makes on the board (a drag, Move to, Review (next round), the Move to
+  Doing dialog with its agent, the card dialog's Column) goes through `tasks:move`; `tasks:update` from the window
+  no longer skips a rule unasked (one that would is refused, naming the rules). A move that asks shows the question
+  (*"Move AM-12 to Done anyway?"*, each rule it skips by its name, **Reason (optional)**, **Move Anyway** / Cancel),
+  then moves with `confirm` and the reason. A window **Start** (the Start dialog, Move to Doing's Assign and start) asks
+  the same before anything is done (`tasks:start` returns `ask` from the runtime's dry move, `startAsks`: no agent
+  added, nothing launched), then starts with the reason kept on its `Override`. Cancel, or a step refused for something no override can make true, puts
+  the card back where it was or where the drag stopped, with the refusal's three sentences in a toast. As a drag
+  starts, the window asks which columns the card's rules have (`tasks:columns`: its ruleset's stages as columns, On
+  Hold always; a reopened Done card's next cycle's; none when no rule applies): a column they don't have takes no
+  drop and isn't highlighted. The **override mark** on a card's tile (an open lock, in the info colour) and a line in
+  its lane segment's hover say who moved it past which rules and why: the card's latest `Override` since its work was
+  last Done (`WorkBadge.override`).
 
 #### 16.8.5 For you
 
@@ -1942,8 +1955,15 @@ no loop: it reaches an agent working on its own, with no lane or reviewer (*"…
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
-`tasks-changed`; the list in the window and its answers are #1276's. Until that window side lands, a dev build of
-1.0.0 can't answer from the window: turning the rules off (Settings → Advanced) un-pauses a lane at its round limit.
+`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind, each
+request in its tooltip and accessible name; the accent colour, pill-shaped) on its tile, folded or not; the Task Board
+icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
+sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
+the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
+the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
+reason, required) for an approval, a reply (**Send Reply**) or **Record as Decision** for a question, and the four
+ways on (carry on with its rounds) at the round limit. A refused answer (answered or retired meanwhile) is said in a
+toast and the board read again; an answer clears the chip at once (`tasks-changed`).
 
 #### 16.8.6 A refused commit (#907)
 
@@ -2219,6 +2239,43 @@ picked up in a clean slot, by the builder that knows it, and the next card alway
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
 a returned card gets its own slot and a fresh conversation) is put to Darren as OP-36.
 
+#### 16.11.2a Built [#1270]: Hive owns the lane
+
+- **One record:** a lane is `lanes.ts`'s (#1291), with what Hive keeps of its run beside it (`lane_runs`,
+  `lane_pending`): the ruleset in force when it started (stored as it starts, while rules are enforced), and a queued
+  list. `lanes.ts` is its one writer.
+- **List changes:** `hive_lane start` (or `POST /v1/lanes`) with a changed list for the builder's running lane, while
+  one of its cards is in flight (in Doing, Review or Passed), queues the list (`LaneInfo.queued`; status "list changes
+  after AM-12"; the reply says so). Once no card of the lane is in flight, the queued list applies and the builder gets
+  a message naming the lane's cards now. Between cards a change applies at once. A queued list keeps every card named
+  (none dropped); a queued empty list leaves the lane as it was. Any new list for the builder's running lane is an edit
+  of it, one sharing no card too (never a new lane abandoning it); a card only in a queued list waits for the card in
+  flight. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
+  that moved on meanwhile (reopened) leaves the lane as it was, to be read again.
+- **The lane's ruleset:** a card of a running lane (its list or its queued list) starts under the ruleset stored when
+  the lane started (the recorder's start and the runtime's `rulesetOf`); a Todo card outside a lane under the current
+  one (S19).
+- **One card at a time:** the runtime refuses to start a lane's card while a card before it in the lane isn't Done
+  (`lane.oneAtATime`, a refusal in all 7 locales; no option of its own: `workflow.enforce` off turns it off; the user's
+  own drag isn't refused). `hive_lane next` (`GET /v1/lanes/next`) names the card to start or carry on, or why the lane
+  waits.
+- **The verified end:** a lane ends by itself once every card is Done (the board's column, which follows the fold), with
+  each card's result revision from its `Integrated` fact (none under Not checked, or a card from before 1.0), the last
+  of them its merge commit. The runtime's `endLaneIfDone` action reads the lanes again. An agent's `hive_lane end`
+  ends a lane only when every card is Done (else refused, 409), never abandons one (403: the user's and the
+  Assistant's), and a `mergeCommit` it gives is ignored with a note; one the user, the Assistant or a script gives is
+  kept only where the cards' facts name no merge. A **`lane-ended`** event (once per lane: its
+  project, lane and each card's result) goes to code that follows lanes and to the Agent API's event stream.
+- **Why a lane waits, as data:** each running lane carries `status` (`LaneStatus`: a reason and its card) worked out in
+  main from the board and its cards' facts: blocked (with why), On Hold, waiting for you (a For you request), the round
+  limit, a card passed and not merged (merging: in the queue), a stale pass (submit again), no reviewer on a card in
+  Review, list changes after a card. The first six pause the lane (`state: paused`, `pausedOn` the card). The Progress
+  panel renders it (#1279); lane notices tell a lane paused for a merge (`paused`, a lane event; the others are told as
+  themselves).
+- **With `workflow.enforce` off** a lane is as before 1.0: list changes apply at once, nothing waits for Done, an
+  agent's `end` records its `mergeCommit` unverified, and the only status is a blocked or held card. The verified end
+  and its event still fire when every card is Done.
+
 #### 16.11.3 Starting and ending a lane from the window
 
 [#1117 c "Without the Assistant", #1117 solo] **Start lane…** on the board and in the Progress panel: pick the
@@ -2406,6 +2463,41 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
+
+**Group E's plain switches** (#1286; rows 24, 28, 29): Hive's own handling, the same for every CLI, so each is one row
+under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:
+- `hive.terminal.ctrlCVToCli` (off; at once): on, an agent pane's Ctrl+C and Ctrl+V go to the CLI as xterm sends them
+  (^C, ^V), selection or not; Hive's copy and paste stay on right-click (`shared/terminalInput.ts` `copyPasteKey`).
+- `hive.assistant.startView` (on; at once): off, `assistantStartView` gives none, read at each start and compaction, so
+  a running Assistant takes a change at its next one.
+- `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
+  breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
+  `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
+  on (the Assistant's decision on #1286; a safe Codex newline is #1327). Other control characters stay out either way,
+  so nothing in a prompt can end a paste or press a key (`promptInput`).
+- `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
+  one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
+  a draft.
+Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants) wait for Darren's choice (#1292).
+
+**Group A's rows 1 and 7** (#1284; Darren's decision on #1120 point 3):
+- **Row 1, the CLI's own setting** (`shared/cliOwnMode.ts`): a permission choice every descriptor lists last
+  (`cli-own`, `cliOwn`), for an agent, a project or a provider's default like any mode, and needing no opt-in. Hive
+  passes no mode flag (Claude Code no `--permission-mode`; Codex no `-s`/`-a`/`--approve-for-me`; Copilot no mode flag
+  or edit rule), so the CLI's own config decides. The session's mode is `cli-own` for the whole launch, in the window,
+  the Agent API and what a restart or resume starts in (the settings'); the mode a footer, hook or status line shows is
+  recorded only as seen (`modeObserved`). What depends on the mode the CLI is in reads that one (`modeInEffect`):
+  Codex's reviewer answering its permission requests (`reviewed` in the status rules and the safeguard check) and the
+  no-guardrails warnings (the badge, the project's warning and its sidebar mark). The badge says "CLI's own" (`short`), its tooltip that the CLI's screen shows
+  the mode. No live switch to or from it (`canSwitchModeLive`): a choice restarts the session, and the running menu
+  says why. The dangerous-mode confirmation doesn't apply (the user's config chose). **Never the Assistant's**: not in
+  its pickers or its settings' options, one set anyway is its provider's `assistantMode` (`assistantProjectConfig`),
+  and switching or restarting it into one is refused (`session.mode.assistantCliOwn`): Control relies on its mode.
+  Hive's tool pre-approval stays row 3's switch.
+- **Row 7, `hive.assistant.otherMcpServers`** (off; sessions started afterwards): on, the Assistant gets every
+  workspace server on in the workspace (its master switch: the Assistant's home has no MCP tab, and it works across
+  every project), its own choice narrowing them, Hive's `hive` still Hive's (`effectiveHere`). Its CLI's own servers
+  follow that CLI's `mcpIsolation` either way. Control governs only Hive's tools; another server's ask per the CLI.
 
 ### 16.16 Other 1.0 rules
 

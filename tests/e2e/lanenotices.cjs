@@ -110,6 +110,9 @@ const check = (name, ok, extra = '') => {
       await say(reviewer.id, `boardreview ${n} passed passed`)
       await until(async () => (await inv('tasks:list')).find((c) => c.number === n)?.column === 'passed', HUNG_MS)
     }
+    // One card at a time (#1270): the first passed while the next went on, so the lane paused for its merge, said so.
+    const pausedNotice = () => notices().find((n) => n.body.includes(`${keyA} passed review: the lane waits for it to be merged`))
+    check('a lane paused for a card not merged is a notice saying why', !!(await until(async () => !!pausedNotice(), HUNG_MS)), JSON.stringify(notices()))
     const dueNotice = () => notices().find((n) => n.body.includes('its merge is due'))
     check('every card passed: a notice that its merge is due', !!(await until(async () => !!dueNotice(), HUNG_MS)), JSON.stringify(notices()))
 

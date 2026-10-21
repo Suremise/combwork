@@ -44,6 +44,9 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
+  // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
+  // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
+  await inv('advanced:set', 'hive.workflow.enforce', false)
   const until = async (fn, ms = 20000) => {
     const t = Date.now()
     let v
@@ -124,7 +127,8 @@ const check = (name, ok, extra = '') => {
   const review = await api('PATCH', '/v1/tasks/2', { column: 'review', comment: 'Docs drafted.' })
   check('an agent moves it to Review with a comment', review.status === 200 && review.body.column === 'review' && review.body.comments.length === 1, JSON.stringify(review.body))
   const badge = page.locator('.activity-btn[aria-label="Task Board"] .activity-badge')
-  check('the activity bar counts cards waiting for review', !!(await until(async () => (await badge.count()) === 1 && (await badge.innerText()) === '1', 5000)))
+  // Its count is of cards waiting for you (#1276: For you), not Review's (the board sidebar's Waiting for review has those).
+  check("the activity bar doesn't count cards waiting for review", (await badge.count()) === 0)
   const start = await api('POST', '/v1/tasks/1/start', {})
   check('only the Assistant starts cards through the API', start.status === 403, JSON.stringify(start))
 

@@ -79,6 +79,7 @@
   "session.mergeSlot.waitingNext": "Czeka na kolejkę scalania (następny w kolejce: {agent})",
   "session.mergeSlot.waitingNextCards": "Czeka na kolejkę scalania (następny w kolejce: {agent}, scali {cards})",
   "session.mode.asking": "Agent pyta Cię o coś. Najpierw odpowiedz, potem przełącz tryb.",
+  "session.mode.assistantCliOwn": "Asystent nie może używać własnego ustawienia CLI: jego ustawienie Kontrola wymaga znajomości trybu, w którym działa. Wybierz jeden z trybów CLI.",
   "session.mode.ended": "Sesja zakończyła się, zanim udało się przełączyć ją na tryb {mode}.",
   "session.mode.endedUnconfirmed": "Sesja zakończyła się przed potwierdzeniem przełączenia na tryb {mode} przez {provider}.",
   "session.mode.notFound": "Nie znaleziono: {what}, więc nie przełączono na tryb {mode}. Sprawdź terminal agenta albo przełącz tryb tam.",

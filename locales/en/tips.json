@@ -399,6 +399,14 @@
     "defaultMessage": "Keep a CLI as it is outside Hive",
     "description": "A tip's title."
   },
+  "tips.cliOwnMode.text": {
+    "defaultMessage": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cliOwnMode.title": {
+    "defaultMessage": "Let the CLI's own config choose the mode",
+    "description": "A tip's title."
+  },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -475,6 +483,14 @@
     "defaultMessage": "Found a bug? Copy Diagnostics",
     "description": "A tip's title."
   },
+  "tips.ctrlCvToCli.text": {
+    "defaultMessage": "In an agent's pane Ctrl+C copies a selection and Ctrl+V pastes. Turn on Settings → Advanced → Ctrl+C and Ctrl+V go to the CLI to send both keys to the CLI instead, as in any other terminal; right-click still copies and pastes.",
+    "description": "A tip. Ctrl+C and Ctrl+V name keys: use the key names your language uses. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.ctrlCvToCli.title": {
+    "defaultMessage": "Give Ctrl+C and Ctrl+V to the agent's CLI",
+    "description": "A tip's title. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
   "tips.dateFormat.text": {
     "defaultMessage": "Hive shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."
@@ -530,6 +546,14 @@
   "tips.flightRecorder.title": {
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
+  },
+  "tips.forYou.text": {
+    "defaultMessage": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, approve."
+  },
+  "tips.forYou.title": {
+    "defaultMessage": "Answer what waits for you",
+    "description": "A tip's title (glossary: For you)."
   },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Git tab need Git for Windows 2.38 or later.",
@@ -778,6 +802,14 @@
   "tips.moreAgents.title": {
     "defaultMessage": "More than {usual, plural, one {# agent} other {# agents}}",
     "description": "A tip's title. {usual} is how many agents a project can have by default (12)."
+  },
+  "tips.moveAnyway.text": {
+    "defaultMessage": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: rule, override, Move anyway."
+  },
+  "tips.moveAnyway.title": {
+    "defaultMessage": "Move a card past its rules, with a reason",
+    "description": "A tip's title (glossary: rule)."
   },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Hive prices every session from your table instead.",

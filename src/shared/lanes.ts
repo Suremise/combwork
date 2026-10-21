@@ -1,5 +1,6 @@
 import { currentCard, laneCardState } from './laneBar'
-import type { LaneCard, LaneInfo, LaneState, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
+import type { LaneCard, LaneInfo, LaneState, LaneStatus, LaneWaitReason, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
+import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 
 /**
@@ -38,6 +39,14 @@ export interface LaneRecord {
    * cards now (another lane may be working them). Missing for lanes ended before it was kept.
    */
   frozen?: LaneCard[]
+  /**
+   * Hive owns the lane (#1270, SPEC §16.11): the ruleset in force when it started (its cards, Todo ones too, use it until
+   * it ends), a list change made while a card was in flight (applied at the next card boundary), and the runtime's card
+   * in flight. Each only when set; kept in `lane_runs` and `lane_pending`.
+   */
+  ruleset?: string
+  pending?: number[]
+  inFlight?: number
 }
 
 /** At most this many cards in a lane, rounds per card, and minutes of wait (a day, as a card watch's longest). */
@@ -99,13 +108,14 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, atLimit?: ReadonlySet<number>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
   const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
   const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) })))
-  const state: LaneState = rec.state === 'active' && waiting ? 'paused' : rec.state
+  const status = running(rec) ? laneStatus(rec, list, current, waiting, facts ?? null) : null
+  const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   const named = (a: LaneAgent): LaneAgent => ({ id: a.id, name: names?.get(a.id) ?? a.name })
   return {
     id: rec.id,
@@ -116,14 +126,81 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     cards: list,
     current,
     state,
-    pausedOn: state === 'paused' ? current : null,
+    pausedOn: state === 'paused' ? (status?.card ?? current) : null,
     rounds: rec.rounds,
     waitMinutes: rec.waitMinutes,
     startedBy: rec.startedBy,
     startedAt: rec.startedAt,
     updatedAt: rec.updatedAt,
     endedAt: rec.endedAt,
-    mergeCommit: rec.mergeCommit
+    mergeCommit: rec.mergeCommit,
+    status,
+    queued: running(rec) && rec.pending ? [...rec.pending] : null
+  }
+}
+
+/** What a lane's status reads of a card's facts (#1270): its stage, an open request for you, a stale pass, its rounds. */
+export interface LaneCardFacts {
+  stage: StageId
+  forYou: boolean
+  stale: boolean
+  rounds: number
+}
+
+/** The reasons that pause a lane: it can't go on to its next card until they clear. */
+const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging'])
+
+/**
+ * Why a running lane waits (#1270, SPEC §16.11.4), most pressing first: its card blocked or On Hold (with no other being
+ * worked), a request for you, the round limit, the card before the next one passed but not merged (§16.11.2: one card
+ * at a time), its pass gone stale, a card in Review nobody reviews, a list change queued. `facts` (the cards' fold) only
+ * while workflow rules are enforced: without them, only a blocked or held card says why, as before 1.0.
+ */
+export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: readonly LaneCard[], current: number | null, waiting: boolean, facts: ReadonlyMap<number, LaneCardFacts> | null): LaneStatus | null {
+  const open = cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded')
+  if (!open.length) return null
+  if (waiting && current !== null) {
+    const c = open.find((x) => x.number === current)!
+    if (c.column === 'hold') return { reason: 'hold', card: c.number }
+    // Its round limit's question open (§16.11.4, #1269): it waits for the user's answer.
+    if (c.roundLimit && !c.blocked) return { reason: 'roundLimit', card: c.number }
+    return { reason: 'blocked', card: c.number, ...(c.blocked ? { blocked: c.blocked } : {}) }
+  }
+  if (!facts) return null
+  // The card the lane waits on: the first not Done when it has passed (merging next), else the one being worked.
+  const focus = open[0].column === 'passed' ? open[0] : (open.find((c) => c.number === current) ?? open[0])
+  const f = facts.get(focus.number)
+  if (f?.forYou) return { reason: 'you', card: focus.number }
+  // Waiting for a merge only while a card after it waits to start: with every card passed, the lane's merge is due.
+  if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
+  if (f?.stale) return { reason: 'stale', card: focus.number }
+  if (focus.column === 'review' && !focus.reviewing) return { reason: 'reviewer', card: focus.number }
+  if (rec.pending && current !== null) return { reason: 'listChanges', card: current }
+  return null
+}
+
+/** Why a lane waits, in a few English words for the hive tools ("waiting: HI-11 not merged"). */
+export function laneStatusText(s: LaneStatus): string {
+  const card = s.card !== null ? cardRef(s.card) : 'a card'
+  switch (s.reason) {
+    case 'blocked':
+      return `${card} is blocked${s.blocked ? ` (${s.blocked})` : ''}`
+    case 'hold':
+      return `${card} is On Hold`
+    case 'you':
+      return `waiting for the user on ${card}`
+    case 'roundLimit':
+      return `${card} reached the round limit: waiting for the user`
+    case 'notMerged':
+      return `waiting: ${card} not merged`
+    case 'merging':
+      return `waiting: ${card} merging`
+    case 'stale':
+      return `stale: ${card} must be submitted again`
+    case 'reviewer':
+      return `waiting for a reviewer on ${card}`
+    case 'listChanges':
+      return `list changes after ${card}`
   }
 }
 
@@ -175,6 +252,8 @@ export function readLane(v: unknown): LaneRecord | null {
   // Its snapshot, kept only when every card of it reads back (else it reads from the board, as before #512).
   const frozen = Array.isArray(v.frozen) && v.frozen.length === cards.length ? v.frozen.map(cardOf) : null
   const snapshot = frozen?.every((c, i) => c && c.number === cards[i]) ? (frozen as LaneCard[]) : null
+  // Its run (#1270): each part kept only when it reads as one (a queued list may be empty only while a card is in flight).
+  const pending = Array.isArray(v.pending) && v.pending.length <= LANE_MAX_CARDS && v.pending.every((n) => whole(n, 1e9)) && new Set(v.pending).size === v.pending.length ? (v.pending as number[]) : null
   return {
     id: v.id,
     project: v.project,
@@ -190,7 +269,10 @@ export function readLane(v: unknown): LaneRecord | null {
     updatedAt: v.updatedAt,
     endedAt: v.endedAt as string | null,
     mergeCommit: v.mergeCommit as string | null,
-    ...(snapshot ? { frozen: snapshot } : {})
+    ...(snapshot ? { frozen: snapshot } : {}),
+    ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
+    ...(pending ? { pending } : {}),
+    ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {})
   }
 }
 
@@ -244,8 +326,10 @@ const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.
  */
 export function laneLine(l: LaneInfo): string {
   const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project})`
+  const said = l.status ? `; ${laneStatusText(l.status)}` : ''
   const paused = l.cards.find((c) => c.number === l.pausedOn)
-  const state = l.state === 'paused' ? `paused, ${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}` : l.state === 'active' ? (l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed') : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
+  const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`
+  const state = l.state === 'paused' ? `paused, ${why}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
   return `${pair}${l.name ? ` ${l.name}` : ''}: ${state}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
 }
 
@@ -264,7 +348,16 @@ export function laneChangeText(r: LaneChange): string {
   return `${what}: ${laneLine(r.lane)}${before}${r.note ? ` ${r.note}` : ''}`
 }
 
-/** What an end did. */
-export function laneEndText(l: LaneInfo): string {
-  return `Lane ${l.state === 'ended' ? 'ended' : 'abandoned'}: ${laneLine(l)}`
+/** What an end did (and why a merge commit given was ignored, #1270). */
+export function laneEndText(l: LaneInfo & { note?: string }): string {
+  return `Lane ${l.state === 'ended' ? 'ended' : 'abandoned'}: ${laneLine(l)}${l.note ? ` ${l.note}` : ''}`
+}
+
+/** What hive_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done. */
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null }): string {
+  if (r.lane.state === 'paused' && r.waits) return `The lane waits: ${laneStatusText(r.waits)}. Start nothing new meanwhile.`
+  if (!r.next) return 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
+  const card = `${cardRef(r.next.card)} ${r.next.title}`
+  const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
+  return r.next.carryOn ? `Carry on with ${card}${also}.` : `Next: ${card}. Start it.`
 }

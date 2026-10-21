@@ -1,4 +1,4 @@
-import { dirname, resolve as resolvePath } from 'path'
+import { dirname, join, resolve as resolvePath } from 'path'
 import type { HiveEvent, LiveSessionState, ProgressRun } from '../shared/types'
 import { activityFields, publicReason } from '../shared/assistantActivity'
 import { cardRefText } from '../shared/progress'
@@ -13,7 +13,7 @@ import { cardRefText } from '../shared/progress'
  * viewer tokens get every event; a project agent's token (`agent`) only its own project's session, notice, progress,
  * merge-slot and agent events, and none of the Hive Assistant's actions.
  */
-export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly HiveEvent['type'][]
+export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'lane-ended', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly HiveEvent['type'][]
 
 /** A project agent's scope: its workspace and project. */
 export interface StreamScope {
@@ -153,6 +153,10 @@ export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record
     // Its lanes (card titles) are read with GET /v1/lanes, a project agent's own.
     case 'lanes-changed':
       return { type: event.type, workspacePath: event.workspacePath }
+    // A lane that ended with its cards Done (#1270): an agent's, its project's.
+    case 'lane-ended':
+      if (!ownWorkspace(event.workspacePath) || !own(join(event.workspacePath, event.project))) return null
+      return { type: event.type, workspacePath: event.workspacePath, lane: event.lane, project: event.project, results: event.results }
     // The workspace's runs (publicRun), as GET /v1/progress gives them; an agent's, its project's.
     case 'progress-changed':
       if (!ownWorkspace(event.workspacePath)) return null

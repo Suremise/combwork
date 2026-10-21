@@ -79,6 +79,7 @@
   "session.mergeSlot.waitingNext": "正在等待合并槽位（{agent} 将接着合并）",
   "session.mergeSlot.waitingNextCards": "正在等待合并槽位（{agent} 将接着合并 {cards}）",
   "session.mode.asking": "智能体正在向你提问。请先回答，再切换模式。",
+  "session.mode.assistantCliOwn": "助手不能使用 CLI 自身的设置：它的“控制”设置依赖于知道它运行时的模式。请选择 CLI 的一种模式。",
   "session.mode.ended": "Hive 还没来得及将其切换到{mode}，会话就结束了。",
   "session.mode.endedUnconfirmed": "会话在 {provider} 确认切换到{mode}之前就结束了。",
   "session.mode.notFound": "Hive 找不到 {what}，因此没有切换到{mode}。请查看它的终端，或在那里切换。",

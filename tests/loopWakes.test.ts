@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { cardChange, loopWakeLine, readCondition, wakeAbout, type WatchCondition } from '../src/shared/watch'
 import { tempDir } from './tempDir'
@@ -32,6 +32,14 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
   const lanes = await import('../src/main/lanes')
+
+  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  const { advanced } = await import('../src/main/advanced')
+  const { ENFORCE } = await import('../src/main/workflow/service')
+  const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+  afterEach(async () => {
+    await advanced.set(ENFORCE, true)
+  })
   const loopWakes = await import('../src/main/loopWakes')
   loopWakes.initLoopWakes()
   const { sessions } = await import('../src/main/sessions')
@@ -261,6 +269,8 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   })
 
   it("goes to whoever reviews it when it is typed: the lane's reviewer changed or taken off while it waited (round 1 finding 1)", async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()
     const st = fake(alpha)

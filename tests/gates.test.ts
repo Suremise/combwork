@@ -24,6 +24,7 @@ const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { apiErrorReply } = await import('../src/main/servers')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
+const { workBadges } = await import('../src/main/workflow/cardWork')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -554,5 +555,74 @@ describe('with nothing to enforce (#1265)', () => {
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
     expect(kinds(w, card)).not.toContain('Override')
     expect(kinds(w, card)).toContain('Refused')
+  })
+})
+
+describe('the window asks before a move that skips rules (#1275)', () => {
+  it("the window's change (tasks:update) never skips a rule unasked: refused naming the rules, nothing written; tasks:move asks", async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const before = kinds(w, card)
+    await expect(update(w, card, { column: 'done' }, user, { ask: true })).rejects.toThrow(/skips/)
+    expect(kinds(w, card)).toEqual(before)
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
+    expect(await inWorkspace(w, () => tasks.moveTask(card, 'done'))).toMatchObject({ ask: expect.arrayContaining(['integrate.approved']) })
+    // A move that skips nothing goes as before.
+    expect((await update(w, card, { column: 'todo' }, user, { ask: true })).column).toBe('todo')
+  })
+
+  it("the override mark: who, which rules and why, from the card's latest Override since it was last Done", async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const badge = () => workBadges(w).find((b) => b.card === card)
+    expect(badge()?.override).toBeNull()
+    await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, reason: 'Merged by hand' }))
+    expect(badge()?.override).toMatchObject({ by: 'user', move: 'active→done', reason: 'Merged by hand', rules: expect.arrayContaining(['integrate.approved']) })
+    // Reopened and started again: its work since then has none.
+    await inWorkspace(w, () => tasks.moveTask(card, 'todo'))
+    await inWorkspace(w, () => tasks.moveTask(card, 'doing', { agent: 'a1' }))
+    expect(badge()?.override).toBeNull()
+  })
+
+  it("the columns a card can be dropped in: its ruleset's stages (On Hold always); none from the rules: every column", async () => {
+    const pair = await workspace(PAIR)
+    const card = await create(pair.w)
+    expect(await inWorkspace(pair.w, () => tasks.moveColumns(card))).toEqual(['hold', 'todo', 'doing', 'review', 'passed', 'done'])
+    // No review, no merge step (all off): no Review or Passed.
+    const off = await workspace(null)
+    const c2 = await create(off.w)
+    expect(await inWorkspace(off.w, () => tasks.moveColumns(c2))).toEqual(['hold', 'todo', 'doing', 'done'])
+    // The rules not enforced: every column.
+    await advanced.set(ENFORCE, false)
+    expect(await inWorkspace(off.w, () => tasks.moveColumns(c2))).toBeNull()
+  })
+
+  it("a window Start that skips rules is asked before anything is done (HR3's round 1): what it skips, nothing written; with the user's reason, one Override", async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { blocked: 'Needs a design decision' })
+    const before = kinds(w, card)
+    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual(['start.notBlocked'])
+    expect(kinds(w, card)).toEqual(before)
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
+    // A card nothing blocks asks nothing.
+    const free = await create(w, 'Free')
+    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual([])
+    // Started with the user's reason (the question answered), as Start makes its move (taskStart's giveCard; the launch
+    // itself is boardgates'): one Override carrying it, then its start.
+    await update(w, card, { agent: 'a1', column: 'doing', override: { reason: 'Decided in the call' } })
+    const o = facts(w, card).filter((f) => f.kind === 'Override')
+    expect(o).toMatchObject([{ actor: 'user', data: { rules: ['start.notBlocked'], reason: 'Decided in the call' } }])
+    expect(kinds(w, card)).toContain('Started')
+  })
+
+  it("Move to Doing's choice goes with the move: the agent chosen is the builder its start records", async () => {
+    const { w, wt } = await workspace(PAIR)
+    const card = await create(w)
+    const r = await inWorkspace(w, () => tasks.moveTask(card, 'doing', { agent: 'a1' }))
+    expect(r).toMatchObject({ moved: { column: 'doing', agent: 'a1' } })
+    expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { builder: 'a1', folder: wt } })
   })
 })

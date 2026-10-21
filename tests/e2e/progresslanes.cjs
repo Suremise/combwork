@@ -167,9 +167,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const l7 = await startLane('B8', 'R1', 'one more', [await make('Eighth lane, one', 'todo')])
   check('seven lanes started, one ended and one abandoned', [l1, l2, l3, l4, l5, l6, l7].every(Boolean) && ended.body?.state === 'ended' && dropped.body?.state === 'abandoned', JSON.stringify([ended, dropped]))
   const order = () => section.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
-  // Running lanes first, newest first, then the paused one (#512), then the ended and abandoned ones in the order they
-  // finished, the latest last (#568).
-  const wantOrder = [l7, l6, l2, l1, l3, l4, l5]
+  // Running lanes first, newest first, then the paused ones (#512) newest first: R1's (its current card blocked) and
+  // B1's (one card at a time, #1270: its card in Passed isn't merged while later ones wait), then the ended and abandoned
+  // ones in the order they finished, the latest last (#568).
+  const wantOrder = [l7, l6, l2, l3, l1, l4, l5]
   check('the lanes show, a row each: running first (newest first), then paused, then ended and abandoned as they finished', !!(await until(async () => (await order()).join() === wantOrder.join(), HUNG_MS)), JSON.stringify({ got: await order(), want: wantOrder }))
   const row1 = section.locator(`.progress-lane[data-lane="${l1}"]`)
   const top1 = await row1.locator('.progress-lane-top').innerText()
@@ -482,7 +483,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await inv('tasks:update', n2, { column: 'review' })
   const row4 = section.locator(`.progress-lane[data-lane="${l4}"]`)
   const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
-  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()), HUNG_MS)) && !/\breview\b/.test(await seg4()) && /\breview\b/.test((await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''), await seg4())
+  // Both rows waited for: B1's shows the move once lanes-changed reaches it, which may come after B5's (#1270 round 3).
+  const seg1 = async () => (await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
+  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()) && /\breview\b/.test(await seg1()), HUNG_MS)) && !/\breview\b/.test(await seg4()), JSON.stringify([await seg4(), await seg1()]))
   check('…its count unknown, and no current card', /–\/2/.test(await row4.locator('.progress-lane-top').innerText()) && (await row4.locator('.progress-lane-current').count()) === 0, await row4.locator('.progress-lane-top').innerText())
   await row4.locator(`.lane-seg[data-card="${n2}"]`).hover()
   check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Hive kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))

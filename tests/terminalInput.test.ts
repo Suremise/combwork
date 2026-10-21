@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTyping } from '../src/shared/terminalInput'
+import { copyPasteKey, isTyping } from '../src/shared/terminalInput'
 
 describe('isTyping', () => {
   it("ignores xterm's replies to the program", () => {
@@ -19,5 +19,30 @@ describe('isTyping', () => {
 
   it('counts keys, Enter and pastes as typing', () => {
     for (const keys of ['a', '\r', '\x7f', '\x03', 'hello world', '\x1b[200~pasted\x1b[201~']) expect(isTyping(keys), JSON.stringify(keys)).toBe(true)
+  })
+})
+
+describe('copyPasteKey (#1286)', () => {
+  const key = (k: string, more: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}) => ({ key: k, ctrlKey: true, metaKey: false, altKey: false, ...more })
+
+  it("by default (the switch off), Hive's copy with a selection and paste; Ctrl+C with none goes on to the CLI", () => {
+    expect(copyPasteKey(key('c'), false, true)).toBe('copy')
+    expect(copyPasteKey(key('C'), false, true)).toBe('copy')
+    expect(copyPasteKey(key('c'), false, false)).toBeNull()
+    expect(copyPasteKey(key('v'), false, false)).toBe('paste')
+    expect(copyPasteKey(key('V'), false, true)).toBe('paste')
+  })
+
+  it('with the switch on, both go to the CLI, a selection or not', () => {
+    for (const k of ['c', 'C', 'v', 'V']) for (const sel of [true, false]) expect(copyPasteKey(key(k), true, sel), `${k} ${sel}`).toBe('cli')
+  })
+
+  it('other keys, Alt chords and keys without Ctrl are none of its business, either way', () => {
+    for (const toCli of [true, false]) {
+      expect(copyPasteKey(key('x'), toCli, true)).toBeNull()
+      expect(copyPasteKey(key('v', { altKey: true }), toCli, true)).toBeNull()
+      expect(copyPasteKey(key('c', { ctrlKey: false }), toCli, true)).toBeNull()
+      expect(copyPasteKey(key('v', { ctrlKey: false, metaKey: true }), toCli, true)).toBe(toCli ? 'cli' : 'paste')
+    }
   })
 })

@@ -194,6 +194,27 @@ describe('SessionManager.compact: typing the /compact', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it("Settings → Advanced's draft switch (#1286): on, Ctrl+U clears the CLI's input first; off, none", async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const { PROMPT_CLEAR_DRAFT } = await import('../src/shared/advanced')
+    const { sessions } = await running()
+    const get = advanced.get.bind(advanced)
+    for (const clear of [true, false]) {
+      typed.length = 0
+      const spy = vi.spyOn(advanced, 'get').mockImplementation(((id: string, own?: Record<string, unknown> | null) => (id === PROMPT_CLEAR_DRAFT ? clear : get(id, own))) as typeof advanced.get)
+      try {
+        const compact = sessions.compact(project, 'short', 'a1')
+        while (typed.at(-1)?.data !== '\r') await vi.advanceTimersByTimeAsync(10)
+        await compact
+      } finally {
+        spy.mockRestore()
+      }
+      expect(typed.map((t) => t.data).join(''), `clear ${clear}`).toBe(`${clear ? '\x15' : ''}/compact short\r`)
+      // Ended as the CLI never begins it, so the next one can start.
+      await vi.advanceTimersByTimeAsync(BEGIN_MS + 100)
+    }
+  })
+
   it('while Hive types a prompt into the agent, Compact is refused (the two would mix)', async () => {
     const { sessions, l, state } = await running()
     const prompt = sessions.sendPrompt(project, 'a1', FOCUS)

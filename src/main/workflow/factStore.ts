@@ -14,6 +14,8 @@ import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
 import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
+import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
+import { KEY_FORM, normalKey } from '../../shared/projectKeys'
 import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
 import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
@@ -187,7 +189,11 @@ interface CardCols {
 }
 const COLS = 'number, title, col, stage, pre_workflow, kind, target, paths_declared'
 
-type Scope = { project: string; key: string; now?: () => Date }
+/**
+ * A project's store: `project` its name on the board (its cards' `project`); `projectId` (#1294) its id now, whose key
+ * (#1219) names it and its cards; `key` the name used where the board has none (a card or project without a key yet).
+ */
+type Scope = { project: string; key: string; projectId?: () => string | null; now?: () => Date }
 
 /** For tests: runs once a read of cards' records has read their rows, before their lists (another connection committing there). */
 export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCards: null }
@@ -225,6 +231,12 @@ export class FactStore {
     return `${this.scope.key}-${n}`
   }
 
+  /** The project's key now (`HI`, #1219: a key changed since names it at once), else the scope's. */
+  projectKey(): string {
+    const id = this.scope.projectId?.()
+    return (id && this.conn.read((db) => currentKeys(db).get(id))) || this.scope.key
+  }
+
   // --- Cards.
 
   /** Cards' records by a condition on `cards` (this module's SQL, its arguments bound), in number order, on one snapshot. */
@@ -247,9 +259,11 @@ export class FactStore {
       const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer, l.rounds FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
         JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id`
       for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null; rounds: number }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer, rounds: r.rounds })
+      // Its key (#1294): its project's key now and its number there (#1219), else the scope's name and its number.
+      const keys = cardKeys(db, rows.map((r) => r.number))
       return rows.map((r) => ({
         id: r.number,
-        key: this.keyOf(r.number),
+        key: keys.get(r.number) ?? this.keyOf(r.number),
         title: r.title,
         kind: r.kind,
         labels: labels.get(r.number) ?? [],
@@ -272,11 +286,26 @@ export class FactStore {
     return c
   }
 
-  /** A card of this project by its key (`<key>-12`, any case; the key may itself hold hyphens: a project's name), or null. */
+  /**
+   * A card of this project by its key (`HI-12`, any case; an old key of its project's too, and a card's name in a project
+   * it left: #1219's resolver), its old number (`#1061`), or the name keys had before (`<name>-<old number>`, the scope's
+   * name, which may hold hyphens: Hive-Card trailers written before #1294 say it), or null.
+   * A prefix any project holds or held as a key is a key, never that name form (HR5's #1294 round 1): a key no card has
+   * here, or another project's card, is null, not the card with that number on the board. So where a project's name is
+   * one of its keys, a name-form trailer finds only a card from before 1.0 (which kept its number in its project, #1219).
+   */
   cardByKey(key: string): CardRecord | null {
-    const m = /^(.+)-(\d+)$/.exec(key.trim())
-    if (!m || !this.scope.key || m[1].toLowerCase() !== this.scope.key.toLowerCase()) return null
-    return this.records('number = ? AND project = ?', [Number(m[2]), this.scope.project])[0] ?? null
+    const ofThis = (n: number): CardRecord | null => this.records('number = ? AND project = ?', [n, this.scope.project])[0] ?? null
+    const v = key.trim()
+    const old = /^#(\d+)$/.exec(v)
+    if (old) return ofThis(Number(old[1]))
+    const m = /^(.+)-(\d+)$/.exec(v)
+    if (!m) return null
+    const prefix = m[1]
+    const keyed = KEY_FORM.test(prefix) ? this.conn.read((db) => (keysHeld(db).some((k) => k.key === normalKey(prefix)) ? { card: cardOfKey(db, prefix, Number(m[2])) } : null)) : null
+    if (keyed) return keyed.card === null ? null : ofThis(keyed.card)
+    if (!this.scope.key || prefix.toLowerCase() !== this.scope.key.toLowerCase()) return null
+    return ofThis(Number(m[2]))
   }
 
   /** This project's cards (not archived), in number order. */
@@ -406,6 +435,11 @@ export class FactStore {
       const list = (table: 'lane_cards' | 'lane_pending'): number[] => (db.prepare(`SELECT card FROM ${table} WHERE lane = ? ORDER BY ord`).all(id) as { card: number }[]).map((r) => r.card)
       return { id, cards: list('lane_cards'), ruleset: run?.ruleset ?? null, pending: run?.has_pending ? list('lane_pending') : null, current: run?.current_card ?? null, ended: row.state !== 'active' }
     })
+  }
+
+  /** A lane's builder agent (lanes.ts's), or null: the one to tell when its queued list applies (#1270). */
+  laneBuilder(id: string): string | null {
+    return this.conn.read((db) => (db.prepare('SELECT builder_id FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(id, this.scope.project) as { builder_id: string } | undefined)?.builder_id ?? null)
   }
 
   /**

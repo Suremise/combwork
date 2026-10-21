@@ -13,3 +13,18 @@ export function typedText(data: string): string {
 export function isTyping(data: string): boolean {
   return typedText(data) !== ''
 }
+
+/**
+ * What Ctrl+C or Ctrl+V does in an agent's terminal (#1286): Hive's copy (Ctrl+C with a selection) or paste, or the
+ * CLI's ('cli': xterm sends it on, Ctrl+C as ^C and Ctrl+V as ^V), which Settings → Advanced can give both keys to.
+ * null for any other key, and for Ctrl+C with nothing selected, which goes on as other keys do (to the CLI, unless it
+ * is one of Hive's shortcuts).
+ */
+export function copyPasteKey(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }, toCli: boolean, hasSelection: boolean): 'copy' | 'paste' | 'cli' | null {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null
+  const k = e.key.toLowerCase()
+  if (k !== 'c' && k !== 'v') return null
+  if (toCli) return 'cli'
+  if (k === 'v') return 'paste'
+  return hasSelection ? 'copy' : null
+}

@@ -563,6 +563,10 @@
     "defaultMessage": "Rename session",
     "description": "Title of the dialog renaming an agent's session (from its footer)."
   },
+  "panes.session.starting": {
+    "defaultMessage": "{kind, select, resume {Resuming…} other {Starting…}}",
+    "description": "A start (other) or Resume (resume) button's label while the agent's session starts, from the click until it runs (it shows a spinner and takes no clicks). Keep it short."
+  },
   "panes.tab.failed": {
     "defaultMessage": "failed to start: {why}",
     "description": "An agent's state after its name (its name's hover on its pane, the summary chip's list): its last launch failed ({why}: the error's first line). Lower case."

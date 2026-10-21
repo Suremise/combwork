@@ -2,7 +2,7 @@ import { msg } from './i18n/msg'
 import { columnName, type Tr } from './tasks'
 import { cardLabel } from './projectKeys'
 import type { LaneCard, LaneState, TaskCard, TaskColumn } from './types'
-import type { WorkBadge } from './workflow/workView'
+import type { WorkBadge, WorkOverride } from './workflow/workView'
 
 /**
  * A lane in the Progress panel (#484): a segmented bar, one equal-width segment per card in the lane's order, coloured
@@ -130,7 +130,19 @@ function whereText(column: TaskColumn, round: number | null, how: 'failed' | 'in
  * revision, and its merge commit once Done: its `Integrated` fact's, else the lane's own record of its merge. Revisions
  * through the project's platform (`short`, revisionShort). Nothing for a card with no work recorded.
  */
-export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMerge: string | null, short: (id: string) => string, tr: Tr): string[] {
+/** How a move past a card's rules names them (#1275): the window's list and each rule's name; hive-mcp passes none. */
+export interface OverrideNames {
+  list: ListOf
+  ruleName: (id: string) => string
+}
+
+/** A move past a card's rules (#1275, §16.8.4): who made it, the rules it skipped and why, for its mark and hover. */
+export function overrideNote(o: WorkOverride, tr: Tr, names: OverrideNames): string {
+  const reason = o.reason.trim()
+  return tr(msg({ id: 'board.work.badgeOverride', defaultMessage: '{by, select, assistant {The Assistant moved it past its rules} other {You moved it past its rules}}: {rules}. {hasReason, select, yes {Reason: {reason}} other {No reason given.}}', description: "Tooltip and accessible name of a mark on a board card (and a line in its lane segment's hover): a move made an exception to the card's workflow rules (glossary: override), by the user (other) or the Hive Assistant (assistant) (select: translate each); {rules} lists the rules it skipped (their names); then the reason the user or the Assistant gave (their own words), or that none was given. Glossary: rule, override." }), { by: o.by, rules: names.list(o.rules.map(names.ruleName), 'unit'), hasReason: reason ? 'yes' : 'no', reason }) // i18n-ignore: select keys, never shown
+}
+
+export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMerge: string | null, short: (id: string) => string, tr: Tr, names?: OverrideNames): string[] {
   const out: string[] = []
   if (b?.revision) out.push(tr(msg({ id: 'board.lane.workRevision', defaultMessage: '{review, select, yes {Under review: {revision}} other {Revision: {revision}}}', description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }), { review: b.stage === 'review' ? 'yes' : 'no', revision: short(b.revision) }))
   if (b?.verdict)
@@ -145,6 +157,7 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
       )
     )
   if (b && b.checks.passed + b.checks.failed > 0) out.push(tr(msg({ id: 'board.lane.workChecks', defaultMessage: 'Checks on it: {passed, number} passed, {failed, number} failed', description: "A line in a lane segment's hover (Progress panel): how many of the checks on the card's revision passed and failed (each check's latest run that counted)." }), { passed: b.checks.passed, failed: b.checks.failed }))
+  if (b?.override && names) out.push(overrideNote(b.override, tr, names))
   const merge = b?.merged ?? (state === 'done' ? laneMerge : null)
   if (merge && state === 'done') out.push(tr(msg({ id: 'board.lane.workMerged', defaultMessage: 'Merged as {commit}', description: "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)." }), { commit: /^[0-9a-f]{12,}$/i.test(merge) ? short(merge) : merge }))
   return out
@@ -156,8 +169,8 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
  * later cycle whose revision, verdicts, checks and merge aren't this lane's (HR5's #1225 round 1), so its segments say
  * only the lane's own record of its merge.
  */
-export function laneSegmentWork(lane: { frozen: unknown; mergeCommit: string | null }, badge: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr): string[] {
-  return workNotes(lane.frozen ? undefined : badge, s.state, lane.mergeCommit, short, tr)
+export function laneSegmentWork(lane: { frozen: unknown; mergeCommit: string | null }, badge: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names?: OverrideNames): string[] {
+  return workNotes(lane.frozen ? undefined : badge, s.state, lane.mergeCommit, short, tr, names)
 }
 
 /** A card segment's accessible name: its label and its notes (#706). */
