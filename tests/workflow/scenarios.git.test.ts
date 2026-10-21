@@ -21,7 +21,7 @@ const agentMerges = (over: Partial<ReturnType<typeof preset>> = {}) => pair({}, 
 
 /** A Pair card started by B1, with a commit in its folder: the card and its folder. */
 async function started(e: Env, title = 'Fix the thing', files: Record<string, string> = { 'src/fix.txt': 'fixed\n' }) {
-  const card = e.wf.createCard({ title, reviewer: 'R1' })
+  const card = e.wf.createCard({ title })
   const s = await e.wf.start(card.key, B1)
   moved(s)
   const folder = s.data!.folder as string
@@ -131,7 +131,7 @@ describe('workflow scenarios, Git', () => {
 
   it('S10: a rebase that conflicted commit by commit, resolved to exactly the replay of the whole change, carries the pass over', async () => {
     const e = agentMerges()
-    const card = e.wf.createCard({ title: 'Two commits', reviewer: 'R1' })
+    const card = e.wf.createCard({ title: 'Two commits' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const folder = s.data!.folder as string
@@ -353,6 +353,8 @@ describe('workflow scenarios, Git', () => {
   it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', async () => {
     const e = pair()
     const { card } = await started(e)
+    // The reviewer to wake is the card's lane's (#1291).
+    e.wf.startLane('L', [card.id], 'R1')
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     moved(await e.wf.startReview(card.key, R1))
     moved(await e.wf.recordDecision(card.key, 'Use the short name'))

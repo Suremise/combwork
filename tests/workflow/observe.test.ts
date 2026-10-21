@@ -19,7 +19,7 @@ describe('two Hives observing one workspace', () => {
   it('S59: HEAD goes A→B→A→B → four HeadMoved facts, each once; a card reopened and merged again → a second Integrated in the new cycle', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const other = e.another()
-    const card = e.wf.createCard({ title: 'Observed', reviewer: 'R1' })
+    const card = e.wf.createCard({ title: 'Observed' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const folder = s.data!.folder as string
@@ -95,7 +95,7 @@ describe('two Hives observing one workspace', () => {
   it('S50 (core): both Hives observe the same hand merge → one Integrated fact', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
     const other = e.another()
-    const card = e.wf.createCard({ title: 'Merged by hand', reviewer: 'R1' })
+    const card = e.wf.createCard({ title: 'Merged by hand' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const rev = commit(s.data!.folder as string, { 'm.txt': 'm\n' }, 'm')
