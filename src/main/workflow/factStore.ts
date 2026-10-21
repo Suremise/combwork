@@ -405,6 +405,11 @@ export class FactStore {
     })
   }
 
+  /** A lane's builder agent (lanes.ts's), or null: the one to tell when its queued list applies (#1270). */
+  laneBuilder(id: string): string | null {
+    return this.conn.read((db) => (db.prepare('SELECT builder_id FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(id, this.scope.project) as { builder_id: string } | undefined)?.builder_id ?? null)
+  }
+
   /**
    * The runtime starts a lane of this project (tests/workflow until #1270 wires the app's): lanes.ts's lane of that id,
    * its cards and reviewer (if given) set, or a new one by Hive when there is none; with the ruleset in force now.

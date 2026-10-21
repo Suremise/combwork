@@ -443,7 +443,9 @@ export class Workflow {
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
       if (changed) return changed
-      // Checked again where the start is written (HR6's #1270 round 1): the lane may have moved on during the gather.
+      // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
+      // design): a queued list whose boundary has passed applies first, then the start is checked against it.
+      if (this.enforced() && !opts.drag) this.applyLaneBoundary(w, this.store.card(card.id))
       const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
       if (waits) return waits
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
@@ -1451,18 +1453,50 @@ export class Workflow {
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
   }
 
+  /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
+  private laneCardFlying(n: number): boolean {
+    const stage = this.store.card(n).stage
+    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging'
+  }
+
   /**
-   * The card this one waits for in its running lane, or null (one card at a time, #1270): a card before it in the lane's
-   * list that isn't Done; for a card only in a queued list (not applied yet), the first card of the lane's list now that
-   * isn't Done (the queue applies once none is in flight: HR6's round 1, a card queued in front can't start early).
+   * A lane's list as a start reads it (#1270; the Assistant's round 4 design, one lane state): the list now, or, once
+   * none of its cards is in flight (the card boundary has passed), the queued list, which `applies` then.
+   */
+  laneNow(l: LaneList): { cards: number[]; applies: boolean } {
+    if (!l.pending?.length || l.cards.some((c) => this.laneCardFlying(c))) return { cards: l.cards, applies: false }
+    return { cards: l.pending, applies: true }
+  }
+
+  /**
+   * The card this one waits for in its running lane, or null (one card at a time, #1270), from the lane's list as a start
+   * reads it (laneNow): a card before it there that isn't Done. A card only in a queued list that hasn't applied (a card
+   * is still in flight) is never eligible: it waits for that card, so no queued card passes an earlier one.
    */
   laneWaits(card: CardRecord): CardRecord | null {
     if (!card.lane) return null
     const l = this.lane(card.lane)
     if (!l || l.ended) return null
-    const before = l.cards.includes(card.id) ? l.cards.slice(0, l.cards.indexOf(card.id)) : l.cards
-    const open = before.find((c) => c !== card.id && !this.laneDone(c))
+    const now = this.laneNow(l)
+    let open: number | undefined
+    if (now.cards.includes(card.id)) open = now.cards.slice(0, now.cards.indexOf(card.id)).find((c) => !this.laneDone(c))
+    else if (l.pending?.includes(card.id)) open = l.cards.find((c) => this.laneCardFlying(c)) ?? l.cards.find((c) => c !== card.id && !this.laneDone(c))
     return open === undefined ? null : this.store.card(open)
+  }
+
+  /**
+   * Inside a start's write (its board change, #1270): a queued list whose boundary has passed is applied there, before the
+   * start is checked, and the builder is told (a wake, delivered once). lanes.ts's refresh then finds nothing queued.
+   */
+  private applyLaneBoundary(w: Write, card: CardRecord): void {
+    if (!card.lane) return
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return
+    const now = this.laneNow(l)
+    if (!now.applies) return
+    this.saveLane({ ...l, cards: [...now.cards], pending: null })
+    const builder = this.store.laneBuilder(l.id)
+    if (builder) this.wake(w, builder, `Your lane's card list changed, as queued: its cards are now ${now.cards.map((c) => this.store.card(c).key).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: a wake, agent-facing
   }
 
   /** A start refused for a card that waits in its lane (laneWaits), or null. */
