@@ -168,7 +168,8 @@ export const AREAS = [
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
   { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
-  { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'wtreuse', 'placement', 'swap'] },
+  { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'wtreuse', 'placement', 'swap', 'repolock'] },
+  { paths: ['src/main/repoLock.ts', 'src/main/repoLockCore.ts', 'tests/e2e/repolock.cjs'], suites: ['repolock', 'gitview', 'mergeslot'] },
   { paths: ['src/main/mergeSlots.ts', 'src/main/mergeSlotHost.ts', 'src/shared/mergeSlot.ts', 'src/renderer/src/components/MergeSlots.tsx'], suites: ['mergeslot', 'progresslanes', 'replysize'] },
   // Lanes (#483): the card loop registers its lane; replysize measures hive_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'progresslanes', 'replysize'] },

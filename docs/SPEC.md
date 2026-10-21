@@ -2109,11 +2109,23 @@ touched:
 
 #### 16.9.3 Around the queue
 
-**Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G]: a **repository lock** across processes (the dev
-and installed Hive can't advance a target at once): a lock file in the repository's common git dir
-(`hive-merge.lock`: pid, process start time, Hive's profile), taken with exclusive create, stale when its process is
-gone. It **replaces** today's `.git/hive-merge` lock, which is in-process only (`withFileLock`, `fsutil.ts:512`), and
-the Git view's actions (§8) take it too. It is held **only for the advance** (§16.9.2), seconds. The test merge
+**Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G; #1338's round 1 finding 3] **Built [#1347]**: a
+**repository lock** across processes (the dev and installed Hive can't merge into or advance a target at once). It is
+a row, not a file's existence: one row (`repo_lock`: `id` 1, `token`, `pid`, `process_start`, `profile`, `taken_at`;
+a typed table) in a small SQLite database in the repository's common git dir (`hive-merge.lock`, so its worktrees
+share it; `repoLockCore.ts`). Taking it is `BEGIN IMMEDIATE` (SQLite's own cross-process lock) then: no row, or a row
+whose holder is **dead** (its pid gone, or running with another process start time: a reused pid), judged before the
+transaction and replaced only if the row is still the one judged (its token: compare and swap), so of two contenders
+on one dead holder exactly one takes it. A **live holder is never taken over**, however long it holds: the waiter's
+bound (Settings → Advanced, **Merges: wait for another Hive**, 30 s) only ends its own attempt, with "Another Hive is
+merging into this repository (<profile>)", which it also shows after a moment's wait. Release deletes the row by its
+token, so a late release after a takeover removes nothing of the new holder's. Why not a lock file taken with
+exclusive create: stale takeover by rename or unlink isn't atomic (two contenders can both judge it stale, and a late
+release can unlink a successor's file). It **replaces** the in-process `.git/hive-merge` lock (`withFileLock`, which
+still serializes this Hive's own takes of the row): the Git view's folder actions (§8), a worktree's merge (the Merge
+dialog, agents' and unused worktrees' merges) and the line updater's move of an agent's branch (§16.19.2, which waits
+quietly and tries again on its next pass) take it. No off switch: it is data safety (§16.6.4). It is held **only for
+the advance** (§16.9.2), seconds. The test merge
 (which runs the repository's hooks and may wait on signing) and the merge checks (an hour on Team) run without it:
 they write only the queue's worktree and `refs/hive/queue/*`, and the advance's expected value catches anything that
 moved meanwhile. A paused entry holds no lock. One queue per target still runs one entry at a time.
@@ -2122,8 +2134,12 @@ moved meanwhile. A paused entry holds no lock. One queue per target still runs o
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose
 what was reviewed or approved. Ref paths compare keys case-insensitively (NTFS).
 
-**`mergeWorktree`** (`worktrees.ts:430`) changes [note §9, #1121]: it returns the merge commit, takes a target, and
-never auto-commits a dirty folder (today it `add -A` + commits, `:435-439`): a dirty slot refuses submit instead.
+**`mergeWorktree`** (`worktrees.ts`) [note §9, #1121] **Built [#1347]**: it returns the merge commit
+(`MergeResult.mergeCommit`), takes a target (default: the project folder's checked-out branch; a branch checked out
+nowhere is merged without touching a folder, the merged tree committed and the branch moved only from its tip; one
+checked out in another folder is refused), and never auto-commits a dirty worktree (before 1.0 it ran `add -A` and
+committed): it refuses with the files counted and the next step ("commit or stash them in the worktree, then merge"),
+which the Merge dialog shows before Merge (greyed out); a dirty slot refuses submit instead.
 The **Merge… dialog** stays for the user's own merges outside cards; for a card's line it shows the queue instead
 (OP-13).
 

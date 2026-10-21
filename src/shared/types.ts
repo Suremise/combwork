@@ -1370,6 +1370,10 @@ export interface MergeResult {
   /** Files that would conflict; nothing was changed. */
   conflicts?: string[]
   error?: string
+  /** Refused: the worktree has this many uncommitted files (#1347: only committed work is merged). */
+  uncommitted?: number
+  /** The commit the target is at after the merge (the merge or squash commit; its tip when a squash changed nothing). */
+  mergeCommit?: string
   /** The worktree and branch were removed afterwards. */
   cleanedUp?: boolean
   /** An unused worktree's merge asked to remove it afterwards, but it was kept: why (#400). */

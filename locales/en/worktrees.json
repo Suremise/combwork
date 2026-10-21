@@ -115,13 +115,13 @@
     "defaultMessage": "Git couldn't check the worktree for uncommitted changes (git status failed in {folder}). Fix it, then merge again.",
     "description": "Why nothing was merged: git couldn't say what is uncommitted in the worktree's folder {folder}."
   },
-  "worktrees.merge.commitFailed": {
-    "defaultMessage": "Could not commit the agent's changes: {why}",
-    "description": "Why nothing was merged: the worktree's uncommitted changes couldn't be committed first. {why} is git's message."
-  },
   "worktrees.merge.detached": {
     "defaultMessage": "The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.",
     "description": "Why nothing was merged: the project folder has no branch checked out. detached HEAD is git's term."
+  },
+  "worktrees.merge.noTarget": {
+    "defaultMessage": "There is no branch {branch} to merge into.",
+    "description": "Why nothing was merged: the branch to merge into ({branch}) does not exist."
   },
   "worktrees.merge.notRemoved": {
     "defaultMessage": "Merged, but the worktree was not removed",
@@ -129,7 +129,7 @@
   },
   "worktrees.merge.nothing": {
     "defaultMessage": "Nothing was merged: {why}.",
-    "description": "Why nothing was merged: git couldn't read the project folder's branch. {why} says why."
+    "description": "Why nothing was merged: git couldn't read the project folder's branch, or failed while merging. {why} says why (git's message)."
   },
   "worktrees.merge.sameBranch": {
     "defaultMessage": "The project folder has {branch} checked out.",
@@ -138,6 +138,18 @@
   "worktrees.merge.staged": {
     "defaultMessage": "The project folder has staged changes. Commit or unstage them before merging.",
     "description": "Why nothing was merged: changes are staged (git add) in the project folder."
+  },
+  "worktrees.merge.targetElsewhere": {
+    "defaultMessage": "{branch} is checked out in {folder}. Merge there, or check out another branch in that folder first.",
+    "description": "Why nothing was merged: the branch to merge into ({branch}) is checked out in another folder ({folder}) than the project folder."
+  },
+  "worktrees.merge.targetMoved": {
+    "defaultMessage": "{branch} changed while Hive was merging into it. Nothing was merged: merge again.",
+    "description": "Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit)."
+  },
+  "worktrees.merge.uncommitted": {
+    "defaultMessage": "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",
+    "description": "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Hive merges only committed work; stash is git's word (git stash)."
   },
   "worktrees.merge.unknownFiles": {
     "defaultMessage": "(unknown files)",

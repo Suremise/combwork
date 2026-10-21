@@ -30,12 +30,15 @@ interface HiveMessageValues {
   'worktrees.gitProblem': { problem: string | number }
   'worktrees.listBranches': { why: string | number }
   'worktrees.merge.cantCheck': { folder: string | number }
-  'worktrees.merge.commitFailed': { why: string | number }
   'worktrees.merge.detached': undefined
+  'worktrees.merge.noTarget': { branch: string | number }
   'worktrees.merge.notRemoved': undefined
   'worktrees.merge.nothing': { why: string | number }
   'worktrees.merge.sameBranch': { branch: string | number }
   'worktrees.merge.staged': undefined
+  'worktrees.merge.targetElsewhere': { branch: string | number; folder: string | number }
+  'worktrees.merge.targetMoved': { branch: string | number }
+  'worktrees.merge.uncommitted': { files: number }
   'worktrees.merge.unknownFiles': undefined
   'worktrees.missing.noAgent': undefined
   'worktrees.missing.noBranch': { agent: string | number; branch: string | number }
