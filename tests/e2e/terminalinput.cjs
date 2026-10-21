@@ -78,11 +78,12 @@ const check = (name, ok, extra = '') => {
     /** Starts a card on the agent as the user does from the board: typed into its CLI (no hive tools), its turn then ended. */
     const startCard = async (title, description) => {
       const card = await inv('tasks:create', { title, description, project: 'alpha' })
-      // Hive keeps an agent it just typed a card into as being given it for a few seconds: started once that's over.
+      // Hive keeps an agent it just typed a card into as being given it for a few seconds, and refuses one still working
+      // on the last card's turn (its end can reach Hive after the status read before): started once neither holds.
       let started = null
       await lib.until(async () => {
         started = await inv('tasks:start', card.number, { kind: 'agent', agentId: def.id }).then(() => true, (e) => String(e?.message ?? e))
-        return started === true || !/being given another card/.test(started)
+        return started === true || !/being given another card|is working/.test(started)
       }, HUNG_MS, 300)
       // Its prompt taken (in the transcript), then its turn over: the next card can be started on it.
       await lib.until(async () => transcriptHas(title), HUNG_MS, 200)
