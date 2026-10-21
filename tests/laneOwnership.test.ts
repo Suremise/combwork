@@ -28,6 +28,7 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { onHiveEvent } = await import('../src/main/events')
 const { deliveriesOf } = await import('../src/main/deliveries')
 const { agentActor } = await import('../src/shared/workflow/facts')
+const tables = await import('../src/main/storeTables')
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -329,6 +330,104 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(out.refused).toMatchObject({ refused: true, rule: 'lane.oneAtATime', values: { earlier: `alpha-${b}` } })
     expect(out.started).toMatchObject({ ok: true })
     expect(out.lane).toMatchObject({ cards: [b, c], pending: null })
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  /** A card Done as stored (its facts and stage), with no board event: nothing reads the lanes again meanwhile. */
+  const doneAsStored = (n: number) => store.boardWrite(w, async () => facts().tx((tx) => {
+    tx.append(n, { kind: 'Moved', actor: 'user', source: 'recorded', data: { from: 'active', to: 'done', cause: 'user' } })
+    tx.setStage(n, 'done')
+  }))
+  /** How often a lane's builder was told its queued list applied: the runtime's wakes and lanes.ts's rebriefs. */
+  const announced = async (cards: number[]): Promise<number> => {
+    const db = store.workspaceDb(wsPath).reader
+    const wakes = (db.prepare("SELECT payload FROM card_actions WHERE kind = 'wake'").all() as { payload: string }[]).filter((r) => r.payload.includes('card list changed') && r.payload.includes(`now ${cards.map((c) => `alpha-${c}`).join(', ')}.`)).length
+    const keys = cards.map((c) => `#${c}`)
+    const rebriefs = (await deliveriesOf(project, 'b1')).filter((d) => d.kind === 'rebrief' && /card list changed/.test(d.body) && keys.every((k) => d.body.includes(k))).length
+    return wakes + rebriefs
+  }
+
+  it('a lanes.ts save read before the runtime applied a queued list is read again, never saved over it (HR6, round 4)', async () => {
+    const [a, b, c] = [await make('Race a'), await make('Race b'), await make('Race c')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    await move(a, 'doing')
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b, c], by: 'B1 (alpha)' })).lane.queued).toEqual([b, c])
+    await doneAsStored(a)
+    const wf = (await workflowFor(w, project))!
+    // The reviewer's join reads the lane (queued [B, C]); before it saves, B starts, which applies the queue.
+    let started: unknown = null
+    tables.tableTestHooks.beforeSave = async (s) => {
+      if (s !== 'lanes' || started) return
+      started = await store.boardWrite(w, async () => wf.start(`#${b}`, agentActor('b1')))
+    }
+    try {
+      await lanes.joinLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', by: 'R1 (alpha)' })
+    } finally {
+      tables.tableTestHooks.beforeSave = null
+    }
+    expect(started).toMatchObject({ ok: true })
+    // The join was decided again on the lane as the start left it: no queue back, the list not put back, joined.
+    expect(facts().lane(l.id)).toMatchObject({ cards: [b, c], pending: null })
+    expect(await lane(l.id)).toMatchObject({ state: 'active', reviewer: { id: 'r1' }, queued: null })
+    expect(facts().card(b).stage).toBe('active')
+    expect(await announced([b, c])).toBe(1)
+    // Following the board after it applies nothing again, tells nothing again, and doesn't end the lane.
+    await lanes.refresh(w)
+    expect(await announced([b, c])).toBe(1)
+    expect(await lane(l.id)).toMatchObject({ state: 'active', queued: null })
+    expect(ended.some((e) => e.type === 'lane-ended' && e.lane === l.id)).toBe(false)
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('a queued list that takes the card out, applied in its start: the card starts again as a card outside the lane, under the current ruleset (HR6, round 4)', async () => {
+    const [a, b, c] = [await make('Out a'), await make('Out b'), await make('Out c')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a, b], by: 'B1 (alpha)' })).lane
+    const kept = facts().lane(l.id)!.ruleset
+    await w.mutateProjectConfig(project, () => ({ workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }))
+    try {
+      await move(a, 'doing')
+      // B taken out, C added, queued while A is in flight; A then Done, as stored.
+      expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a, c], by: 'B1 (alpha)' })).lane.queued).toEqual([a, c])
+      await doneAsStored(a)
+      const wf = (await workflowFor(w, project))!
+      expect(facts().card(b).lane).toBe(l.id)
+      expect(await store.boardWrite(w, async () => wf.start(`#${b}`, agentActor('b1')))).toMatchObject({ ok: true })
+      expect(facts().lane(l.id)).toMatchObject({ cards: [a, c], pending: null })
+      expect(facts().card(b).lane ?? null).toBeNull()
+      const now = wf.currentRuleset(false).id
+      expect(now).not.toBe(kept)
+      expect(facts().facts(b).find((f) => f.kind === 'Started')?.ruleset).toBe(now)
+      expect(await announced([a, c])).toBe(1)
+    } finally {
+      await lanes.endLane(w, l.id, { abandoned: true })
+      await w.mutateProjectConfig(project, () => ({ workflow: undefined }))
+    }
+  })
+
+  it('a reorder while a start gathers: the start is checked against the lane as it is where it is written (HR6, round 4)', async () => {
+    const [a, b, c] = [await make('Reorder a'), await make('Reorder b'), await make('Reorder c')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    await move(a, 'doing')
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b, c], by: 'B1 (alpha)' })).lane.queued).toEqual([b, c])
+    await doneAsStored(a)
+    const wf = (await workflowFor(w, project))!
+    const hooks = wf.cfg.hooks
+    let reordered = false
+    // B's start gathers with [B, C] queued; before it writes, the lane becomes [C, B] (as a reorder between cards saves
+    // it: the lane's own tables, written here, inside the start's board change, where lanes.ts can't save).
+    wf.cfg.hooks = { beforeWrite: async (m) => {
+      if (m !== 'start' || reordered) return
+      reordered = true
+      facts().saveLane({ ...facts().lane(l.id)!, cards: [c, b], pending: null })
+    } }
+    try {
+      expect(await store.boardWrite(w, async () => wf.start(`#${b}`, agentActor('b1')))).toMatchObject({ refused: true, rule: 'lane.oneAtATime', values: { earlier: `alpha-${c}` } })
+    } finally {
+      wf.cfg.hooks = hooks
+    }
+    expect(reordered).toBe(true)
+    expect(facts().lane(l.id)).toMatchObject({ cards: [c, b], pending: null })
+    expect(await store.boardWrite(w, async () => wf.start(`#${c}`, agentActor('b1')))).toMatchObject({ ok: true })
     await lanes.endLane(w, l.id, { abandoned: true })
   })
 

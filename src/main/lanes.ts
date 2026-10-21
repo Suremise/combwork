@@ -11,7 +11,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
-import { boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { boardOpen, boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou } from '../shared/workflow/facts'
@@ -75,6 +75,7 @@ async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
   const gen = dbGeneration(ws.path!)
   const data = await savedLanes(ws)
   const raw = data && typeof data === 'object' && Array.isArray((data as { lanes?: unknown }).lanes) ? ((data as { lanes: unknown[] }).lanes as Record<string, unknown>[]) : []
+  const seen = JSON.stringify(raw)
   // Listed now: the cards read against these lanes next see the same projects (a lane and its cards agree).
   const ids = await ws.projectIds({ fresh: true })
   const idOf = new Map<string, string>()
@@ -86,11 +87,19 @@ async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
   const lanes = readLanes(data)
   for (const l of lanes) if (idOf.has(l.id)) readIds.set(l, idOf.get(l.id)!)
   readGens.set(lanes, gen)
+  readAs.set(lanes, seen)
   return lanes
 }
 
 /** The workspace database's generation each list was read in (#1207 round 2): written back only into that one. */
 const readGens = new WeakMap<LaneRecord[], number>()
+
+/**
+ * The lanes each list was read from, as saved (HR6's #1270 round 4): written back only while the tables still hold
+ * them, checked under the board's lock. The runtime writes the lanes too (a queued list applied at a card's start), so a
+ * list read before that is never saved over it: the save is refused (StaleLane) and decided again from a fresh read.
+ */
+const readAs = new WeakMap<LaneRecord[], string>()
 
 /** Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Hive started. */
 const opened = new Set<string>()
@@ -168,9 +177,12 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
   })
   // Read from a database since replaced (the upgrade to 1.0, a restore): never written over the file as it is now.
   const gen = readGens.get(lanes)
+  const seen = readAs.get(lanes)
   const path = ws.path!
   await saveTable(path, 'lanes', stamped, {}, () => {
     if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
+    // Another writer (the runtime, #1270) changed the lanes since they were read: nothing is saved over it.
+    if (seen !== undefined && boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== seen) throw new StaleRead('the lanes changed since they were read') // i18n-ignore: internal, caught and retried (never shown)
     // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.
     check?.()
   })
@@ -186,7 +198,7 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
 export async function stampLaneProjects(ws: WorkspaceService): Promise<number> {
   if (!ws.path) return 0
   const file = fileOf(ws)
-  const n = await withFileLock(file, async () => {
+  const n = await readAgain(() => withFileLock(file, async () => {
     const before = await savedLanes(ws)
     if (!before.lanes.length) return 0
     const lanes = await read(ws)
@@ -200,7 +212,7 @@ export async function stampLaneProjects(ws: WorkspaceService): Promise<number> {
     if (!changing) return 0
     await write(ws, lanes)
     return changing
-  })
+  }))
   if (n) {
     log.info(`${n} lane(s) now name their project by its id`)
     changed(ws)
@@ -215,7 +227,7 @@ export async function stampLaneProjects(ws: WorkspaceService): Promise<number> {
 export async function moveOrphanLanes(ws: WorkspaceService, m: { from: string; to: string }): Promise<number> {
   if (!ws.path) return 0
   const file = fileOf(ws)
-  const n = await withFileLock(file, async () => {
+  const n = await readAgain(() => withFileLock(file, async () => {
     const lanes = await read(ws)
     const moving = lanes.filter((l) => !readIds.has(l) && same(l.project, m.from))
     if (!moving.length) return 0
@@ -225,7 +237,7 @@ export async function moveOrphanLanes(ws: WorkspaceService, m: { from: string; t
     }
     await write(ws, lanes)
     return moving.length
-  })
+  }))
   if (n) {
     log.info(`Repair gave ${n} lane(s) of ${userText(m.from)} to ${userText(m.to)}`)
     changed(ws)
@@ -241,15 +253,29 @@ export async function legacyLanes(ws: WorkspaceService): Promise<{ name: string;
 /** Changes a workspace's lanes under its lock: fn changes the list it is given (or throws), and says whether it did. */
 async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[]) => T | Promise<T>): Promise<T> {
   if (!ws.path) throw new LaneError(409, M.noWorkspace)
-  const result = await withFileLock(fileOf(ws), async () => {
+  const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
     const lanes = await read(ws)
     const checks: (() => void)[] = []
     const r = await fn(lanes, checks)
     await write(ws, lanes, () => checks.forEach((c) => c()))
     return r
-  })
+  }))
   changed(ws)
   return result
+}
+
+/**
+ * Runs a read and its save again while the lanes changed between them (StaleRead: the runtime applied a queued list
+ * meanwhile, #1270), a few times; fn starts from its own read each time, so it resets what it gathers.
+ */
+async function readAgain<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!(e instanceof StaleRead) || attempt >= 4) throw e
+    }
+  }
 }
 
 const now = (): string => new Date().toISOString()
@@ -360,6 +386,8 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
 class StaleLane extends Error {}
+/** The lanes themselves changed since they were read (readAs): read again at once. */
+class StaleRead extends StaleLane {}
 
 /** Where a lane's cards are now, as the board has committed them: a card archived, gone or in another project is gone. */
 function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] = l.cards): string[] {
@@ -500,6 +528,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks) => {
+    queuedAfter = null
+    ended.length = 0
     const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     const t = now()
     // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
@@ -609,6 +639,8 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
   const on = await enforced()
   const verified: EndedLane[] = []
   const rec = await mutate(ws, async (lanes, checks) => {
+    ended = false
+    verified.length = 0
     const l = lanes.find((x) => x.id === id && (!o.project || same(x.project, o.project)))
     if (!l) throw new LaneError(404, withValues(M.unknown, { id }))
     if (o.agent && l.builder.id !== o.agent && l.reviewer?.id !== o.agent) throw new LaneError(403, "Only a lane's builder or reviewer ends it (or the user, or the Assistant)") // i18n-ignore: hive_lane's refusal, which only a project agent gets

@@ -440,12 +440,24 @@ export class Workflow {
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
     await this.cfg.hooks?.beforeWrite?.('start')
     if (await this.revalidate(card, s, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+    let laneMoved = false
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
       if (changed) return changed
       // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
-      // design): a queued list whose boundary has passed applies first, then the start is checked against it.
-      if (this.enforced() && !opts.drag) this.applyLaneBoundary(w, this.store.card(card.id))
+      // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
+      // then refused: the boundary passed either way), then the start is checked against it.
+      if (this.enforced() && !opts.drag) {
+        this.applyLaneBoundary(w, this.store.card(card.id))
+        // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
+        // out, or a lane changed meanwhile): else it is gathered again from the top, once, as what it is now.
+        const now = this.store.card(card.id)
+        const r = this.rulesetOf(now, w.state())
+        if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
+          laneMoved = true
+          return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
+        }
+      }
       const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
       if (waits) return waits
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
@@ -454,6 +466,7 @@ export class Workflow {
       this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
       return null
     })
+    if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
     if (out) return this.refuse(card, actor, 'start', out)
     return this.ok(card, 'todo', 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
   }
