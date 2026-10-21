@@ -163,12 +163,19 @@ export async function startHookServer(): Promise<string> {
     }
     let done: (() => void) | null = null
     try {
-      const body = JSON.parse((await readBody(req)) || '{}')
+      const raw = await readBody(req)
+      const body = JSON.parse(raw || '{}')
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
-        // The reply becomes Claude Code's status line, so send nothing.
-        res.writeHead(204)
-        res.end()
+        // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
+        // the JSON as it came, for their command's input.
+        if (query.has('echo')) {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end(raw)
+        } else {
+          res.writeHead(204)
+          res.end()
+        }
         sessions.handleStatusLine(run, body)
         return
       }
