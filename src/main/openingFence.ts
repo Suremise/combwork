@@ -1,51 +1,41 @@
-import { AsyncLocalStorage } from 'async_hooks'
 import { join, resolve, sep } from 'path'
 import { HIVE_DIR } from '../shared/defaults'
 
 /**
- * One opening of a workspace that work began for (#1379): its folder, and that opening's lifetime (the workspace's
- * `lifetime` as the work began: closing aborts it, and the next opening has a new one).
+ * The fence at the databases' open (#1379): once a window starts closing a workspace, its databases (hive.db, the
+ * Assistant's journal, usage.db) aren't opened again until a window opens the workspace again. Work still going on for
+ * it (a read that resumes after the close, a job queued before it) used to open them again as the window switched away,
+ * holding the folder until Hive quit, so it couldn't be moved or deleted. Keyed on the workspace, not on who asks: work
+ * of no window's request (a timer, a session's end) is fenced as well. Openers that close again what they open (a store's
+ * last save as its workspace closes) aren't fenced.
  */
-export interface Opening {
-  path: string
-  signal: AbortSignal
+const closed = new Map<string, Error>()
+
+const keyOf = (path: string): string => resolve(path).toLowerCase()
+
+/** A window starts closing the workspace: from now on its databases aren't opened, `reason` saying why. */
+export function markClosed(path: string, reason: Error): void {
+  closed.set(keyOf(path), reason)
 }
 
-/**
- * The fence at the databases' open (#1379): work begun for one opening of a workspace never opens that workspace's
- * databases (hive.db, the Assistant's journal, usage.db) again once the opening closed, unless a window has the workspace
- * open again. A late read used to open them as the window switched away and hold the folder until Hive quit, so it
- * couldn't be moved or deleted. Openers that close again what they open (a store's save, Restore's copies) aren't fenced.
- */
-const current = new AsyncLocalStorage<Opening | null>()
-let openNow: (path: string) => boolean = () => false
-
-/** Runs `fn` as work of `opening` (null: of none), whatever the work around it began for. */
-export function inOpening<T>(opening: Opening | null, fn: () => T): T {
-  return current.run(opening, fn)
+/** A window opens the workspace (again): its databases open as they're used. */
+export function markOpen(path: string): void {
+  closed.delete(keyOf(path))
 }
 
-/** The opening the current work began for, if any. */
-export const currentOpening = (): Opening | null => current.getStore() ?? null
-
-/** How the fence asks whether a window has a workspace open now (workspace.ts sets it). */
-export function setOpenCheck(fn: (path: string) => boolean): void {
-  openNow = fn
-}
-
-const inside = (file: string, dir: string): boolean => {
+/** Why `file`, in the `.hive` of a workspace closed and not opened again since, isn't opened; null when it may be. */
+export function fencedOut(file: string): Error | null {
+  if (!closed.size) return null
   const f = resolve(file).toLowerCase()
-  const d = resolve(dir).toLowerCase()
-  return f === d || f.startsWith(d + sep)
+  for (const [path, reason] of closed) {
+    const d = join(path, HIVE_DIR)
+    if (f === d || f.startsWith(d + sep)) return reason
+  }
+  return null
 }
 
-/** Whether the current work's opening has closed and `file` is in that workspace's `.hive`, not open again since. */
-export function fencedOut(file: string): boolean {
-  const o = current.getStore()
-  return !!o?.signal.aborted && inside(file, join(o.path, HIVE_DIR)) && !openNow(o.path)
-}
-
-/** Throws the close's reason when `file` is fenced out (fencedOut). */
+/** Throws why `file` isn't opened (fencedOut). */
 export function assertNotFencedOut(file: string): void {
-  if (fencedOut(file)) current.getStore()!.signal.throwIfAborted()
+  const reason = fencedOut(file)
+  if (reason) throw reason
 }

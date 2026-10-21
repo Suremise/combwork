@@ -19,7 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
-import { inOpening, setOpenCheck } from './openingFence'
+import { markClosed, markOpen } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -277,6 +277,7 @@ export class WorkspaceService {
       await this.close()
       this.generation++
       this.path = abs
+      markOpen(abs)
     })
     admission = admit.catch(() => undefined)
     await admit
@@ -315,8 +316,11 @@ export class WorkspaceService {
     this.generation++
     // What was said of the projects' platforms is this workspace's.
     this.platformOffers.clear()
-    this.life.abort(hiveError(M.closed, undefined, { kind: 'conflict' }))
+    const reason = hiveError(M.closed, undefined, { kind: 'conflict' })
+    this.life.abort(reason)
     const closing = this.path
+    // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
+    if (closing) markClosed(closing, reason)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -1221,14 +1225,8 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {
-  // Also the work of the workspace's opening now (#1379): once that closes, it can't open the closed one's databases again.
-  return context.run(w, () => inOpening(w.path ? { path: w.path, signal: w.lifetime } : null, fn))
+  return context.run(w, fn)
 }
-
-setOpenCheck((path) => {
-  const k = resolve(path).toLowerCase()
-  return [...services].some((w) => !!w.path && resolve(w.path).toLowerCase() === k)
-})
 
 /** The workspace set for the current work by inWorkspace (a window's request, an API request), if any. */
 export function contextWorkspace(): WorkspaceService | undefined {

@@ -1,5 +1,4 @@
 import { Worker } from 'worker_threads'
-import { AsyncResource } from 'async_hooks'
 import { app } from 'electron'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
@@ -19,7 +18,7 @@ import { cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { assertNotFencedOut, fencedOut, inOpening, type Opening } from './openingFence'
+import { assertNotFencedOut, fencedOut } from './openingFence'
 
 const log = createLogger('usage')
 
@@ -50,7 +49,7 @@ type Body = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, 
 interface Queued {
   key: string
   priority: Priority
-  /** Makes its request (null: none) and sends it, as the work that queued it. */
+  /** Makes its request (null: none) and sends it. */
   run: () => Promise<unknown>
   waiters: { resolve: (v: unknown) => void; reject: (e: unknown) => void }[]
 }
@@ -66,7 +65,10 @@ export interface StoredUsage {
 const wsKey = (p: string): string => p.toLowerCase()
 
 /** The opening of a workspace that work in the background was begun for: its path, and that opening's lifetime. */
-type WorkspaceRun = Opening
+interface WorkspaceRun {
+  path: string
+  signal: AbortSignal
+}
 const runOf = (ws: WorkspaceService): WorkspaceRun | null => (ws.path ? { path: ws.path, signal: ws.lifetime } : null)
 
 class UsageHistory {
@@ -136,11 +138,6 @@ class UsageHistory {
    */
   async attribute(ws: WorkspaceService, run = runOf(ws)): Promise<void> {
     if (!run || !this.live(ws, run)) return
-    return inOpening(run, () => this.attributeIn(ws, run))
-  }
-
-  /** attribute's work, as work of its opening. */
-  private async attributeIn(ws: WorkspaceService, run: WorkspaceRun): Promise<void> {
     const file = usageFile(run.path)
     const waits: Promise<unknown>[] = []
     for (const host of await ws.listProjectPaths().then(async (a) => [...a, ...(await ws.listProjectPaths({ hidden: true }))])) {
@@ -160,7 +157,7 @@ class UsageHistory {
             let h = byWho.get(k)
             if (!h) {
               if (!this.live(ws, run)) return null
-              byWho.set(k, (h = await this.holdsFor(ws, host, who)))
+              byWho.set(k, (h = await this.holdsFor(ws, run, host, who)))
             }
             if (h.holdsKey !== id.holdsKey) list.push({ session: id.session, ...h })
           }
@@ -244,7 +241,7 @@ class UsageHistory {
 
   /** A request to the worker, the settings it reads sent first when they changed. */
   private async call<T>(body: Body): Promise<T> {
-    // Work of a workspace's opening that has closed doesn't open its usage.db again (#1379); a read goes on without the
+    // A closed workspace's usage.db isn't opened again until a window opens it (#1379); a read goes on without the
     // session's saved state there.
     if (body.type !== 'close' && 'file' in body) assertNotFencedOut(body.file)
     if (body.type === 'read' && body.seed && fencedOut(body.seed.file)) body = { ...body, seed: null }
@@ -263,10 +260,11 @@ class UsageHistory {
 
   /**
    * A file of a workspace no window has open, used by a request that came after its close (one under way as it closed):
-   * closed again, so the worker doesn't hold the folder (#1379: the user can't move or delete it).
+   * closed again, so the worker doesn't hold the folder (#1379: the user can't move or delete it). A window closing the
+   * workspace (its lifetime over) doesn't have it open.
    */
   private closeIfUnused(file: string): void {
-    if (this.stopped || openWorkspaces().some((w) => w.path && wsKey(usageFile(w.path)) === wsKey(file))) return
+    if (this.stopped || openWorkspaces().some((w) => w.path && !w.lifetime.aborted && wsKey(usageFile(w.path)) === wsKey(file))) return
     void this.enqueue(`close|${wsKey(file)}`, 2, async () => ({ type: 'close', file })).catch(() => undefined)
   }
 
@@ -296,11 +294,10 @@ class UsageHistory {
   /** Queues a job (one already queued under its key is shared, and takes the more urgent priority). */
   private enqueue<T>(key: string, priority: Priority, queued: () => Promise<Body | null>): Promise<T | null> {
     if (this.stopped) return Promise.resolve(null)
-    // Made and sent as the work that queued it, not as whatever runs the queue: the opening it was queued for is fenced (#1379).
-    const run = AsyncResource.bind(async (): Promise<unknown> => {
+    const run = async (): Promise<unknown> => {
       const body = await queued()
       return body ? this.call(body) : null
-    })
+    }
     return new Promise<T | null>((resolve, reject) => {
       const had = this.queue.find((q) => q.key === key)
       if (had) {
@@ -360,13 +357,13 @@ class UsageHistory {
   private ingestJob(projectPath: string, sessionId: string, o: { priority: Priority; keepState: IngestJob['keepState']; path?: string }): Promise<IngestResult | null> {
     return this.enqueue<IngestResult>(`ingest|${projectPath.toLowerCase()}|${sessionId}`, o.priority, async () => {
       const ws = workspaceFor(projectPath)
-      if (!ws?.path) return null
-      const life = ws.lifetime
+      const run = ws && runOf(ws)
+      if (!ws || !run) return null
       const { workspace, scope } = await ws.sessionScope(projectPath)
-      const rec = (await ws.sessionsFile(projectPath, life)).sessions.find((s) => s.id === sessionId)
+      const rec = (await ws.sessionsFile(projectPath, run.signal)).sessions.find((s) => s.id === sessionId)
       if (!rec) return null
       const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId).catch(() => null)
-      const { holds, holdsKey } = await this.holdsFor(ws, projectPath, rec)
+      const { holds, holdsKey } = await this.holdsFor(ws, run, projectPath, rec)
       const job: IngestJob = { ...metaOf(scope, rec), path, holds, holdsKey, keepState: o.keepState }
       return { type: 'ingest', file: usageFile(workspace), job }
     })
@@ -393,9 +390,10 @@ class UsageHistory {
   private importKept(projectPath: string, k: { id: string; provider: ProviderId; agentId?: string; agentName?: string; name?: string; cwd?: string; usage: KeptUsage['usage'] }, priority: Priority = 2): Promise<IngestResult | null> {
     return this.enqueue<IngestResult>(`kept|${projectPath.toLowerCase()}|${k.id}`, priority, async () => {
       const ws = workspaceFor(projectPath)
-      if (!ws?.path) return null
+      const run = ws && runOf(ws)
+      if (!ws || !run) return null
       const { workspace, scope } = await ws.sessionScope(projectPath)
-      const { holds, holdsKey } = await this.holdsFor(ws, projectPath, { agentId: k.agentId, agentName: k.agentName })
+      const { holds, holdsKey } = await this.holdsFor(ws, run, projectPath, { agentId: k.agentId, agentName: k.agentName })
       const job: KeptJob = { scope, session: k.id, provider: k.provider, ...(k.agentId ? { agentId: k.agentId } : {}), ...(k.agentName ? { agentName: k.agentName } : {}), ...(k.name ? { name: k.name } : {}), ...(k.cwd ? { cwd: k.cwd } : {}), usage: k.usage, holds, holdsKey }
       return { type: 'kept', file: usageFile(workspace), job }
     })
@@ -404,11 +402,11 @@ class UsageHistory {
   /**
    * The cards a session's agent held (none for the Assistant's), from the board as it is, archived cards too (read again
    * after a change, or half a minute); and their key, open holds as open, so the worker shares a session's cards out again
-   * only when they changed.
+   * only when they changed. Of `run`'s workspace only: none once it closed (the service may have the next one by then).
    */
-  private async holdsFor(ws: WorkspaceService, projectPath: string, who: Pick<SessionRecord, 'agentId' | 'agentName'>): Promise<{ holds: SessionHold[]; holdsKey: string | null }> {
-    if (!ws.path || ws.isAssistantHome(projectPath)) return { holds: [], holdsKey: null }
-    const key = wsKey(ws.path)
+  private async holdsFor(ws: WorkspaceService, run: WorkspaceRun, projectPath: string, who: Pick<SessionRecord, 'agentId' | 'agentName'>): Promise<{ holds: SessionHold[]; holdsKey: string | null }> {
+    if (!this.live(ws, run) || ws.isAssistantHome(projectPath)) return { holds: [], holdsKey: null }
+    const key = wsKey(run.path)
     let c = this.cards.get(key)
     if (!c || Date.now() - c.at > CARDS_MS) {
       // Only the cards' holds (#1107: never their comments).
@@ -416,9 +414,12 @@ class UsageHistory {
       this.cards.set(key, c)
     }
     const project = basename(projectPath).toLowerCase()
-    const cards = (await c.cards).filter((card) => card.project.toLowerCase() === project)
+    const all = await c.cards
+    if (!this.live(ws, run)) return { holds: [], holdsKey: null }
+    const cards = all.filter((card) => card.project.toLowerCase() === project)
     if (!cards.length) return { holds: [], holdsKey: null }
     const cfg = await ws.projectConfig(projectPath).catch(() => null)
+    if (!this.live(ws, run)) return { holds: [], holdsKey: null }
     const agents = cfg ? projectAgents(cfg) : []
     const named = (name: string): string[] => agents.filter((a) => a.name.toLowerCase() === name.toLowerCase()).map((a) => a.id)
     const holds = sessionHolds(cards, who, named, Date.now())
@@ -442,11 +443,9 @@ class UsageHistory {
       if (!run) continue
       if (!this.backfilled(run.path)) void this.opened(ws)
       else
-        void inOpening(run, () =>
-          this.sweep(ws, run)
-            .then(() => this.housekeep(ws, run))
-            .catch((e) => log.warn('checking the usage history', e))
-        )
+        void this.sweep(ws, run)
+          .then(() => this.housekeep(ws, run))
+          .catch((e) => log.warn('checking the usage history', e))
     }
   }
 
@@ -594,17 +593,14 @@ class UsageHistory {
     const key = wsKey(path)
     let run = this.backfills.get(key)
     if (!run) {
-      // All of it as work of this opening: once it closes, nothing opens the workspace's databases again (#1379).
-      run = inOpening(opening, () =>
-        this.backfill(ws, opening)
-          // Then what changed since it was last open (a session continued outside Hive, one that ended as Hive quit; a card
-          // moved meanwhile, by another Hive or a script). Only while this opening lasts: not the next workspace's.
-          .then(() => this.sweep(ws, opening))
-          .then(() => this.attribute(ws, opening))
-          .then(() => this.housekeep(ws, opening))
-          .catch((e) => log.warn(`importing the usage history of ${userText(path)}`, e))
-          .finally(() => this.backfills.delete(key))
-      )
+      run = this.backfill(ws, opening)
+        // Then what changed since it was last open (a session continued outside Hive, one that ended as Hive quit; a card
+        // moved meanwhile, by another Hive or a script). Only while this opening lasts: not the next workspace's.
+        .then(() => this.sweep(ws, opening))
+        .then(() => this.attribute(ws, opening))
+        .then(() => this.housekeep(ws, opening))
+        .catch((e) => log.warn(`importing the usage history of ${userText(path)}`, e))
+        .finally(() => this.backfills.delete(key))
       this.backfills.set(key, run)
     }
     return run

@@ -1,9 +1,9 @@
-// The usage history's work for a workspace stops when it closes (#1379): an import begun as it opened, still reading
-// when the window switched to another workspace, doesn't read the closed one's sessions, which opened its hive.db again
-// and held its folder until Hive quit (the user couldn't move or delete it); nor does its housekeeping go on to the
-// backups' retention; and a transcript read that takes its saved state from the closed workspace's usage.db closes it
-// again after.
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+// A workspace's databases aren't opened again once a window starts closing it (#1379): an import begun as it opened, a
+// session's ingest queued from no window's request, a host's first read waiting for the board's lock, a read resuming
+// while the close waits for its file watcher, housekeeping between compression and retention, a transcript read taking
+// its saved state from the closed workspace's usage.db. Each used to open its hive.db or usage.db again as the window
+// switched away, holding its folder until Hive quit (the user couldn't move or delete it).
+import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve as resolvePath } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -13,14 +13,13 @@ const base = tempDir('hive-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const { usageHistory } = await import('../src/main/usageHistory')
 const { boardLock, boardOpen } = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
-const { usageFile } = await import('../src/main/usageDb')
 const { withFileLock } = await import('../src/main/fsutil')
 
-const [wsA, wsB, wsC, wsD, wsE, wsF] = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'].map((n) => join(base, n))
+const [wsA, wsB, wsC, wsD, wsE, wsF, wsG] = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta'].map((n) => join(base, n))
 let w: ReturnType<typeof createWorkspaceService>
 
 /** Holds a promise until `release()`: the moment a test switches workspaces in. */
@@ -32,7 +31,7 @@ function gate(): { held: Promise<void>; release: () => void } {
 
 describe('the usage history of a workspace that closed', () => {
   beforeAll(async () => {
-    for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF]) {
+    for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF, wsG]) {
       mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
       writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
@@ -88,7 +87,7 @@ describe('the usage history of a workspace that closed', () => {
     }
   })
 
-  it("closes the usage.db a transcript read opened for a workspace that closed while it waited", async () => {
+  it("leaves no usage.db open for a transcript read whose workspace closed while it waited", async () => {
     // As a worker thread does: its files stay open until it's told to close them (in-process it closes them when idle).
     const inner = usageHistory as unknown as { closeInProcess: (() => void) | null }
     await usageHistory.storedSessions(wsB, null)
@@ -113,9 +112,8 @@ describe('the usage history of a workspace that closed', () => {
       await w.open(wsB)
       g.release()
       await reading
-      const file = usageFile(wsD)
-      expect(existsSync(file)).toBe(true)
-      // Closed again after the read: the folder can go.
+      // Its saved state isn't looked for in the closed workspace's usage.db (or, sent before the close, the file is closed
+      // again after): the folder can go.
       await vi.waitFor(() => rmSync(join(wsD, '.hive'), { recursive: true }), { timeout: 20000 })
     } finally {
       spy.mockRestore()
@@ -136,7 +134,7 @@ describe('the usage history of a workspace that closed', () => {
       await g.held
     })
     await holding
-    const reading = inWorkspace(w, () => w.sessionsFile(host)).then(
+    const reading = w.sessionsFile(host).then(
       () => 'read',
       (e: Error) => e.message
     )
@@ -164,7 +162,8 @@ describe('the usage history of a workspace that closed', () => {
     })
     const providers = vi.spyOn(sessions, 'providerTranscript')
     try {
-      const ingesting = inWorkspace(w, () => usageHistory.ingest(host, id, { priority: 1, keepState: 'no' })).catch(() => null)
+      // Queued as the tick and a session's end queue it: from no window's request.
+      const ingesting = usageHistory.ingest(host, id, { priority: 1, keepState: 'no' }).catch(() => null)
       await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: 20000 })
       await w.open(wsB)
       expect(boardOpen(wsF)).toBe(false)
@@ -176,5 +175,32 @@ describe('the usage history of a workspace that closed', () => {
       spy.mockRestore()
       providers.mockRestore()
     }
+  })
+
+  it("a read resuming while the window's close waits for its file watcher doesn't open the closed board again", async () => {
+    await w.open(wsG)
+    const host = join(wsG, 'proj')
+    await w.sessionsFile(host)
+    expect(boardOpen(wsG)).toBe(true)
+    // The close's file watcher stops only when the test says, after its real stop: the board is closed by then, the
+    // workspace's path not yet cleared.
+    const g = gate()
+    const watcher = (w as unknown as { watcher: { close: () => Promise<void> } }).watcher
+    const stop = watcher.close.bind(watcher)
+    watcher.close = async () => {
+      await stop()
+      await g.held
+    }
+    const closing = w.close()
+    await vi.waitFor(() => expect(boardOpen(wsG)).toBe(false), { timeout: 20000 })
+    expect(w.path).toBe(wsG)
+    const reading = w.sessionsFile(host).then(
+      () => 'read',
+      (e: Error) => e.message
+    )
+    expect(await reading).toBe('The workspace was closed')
+    g.release()
+    await closing
+    expect(boardOpen(wsG)).toBe(false)
   })
 })
