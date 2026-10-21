@@ -116,6 +116,7 @@
   "tasks.history.reviewPassed": "Revisión aprobada",
   "tasks.history.reviewStarted": "Empezó a revisarla",
   "tasks.history.reviewStopped": "La revisión del agente {agent} se detuvo",
+  "tasks.history.reviewerRequest": "Pidió al autor: “{text}”",
   "tasks.history.safeguardStop": "**{agent}, tras una parada de seguridad:** {stops, plural, =0 {} one {Un clasificador de seguridad detuvo una respuesta{model, select, none {} other { en {model}}} a las {time}{stops, plural, =1 {} one { (# en esta sesión)} many { (# en esta sesión)} other { (# en esta sesión)}}. } many {Un clasificador de seguridad detuvo una respuesta{model, select, none {} other { en {model}}} a las {time}{stops, plural, =1 {} one { (# en esta sesión)} many { (# en esta sesión)} other { (# en esta sesión)}}. } other {Un clasificador de seguridad detuvo una respuesta{model, select, none {} other { en {model}}} a las {time}{stops, plural, =1 {} one { (# en esta sesión)} many { (# en esta sesión)} other { (# en esta sesión)}}. }}Ahora usa {to} en lugar de {from} (desde {since}).{state, select, asks { Su CLI pregunta qué hacer al respecto.} idle { Inactivo tras la parada: dale un empujón.} other {}}{hasTools, select, yes { Antes, sus últimas llamadas a herramientas: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
   "tasks.history.takenFrom": "Quitada al agente {agent}",
   "tasks.history.takenFromAgent": "Quitada a su agente",
