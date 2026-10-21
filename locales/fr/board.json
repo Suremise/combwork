@@ -231,6 +231,7 @@
   "board.dialog.titlePlaceholder": "Titre",
   "board.dialog.tryAgain": "Réessayer",
   "board.dialog.write": "Écrire",
+  "board.discard.answer": "la réponse en cours d’écriture",
   "board.discard.changes": "tes modifications de la carte",
   "board.discard.comment": "le commentaire en cours d’écriture",
   "board.discard.decision": "la décision en cours d’écriture",

@@ -231,6 +231,7 @@
   "board.dialog.titlePlaceholder": "Título",
   "board.dialog.tryAgain": "Reintentar",
   "board.dialog.write": "Escribir",
+  "board.discard.answer": "la respuesta que estás escribiendo",
   "board.discard.changes": "tus cambios en la tarjeta",
   "board.discard.comment": "el comentario que estás escribiendo",
   "board.discard.decision": "la decisión que estás escribiendo",

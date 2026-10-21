@@ -231,6 +231,7 @@
   "board.dialog.titlePlaceholder": "Title",
   "board.dialog.tryAgain": "Try Again",
   "board.dialog.write": "Write",
+  "board.discard.answer": "the answer you are writing",
   "board.discard.changes": "your changes to the card",
   "board.discard.comment": "the comment you are writing",
   "board.discard.decision": "the decision you are writing",

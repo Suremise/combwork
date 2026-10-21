@@ -231,6 +231,7 @@
   "board.dialog.titlePlaceholder": "标题",
   "board.dialog.tryAgain": "重试",
   "board.dialog.write": "编写",
+  "board.discard.answer": "正在编写的回答",
   "board.discard.changes": "对卡片的更改",
   "board.discard.comment": "正在编写的评论",
   "board.discard.decision": "正在编写的决定",

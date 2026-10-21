@@ -211,9 +211,20 @@ const check = (name, ok, extra = '') => {
     qDialog = await openQ()
     check('a Decide question shows with a reply box', !!(await lib.until(async () => (await section.locator('textarea').count()) === 1, HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('textarea').fill('SQLite in memory')
+    // An answer written and not sent is kept like a comment (HR3's #1276 round 1): closing asks; Keep Editing keeps it.
+    const discard = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
+    for (const how of ['Escape', 'Save']) {
+      if (how === 'Escape') await page.keyboard.press('Escape')
+      else await qDialog.getByRole('button', { name: 'Save', exact: true }).click()
+      check(`${how} with an answer not sent asks first`, !!(await lib.until(async () => (await discard.count()) === 1 && (await discard.innerText()).includes('the answer you are writing'), HUNG_MS)), await discard.innerText().catch(() => ''))
+      await discard.getByRole('button', { name: 'Keep Editing' }).click()
+      check('…Keep Editing keeps the dialog and the answer', !!(await lib.until(async () => (await discard.count()) === 0, HUNG_MS)) && (await qDialog.count()) === 1 && (await section.locator('textarea').inputValue()) === 'SQLite in memory')
+    }
     await section.getByRole('button', { name: 'Send Reply' }).click()
     check('the reply reaches the builder', !!(await lib.until(async () => wakeAbout('SQLite in memory'), HUNG_MS)), JSON.stringify(wakes('Maker')))
+    // Sent: nothing left to lose, so closing asks nothing.
     await page.keyboard.press('Escape')
+    check('…and once sent, closing asks nothing', !!(await lib.until(async () => (await qDialog.count()) === 0, HUNG_MS)) && (await discard.count()) === 0)
 
     // The user's review approved: the card moves on (Approved), its builder told.
     commitIn('button-name.css')

@@ -927,6 +927,10 @@
     "defaultMessage": "Write",
     "description": "A tab button in the card dialog: edit the description's Markdown."
   },
+  "board.discard.answer": {
+    "defaultMessage": "the answer you are writing",
+    "description": "What closing the card dialog would lose, in \"Closing loses {what}.\": an answer to a request for the user (For you) not sent yet. Lower case."
+  },
   "board.discard.changes": {
     "defaultMessage": "your changes to the card",
     "description": "What closing the card dialog would lose, in \"Closing loses {what}.\": changed fields. Lower case."

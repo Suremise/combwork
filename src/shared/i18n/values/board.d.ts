@@ -233,6 +233,7 @@ interface HiveMessageValues {
   'board.dialog.titlePlaceholder': undefined
   'board.dialog.tryAgain': undefined
   'board.dialog.write': undefined
+  'board.discard.answer': undefined
   'board.discard.changes': undefined
   'board.discard.comment': undefined
   'board.discard.decision': undefined

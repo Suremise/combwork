@@ -231,6 +231,7 @@
   "board.dialog.titlePlaceholder": "タイトル",
   "board.dialog.tryAgain": "再試行",
   "board.dialog.write": "編集",
+  "board.discard.answer": "書きかけの回答",
   "board.discard.changes": "カードへの変更",
   "board.discard.comment": "書きかけのコメント",
   "board.discard.decision": "書きかけの決定事項",

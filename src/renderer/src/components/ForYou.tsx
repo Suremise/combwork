@@ -52,8 +52,11 @@ export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
   )
 }
 
-/** The card dialog's For you section: each request with its answers. Nothing when nothing waits for the user. */
-export function ForYouSection({ card, items }: { card: TaskCard; items: ForYouItem[] | undefined }) {
+/**
+ * The card dialog's For you section: each request with its answers. Nothing when nothing waits for the user. The answers
+ * being written are the dialog's (`drafts`, by request), so closing it asks first; `setAnswering` says one is being sent.
+ */
+export function ForYouSection({ card, items, drafts, setDraft, setAnswering }: { card: TaskCard; items: ForYouItem[] | undefined; drafts: Record<string, string>; setDraft: (request: string, text: string) => void; setAnswering: (busy: boolean) => void }) {
   useLanguage()
   if (!items?.length) return null
   return (
@@ -62,30 +65,36 @@ export function ForYouSection({ card, items }: { card: TaskCard; items: ForYouIt
         <Icon name="bell-dot" /> {tr(M.heading)}
       </div>
       {items.map((i) => (
-        <ForYouRequest key={i.request} card={card} item={i} />
+        <ForYouRequest key={i.request} card={card} item={i} reply={drafts[i.request] ?? ''} setReply={(t) => setDraft(i.request, t)} setAnswering={setAnswering} />
       ))}
     </div>
   )
 }
 
-function ForYouRequest({ card, item }: { card: TaskCard; item: ForYouItem }) {
+function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: TaskCard; item: ForYouItem; reply: string; setReply: (text: string) => void; setAnswering: (busy: boolean) => void }) {
   const agents = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.agents)
-  const [reply, setReply] = useState('')
   const [rounds, setRounds] = useState('1')
   const action = useBusy()
   const text = requestText(item)
   const who = item.asker ? (agents?.find((a) => a.id === item.asker)?.name ?? item.asker) : 'hive'
   const answer = async (name: string, a: ForYouAnswer): Promise<void> => {
     let failed: string | null = null
-    await action.run(name, async () => {
-      try {
-        await call('tasks:answer', card.number, item.request, a)
-      } catch (e) {
-        failed = errorMessage(e)
-      }
-    })
-    // Refused (answered or retired meanwhile, the card moved on): said, and the board read again.
+    setAnswering(true)
+    try {
+      await action.run(name, async () => {
+        try {
+          await call('tasks:answer', card.number, item.request, a)
+        } catch (e) {
+          failed = errorMessage(e)
+        }
+      })
+    } finally {
+      setAnswering(false)
+    }
+    // Refused (answered or retired meanwhile, the card moved on): said, and the board read again; the answer written is
+    // kept. Taken: it is sent, so nothing is left to lose.
     if (failed !== null) notify('error', tr(M.failed), failed)
+    else setReply('')
     await loadTasks()
   }
   const decline = async (): Promise<void> => {

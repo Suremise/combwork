@@ -341,6 +341,8 @@ const FIELD_NAMES: Record<string, Msg> = {
 /** The New card buttons' tooltip. */
 const NEW_CARD_TIP = msg({ id: 'board.newCard.tip', defaultMessage: 'New card', description: 'Tooltip on the + buttons that add a card (the Todo column, the Board sidebar).' })
 /** A card's move failed. */
+/** What closing the card dialog would lose: an answer to a For you request, written and not sent (#1276). */
+const UNSENT_ANSWER = msg({ id: 'board.discard.answer', defaultMessage: 'the answer you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": an answer to a request for the user (For you) not sent yet. Lower case.' })
 const MOVE_FAILED = msg({ id: 'board.error.move', defaultMessage: 'Could not move the card', description: "An error toast's title: moving a card to another column failed." })
 /** Where a card with no project belongs (on the card, and the archived cards' Project column). */
 const WORKSPACE_CARD = msg({ id: 'board.card.workspace', defaultMessage: 'workspace', description: "Where a card that belongs to no project is (it is about the whole workspace): shown in place of a project's name on the card. Lower case." })
@@ -1598,6 +1600,10 @@ export function TaskDialog() {
   const drafts = useRef<{ decision: string; comment: string; edit: DecisionEdit | null }>({ decision: '', comment: '', edit: null })
   drafts.current = { decision, comment, edit: decisionEdit }
   const action = useBusy()
+  // Answers to its For you requests being written, by request (#1276 round 1): kept here, so closing asks first, as for a
+  // comment; and whether one is being sent (the dialog doesn't close meanwhile).
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
+  const [answering, setAnswering] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
   // The fields as the dialog opened: Save sends only what the user changed since, so a change an agent made
@@ -1614,6 +1620,7 @@ export function TaskDialog() {
   useLayoutEffect(() => {
     if (open === null || !ready) return
     setActionError(null)
+    setAnswerDrafts({})
     const c = typeof open === 'number' ? get().tasks.find((x) => x.number === open) : null
     setTitle(c?.title ?? '')
     setDescription(c?.description ?? '')
@@ -1663,17 +1670,23 @@ export function TaskDialog() {
   // Edits not saved yet: the fields as they opened, or a comment being written.
   const edited = Object.keys(fields).filter((k) => fields[k] !== (orig.current[k] ?? ''))
   const decisionChanged = !!decisionEdit && decisionEdit.text.trim() !== decisionEdit.was
-  const unsaved = edited.length > 0 || !!comment.trim() || !!decision.trim() || decisionChanged
+  // An answer written to a request still open (one answered or retired meanwhile has nothing left to send).
+  const answerUnsent = (forYouItems ?? []).some((i) => !!answerDrafts[i.request]?.trim())
+  const unsaved = edited.length > 0 || !!comment.trim() || !!decision.trim() || decisionChanged || answerUnsent
 
-  /** Closing (Escape, ×, outside, Cancel, or going to a Read first reference): asks first when something would be lost; says whether it closed. */
-  const tryClose = async (): Promise<boolean> => {
-    if (action.busy || decisionBusy) return false
-    if (unsaved) {
-      const what = [
+  /**
+   * Closing (Escape, ×, outside, Cancel, going to a Read first reference, or after Save): asks first when something would
+   * be lost; says whether it closed. `saved`: after Save, which saved the rest: only an unsent answer is left to lose.
+   */
+  const tryClose = async (saved = false): Promise<boolean> => {
+    if (action.busy || decisionBusy || answering) return false
+    if (saved ? answerUnsent : unsaved) {
+      const what = saved ? [tr(UNSENT_ANSWER)] : [
         edited.length ? (isNew ? tr(msg({ id: 'board.discard.newCard', defaultMessage: 'this new card', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a card not added yet. Lower case.' })) : tr(msg({ id: 'board.discard.changes', defaultMessage: 'your changes to the card', description: 'What closing the card dialog would lose, in "Closing loses {what}.": changed fields. Lower case.' }))) : '',
         comment.trim() ? tr(msg({ id: 'board.discard.comment', defaultMessage: 'the comment you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a comment not posted. Lower case.' })) : '',
         decision.trim() ? tr(msg({ id: 'board.discard.decision', defaultMessage: 'the decision you are writing', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision not added. Lower case.' })) : '',
-        decisionChanged ? tr(msg({ id: 'board.discard.decisionChange', defaultMessage: 'your change to a decision', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision changed and not saved. Lower case.' })) : ''
+        decisionChanged ? tr(msg({ id: 'board.discard.decisionChange', defaultMessage: 'your change to a decision', description: 'What closing the card dialog would lose, in "Closing loses {what}.": a decision changed and not saved. Lower case.' })) : '',
+        answerUnsent ? tr(UNSENT_ANSWER) : ''
       ].filter(Boolean)
       const choice = await choose({
         title: tr(msg({ id: 'board.discard.title', defaultMessage: 'Discard unsaved changes?', description: 'Title of the question when the card dialog closes with something not saved.' })),
@@ -1826,7 +1839,8 @@ export function TaskDialog() {
       await saveDecisions()
       await postComment()
     })
-    if (r) close()
+    // Saved: an answer not sent yet (Save doesn't send it) is asked about before the dialog closes (#1276 round 1).
+    if (r) await tryClose(true)
   }
 
   /** Start…: unsaved edits are saved first, so the agent gets the card as shown (a failed save starts nothing). */
@@ -1912,7 +1926,7 @@ export function TaskDialog() {
             {tr(msg({ id: 'board.dialog.archivedBanner', defaultMessage: '{cause, select, hidden {Archived when {project} was hidden.} removed {Archived when {project} was removed from Hive.} done {Archived automatically after its days in Done (Settings → Board).} other {Archived.}} Bring it back to change it.', description: "A banner in an archived card's dialog: why it was archived (its project {project} hidden or removed, or after its days in the Done column: Settings → Board is where that is set), and that it must be brought back to be changed." }), { cause: card.archivedFor === 'project-hidden' ? 'hidden' : card.archivedFor === 'project-removed' ? 'removed' : card.archivedFor === 'done' ? 'done' : 'user', project: card.project })}
           </div>
         )}
-        {card && !card.archived && <ForYouSection card={card} items={forYouItems} />}
+        {card && !card.archived && <ForYouSection card={card} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
           <label>{tr(msg({ id: 'board.dialog.project', defaultMessage: 'Project', description: "A field label in the card dialog: the card's project." }))}</label>
