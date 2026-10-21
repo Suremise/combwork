@@ -20,7 +20,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
-const { ENFORCE } = await import('../src/main/workflow/service')
+const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { apiErrorReply } = await import('../src/main/servers')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
@@ -115,6 +115,22 @@ describe('the user moves cards through the rules (#1265)', () => {
     expect(kinds(w, card).filter((x) => x === 'Moved')).toHaveLength(4)
     expect(kinds(w, card)).not.toContain('Override')
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
+  })
+
+  it('the one intent path: any intent (a start here) writes its facts once and the board follows in the same change', async () => {
+    const { w, repo, wt } = await workspace(PAIR)
+    const card = await create(w)
+    const wf = (await workflowFor(w, repo))!
+    const { reply, saved } = await inWorkspace(w, () => tasks.runIntent(wf, card, builder, (x) => x.start(`#${card}`, 'agent:a1')))
+    expect(reply).toMatchObject({ ok: true, from: 'todo', to: 'active', data: { folder: wt, line: 'card' } })
+    expect(saved).toMatchObject({ column: 'doing' })
+    expect(saved!.history.at(-1)?.what).toMatch(/Doing/)
+    expect(kinds(w, card)).toEqual(['Started', 'Moved'])
+    expect(facts(w, card)[0]).toMatchObject({ actor: 'agent:a1', data: { builder: 'a1' } })
+    // A refused intent writes nothing of the card's (a second start, from Active): its reply says why.
+    const again = await inWorkspace(w, () => tasks.runIntent(wf, card, builder, (x) => x.start(`#${card}`, 'agent:a1')))
+    expect(again).toMatchObject({ reply: { refused: true, rule: 'move.notFromHere' }, saved: null })
+    expect(kinds(w, card)).toEqual(['Started', 'Moved', 'Refused'])
   })
 
   it("the window's move asks first: the rules it would skip, nothing written; confirmed, one Override with the reason", async () => {

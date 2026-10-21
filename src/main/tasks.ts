@@ -1052,26 +1052,60 @@ export type MoveResult = TaskMoveResult
  * write, its place with the write that reaches the column asked for. The user's move with `confirm` skips what it must
  * and records an `Override`; the Assistant's needs `override.reason` for that.
  */
-async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}, confirm = true): Promise<MoveResult> {
-  const ws = workspace
-  const target = patch.column!
-  const { column: _column, before, position, override, ...rest } = patch
+/**
+ * The one intent path (#1265, SPEC §16.7): runs a runtime intent of a card (`call`, given the card's runtime: start,
+ * submit, a verdict, a move…) and, inside each write it makes, in the same transaction, the card's 0.9 fields that
+ * readers still use (column, place, history, agent, review: watches, lanes, costs, the Agent API's card), so they
+ * follow the stage the write left. `zero9(w, first)` says what else of the card that write changes (the change's other
+ * fields with the first write; a verdict's history line…); its column is the stage's. The runtime writes the intent's
+ * facts, so the recorder writes none of a move's (one owner per fact). The intent's own reads (the platform's) are made
+ * by the runtime before its writes, outside the lock unless the caller holds it (a batch). Returns the intent's reply
+ * and the card as last saved (null: nothing was written).
+ */
+export async function runIntent<R>(
+  wf: Workflow,
+  n: number,
+  actor: TaskActor,
+  call: (wf: Workflow) => Promise<R>,
+  zero9: (w: { was: StageId; current: StageId }, first: boolean) => { patch?: TaskPatch; opts?: Parameters<typeof updateTaskLocked>[3] } = () => ({})
+): Promise<{ reply: R; saved: TaskCard | null }> {
   let saved: TaskCard | null = null
   let first = true
   const reply = await recording(actor, null, () =>
     alongside(
       {
         written: async (w) => {
-          const column = STAGE_CATEGORY[w.current]
-          const placed = column === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
-          const p: TaskPatch = { ...(first ? rest : {}), column, ...placed }
-          const o = first ? opts : {}
+          const extra = zero9(w, first)
           first = false
-          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...o, was: STAGE_CATEGORY[w.was] }))
+          const p: TaskPatch = { ...extra.patch, column: STAGE_CATEGORY[w.current] }
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }))
         }
       },
-      () => g.wf.move(n, g.to, g.by, { confirm, ...(override?.reason.trim() ? { reason: override.reason.trim() } : {}), ...(g.builder ? { builder: g.builder } : {}) })
+      () => call(wf)
     )
+  )
+  return { reply, saved }
+}
+
+/**
+ * A column move through the card's runtime (#1265): `Workflow.move` on the intent path, the change's other fields (and
+ * its comment) saved with its first write, its place with the write that reaches the column asked for. The user's move
+ * with `confirm` skips what it must and records an `Override`; the Assistant's needs `override.reason` for that.
+ */
+async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}, confirm = true): Promise<MoveResult> {
+  const ws = workspace
+  const target = patch.column!
+  const { column: _column, before, position, override, ...rest } = patch
+  const reason = override?.reason.trim()
+  const { reply, saved } = await runIntent(
+    g.wf,
+    n,
+    actor,
+    (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}) }),
+    (w, first) => {
+      const placed = STAGE_CATEGORY[w.current] === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
+      return { patch: { ...(first ? rest : {}), ...placed }, opts: first ? opts : {} }
+    }
   )
   if (isRefusal(reply)) return { refused: reply }
   if ('ask' in reply) return saved ? { moved: saved } : { ask: reply.rules }
