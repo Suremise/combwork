@@ -1244,6 +1244,9 @@ export async function runIntent<R>(
     alongside(
       {
         written: async (w) => {
+          // Only this intent's own card's writes: another card's write made under its context (something it set off,
+          // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
+          if (w.card.id !== n) return
           const extra = zero9(w, first)
           first = false
           // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).

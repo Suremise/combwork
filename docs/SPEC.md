@@ -2973,7 +2973,8 @@ before it in the lane worked there, Done) has a head not in that card's target (
 drag isn't refused), and Hive's line updater (`workflow/lineUpdates.ts`, after board changes and an agent's status
 changes, one pass per workspace at a time) does the steps above between cards: the builder busy (in a turn, starting,
 asking a permission, its background tasks running, or a prompt not yet taken), a Progress run of it going, or the
-worktree dirty, the lane's `status` is `lineUpdate` ("waiting: bringing the builder's branch up to date", not pausing);
+worktree dirty, the lane's `status` is `lineUpdate` ("waiting: bringing the builder's branch up to date", not pausing;
+the Progress panel's lane header says so, #1287);
 the line's change since the card's approved base not in the target (containment, as `done.contained` checks it), a For
 you **Decide** on the next card naming the commits after the approved revision; git's refusal, a For you **Decide** with
 git's reason. Each is asked once for the branch's head (bound to it), so a branch nobody touches isn't asked about twice.

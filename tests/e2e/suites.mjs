@@ -153,6 +153,7 @@ export const SUITES = [
   { name: 'nocode' },
   { name: 'numbers' },
   { name: 'overview' },
+  { name: 'p4lane' },
   { name: 'packaged', needs: ['packaged'] },
   { name: 'packaged-mcp', needs: ['packaged'] },
   { name: 'packaged-progress', needs: ['packaged'] },
