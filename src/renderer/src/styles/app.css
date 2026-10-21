@@ -1143,6 +1143,8 @@ kbd {
 }
 
 /* ---------- Buttons & controls ---------- */
+/* A plain button has an edge of its own (#1304): its fill alone vanished on a hovered row (--bg-hover is within a
+   shade of --bg-elevated in dark) and on a white page in light. Filled buttons (primary, danger) keep no edge. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1150,7 +1152,7 @@ kbd {
   height: 28px;
   padding: 0 12px;
   border-radius: 4px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
   font: inherit;
@@ -1167,6 +1169,7 @@ kbd {
 }
 .btn.primary {
   background: var(--accent-fill);
+  border-color: transparent;
   color: var(--accent-fg);
   font-weight: 600;
 }
@@ -1176,6 +1179,7 @@ kbd {
 }
 .btn.danger {
   background: var(--error);
+  border-color: transparent;
   color: #fff;
 }
 .btn.subtle {

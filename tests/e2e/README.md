@@ -471,7 +471,7 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   runs. In a CLI step that is an environment SKIP only when that session's Codex transcript records the refusal with
   the command's executable the Store's pwsh (its WindowsApps alias or the package's path; the terminal cuts it off):
   another shell, another code, or a command that can't be read stays a FAIL. Windows PowerShell 5.1 and cmd aren't
-  affected, so the suites that run the real Codex (codex, codex-background, codex-extra, codex-handover, codex-mcpapproval, codex-setup,
+  affected, so the suites that run the real Codex (codex, codex-background, codex-extra, codex-handover, codex-mcpapproval, codex-setup, codexoverrides,
   and real Codex scenario trials) give their test Hive a PATH without the Store's aliases
   (`lib.pathWithoutStoreAliases()`, #584): Codex then runs commands in Windows PowerShell, even with a Store pwsh
   open. `leftovers-codex` keeps the Store's on purpose (what escapes through it is its subject, #543), and

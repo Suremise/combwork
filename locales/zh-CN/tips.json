@@ -97,6 +97,8 @@
   "tips.cardSummaries.title": "报告先说要点",
   "tips.cardWork.text": "打开卡片：其“工作记录”部分列出每个提交评审的修订版本，包括轮次、文件、结论和检查，以及它是如何合并的。在看板上，卡片会显示其修订版本和最近的结论。",
   "tips.cardWork.title": "查看卡片工作经历了什么",
+  "tips.cliOverrides.text": "Hive 会稍微改变每个 CLI 在其会话中的行为，例如不让 Copilot 自行更新，或设置 Codex 的终端标题。每项更改都可以在“设置”→“高级”中对应 CLI 的下方关闭，那里会说明关闭后 Hive 无法再做什么。",
+  "tips.cliOverrides.title": "让 CLI 保持与 Hive 之外相同",
   "tips.closeWindow.text": "打开多个窗口时，“文件”→“关闭窗口”（{key}）只关闭当前窗口，与点击窗口的 X 相同。“退出 Hive（所有窗口）”会关闭所有窗口并停止其中的所有智能体。",
   "tips.closeWindow.title": "关闭一个窗口，或全部关闭",
   "tips.commandName": "“{command}”",

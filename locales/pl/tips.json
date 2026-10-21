@@ -97,6 +97,8 @@
   "tips.cardSummaries.title": "Raporty zaczynają się od sedna",
   "tips.cardWork.text": "Otwórz kartę: jej sekcja Praca pokazuje każdą rewizję przesłaną do recenzji, z rundą, plikami, werdyktami i sprawdzeniami, oraz to, jak ją scalono. Na tablicy karta pokazuje swoją rewizję i ostatni werdykt.",
   "tips.cardWork.title": "Zobacz, przez co przeszła praca karty",
+  "tips.cliOverrides.text": "Hive trochę zmienia zachowanie każdego CLI w swoich sesjach, na przykład to, że Copilot nie aktualizuje się sam, albo tytuł terminala Codex. Każdą zmianę można wyłączyć w Ustawienia → Zaawansowane, pod jej CLI, gdzie opisano, czego Hive bez niej już nie zrobi.",
+  "tips.cliOverrides.title": "Zachowaj CLI takie jak poza Hive",
   "tips.closeWindow.text": "Gdy otwartych jest kilka okien, Plik → Zamknij okno ({key}) zamyka tylko to jedno, tak jak jego X. Zakończ Hive (wszystkie okna) zamyka wszystkie okna i zatrzymuje wszystkich ich agentów.",
   "tips.closeWindow.title": "Zamknij jedno okno albo wszystkie",
   "tips.commandName": "„{command}”",
