@@ -1888,7 +1888,10 @@ the OK before merging) moves the card on; a decline of one is a round and return
 an agent's own question (ask the user, couldn't within the rules) moves nothing, is never a round, and an approval of
 it is recorded (`Approval`) as the OK it asked for (#922's push or release OK). **Answering wakes the waiting agent**,
 once (the runtime's durable `wake`, `about: 'answer'`): the agent that asked (its request records it, `asker`), else the
-card's builder; at the round limit the builder and the lane's reviewer, with the user's choice. An answer's wake needs
+card's builder; at the round limit the builder and the lane's reviewer, with the user's choice; an approval of a gate's
+request (the user's review, the OK before merging) its builder, whatever it led to (finished, queued, or waiting on
+another gate), its wake saying the answer first. An answer moves the card only through its gate: one that moves
+nothing leaves its column as it is (a failed card in Review isn't returned for review by it). An answer's wake needs
 no loop: it reaches an agent working on its own, with no lane or reviewer (*"…The user answered: carry on from where you
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,

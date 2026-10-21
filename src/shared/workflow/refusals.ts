@@ -143,8 +143,8 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Agent Setup or the folder, then try again.', description: 'The next step when Hive could not read what a rule needs.' })
   ),
   'loop.roundLimit': r(
-    msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: the user decides how it goes on.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked the user how to go on (For you); until they answer, its loop is paused. {card} is a card key." }),
-    msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: "Wait for the user's answer to the question on the card: you are woken when they answer.", description: 'The next step while a card waits for the user at its round limit (said to an agent or the Hive Assistant): wait; Hive wakes the agent when the user answers.' })
+    msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),
+    msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: 'The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.', description: "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card." })
   ),
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),

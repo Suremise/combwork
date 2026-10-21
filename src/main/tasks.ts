@@ -1069,9 +1069,11 @@ export async function runIntent<R>(
         written: async (w) => {
           const extra = zero9(w, first)
           first = false
-          const p: TaskPatch = { ...extra.patch, column: STAGE_CATEGORY[w.current] }
           // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).
           const moved = w.written.findLast((f) => f.kind === 'Moved')?.seq ?? null
+          // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
+          // place, so a failed card still in Review isn't "returned for review" by it (#1269 round 3).
+          const p: TaskPatch = { ...extra.patch, ...(moved !== null ? { column: STAGE_CATEGORY[w.current] } : {}) }
           saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }), moved)
         }
       },

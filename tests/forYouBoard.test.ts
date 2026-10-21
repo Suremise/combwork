@@ -106,7 +106,11 @@ describe('For you on the board (#1269)', () => {
     expect(after.column).toBe('passed')
     expect(forYou(w).count).toBe(0)
     expect(facts(w, card).filter((f) => f.kind === 'Approval')).toMatchObject([{ actor: 'user', data: { request: req, answer: 'approved' } }])
-    expect(actions(w, card).filter((a) => a.kind === 'wake').at(-1)?.payload).toMatchObject({ agent: 'a1', why: 'approved: merge it and report the merge' })
+    expect(actions(w, card).filter((a) => a.kind === 'wake').at(-1)?.payload).toMatchObject({ agent: 'a1', about: 'answer', why: expect.stringContaining('approved: merge it and report the merge') })
+    // Delivered to its builder with no lane or reviewer (HR3's round 2 finding 1), once.
+    const told = await deliveredTo(w, 'a1')
+    expect(told).toHaveLength(1)
+    expect(told[0]).toContain(`the user approved "p-${card} waits for your review". approved: merge it and report the merge`)
     // Answered: a second answer is refused.
     await expect(answer(w, card, req, { outcome: 'approved' })).rejects.toThrow()
   })
@@ -128,6 +132,23 @@ describe('For you on the board (#1269)', () => {
     expect(now.decisions ?? []).toEqual([])
     // A decline may say why.
     expect((await answer(w, card, req, { outcome: 'declined', reply: 'Not yet: the names' })).column).toBe('doing')
+  })
+
+  it("G10's OK with no lane or reviewer: the approval reaches the builder waiting to merge, once (HR3's round 2 finding 1)", async () => {
+    const { w, wt } = await workspace({ ...allOff('git'), finish: 'agentMerges', okBefore: { mode: 'every', labels: [] }, folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    commitIn(wt, 'b.txt')
+    // No review: the drag submits it and it waits in Approved (Passed) for the OK.
+    expect((await update(w, card, { column: 'passed' })).column).toBe('passed')
+    const req = forYou(w).items[0]
+    expect(req).toMatchObject({ gate: 'okBefore', kind: 'approve', shown: { id: FOR_YOU.okBefore.id } })
+    await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
+    expect(forYou(w).count).toBe(0)
+    const told = await deliveredTo(w, 'a1')
+    expect(told).toHaveLength(1)
+    expect(told[0]).toContain(`the user approved "p-${card} is approved: OK to merge?": Go ahead. approved: merge it and report the merge`)
+    expect(told[0]).toContain('The user answered: carry on from where you asked')
   })
 
   it("a solo agent's question (no lane, no reviewer) is answered and the asker woken, rules on or off (HR3's round 1 finding 3)", async () => {
@@ -200,7 +221,10 @@ describe('For you on the board (#1269)', () => {
     const req = list.items[0].request
     await expect(answer(w, card, req, { outcome: 'approved' })).rejects.toThrow(/doesn't fit the request/)
     await expect(answer(w, card, req, { outcome: 'answered', choice: 'carryOn' })).rejects.toThrow(/doesn't fit the request/)
-    await answer(w, card, req, { outcome: 'answered', choice: 'carryOn', rounds: 2 })
+    const answered = await answer(w, card, req, { outcome: 'answered', choice: 'carryOn', rounds: 2 })
+    // The answer moves nothing: the failed card stays where it was, not "returned for review" (#1269 round 3).
+    expect(answered.column).toBe('review')
+    expect(answered.history.filter((h) => /Returned for review/.test(h.what))).toEqual([])
     lane = (await lanes.listLanes(w, { project: 'p' }))[0]
     expect(lane.state).toBe('active')
     expect(forYou(w).count).toBe(0)

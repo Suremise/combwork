@@ -114,7 +114,7 @@ describe('For you at the core (#1269)', () => {
     // Before the OK, the report of its merge can't finish.
     refusedBy(await e.wf.reportMerge(card.key, B1), 'approval.given')
     moved(await e.wf.answer(card.key, ok.request, 'approved'))
-    expect(e.wakes.at(-1)).toMatchObject({ agent: 'B1', why: 'approved: merge it and report the merge' })
+    expect(e.wakes.filter((x) => x.why.includes(`the user approved "${card.key} is approved: OK to merge?"`))).toEqual([{ agent: 'B1', card: card.key, why: `${card.key}: the user approved "${card.key} is approved: OK to merge?". approved: merge it and report the merge` }])
     moved(await e.wf.reportMerge(card.key, B1))
     s = e.wf.state(card)
     expect(s.stage).toBe('done')
@@ -187,7 +187,7 @@ describe('For you at the core (#1269)', () => {
     commit(folder, { 'src/next.txt': 'next\n' }, 'next')
     // The builder submits again without the user's answer: refused, the question kept.
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'loop.roundLimit')
-    expect(r.message).toBe(`${card.key} reached its round limit: the user decides how it goes on.`)
+    expect(r.message).toBe(`${card.key} reached its round limit: it goes on once its round-limit question is answered.`)
     refusedBy(await e.wf.move(card.key, 'review', 'assistant', { reason: 'go on' }), 'loop.roundLimit')
     expect(e.wf.state(card)).toMatchObject({ stage: 'active', requests: [expect.objectContaining({ request: limit.request })] })
     // The rules off: the escape hatch, the question still waiting for the user.

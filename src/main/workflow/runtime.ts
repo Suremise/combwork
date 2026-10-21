@@ -147,6 +147,12 @@ const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
   readonly written: Fact[] = []
+  /**
+   * The user's answer this write records, as agents read it (#1269): every wake it makes is an answer's (`about:
+   * 'answer'`, delivered with or without a loop), saying the answer first; `woken`, the agents it woke.
+   */
+  answer: string | null = null
+  readonly woken: string[] = []
   /** The card's stage when the write began. */
   readonly was: StageId
   constructor(
@@ -681,7 +687,12 @@ export class Workflow {
    * agent whether or not the card has a reviewer (loopWakes.ts).
    */
   wake(w: Write, agent: string | null | undefined, why: string, about?: 'answer'): void {
-    if (agent && agent !== 'user') w.action('wake', { agent, why, ...(about ? { about } : {}) })
+    if (!agent || agent === 'user') return
+    // In the user's answer's write (finish's wakes too): an answer's wake, the answer first (HR3's #1269 round 2).
+    const answer = about ?? (w.answer !== null ? 'answer' : undefined)
+    const said = w.answer !== null && !why.startsWith(w.answer) ? `${w.answer}. ${why}` : why
+    w.action('wake', { agent, why: said, ...(answer ? { about: answer } : {}) })
+    w.woken.push(agent)
   }
 
   /** The reviewer to wake: the card's (a lane's), else the pool. */
@@ -999,6 +1010,7 @@ export class Workflow {
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
       const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${req.text}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      w.answer = said
       if (req.gate === ROUND_LIMIT_GATE) {
         this.wake(w, builder, said, 'answer')
         // Its lane's reviewer, which paused with it.
@@ -1025,6 +1037,8 @@ export class Workflow {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
         else this.wake(w, builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
       }
+      // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
+      if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
     if (out) return this.refuse(card, 'user', 'answer', out)
