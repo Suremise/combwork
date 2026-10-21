@@ -4,9 +4,9 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { createInterface } from 'readline'
 import { buildSync } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -290,7 +290,8 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await running(outside)).toBe(false)
       expect(w.store.queueProcs(got.lease)).toEqual([])
-      expect(existsSync(join(w.root, '.queue-journals', `${got.lease}.followed`))).toBe(false)
+      // Cleared, and sealed: a folder in its place, so the outlived supervisor can't write there any more.
+      expect(statSync(join(w.root, '.queue-journals', `${got.lease}.followed`)).isDirectory()).toBe(true)
     } finally {
       await w.close()
     }
@@ -583,22 +584,23 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
   })
 
   it.each([
-    ['a journal that can\'t be read (a folder where it should be)', (file: string) => {
-      renameSync(file, `${file}.saved`)
-      mkdirSync(file)
-      return () => {
-        rmSync(file, { recursive: true })
-        renameSync(`${file}.saved`, file)
-      }
+    ['a journal part that can\'t be read (a moved-aside part that is a folder)', (file: string) => {
+      const part = `${file.replace(/\.followed$/, '')}.sealed-0-unreadable`
+      mkdirSync(part)
+      return () => rmSync(part, { recursive: true })
     }],
     ['a damaged journal (a line that isn\'t a process)', (file: string) => {
-      const text = readFileSync(file, 'utf8')
-      writeFileSync(file, `${text}12x:34\n`)
-      return () => writeFileSync(file, text)
+      writeFileSync(file, `${readFileSync(file, 'utf8')}12x:34\n`)
+      // The takeover sealed it before it read it: the damaged line is in the part moved aside.
+      return () => {
+        const folder = join(file, '..')
+        const stem = basename(file).replace(/\.followed$/, '')
+        for (const n of readdirSync(folder).filter((x) => x.startsWith(`${stem}.sealed-`))) writeFileSync(join(folder, n), readFileSync(join(folder, n), 'utf8').replace('12x:34\n', ''))
+      }
     }]
-  ])("HR4 r4 #1: %s is never taken for empty: the next runner pauses and keeps the duty, and settles once it reads", async (_what, damage) => {
+])("HR4 r4 #1: %s is never taken for empty: the next runner pauses and keeps the duty, and settles once it reads", async (what, damage) => {
     let endable = false
-    const target = `unread-${damage.length}${_what.length}`
+    const target = what.startsWith('a damaged') ? 'damaged' : 'unreadable'
     const cfg = { store: w.store, project: w.project, target, root: w.root, profile: 'A', hooks: { endJob: () => endable } }
     const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
     const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
@@ -624,10 +626,14 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     await b.runner.release()
   })
 
-  it('HR4 r4 #2: a process an outlived supervisor writes down while a takeover settles (after its read) is ended too, before the takeover runs', async () => {
+  it.each([
+    ['just after the journal is sealed', 'afterSeal'],
+    ['after the last read, just before the duties are dropped', 'beforeClear']
+  ] as const)("HR4 r4 #2 / design review: an outlived supervisor that finds another process %s can't write it down, and ends it itself; the takeover ends the rest and runs", async (_when, at) => {
     // A's supervisor is its own (it outlives A, the seam); A's holder looks dead to B (as after a crash).
+    const target = `late-${at}`
     const aHost = queueHost({ linger: true })
-    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'late', root: w.root, profile: 'A', host: aHost, probe: probeWith(new Set(), { pid: 1001, started: 5 }) })) as { ok: true; runner: QueueRunner }
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target, root: w.root, profile: 'A', host: aHost, probe: probeWith(new Set(), { pid: 1001, started: 5 }) })) as { ok: true; runner: QueueRunner }
     await identify(a.runner.supervisorPid!)
     const sleeper = (): ChildProcess => {
       const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
@@ -639,30 +645,29 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(await a.runner.followForTests(first.pid!)).toBe(true)
     const second = sleeper()
     const two = await identify(second.pid!)
-    let late = false
+    let late: unknown = null
     const bProbe: ProcessProbe = { ...windowsProbe, self: async () => ({ pid: 2002, started: 7 }), alive: async (pid) => pid !== 1001 }
     const b = (await QueueRunner.acquire({
       store: w.store,
       project: w.project,
-      target: 'late',
+      target,
       root: w.root,
       profile: 'B',
       probe: bProbe,
-      hooks: {
-        // Once B has read A's journal, A's lingering supervisor finds and writes down another process.
-        afterJournalRead: async () => {
-          if (late) return
-          late = true
-          expect(await a.runner.followForTests(second.pid!)).toBe(true)
-        }
-      }
+      // There, A's lingering supervisor finds another process to follow.
+      hooks: { [at]: async () => void (late ??= await a.runner.followForTests(second.pid!)) }
     })) as { ok: true; runner: QueueRunner; paused?: number }
-    expect(late).toBe(true)
+    // Sealed: it couldn't write it down, so it didn't follow it, and ended it.
+    expect(late).toBe(false)
+    await ends(two)
     expect(b).toMatchObject({ ok: true })
     expect(b.paused).toBeUndefined()
     expect(await running(one)).toBe(false)
-    expect(await running(two)).toBe(false)
-    expect(existsSync(join(w.root, '.queue-journals', `${a.runner.lease}.followed`))).toBe(false)
+    expect(w.store.queueProcs(null, target).every((p) => p.lease === b.runner.lease)).toBe(true)
+    // Its journal is cleared; the seal stays.
+    const journals = join(w.root, '.queue-journals')
+    expect(readdirSync(journals).filter((n) => n.startsWith(`${a.runner.lease}.sealed-`))).toEqual([])
+    expect(statSync(join(journals, `${a.runner.lease}.followed`)).isDirectory()).toBe(true)
     await b.runner.release()
   })
 

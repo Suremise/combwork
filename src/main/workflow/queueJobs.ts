@@ -21,7 +21,7 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { mkdir, readFile, rm } from 'original-fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat } from 'original-fs/promises'
 import { JobHost } from '../processSupervisor'
 import { createLogger } from '../logger'
 
@@ -127,6 +127,11 @@ export const fileTimeMs = (created: string): number => Number((BigInt(created) -
  * A lease's journal (#1360): the file its job's supervisor writes each process it follows to, durably, before it
  * follows it (HiveJobs.Journal), so another Hive can end those after a crash. In the project's worktrees folder (or
  * `dir`, tests), made ready here.
+ *
+ * Sealing it (sealJournal) closes it to writers for good: what it held is moved aside (`<lease>.sealed-<n>`), and a
+ * folder takes its name, so a supervisor that outlived its Hive and finds something more to follow can't write it down,
+ * and so ends it itself instead (its fail-closed rule): no entry can arrive after the last read (HR4's design review of
+ * round 5). What is moved aside stays until a settle has ended what it names; the seal stays.
  */
 export async function journalPath(root: string, lease: string, dir?: string): Promise<string> {
   const folder = dir ?? join(root, JOURNALS)
@@ -135,38 +140,95 @@ export async function journalPath(root: string, lease: string, dir?: string): Pr
 }
 
 const JOURNALS = '.queue-journals'
+const journalsOf = (root: string, dir?: string): string => dir ?? join(root, JOURNALS)
 
 /** A process a journal names: its id and start (Unix ms). */
 export type Journalled = { pid: number; started: number }
 
 /**
- * What a lease's journal says: `absent` (none was written: nothing was followed), `read` (every line a process), or
- * `unknown` (it couldn't be read, or a line isn't one: damaged or cut short). Unknown is never taken for empty: what it
- * may name can't be ruled out, so its duty stays and the queue pauses (HR4's round 4 finding 1).
+ * What a lease's journal says, its moved-aside parts included: `absent` (none was written: nothing was followed),
+ * `read` (every line a process; `sealed`: closed to writers), or `unknown` (a part couldn't be read, or a line isn't a
+ * process: damaged or cut short). Unknown is never taken for empty: what it may name can't be ruled out, so its duty
+ * stays and the queue pauses (HR4's round 4 finding 1).
  */
-export type JournalState = { state: 'absent' } | { state: 'read'; entries: Journalled[] } | { state: 'unknown'; why: string }
+export type JournalState = { state: 'absent' } | { state: 'read'; entries: Journalled[]; sealed: boolean } | { state: 'unknown'; why: string }
 
 /** A lease's journal, as it is now (JournalState). */
 export async function journalOf(root: string, lease: string, dir?: string): Promise<JournalState> {
-  let text: string
+  const folder = journalsOf(root, dir)
+  const main = join(folder, `${lease}.followed`)
+  let names: string[]
   try {
-    text = await readFile(join(dir ?? join(root, JOURNALS), `${lease}.followed`), 'utf8')
+    names = await readdir(folder)
   } catch (e) {
     return (e as NodeJS.ErrnoException).code === 'ENOENT' ? { state: 'absent' } : { state: 'unknown', why: (e as Error).message }
   }
-  const entries: Journalled[] = []
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) continue
-    const m = /^(\d+):(\d+)$/.exec(line.trim())
-    if (!m) return { state: 'unknown', why: `a line that isn't a process: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
-    entries.push({ pid: Number(m[1]), started: fileTimeMs(m[2]) })
+  const parts = names.filter((n) => n.startsWith(`${lease}.sealed-`)).map((n) => join(folder, n))
+  let sealed = false
+  if (names.includes(`${lease}.followed`)) {
+    try {
+      if ((await stat(main)).isDirectory()) sealed = true
+      else parts.push(main)
+    } catch (e) {
+      return { state: 'unknown', why: (e as Error).message }
+    }
   }
-  return { state: 'read', entries }
+  if (!parts.length && !sealed) return { state: 'absent' }
+  const entries: Journalled[] = []
+  for (const part of parts) {
+    let text: string
+    try {
+      text = await readFile(part, 'utf8')
+    } catch (e) {
+      return { state: 'unknown', why: (e as Error).message }
+    }
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim()) continue
+      const m = /^(\d+):(\d+)$/.exec(line.trim())
+      if (!m) return { state: 'unknown', why: `a line that isn't a process: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
+      entries.push({ pid: Number(m[1]), started: fileTimeMs(m[2]) })
+    }
+  }
+  return { state: 'read', entries, sealed }
 }
 
-/** Removes a lease's journal, once what it names is seen gone. */
+/**
+ * Seals a lease's journal (closed to writers for good): what it holds moved aside, then a folder made in its place. A
+ * file that appears again meanwhile (a write between the two) is moved aside too. Whether it is sealed.
+ */
+export async function sealJournal(root: string, lease: string, dir?: string): Promise<boolean> {
+  const folder = journalsOf(root, dir)
+  const main = join(folder, `${lease}.followed`)
+  await mkdir(folder, { recursive: true }).catch(() => undefined)
+  for (let n = 0; n < 5; n++) {
+    try {
+      if ((await stat(main)).isDirectory()) return true
+      await rename(main, join(folder, `${lease}.sealed-${Date.now()}-${n}`))
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return false
+    }
+    try {
+      await mkdir(main)
+      return true
+    } catch (e) {
+      // EEXIST: a file again (a write between the move and the folder): moved aside in the next turn.
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return false
+    }
+  }
+  return false
+}
+
+/**
+ * Removes a lease's journal, once what it names is seen gone: its moved-aside parts, and the journal itself unless it
+ * is sealed (the seal stays: a supervisor that outlived its Hive may still try to write there).
+ */
 export async function clearJournal(root: string, lease: string, dir?: string): Promise<void> {
-  await rm(join(dir ?? join(root, JOURNALS), `${lease}.followed`), { force: true }).catch(() => undefined)
+  const folder = journalsOf(root, dir)
+  const names = await readdir(folder).catch(() => [] as string[])
+  for (const n of names) if (n.startsWith(`${lease}.sealed-`)) await rm(join(folder, n), { force: true }).catch(() => undefined)
+  const main = join(folder, `${lease}.followed`)
+  const isFile = await stat(main).then((st) => st.isFile(), () => false)
+  if (isFile) await rm(main, { force: true }).catch(() => undefined)
 }
 
 /**

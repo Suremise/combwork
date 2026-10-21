@@ -2127,11 +2127,13 @@ job and recorded in hive.db.
 
 **A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
 naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
-serve a living Hive's other targets and agents), is empty or gone; every process its records and its journal name is
-gone (ended by pid and start time, never by name, the journal read again after each ending until nothing new appears);
-its journal could be read; and its folder is removed. What a runner owns stays recorded as a duty of the target until
-then, however many runners crash in between; a journal that can't be read, or isn't whole, is never taken for empty;
-a folder that can't be removed pauses the queue naming it, until a later try removes it. A clean release (closing a
+serve a living Hive's other targets and agents), is empty or gone; its journal is sealed (closed to writers for good:
+a supervisor that outlived its Hive can't write down anything more, and ends what it can't write down instead), then
+read, and could be; every process its records and its journal name is gone (ended by pid and start time, never by
+name); and its folder is removed, in that order, its duty dropped only after all of them. What a runner owns stays
+recorded as a duty of the target until then, however many runners crash in between; a journal that can't be read, or
+isn't whole, is never taken for empty; a folder that can't be removed pauses the queue naming it, until a later try
+removes it. A clean release (closing a
 workspace, quitting) ends and confirms its own job first, and leaves as duties what it couldn't confirm.
 
 Each fact the queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its
@@ -2141,11 +2143,13 @@ kept while the queue needs it (an open entry, an unfinished advance, an in-fligh
 into that target, a run in it) and removed when nothing does, or with its project. Unused Worktrees never lists a
 living runner's worktree.
 
-**Accepted:** a process that escapes a job and that the supervisor hasn't yet seen (about a second, or until the next
-process of the job ends) has no identity anywhere if Hive crashes in that moment, so a takeover can't end it. It can
-only have been working in the old lease's folder, which the takeover removes, or pauses the queue naming; it can't
-write the queue's facts or pauses (they are fenced by the lease); and it can't advance the target past the queue, whose
-advance is a compare-and-swap against the head it tested.
+**Accepted (a limitation, not a guarantee):** a process that escapes a job and that the supervisor hasn't yet seen
+(about a second, or until the next process of the job ends) has no identity anywhere if Hive crashes in that moment,
+so a takeover can't end it, and it may go on doing whatever its command does. Worktrees share the repository and its
+refs, and a command can use any path: such a process isn't confined to the old lease's folder, needn't take Hive's
+repository lock, and could move a ref, the target's included. What Hive itself does stays safe: the takeover removes
+the old folder or pauses naming it, the queue's facts and pauses are fenced by the lease, and Hive's own advance is a
+compare-and-swap against the head it tested, so it never builds on a target that moved under it unseen.
 
 **Pins** [HB3's round 1 finding 11]: every submitted revision is pinned by a ref, `refs/hive/cards/<key>/<n>` (the
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose

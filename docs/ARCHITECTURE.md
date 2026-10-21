@@ -270,9 +270,11 @@ flushed through) before following it, and ends one it can't write (`unowned …`
 its job (`what = 'job'`), never the supervisor process. Commands start through a detached Node launcher (`queueJobs.ts`)
 that the supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before
 it is told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
-name, then the processes their records and journals name still running (the journals read again after each pass until
-nothing new appears), waits, removes their folders, and only then drops them and the journals; anything it can't rule
-out (a journal it can't read, a process or folder that won't go) pauses the queue needs-you, naming it. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
+name, seals their journals (`sealJournal`: the file moved aside, a folder in its place, so an outlived supervisor can't
+append), reads them once, ends the processes their records and journals name still running, waits, removes their
+folders, and only then drops their duties and clears the journals (the seals stay); anything it can't rule out (a
+journal it can't read, a process or folder that won't go) pauses the queue needs-you, naming it, and leaves all of it
+for the next try. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
 (factStore.ts, an AsyncLocalStorage check run inside every store write) fences everything the queue's work writes,
 reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released
 runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close

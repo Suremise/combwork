@@ -28,7 +28,7 @@ import { git, GIT_PREFIX } from '../git'
 import { createLogger, userText } from '../logger'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
-import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, startLauncher, type Journalled } from './queueJobs'
+import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, sealJournal, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
@@ -38,8 +38,6 @@ const log = createLogger('queue')
 export const RENEW_MS = 30_000
 /** How long a takeover waits for the processes it ended to be gone. */
 const END_WAIT_MS = 15_000
-/** How many times a takeover reads the earlier runners' journals again, as long as each read finds something new. */
-const SETTLE_PASSES = 5
 /** A recorded launcher's start may be this far outside the clock readings around it (clock resolution). */
 const START_SLACK_MS = 50
 
@@ -73,10 +71,10 @@ export interface RunnerConfig {
    * Test seams. `renew`: false skips a renewal (a Hive stalled for as long as a test wants). `lingeringJob`: the
    * supervisor outlives this process (a Hive whose helper survived it). `beforeSettle`: runs as a takeover begins on a
    * dead runner's duties. `endJob`: false makes ending a job fail (a job that won't empty). `journalDir`: where the
-   * jobs' journals go (a folder that can't be written, for a journal that fails). `afterJournalRead`: runs as a takeover
-   * has read the earlier runners' journals, before it ends what they name (a late entry written meanwhile).
+   * jobs' journals go (a folder that can't be written, for a journal that fails). `afterSeal`, `beforeClear`: run as a
+   * takeover has sealed the earlier runners' journals, and just before it drops their duties (a late write, then).
    */
-  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; afterJournalRead?: () => Promise<void>; endJob?: () => boolean; journalDir?: string }
+  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; afterSeal?: () => Promise<void>; beforeClear?: () => Promise<void>; endJob?: () => boolean; journalDir?: string }
 }
 
 /** Who holds a target's lease, as the panel shows it. */
@@ -352,8 +350,11 @@ export class QueueRunner {
     this.stop()
     const store = this.cfg.store
     // Its job and what it follows ended and seen gone, the journal's processes too (as the next runner would check them).
-    const ended = !!this.job && (this.cfg.hooks?.endJob?.() ?? true) && (await this.job.end()) && (await this.journalGone(this.lease))
+    // Its job and what it follows ended and seen gone; then the job let go (its supervisor can't write to its journal
+    // after that), and only then the journal's processes checked, as the next runner would check them.
+    const emptied = !!this.job && (this.cfg.hooks?.endJob?.() ?? true) && (await this.job.end())
     await this.closeJob()
+    const ended = emptied && (await this.journalGone(this.lease))
     if (!ended) log.warn(`The merge queue for ${userText(this.target)} couldn't see its processes end: the next runner ends them before it runs`)
     const keep = ended && this.cfg.needed ? await this.cfg.needed().catch(() => true) : !ended
     // Its own, by token: a lease taken over meanwhile (its pid looked gone to another Hive) keeps its successor's row and
@@ -422,61 +423,61 @@ export class QueueRunner {
 
   /**
    * Settles every earlier runner's duties for the target (any lease but this one's, however many runners crashed since
-   * they were recorded): each of their jobs ended and seen empty (or gone, which ended what was in it), then each
-   * recorded process still running (its pid and start) ended as a tree and waited for, and only then their records
-   * dropped. Something that can't be ended or seen gone pauses the queue (needs you, its pid) and its records stay, for
-   * the next try (an acquire, or `settle` again). The pid it paused for, or null when all is settled. Public: a host
-   * tries again before resuming such a pause.
+   * they were recorded), in this order, each step only once the one before has succeeded:
+   * 1. their jobs ended by name (never the supervisor holding them) and seen empty, or gone;
+   * 2. their journals sealed: closed to writers for good, so nothing a supervisor that outlived its Hive writes down can
+   *    arrive after the read (it ends what it can't write down instead);
+   * 3. one read of them (unreadable or damaged: unknown, never empty), then every process they and the launcher
+   *    records name that still runs ended as a tree, and waited for;
+   * 4. their folders removed;
+   * 5. only then their records dropped and their journals cleared (the seals stay).
+   * A step that fails pauses the queue (needs you, naming the pid or the folder) and leaves everything as it was, so a
+   * crash or a failure at any point leaves the evidence for the next try (an acquire, or `settle` again). The pid it
+   * paused for (0: none to name), or null when all is settled. Public: a host tries again before resuming such a pause.
    */
   async settle(): Promise<number | null> {
     const store = this.cfg.store
     const duties = store.queueProcs(null, this.target).filter((p) => p.lease !== this.lease)
-    if (duties.length) {
+    const leases = [...new Set(duties.map((d) => d.lease))]
+    if (leases.length) {
       await this.cfg.hooks?.beforeSettle?.()
-      const leases = [...new Set(duties.map((d) => d.lease))]
       const launchers = duties.filter((d) => d.what !== 'job')
-      // Their jobs first, by name, never by the supervisor holding them (it may be a living Hive's, serving its other
-      // targets and its agents): ended and seen empty, or gone (closed, so the system ended what was in them).
+      // A pid to name in a pause: a launcher's, else one a journal names, if any can be read.
+      const hint = async (): Promise<number> => {
+        const read = await this.journalsOf(leases)
+        return launchers[0]?.pid ?? ('entries' in read ? read.entries[0]?.pid : undefined) ?? 0
+      }
       for (const lease of leases) {
         const ok = this.cfg.hooks?.endJob?.() !== false && (await endLeaseJob(this.host!, lease))
-        if (!ok) {
-          // Named for the user: a process it recorded, if any can be read.
-          const read = await this.journalsOf(leases)
-          return this.pauseFor(launchers[0]?.pid ?? ('entries' in read ? read.entries[0]?.pid : undefined) ?? 0)
-        }
+        if (!ok) return this.pauseFor(await hint())
       }
-      // Then what they recorded and still runs: their launchers' trees, and each process their journals name (what their
-      // jobs followed, outside them). Read once their jobs are ended, and again after ending what they name, until a read
-      // finds nothing new: a supervisor that outlived its Hive may still write down what it finds meanwhile (HR4's round
-      // 4 finding 2). A journal that can't be read, or that keeps growing, pauses the queue and keeps the duties.
-      const ended = new Set<string>()
-      for (let pass = 0; ; pass++) {
-        const read = await this.journalsOf(leases)
-        if ('unknown' in read) return this.pauseFor(launchers[0]?.pid ?? 0)
-        const fresh = read.entries.filter((j) => !ended.has(`${j.pid}:${j.started}`))
-        const named: QueueProc[] = [...(pass === 0 ? launchers : []), ...fresh.map((j) => ({ lease: '', target: this.target, pid: j.pid, startAfter: j.started, startBefore: j.started, what: 'check' as const }))]
-        if (!named.length) break
-        if (pass >= SETTLE_PASSES) return this.pauseFor(named[0].pid)
-        for (const j of fresh) ended.add(`${j.pid}:${j.started}`)
-        await this.cfg.hooks?.afterJournalRead?.()
+      for (const lease of leases) if (!(await sealJournal(this.cfg.root, lease, this.cfg.hooks?.journalDir))) return this.pauseFor(await hint())
+      await this.cfg.hooks?.afterSeal?.()
+      const read = await this.journalsOf(leases)
+      if ('unknown' in read) return this.pauseFor(launchers[0]?.pid ?? 0)
+      const named: QueueProc[] = [...launchers, ...read.entries.map((j) => ({ lease: '', target: this.target, pid: j.pid, startAfter: j.started, startBefore: j.started, what: 'check' as const }))]
+      if (named.length) {
         const list = await this.probe.list()
         if (!list) return this.pauseFor(named[0].pid)
         const roots = named.flatMap((d) => list.filter((p) => matches(p, d)))
-        if (!roots.length) continue
-        log.info(`Ending ${roots.length} process(es) an earlier merge queue runner left running`)
-        const tree = uniq(roots.flatMap((root) => treeOf(list, root)))
-        await this.probe.end(tree)
-        const still = await gone(this.probe, tree)
-        if (still === null) return this.pauseFor(roots[0].pid)
-        if (still.length) return this.pauseFor(still[0].pid)
+        if (roots.length) {
+          log.info(`Ending ${roots.length} process(es) an earlier merge queue runner left running`)
+          const tree = uniq(roots.flatMap((root) => treeOf(list, root)))
+          await this.probe.end(tree)
+          const still = await gone(this.probe, tree)
+          if (still === null) return this.pauseFor(roots[0].pid)
+          if (still.length) return this.pauseFor(still[0].pid)
+        }
       }
+      await this.cfg.hooks?.beforeClear?.()
+      for (const f of store.queueFolders(this.target)) if (f.lease && leases.includes(f.lease) && !(await this.removeFolder(f.folder))) return this.pauseFor(0, f.folder)
       await this.change(() => {
         for (const d of duties) store.dropQueueProc(d.lease, d.pid)
       })
       for (const lease of leases) await clearJournal(this.cfg.root, lease, this.cfg.hooks?.journalDir)
     }
-    // Then their folders, where whatever they ran worked (and whatever escaped before the supervisor saw it, if Hive
-    // crashed in that moment, the window SPEC accepts): each removed, or the queue paused naming it, its record kept.
+    // Folders of leases with no duties left (a release that ended its job but couldn't remove its folder): removed, or
+    // the queue paused naming one, its record kept.
     for (const f of store.queueFolders(this.target)) {
       if (f.lease === null || f.lease === this.lease || store.queueProcs(f.lease).length) continue
       if (!(await this.removeFolder(f.folder))) return this.pauseFor(0, f.folder)
