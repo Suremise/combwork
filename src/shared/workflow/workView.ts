@@ -26,6 +26,11 @@ export interface WorkRevision {
   warnings: string[]
   /** The builder's summary with it. */
   summary: string
+  /**
+   * What couldn't be read when it was submitted, and why (its fact's `platform.unknown`: `revision`, `files`…), so a
+   * revision or diff never read isn't shown as none (#1224 round 1, finding 2). Empty when all was read.
+   */
+  unknown: Record<string, string>
 }
 
 export interface WorkVerdict {
@@ -125,6 +130,8 @@ export interface WorkView {
   builder: string | null
   /** The last head seen in its folder. */
   head: string | null
+  /** What couldn't be read when its work started, and why (`line`, `base`, `target`…, its Started's `platform.unknown`). */
+  unknown: Record<string, string>
   /** The revision the latest submission's passes now cover, and its base. */
   approved: { revision: string | null; base: string | null } | null
   /** This cycle's submissions, oldest first. */
@@ -156,6 +163,13 @@ export interface WorkCard {
   preWorkflow: boolean
 }
 
+/** A fact's `platform.unknown`: each field that couldn't be read, and why (text only). */
+function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
+  const u = platform?.unknown
+  if (!u || typeof u !== 'object') return {}
+  return Object.fromEntries(Object.entries(u as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'))
+}
+
 /** A card's work view from its facts, in seq order. Only the current cycle's (since its latest Started or Adopted). */
 export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const s = foldCard(facts, c.stage)
@@ -163,7 +177,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const at = new Map(facts.map((f) => [f.seq, f.at]))
   const latest = s.latest?.id ?? null
   const revisions = s.submissions.map(
-    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary })
+    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform) })
   )
   const verdicts = s.verdicts
     .filter((v) => v.seq >= s.cycle)
@@ -199,6 +213,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     target: started?.target ?? null,
     builder: started?.builder ?? null,
     head: s.head,
+    unknown: unknownOf(started?.platform),
     approved: s.approved,
     revisions,
     verdicts,

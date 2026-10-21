@@ -95,6 +95,8 @@
   "tips.cardReadFirst.title": "Indique à une carte les documents dont elle a besoin",
   "tips.cardSummaries.text": "Les agents commencent le rapport ou le verdict de relecture d’une carte par une ligne qui dit ce qui est prêt ou ce qui a été trouvé, les détails en dessous ; eux et l’Assistant ne lisent que ces lignes quand cela suffit.",
   "tips.cardSummaries.title": "Les rapports commencent par l’essentiel",
+  "tips.cardWork.text": "Ouvrez une carte : sa section Travail liste chaque révision soumise à relecture, avec son tour, ses fichiers, ses verdicts et ses vérifications, et la façon dont elle a été fusionnée. Sur le tableau, une carte affiche sa révision et son dernier verdict.",
+  "tips.cardWork.title": "Voir le parcours du travail d’une carte",
   "tips.cliOverrides.text": "Hive modifie un peu le comportement de chaque CLI dans ses sessions, comme Copilot qui ne se met pas à jour lui-même ou le titre du terminal de Codex. Chaque modification peut être désactivée dans Paramètres → Avancé, sous sa CLI, qui indique ce que Hive ne peut plus faire sans elle.",
   "tips.cliOverrides.title": "Garder une CLI telle qu’elle est hors de Hive",
   "tips.closeWindow.text": "Avec plusieurs fenêtres ouvertes, Fichier → Fermer la fenêtre ({key}) ferme seulement celle-ci, comme son X. Quitter Hive (toutes les fenêtres) ferme toutes les fenêtres et arrête tous leurs agents.",

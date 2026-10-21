@@ -1143,6 +1143,8 @@ kbd {
 }
 
 /* ---------- Buttons & controls ---------- */
+/* A plain button has an edge of its own (#1304): its fill alone vanished on a hovered row (--bg-hover is within a
+   shade of --bg-elevated in dark) and on a white page in light. Filled buttons (primary, danger) keep no edge. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1150,7 +1152,7 @@ kbd {
   height: 28px;
   padding: 0 12px;
   border-radius: 4px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
   font: inherit;
@@ -1167,6 +1169,7 @@ kbd {
 }
 .btn.primary {
   background: var(--accent-fill);
+  border-color: transparent;
   color: var(--accent-fg);
   font-weight: 600;
 }
@@ -1176,6 +1179,7 @@ kbd {
 }
 .btn.danger {
   background: var(--error);
+  border-color: transparent;
   color: #fff;
 }
 .btn.subtle {
@@ -8073,6 +8077,33 @@ body.pane-resizing-v .monaco-editor {
   gap: 6px;
   font-size: 11px;
 }
+/* A board card's work badges (#1224): one quiet line, an icon with each (colour never alone). */
+.task-work {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.task-work-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.task-work-badge code {
+  font-size: 11px;
+}
+.task-work-badge.pass .codicon {
+  color: var(--success);
+}
+.task-work-badge.fail .codicon,
+.task-work-badge.warn .codicon {
+  color: var(--warning);
+}
+.task-work-badge.old {
+  opacity: 0.6;
+}
 .task-label {
   background: var(--bg-active);
   border-radius: 8px;
@@ -8337,6 +8368,110 @@ textarea.input.task-blocked-input {
   width: 100%;
   min-height: 140px;
   resize: vertical;
+}
+/* The card dialog's Work section (#1224). */
+.card-work {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card-work-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warning);
+}
+.card-work-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.card-work-facts > div {
+  display: contents;
+}
+.card-work-facts dt {
+  color: var(--fg-muted);
+}
+.card-work-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.card-work-marks,
+.card-work-results,
+.card-work-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.card-work-marks li {
+  color: var(--warning);
+}
+.card-work-sub {
+  color: var(--fg-muted);
+  margin-block-start: 4px;
+}
+.card-work-rev {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-rev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.card-work-dot::before {
+  content: '·';
+  margin-inline-end: 8px;
+}
+.card-work-rev-head > .card-work-dot:first-child::before {
+  content: none;
+}
+.card-work-unread {
+  color: var(--warning);
+}
+.card-work-rev-id {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--info);
+}
+.card-work-results li.pass .codicon {
+  color: var(--success);
+}
+.card-work-results li.fail .codicon {
+  color: var(--warning);
+}
+.card-work-results li.old {
+  opacity: 0.65;
+}
+.card-work-files {
+  padding-inline-start: 18px;
+}
+.card-work-files .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.card-work-file-status {
+  display: inline-block;
+  min-inline-size: 1.4em;
+  color: var(--fg-muted);
+  font-family: var(--font-mono, monospace);
 }
 .task-description {
   border: 1px solid var(--border-subtle);

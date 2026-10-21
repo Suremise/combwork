@@ -212,6 +212,68 @@ function measure([selector, parts]) {
     }
     await shot(`${theme}-badges`, { x: 0, y: 0, width: 340, height: 240 })
 
+    // A plain button keeps an edge on a row that colours when hovered (#1304: Antivirus scanning's Add Exclusions… was
+    // only its fill, and a hovered setting row is within a shade of it in dark; on a white page in light, at rest too).
+    // Its border or its fill against the row behind it, resting and hovered: at least 1.2:1, as a subtle button's edge
+    // is; a primary button keeps its fill and no edge. Rows of each kind added to Settings, a button in each.
+    await page.locator('.activity-btn[aria-label="Settings"]').click()
+    const content = page.locator('.settings-content')
+    check(`${theme}: Settings opens`, !!(await lib.until(async () => (await content.count()) === 1, HUNG_MS)))
+    const rowKinds = ['setting', 'row', 'session-row', 'inbox-row', 'journal-row', 'running-row clickable']
+    await content.evaluate((c, kinds) => {
+      for (const [i, kind] of kinds.entries()) {
+        const r = document.createElement('div')
+        r.className = `${kind} probe-btnrow probe-btnrow-${i}`
+        r.style.padding = '12px'
+        r.innerHTML = '<span class="s-text">A setting</span><button class="btn small probe-plain">Add Exclusions…</button> <button class="btn small subtle">About Dev Drive</button> <button class="btn small primary probe-primary">Turn on</button>'
+        c.prepend(r)
+      }
+    }, rowKinds)
+    const edge = (selector) =>
+      page.evaluate((sel) => {
+        const parse = (c) => {
+          const v = /rgba?\(([^)]+)\)/.exec(c)?.[1].split(',').map(Number) ?? [0, 0, 0, 0]
+          return [v[0], v[1], v[2], v[3] === undefined ? 1 : v[3]]
+        }
+        const over = (top, under) => top.slice(0, 3).map((v, i) => v * top[3] + under[i] * (1 - top[3]))
+        const lum = (c) => {
+          const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4))
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b
+        }
+        const ratio = (a, b) => {
+          const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p)
+          return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100
+        }
+        const btn = document.querySelector(sel)
+        if (!btn) return null
+        // What the button sits on: the nearest ancestor that paints, laid over the ones under it.
+        const chain = []
+        for (let n = btn.parentElement; n; n = n.parentElement) chain.push(parse(getComputedStyle(n).backgroundColor))
+        const behind = chain.reverse().reduce((under, c) => over(c, under), [255, 255, 255])
+        const st = getComputedStyle(btn)
+        const fill = over(parse(st.backgroundColor), behind)
+        return { border: ratio(over(parse(st.borderTopColor), behind), behind), fill: ratio(fill, behind), borderAlpha: parse(st.borderTopColor)[3] }
+      }, selector)
+    for (const [i, kind] of rowKinds.entries()) {
+      const probeRow = page.locator(`.probe-btnrow-${i}`)
+      for (const hover of [false, true]) {
+        if (hover) await probeRow.hover({ position: { x: 4, y: 4 } })
+        else await page.mouse.move(5, 5)
+        const want = hover ? 'hovered' : 'resting'
+        // Measured once the row is drawn as wanted: painted when hovered, clear at rest.
+        const painted = await lib.until(async () => hover === !/^rgba\(0, 0, 0, 0\)$/.test(await probeRow.evaluate((r) => getComputedStyle(r).backgroundColor)), HUNG_MS)
+        check(`${theme}: a ${want} .${kind.split(' ')[0]} is drawn ${hover ? 'with' : 'without'} its hover colour`, !!painted)
+        const e = await edge(`.probe-btnrow-${i} .probe-plain`)
+        check(`${theme}: a plain button keeps its edge on a ${want} .${kind.split(' ')[0]}`, !!e && Math.max(e.border, e.fill) >= 1.2, JSON.stringify(e))
+        const p = await edge(`.probe-btnrow-${i} .probe-primary`)
+        check(`${theme}: a primary button on a ${want} .${kind.split(' ')[0]} keeps its fill and no edge`, !!p && p.borderAlpha === 0 && p.fill >= 1.2, JSON.stringify(p))
+        if (kind === 'setting') await shot(`${theme}-setting-${want}`, await probeRow.boundingBox())
+      }
+    }
+    await page.evaluate(() => document.querySelectorAll('.probe-btnrow').forEach((e) => e.remove()))
+    await page.mouse.move(5, 5)
+    await page.locator('.activity-btn[aria-label="Projects"]').click()
+
     // The text greys and the accent as text (#421) on every background text sits on, hovered and selected rows too, and
     // the accent as text on its own tint over each (a badge, an active button): 4.5:1. The status dots (their fill, the
     // idle one's ring), resting and at the height of their pulse: 3:1, as icons need; and the pulse never fades (opacity).

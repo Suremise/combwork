@@ -107,13 +107,20 @@ const check = (name, ok, extra = '') => {
       return s && al && d && s.y === d.y ? { s, d, w: (al.x - s.x) / 9 } : null
     }, HUNG_MS, 200)
     check('the reply is on screen', !!at, JSON.stringify(at))
+    // Copilot's own selection as it draws it (on a background colour): the whole text, as a user sees it before copying.
+    const copilotSelected = async () => ((await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)) ?? []).some((r) => r.trimEnd() === TEXT)
+    // A drag over the text. Without Shift it's Copilot's, which takes its last moves a moment after a key that follows at
+    // once (#1299: Ctrl+C straight after the drag copied "SELE" while the whole text was drawn selected after it), so
+    // it is over once Copilot draws the whole text selected, from none drawn before: true then.
     const drag = async (shift) => {
+      const clear = shift || !!(await lib.until(async () => !(await copilotSelected()), HUNG_MS, 100))
       await page.mouse.move(at.s.x - at.w / 2 + 1, at.s.y)
       if (shift) await page.keyboard.down('Shift')
       await page.mouse.down()
       for (let i = 1; i <= 8; i++) await page.mouse.move(at.s.x + ((at.d.x + 6 * at.w - at.s.x) * i) / 8, at.s.y)
       await page.mouse.up()
       if (shift) await page.keyboard.up('Shift')
+      return shift || (clear && !!(await lib.until(copilotSelected, HUNG_MS, 100)))
     }
     const rightClick = () => page.mouse.click(at.s.x + at.w, at.s.y, { button: 'right' })
     const clickBelow = () => page.mouse.click(at.s.x, at.s.y + 4 * at.w)
@@ -121,7 +128,7 @@ const check = (name, ok, extra = '') => {
     // 1. Copilot's own selection: a drag (reported to Copilot, which tracks the mouse), then Ctrl+C. Copilot copies with
     // an OSC 52 write; the terminal is in use (focused, a key just now), so the text reaches the clipboard.
     const copiedOnScreen = (await screen()).split('copied to clipboard').length
-    await drag(false)
+    check('Copilot draws the drag as its selection, over the whole text', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
     check("the drag makes Copilot's selection, not Hive's", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
     await page.keyboard.press('Control+c')
     const got = await lib.until(async () => ((await copied()).length ? await copied() : null), HUNG_MS, 100)
@@ -223,7 +230,7 @@ const check = (name, ok, extra = '') => {
     check('right-click now goes to Copilot', !!(await lib.until(async () => (await rightClickGoesTo()) === 'cli', HUNG_MS, 100)), await rightClickGoesTo())
     const m7 = (await copied()).length
     const reads7 = await reads()
-    await drag(false)
+    check('Copilot draws the drag as its selection again', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
     check("the drag makes Copilot's selection", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
     await rightClick()
     const viaCopilot = await lib.until(async () => ((await copied()).length > m7 ? await copied() : null), HUNG_MS, 100)
