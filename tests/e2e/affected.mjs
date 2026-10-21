@@ -21,6 +21,8 @@ export const EVERYTHING = [
   'src/main/sessions.ts',
   'src/main/servers.ts',
   'src/main/fsutil.ts',
+  // Every workspace's open and close marks it, and every database's open is fenced by that (#1379).
+  'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
   'src/main/ptyHost.ts',
