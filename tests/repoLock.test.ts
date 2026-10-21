@@ -130,6 +130,25 @@ describe('the repository lock across processes (#1347)', () => {
     await waiter.exited()
   })
 
+  it("a holder's pid reused while another waits is seen as dead; a live holder judged again stays the holder's (HR6's round 1)", async () => {
+    const dir = repoDir()
+    repoLockHolder(dir)
+    const db = openLockDb(join(dir, REPO_LOCK_FILE), 1000, 'SELECT 1')
+    db.prepare("INSERT INTO repo_lock (id, token, pid, process_start, profile, taken_at) VALUES (1, 'old', 99999, 22, 'Hive-Old', '')").run()
+    db.close()
+    // Pid 99999 runs throughout; the process behind it changes (start 22, then 33) once the waiter has judged it live.
+    let start = 22
+    const asked: number[] = []
+    const procs = { alive: () => true, startOf: async (pid: number) => (pid === 99999 ? (asked.push(start), start) : 1) }
+    const kept = await takeRepoLock(dir, { profile: 'me', waitMs: 200, pollMs: 10, recheckMs: 0, procs })
+    expect(kept).toMatchObject({ timedOut: { profile: 'Hive-Old' } })
+    expect(asked.length).toBeGreaterThan(1)
+    const got = await takeRepoLock(dir, { profile: 'me', waitMs: 30_000, pollMs: 10, recheckMs: 0, procs, onWait: () => (start = 33) })
+    expect('held' in got).toBe(true)
+    expect(repoLockHolder(dir)).toMatchObject({ pid: process.pid, profile: 'me' })
+    if ('held' in got) got.held.release()
+  })
+
   it("a late release by a holder whose row was replaced removes nothing of the new holder's", async () => {
     const dir = repoDir()
     const got = await takeRepoLock(dir, { profile: 'me', waitMs: 10_000 })

@@ -30,7 +30,9 @@ interface HiveMessageValues {
   'worktrees.gitProblem': { problem: string | number }
   'worktrees.listBranches': { why: string | number }
   'worktrees.merge.cantCheck': { folder: string | number }
+  'worktrees.merge.caseAlias': { branch: string | number; other: string | number }
   'worktrees.merge.detached': undefined
+  'worktrees.merge.intoItself': { branch: string | number }
   'worktrees.merge.noTarget': { branch: string | number }
   'worktrees.merge.notRemoved': undefined
   'worktrees.merge.nothing': { why: string | number }

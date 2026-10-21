@@ -91,6 +91,21 @@ describe('mergeWorktree (#1347)', () => {
     expect(await mergeWorktree(project, a, { squash: false, message: 'A', target: 'nope' })).toEqual({ ok: false, error: 'There is no branch nope to merge into.' })
   })
 
+  // HR6's round 1: on Windows a ref named in another case is the same branch, so it is routed as that branch.
+  it('a target named in another case is that branch: merged in its folder, or refused, never a bare ref move', async () => {
+    const { project, a, b } = await twoBranches()
+    const merged = await mergeWorktree(project, a, { squash: false, message: 'A', target: 'MAIN' })
+    expect(merged).toEqual({ ok: true, mergeCommit: run(project, 'rev-parse', 'main').trim() })
+    expect(readFileSync(join(project, 'CHANGELOG.md'), 'utf8')).toContain('- Entry from A.')
+    expect(run(project, 'status', '--porcelain')).toBe('')
+    const tipB = run(project, 'rev-parse', b.branch)
+    const elsewhere = await mergeWorktree(project, a, { squash: false, message: 'A', target: b.branch.toUpperCase() })
+    expect(elsewhere.ok).toBe(false)
+    expect(elsewhere.error).toContain(`${b.branch} is checked out in`)
+    expect(run(project, 'rev-parse', b.branch)).toBe(tipB)
+    expect(await mergeWorktree(project, a, { squash: false, message: 'A', target: a.branch.toUpperCase() })).toEqual({ ok: false, error: `${a.branch} can't be merged into itself.` })
+  })
+
   it('finds conflicts with a target checked out nowhere, and changes nothing', async () => {
     const { project, a } = await twoBranches()
     run(project, 'branch', 'release')

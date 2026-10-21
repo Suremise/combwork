@@ -36,6 +36,8 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS repo_lock (
 
 /** SQLite's own wait for its file lock: a transaction on the lock lasts well under a millisecond. */
 const BUSY_MS = 1000
+/** How often a waiter judges a live holder's identity again (a start time is a PowerShell query, about half a second). */
+const RECHECK_MS = 2000
 
 /** Who holds a repository's lock. `processStart` 0: not known (its liveness is its pid's alone). */
 export interface RepoLockHolder {
@@ -61,6 +63,8 @@ export interface TakeOptions {
   waitMs: number
   /** How often to look again while waiting. */
   pollMs?: number
+  /** How often a holder judged live has its identity (pid and start time) judged again while waiting. */
+  recheckMs?: number
   /** Told once, after `noticeAfterMs` of waiting, who holds the lock. */
   onWait?: (holder: RepoLockHolder) => void
   noticeAfterMs?: number
@@ -137,15 +141,23 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
   const db = openLockDb(join(commonDir, REPO_LOCK_FILE), BUSY_MS, SCHEMA)
   const started = Date.now()
   let told = false
-  // Holders judged live, by token: looked at again by pid only (the start time doesn't change while it runs).
-  const live = new Set<string>()
+  // Holders judged live, by token, and when: looked at by pid alone between full checks, and judged again whole (its
+  // start time too) every recheckMs, so a pid that ends and is reused while this one waits is seen as the dead holder's.
+  const live = new Map<string, number>()
+  const recheckMs = opts.recheckMs ?? RECHECK_MS
   let kept = false
   try {
     for (;;) {
       const seen = readRow(db)
       let dead = false
-      if (seen) dead = live.has(seen.token) ? !procs.alive(seen.pid) : await holderDead(seen, own, procs)
-      if (seen && !dead) live.add(seen.token)
+      if (seen) {
+        const at = live.get(seen.token)
+        if (at !== undefined && Date.now() - at < recheckMs) dead = !procs.alive(seen.pid)
+        else {
+          dead = await holderDead(seen, own, procs)
+          if (!dead) live.set(seen.token, Date.now())
+        }
+      }
       if (!seen || dead) {
         const token = randomUUID()
         db.exec('BEGIN IMMEDIATE')

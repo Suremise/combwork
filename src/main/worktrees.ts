@@ -21,6 +21,8 @@ const log = createLogger('worktrees')
  * own words stay as git said them, in either.
  */
 const M = {
+  noTarget: msg({ id: 'worktrees.merge.noTarget', defaultMessage: 'There is no branch {branch} to merge into.', description: 'Why nothing was merged: the branch to merge into ({branch}) does not exist.' }),
+  caseAlias: msg({ id: 'worktrees.merge.caseAlias', defaultMessage: "The branches {branch} and {other} differ only in case, which Windows can't tell apart, so nothing was merged. Rename one of them, then merge.", description: 'Why nothing was merged: two branches ({branch}, {other}) have names that differ only in upper and lower case, and Windows treats them as one.' }),
   nothingMerged: msg({ id: 'worktrees.merge.nothing', defaultMessage: 'Nothing was merged: {why}.', description: "Why nothing was merged: git couldn't read the project folder's branch, or failed while merging. {why} says why (git's message)." }),
   gitFailed: msg({ id: 'worktrees.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when git said nothing itself. {command} is the git command (\"git rev-parse\"): keep it as it is." }),
   gitProblem: msg({ id: 'worktrees.gitProblem', defaultMessage: '{problem}.', description: 'An error: git cannot run. {problem} says why (git is missing, or too old), without its full stop.' }),
@@ -445,9 +447,17 @@ export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts
   } catch (e) {
     return { ok: false, error: tr(M.nothingMerged, { why: shownError(e) }) }
   }
-  const into = opts.target ?? checkedOut
+  let into = checkedOut
+  if (opts.target !== undefined) {
+    // The branch as git keeps it: on Windows a ref named in another case (MAIN) is the same branch (main), and must be
+    // routed as that one, never moved as if it were checked out nowhere (HR6's round 1).
+    const named = await branchNamed(projectPath, opts.target)
+    if (typeof named !== 'string') return named
+    into = named
+    if (sameRef(into, wt.branch)) return { ok: false, error: tr(msg({ id: 'worktrees.merge.intoItself', defaultMessage: "{branch} can't be merged into itself.", description: "Why nothing was merged: the branch to merge into is the worktree's own branch {branch}." }), { branch: wt.branch }) }
+  }
   if (!into) return { ok: false, error: tr(msg({ id: 'worktrees.merge.detached', defaultMessage: 'The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.', description: "Why nothing was merged: the project folder has no branch checked out. detached HEAD is git's term." })) }
-  if (into === wt.branch) return { ok: false, error: tr(msg({ id: 'worktrees.merge.sameBranch', defaultMessage: 'The project folder has {branch} checked out.', description: "Why nothing was merged: the project folder is on the worktree's own branch {branch}." }), { branch: wt.branch }) }
+  if (sameRef(into, wt.branch)) return { ok: false, error: tr(msg({ id: 'worktrees.merge.sameBranch', defaultMessage: 'The project folder has {branch} checked out.', description: "Why nothing was merged: the project folder is on the worktree's own branch {branch}." }), { branch: wt.branch }) }
   if (into !== checkedOut) return mergeElsewhere(projectPath, wt, into, opts.squash, message, opts.moveBranch)
   // With nothing staged in the project folder, undoing a failed merge (reset --merge) can't touch the user's own work.
   if ((await git(projectPath, ['diff', '--cached', '--quiet'])).code === 1) {
@@ -492,6 +502,31 @@ async function afterMerge(projectPath: string, wt: AgentWorktree, into: string, 
   return moved === true ? { ...done, branchMoved: true } : { ...done, moveError: moved }
 }
 
+/** A worktree's branch line in `git worktree list --porcelain`. */
+const ON_BRANCH = 'branch refs/heads/' // i18n-ignore: git's porcelain output, as it is
+
+/** Whether two branch names are one ref on Windows, whose ref store (NTFS) doesn't tell case apart. */
+const sameRef = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
+
+/**
+ * A local branch's name as git keeps it, for a name the caller may have written in another case: the branch of that
+ * exact name, else the one branch whose name differs only in case. A refusal when there is none, when git can't list
+ * them, or when several differ only in case from the name given (which is meant can't be told).
+ */
+async function branchNamed(projectPath: string, name: string): Promise<string | MergeResult> {
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/heads/'])
+  if (!r.ok) return { ok: false, error: tr(M.nothingMerged, { why: r.err || 'git for-each-ref' }) } // i18n-ignore: a git command, as it is
+  const names = r.out.split(/\r?\n/).filter(Boolean).map((l) => l.replace(/^refs\/heads\//, ''))
+  if (names.includes(name)) {
+    const aliases = names.filter((n) => n !== name && sameRef(n, name))
+    return aliases.length ? { ok: false, error: tr(M.caseAlias, { branch: name, other: aliases[0] }) } : name
+  }
+  const alike = names.filter((n) => sameRef(n, name))
+  if (alike.length === 1) return alike[0]
+  if (alike.length > 1) return { ok: false, error: tr(M.caseAlias, { branch: alike[0], other: alike[1] }) }
+  return { ok: false, error: tr(M.noTarget, { branch: name }) }
+}
+
 /**
  * Merges into a branch the project folder hasn't checked out: the merged tree (git merge-tree) committed on the target's
  * tip (and the branch's, unless squashed), and the target moved to it only from that tip (update-ref's compare and swap).
@@ -501,13 +536,17 @@ async function mergeElsewhere(projectPath: string, wt: AgentWorktree, into: stri
   const fail = (why: string): MergeResult => ({ ok: false, error: tr(M.nothingMerged, { why }) })
   const listed = await git(projectPath, ['worktree', 'list', '--porcelain'])
   if (!listed.ok) return fail(listed.err || 'git worktree list') // i18n-ignore: a git command, as it is
-  const at = listed.out.split(/\r?\n\r?\n/).find((b) => b.split(/\r?\n/).includes(`branch refs/heads/${into}`))
-  if (at) {
-    const folder = at.split(/\r?\n/)[0].replace(/^worktree /, '')
+  // Checked out in any folder under any case of its name (one ref on Windows): its files would no longer match.
+  const checkedOutAt = listed.out
+    .split(/\r?\n\r?\n/)
+    .map((b) => b.split(/\r?\n/))
+    .find((lines) => lines.some((l) => l.startsWith(ON_BRANCH) && sameRef(l.slice(ON_BRANCH.length), into)))
+  if (checkedOutAt) {
+    const folder = checkedOutAt[0].replace(/^worktree /, '')
     return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetElsewhere', defaultMessage: '{branch} is checked out in {folder}. Merge there, or check out another branch in that folder first.', description: "Why nothing was merged: the branch to merge into ({branch}) is checked out in another folder ({folder}) than the project folder." }), { branch: into, folder }) }
   }
-  const [old, tip] = await Promise.all([git(projectPath, ['rev-parse', '--verify', '--quiet', `refs/heads/${into}^{commit}`]), git(projectPath, ['rev-parse', '--verify', `${wt.branch}^{commit}`])])
-  if (!old.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.noTarget', defaultMessage: 'There is no branch {branch} to merge into.', description: 'Why nothing was merged: the branch to merge into ({branch}) does not exist.' }), { branch: into }) }
+  const [old, tip] = await Promise.all([git(projectPath, ['rev-parse', '--verify', '--quiet', `refs/heads/${into}^{commit}`]), git(projectPath, ['rev-parse', '--verify', `refs/heads/${wt.branch}^{commit}`])])
+  if (!old.ok) return { ok: false, error: tr(M.noTarget, { branch: into }) }
   if (!tip.ok) return fail(tip.err || 'git rev-parse') // i18n-ignore: a git command, as it is
   const from = old.out.trim()
   const merged = await git(projectPath, ['merge-tree', '--write-tree', '--name-only', '--no-messages', from, tip.out.trim()])

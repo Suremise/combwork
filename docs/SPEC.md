@@ -2137,7 +2137,8 @@ what was reviewed or approved. Ref paths compare keys case-insensitively (NTFS).
 **`mergeWorktree`** (`worktrees.ts`) [note §9, #1121] **Built [#1347]**: it returns the merge commit
 (`MergeResult.mergeCommit`), takes a target (default: the project folder's checked-out branch; a branch checked out
 nowhere is merged without touching a folder, the merged tree committed and the branch moved only from its tip; one
-checked out in another folder is refused), and never auto-commits a dirty worktree (before 1.0 it ran `add -A` and
+checked out in another folder is refused; a target is the branch git keeps under that name in any case, since Windows'
+ref store is one ref for `main` and `MAIN`, and two branches differing only in case are refused), and never auto-commits a dirty worktree (before 1.0 it ran `add -A` and
 committed): it refuses with the files counted and the next step ("commit or stash them in the worktree, then merge"),
 which the Merge dialog shows before Merge (greyed out); a dirty slot refuses submit instead.
 The **Merge… dialog** stays for the user's own merges outside cards; for a card's line it shows the queue instead
