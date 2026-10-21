@@ -97,6 +97,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -698,8 +699,15 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:movedCardNames': () => movedNames(workspace),
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
+      // The workflow options are checked as a whole (contradictions, what this version offers): workflow:setOptions.
+      if (patch.workflow !== undefined) throw new HiveError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
       return workspace.updateProjectConfig(workspace.assertProject(p), patch)
     },
+    'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
+    'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
+    'workflow:presetsNotice': () => presetsNotice(workspace),
+    'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'project:excludeHive': async (p) => {
       p = workspace.assertProject(p)
       const r = await ensureHiveExcluded(p)

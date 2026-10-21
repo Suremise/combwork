@@ -6,9 +6,12 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, type Finisher, type FolderMode, type OkBefore, type ReviewBy, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NOT_OFFERED, notOffered, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { englishText } from '../../shared/advanced'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { WorkflowDefaults } from '../../shared/types'
+import type { ProjectConfig, WorkflowDefaults } from '../../shared/types'
+import { config } from '../config'
+import type { WorkspaceService } from '../workspace'
 
 const log = createLogger('workflow')
 
@@ -30,42 +33,9 @@ export interface ResolvedOptions {
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
-const strings = (v: unknown): boolean => Array.isArray(v) && v.every((x) => typeof x === 'string')
-
-const oneOf =
-  <T extends string>(choices: readonly T[]) =>
-  (v: unknown): boolean =>
-    typeof v === 'string' && (choices as readonly string[]).includes(v)
-const bool = (v: unknown): boolean => typeof v === 'boolean'
-
-/**
- * What each option takes: its type and, for a choice, one of its values (HR2's #1263 round 1: compiling checks only
- * contradictions). Every option has its check (a new one fails the typecheck until it has).
- */
-const TAKES: Record<Exclude<keyof WorkflowOptions, 'platform'>, (v: unknown) => boolean> = {
-  review: oneOf<ReviewBy>(['none', 'agent', 'agentThenYou', 'you']),
-  reviewers: (v) => v === 1 || v === 2,
-  noSelfReview: bool,
-  preChecks: strings,
-  sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
-  style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
-  target: (v) => typeof v === 'string',
-  strict: bool,
-  mergeChecks: strings,
-  okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
-  folder: oneOf<FolderMode>(['slots', 'project']),
-  identity: (v) => v === null || (isRecord(v) && typeof v.name === 'string' && typeof v.email === 'string'),
-  stopOwnRuns: bool,
-  dependenciesDone: bool,
-  slotsUpToDate: bool,
-  sharedFolderWarning: bool,
-  excluded: strings,
-  commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string')
-}
 
 /** Whether a value is one its option takes. */
-const fits = (key: keyof WorkflowOptions, v: unknown): boolean => key !== 'platform' && TAKES[key](v)
+const fits = (key: keyof WorkflowOptions, v: unknown): boolean => takesOption(key, v)
 
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {
@@ -119,6 +89,32 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
   return { options, origins, invalid: null }
 }
 
+/** Why options can't be saved (#1278): a level that can't be read, a contradiction, or a value this version doesn't offer yet. */
+export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: ReturnType<typeof notOffered>[number] }
+
+/**
+ * Options as a save would leave them (the Workflow section, the Assistant's settings tool): resolved, and every reason
+ * they can't be saved, which a read would only log and fall back from. A project's values this version doesn't offer
+ * (§16.19.1) count only when the project sets them.
+ */
+export function checkOptions(platform: PlatformId, levels: OptionLevels): { resolved: ResolvedOptions; problems: OptionsProblem[] } {
+  const resolved = resolveOptions(platform, { ...levels, project: null })
+  const known = new Set(Object.keys(allOff(platform)).filter((k) => k !== 'platform'))
+  const own = levelOf(levels.project, platform, known)
+  if ('bad' in own) return { resolved, problems: [{ kind: 'bad', why: `project options: ${own.bad}` }] } // i18n-ignore: an English reason for the Assistant and the log
+  if (resolved.invalid) return { resolved, problems: [{ kind: 'bad', why: resolved.invalid }] }
+  const options = { ...resolved.options, ...own.set }
+  const origins = { ...resolved.origins }
+  for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
+  const problems: OptionsProblem[] = [...contradictions(options).map((id) => ({ kind: 'contradiction' as const, id })), ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id }))]
+  return { resolved: { options, origins, invalid: null }, problems }
+}
+
+/** A problem in English, for the Assistant's tools and the log. */
+export function problemText(p: OptionsProblem): string {
+  return p.kind === 'bad' ? p.why : englishText(p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : NOT_OFFERED[p.id])
+}
+
 /** resolveOptions(), logging a fall-back once per project and reason (each read would log it again otherwise). */
 const logged = new Map<string, string>()
 export function resolveLogged(project: string, platform: PlatformId, levels: OptionLevels): ResolvedOptions {
@@ -128,4 +124,12 @@ export function resolveLogged(project: string, platform: PlatformId, levels: Opt
   if (r.invalid) logged.set(key, r.invalid)
   else logged.delete(key)
   return r
+}
+
+/**
+ * A project's options from its config as read (the runtime, the recorder's start, the adoption: #1278 lets a project set
+ * only some options), over the workspace's and Hive's; a project's options for another platform don't apply.
+ */
+export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>): ResolvedOptions {
+  return resolveLogged(projectPath, platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: cfg.workflow?.options })
 }

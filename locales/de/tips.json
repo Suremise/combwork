@@ -323,6 +323,8 @@
   "tips.unusedWorktrees.title": "Behaltene Worktrees aufräumen",
   "tips.viewerTokens.text": "Eine App, die zeigt, was deine Agenten tun, etwa Apiary, braucht nur ein Lese-Token: Einstellungen → Agent API → Lese-Tokens erstellt eines, das alles lesen und nichts ändern kann, und widerruft es wieder.",
   "tips.viewerTokens.title": "Eine andere App Hive beobachten lassen",
+  "tips.workflowOptions.text": "Projekteinstellungen → Workflow legt fest, wer die Arbeit einer Karte reviewt, welche Checks vorher bestehen und wer sie mergt. Wähle eine Voreinstellung oder setze jede Option einzeln: Eine Änderung gilt ab der nächsten Karte, die startet.",
+  "tips.workflowOptions.title": "Lege fest, wie Karten zu Erledigt kommen",
   "tips.workspaceMoved.text": "Den Ordner des Arbeitsbereichs verschoben, etwa auf ein anderes Laufwerk? Öffne ihn am neuen Ort und wähle „Reparieren…“ im Banner: Die Worktrees der Agenten, ihre Sitzungen sowie die Unterhaltungen und das Gedächtnis von Claude Code ziehen mit.",
   "tips.workspaceMoved.title": "Einen Arbeitsbereich verschieben, ohne seine Agenten zu verlieren",
   "tips.worktreeReuse.text": "Du fügst einen Agenten mit einem neuen Worktree hinzu, der wie ein behaltener heißt (B4, und der Worktree von B4 ist unbenutzt)? Ist er gemergt und sauber, gibt Hive dem Agenten diesen Ordner, auf den Stand von main gebracht: Seine node_modules sind schon da.",
