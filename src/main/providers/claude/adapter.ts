@@ -5,6 +5,7 @@ import { mkdir, open, readdir, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
+import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
@@ -15,7 +16,7 @@ import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardComman
 import type { StartHint } from '../../../shared/startFailure'
 import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
-import { mergeLaunchSettings, userSettings, withoutSettingsArgs } from './launchSettings'
+import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
 import { claudeSafeguards } from './safeguards'
 import type { SafeguardEvent } from '../../../shared/safeguards'
@@ -373,8 +374,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       else hooks[ev] = [ev === 'PostToolUse' ? { matcher: '*', hooks: [hook] } : { hooks: [hook] }]
     }
     // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Hive and
-    // prints nothing, so no line is added to the terminal.
-    const statusLine = { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile, timeout), padding: 0 }
+    // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
+    // same JSON, and shows its output: Hive still reads the status.
+    const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs))
+    const statusLine = hiveStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
     // The user's --settings merged in: Hive passes only this file (#330).
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' }))
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
@@ -407,7 +410,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)
-    if (ctx.permissionMode) args.push('--permission-mode', ctx.permissionMode)
+    // The CLI's own setting (#1284): no flag, so Claude Code's own settings (defaultMode) decide.
+    if (ctx.permissionMode && !isCliOwnMode(ctx.permissionMode)) args.push('--permission-mode', ctx.permissionMode)
     args.push(...withoutSettingsArgs(ctx.extraArgs))
     // Claude Code takes a first message as its last argument and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))

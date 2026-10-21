@@ -121,6 +121,7 @@
   "tasks.history.reviewPassed": "Review passed",
   "tasks.history.reviewStarted": "Started reviewing",
   "tasks.history.reviewStopped": "Review by {agent} stopped",
+  "tasks.history.reviewerRequest": "Asked the builder: \"{text}\"",
   "tasks.history.safeguardStop": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
   "tasks.history.takenFrom": "Taken from {agent}",
   "tasks.history.takenFromAgent": "Taken from its agent",

@@ -1,3 +1,4 @@
+import { withCliOwn } from './cliOwnMode'
 import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
 import { msg } from './i18n/msg'
 import type { Tr } from './tasks'
@@ -225,7 +226,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   icon: 'claude',
   setupUrl: 'https://code.claude.com/docs/en/setup',
   pricingUrl: 'https://platform.claude.com/docs/en/about-claude/pricing',
-  permissionModes: CLAUDE_PERMISSION_MODES,
+  permissionModes: withCliOwn(CLAUDE_PERMISSION_MODES),
   defaultPermissionMode: 'auto',
   // Plan mode would block the hive tools.
   assistantMode: 'auto',

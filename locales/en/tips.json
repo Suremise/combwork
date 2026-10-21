@@ -391,12 +391,28 @@
     "defaultMessage": "See what a card’s work went through",
     "description": "A tip's title. Glossary: work (a card's Work section)."
   },
+  "tips.claudeStatusLine.text": {
+    "defaultMessage": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.claudeStatusLine.title": {
+    "defaultMessage": "Keep your own Claude Code status line",
+    "description": "A tip's title. The status line is the line Claude Code shows under its input."
+  },
   "tips.cliOverrides.text": {
     "defaultMessage": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.cliOverrides.title": {
     "defaultMessage": "Keep a CLI as it is outside Hive",
+    "description": "A tip's title."
+  },
+  "tips.cliOwnMode.text": {
+    "defaultMessage": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cliOwnMode.title": {
+    "defaultMessage": "Let the CLI's own config choose the mode",
     "description": "A tip's title."
   },
   "tips.closeWindow.text": {
@@ -666,6 +682,22 @@
   "tips.keepAwake.title": {
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
+  },
+  "tips.laneBranchSquash.text": {
+    "defaultMessage": "After an agent's card is squash-merged, Hive brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.laneBranchSquash.title": {
+    "defaultMessage": "An agent's branch kept up to date between cards",
+    "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
+  "tips.laneGates.text": {
+    "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
+  },
+  "tips.laneGates.title": {
+    "defaultMessage": "See why a lane isn’t moving",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
@@ -940,8 +972,8 @@
     "description": "A tip's title."
   },
   "tips.progressHistory.text": {
-    "defaultMessage": "Recent in the Progress panel shows the last {recent, plural, one {# run} other {# runs}}; Show all scrolls through the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts. The project filter applies to them all.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {recent} is how many runs Recent shows (10), {kept} how many Show all keeps (200)."
+    "defaultMessage": "The Runs tab of the Progress panel keeps the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts: by day, a run and its retries in one line. Find them by their words, or show only failures, a lane’s or an agent’s.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Hive keeps (200)."
   },
   "tips.progressHistory.title": {
     "defaultMessage": "What ran this morning?",
@@ -979,13 +1011,13 @@
     "defaultMessage": "How long until the tests finish?",
     "description": "A tip's title."
   },
-  "tips.progressRecentFold.text": {
-    "defaultMessage": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Recent is the Progress panel's section of runs that ended."
+  "tips.progressTabs.text": {
+    "defaultMessage": "The Progress panel has four tabs: Pulse for what is going on now, then Merges, Runs and Lanes. A red number on Runs counts the runs that failed with nothing passing since; Pulse has a line for them too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (the tabs: Pulse, Merges, Runs, Lanes)."
   },
-  "tips.progressRecentFold.title": {
-    "defaultMessage": "Fold Recent away",
-    "description": "A tip's title."
+  "tips.progressTabs.title": {
+    "defaultMessage": "Pulse, Merges, Runs, Lanes",
+    "description": "A tip's title: the Progress panel's tabs, named as the panel shows them."
   },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",

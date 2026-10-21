@@ -272,9 +272,9 @@ describe("a provider's danger opt-in (#461)", () => {
     const ticked = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { providers: { copilot: { enableDangerousMode: true } } } as unknown as Partial<AppSettings>)
     expect(modeAllowed('copilot', 'allow-all', off)).toBe(true)
     expect(modeAllowed('copilot', 'autopilot', off)).toBe(false)
-    expect(offeredModes('copilot', off).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'allow-all'])
+    expect(offeredModes('copilot', off).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'allow-all', 'cli-own'])
     expect(modeAllowed('copilot', 'autopilot', ticked)).toBe(true)
-    expect(offeredModes('copilot', ticked).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all'])
+    expect(offeredModes('copilot', ticked).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all', 'cli-own'])
     // Allow all can be Copilot's default mode, as any mode outside the opt-in can; Autopilot can't.
     const choices = (entry('copilot.defaultPermissionMode').options ?? []).map((o) => o.value)
     expect(choices).toContain('allow-all')

@@ -81,6 +81,7 @@ interface HiveMessageValues {
   'session.mergeSlot.waitingNext': { agent: string | number }
   'session.mergeSlot.waitingNextCards': { agent: string | number; cards: string | number }
   'session.mode.asking': undefined
+  'session.mode.assistantCliOwn': undefined
   'session.mode.ended': { mode: string | number }
   'session.mode.endedUnconfirmed': { provider: string | number; mode: string | number }
   'session.mode.notFound': { what: string | number; mode: string | number }

@@ -1391,6 +1391,10 @@
     "defaultMessage": "{n, plural, one {# finished: {cards}} other {# finished: {cards}}}",
     "description": "A lane segment's label (Progress panel) for its finished cards folded into one: how many ({n}) and which ({cards}: \"#3, #4\")."
   },
+  "board.lane.foldedMark": {
+    "defaultMessage": "{card}: {mark}",
+    "description": "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)."
+  },
   "board.lane.goneWhenEnded": {
     "defaultMessage": "{card} · not on the board when the lane ended",
     "description": "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its name: its key, such as AM-12, or #12 for a card with none."
@@ -1459,9 +1463,21 @@
     "defaultMessage": "Merged as {commit}",
     "description": "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)."
   },
+  "board.lane.workNoCode": {
+    "defaultMessage": "No-code card: no commits",
+    "description": "A line in a lane segment's hover (Progress panel): the card is a no-code card (its work isn't code), so it has no commits to show. Glossary: no-code card."
+  },
+  "board.lane.workRefused": {
+    "defaultMessage": "{message} {next}{times, plural, one {} other { (refused # times)}}",
+    "description": "A line in a lane segment's hover (Progress panel), for its red notch: the card's latest request was refused by its workflow rules: why ({message}) and what to do next ({next}), each a whole sentence already translated, then, when it was refused more than once in a row, how many times ({times}; nothing when once). Glossary: refused, rule."
+  },
   "board.lane.workRevision": {
     "defaultMessage": "{review, select, yes {Under review: {revision}} other {Revision: {revision}}}",
     "description": "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review."
+  },
+  "board.lane.workStalePass": {
+    "defaultMessage": "{now, select, none {Pass was for {approved}: it no longer holds} other {Pass was for {approved}; now at {current}}}",
+    "description": "A line in a lane segment's hover (Progress panel), with its stale mark: the card's pass was for one revision ({approved}, a short commit id) and the card is at another now ({current}); none: the revision now isn't known. Keep the select keys."
   },
   "board.lane.workVerdict": {
     "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
@@ -1495,6 +1511,10 @@
     "defaultMessage": "Fold the lanes",
     "description": "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar."
   },
+  "board.lanes.latestRun": {
+    "defaultMessage": "{card}'s latest run: {run}, {state, select, running {running} passed {passed} failed {failed} other {stopped}}",
+    "description": "Tooltip and accessible name of the dot after a lane's current card (Progress panel): that card's latest run ({run}: its title) and how it is going or went. Keep the select keys."
+  },
   "board.lanes.moveDown": {
     "defaultMessage": "Move Down",
     "description": "A lane's context menu item in the Progress panel: moves it down among the running lanes."
@@ -1506,6 +1526,10 @@
   "board.lanes.moved": {
     "defaultMessage": "{lane} moved: {at} of {n, plural, one {# running lane} other {# running lanes}}",
     "description": "Said to screen readers after a lane is moved in the Progress panel: the lane (its builder / reviewer, and its name in brackets), and its place now ({at}) among the {n} running lanes."
+  },
+  "board.lanes.none": {
+    "defaultMessage": "No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.",
+    "description": "The Progress panel's Lanes tab when there are no lanes. Glossary: lane."
   },
   "board.lanes.show": {
     "defaultMessage": "Show the lanes",
@@ -1534,6 +1558,14 @@
   "board.lanes.usualOrderSaid": {
     "defaultMessage": "Lanes back in the usual order",
     "description": "Said to screen readers after the Progress panel's lanes go back to their usual order (Usual Order, in a lane's menu)."
+  },
+  "board.lanes.waitingForYou": {
+    "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
+    "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
+  },
+  "board.lanes.waits": {
+    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} other {list changes after {card}}}",
+    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
@@ -1679,6 +1711,26 @@
     "defaultMessage": "Agent",
     "description": "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)."
   },
+  "board.progress.attention": {
+    "defaultMessage": "{n, plural, one {# run failed} other {# runs failed}}",
+    "description": "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab."
+  },
+  "board.progress.badgeLanes": {
+    "defaultMessage": "{n, plural, one {# lane} other {# lanes}}",
+    "description": "What the badge on the Progress panel's Lanes tab means: how many lanes there are."
+  },
+  "board.progress.badgeMerges": {
+    "defaultMessage": "{n, plural, one {# merge waiting} other {# merges waiting}}",
+    "description": "What the badge on the Progress panel's Merges tab means: how many agents wait for the merge slot."
+  },
+  "board.progress.badgeRuns": {
+    "defaultMessage": "{n, plural, one {# failure nothing has passed since} other {# failures nothing has passed since}}",
+    "description": "What the red badge on the Progress panel's Runs tab means: runs that failed with no later run of the same thing passing."
+  },
+  "board.progress.blocksReview": {
+    "defaultMessage": "Blocks review for {card}",
+    "description": "Under a failed run in the Progress panel: the run was a check the card's rules require before it can go to Review, so the card can't until it passes. {card} is the card's name (its key, such as HI-12). Glossary: check, rule."
+  },
   "board.progress.cantShow": {
     "defaultMessage": "Can't show {agent}",
     "description": "A notification's title: the agent ({agent}) that ran a Progress panel run can't be shown. Its message says why."
@@ -1708,8 +1760,8 @@
     "description": "Accessible name of a run's details in the Progress panel ({run}: the run's title)."
   },
   "board.progress.dismiss": {
-    "defaultMessage": "Dismiss (it stays under Recent)",
-    "description": "Tooltip of the button dismissing a failed or stale run in the Progress panel. Recent is the panel's section of older runs."
+    "defaultMessage": "Dismiss (it stays in the Runs tab)",
+    "description": "Tooltip of the button dismissing a failed or stale run in the Progress panel's Pulse tab. Runs is the panel's tab of every run (keep it as the panel names it)."
   },
   "board.progress.empty": {
     "defaultMessage": "Nothing is running. When an agent runs tests or a build with progress reporting, it shows here with how far along it is and the time left.",
@@ -1747,6 +1799,10 @@
     "defaultMessage": "The Assistant is not in this workspace.",
     "description": "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none."
   },
+  "board.progress.noMerges": {
+    "defaultMessage": "No merge is going on. While an agent merges its branch, it shows here with its cards, its checks and who waits.",
+    "description": "The Progress panel's Merges tab when no agent is merging."
+  },
   "board.progress.openCard": {
     "defaultMessage": "Open {card}",
     "description": "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)."
@@ -1779,29 +1835,13 @@
     "defaultMessage": "Showing {name} only ({shown, number} of {all, number})",
     "description": "Tooltip of the filter mark on the folded Progress strip: only one project's (or agent's) runs ({name}) show, {shown} of {all} runs."
   },
-  "board.progress.recent": {
-    "defaultMessage": "Recent",
-    "description": "A section heading in the Progress panel: runs that finished a while ago."
-  },
-  "board.progress.recentFold": {
-    "defaultMessage": "Fold the recent runs",
-    "description": "Tooltip of the Progress panel's Recent heading: folds its runs away, leaving the heading."
-  },
   "board.progress.recentHover": {
     "defaultMessage": "{agent}: {run} {state}",
-    "description": "Tooltip of a run under the Progress panel's Recent: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)."
+    "description": "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)."
   },
   "board.progress.recentHoverTook": {
     "defaultMessage": "{agent}: {run} {state} ({took})",
-    "description": "Tooltip of a run under the Progress panel's Recent: its agent, its title ({run}), its state in a few words ({state}: failed, stopped reporting…) and how long it took ({took}: 4 min)."
-  },
-  "board.progress.recentRuns": {
-    "defaultMessage": "Recent runs",
-    "description": "What the Progress panel's Recent list holds, for its Show all button and accessible name."
-  },
-  "board.progress.recentShow": {
-    "defaultMessage": "Show the recent runs",
-    "description": "Tooltip of the Progress panel's Recent heading while its runs are folded away: shows them."
+    "description": "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}), its state in a few words ({state}: failed, stopped reporting…) and how long it took ({took}: 4 min)."
   },
   "board.progress.region": {
     "defaultMessage": "Progress",
@@ -1858,6 +1898,14 @@
   "board.progress.stepOfNamed": {
     "defaultMessage": "{step, number} of {total, number}: {name}",
     "description": "A run's step in the Progress panel, under its bar: step {step} of {total}, and the step's name ({name}, as its reporter named it)."
+  },
+  "board.progress.tab": {
+    "defaultMessage": "{tab, select, pulse {Pulse} merges {Merges} runs {Runs} other {Lanes}}",
+    "description": "A tab of the Progress panel: Pulse (an overview of what is going on now), Merges, Runs (tests, builds and checks agents ran) or Lanes (card loops). Keep \"Runs\" as the panel says it everywhere. Keep the select keys."
+  },
+  "board.progress.tabs": {
+    "defaultMessage": "Progress panel views",
+    "description": "Accessible name of the Progress panel's tabs (Pulse, Merges, Runs, Lanes)."
   },
   "board.progress.title": {
     "defaultMessage": "Progress",
@@ -1978,6 +2026,58 @@
   "board.run.wordsWaiting": {
     "defaultMessage": "{run} · waiting",
     "description": "A run in a few words, for an agent's status line: {run} is its title and steps (\"e2e 4/12\"); it is waiting (for a test slot, say)."
+  },
+  "board.runs.agent": {
+    "defaultMessage": "Agent",
+    "description": "Accessible name of the Progress panel's Runs tab filter by agent: only the runs one agent ran."
+  },
+  "board.runs.anyAgent": {
+    "defaultMessage": "Any agent",
+    "description": "A choice of the Progress panel's Runs tab filter by agent: runs of every agent."
+  },
+  "board.runs.anyLane": {
+    "defaultMessage": "Any lane",
+    "description": "A choice of the Progress panel's Runs tab filter by lane: runs of any card."
+  },
+  "board.runs.cardRun": {
+    "defaultMessage": "{card} {run}",
+    "description": "A run named with its card in the Progress panel's Runs tab: the card's name ({card}: its key, such as AL-12) and the run's title ({run})."
+  },
+  "board.runs.clear": {
+    "defaultMessage": "Clear",
+    "description": "A button in the Progress panel's Runs tab: clears its filters and search."
+  },
+  "board.runs.failedOnly": {
+    "defaultMessage": "Failed",
+    "description": "A toggle in the Progress panel's Runs tab: shows only the runs that failed."
+  },
+  "board.runs.group": {
+    "defaultMessage": "{what} ×{n, number} · {outcome, select, passed {{failed, plural, =0 {all passed} one {# failed, then passed} other {# failed, then passed}}} failed {{failed, plural, one {# failed} other {# failed}}} other {{failed, plural, =0 {last stopped} one {# failed, last stopped} other {# failed, last stopped}}}}",
+    "description": "A line in the Progress panel's Runs tab for one run tried several times the same day: what ran ({what}: a card and the run's title), how many times ({n}), how many of them failed ({failed}) and how the last one ended (outcome: passed, failed, or stopped without passing or failing). Keep the select keys."
+  },
+  "board.runs.lane": {
+    "defaultMessage": "Lane",
+    "description": "Accessible name of the Progress panel's Runs tab filter by lane: only the runs for a lane's cards."
+  },
+  "board.runs.none": {
+    "defaultMessage": "No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.",
+    "description": "The Progress panel's Runs tab when Hive has no runs."
+  },
+  "board.runs.noneMatch": {
+    "defaultMessage": "No runs match.",
+    "description": "The Progress panel's Runs tab when no run matches its filters or search."
+  },
+  "board.runs.search": {
+    "defaultMessage": "Find runs",
+    "description": "Placeholder and accessible name of the search box in the Progress panel's Runs tab: finds runs by title, command, agent or card."
+  },
+  "board.runs.today": {
+    "defaultMessage": "Today",
+    "description": "A heading in the Progress panel's Runs tab: the runs that ended today follow."
+  },
+  "board.runs.yesterday": {
+    "defaultMessage": "Yesterday",
+    "description": "A heading in the Progress panel's Runs tab: the runs that ended yesterday follow."
   },
   "board.setAside.add": {
     "defaultMessage": "Add to Board",

@@ -26,6 +26,7 @@ import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
 import { roundLimitCards } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
+import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 
 const log = createLogger('lanes')
 
@@ -367,7 +368,8 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
       const m = new Map<number, LaneCardFacts>()
       for (const n of l.cards) {
         const s = foldCard(store.facts(n))
-        m.set(n, { stage: s.stage, forYou: forYou(s).length > 0, stale: !!s.stale, rounds: s.rounds })
+        const asks = forYou(s)
+        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds })
       }
       out.set(l.id, m)
     } catch (e) {
@@ -386,7 +388,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // The running lanes' cards waiting for the user at their round limit (§16.11.4): from their facts, while the rules
   // are enforced (turned off, nothing pauses a lane for a rule).
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
@@ -858,6 +860,8 @@ export function startLanes(): void {
     const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
     if (ws) changed(ws)
   })
+  // A lane starting or stopping to wait for its builder's branch (#1271): read again.
+  onLineWaitChanged((ws) => changed(ws))
   // The runtime's `endLaneIfDone` (a card Done, #1270): the lanes are read again, and one whose cards are all Done ends.
   onAction('endLaneIfDone', (_a, ws) => changed(ws), 'repeatable')
   // An ended lane leaves the list after an hour: looked at again each minute (only workspaces whose window was told some).

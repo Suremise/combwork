@@ -108,13 +108,15 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
   const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
   const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) })))
-  const status = running(rec) ? laneStatus(rec, list, current, waiting, facts ?? null) : null
+  // Its next card waiting while its builder's branch is brought up to date (§16.19.2, `line`: the main side's), when
+  // nothing more pressing says why.
+  const status = running(rec) ? (laneStatus(rec, list, current, waiting, facts ?? null) ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
   const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   const named = (a: LaneAgent): LaneAgent => ({ id: a.id, name: names?.get(a.id) ?? a.name })
   return {
@@ -143,6 +145,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
 export interface LaneCardFacts {
   stage: StageId
   forYou: boolean
+  /** What the user is asked for (the first open request's kind), while forYou. */
+  ask?: LaneStatus['ask']
   stale: boolean
   rounds: number
 }
@@ -170,7 +174,7 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   // The card the lane waits on: the first not Done when it has passed (merging next), else the one being worked.
   const focus = open[0].column === 'passed' ? open[0] : (open.find((c) => c.number === current) ?? open[0])
   const f = facts.get(focus.number)
-  if (f?.forYou) return { reason: 'you', card: focus.number }
+  if (f?.forYou) return { reason: 'you', card: focus.number, ...(f.ask ? { ask: f.ask } : {}) }
   // Waiting for a merge only while a card after it waits to start: with every card passed, the lane's merge is due.
   if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }
@@ -199,6 +203,8 @@ export function laneStatusText(s: LaneStatus): string {
       return `stale: ${card} must be submitted again`
     case 'reviewer':
       return `waiting for a reviewer on ${card}`
+    case 'lineUpdate':
+      return `waiting: bringing the builder's branch up to date before ${card}`
     case 'listChanges':
       return `list changes after ${card}`
   }

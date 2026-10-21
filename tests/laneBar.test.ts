@@ -2,9 +2,10 @@
 // rounds), the hover text, folding a long lane's finished cards, and the header's numbers; an ended lane's segments as it
 // left them, the card being worked, and the panel's order of lanes (#512).
 import { describe, expect, it } from 'vitest'
-import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
+import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
-import type { LaneCard, LaneState, TaskCard, TaskColumn } from '../src/shared/types'
+import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
+import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
 import { fmt, tr } from '../src/shared/i18n'
 
 // The segments' text is the window's (#798): worded with tr(), in English here.
@@ -366,7 +367,7 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
@@ -382,6 +383,74 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(workNotes(badge({ revision: null, override: { ...o, by: 'assistant', reason: '' } }), 'done', null, short, tr, names)).toEqual(['The Assistant moved it past its rules: Review and approval before merging + done.contained. No reason given.'])
     // Without the window's names (hive-mcp): no line.
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr)).toEqual([])
+  })
+
+  // The gates, visible (#1279).
+  const names = { list: (items: string[]) => items.join(' + '), ruleName: (id: string) => id, refusal: (rule: string, values: Record<string, string | number | StoredText>) => refusalLines(rule as RuleId, values, { one: (m, v) => tr(m, v), list: (items) => items.join(', '), names: true }) }
+  const refused = { move: 'submit', rule: 'submit.empty', values: { card: 'alpha-7' }, at: '', times: 1 }
+
+  it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7 has no change to review. Commit the work, then submit.', 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7')[0]).toBe('AL-7 has no change to review. Commit the work, then submit. (refused 3 times)')
+    // A rule's names in the window's words (move.notFromHere names the stage and the moves).
+    expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
+  })
+
+  it('a stale pass (#1279): the revision it was for and the one now, through the platform', () => {
+    expect(workNotes(badge({ stage: 'approved', stale: true, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' } }), 'passed', null, short, tr)).toEqual(['Pass was for a3f2c1d; now at b71e09a', 'Revision: a3f2c1d'])
+    expect(workNotes(badge({ revision: null, stale: true, stalePass: { approved: 'a3f2c1d9e8', current: null } }), 'passed', null, short, tr)).toEqual(['Pass was for a3f2c1d: it no longer holds'])
+  })
+
+  it('a no-code card (#1279): says so, with no revision or merge lines', () => {
+    expect(workNotes(badge({ noCode: true, stage: 'done', revision: 'hash12345678', merged: '9f8e7d6c5b4a3', verdict: { pass: true, revision: null, current: true } }), 'done', 'ffffffffffff', short, tr)).toEqual(['No-code card: no commits', 'Last verdict: passed'])
+  })
+
+  it("a running lane's segment marks (#1279): a refusal, a stale pass and an override each with what it means; none in an ended lane", () => {
+    const seg = { kind: 'card', number: 7, name: 'AL-7', state: 'passed', failed: false, round: 1, label: 'AL-7 x · Passed', notes: [] } as CardSegment
+    const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: '', at: '' }
+    const b = badge({ refused, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' }, override: o })
+    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7 has no change to review. Commit the work, then submit.', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
+    expect(segmentMarks({ frozen: null }, badge(), seg, short, tr, names)).toEqual({})
+    // Done, a stale pass no longer matters: no stale mark or line.
+    expect(segmentMarks({ frozen: null }, b, { ...seg, state: 'done' }, short, tr, names)).not.toHaveProperty('stale')
+    expect(workNotes(b, 'done', null, short, tr, names, 'AL-7').some((l) => l.startsWith('Pass was for'))).toBe(false)
+    expect(segmentMarks({ frozen: [] }, b, seg, short, tr, names)).toEqual({})
+    expect(segmentMarks({ frozen: null }, undefined, seg, short, tr, names)).toEqual({})
+  })
+
+  it("folded segments keep their cards' marks (HR6's #1279 round 1): each mark of each folded card, named by its card", () => {
+    const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: 'Merged by hand', at: '' }
+    const segs = [
+      { kind: 'card', number: 1, name: 'AL-1', state: 'done', failed: false, round: 1, label: 'AL-1', notes: [] },
+      { kind: 'card', number: 2, name: 'AL-2', state: 'passed', failed: false, round: 1, label: 'AL-2', notes: [] },
+      { kind: 'card', number: 27, name: 'AL-27', state: 'todo', failed: false, round: null, label: 'AL-27', notes: [] }
+    ] as CardSegment[]
+    const badges = new Map([
+      [1, badge({ card: 1, override: o })],
+      [2, badge({ card: 2, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' } })],
+      [27, badge({ card: 27, revision: null, refused: { ...refused, values: { card: 'alpha-27' } } })]
+    ])
+    const marks = foldedMarks({ frozen: null }, badges, segs, [1, 2, 27], () => short, tr, names)
+    expect(marks).toEqual({
+      refused: ['AL-27: AL-27 has no change to review. Commit the work, then submit.'],
+      stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
+      override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand']
+    })
+    expect(foldedMarks({ frozen: [] }, badges, segs, [1, 2, 27], () => short, tr, names)).toEqual({ refused: [], stale: [], override: [] })
+  })
+
+  it('why a lane waits, in the window (#1279): each reason, the card by its key', () => {
+    const name = (n: number): string => `HI-${n}`
+    expect(laneWaitText({ reason: 'you', card: 12, ask: 'approve' }, name, tr)).toBe('waiting for you (approval): HI-12')
+    expect(laneWaitText({ reason: 'you', card: 12 }, name, tr)).toBe('waiting for you (an answer): HI-12')
+    expect(laneWaitText({ reason: 'notMerged', card: 11 }, name, tr)).toBe('waiting: HI-11 not merged')
+    expect(laneWaitText({ reason: 'merging', card: 11 }, name, tr)).toBe('waiting: HI-11 merging')
+    expect(laneWaitText({ reason: 'reviewer', card: 12 }, name, tr)).toBe('waiting for a reviewer on HI-12')
+    expect(laneWaitText({ reason: 'stale', card: 12 }, name, tr)).toBe('stale: HI-12 must be submitted again')
+    expect(laneWaitText({ reason: 'listChanges', card: 12 }, name, tr)).toBe('list changes after HI-12')
+    expect(laneWaitText({ reason: 'roundLimit', card: 12 }, name, tr)).toBe('waiting for you: HI-12 reached its round limit')
+    expect(laneWaitText({ reason: 'blocked', card: 3, blocked: 'x' }, name, tr)).toBe('HI-3 is blocked')
+    expect(laneWaitText({ reason: 'hold', card: 3 }, name, tr)).toBe('HI-3 is On Hold')
   })
 
   it("its merge commit once Done: the Integrated fact's, else the lane's record; nothing for a card with no work recorded", () => {

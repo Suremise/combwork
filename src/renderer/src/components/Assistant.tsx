@@ -90,7 +90,8 @@ const M = {
   settingsMenu: msg({ id: 'assistant.panel.settingsMenu', defaultMessage: 'Assistant Settings…', description: "An item of the Assistant panel's More (⋯) menu: opens the Assistant Settings dialog." }),
   moveRight: msg({ id: 'assistant.panel.moveRight', defaultMessage: 'Move Panel to the Right', description: "An item of the Assistant panel's More (⋯) menu: moves the panel to the window's right side." }),
   moveLeft: msg({ id: 'assistant.panel.moveLeft', defaultMessage: 'Move Panel to the Left', description: "An item of the Assistant panel's More (⋯) menu: moves the panel to the window's left side." }),
-  hide: msg({ id: 'assistant.panel.hide', defaultMessage: 'Hide the Assistant', description: "An item of the Assistant panel's More (⋯) menu: hides the panel; the Assistant keeps running." }),
+  fold: msg({ id: 'assistant.panel.fold', defaultMessage: 'Fold the Assistant panel', description: "An item of the Assistant panel's More (⋯) menu, and its header's button: folds the panel to a strip at the window's edge; the Assistant keeps running. Fold as the Progress panel's button says it." }),
+  foldTip: msg({ id: 'assistant.panel.foldTip', defaultMessage: '{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}', description: 'Tooltip of the button in the Assistant panel\'s header that folds it to a strip at the window\'s edge, with its shortcut ({key}: "Ctrl+Alt+I").' }),
   nameTip: msg({ id: 'assistant.panel.nameTip', defaultMessage: 'Assistant · {provider}', description: "Tooltip of the Assistant's name on its panel's header: its coding agent ({provider}: \"Claude Code\"). Assistant as the panel's title says it." }),
   provider: msg({ id: 'assistant.panel.provider', defaultMessage: 'Coding agent: {provider}', description: "A line of an agent's tooltip in the Assistant's workspace section ({provider}: \"Claude Code\")." }),
   noneRunning: msg({ id: 'assistant.panel.noneRunning', defaultMessage: 'no agents running', description: "The Assistant's workspace section: a project none of whose agents run. Lower case." }),
@@ -568,7 +569,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
         { label: tr(M.manageModes), icon: 'person', onClick: () => showAssistantView('modes') },
         { separator: true },
         { label: tr(left ? M.moveRight : M.moveLeft), icon: left ? 'layout-sidebar-right' : 'layout-sidebar-left', onClick: () => void setAssistantSide(left ? 'right' : 'left') },
-        { label: tr(M.hide), icon: left ? 'layout-sidebar-left-off' : 'layout-sidebar-right-off', keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setAssistantOpen(false) }
+        { label: tr(M.fold), icon: left ? 'layout-sidebar-left-off' : 'layout-sidebar-right-off', keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setAssistantOpen(false) }
       ],
       keyboard
     )
@@ -602,6 +603,8 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
           <Icon name="ellipsis" />
         </button>
       </Tooltip>
+      {/* Fold, as the Progress panel's header has it (#1330): its chevron points to the edge the panel folds to. */}
+      <IconButton icon={left ? 'chevron-left' : 'chevron-right'} className="assistant-panel-fold" title={tr(M.foldTip, { hasKey: kb ? 'yes' : 'no', key: kb ? formatKeybinding(kb) : '' })} onClick={() => setAssistantOpen(false)} />
       {menu.element}
       {picker.element}
     </div>
@@ -997,7 +1000,7 @@ export function AssistantSettingsDialog() {
       <h3 className="agent-dialog-h">{tr(M.codingAgent)}</h3>
       <ProviderChoice value={provider} current={current} onChange={chooseProvider} />
       <h3 className="agent-dialog-h">{tr(M.settings)}</h3>
-      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault />
+      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault assistant />
       {agent.live && <div className="detail">{tr(M.appliesNext)}</div>}
     </Modal>
   )

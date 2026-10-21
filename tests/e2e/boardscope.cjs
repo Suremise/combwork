@@ -112,6 +112,16 @@ const until = async (fn, ms = 10000) => {
   check('a project change takes the card from its agent, and says so', m.status === 200 && m.body.agent === null && m.body.history.slice(-1)[0].what === 'Taken from Alfie of alpha', JSON.stringify(m.body?.history?.slice(-2)))
   await inv('tasks:delete', moved)
   check('the workspace token still lists every card', r.status === 200 && r.body.length === 5, String(r.body?.length))
+  // ?q= (#1237): the board's search, through its index for words, in the caller's scope.
+  const titles = (x) => (x.status === 200 ? x.body.map((c) => c.title).sort() : x)
+  r = await call(workspaceToken, 'GET', '/v1/tasks?q=bet')
+  check('?q= finds cards by their words (the project, through the index)', JSON.stringify(titles(r)) === '["B1","B2"]', JSON.stringify(titles(r)))
+  r = await as('GET', '/v1/tasks?q=bet')
+  check("an agent's ?q= finds nothing of another project's", JSON.stringify(titles(r)) === '[]', JSON.stringify(titles(r)))
+  r = await as('GET', '/v1/tasks?q=ALP')
+  check("…and its own project's cards, case aside", JSON.stringify(titles(r)) === '["A1","A2"]', JSON.stringify(titles(r)))
+  r = await call(workspaceToken, 'GET', `/v1/tasks?q=%23${n.W}`)
+  check('?q= takes a card number too', JSON.stringify(titles(r)) === '["W"]', JSON.stringify(titles(r)))
 
   // --- Another project's card, or the workspace's: as if it didn't exist, whatever the request claims.
   for (const [what, x] of [['beta', n.B1], ['workspace', n.W]]) {

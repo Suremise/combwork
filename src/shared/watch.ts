@@ -17,8 +17,10 @@ import { cardRef } from './projectKeys'
 /**
  * What counts as a change: a column move, a new comment, a review verdict, a change of agent. Default: any. `blocked` (a
  * card becoming blocked) isn't one to choose: a lane watch counts it for the cards beside its lanes (#726, `blocked`).
+ * Nor are `request` (its reviewer asked its builder for something, #912) and `decision` (the user recorded, changed or
+ * removed a decision): a watch that counts a verdict, a move or a comment counts them too (#1272, SPEC §16.8.2).
  */
-export type WatchChange = 'column' | 'comment' | 'verdict' | 'agent' | 'blocked'
+export type WatchChange = 'column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision'
 export const WATCH_CHANGES: readonly WatchChange[] = ['column', 'comment', 'verdict', 'agent']
 
 /** A wait's condition: the cards (numbers), which changes count, and optionally a column one of them must be in. */
@@ -230,10 +232,38 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
   if (kinds.has('agent') && now.agent !== base.mark.agent) out.push('agent')
   // Blocked since, and still (#726): a block lifted again meanwhile has nothing left to tell.
   if (cond.blocked && card.blocked && h.some((e) => BLOCKED.test(e.what))) out.push('blocked')
+  out.push(...handoffsIn(h, cond, base.watcher))
   return out
 }
 
 const BLOCKED = /^Blocked: /
+/** A reviewer's request to the card's builder (#912), and a decision the user recorded, changed or removed, in a card's history. */
+const REQUEST = /^Asked the builder: /
+const DECISION = /^(Recorded a decision|Changed a decision|Removed a decision)\b/
+/** Whether a history entry is a decision recorded, changed or removed. */
+export const isDecisionEntry = (what: string): boolean => DECISION.test(what)
+
+/**
+ * Whether a watch counts a reviewer's request and a decision (#1272, SPEC §16.8.2): one that counts a verdict, a move or
+ * a comment (a builder waiting for its verdict asked only for verdict and column, #912's case), but not one that waits
+ * only to see a card in a column (a reviewer waiting for its arrival in Review).
+ */
+export const hearsHandoffs = (cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>): boolean =>
+  !(cond.column && !cond.moveInto) && (!cond.changes.length || cond.changes.some((c) => c === 'verdict' || c === 'column' || c === 'comment'))
+
+/** The requests and decisions among history entries new to a watch (`watcher`: its board name; its own aren't news). */
+function handoffsIn(h: readonly { by: string; what: string }[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
+  if (!hearsHandoffs(cond)) return []
+  const others = watcher ? h.filter((e) => e.by !== watcher) : h
+  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : [])]
+}
+
+/**
+ * The requests and decisions a wait counts on a card after `since` (ISO), by its history: for a wait that compares marks
+ * (a bounded wait, a watch saved before #224), which have no place for them.
+ */
+export const handoffsSince = (card: TaskCard | null, since: string, cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] =>
+  card ? handoffsIn(card.history.filter((e) => e.at > since), cond, watcher) : []
 
 /** A card's return for review in its history: "Returned for review, round 2". */
 const RETURNED = /^Returned for review, round (\d+)/
@@ -461,7 +491,14 @@ function whereNow(change: CardChange, blockedMax = 120): string {
   const merged = about?.owner && change.column === 'passed' ? " (Passed isn't merged)" : ''
   const why = change.blocked ? [...change.blocked.replace(/\s+/g, ' ').trim()] : []
   const blocked = change.blocked ? ` and blocked${blockedMax > 0 ? `: "${why.length > blockedMax ? `${why.slice(0, blockedMax - 1).join('')}…` : why.join('')}"` : ''}` : ''
-  return about?.returned ? `${owner} was returned for review (round ${about.returned})${verdict}${blocked}` : `${owner} is in ${columnWord(change.column)}${verdict}${merged}${blocked}`
+  const said = handoffWords(change.changes)
+  return about?.returned ? `${owner} was returned for review (round ${about.returned})${verdict}${blocked}${said}` : `${owner} is in ${columnWord(change.column)}${verdict}${merged}${blocked}${said}`
+}
+
+/** What a wake adds for a reviewer's request and a new decision (#1272): " (its reviewer asks you something; a new decision)". */
+function handoffWords(changes: WatchChange[]): string {
+  const said = [changes.includes('request') ? 'its reviewer asks you something' : '', changes.includes('decision') ? 'a new decision from the user: read its decisions' : ''].filter(Boolean)
+  return said.length ? ` (${said.join('; ')})` : ''
 }
 
 /**
@@ -510,7 +547,7 @@ export function brief(c: CardChange): string {
   if (c.changes === 'gone' || c.column === 'gone') return `${cardRef(c.number)} ${c.archived ? 'archived' : 'gone'}`
   const a = c.about
   if (a?.returned) return `${cardRef(c.number)} returned for review (round ${a.returned})`
-  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}`
+  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}${c.changes.includes('request') ? ', a request' : ''}${c.changes.includes('decision') ? ', a decision' : ''}`
 }
 
 /**

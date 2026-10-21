@@ -71,6 +71,10 @@ interface HiveMessageValues {
   'agents.claude.planDescription': undefined
   'agents.claude.safeguardHelp': undefined
   'agents.claude.signInHelp': undefined
+  'agents.cliOwn.cliNote': undefined
+  'agents.cliOwn.description': undefined
+  'agents.cliOwn.label': undefined
+  'agents.cliOwn.short': undefined
   'agents.codex.approveForMe': undefined
   'agents.codex.approveForMeDescription': undefined
   'agents.codex.ask': undefined
@@ -232,6 +236,8 @@ interface HiveMessageValues {
   'agents.permission.agentNewSessions': { agent: string | number }
   'agents.permission.answerFirst': undefined
   'agents.permission.badgeTip': { live: string; mode: string | number; note: string; key: string; cycles: string; plan: string }
+  'agents.permission.cliOwnNoSwitch': undefined
+  'agents.permission.cliOwnNoSwitchTitle': undefined
   'agents.permission.current': undefined
   'agents.permission.dangerConfirm': { mode: string | number }
   'agents.permission.dangerDetail': { provider: string | number }

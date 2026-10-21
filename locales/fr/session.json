@@ -79,6 +79,7 @@
   "session.mergeSlot.waitingNext": "En attente du créneau de fusion ({agent} fusionne ensuite)",
   "session.mergeSlot.waitingNextCards": "En attente du créneau de fusion ({agent} fusionne ensuite {cards})",
   "session.mode.asking": "L’agent te pose une question. Réponds-lui d’abord, puis change de mode.",
+  "session.mode.assistantCliOwn": "L’Assistant ne peut pas utiliser le réglage propre à la CLI : son réglage Contrôle suppose de connaître le mode dans lequel il s’exécute. Choisis l’un des modes de la CLI.",
   "session.mode.ended": "La session s’est terminée avant que Hive puisse la passer en mode {mode}.",
   "session.mode.endedUnconfirmed": "La session s’est terminée avant que {provider} confirme le passage en mode {mode}.",
   "session.mode.notFound": "Hive n’a pas trouvé {what} et n’est donc pas passé en mode {mode}. Vérifie son terminal, ou change de mode là-bas.",

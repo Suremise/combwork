@@ -171,6 +171,12 @@ export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
 /** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
 export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
 
+/** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
+export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
+
+/** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
+export const HIVE_GUIDANCE = 'hive.guidance'
+
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
@@ -445,6 +451,20 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
+  // An agent's branch after a squash merge (#1271, SPEC §16.19.2): Hive moves it between a lane's cards, or asks first.
+  {
+    id: 'hive.workflow.updateAgentBranch',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.workflow.updateAgentBranch.title', defaultMessage: "Bring an agent's branch up to date after a squash merge", description: "An advanced setting's title (Settings → Advanced), listed under Hive. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Hive can move the branch to the target before the agent's next card." }),
+    desc: msg({
+      id: 'settings.advanced.hive.workflow.updateAgentBranch.desc',
+      defaultMessage: "When a card from an agent's own worktree was squashed into its target, the agent's branch still has its commits, so its next card in the lane would include them. On, Hive moves the branch to the target before the next card starts, once the agent is idle, its runs have ended and its worktree is clean, and only when everything on it is in the target: anything else, it asks you under For you. Off, Hive asks you every time: approve to let it move the branch once, or decline and do it yourself. Hive never moves a branch with workflow rules turned off.",
+      description: 'What the advanced setting "Bring an agent\'s branch up to date after a squash merge" does (Settings → Advanced). For you is the board\'s list of what waits for the user: use it as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
   // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
   {
@@ -499,6 +519,36 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'now'
+  },
+  // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
+  // only Hive's own. Control governs only Hive's tools either way; another server's tools ask as its CLI's mode says.
+  {
+    id: ASSISTANT_OTHER_MCP,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.assistant.otherMcpServers.title', defaultMessage: "The Assistant uses the workspace's other MCP servers", description: "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant." }),
+    desc: msg({
+      id: 'settings.advanced.hive.assistant.otherMcpServers.desc',
+      defaultMessage: "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
+      description: "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'sessions'
+  },
+  // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
+  // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
+  {
+    id: HIVE_GUIDANCE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Hive's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Hive: the instructions Hive gives project agents on how to work with it." }),
+    desc: msg({
+      id: 'settings.advanced.hive.guidance.desc',
+      defaultMessage: "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
+      description: 'What the advanced setting "Hive\'s guidance for agents" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs\' names, hive the name of Hive\'s MCP server and developer_instructions a Codex setting: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions'
   },
   // Claude Code
   {
@@ -778,6 +828,21 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
+  },
+  // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
+  // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
+  {
+    id: 'codex.promptInput.timeoutSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.title', defaultMessage: "Reading a session's instructions: timeout", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.desc', defaultMessage: "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.", description: 'What the advanced setting "Reading a session\'s instructions: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them.' }),
+    kind: 'number',
+    default: 15,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/help-codex-0.163.0-prompt-input.txt`, version: '0.163.0', text: 'Render the model-visible prompt input list as JSON', shows: "Codex's help for the command Hive runs, offline, to read a session's developer_instructions" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.mcp.toolTimeoutSeconds',
@@ -1164,6 +1229,22 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     override: true,
     samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: 'Only use MCP servers from --mcp-config,', shows: "Claude Code's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // Hive's status line in place of the user's (#1285, #966 row 12). Off, theirs shows again, chained after Hive's.
+  {
+    id: overrideId('claude-code', 'statusLine'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.override.statusLine.title', defaultMessage: "Hive's status line in place of yours", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.override.statusLine.desc',
+      defaultMessage: "Hive starts Claude Code with a status line of its own, which sends Hive the session's model, context, cost and plan limits for the agent's footer and shows nothing under the input. Turned off, the status line in your Claude Code settings shows again: Hive's command still reads the status, then runs yours with the same input Claude Code gives it and shows what it prints. With no status line of yours, nothing changes.",
+      description: 'What the advanced setting "Hive\'s status line in place of yours" does (Settings → Advanced, under Claude Code).'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/statusline-claude-2.1.296.json`, version: '2.1.296', text: '"context_window"', shows: "Claude Code's status line input, which Hive's command reads and passes on to yours" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'mcpIsolation'),

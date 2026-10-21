@@ -487,6 +487,10 @@
     "defaultMessage": "Review by {agent} stopped",
     "description": "A line in a card's history: the review the agent {agent} (its name) had going on the card ended without a verdict (the card moved on)."
   },
+  "tasks.history.reviewerRequest": {
+    "defaultMessage": "Asked the builder: \"{text}\"",
+    "description": "A line in a card's history: the card's reviewer (named beside it), mid-review, asked the agent building it for something (a commit, a run); {text} is what it asked (cut short). Builder: the agent working on the card."
+  },
   "tasks.history.safeguardStop": {
     "defaultMessage": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
     "description": "A comment Hive writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped."

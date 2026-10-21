@@ -51,9 +51,10 @@ describe('the settings catalogue as Settings shows it', () => {
   it("every row's text is messages of the settings area, in the English catalogue with a note for translators", () => {
     for (const e of SETTINGS_CATALOG)
       for (const m of textsOf(e).flatMap((t) => messagesOf(t))) {
-        // A language's own name, the permission and file lock modes' names (the agents area's, #885), and the workflow
+        // A language's own name, the permission and file lock modes' names (the agents area's, #885; the CLI's own setting's,
+        // #1284), and the workflow
         // options' words, the Workflow section's own (#1278: the workflow area's, glossary 2.6).
-        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|fileLock)\./.test(m.id)) continue
+        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|cliOwn|fileLock)\./.test(m.id)) continue
         expect(m.id, e.id).toMatch(/^settings\./)
         expect(EN[m.id], `${e.id}: ${m.id}`).toEqual({ defaultMessage: m.defaultMessage, description: m.description })
         expect(m.description.length, m.id).toBeGreaterThan(10)

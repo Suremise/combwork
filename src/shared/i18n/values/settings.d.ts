@@ -17,6 +17,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.override.preApproveHiveTools.title': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.desc': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.title': undefined
+  'settings.advanced.claude-code.override.statusLine.desc': undefined
+  'settings.advanced.claude-code.override.statusLine.title': undefined
   'settings.advanced.claude-code.safeguard.note.desc': undefined
   'settings.advanced.claude-code.safeguard.note.title': undefined
   'settings.advanced.claude-code.safeguard.prompt.desc': undefined
@@ -67,6 +69,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
   'settings.advanced.codex.prompt.drawnSeconds.title': undefined
+  'settings.advanced.codex.promptInput.timeoutSeconds.desc': undefined
+  'settings.advanced.codex.promptInput.timeoutSeconds.title': undefined
   'settings.advanced.codex.queue.hint.desc': undefined
   'settings.advanced.codex.queue.hint.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined
@@ -143,12 +147,16 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
+  'settings.advanced.hive.assistant.otherMcpServers.desc': undefined
+  'settings.advanced.hive.assistant.otherMcpServers.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
+  'settings.advanced.hive.guidance.desc': undefined
+  'settings.advanced.hive.guidance.title': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
@@ -187,6 +195,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.wait.cardMaxSeconds.title': undefined
   'settings.advanced.hive.workflow.enforce.desc': undefined
   'settings.advanced.hive.workflow.enforce.title': undefined
+  'settings.advanced.hive.workflow.updateAgentBranch.desc': undefined
+  'settings.advanced.hive.workflow.updateAgentBranch.title': undefined
   'settings.advanced.logs.desc': undefined
   'settings.advanced.logs.tip': undefined
   'settings.advanced.logs.title': undefined

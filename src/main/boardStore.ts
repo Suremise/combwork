@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -176,6 +176,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of ACTIONS_DELIVERED_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1237: the board's full-text search, an FTS5 index of the cards' text kept in step by triggers (schema/v1_0.ts).
+    version: 11,
+    name: CARD_SEARCH_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of CARD_SEARCH_STEP.ddl) db.exec(sql)
     }
   }
 ]
@@ -1080,6 +1089,37 @@ export interface CardQuery {
   numbers?: number[]
   agents?: string[]
   reviewers?: string[]
+}
+
+/**
+ * Lower-case letters the index can't be trusted with (#1237 round 2). FTS5 folds case by its own Unicode tables, and
+ * `toLowerCase` (what cardMatches compares) lowers some capitals to a letter FTS5 keeps apart from them: İ to i + U+0307,
+ * Georgian Mtavruli (Ა) to Mkhedruli (ა), Cherokee capitals to its small letters, and a few dozen more. A card holding the
+ * capital matches such a query in memory but not in the index, so a query with one of these letters is matched in memory;
+ * so is one ending in `i` (it could be the start of İ's `i̇`), while an `i` before another letter can't be. Most folds
+ * FTS5 makes beyond `toLowerCase` (ſ to s, ς to σ) only find more candidates, which cardMatches drops. Generated from
+ * SQLite 3.53 (Electron's 3.53.4 and Node's 3.53.3 alike); tests/cardSearch.test.ts works the set out again from the
+ * SQLite it runs on and fails if a letter is missing.
+ */
+const FOLD_APART = /[\u{19b}\u{25c}\u{261}\u{264}\u{26a}\u{26c}\u{282}\u{287}\u{29d}-\u{29e}\u{3f3}\u{529}\u{52b}\u{52d}\u{52f}\u{10d0}-\u{10fa}\u{10fd}-\u{10ff}\u{13f8}-\u{13fd}\u{1c8a}\u{1d8e}\u{2c5f}\u{a699}\u{a69b}\u{a794}\u{a797}\u{a799}\u{a79b}\u{a79d}\u{a79f}\u{a7b5}\u{a7b7}\u{a7b9}\u{a7bb}\u{a7bd}\u{a7bf}\u{a7c1}\u{a7c3}\u{a7c8}\u{a7ca}\u{a7cd}\u{a7cf}\u{a7d1}\u{a7d3}\u{a7d5}\u{a7d7}\u{a7d9}\u{a7db}\u{a7f6}\u{ab53}\u{ab70}-\u{abbf}\u{104d8}-\u{104fb}\u{10597}-\u{105a1}\u{105a3}-\u{105b1}\u{105b3}-\u{105b9}\u{105bb}-\u{105bc}\u{10cc0}-\u{10cf2}\u{10d70}-\u{10d85}\u{118c0}-\u{118df}\u{16e60}-\u{16e7f}\u{16ebb}-\u{16ed3}\u{1e922}-\u{1e943}]/u
+/** Whether `words` has a letter the index can't be trusted with (FOLD_APART, or İ's combining dot above, U+0307). */
+export const foldsApart = (words: string): boolean => FOLD_APART.test(words) || words.includes('\u0307')
+
+/** An FTS5 query for cards whose searched text contains `words` (one string, spaces and all): a phrase, quotes doubled. */
+export const searchMatch = (words: string): string => `{title description project agent labels} : "${words.replace(/"/g, '""')}"` // i18n-ignore: an FTS5 query
+
+/**
+ * The board's search through its full-text index (#1237, `card_search`): the cards whose title, description, project,
+ * agent's name or labels contain `words` (searchedWords: lower case), as candidates the caller confirms with cardMatches.
+ * Null when the index can't answer: words under three characters (it indexes trigrams), words it can't be trusted with
+ * (foldsApart), or a board without it (0.9's, waiting for its upgrade).
+ */
+export function searchCards(ws: WorkspaceService, words: string): Set<number> | null {
+  if ([...words].length < 3 || foldsApart(words) || words.endsWith('i')) return null
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy || b.db.pending) return null
+    return new Set((db.prepare(QUERIES['board.search'].sql).all(searchMatch(words)) as { number: number }[]).map((r) => r.number))
+  })
 }
 
 /** Cards' documents, by number, as the query asks; in number order. */

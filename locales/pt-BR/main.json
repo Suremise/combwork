@@ -238,6 +238,7 @@
   "main.update.readyAuto": "Ela será instalada quando você sair do Hive. Ou reinicie agora.",
   "main.update.readyManual": "Reinicie o Hive para instalá-la.",
   "main.update.restart": "Reiniciar e atualizar",
+  "main.update.testCopy": "Uma cópia de teste do Hive não procura atualizações.",
   "main.update.updated": "{app} atualizado para {version}",
   "main.update.updatedBody": "Veja o que mudou nesta versão.",
   "main.update.whatsNew": "Novidades",

@@ -68,6 +68,8 @@ async function workspace(options: object | null): Promise<{ w: WS; wt: string }>
 const facts = (w: WS, card: number) => FactStore.forBoard(w, { project: 'p', key: 'p' }).facts(card)
 const actions = (w: WS, card: number): { kind: string; payload: Record<string, unknown> }[] =>
   (store.workspaceDb(w.path!).reader.prepare('SELECT kind, payload FROM card_actions WHERE card = ? ORDER BY id').all(card) as { kind: string; payload: string }[]).map((r) => ({ kind: r.kind, payload: JSON.parse(r.payload) }))
+/** A review by an agent (with every option off a submission is Done at once). */
+const REVIEWED = { ...allOff('git'), review: 'agent', noSelfReview: true }
 const create = (w: WS) => inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
 const update = (w: WS, card: number, patch: Parameters<typeof tasks.updateTask>[1], actor: Parameters<typeof tasks.updateTask>[2] = user, opts: Parameters<typeof tasks.updateTask>[3] = {}) => inWorkspace(w, () => tasks.updateTask(card, patch, actor, opts))
 const answer = (w: WS, card: number, request: string, a: Parameters<typeof tasks.answerTask>[2]) => inWorkspace(w, () => tasks.answerTask(card, request, a))
@@ -194,10 +196,11 @@ describe('For you on the board (#1269)', () => {
   })
 
   it("at the lane's round limit a failed review given on the board asks the user and pauses the lane; a carry on resumes it", async () => {
-    const { w } = await workspace(null)
+    const { w, wt } = await workspace(REVIEWED)
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], rounds: 1, by: 'Builder (p)' })
+    commitIn(wt, 'r1.txt')
     await update(w, card, { column: 'review' }, b1)
     await update(w, card, { review: 'start' }, r1)
     await update(w, card, { review: 'failed' }, r1, { comment: 'FAILED' })
@@ -207,9 +210,10 @@ describe('For you on the board (#1269)', () => {
     let lane = (await lanes.listLanes(w, { project: 'p' }))[0]
     expect(lane).toMatchObject({ state: 'paused', pausedOn: card })
     expect(lane.cards[0].roundLimit).toBe(true)
-    // Its builder sends it to Review again on the board without the user's answer: the question and the pause stay.
-    await update(w, card, { column: 'doing' }, b1)
-    await update(w, card, { column: 'review' }, b1)
+    // Its builder sends it to Review again on the board without the user's answer: refused (its old move is a submission,
+    // #1268), the question and the pause stay.
+    commitIn(wt, 'r2.txt')
+    await expect(update(w, card, { column: 'review' }, b1)).rejects.toMatchObject({ refusal: { rule: 'loop.roundLimit' } })
     expect(forYou(w).items.map((i) => i.gate)).toEqual(['roundLimit'])
     expect((await lanes.listLanes(w, { project: 'p' }))[0].state).toBe('paused')
     // With the rules turned off, nothing pauses the lane for it; on again, it waits for the answer.
@@ -222,8 +226,8 @@ describe('For you on the board (#1269)', () => {
     await expect(answer(w, card, req, { outcome: 'approved' })).rejects.toThrow(/doesn't fit the request/)
     await expect(answer(w, card, req, { outcome: 'answered', choice: 'carryOn' })).rejects.toThrow(/doesn't fit the request/)
     const answered = await answer(w, card, req, { outcome: 'answered', choice: 'carryOn', rounds: 2 })
-    // The answer moves nothing: the failed card stays where it was, not "returned for review" (#1269 round 3).
-    expect(answered.column).toBe('review')
+    // The answer moves nothing: the failed card stays where its verdict left it, not "returned for review" (#1269 round 3).
+    expect(answered.column).toBe('doing')
     expect(answered.history.filter((h) => /Returned for review/.test(h.what))).toEqual([])
     lane = (await lanes.listLanes(w, { project: 'p' }))[0]
     expect(lane.state).toBe('active')
@@ -231,7 +235,6 @@ describe('For you on the board (#1269)', () => {
     const wakes = actions(w, card).filter((a) => a.kind === 'wake' && typeof a.payload.why === 'string' && a.payload.why.includes('carry on (2 more rounds)'))
     expect(wakes.map((a) => a.payload.agent)).toEqual(['a1', 'a2'])
     // A passing review asks nothing, whatever the rounds.
-    await update(w, card, { column: 'doing' }, b1)
     await update(w, card, { column: 'review' }, b1)
     await update(w, card, { review: 'start' }, r1)
     await update(w, card, { review: 'passed', column: 'passed' }, r1, { comment: 'PASSED' })
@@ -239,11 +242,14 @@ describe('For you on the board (#1269)', () => {
   })
 
   it('past the limit, after another way on than carry on, a passing review asks nothing; a failing one asks again', async () => {
-    const { w } = await workspace(null)
+    const { w, wt } = await workspace(REVIEWED)
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], rounds: 1, by: 'Builder (p)' })
+    let k = 0
+    // A round by the agents' old moves (#1268): a change, its submission, its review and verdict.
     const round = async (verdict: 'passed' | 'failed') => {
+      commitIn(wt, `r${++k}.txt`)
       await update(w, card, { column: 'review' }, b1)
       await update(w, card, { review: 'start' }, r1)
       await update(w, card, { review: verdict }, r1, { comment: verdict })
@@ -251,11 +257,9 @@ describe('For you on the board (#1269)', () => {
     await round('failed')
     await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', choice: 'accept' })
     expect(forYou(w).count).toBe(0)
-    await update(w, card, { column: 'doing' }, b1)
     await round('failed')
     expect(forYou(w).items).toMatchObject([{ gate: 'roundLimit', shown: { values: { rounds: 2 } } }])
     await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', choice: 'takeOver' })
-    await update(w, card, { column: 'doing' }, b1)
     await round('passed')
     expect(forYou(w).count).toBe(0)
   })

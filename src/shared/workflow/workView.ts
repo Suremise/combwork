@@ -216,6 +216,8 @@ export interface WorkView {
   /** Its acceptance this cycle, where there is no merge (None, a no-code card). */
   accepted: WorkAcceptance | null
   queue: WorkQueueEntry | null
+  /** Its latest refused request since its last move (#1279): cleared by the card's next move. */
+  refused: WorkRefusal | null
   /** The card's newest decision generation (0: none) and the one each agent has received. */
   decisions: { generation: number; received: Record<string, number> }
   /** Failed verdicts and the user's declines, over the card's whole history. */
@@ -224,6 +226,18 @@ export interface WorkView {
   forYou: number
   /** The newest fact's seq: a view is newer than another when this is higher. */
   lastSeq: number
+}
+
+/**
+ * A refused request (a `Refused` fact, #1279): its rule and values, from which the window says it in its language as the
+ * agent got it in English; `times`: the refusals in a row since the card last moved with the same rule (repeats collapse).
+ */
+export interface WorkRefusal {
+  move: string
+  rule: string
+  values: Record<string, string | number | StoredText>
+  at: string
+  times: number
 }
 
 /**
@@ -286,6 +300,11 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const doneAt = facts.findLast((f) => f.seq < s.cycle && f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.seq ?? 0
   const lastOverride = facts.findLast((f) => f.kind === 'Override' && f.seq > doneAt)
   const override = lastOverride ? ((d) => ({ by: d.by, move: d.move, rules: d.rules, reason: d.reason, at: lastOverride.at }))(lastOverride.data as FactData['Override']) : null
+  // Refused since it last moved (#1279): the latest, with how many like it came in a row.
+  const movedAt = facts.findLast((f) => f.kind === 'Moved')?.seq ?? 0
+  const since = facts.filter((f) => f.kind === 'Refused' && f.seq > movedAt)
+  const lastRefused = since.at(-1)
+  const refused = lastRefused ? ((d) => ({ move: d.move, rule: d.rule, values: d.values ?? {}, at: lastRefused.at, times: since.filter((f) => (f.data as FactData['Refused']).rule === d.rule && (f.data as FactData['Refused']).move === d.move).length }))(lastRefused.data as FactData['Refused']) : null
   return {
     card: c.card,
     stage: s.stage,
@@ -309,6 +328,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
+    refused,
     queue: entry ? { entry: entry.id, revision: entry.revision, target: entry.target, state: entry.state, ...(entry.failure ? { failure: entry.failure.reason } : {}), ...(entry.cancelled ? { cancelled: entry.cancelled } : {}) } : null,
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
@@ -336,6 +356,12 @@ export interface WorkBadge {
   /** The checks on `revision`: the newest run of each check, by result, and the runs not counted. */
   checks: { passed: number; failed: number; notCounted: number }
   stale: boolean
+  /** A content-stale pass (#1279): the revision it was for and the one now. */
+  stalePass: { approved: string | null; current: string | null } | null
+  /** A no-code card: no commits, so no revision or merge lines (#1279). */
+  noCode: boolean
+  /** Its latest refused request since it last moved (#1279). */
+  refused: WorkRefusal | null
   overridden: boolean
   /** The latest move past its rules since it was last Done (the board's override mark). */
   override: WorkOverride | null
@@ -375,6 +401,9 @@ export function workBadge(v: WorkView): WorkBadge {
     verdict: verdict ? { pass: verdict.pass, revision: verdict.revision, current: verdict.current } : null,
     checks: { passed: runs.filter((c) => c.result === 'passed').length, failed: runs.filter((c) => c.result !== 'passed').length, notCounted },
     stale: !!v.marks.stale,
+    stalePass: v.marks.stale ? { approved: v.marks.stale.approved, current: v.marks.stale.current } : null,
+    noCode: v.kind === 'no-code',
+    refused: v.refused,
     overridden: v.marks.overridden,
     override: v.marks.override,
     outsideRules: v.marks.outsideRules.length > 0,

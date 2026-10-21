@@ -349,6 +349,7 @@ interface HiveMessageValues {
   'board.lane.blocked': { card: string | number }
   'board.lane.blockedReason': { card: string | number; reason: string | number }
   'board.lane.finished': { n: number; cards: string | number }
+  'board.lane.foldedMark': { card: string | number; mark: string | number }
   'board.lane.goneWhenEnded': { card: string | number }
   'board.lane.holdReason': { card: string | number; reason: string | number }
   'board.lane.holdWaiting': { card: string | number }
@@ -366,7 +367,10 @@ interface HiveMessageValues {
   'board.lane.unrecordedUntitled': { card: string | number }
   'board.lane.workChecks': { passed: number; failed: number }
   'board.lane.workMerged': { commit: string | number }
+  'board.lane.workNoCode': undefined
+  'board.lane.workRefused': { message: string | number; next: string | number; times: number }
   'board.lane.workRevision': { review: string; revision: string | number }
+  'board.lane.workStalePass': { now: string; approved: string | number; current: string | number }
   'board.lane.workVerdict': { pass: string; revision: string; current: string }
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
@@ -375,9 +379,11 @@ interface HiveMessageValues {
   'board.lanes.edgeTip': { lanes: string | number }
   'board.lanes.edgeValue': { shown: string | number; count: number }
   'board.lanes.fold': undefined
+  'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
   'board.lanes.moveDown': undefined
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
+  'board.lanes.none': undefined
   'board.lanes.show': undefined
   'board.lanes.stalled': undefined
   'board.lanes.state': { state: string }
@@ -385,6 +391,8 @@ interface HiveMessageValues {
   'board.lanes.usualOrder': undefined
   'board.lanes.usualOrderDetail': undefined
   'board.lanes.usualOrderSaid': undefined
+  'board.lanes.waitingForYou': { n: number }
+  'board.lanes.waits': { reason: string; card: string | number; ask: string }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
   'board.menu.delete': undefined
@@ -421,6 +429,11 @@ interface HiveMessageValues {
   'board.progress.allAgents': undefined
   'board.progress.allProjects': undefined
   'board.progress.anAgent': undefined
+  'board.progress.attention': { n: number }
+  'board.progress.badgeLanes': { n: number }
+  'board.progress.badgeMerges': { n: number }
+  'board.progress.badgeRuns': { n: number }
+  'board.progress.blocksReview': { card: string | number }
   'board.progress.cantShow': { agent: string | number }
   'board.progress.copied': { what: string }
   'board.progress.copyCommand': undefined
@@ -438,6 +451,7 @@ interface HiveMessageValues {
   'board.progress.moreOthers': { n: number }
   'board.progress.moreRuns': { n: number }
   'board.progress.noAssistant': undefined
+  'board.progress.noMerges': undefined
   'board.progress.openCard': { card: string | number }
   'board.progress.openLog': undefined
   'board.progress.openLogFailed': undefined
@@ -446,12 +460,8 @@ interface HiveMessageValues {
   'board.progress.railFilteredNone': { name: string | number; all: number }
   'board.progress.railLabel': undefined
   'board.progress.railShowing': { name: string | number; shown: number; all: number }
-  'board.progress.recent': undefined
-  'board.progress.recentFold': undefined
   'board.progress.recentHover': { agent: string | number; run: string | number; state: string | number }
   'board.progress.recentHoverTook': { agent: string | number; run: string | number; state: string | number; took: string | number }
-  'board.progress.recentRuns': undefined
-  'board.progress.recentShow': undefined
   'board.progress.region': undefined
   'board.progress.revisionCopied': { revision: string | number }
   'board.progress.revisionCopyFailed': undefined
@@ -466,6 +476,8 @@ interface HiveMessageValues {
   'board.progress.showTheAgent': undefined
   'board.progress.stepOf': { step: number; total: number }
   'board.progress.stepOfNamed': { step: number; total: number; name: string | number }
+  'board.progress.tab': { tab: string }
+  'board.progress.tabs': undefined
   'board.progress.title': undefined
   'board.progress.waiting': undefined
   'board.readOnly.newer': undefined
@@ -496,6 +508,19 @@ interface HiveMessageValues {
   'board.run.waiting': { waited: string | number }
   'board.run.wordsStale': { run: string | number }
   'board.run.wordsWaiting': { run: string | number }
+  'board.runs.agent': undefined
+  'board.runs.anyAgent': undefined
+  'board.runs.anyLane': undefined
+  'board.runs.cardRun': { card: string | number; run: string | number }
+  'board.runs.clear': undefined
+  'board.runs.failedOnly': undefined
+  'board.runs.group': { what: string | number; n: number; outcome: string; failed: number }
+  'board.runs.lane': undefined
+  'board.runs.none': undefined
+  'board.runs.noneMatch': undefined
+  'board.runs.search': undefined
+  'board.runs.today': undefined
+  'board.runs.yesterday': undefined
   'board.setAside.add': undefined
   'board.setAside.added': { n: string | number }
   'board.setAside.adding': undefined
