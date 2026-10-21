@@ -6,7 +6,8 @@
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { LaunchContext } from '../src/main/providers/types'
+import type { HookIds, LaunchContext } from '../src/main/providers/types'
+import { admit, newLedger } from '../src/main/turnLedger'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
 import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptAnswered, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
 import { promptKey } from '../src/main/providers/turns'
@@ -277,34 +278,78 @@ describe("a turn its transcript shows (#1371)", () => {
     hookTurn(w, 10_001, 'A')
     expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
     hookTurn(w, 70_002, 'A')
-    expect(transcriptAnswered(w, 'A', false)).toBe(false)
-    expect(transcriptAnswered(w, 'A', true)).toBe(false)
+    expect(transcriptAnswered(w, 'A')).toBe(false)
     hookTurn(w, 70_003, 'E')
-    expect(transcriptAnswered(w, 'E', false)).toBe(true)
+    expect(transcriptAnswered(w, 'E')).toBe(true)
     expect(w.flagged).toBeNull()
     expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
   })
 
-  it("flagged: a newer turn's hook answers it (one read after it, or a prompt the ledger takes as current and the transcript hasn't shown); a stale unknown one doesn't", () => {
+  it("flagged: a newer turn's hook answers it once the transcript shows that turn after the flagged one; an unread id is unknown until then", () => {
     const later = idWatch()
     transcriptTurns(later, [turn('E'), turn('F', 3_000, false)], 10_000, since)
     expect(hooksMissing(later, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    expect(transcriptAnswered(later, 'F', false)).toBe(true)
+    expect(transcriptAnswered(later, 'F')).toBe(true)
     expect(hooksMissing(later, quiet, 100 * BOUND, BOUND)).toBeNull()
 
+    // A healthy newer turn's hook comes before its transcript is written: nothing yet, then its record answers the flag.
     const fresh = idWatch()
     transcriptTurns(fresh, [turn('E')], 10_000, since)
     expect(hooksMissing(fresh, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    expect(transcriptAnswered(fresh, 'old-unknown', false)).toBe(false)
-    expect(transcriptAnswered(fresh, 'new-prompt', true)).toBe(true)
+    hookTurn(fresh, 80_000, 'N')
+    expect(transcriptAnswered(fresh, 'N')).toBe(false)
+    expect(fresh.flagged).toBe('E')
+    expect(transcriptTurns(fresh, [turn('N', 79_000)], 81_000, since)).toBe(true)
+    expect(fresh.flagged).toBeNull()
     expect(hooksMissing(fresh, quiet, 100 * BOUND, BOUND)).toBeNull()
+
+    // An unread id the transcript never shows (an older turn's, its prompt before the reading began): it never answers,
+    // however much more of the transcript is read.
+    const older = idWatch()
+    transcriptTurns(older, [turn('E', 3_000)], 10_000, since)
+    expect(hooksMissing(older, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    hookTurn(older, 80_000, 'A')
+    expect(transcriptAnswered(older, 'A')).toBe(false)
+    expect(transcriptTurns(older, [turn('E', 3_000)], 81_000, since)).toBe(false)
+    expect(older.flagged).toBe('E')
   })
 
-  it('read again from the start (another file, conversation or launch): what was waited on is let go', () => {
+  it("a newer turn already heard when the transcript shows both: the older turn waited on before it is answered, never flagged", () => {
+    const w = idWatch()
+    hookTurn(w, 9_000, 'N')
+    expect(transcriptTurns(w, [turn('E', 3_000), turn('N', 8_000)], 10_000, since)).toBe(false)
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it("with the real ledger (HR6's case): a resumed reading that never showed A; E flagged; A's late Stop, which the ledger applies, doesn't clear E", () => {
+    const ledger = newLedger(0)
+    const ids = (id: string): HookIds => ({ turn: id, call: null, sub: null, continued: false })
+    const w = idWatch()
+    expect(admit(ledger, { kind: 'prompt', text: 'a' }, ids('A'), { now: 1 }).verdict).toBe('apply')
+    hookTurn(w, 1_500, 'A')
+    // The resumed file is read from its end: A's records are never read, E's are, and E's hooks never come.
+    transcriptTurns(w, [turn('E', 5_000)], 10_000, since)
+    expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    const stop = admit(ledger, { kind: 'stop', lastMessage: null }, ids('A'), { now: 2 })
+    expect(stop.verdict).toBe('apply')
+    hookTurn(w, 75_000, 'A')
+    expect(transcriptAnswered(w, 'A')).toBe(false)
+    expect(w.flagged).toBe('E')
+  })
+
+  it('read again from the start (another file, conversation or launch): what was waited on is let go, and a flag it raised with it', () => {
     const w = idWatch()
     transcriptTurns(w, [turn('E')], 10_000, since)
-    transcriptReset(w)
+    expect(transcriptReset(w)).toBe(false)
     expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+
+    const flagged = idWatch()
+    transcriptTurns(flagged, [turn('E')], 10_000, since)
+    expect(hooksMissing(flagged, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    expect(transcriptReset(flagged)).toBe(true)
+    expect(flagged.flagged).toBeNull()
+    expect(flagged.unheard.size).toBe(0)
+    expect(hooksMissing(flagged, quiet, 100 * BOUND, BOUND)).toBeNull()
   })
 
   it("Copilot (no turn ids): its prompt hook answers it by the prompt's text, any hook after it was recorded by time; the turn before's last hook, a moment earlier, doesn't", () => {
@@ -316,7 +361,7 @@ describe("a turn its transcript shows (#1371)", () => {
     transcriptTurns(w, [copilotTurn('I1', 10_000, 'say Deaf turn.')], 11_000, since)
     expect(hooksMissing(w, quiet, 11_000 + BOUND, BOUND)).toBe('transcript')
     // Flagged: any hook clears it (none names a turn).
-    expect(transcriptAnswered(w, null, false)).toBe(true)
+    expect(transcriptAnswered(w, null)).toBe(true)
 
     // Its prompt hook (it runs before Copilot records the prompt), whether read before or after the transcript: heard.
     const before = newHooksWatch(since, false, 'time')

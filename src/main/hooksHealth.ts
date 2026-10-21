@@ -113,16 +113,30 @@ export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt
   for (const [id, u] of w.unheard) if (u.at <= now || (key && u.prompt === key)) w.unheard.delete(id)
 }
 
+/** The turns waited on up to `upTo` (a place in the transcript) are answered, and so is the flag if its turn is among them. */
+function answeredUpTo(w: HooksWatch, upTo: number): boolean {
+  for (const [id, u] of w.unheard) if (u.seq <= upTo) w.unheard.delete(id)
+  if (w.flagged === null || (w.order.get(w.flagged) ?? 0) > upTo) return false
+  w.flagged = null
+  return true
+}
+
 /**
  * Turns its transcript showed (the adapter's transcriptTurns), read at `now`: a worked turn begun since `since` (this
- * launch's start; history never counts) that no hook has named is waited on from now. Each turn's place is kept.
+ * launch's start; history never counts) that no hook has named is waited on from now. Each turn's place is kept. With
+ * turn ids, a turn read that a hook had already named answers every turn waited on before it, the flagged one too (its
+ * hook came before the transcript showed it: an id not read yet is unknown, never taken as newer). A turn is read only
+ * from its prompt, in the file's order, so one first read now is newer than those read before. Whether the flag was
+ * answered.
  */
-export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; worked: boolean; prompt?: string }[], now: number, since: number): void {
+export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; worked: boolean; prompt?: string }[], now: number, since: number): boolean {
+  let heardUpTo = 0
   for (const t of turns) {
     if (!w.order.has(t.id)) {
       w.order.set(t.id, ++w.seq)
       keep(w.order, MAX_TURNS)
     }
+    if (w.join === 'id' && w.heard.has(t.id)) heardUpTo = Math.max(heardUpTo, w.order.get(t.id)!)
     if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id)) continue
     const hookAt = t.prompt ? w.prompts.get(t.prompt) : undefined
     const heard = w.join === 'time' ? (w.lastHookAt !== null && w.lastHookAt >= t.at) || (hookAt !== undefined && hookAt >= t.at - PROMPT_HOOK_WINDOW_MS) : w.heard.has(t.id)
@@ -130,31 +144,35 @@ export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; 
     w.unheard.set(t.id, { foundAt: now, seq: w.order.get(t.id)!, at: t.at, ...(t.prompt ? { prompt: t.prompt } : {}) })
     keep(w.unheard, MAX_TURNS)
   }
+  return heardUpTo > 0 && answeredUpTo(w, heardUpTo)
 }
 
-/** Its transcript is read again from the start (another file, conversation or launch): what it showed is let go. */
-export function transcriptReset(w: HooksWatch): void {
+/**
+ * Its transcript is read again from the start (another file, conversation or launch): what it showed is let go, and the
+ * flag it raised with it. Whether a flag stood (its alarm goes too).
+ */
+export function transcriptReset(w: HooksWatch): boolean {
+  const flagged = w.flagged !== null
   w.unheard.clear()
   w.order.clear()
+  w.flagged = null
+  return flagged
 }
 
 /**
  * Whether a hook (as the launch's queue takes it) answers the transcript turn that raised the flag: that turn's own id,
- * a newer turn's (one read after it, or, `current`, one the ledger takes as current and the transcript hasn't shown yet:
- * a new prompt), or with no ids any hook. An older turn's late hook never does. Answered, the turns waited on up to the
- * answering one are let go.
+ * a newer turn's (one the transcript read after it), or with no ids any hook. An older turn's late hook never does, nor
+ * does one whose turn the transcript hasn't shown (unknown: the ledger's current turn may be older than the flagged one,
+ * whose hooks are what went missing): that one answers once the transcript shows it after the flagged turn
+ * (transcriptTurns). Answered, the turns waited on up to the answering one are let go.
  */
-export function transcriptAnswered(w: HooksWatch, turn: string | null, current: boolean): boolean {
+export function transcriptAnswered(w: HooksWatch, turn: string | null): boolean {
   const f = w.flagged
   if (f === null) return false
-  const at = w.order.get(f) ?? 0
+  if (w.join === 'time') return answeredUpTo(w, Infinity)
+  if (turn === f) return answeredUpTo(w, w.order.get(f) ?? Infinity)
   const pos = turn ? w.order.get(turn) : undefined
-  const answers = w.join === 'time' || turn === f || (pos !== undefined && pos > at) || (!!turn && pos === undefined && current)
-  if (!answers) return false
-  const upTo = pos ?? Infinity
-  for (const [id, u] of w.unheard) if (u.seq <= upTo) w.unheard.delete(id)
-  w.flagged = null
-  return true
+  return pos !== undefined && pos > (w.order.get(f) ?? 0) && answeredUpTo(w, pos)
 }
 
 /**

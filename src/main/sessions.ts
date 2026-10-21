@@ -3223,18 +3223,24 @@ class SessionManager {
   private async readTurns(l: LiveSession, path: string, size: number): Promise<void> {
     const w = l.hooksWatch
     const turnsOf = l.adapter.transcriptTurns?.bind(l.adapter)
-    if (!w || !turnsOf) return
+    // Still its transcript (a hook may have named another file while the look before this read waited): else it isn't read.
+    if (!w || !turnsOf || l.transcriptPath !== path) return
     const sessionId = l.state.sessionId
     const prev = l.turnsRead
     const look = await lookAtTurns(prev, { path, sessionId, size, fresh: !l.turnsBegun && !l.resumed }, (start, end) => readSpan(path, start, end))
-    // Still this launch, conversation and reading (not restarted, switched or read again meanwhile): else what it found goes.
-    if (!look || this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || l.state.sessionId !== sessionId || l.turnsRead !== prev) return
+    // Still this launch, conversation, file and reading (not restarted, switched or read again meanwhile): else what it found goes.
+    if (!look || this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || l.state.sessionId !== sessionId || l.transcriptPath !== path || l.turnsRead !== prev) return
     l.turnsRead = look.reading
     if (look.restarted) {
       l.turnsBegun = true
-      transcriptReset(w)
+      this.turnsReset(l, w)
     }
-    if (look.lines) transcriptTurns(w, turnsOf(look.lines, look.reading.memo), Date.now(), Date.parse(l.state.startedAt))
+    if (look.lines && transcriptTurns(w, turnsOf(look.lines, look.reading.memo), Date.now(), Date.parse(l.state.startedAt)) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
+  }
+
+  /** What its transcript showed of its turns is let go (#1371), and an alarm that evidence raised goes with it. */
+  private turnsReset(l: LiveSession, w: HooksWatch): void {
+    if (transcriptReset(w) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
   }
 
   /**
@@ -4213,9 +4219,9 @@ class SessionManager {
     // that is over says nothing of a prompt sent since.
     if (l.hooksWatch) {
       if (took.verdict !== 'stale') turnHeard(l.hooksWatch)
-      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's: the ledger's
-      // current turn may be older than it (its hooks are what went missing).
-      const back = st.hooksMissing?.after === 'transcript' ? transcriptAnswered(l.hooksWatch, ids.turn, took.verdict !== 'stale') : !!st.hooksMissing && took.verdict !== 'stale'
+      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity: the
+      // ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
+      const back = st.hooksMissing?.after === 'transcript' ? transcriptAnswered(l.hooksWatch, ids.turn) : !!st.hooksMissing && took.verdict !== 'stale'
       if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
@@ -4604,7 +4610,7 @@ class SessionManager {
       l.stopsAnswered = undefined
       // Its turns are read from the new conversation's file (#1371): the old one's are let go.
       l.turnsRead = undefined
-      if (l.hooksWatch) transcriptReset(l.hooksWatch)
+      if (l.hooksWatch) this.turnsReset(l, l.hooksWatch)
       st.transcriptBytes = undefined
       this.clearTasks(l)
       l.lastBackupAt = undefined
