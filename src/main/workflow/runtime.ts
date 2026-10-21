@@ -238,6 +238,12 @@ interface SubmitGathered {
 const NO_CODE_GUARDS: GuardId[] = ['submit.notDuplicate', 'submit.ownRunsStopped', 'submit.decisionsReceived']
 
 /** A drag's write undone (it throws, so its part of the change is undone): a refusal, or rules not decided on (ask again). */
+/**
+ * The lanes' next cards whose builder's line is being moved now (moveLineOn, #1271), by project folder and card: their
+ * start waits for that move's LineMoved, whichever runtime of the project starts them (HR2's round 2 finding 2).
+ */
+const lineMoving = new Map<string, LineBehind>()
+
 /** A lane's next card held up by its builder's line (lineBehind, §16.19.2): the cards, the builder, its worktree and line now. */
 export interface LineBehind extends LineNow {
   next: CardRecord
@@ -486,6 +492,13 @@ export class Workflow {
     // to bring the branch up to date, so its change is only its own.
     const behind = this.enforced() && !opts.drag ? await this.lineBehind(card) : null
     if (behind) return this.refuse(card, actor, 'start', { rule: 'lane.lineBehind', values: { card: card.key, earlier: behind.prev.key, line: behind.line ?? behind.folder, target: behind.target } })
+    // Its line being moved right now: it waits for that move's LineMoved (refused as behind, checked again in its write).
+    const moving = (): GuardRefusal | null => {
+      const m = this.enforced() && !opts.drag ? lineMoving.get(this.movingKey(card.id)) : undefined
+      return m ? { rule: 'lane.lineBehind', values: { card: card.key, earlier: m.prev.key, line: m.line ?? m.folder, target: m.target } } : null
+    }
+    const inMove = moving()
+    if (inMove) return this.refuse(card, actor, 'start', inMove)
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
@@ -516,7 +529,7 @@ export class Workflow {
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
       }
-      const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
+      const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
       if (waits) return undone(waits)
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
@@ -1725,24 +1738,46 @@ export class Workflow {
    * card's `Started` (whose base is its `to`), and the builder told. Only from the state checked (HR2's #1271 round 1):
    * the line, its head and the target's head read again, the worktree clean and `still()` (the caller's own conditions:
    * the rules on, the switch or the user's approval, the builder idle with no run, the workspace open) just before, and
-   * the platform's move itself conditional on that head. Git's refusal comes back as its reason; null when anything
+   * the platform's move itself serialized with the worktree's other git work and conditional on that branch, head and
+   * target, `still()` asked again at its boundary (HR2's round 2). The next card is reserved meanwhile (`lineMoving`):
+   * its start is refused until the `LineMoved` is saved, and the move goes ahead only while the card is still in Todo.
+   * A move whose fact can't be saved is undone the same way. Git's refusal comes back as its reason; null when anything
    * changed (nothing moved, nothing recorded: looked at again).
    */
   async moveLineOn(b: LineBehind, still: () => boolean): Promise<true | string | null> {
     const s = this.state(b.prev)
     const p = this.platform(this.rulesetOf(b.prev, s).options)
     if (!p.moveLine || !p.lineNow) return 'no line to move' // i18n-ignore: a platform with no lines (never asked: lineBehind is Git's)
-    const now = await p.lineNow(b.folder, b.target)
-    if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !still()) return null
-    const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head })
-    if (moved !== true) return moved
-    const line = b.line ?? b.folder
-    await this.write(b.prev, null, 'hive', (w) => {
-      w.fact('LineMoved', { line, from: b.head, to: b.targetHead, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
-      this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
-      return null
-    })
-    return true
+    const key = this.movingKey(b.next.id)
+    if (lineMoving.has(key)) return null
+    lineMoving.set(key, b)
+    try {
+      const ok = (): boolean => this.state(b.next).stage === 'todo' && still()
+      const now = await p.lineNow(b.folder, b.target)
+      if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !ok()) return null
+      const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head, target: b.target }, ok)
+      if (moved !== true) return moved
+      const line = b.line ?? b.folder
+      try {
+        await this.write(b.prev, null, 'hive', (w) => {
+          w.fact('LineMoved', { line, from: b.head, to: b.targetHead, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
+          this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
+          return null
+        })
+      } catch (e) {
+        // Not recorded (the workspace closed, the board failing): the branch put back where it was, as conditionally.
+        await p.moveLine(b.folder, b.head, { line: b.line, head: b.targetHead }, () => true)
+        throw e
+      }
+      return true
+    } finally {
+      lineMoving.delete(key)
+    }
+  }
+
+  /** A card as `lineMoving` keys it: its project's folder, resolved, and its number (any runtime of that project sees it). */
+  private movingKey(card: number): string {
+    return `${resolvePath(this.cfg.project).toLowerCase()}#${card}`
   }
 
   /** Asks the user about a line held up (§16.19.2): on the lane's next card, bound to the line's head, so asked once for it. */

@@ -4,7 +4,7 @@
 //
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
-import { existsSync, readFileSync } from 'original-fs'
+import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, unlinkSync } from 'original-fs'
 import { isAbsolute, join } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
@@ -293,21 +293,58 @@ export async function isolate(repo: string, folder: string, line: string, base: 
 }
 
 /**
- * Moves a worktree's branch to a revision with `git reset --keep` (§16.19.2, #1271), only from the exact state checked:
- * `expect`'s branch checked out at `expect`'s head (else null, nothing moved). Git refuses rather than overwrite a local
- * change (its reason returned). A commit landing between the check and the reset is never dropped: the reset's
- * ORIG_HEAD is then not the head checked, and the branch is put back on it (null: it changed meanwhile).
+ * Moves a worktree's branch from `expect` (its branch checked out at that head, the worktree clean) to `to`, as
+ * `git reset --keep` would, serialized with whatever else uses the worktree (§16.19.2, #1271; HR2's round 2): under the
+ * worktree's own index lock, so no commit or other git write can run in it meanwhile (git refuses them, nothing lost),
+ * the branch, head and clean state are checked, then `go()` (the caller's authority, at the boundary itself); the files
+ * and index are brought from the head's tree to the target's through a separate index (`read-tree -m -u`, which
+ * refuses to overwrite a local change), and the branch moved only if it is still at that head (`update-ref <to>
+ * <head>`, compare and swap), else the files are put back. Never a reset of a branch that may have moved on.
+ * True when moved; git's reason when it refused; null when anything differed (another git command at work there, the
+ * branch or head changed, the worktree not clean, or `go()` no longer holds): nothing moved.
  */
-export async function resetKeep(folder: string, to: string, expect: { line: string | null; head: string }): Promise<true | string | null> {
-  const [line, h] = await Promise.all([branch(folder), head(folder)])
-  if (isUnknown(line) || isUnknown(h) || line !== expect.line || h !== expect.head) return null
-  const r = await git(folder, ['reset', '--keep', to])
-  if (!r.ok) return (r.err || r.out || 'git reset --keep failed').trim() // i18n-ignore: git's own words, or the command
-  const orig = await git(folder, ['rev-parse', 'ORIG_HEAD'])
-  if (orig.ok && orig.out.trim() === expect.head) return true
-  // Another commit came first: back onto it, so nothing of it is lost; looked at again.
-  if (orig.ok) await git(folder, ['reset', '--keep', orig.out.trim()])
-  return null
+export async function moveLineLocked(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
+  if (!expect.line) return null
+  const at = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
+  if (!at.ok) return null
+  const index = at.out.trim()
+  const lock = `${index}.lock`
+  const next = `${index}.hive-line`
+  let fd: number | null
+  try {
+    fd = openSync(lock, 'wx')
+  } catch {
+    return null
+  }
+  let placed = false
+  try {
+    const [line, h, d, t] = await Promise.all([branch(folder), head(folder), dirty(folder), expect.target ? lineHead(folder, expect.target) : Promise.resolve(to)])
+    // The target still where it was read too (`to`, its head then): moved on, it is looked at again.
+    if (isUnknown(line) || isUnknown(h) || isUnknown(d) || isUnknown(t) || line !== expect.line || h !== expect.head || t !== to || d.length || !go()) return null
+    copyFileSync(index, next)
+    const env = { ...process.env, GIT_INDEX_FILE: next }
+    const files = await git(folder, ['read-tree', '-m', '-u', expect.head, to], undefined, undefined, { env })
+    if (!files.ok) return (files.err || files.out || 'git read-tree failed').trim() // i18n-ignore: git's own words, or the command
+    const ref = await git(folder, ['update-ref', '-m', 'Hive: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
+    if (!ref.ok) {
+      // The branch moved on (not through this worktree's index): its files back as they were, nothing moved.
+      await git(folder, ['read-tree', '-m', '-u', to, expect.head], undefined, undefined, { env })
+      return null
+    }
+    // The new index in place of the old, as git commits a lock: written into the lock, then renamed over the index.
+    closeSync(fd)
+    fd = null
+    renameSync(next, lock)
+    renameSync(lock, index)
+    placed = true
+    return true
+  } finally {
+    if (fd !== null) closeSync(fd)
+    if (!placed) {
+      if (existsSync(next)) unlinkSync(next)
+      if (existsSync(lock)) unlinkSync(lock)
+    }
+  }
 }
 
 /** Pins a revision by a ref so a deleted line, a force push or garbage collection can't lose it (§16.9.3). */

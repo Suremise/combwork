@@ -106,7 +106,7 @@ export interface PlatformAdapter {
    * Moves an agent's worktree's line to `to` (Git: `reset --keep`, which refuses to overwrite a local change), only from
    * `expect` (its line and head as checked): true; git's reason; or null when the line changed since (nothing moved).
    */
-  moveLine?(folder: string, to: string, expect: { line: string | null; head: string }): Promise<true | string | null>
+  moveLine?(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null>
   /** The commits on a line from `from` (exclusive) to `to`, oldest first, as short ids and subjects. */
   commitsBetween?(folder: string, from: string, to: string): Promise<Maybe<string[]>>
   /** Reconciles a card with the platform (§16.4.4). */

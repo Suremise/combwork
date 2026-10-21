@@ -2801,10 +2801,16 @@ The move goes through the platform (`lineNow`, `moveLine`: `git reset --keep`), 
 and a wake to the builder ("<line> is up to date with <target> …: <next> can start"); the next card's start then reads
 its base as `LineMoved.to`. **The move is checked again at its boundary** [HR2's round 1]: just before it, the line,
 its head and the target's head are read again (the worktree still clean), and the rules on, the switch (or the user's
-approval), the builder idle with no run and the workspace open checked again; the platform moves only from that exact
-branch and head, and a commit landing between that check and the reset is put back (`ORIG_HEAD`), so no commit is ever
-dropped. Anything changed: nothing moves or is recorded, and the next pass looks again. What waits is each workspace's
-own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
+approval), the builder idle with no run and the workspace open checked again. The platform's move [HR2's round 2] is
+serialized with the worktree's own git work: it holds the worktree's index lock (a commit or other git write there
+meanwhile is refused by git, nothing lost), checks the branch, head, target head and a clean worktree under it, asks
+those conditions once more at that boundary, brings the files from the head's tree to the target's through a separate
+index (`read-tree -m -u`, which won't overwrite a local change), then moves the branch only if it is still at that
+head (`update-ref <to> <head>`, compare and swap; else the files go back and nothing moves). Never a reset of a branch
+that may have moved on. Anything changed: nothing moves or is recorded, and the next pass looks again. While the move
+runs, the next card is reserved: its start is refused (`lane.lineBehind`, also inside its own write) until the
+`LineMoved` is saved, and a `LineMoved` that can't be saved has the move undone the same way. What waits is each
+workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
 (`hive.workflow.updateAgentBranch`, default on): off, the user is asked every time, a For you **Approve** on the next
 card (approve: Hive moves it once, by the steps above; decline: the user does it). With workflow rules off, nothing
 moves, nothing is asked and nothing waits: P3's behaviour (Darren's decision on #1120, point 2; the Assistant on #1271),

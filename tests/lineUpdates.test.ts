@@ -28,6 +28,10 @@ const { GitPlatform } = await import('../src/main/platform/gitPlatform')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { forYou } = await import('../src/main/workflow/cardWork')
+const service = await import('../src/main/workflow/service')
+const G = await import('../src/main/platform/git')
+const { gitTestHooks } = await import('../src/main/git')
+const { Workflow } = await import('../src/main/workflow/runtime')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -302,39 +306,142 @@ describe('the move checked again at its boundary (#1271 round 2)', () => {
     expect(lineMoved(w, cards[0]).map((f) => (f.data as { to: string }).to)).toEqual([git(repo, 'rev-parse', 'main')])
   })
 
-  it('the builder busy, a run going, the switch turned off, the rules turned off or the workspace closed meanwhile: nothing moves', async () => {
-    const service = await import('../src/main/workflow/service')
-    const cases: [string, (env: Awaited<ReturnType<typeof squashed>>) => Promise<void> | void][] = [
-      ['busy', () => lines.setAgentBusy(() => true)],
-      ['a run', () => service.setRunsGoing(() => ['unit tests'])],
-      ['switch off', () => advanced.set(lines.UPDATE_AGENT_BRANCH, false)],
-      ['rules off', () => advanced.set(ENFORCE, false)],
-      ['closed', async (env) => {
+  // One case a test, each its own workspace (HR2's round 2: five in one test outran its bound under load).
+  const meanwhile: [string, (env: Awaited<ReturnType<typeof squashed>>) => Promise<void> | void][] = [
+    ['the builder busy', () => lines.setAgentBusy(() => true)],
+    ['a run going', () => service.setRunsGoing(() => ['unit tests'])],
+    ['the switch turned off', () => advanced.set(lines.UPDATE_AGENT_BRANCH, false)],
+    ['the rules turned off', () => advanced.set(ENFORCE, false)],
+    [
+      'the workspace closed',
+      async (env) => {
         opened.splice(opened.indexOf(env.w), 1)
         await disposeWorkspaceService(env.w)
-      }]
+      }
     ]
-    for (const [what, during] of cases) {
-      const env = await squashed()
+  ]
+  it.each(meanwhile)('%s meanwhile: nothing moves', async (what, during) => {
+    const env = await squashed()
+    try {
       whileChecking(() => during(env))
       await update(env.w).catch(() => undefined)
-      expect([what, git(env.wt, 'rev-parse', 'HEAD')]).toEqual([what, env.head])
-      if (what !== 'closed') expect([what, lineMoved(env.w, env.cards[0]).length]).toEqual([what, 0])
-      vi.restoreAllMocks()
-      lines.setAgentBusy(null)
+      expect(git(env.wt, 'rev-parse', 'HEAD')).toBe(env.head)
+      if (what !== 'the workspace closed') expect(lineMoved(env.w, env.cards[0])).toEqual([])
+    } finally {
       service.setRunsGoing(null)
-      await advanced.set(lines.UPDATE_AGENT_BRANCH, true)
-      await advanced.set(ENFORCE, true)
     }
   })
 
-  it("the platform's move is conditional on the head checked: a branch that moved on since isn't reset", async () => {
-    const { repo, wt, head } = await squashed()
-    const G = await import('../src/main/platform/git')
-    commit(wt, 'after.txt')
-    expect(await G.resetKeep(wt, git(repo, 'rev-parse', 'main'), { line: 'card', head })).toBeNull()
-    expect(git(wt, 'log', '-1', '--format=%s')).toBe('after.txt')
-    expect(await G.resetKeep(wt, git(repo, 'rev-parse', 'main'), { line: 'other', head: git(wt, 'rev-parse', 'HEAD') })).toBeNull()
+  // HR2's round 2 finding 1: the move itself is serialized with the worktree's other git work and conditional on the
+  // exact branch, head and target, its authority asked at that boundary; nothing is reset blindly.
+  describe('at the move itself', () => {
+    afterEach(() => {
+      gitTestHooks.started = undefined
+    })
+    /** Runs `fn` once, as the move's git command `cmd` starts (synchronously, before it runs). */
+    const atCommand = (cmd: string, fn: () => void) => {
+      let done = false
+      gitTestHooks.started = (_cwd, args) => {
+        if (done || args[0] !== cmd) return
+        done = true
+        fn()
+      }
+    }
+
+    it('only from the head, branch and target checked, and only while go holds', async () => {
+      const { repo, wt, head } = await squashed()
+      const main = git(repo, 'rev-parse', 'main')
+      expect(await G.moveLineLocked(wt, main, { line: 'other', head, target: 'main' }, () => true)).toBeNull()
+      expect(await G.moveLineLocked(wt, main, { line: 'card', head: main, target: 'main' }, () => true)).toBeNull()
+      expect(await G.moveLineLocked(wt, head, { line: 'card', head, target: 'main' }, () => true)).toBeNull()
+      expect(await G.moveLineLocked(wt, main, { line: 'card', head, target: 'main' }, () => false)).toBeNull()
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)
+      expect(await G.moveLineLocked(wt, main, { line: 'card', head, target: 'main' }, () => true)).toBe(true)
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(main)
+      expect(git(wt, 'status', '--porcelain')).toBe('')
+    })
+
+    it('a git write tried in the worktree during the move is refused by git (the move holds its index), and nothing is lost', async () => {
+      const { repo, wt, cards, w } = await squashed()
+      let tried = ''
+      atCommand('update-ref', () => {
+        writeFileSync(join(wt, 'racing.txt'), 'racing\n')
+        try {
+          git(wt, 'add', 'racing.txt')
+          tried = 'added'
+        } catch (e) {
+          tried = String((e as Error).message)
+        }
+      })
+      await update(w)
+      expect(tried).toMatch(/index\.lock/)
+      // Moved and recorded; the racing file is still there, untracked, for the agent to add again.
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(git(repo, 'rev-parse', 'main'))
+      expect(lineMoved(w, cards[0])).toHaveLength(1)
+      expect(git(wt, 'status', '--porcelain')).toBe('?? racing.txt')
+    })
+
+    it('the branch moved by another route as it is moved: the compare-and-swap fails, the files are put back, the branch keeps that commit', async () => {
+      const { wt, cards, w, head } = await squashed()
+      let other = ''
+      atCommand('update-ref', () => {
+        // A commit made with no index (as a fetch or a script would), the branch set to it.
+        other = git(wt, 'commit-tree', `${head}^{tree}`, '-p', head, '-m', 'elsewhere')
+        git(wt, 'update-ref', 'refs/heads/card', other)
+      })
+      await update(w)
+      expect(git(wt, 'rev-parse', 'refs/heads/card')).toBe(other)
+      expect(lineMoved(w, cards[0])).toEqual([])
+      // The worktree's files are the head's again (nothing of main's left over them).
+      expect(git(wt, 'diff', '--stat', head)).toBe('')
+    })
+
+    it('the rules turned off as the move takes its lock: asked at that boundary, nothing moves', async () => {
+      const { wt, cards, w, head } = await squashed()
+      // The move's first git command (where its index is): the rules turned off just as it runs.
+      gitTestHooks.started = (_cwd, args) => {
+        if (args.includes('--git-path')) void advanced.set(ENFORCE, false)
+      }
+      await update(w)
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)
+      expect(lineMoved(w, cards[0])).toEqual([])
+    })
+
+    it("the next card's start during the move waits for its LineMoved (HR2's round 2 finding 2)", async () => {
+      const { wt, cards, w } = await squashed()
+      // Started just after the branch has moved (its head in main now), before its LineMoved is saved.
+      let during: string | null | undefined
+      let recorded = true
+      const move = GitPlatform.prototype.moveLine
+      vi.spyOn(GitPlatform.prototype, 'moveLine').mockImplementation(async function (this: InstanceType<typeof GitPlatform>, ...a: Parameters<typeof move>) {
+        const r = await move.apply(this, a)
+        if (r === true && during === undefined) {
+          recorded = lineMoved(w, cards[0]).length > 0
+          during = await refused(act(w, cards[1], builder, { kind: 'start' }))
+        }
+        return r
+      })
+      await update(w)
+      expect(recorded).toBe(false)
+      expect(during).toBe('lane.lineBehind')
+      expect(lineMoved(w, cards[0])).toHaveLength(1)
+      expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBeNull()
+      const started = facts(w, cards[1]).find((f) => f.kind === 'Started')
+      expect(started?.data).toMatchObject({ base: git(wt, 'rev-parse', 'main') })
+    })
+
+    it("a LineMoved that can't be saved: the move is undone the same way, nothing recorded", async () => {
+      const { wt, cards, w, head } = await squashed()
+      const write = Workflow.prototype.write
+      vi.spyOn(Workflow.prototype, 'write').mockImplementation(function (this: InstanceType<typeof Workflow>, ...a: Parameters<typeof write>) {
+        if (a[0].id === cards[0]) return Promise.reject(new Error('the board failed'))
+        return write.apply(this, a)
+      })
+      await update(w)
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)
+      expect(git(wt, 'status', '--porcelain')).toBe('')
+      expect(lineMoved(w, cards[0])).toEqual([])
+    })
   })
 })
 
