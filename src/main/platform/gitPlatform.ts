@@ -323,17 +323,14 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   async lineNow(folder: string, target: string): Promise<Maybe<LineNow>> {
-    const line = await G.branch(folder)
-    if (isUnknown(line)) return line
-    const head = await G.head(folder)
-    if (isUnknown(head)) return head
-    const th = await G.lineHead(this.project, target)
-    if (isUnknown(th)) return th
+    // The target read in the folder: an agent's worktree is the project's, its branches the same (as the move reads it).
+    const now = await G.worktreeNow(folder, { target })
+    if (isUnknown(now)) return now
+    const { line, head, dirty, target: th } = now
+    if (!head) return unknown(UNREADABLE.head, { where: folder })
     if (!th) return unknown(UNREADABLE.head, { where: target })
-    const inTarget = await G.isAncestor(folder, head, th)
+    const inTarget = head === th || (await G.isAncestor(folder, head, th))
     if (isUnknown(inTarget)) return inTarget
-    const dirty = await G.dirty(folder)
-    if (isUnknown(dirty)) return dirty
     return { line, head, targetHead: th, inTarget, dirty }
   }
 
