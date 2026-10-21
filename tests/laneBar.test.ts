@@ -366,13 +366,22 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, overridden: false, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, decisionSince: false, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, decisionSince: false, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
     expect(workNotes(badge({ stage: 'active', verdict: { pass: true, revision: 'a3f2c1d9e8', current: false } }), 'doing', null, short, tr)).toEqual(['Revision: a3f2c1d', 'Last verdict: passed on a3f2c1d, which no longer counts'])
     // A no-code card's verdict has no revision.
     expect(workNotes(badge({ revision: null, verdict: { pass: true, revision: null, current: true } }), 'passed', null, short, tr)).toEqual(['Last verdict: passed'])
+  })
+
+  it("a move past its rules (#1275): who, which rules by name and why, when the window names them", () => {
+    const names = { list: (items: string[]) => items.join(' + '), ruleName: (id: string) => (id === 'integrate.approved' ? 'Review and approval before merging' : id) }
+    const o = { by: 'user' as const, move: 'active→done', rules: ['integrate.approved', 'done.contained'], reason: ' Merged by hand ', at: '' }
+    expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr, names)).toEqual(['You moved it past its rules: Review and approval before merging + done.contained. Reason: Merged by hand'])
+    expect(workNotes(badge({ revision: null, override: { ...o, by: 'assistant', reason: '' } }), 'done', null, short, tr, names)).toEqual(['The Assistant moved it past its rules: Review and approval before merging + done.contained. No reason given.'])
+    // Without the window's names (hive-mcp): no line.
+    expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr)).toEqual([])
   })
 
   it("its merge commit once Done: the Integrated fact's, else the lane's record; nothing for a card with no work recorded", () => {

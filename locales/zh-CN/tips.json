@@ -194,6 +194,8 @@
   "tips.modes.title": "助手的模式",
   "tips.moreAgents.text": "一个项目需要超过 {usual, plural, other {# 个智能体}}？在“设置”→“高级”中调高“每个项目的智能体数”，最多 {most, number} 个，可应用于所有工作区或仅当前工作区。超过 {usual, number} 个时，它会显示它们在你电脑上的开销：运行中的智能体占用的内存，以及剩余多少。",
   "tips.moreAgents.title": "超过 {usual, plural, other {# 个智能体}}",
+  "tips.moveAnyway.text": "把卡片拖过其项目的某条规则时（例如在评审前拖到“已完成”），Hive 会先询问并列出将跳过的规则。“仍然移动”会在卡片上记录一次例外放行并附上你的理由：卡片上的打开的锁图标显示是谁、跳过了哪些规则以及原因。",
+  "tips.moveAnyway.title": "附上理由，绕过规则移动卡片",
   "tips.myPrices.text": "Claude Code 的费用是它自己根据其价格表算出的。你的费率不同（有折扣或其他套餐）？把“会话费用”设为“我的价格”，Hive 就会改用你的价格表为每个会话计价。",
   "tips.myPrices.title": "为 Claude Code 设置自己的价格",
   "tips.newCard.text": "按 {key} 即可为当前项目新建卡片，无需离开正在做的事。",

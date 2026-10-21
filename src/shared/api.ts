@@ -336,7 +336,9 @@ export interface HiveRequests {
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
    */
-  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string }) => TaskMoveResult
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null }) => TaskMoveResult
+  /** The columns a card can be moved to under its rules (#1275): where a drag may drop it; null: every column (no rule applies). */
+  'tasks:columns': (n: number) => TaskColumn[] | null
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
   'tasks:facts': (n: number) => Fact[]
   /** What waits for the user (For you, #1269, SPEC §16.8.5): every live card's open requests, of one project (its folder name) or the workspace, oldest first, and their count. */

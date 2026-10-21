@@ -194,6 +194,8 @@
   "tips.modes.title": "Tryby Asystenta",
   "tips.moreAgents.text": "Potrzebujesz więcej niż {usual, plural, one {# agenta} few {# agentów} many {# agentów} other {# agenta}} w projekcie? Zwiększ Agenci na projekt w Ustawienia → Zaawansowane, maksymalnie do {most, number}, dla każdego obszaru roboczego albo tylko tego. Powyżej {usual, number} widać, jak obciążają Twój komputer: ile pamięci zajmują działający agenci i ile jest wolnej.",
   "tips.moreAgents.title": "Więcej niż {usual, plural, one {# agent} few {# agentów} many {# agentów} other {# agenta}}",
+  "tips.moveAnyway.text": "Przeciągnięcie karty poza regułę jej projektu (na przykład do Gotowe przed recenzją) najpierw pyta i wymienia pomijane reguły. Przenieś mimo to zapisuje na karcie wyjątek, z twoim uzasadnieniem: otwarta kłódka na karcie pokazuje, kto, które reguły i dlaczego.",
+  "tips.moveAnyway.title": "Przenoszenie karty z pominięciem jej reguł, z uzasadnieniem",
   "tips.myPrices.text": "Koszt w Claude Code to jego własne wyliczenie według jego cennika. Masz inne stawki (rabat, inny plan)? Ustaw Koszty sesji na Moje ceny, a Hive wyceni każdą sesję według Twojej tabeli.",
   "tips.myPrices.title": "Twoje własne ceny dla Claude Code",
   "tips.newCard.text": "Naciśnij {key}, żeby dodać nową kartę dla bieżącego projektu bez przerywania tego, co robisz.",

@@ -628,8 +628,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
-    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }),
+    // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
+    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
+    'tasks:columns': (n) => tasks.moveColumns(n),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
     'tasks:forYou': (project) => {
       const ws = currentWorkspace()

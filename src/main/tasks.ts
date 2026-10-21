@@ -1115,8 +1115,11 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
 }
 
 async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
-  // Interim (#1290, #1275): the user's moves don't ask yet, so a move that skips a rule records its Override.
-  const r = await moveThroughRules(g, n, patch, actor, opts, true)
+  // The window's change (`ask`: IPC tasks:update, #1275) never skips a rule unasked: its moves go through tasks:move,
+  // which asks; one that would skip a rule here is refused with the rules it names. Hive's own calls for the user (a
+  // card's Start) confirm as before.
+  const { ask, ...rest } = opts
+  const r = await moveThroughRules(g, n, patch, actor, rest, !ask)
   if ('refused' in r) throw new WorkflowRefusedError(r.refused)
   // Stopped part way: the user sees where the card is; the Assistant is told why it stopped there (its start kept).
   if ('moved' in r && r.stopped && actor.kind !== 'user') throw new WorkflowRefusedError(r.stopped)
@@ -1128,15 +1131,41 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
  * The window's move (`tasks:move`, #1265): through the card's rules when they apply, asking first unless `confirm`
  * (the rules it would skip, nothing written), else a plain move. Never refused for a rule: the user overrides.
  */
-export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string } = {}): Promise<MoveResult> {
+export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null } = {}): Promise<MoveResult> {
   const actor: TaskActor = { kind: 'user' }
-  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
+  // `agent`: the Move to Doing dialog's choice (an agent, or nobody), given with the move.
+  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.agent !== undefined ? { agent: o.agent } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
   const gate = await gateOf(workspace, n, patch, actor, { anyStage: true })
   if (!gate) {
     const { override: _o, ...plain } = patch
     return { moved: await updateTask(n, plain, actor) }
   }
   return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm)
+}
+
+/**
+ * The columns a card can be moved to under its rules (IPC `tasks:columns`, #1275): its ruleset's stages as columns
+ * (On Hold always), where the window's drag highlights a drop; null when no rule applies to it (the rules off, a card
+ * from before 1.0, a project with no platform): every column. A Done card dragged on is reopened: its next cycle's.
+ */
+export async function moveColumns(n: number): Promise<TaskColumn[] | null> {
+  const ws = workspace
+  const { workflowEnforced, workflowFor } = await import('./workflow/service')
+  if (!ws.path || !workflowEnforced()) return null
+  const head = cardHeads(ws, [n])[0]
+  if (!head || typeof head.project !== 'string' || !head.project) return null
+  const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
+  const rec = (() => {
+    try {
+      return wf?.store.card(n) ?? null
+    } catch {
+      return null
+    }
+  })()
+  if (!wf || !rec || rec.preWorkflow) return null
+  const s = wf.state(rec)
+  const r = wf.rulesetOf(rec, s.stage === 'done' ? { ...s, stage: 'todo' } : s)
+  return TASK_COLUMNS.map((c) => c.id).filter((c) => c === 'hold' || c === head.column || r.stages.some((x) => STAGE_CATEGORY[x.id] === c))
 }
 
 /** An answer the window sent that can't be one (the request's kind decides which fields it takes). */
@@ -1224,7 +1253,7 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; ask?: boolean } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }

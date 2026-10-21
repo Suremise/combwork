@@ -194,6 +194,8 @@
   "tips.modes.title": "Des modes pour l’Assistant",
   "tips.moreAgents.text": "Besoin de plus de {usual, plural, one {# agent} many {# agents} other {# agents}} dans un projet ? Augmente Agents par projet dans Paramètres → Avancé, jusqu’à {most, number}, pour tous les espaces de travail ou seulement celui-ci. Au-delà de {usual, number}, le paramètre montre ce qu’ils coûtent à ton ordinateur : la mémoire que prennent tes agents en cours, et combien il en reste de libre.",
   "tips.moreAgents.title": "Plus de {usual, plural, one {# agent} many {# agents} other {# agents}}",
+  "tips.moveAnyway.text": "Faire glisser une carte au-delà d’une règle de son projet (vers Terminé avant sa relecture, par exemple) demande d’abord confirmation et nomme les règles contournées. Déplacer quand même enregistre une dérogation sur la carte, avec ta raison : un cadenas ouvert sur la carte indique qui, quelles règles et pourquoi.",
+  "tips.moveAnyway.title": "Déplacer une carte en dérogeant à ses règles, avec une raison",
   "tips.myPrices.text": "Le coût de Claude Code est son propre chiffre, tiré de sa grille de prix. Tu as d’autres tarifs (une remise, un autre niveau) ? Mets Coûts des sessions sur Mes prix, et Hive calcule le prix de chaque session avec ta grille.",
   "tips.myPrices.title": "Tes propres prix pour Claude Code",
   "tips.newCard.text": "Appuie sur {key} pour une nouvelle carte dans le projet où tu es, sans quitter ce que tu fais.",
