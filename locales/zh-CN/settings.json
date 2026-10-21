@@ -147,6 +147,8 @@
   "settings.advanced.hive.wait.agentsMaxSeconds.title": "智能体等待：最长时间",
   "settings.advanced.hive.wait.cardMaxSeconds.desc": "智能体调用 hive_wait_for_tasks（不带 wake）时回应前的最长等待时间。它必须低于各 CLI 自身的工具超时，因此无论这里如何设置，Hive 都会让它比 Codex 的 hive 工具超时少一分钟。",
   "settings.advanced.hive.wait.cardMaxSeconds.title": "卡片等待：最长时间",
+  "settings.advanced.hive.workflow.enforce.desc": "卡片移动时，Hive 会执行每个项目的工作流程规则：卡片进入评审、已批准或已完成之前其版本控制选项的要求，以及 Hive 发现卡片的工作在 Hive 之外被合并或更改后的后续处理。关闭后，所有项目中的所有规则会同时关闭：卡片放到哪里就移到哪里，不会拒绝或询问任何操作，Hive 只记录每张卡片的工作发生了什么，不会因此移动卡片或唤醒代理。",
+  "settings.advanced.hive.workflow.enforce.title": "强制执行工作流程规则",
   "settings.advanced.logs.desc": "打开 Hive 日志文件所在的文件夹。",
   "settings.advanced.logs.tip": "报告问题时很有用。",
   "settings.advanced.logs.title": "日志",

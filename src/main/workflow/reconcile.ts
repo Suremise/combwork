@@ -3,14 +3,17 @@
 // observed fact they follow (their dedupe key), so two Hives observing one workspace write each transition once, and
 // a writer that loses the race reads the platform again and writes only what is true now (§16.17).
 //
-// Called by the app's reconciler (reconciler.ts, #1217) on the watcher's events, and by the runtime's tests. **P3 is
-// record-only**: the table's moves (Done when integrated outside, a stale card moved back), queue cancellations and wakes
-// run only with the runtime's `reconcileActs`, which P4 turns on; without it, what is observed is recorded and nothing
-// else changes. Every write goes through the runtime's lock (`wf.locked`: the board's change, in the app).
+// Called by the app's reconciler (reconciler.ts, #1217) on the watcher's events, and by the runtime's tests. The table's
+// moves (Done when integrated outside, a stale card moved back), queue cancellations and wakes run only with the
+// runtime's `reconcileActs` (in the app, Settings → Advanced → Workflow rules are enforced, #1263); without it, what is
+// observed is recorded and nothing else changes (P3's record-only). An observation is recorded once (its dedupe key),
+// and what follows from it is applied apart from that, once (HR2's #1263 round 1): an integration until the card is
+// Done, a stale pass once per Stale fact, so one recorded while the rules were off is acted on once they're on again.
+// Every write goes through the runtime's lock (`wf.locked`: the board's change, in the app).
 
 import { statSync } from 'original-fs'
 import { join } from 'path'
-import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
+import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -148,11 +151,11 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   // card's own folder. Recorded once per cycle.
   const s0 = s
   if (presence(project) === 'gone' || (presence(join(project, '.git')) === 'gone' && isUnknown(await G.commonDir(project)))) {
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:repository:${s0.cycle}`, data: { what: 'repository' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
   if (wf.ownLine(s) && card.stage !== 'done' && presence(s.started.folder) === 'gone') {
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
   }
   await observeTarget(wf, card, s, hooks)
 
@@ -165,7 +168,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
     s = wf.state(card)
     const lh = await G.lineHead(project, line)
-    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } }))
+    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
   }
 
   card = wf.store.card(card.id)
@@ -183,6 +186,11 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const c = await G.contains(project, target, approved)
       if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
     }
+    // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
+    if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
+      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, 'approved', `${card.key}: stale, submit again`)) // i18n-ignore: a wake, agent-facing
+      return
+    }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
     if (wf.ownLine(s) && s.head && s.head !== approved.revision && !s.stale) {
       const th = await G.lineHead(project, target)
@@ -196,12 +204,9 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
           observed(w, 'CarriedOver', `carried:${s.cycle}:${head}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
           return
         }
-        if (!observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' })) return
-        // P4: what follows from it (#1217: P3 records only).
-        if (!wf.cfg.reconcileActs) return
-        if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' })
-        w.move('approved', 'derived')
-        wf.wake(w, s.started?.builder, `${card.key}: stale, submit again`)
+        observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
+        // What follows from it, once, with the rules enforced (P3 records only).
+        if (wf.cfg.reconcileActs) staleEffects(w, 'approved', `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
@@ -242,7 +247,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
     const th = await G.lineHead(project, target)
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } }))
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
 
@@ -264,16 +269,17 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
 async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
   const target = s.started!.target ?? ''
   const th = await G.lineHead(wf.cfg.project, target)
-  const entry = openEntry(s)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
     // Unique per cycle: two Hives observing the same merge write one `Integrated` (§16.17).
-    const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } })
-    if (!f) return
-    w.written.push(f as Fact)
-    // P4: the card Done, its queue entry and slot released, its lane told (#1217: P3 records only; the card stays).
-    if (!wf.cfg.reconcileActs) return
-    if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'integratedOutside' })
+    const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
+    if (f) w.written.push(f as Fact)
+    // With the rules enforced: the card Done, its queue entry and slot released, its lane told (P3 records only; the
+    // card stays). Also for an integration recorded before (the rules off then, or another Hive's): applied once, until
+    // the card is Done.
+    if (!wf.cfg.reconcileActs || w.current === 'done') return
+    const open = openEntry(w.state())
+    if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
     w.move('done', 'derived')
     w.action('endLaneIfDone', {})
     w.action('releaseSlot', {})
@@ -282,18 +288,59 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
 
 /** None: an edit to a card's paths after a pass makes the pass stale (§16.3.3); files outside its paths never do. */
 export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState): Promise<void> {
-  if (card.stage !== 'review' || !passingReviewers(s).length || s.stale) return
+  if (card.stage !== 'review') return
+  const r = wf.rulesetOf(card, s)
+  // Without a Review stage of its own, the card goes back to Active; else it stays in Review with the stale mark.
+  const back = hasStage(r, 'review') ? null : 'active'
+  const why = `${card.key}: your paths changed since the pass, submit again` // i18n-ignore: a wake, agent-facing
+  if (s.stale) {
+    // Recorded while the rules weren't enforced: what follows from it, now, once.
+    if (wf.cfg.reconcileActs && !staleApplied(wf, card, s)) await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, why))
+    return
+  }
+  if (!passingReviewers(s).length) return
   const now = wf.none.revision(card.paths ?? [])
   if (isUnknown(now) || now.revision === s.approved?.revision) return
-  const r = wf.rulesetOf(card, s)
   await wf.write(card, r, 'outside', (w) => {
     if (!sameCycle(w, s)) return
-    if (!observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' })) return
-    // P4: what follows from it (#1217: P3 records only).
-    if (!wf.cfg.reconcileActs) return
-    if (!hasStage(r, 'review')) w.move('active', 'derived')
-    wf.wake(w, s.started?.builder, `${card.key}: your paths changed since the pass, submit again`)
+    observed(w, 'Stale', `stale:${s.cycle}:${now.revision}`, { approved: s.approved?.revision ?? null, current: now.revision, why: 'change' }) // i18n-ignore: a fact's kind and codes, not text
+    // What follows from it, once, with the rules enforced (P3 records only).
+    if (wf.cfg.reconcileActs) staleEffects(w, back, why)
   })
+}
+
+/** The card's content-stale pass this cycle (§16.4.4: not a decision's), as the log has it. */
+const staleFact = (facts: Fact[], cycle: number): Fact | undefined => facts.findLast((f) => f.kind === 'Stale' && f.seq > cycle && (f.data as FactData['Stale']).why !== 'decision')
+
+/** The builder a stale pass wakes: an agent (the user isn't woken). */
+const wakes = (s: CardState): string | null => (s.started?.builder && s.started.builder !== 'user' ? s.started.builder : null)
+
+/**
+ * Whether a stale pass's effects were applied: its builder's wake was written for its Stale fact. With no builder to
+ * wake, its effects are moves and a cancellation that write nothing once made, so it is applied when there is nothing
+ * left to cancel.
+ */
+function staleApplied(wf: Workflow, card: CardRecord, s: CardState): boolean {
+  const f = staleFact(wf.store.facts(card.id), s.cycle)
+  if (!f) return true
+  return wakes(s) ? wf.store.hasAction(card.id, 'wake', f.seq) : !openEntry(s)
+}
+
+/**
+ * What follows a content-stale pass (§16.4.4), once per Stale fact, in the write's transaction: its queue entry
+ * cancelled, the card moved `back` (Git: Approved; None without Review: Active; null: it stays), and its builder woken
+ * with the wake tied to the Stale fact, which records that it was applied.
+ */
+function staleEffects(w: Write, back: StageId | null, why: string): void {
+  const cur = w.state()
+  const f = staleFact(w.tx.facts(w.card.id), cur.cycle)
+  if (!f || !cur.stale) return
+  const builder = wakes(cur)
+  if (builder && w.tx.hasAction(w.card.id, 'wake', f.seq)) return
+  const open = openEntry(cur)
+  if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
+  if (back) w.move(back, 'derived')
+  if (builder) w.action('wake', { agent: builder, why }, f.seq)
 }
 
 /**

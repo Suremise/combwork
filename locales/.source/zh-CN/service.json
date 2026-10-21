@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "No such image",
   "service.transcripts.noTool": "No such tool call",
   "service.transcripts.none": "This session has no transcript yet.",
+  "service.workflow.closed": "The workspace this card belongs to has closed",
   "service.workspace.advancedNotHere": "{setting} can't be set for a workspace.",
   "service.workspace.agentGone": "That agent no longer exists.",
   "service.workspace.badName": "Project names cannot start with \".\" or contain {chars}",

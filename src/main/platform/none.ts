@@ -9,6 +9,7 @@ import { createHash } from 'crypto'
 import { readdirSync, readFileSync, statSync } from 'original-fs'
 import { isAbsolute, join, relative, sep } from 'path'
 import type { FileChange, Manifest } from '../../shared/workflow/facts'
+import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Maybe } from './types'
 
 /** At most this many files or bytes per card; beyond, the revision is unknown and the option row says to narrow it. */
@@ -32,6 +33,18 @@ export class NoneAdapter {
     /** Names of folders left out of the deliverables (N4); `.hive` always is. */
     private excluded: string[] = []
   ) {}
+
+  /** The folders left out changed (the project's options, #1263): what is hashed follows from the next read. */
+  setExcluded(excluded: string[]): void {
+    if (JSON.stringify(excluded) === JSON.stringify(this.excluded)) return
+    this.excluded = [...excluded]
+    this.cache.clear()
+  }
+
+  /** Every cached hash goes (writes may have been missed: the watcher's record isn't complete), each path read again. */
+  forget(): void {
+    this.cache.clear()
+  }
 
   /** A watcher write event for a path: its cached hash goes, even if its size and time look unchanged. */
   invalidate(path: string): void {
@@ -69,7 +82,7 @@ export class NoneAdapter {
     const out: string[] = []
     const limit = { n: 0 }
     this.files('', out, limit)
-    return limit.n > NONE_MAX_FILES ? unknown(`the deliverables of ${this.project} (over ${NONE_MAX_FILES} files)`) : out.sort()
+    return limit.n > NONE_MAX_FILES ? unknown(UNREADABLE.deliverables, { project: this.project, n: NONE_MAX_FILES }) : out.sort()
   }
 
   private hashFile(rel: string): string {
@@ -99,11 +112,11 @@ export class NoneAdapter {
     const limit = { n: 0 }
     let bytes = 0
     const outside = paths.find((p) => !NoneAdapter.inside(p))
-    if (outside !== undefined) return unknown(`the path ${outside}, outside the project`)
+    if (outside !== undefined) return unknown(UNREADABLE.pathOutside, { path: outside })
     for (const p of [...new Set(paths.map(toPosix))].sort()) {
       const found: string[] = []
       this.files(p, found, limit)
-      if (limit.n > NONE_MAX_FILES) return unknown(`the card's paths (over ${NONE_MAX_FILES} files)`)
+      if (limit.n > NONE_MAX_FILES) return unknown(UNREADABLE.cardPathsFiles, { n: NONE_MAX_FILES })
       if (!found.length) out[p] = DELETED
       for (const f of found) {
         try {
@@ -111,7 +124,7 @@ export class NoneAdapter {
         } catch {
           // Gone meanwhile: hashed as deleted below.
         }
-        if (bytes > NONE_MAX_BYTES) return unknown(`the card's paths (over 2 GB)`)
+        if (bytes > NONE_MAX_BYTES) return unknown(UNREADABLE.cardPathsSize, { n: NONE_MAX_BYTES / 1024 ** 3 })
         out[f] = this.hashFile(f)
       }
     }

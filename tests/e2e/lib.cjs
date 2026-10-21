@@ -281,12 +281,16 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile. Returns { app, page, inv } (inv calls an IPC channel). readyMs bounds the
- * wait for its window to be ready; one that isn't is closed and the failure thrown.
+ * Starts the dev build with a test profile, or the packaged Hive.exe HIVE_EXE names (the Sandbox upgrade checks run
+ * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
+ * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
+  const exe = process.env.HIVE_EXE
+  if (exe && !launch.said) console.log(`Hive: ${exe} (HIVE_EXE), not the dev build`)
+  launch.said = !!exe
   // The run context's environment (quiet, tips off, the suite's port) with the profile and the suite's own variables.
-  const app = await _electron.launch({ executablePath: ELECTRON, args: [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
+  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
     // Electron that failed to start (0xc0000142 under heavy load, #599): its exit code said with what it means.
     const said = windowsCodesIn(e?.message)
     if (said.length && e instanceof Error) e.message = `${e.message}\nWindows: ${said.join('; ')}`
@@ -632,9 +636,11 @@ const inside = (file, dir) => {
 function testExecutable(exe) {
   if (comparable(exe) === comparable(ELECTRON)) return 'dev'
   if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Hive (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (HIVE_E2E_HIVE09) (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
+  if (named.some((d) => inside(exe, d))) return 'packaged'
+  // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
   const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
-  const allowed = [ROOT, TEST_ROOT, main && path.join(main, 'dist', 'win-unpacked'), process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
-  if (!allowed.some((d) => inside(exe, d))) throw new Error(`A test starts Hive from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
+  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Hive from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
   return 'packaged'
 }
 

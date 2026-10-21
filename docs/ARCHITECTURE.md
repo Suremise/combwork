@@ -264,7 +264,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 | Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
-| Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
+| Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
 | Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
 | Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
@@ -383,16 +383,39 @@ once), each repository and folder watched once however many projects share it:
 target ref moving); `reconcile.ts` applies SPEC §16.4.4's table, through the same runtime, with the actor `outside`.
 It also runs when a gate reads a card and once at start.
 
-**In the app, record-only (#1217, P3).** `workflow/reconciler.ts` follows the open workspaces' projects (as
+**The runtime in the app (#1263, P4).** `workflow/service.ts` is the app's one way to a project's runtime:
+`workflowFor(ws, projectPath)` gives the `Workflow` of a project of an open workspace (null for a path that isn't one
+with a platform), made once per workspace and project and again for the workspace's next lifetime (a close, or its
+window opening another), on the board's store (`FactStore.forBoard`). Its `locked` is a change of the board
+(`boardWrite`, which joins a change the caller already holds: tasks.ts's `boardLock`), refused once its workspace's
+lifetime has ended; `autoRun` is off, so its side effects are only `card_actions` rows the actions worker runs after
+the commit (`runActions`/`perform` stay in `runtime.ts` for `tests/workflow`). Its options are the project's resolved
+ones, read again at each `workflowFor`: `workflow/rulesets.ts` (`resolveOptions`) lays the platform's all-off, the global
+defaults (`settings.workflow`), the workspace's (`workspace.json` `workflow`) and the project's (`project.json`
+`workflow.options`) over each other, the first two per platform, with each option's origin, and falls back to all-off
+(logged once per project and reason) on an unknown option, a value it doesn't take (each option's check in `TAKES`:
+its type and its choices), another platform's options or a contradiction. `optionsFor` gives them with their origins.
+Its `reconcileActs` is a getter on the Advanced switch `hive.workflow.enforce` (`workflowEnforced()`, default on,
+#1120's table: off is P3's behaviour), read at each use. A None project's kept runtime keeps its paths' hashes, so
+each `workflowFor` first syncs them with the watcher (`syncHashes`, one at a time per instance): the paths
+`observer.changedBetween` saw written since the last sync are invalidated, or every hash is forgotten when its record
+of that time isn't complete. `cardRunRevision` (`runChecks.ts`) takes its runtime from `workflowFor` too.
+
+**Acting once (#1263).** `reconcile.ts` records an observation once (its dedupe key) and applies what follows from it
+apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
+(`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake
+written for that fact (`card_actions.fact`, read with `hasAction`) as the record that it was applied. So an observation
+recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing.
+
+**Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
 reconciles the project once its events settle (`RECONCILE_DEBOUNCE_MS`; one run at a time, a run asked for meanwhile
 runs after). It also runs once as a workspace opens (`onOpened`), when a window is focused (at most every 10 s), and
-when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run builds the project's
-runtime on the board's store (`FactStore.forBoard`) with its writes as changes of the board (`cfg.locked`:
-`boardWrite`, with the run's workspace lifetime as `alive`), its options from `project.json` (else the platform's
-defaults), and **`reconcileActs` off**: `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
-MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone) and the table's moves, queue cancellations,
-actions and wakes run only with that switch, which the P4 runtime turns on (the P2 scenarios run with it). It
+when a card is read for its Work section (`tasks:work`: that card, whatever its stage). A run takes the project's
+runtime from `workflowFor` (above): `reconcile.ts` records what it observes (HeadMoved, Integrated by outside,
+MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone), and the table's moves, queue cancellations,
+actions and wakes run only with `reconcileActs`, the switch `hive.workflow.enforce` (on by default; off, P3's
+record-only). It
 reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
 fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
 revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now

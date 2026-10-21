@@ -1,12 +1,12 @@
 // Refusals as instructions (SPEC §16.8.3): every refusal names the rule, what happened, the exact next step possible
 // under the card's ruleset, and where the rule is changed. Three whole sentences, each its own message, never glued from
-// pieces; agents get them in English (`englishText`), the window shows them translated.
-//
-// P2 spike (#1118): not wired into the app yet.
+// pieces; agents get them in English (`refusal`), the window shows them translated (`refusalLines`), each a line.
 
 import { englishText } from '../advanced'
-import { msg, type Msg, type Values } from '../i18n/msg'
+import { msg, type Msg } from '../i18n/msg'
+import type { StoredText } from '../types'
 import type { GuardId } from './pieces'
+import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
 export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
@@ -25,18 +25,18 @@ const r = (message: Msg, next: Msg, change: Msg | null = null): RefusalText => (
 export const REFUSALS: Record<RuleId, RefusalText> = {
   'start.notBlocked': r(
     msg({ id: 'workflow.refused.start.notBlocked.message', defaultMessage: "{card} can't start: it is blocked ({reason}).", description: 'A refused start of a card. {card} is a card key like AM-12; {reason} is why the card is blocked, in the words given.' }),
-    msg({ id: 'workflow.refused.start.notBlocked.next', defaultMessage: 'Ask the user to unblock it, or work on another card.', description: 'The next step after a refused start of a blocked card.' }),
-    msg({ id: 'workflow.refused.start.notBlocked.change', defaultMessage: 'The user can change this rule in Version Control → Cards start only when the cards they wait for are done.', description: 'Where the rule that refused starting a blocked card is changed.' })
+    msg({ id: 'workflow.refused.start.notBlocked.next', defaultMessage: 'Wait for it to be unblocked, or work on another card.', description: 'The next step after a refused start of a blocked card.' }),
+    msg({ id: 'workflow.refused.start.notBlocked.change', defaultMessage: 'This rule is set in Version Control → Cards start only when the cards they wait for are done.', description: 'Where the rule that refused starting a blocked card is changed.' })
   ),
   'start.dependenciesIntegrated': r(
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.message', defaultMessage: "{card} can't start: {waitsFor} isn't done yet.", description: "A refused start of a card. {card} and {waitsFor} are card keys (AM-12): the card waits for {waitsFor}'s work to be merged or accepted." }),
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.next', defaultMessage: 'Wait for {waitsFor} to be done, or work on another card.', description: 'The next step after a refused start: {waitsFor} is the card key it waits for.' }),
-    msg({ id: 'workflow.refused.start.dependenciesIntegrated.change', defaultMessage: 'The user can change this rule in Version Control → Cards start only when the cards they wait for are merged.', description: 'Where the rule that refused starting a card before the cards it waits for are done is changed.' })
+    msg({ id: 'workflow.refused.start.dependenciesIntegrated.change', defaultMessage: 'This rule is set in Version Control → Cards start only when the cards they wait for are merged.', description: 'Where the rule that refused starting a card before the cards it waits for are done is changed.' })
   ),
   'start.slotAvailable': r(
     msg({ id: 'workflow.refused.start.slotAvailable.message', defaultMessage: "{card} can't start: no slot is free.", description: 'A refused start: every working folder (slot) is lent to other work. {card} is a card key.' }),
     msg({ id: 'workflow.refused.start.slotAvailable.next', defaultMessage: 'Wait for a slot to be free.', description: 'The next step after a refused start for want of a slot.' }),
-    msg({ id: 'workflow.refused.start.slotAvailable.change', defaultMessage: 'The user can change this in Version Control → Where cards are built.', description: 'Where the rule that refused starting for want of a slot is changed.' })
+    msg({ id: 'workflow.refused.start.slotAvailable.change', defaultMessage: 'This is set in Version Control → Where cards are built.', description: 'Where the rule that refused starting for want of a slot is changed.' })
   ),
   'submit.notDuplicate': r(
     msg({ id: 'workflow.refused.submit.notDuplicate.message', defaultMessage: '{card} is already submitted at {revision} and waits for review or merging.', description: 'A refused submit: the same revision is already waiting. {card} is a card key, {revision} a short revision id.' }),
@@ -45,7 +45,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'requeue.allowed': r(
     msg({ id: 'workflow.refused.requeue.allowed.message', defaultMessage: "{card} at {revision} can't go back into the merge queue unchanged: {why}", description: 'A refused resubmission into the merge queue. {card} is a card key, {revision} a short revision id, {why} one of the requeue reasons below, a whole sentence.' }),
     msg({ id: 'workflow.refused.requeue.allowed.next', defaultMessage: 'Fix the failure, commit and submit the new revision.', description: 'The next step after a refused unchanged requeue.' }),
-    msg({ id: 'workflow.refused.requeue.allowed.change', defaultMessage: 'The user can retry the merge once from the queue.', description: 'Who can override a refused requeue: the user, with Retry merge.' })
+    msg({ id: 'workflow.refused.requeue.allowed.change', defaultMessage: 'Retry merge on the merge queue retries it once.', description: 'Who can override a refused requeue: the user, with Retry merge on the merge queue (glossary 2.5: merge queue).' })
   ),
   'submit.ready': r(
     msg({ id: 'workflow.refused.submit.ready.message', defaultMessage: '{card} at {revision} has unresolved conflicts: {files}.', description: 'A refused submit: the revision stores conflicts. {files} lists file paths.' }),
@@ -64,17 +64,17 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'submit.checksPassed': r(
     msg({ id: 'workflow.refused.submit.checksPassed.message', defaultMessage: "Review refused: {check} hasn't passed on {revision}.", description: 'A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id.' }),
     msg({ id: 'workflow.refused.submit.checksPassed.next', defaultMessage: 'Run {command}, then submit again.', description: 'The next step after a refused submit for a missing check: {command} is the command to run.' }),
-    msg({ id: 'workflow.refused.submit.checksPassed.change', defaultMessage: 'The user can change this rule in Version Control → Checks pass before review.', description: 'Where the rule that refused a submit for a missing check is changed.' })
+    msg({ id: 'workflow.refused.submit.checksPassed.change', defaultMessage: 'This rule is set in Version Control → Checks pass before review.', description: 'Where the rule that refused a submit for a missing check is changed.' })
   ),
   'submit.identity': r(
     msg({ id: 'workflow.refused.submit.identity.message', defaultMessage: "{card}: commit {commit} isn't authored with the project's identity ({email}).", description: "A refused submit: a commit's author email isn't the project's. {email} is the project's email address." }),
     msg({ id: 'workflow.refused.submit.identity.next', defaultMessage: 'Set the identity, run {command}, then submit again.', description: "The next step after a refused submit for a commit's identity: {command} is the git command to fix it." }),
-    msg({ id: 'workflow.refused.submit.identity.change', defaultMessage: "The user can change this rule in Version Control → Commits use the project's identity.", description: 'Where the identity rule is changed.' })
+    msg({ id: 'workflow.refused.submit.identity.change', defaultMessage: "This rule is set in Version Control → Commits use the project's identity.", description: 'Where the identity rule is changed.' })
   ),
   'submit.ownRunsStopped': r(
     msg({ id: 'workflow.refused.submit.ownRunsStopped.message', defaultMessage: '{card}: runs you started are still going ({runs}).', description: 'A refused submit: the agent still has runs going. {runs} lists their titles.' }),
     msg({ id: 'workflow.refused.submit.ownRunsStopped.next', defaultMessage: 'Stop them or let them finish, then submit again.', description: 'The next step after a refused submit while runs are going.' }),
-    msg({ id: 'workflow.refused.submit.ownRunsStopped.change', defaultMessage: 'The user can change this rule in Version Control → Agents stop what they started before review.', description: 'Where the rule about stopping runs before review is changed.' })
+    msg({ id: 'workflow.refused.submit.ownRunsStopped.change', defaultMessage: 'This rule is set in Version Control → Agents stop what they started before review.', description: 'Where the rule about stopping runs before review is changed.' })
   ),
   'submit.decisionsReceived': r(
     msg({ id: 'workflow.refused.submit.decisionsReceived.message', defaultMessage: "{card} has a decision you haven't read.", description: 'A refused submit: the card has a newer decision than the builder has received.' }),
@@ -83,7 +83,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'review.notAuthor': r(
     msg({ id: 'workflow.refused.review.notAuthor.message', defaultMessage: "You worked on {card}, so you can't review it.", description: 'A refused review: the reviewer is one of the agents who built the card.' }),
     msg({ id: 'workflow.refused.review.notAuthor.next', defaultMessage: 'Leave the review to another reviewer.', description: 'The next step after a refused self-review.' }),
-    msg({ id: 'workflow.refused.review.notAuthor.change', defaultMessage: 'Only the user can override this rule, on the card.', description: 'Who can override the no-self-review rule.' })
+    msg({ id: 'workflow.refused.review.notAuthor.change', defaultMessage: 'Only Move anyway, on the card, skips this rule.', description: 'Who can override the no-self-review rule: only the user, moving the card anyway (glossary 2.4: override, Move anyway).' })
   ),
   'review.decisionsReceived': r(
     msg({ id: 'workflow.refused.review.decisionsReceived.message', defaultMessage: "{card} has a decision you haven't read.", description: 'A refused review or verdict: the card has a newer decision than the reviewer has received.' }),
@@ -98,9 +98,9 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.verdict.currentSubmission.next', defaultMessage: 'Review the latest submission, {latest}.', description: 'The next step after a verdict on an old submission: {latest} is the latest submission number.' })
   ),
   'approval.given': r(
-    msg({ id: 'workflow.refused.approval.given.message', defaultMessage: '{card} waits for your OK.', description: 'A refused move: the user has to approve the card first.' }),
-    msg({ id: 'workflow.refused.approval.given.next', defaultMessage: 'Approve it on the card or in For you.', description: 'The next step after a move refused for want of the user’s approval.' }),
-    msg({ id: 'workflow.refused.approval.given.change', defaultMessage: 'The user can change this rule in Version Control → Your OK before merging.', description: "Where the rule that waits for the user's OK is changed." })
+    msg({ id: 'workflow.refused.approval.given.message', defaultMessage: '{card} waits for the OK before merging.', description: "A refused move: the user has to approve the card first (glossary 2.3: approval; Version Control → Your OK before merging)." }),
+    msg({ id: 'workflow.refused.approval.given.next', defaultMessage: 'Wait for the OK, given on the card or in For you.', description: 'The next step after a move refused for want of the user’s approval.' }),
+    msg({ id: 'workflow.refused.approval.given.change', defaultMessage: 'This rule is set in Version Control → Your OK before merging.', description: "Where the rule that waits for the user's OK is changed." })
   ),
   'integrate.approved': r(
     msg({ id: 'workflow.refused.integrate.approved.message', defaultMessage: "{card} at {revision} isn't approved: {why}", description: "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing." }),
@@ -109,17 +109,17 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'integrate.upToDate': r(
     msg({ id: 'workflow.refused.integrate.upToDate.message', defaultMessage: "{card} at {revision} doesn't contain {target}'s head.", description: 'A refused merge (strict): the revision is behind its target. {target} is a branch name.' }),
     msg({ id: 'workflow.refused.integrate.upToDate.next', defaultMessage: 'The merge queue brings it up to date itself.', description: 'What happens next after the strict up-to-date rule refuses.' }),
-    msg({ id: 'workflow.refused.integrate.upToDate.change', defaultMessage: 'The user can change this rule in Version Control → Work is up to date before it merges.', description: 'Where the strict rule is changed.' })
+    msg({ id: 'workflow.refused.integrate.upToDate.change', defaultMessage: 'This rule is set in Version Control → Work is up to date before it merges.', description: 'Where the strict rule is changed.' })
   ),
   'integrate.checksPassed': r(
     msg({ id: 'workflow.refused.integrate.checksPassed.message', defaultMessage: "The merge checks failed on {card}'s merged result.", description: 'A merge returned: the merge checks failed on the test merge.' }),
     msg({ id: 'workflow.refused.integrate.checksPassed.next', defaultMessage: 'Fix the failures, commit and submit the new revision.', description: 'The next step after failed merge checks.' }),
-    msg({ id: 'workflow.refused.integrate.checksPassed.change', defaultMessage: 'The user can change this rule in Version Control → Checks pass on the merged result.', description: 'Where the merge checks are changed.' })
+    msg({ id: 'workflow.refused.integrate.checksPassed.change', defaultMessage: 'This rule is set in Version Control → Checks pass on the merged result.', description: 'Where the merge checks are changed.' })
   ),
   'done.contained': r(
     msg({ id: 'workflow.refused.done.contained.message', defaultMessage: "{card} at {revision} isn't in {target}.", description: 'A refused Done: the approved revision is not in the target branch. {target} is a branch name.' }),
     msg({ id: 'workflow.refused.done.contained.next', defaultMessage: 'Merge {revision} into {target}, then report the merge again.', description: 'The next step after a refused report of a merge.' }),
-    msg({ id: 'workflow.refused.done.contained.change', defaultMessage: 'The user can change this rule in Version Control → Who merges.', description: 'Where the rule that checks a merge is changed.' })
+    msg({ id: 'workflow.refused.done.contained.change', defaultMessage: 'This rule is set in Version Control → Who merges.', description: 'Where the rule that checks a merge is changed.' })
   ),
   'move.notFromHere': r(
     msg({ id: 'workflow.refused.move.notFromHere.message', defaultMessage: "{card} is in {stage}: {move} isn't possible from there.", description: 'A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent.' }),
@@ -169,8 +169,18 @@ export const WHY = {
   requeueLimit: msg({ id: 'workflow.refused.why.requeueLimit', defaultMessage: 'it was sent back unchanged {n, plural, one {# time} other {# times}} already.', description: 'The {why} of a refused requeue: the limit of unchanged requeues was reached. {n} is how many.' }),
   stale: msg({ id: 'workflow.refused.why.stale', defaultMessage: 'its pass is stale.', description: "The {why} of a refused merge or requeue: the revision's pass no longer holds." }),
   passes: msg({ id: 'workflow.refused.why.passes', defaultMessage: '{n, number} of {q, plural, one {# reviewer} other {# reviewers}} passed it.', description: 'The {why} of a refused merge: not enough distinct reviewers passed the revision. {n} and {q} are numbers.' }),
-  userOk: msg({ id: 'workflow.refused.why.userOk', defaultMessage: "the user hasn't approved it.", description: "The {why} of a refused merge: the user's approval is missing." })
+  userOk: msg({ id: 'workflow.refused.why.userOk', defaultMessage: "it waits for the OK before merging.", description: "The {why} of a refused merge: the user's approval is missing." })
 } satisfies Record<string, Msg>
+
+/** The next step of `move.notFromHere` when nothing can be done from the stage (a request answered meanwhile). */
+export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.nextNone', defaultMessage: 'Nothing waits to be done there now.', description: "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)." })
+
+/**
+ * A refusal's values: names and numbers, the same in every language, or a message of its own kept as data (what a
+ * platform couldn't read, texts.ts). {stage}, {move}, {intent}, {moves}, {rule} and {rules} hold the code's names, which
+ * agents read as they are and the window shows through texts.ts's messages.
+ */
+export type RefusalValues = Record<string, string | number | StoredText>
 
 /** A refusal as the Agent API sends it (HTTP 409), in English for agents, with its rule and values for the window. */
 export interface Refusal {
@@ -180,16 +190,43 @@ export interface Refusal {
   next: string
   change?: string
   override: 'the user' | 'the user or the Assistant' | null
-  values: Values
+  values: RefusalValues
+}
+
+/** How a refusal's sentences are formatted: in English for agents, or in the window's language (`refusalLines`). */
+export interface RefusalFormat {
+  one: (m: Msg, values?: Record<string, string | number>) => string
+  list: (items: string[]) => string
+  /** Whether names in the code are shown through their messages (the window) or as they are (agents). */
+  names: boolean
+}
+
+const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m, values } : m), list: (items) => items.join(', '), names: false }
+
+/** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
+export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
+  const t = REFUSALS[rule]
+  const vals: Record<string, string | number> = {}
+  for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
+  if (f.names) {
+    const name = (x: string): string => {
+      const m = MOVE_NAMES[x] ?? RULE_NAMES[x]
+      return m ? f.one(m) : f.one(STAGE_NAME, { stage: x })
+    }
+    const names = (s: string | number): string => f.list(String(s).split(', ').filter(Boolean).map(name))
+    if (typeof vals.stage === 'string') vals.stage = f.one(STAGE_NAME, { stage: vals.stage })
+    for (const k of ['move', 'intent', 'rule'] as const) if (typeof vals[k] === 'string') vals[k] = name(vals[k] as string)
+    for (const k of ['moves', 'rules'] as const) if (vals[k] !== undefined) vals[k] = names(vals[k])
+  }
+  // The {why} of a rule with several reasons is the whole sentence of its `cause`.
+  if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
+  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : t.next
+  return { message: f.one(t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */
 // i18n-ignore: the override field's values are agent-facing English (§16.8.3)
-export function refusal(rule: RuleId, values: Values, override: Refusal['override'] = 'the user'): Refusal {
-  const t = REFUSALS[rule]
-  const vals = { ...values } as Record<string, string | number>
-  // The {why} of a rule with several reasons is the whole sentence of its `cause`.
-  if (typeof vals.cause === 'string' && Object.hasOwn(WHY, vals.cause)) vals.why = englishText({ m: WHY[vals.cause as keyof typeof WHY], values: { n: vals.n ?? 0, q: vals.q ?? 0 } })
-  const one = (m: Msg) => englishText({ m, values: vals })
-  return { refused: true, rule, message: one(t.message), next: one(t.next), ...(t.change ? { change: one(t.change) } : {}), override, values }
+export function refusal(rule: RuleId, values: RefusalValues, override: Refusal['override'] = 'the user'): Refusal {
+  const l = refusalLines(rule, values, IN_ENGLISH)
+  return { refused: true, rule, message: l.message, next: l.next, ...(l.change !== null ? { change: l.change } : {}), override, values }
 }

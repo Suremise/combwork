@@ -149,6 +149,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.title': undefined
+  'settings.advanced.hive.workflow.enforce.desc': undefined
+  'settings.advanced.hive.workflow.enforce.title': undefined
   'settings.advanced.logs.desc': undefined
   'settings.advanced.logs.tip': undefined
   'settings.advanced.logs.title': undefined

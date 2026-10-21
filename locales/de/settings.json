@@ -147,6 +147,8 @@
   "settings.advanced.hive.wait.agentsMaxSeconds.title": "Warten auf Agenten: höchstens",
   "settings.advanced.hive.wait.cardMaxSeconds.desc": "Wie lange ein Aufruf von hive_wait_for_tasks eines Agenten (ohne Wecken) höchstens wartet, bevor er antwortet. Er muss unter den Tool-Timeouts der CLIs bleiben, daher hält Hive ihn eine Minute unter dem Timeout der hive-Tools in Codex, egal was hier eingestellt ist.",
   "settings.advanced.hive.wait.cardMaxSeconds.title": "Warten auf Karten: höchstens",
+  "settings.advanced.hive.workflow.enforce.desc": "Hive hält die Workflow-Regeln jedes Projekts ein, während Karten verschoben werden: was seine Optionen unter Versionsverwaltung verlangen, bevor eine Karte Review, Genehmigt oder Erledigt erreicht, und was folgt, wenn Hive sieht, dass die Arbeit einer Karte außerhalb von Hive gemergt oder geändert wurde. Ausgeschaltet sind alle Regeln in allen Projekten auf einmal aus: Karten landen dort, wo sie abgelegt werden, nichts wird abgelehnt oder nachgefragt, und Hive zeichnet nur auf, was mit der Arbeit jeder Karte geschieht, ohne dafür Karten zu verschieben oder Agenten zu wecken.",
+  "settings.advanced.hive.workflow.enforce.title": "Workflow-Regeln werden durchgesetzt",
   "settings.advanced.logs.desc": "Den Ordner mit Hives Logdateien öffnen.",
   "settings.advanced.logs.tip": "Nützlich, wenn du ein Problem meldest.",
   "settings.advanced.logs.title": "Logs",

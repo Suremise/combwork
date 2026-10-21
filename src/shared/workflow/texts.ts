@@ -1,0 +1,121 @@
+// The workflow core's text for the window (SPEC §16.8.3, §16.8.5; #1264), as messages kept as data. What main records
+// keeps its English (agents, the Agent API and the log read it) and, beside it, a `StoredText` (the message's id and
+// values) that the window formats in its language: a For you request, what a platform couldn't read. A refusal's values
+// that are names in the code (a stage, an intent, a rule) are shown through these messages too (`refusalLines`).
+// Main and the window both use it.
+
+import { englishText } from '../advanced'
+import { msg, type MessageArgs, type Msg } from '../i18n/msg'
+import type { StoredText } from '../types'
+import { storedLineText } from '../taskHistory'
+
+/** What Hive asks the user (For you, §16.8.5): `ApprovalRequested`'s text and the notification with it. */
+export const FOR_YOU = {
+  review: msg({ id: 'workflow.forYou.review', defaultMessage: '{card} waits for your review', description: 'A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12.' }),
+  okBefore: msg({ id: 'workflow.forYou.okBefore', defaultMessage: '{card} is approved: OK to merge?', description: "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12." }),
+  passedReview: msg({ id: 'workflow.forYou.passedReview', defaultMessage: '{card} passed review: your OK?', description: "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12." }),
+  newDecision: msg({ id: 'workflow.forYou.newDecision', defaultMessage: '{card} has a new decision: your review again?', description: 'A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12.' }),
+  decidedAfterMerge: msg({ id: 'workflow.forYou.decidedAfterMerge', defaultMessage: '{card} was decided after it merged: does it need a follow-up?', description: "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12." })
+}
+
+/**
+ * What a platform couldn't read (§16.3.1), the {what} of "Hive couldn't read {what}" (workflow.refused.platform.unknown):
+ * each a noun phrase, the object of that sentence. Revisions are short ids, folders paths, branches names.
+ */
+export const UNREADABLE = {
+  gitFolder: msg({ id: 'workflow.unreadable.gitFolder', defaultMessage: 'the Git folder of {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the repository\'s .git folder. {folder} is a folder path.' }),
+  head: msg({ id: 'workflow.unreadable.head', defaultMessage: 'the latest commit in {where}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the commit checked out in a folder, or at the tip of a branch. {where} is a folder path or a branch name.' }),
+  branch: msg({ id: 'workflow.unreadable.branch', defaultMessage: 'the branch checked out in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {folder} is a folder path.' }),
+  line: msg({ id: 'workflow.unreadable.line', defaultMessage: 'the branch {branch}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": a Git branch. {branch} is its name.' }),
+  revision: msg({ id: 'workflow.unreadable.revision', defaultMessage: 'the revision {revision}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …" (glossary 2.3: revision). {revision} is a commit id or name.' }),
+  files: msg({ id: 'workflow.unreadable.files', defaultMessage: 'the files of {revision}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the files as they are at a revision. {revision} is a commit id or name.' }),
+  defaultBranch: msg({ id: 'workflow.unreadable.defaultBranch', defaultMessage: 'the default branch of {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the branch work merges into by default. {folder} is a folder path.' }),
+  contains: msg({ id: 'workflow.unreadable.contains', defaultMessage: 'whether {revision} is in {target}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {revision} and {target} are short commit ids.' }),
+  branchedOff: msg({ id: 'workflow.unreadable.branchedOff', defaultMessage: 'where {a} and {b} branched off', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the commit two lines of work have in common. {a} and {b} are commit ids or branch names.' }),
+  branchedOffTarget: msg({ id: 'workflow.unreadable.branchedOffTarget', defaultMessage: 'where the work branched off its target', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the commit the card\'s work and the branch it merges into have in common.' }),
+  uncommitted: msg({ id: 'workflow.unreadable.uncommitted', defaultMessage: 'the uncommitted changes in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {folder} is a folder path.' }),
+  state: msg({ id: 'workflow.unreadable.state', defaultMessage: 'the state of {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": whether a merge or rebase is going on in the folder. {folder} is a folder path.' }),
+  filesChanged: msg({ id: 'workflow.unreadable.filesChanged', defaultMessage: 'the files changed from {from} to {to}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {from} and {to} are short commit ids.' }),
+  change: msg({ id: 'workflow.unreadable.change', defaultMessage: 'the change from {from} to {to}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …" (glossary 2.3: change). {from} and {to} are short commit ids.' }),
+  changeFingerprint: msg({ id: 'workflow.unreadable.changeFingerprint', defaultMessage: "the change's fingerprint", description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": what tells a change apart from others (glossary 2.3: change).' }),
+  replayedFiles: msg({ id: 'workflow.unreadable.replayedFiles', defaultMessage: 'the files of the change applied again', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the result of applying the change again on another commit, to tell whether two revisions are the same change.' }),
+  replay: msg({ id: 'workflow.unreadable.replay', defaultMessage: '{revision} applied onto {onto}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the result of applying a revision\'s change onto another commit. {revision} and {onto} are short commit ids.' }),
+  target: msg({ id: 'workflow.unreadable.target', defaultMessage: 'the target branch {target}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the branch the work merges into. {target} is its name.' }),
+  history: msg({ id: 'workflow.unreadable.history', defaultMessage: 'the history of {target}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the commits of a branch. {target} is a branch name.' }),
+  commitsOn: msg({ id: 'workflow.unreadable.commitsOn', defaultMessage: 'the commits on {target}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {target} is a branch name.' }),
+  holdsChange: msg({ id: 'workflow.unreadable.holdsChange', defaultMessage: 'whether {where} holds the change', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": whether the card\'s change is already in a commit or branch (glossary 2.3: change). {where} is a short commit id or a branch name.' }),
+  commitsSince: msg({ id: 'workflow.unreadable.commitsSince', defaultMessage: 'the commits of {revision} since {base}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {revision} and {base} are short commit ids.' }),
+  commitsOf: msg({ id: 'workflow.unreadable.commitsOf', defaultMessage: 'the commits of {range}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …". {range} is a Git range of commits, like a1b2c3d..e4f5a6b.' }),
+  worktrees: msg({ id: 'workflow.unreadable.worktrees', defaultMessage: 'the worktrees of {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the Git worktrees of a repository. {folder} is its folder path.' }),
+  folderFor: msg({ id: 'workflow.unreadable.folderFor', defaultMessage: 'a folder for {branch}', description: 'What Hive couldn\'t make, the object of "Hive couldn\'t read …": a working folder (a Git worktree) for a branch. {branch} is its name.' }),
+  revisionIn: msg({ id: 'workflow.unreadable.revisionIn', defaultMessage: 'the revision in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the revision checked out in a folder (glossary 2.3: revision). {folder} is a folder path.' }),
+  deliverables: msg({ id: 'workflow.unreadable.deliverables', defaultMessage: 'the work in {project}: it has over {n, plural, one {# file} other {# files}}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": a project without version control has too many files to read its work. {project} is a project name, {n} the limit.' }),
+  pathOutside: msg({ id: 'workflow.unreadable.pathOutside', defaultMessage: 'the path {path}, which is outside the project', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": a card\'s path that isn\'t in its project. {path} is the path.' }),
+  cardPathsFiles: msg({ id: 'workflow.unreadable.cardPathsFiles', defaultMessage: "the card's paths: they hold over {n, plural, one {# file} other {# files}}", description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the files a card names hold too many files. {n} is the limit.' }),
+  cardPathsSize: msg({ id: 'workflow.unreadable.cardPathsSize', defaultMessage: "the card's paths: they hold over {n, number} GB", description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the files a card names are too large. {n} is a size in gigabytes (GB, of 1024 MB): write the unit as your language does.' }),
+  writes: msg({ id: 'workflow.unreadable.writes', defaultMessage: 'the files written in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": which files changed in a folder. {folder} is a folder path.' }),
+  ignored: msg({ id: 'workflow.unreadable.ignored', defaultMessage: 'what Git ignores in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the files Git is told to leave out. {folder} is a folder path.' })
+}
+
+/** A stage's name, for a refusal's {stage} (glossary 2.2). An unknown id is shown as it is. */
+export const STAGE_NAME = msg({ id: 'workflow.stage', defaultMessage: '{stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} done {Done} other {{stage}}}', description: 'A stage of the board, named in a refusal (glossary 2.2: On Hold, Todo, Active, Review, Approved, Merging, Done): translate each as the glossary does.' })
+
+/**
+ * What an agent or the user asked for, named in a refusal's {move}, {intent} and {moves} (agents read the intent's name,
+ * the window this). Keys are the names the runtime records.
+ */
+export const MOVE_NAMES: Record<string, Msg> = {
+  start: msg({ id: 'workflow.move.start', defaultMessage: 'Start', description: 'A move on a card, named in a refused move ("… isn\'t possible from there"): starting work on it.' }),
+  'put back': msg({ id: 'workflow.move.putBack', defaultMessage: 'Put back', description: 'A move on a card, named in a refused move: putting a started card back in Todo.' }),
+  submit: msg({ id: 'workflow.move.submit', defaultMessage: 'Submit for review', description: 'A move on a card, named in a refused move: sending its work to Review.' }),
+  'declare paths': msg({ id: 'workflow.move.declarePaths', defaultMessage: "Set the card's paths", description: 'A move on a card, named in a refused move: saying which files are its work (a project without version control).' }),
+  'start review': msg({ id: 'workflow.move.startReview', defaultMessage: 'Start review', description: 'A move on a card, named in a refused move: a reviewer beginning a review.' }),
+  verdict: msg({ id: 'workflow.move.verdict', defaultMessage: 'Verdict', description: 'A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict).' }),
+  'report merge': msg({ id: 'workflow.move.reportMerge', defaultMessage: 'Report the merge', description: 'A move on a card, named in a refused move: the agent saying it merged the work.' }),
+  'retry merge': msg({ id: 'workflow.move.retryMerge', defaultMessage: 'Retry merge', description: "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card." }),
+  'remove from queue': msg({ id: 'workflow.move.removeFromQueue', defaultMessage: 'Remove from queue', description: "A move on a card, named in a refused move: the user taking it out of the merge queue." }),
+  move: msg({ id: 'workflow.move.move', defaultMessage: 'Move', description: 'A move on a card, named in a refused move: dragging it to another column.' }),
+  answer: msg({ id: 'workflow.move.answer', defaultMessage: 'Answer', description: "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)." })
+}
+
+/** A rule as the user reads it (glossary 3: a gate is a rule), for a refusal's {rule} and {rules}: the option it comes from. */
+export const RULE_NAMES: Record<string, Msg> = {
+  'start.notBlocked': msg({ id: 'workflow.rule.start.notBlocked', defaultMessage: "Blocked cards don't start", description: 'A rule of the workflow, named where a move skips or can\'t check it.' }),
+  'start.dependenciesIntegrated': msg({ id: 'workflow.rule.start.dependenciesIntegrated', defaultMessage: 'Cards start only when the cards they wait for are done', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: N6, G14).' }),
+  'start.slotAvailable': msg({ id: 'workflow.rule.start.slotAvailable', defaultMessage: 'Each card in its own folder', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G11 values): a card starts only when a folder is free.' }),
+  'submit.notDuplicate': msg({ id: 'workflow.rule.submit.notDuplicate', defaultMessage: 'Work is submitted once', description: 'A rule of the workflow, named where a move skips or can\'t check it: the same revision isn\'t submitted twice.' }),
+  'requeue.allowed': msg({ id: 'workflow.rule.requeue.allowed', defaultMessage: 'Unchanged work is queued again only after a failure outside it', description: 'A rule of the workflow, named where a move skips or can\'t check it: work goes back into the merge queue unchanged only after a merge failed for a reason outside the work (a network error, a timeout).' }),
+  'submit.ready': msg({ id: 'workflow.rule.submit.ready', defaultMessage: 'Work has no unresolved conflicts', description: 'A rule of the workflow, named where a move skips or can\'t check it.' }),
+  'submit.clean': msg({ id: 'workflow.rule.submit.clean', defaultMessage: 'Work is committed before review', description: 'A rule of the workflow, named where a move skips or can\'t check it.' }),
+  'submit.trailer': msg({ id: 'workflow.rule.submit.trailer', defaultMessage: 'Commits name their card', description: 'A rule of the workflow, named where a move skips or can\'t check it: in a shared folder, each commit names its card.' }),
+  'submit.checksPassed': msg({ id: 'workflow.rule.submit.checksPassed', defaultMessage: 'Checks pass before review', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: N3, G3).' }),
+  'submit.identity': msg({ id: 'workflow.rule.submit.identity', defaultMessage: "Commits use the project's identity", description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G12).' }),
+  'submit.ownRunsStopped': msg({ id: 'workflow.rule.submit.ownRunsStopped', defaultMessage: 'Agents stop what they started before review', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G13).' }),
+  'submit.decisionsReceived': msg({ id: 'workflow.rule.submit.decisionsReceived', defaultMessage: 'The builder has read every decision', description: 'A rule of the workflow, named where a move skips or can\'t check it: the agent who built the card has read every decision on it (glossary 2.5: builder).' }),
+  'review.notAuthor': msg({ id: 'workflow.rule.review.notAuthor', defaultMessage: 'Nobody reviews their own work', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: N2, G2).' }),
+  'review.decisionsReceived': msg({ id: 'workflow.rule.review.decisionsReceived', defaultMessage: 'The reviewer has read every decision', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.5: reviewer).' }),
+  'verdict.reviewing': msg({ id: 'workflow.rule.verdict.reviewing', defaultMessage: 'A verdict follows a review', description: 'A rule of the workflow, named where a move skips or can\'t check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict).' }),
+  'verdict.currentSubmission': msg({ id: 'workflow.rule.verdict.currentSubmission', defaultMessage: 'A verdict is on the latest submission', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.3: verdict).' }),
+  'approval.given': msg({ id: 'workflow.rule.approval.given', defaultMessage: 'Your OK before merging', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G10).' }),
+  'integrate.approved': msg({ id: 'workflow.rule.integrate.approved', defaultMessage: "Work is reviewed before it's merged", description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G1).' }),
+  'integrate.upToDate': msg({ id: 'workflow.rule.integrate.upToDate', defaultMessage: 'Work is up to date before it merges', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G8, without the branch name).' }),
+  'integrate.checksPassed': msg({ id: 'workflow.rule.integrate.checksPassed', defaultMessage: 'Checks pass on the merged result', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G9).' }),
+  'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Hive checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' })
+}
+
+const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), ...Object.values(UNREADABLE), STAGE_NAME, ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
+
+/** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
+export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null
+
+/** A workflow message and its values as they are kept in a fact: its id and values, never its English. */
+export function workflowText<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): StoredText {
+  const v = values[0] as Record<string, string | number> | undefined
+  return v ? { id: m.id, values: v } : { id: m.id }
+}
+
+/** A stored workflow text by `format` (the window's language, or English); null when this Hive doesn't know its message. */
+export const workflowLine = (s: unknown, format: (m: Msg, values?: Record<string, string | number>) => string): string | null => storedLineText(s, format, workflowMessage)
+
+/** A stored workflow text in English (agents, the Agent API, the log); its id when this Hive doesn't know it. */
+export const workflowEnglish = (s: StoredText): string => workflowLine(s, (m, values) => englishText(values ? { m, values } : m)) ?? s.id
