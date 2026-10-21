@@ -11,7 +11,7 @@ import type { AgentInfo, AgentPatch, AssistantAction, EffortLevel, PermissionMod
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStore, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { useInbox } from '../inbox'
 import { useLiveUsage } from '../usage'
@@ -417,9 +417,13 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
   const modeId = assistantModeId(a, settings)
   const mode = modes.find((p) => p.id === modeId)
   const picker = useConversationPicker()
+  // From the click until the Assistant runs (#1177).
+  const starting = useStarting(project.path, AGENT)
+  const resuming = starting?.kind === 'resume'
+  const startingNew = starting?.kind === 'start'
   const resume = a.resume ? (
-    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} onClick={() => void actions.resumeLast(project.path, AGENT)} title={tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
-      <Icon name="debug-continue" /> {tr(M.resume)}
+    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} disabled={!!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, AGENT)} title={tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
+      <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
     </button>
   ) : null
   if (ended) {
@@ -428,8 +432,8 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
         <Icon name="debug-disconnect" />
         <span className="grow">{tr(M.ended)}</span>
         {resume}
-        <button className="btn act-start solid small" onClick={() => void actions.newSession(project.path, AGENT)}>
-          <Icon name="add" /> {tr(M.new)}
+        <button className="btn act-start solid small" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, AGENT)}>
+          <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.new)}
         </button>
       </div>
     )
@@ -442,11 +446,11 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
       </p>
       <p className="faint">{tr(M.noEdits)}</p>
       <div className="btns">
-        <button className="btn act-start solid" onClick={() => void actions.newSession(project.path, AGENT)}>
-          <Icon name="play" /> {tr(M.start)}
+        <button className="btn act-start solid" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, AGENT)}>
+          <Icon name={startingNew ? 'loading' : 'play'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.start)}
         </button>
         {resume}
-        <button className="btn subtle small" onClick={(e) => picker.openBelow(e.currentTarget, project)}>
+        <button className="btn subtle small" disabled={!!starting} onClick={(e) => picker.openBelow(e.currentTarget, project)}>
           <Icon name="history" /> {tr(M.conversations)}
         </button>
       </div>
@@ -496,6 +500,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const menu = useContextMenu()
   const picker = useConversationPicker()
   const usage = useLiveUsage(project, AGENT)
+  const starting = useStarting(project.path, AGENT)
   const live = a.live
   const idle = live && (live.status === 'ready' || live.status === 'finished')
   const empty = !usage || usage.userMessages === 0 || (usage.contextTokens ?? 0) === 0
@@ -534,10 +539,11 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   // Compact…'s detail in ⋯, as an agent's: why it is unavailable, or that it is recommended.
   const compactDetail = compacting ? tr(M.compacting) : !idle ? tr(M.compactLater) : empty ? tr(M.nothingToCompact) : suggested ? tr(M.compactRecommended) : undefined
   /** Stop's place: an icon with a tooltip, in its action's colour, as on an agent's pane. */
-  const btn = (icon: string, label: string, onClick: () => void, tone: string, tip: string) => (
-    <Tooltip content={tip}>
-      <button type="button" className={cx(/* i18n-ignore: class names */ 'btn small pane-btn icon-only', tone)} aria-label={label} onClick={onClick}>
-        <Icon name={icon} />
+  // A start or resume under way shows on its button, which takes no clicks (#1177).
+  const btn = (icon: string, label: string, onClick: () => void, tone: string, tip: string, busy?: boolean) => (
+    <Tooltip content={busy && starting ? startingLabel(starting) : tip}>
+      <button type="button" className={cx(/* i18n-ignore: class names */ 'btn small pane-btn icon-only', tone)} disabled={busy} aria-busy={busy || undefined} aria-label={busy && starting ? startingLabel(starting) : label} onClick={onClick}>
+        <Icon name={busy ? 'loading' : icon} spin={busy} />
       </button>
     </Tooltip>
   )
@@ -553,8 +559,8 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
         // Compact… as on an agent's ⋯: once the Assistant has finished, recommended past the threshold.
         ...(live ? [{ label: tr(M.compactMenu), icon: compacting ? 'loading' : 'fold', detail: compactDetail, disabled: !idle || empty || compacting, onClick: compact } as MenuEntry] : []),
         // Stop's place has Resume while there is a conversation to go back to: a new one is here.
-        live || a.resume ? { label: tr(M.newConversation), icon: 'add', action: 'start', onClick: start } : { label: tr(M.startMenu), icon: 'play', action: 'start', onClick: start },
-        ...(live ? [] : [{ label: tr(M.resumeMenu), icon: 'debug-continue', action: 'resume', disabled: !a.resume, onClick: resume } as MenuEntry]),
+        live || a.resume ? { label: tr(M.newConversation), icon: 'add', action: 'start', disabled: !!starting, onClick: start } : { label: tr(M.startMenu), icon: 'play', action: 'start', disabled: !!starting, onClick: start },
+        ...(live ? [] : [{ label: tr(M.resumeMenu), icon: 'debug-continue', action: 'resume', disabled: !a.resume || !!starting, onClick: resume } as MenuEntry]),
         { label: tr(M.resumeConversation), icon: 'history', action: 'resume', onClick: () => void picker.openAt(project, x, y) },
         { label: tr(M.allConversations), icon: 'comment-discussion', onClick: () => showAssistantView('conversations') },
         { separator: true },
@@ -589,8 +595,8 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
       {live
         ? btn('stop-circle', tr(M.stop), stop, 'act-stop', tr(M.stopTip))
         : a.resume
-          ? btn('debug-continue', tr(M.resume), resume, 'act-resume', resumeTip)
-          : btn('play', tr(M.startMenu), start, 'act-start', tr(M.startTip))}
+          ? btn('debug-continue', tr(M.resume), resume, 'act-resume', resumeTip, !!starting)
+          : btn('play', tr(M.startMenu), start, 'act-start', tr(M.startTip), !!starting)}
       <Tooltip content={tr(M.more)}>
         <button ref={more} type="button" className="icon-btn pane-more" aria-label={tr(M.more)} aria-haspopup="menu" onClick={(e) => openMore(e.detail === 0)}>
           <Icon name="ellipsis" />

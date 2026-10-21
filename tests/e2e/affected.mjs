@@ -248,6 +248,8 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast'] },
   // The session toolbar (#975): Panes | Tiles, the summary chip, + Add ▾.
   { paths: ['src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentTiles.tsx'], suites: ['sessiontoolbar'] },
+  // Start and Resume busy while a session starts (#1177).
+  { paths: ['src/renderer/src/actions.ts', 'src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/views/SessionsTab.tsx', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/components/Sidebar.tsx', 'src/main/stepTimes.ts'], suites: ['startbusy'] },
   // The Tiles view and focus view (#976).
   { paths: ['src/renderer/src/components/AgentTiles.tsx', 'src/shared/tiles.ts', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/commands.ts'], suites: ['tilesview'] },
   // The agent-state marks (#973).
