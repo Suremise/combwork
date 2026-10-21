@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'tips.agentSettings.title': undefined
   'tips.agentStates.text': undefined
   'tips.agentStates.title': undefined
+  'tips.allKeysToCli.text': undefined
+  'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
   'tips.antivirus.text': undefined

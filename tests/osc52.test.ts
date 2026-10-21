@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Terminal } from '@xterm/headless'
-import { osc52, OSC52_MAX_BYTES } from '../src/shared/osc52'
+import { clipboardPreview, osc52, osc52Decision, OSC52_MAX_BYTES, OSC52_PREVIEW, OSC52_PREVIEW_LINES } from '../src/shared/osc52'
 
 // What GitHub Copilot CLI 1.0.95 printed when Ctrl+C copied its own mouse selection ("SELECTME alpha beta gamma delta"),
 // offline against the stand-in model (#736): a BEL-terminated OSC 52 write between its redraw and "copied to clipboard".
@@ -52,5 +52,40 @@ describe('osc52', () => {
   it('changes nothing for an empty or malformed payload', () => {
     for (const data of ['c;', 'c', '', 'c;not base64!', 'c;QQ===', 'c;A'])
       expect(osc52(data, true), JSON.stringify(data)).toEqual({ kind: 'refused', reason: 'invalid' })
+  })
+})
+
+// The policy (#1292, #966 row 27, Darren's choice: Allow as before, Ask each time, Block; reads never allowed).
+describe('osc52Decision (#1292)', () => {
+  const write = osc52(`c;${b64('copied')}`, true)
+  it('Allow (the default) writes, Ask asks first with the text, Block refuses', () => {
+    expect(osc52Decision(write, 'allow')).toEqual({ write: 'copied' })
+    expect(osc52Decision(write, undefined)).toEqual({ write: 'copied' })
+    expect(osc52Decision(write, 'ask')).toEqual({ ask: 'copied' })
+    expect(osc52Decision(write, 'block')).toEqual({ refuse: 'blocked' })
+  })
+  it('a read, a write from a terminal not in use, or a bad one is refused whatever the policy', () => {
+    for (const policy of ['allow', 'ask', 'block']) {
+      expect(osc52Decision(osc52('c;?', true), policy)).toEqual({ refuse: 'read' })
+      expect(osc52Decision(osc52(`c;${b64('x')}`, false), policy)).toEqual({ refuse: 'not-in-use' })
+      expect(osc52Decision(osc52('c;not base64!', true), policy)).toEqual({ refuse: 'invalid' })
+    }
+  })
+})
+
+// What the question shows of a write (#1292, the Assistant's screenshot note): its first lines in the dialog's box, cut
+// after a few, with how many characters it leaves out.
+describe('clipboardPreview (#1292)', () => {
+  it('shows a short text whole, line by line, with nothing left out', () => {
+    expect(clipboardPreview('one line')).toEqual({ lines: ['one line'], more: 0 })
+    expect(clipboardPreview('a\nb\r\nc')).toEqual({ lines: ['a', 'b', 'c'], more: 0 })
+  })
+  it('cuts after its lines or its characters, counting every character not shown', () => {
+    const many = Array.from({ length: OSC52_PREVIEW_LINES + 3 }, (_, i) => `line ${i}`).join('\n')
+    const p = clipboardPreview(many)
+    expect(p.lines).toHaveLength(OSC52_PREVIEW_LINES)
+    expect(p.more).toBe(many.length - p.lines.join('\n').length)
+    const long = 'x'.repeat(OSC52_PREVIEW + 40)
+    expect(clipboardPreview(long)).toEqual({ lines: ['x'.repeat(OSC52_PREVIEW)], more: 40 })
   })
 })
