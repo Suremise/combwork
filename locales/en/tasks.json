@@ -31,6 +31,10 @@
     "defaultMessage": "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).",
     "description": "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)."
   },
+  "tasks.error.badKind": {
+    "defaultMessage": "A card is code or no-code, not {kind}.",
+    "description": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a test). Keep code and no-code as they are (they are values)."
+  },
   "tasks.error.batchGone": {
     "defaultMessage": "That batch is no longer kept: unarchive its cards from Archived.",
     "description": "An error: the Archive All batch to bring back is no longer kept (Hive keeps the latest 50); its cards can still be brought back one by one from the board's Archived list."
@@ -119,6 +123,14 @@
     "defaultMessage": "#{n} is in Doing with another agent, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; another agent moves it to Review when done, and the user can move it.",
     "description": "An error: an agent tried to move card #{n} (a number) on to {column} (select: a board column; translate each), but the card is in Doing with another agent (whose name isn't known), whose work is in progress. Doing and Review are board columns."
   },
+  "tasks.error.kindNeedsReason": {
+    "defaultMessage": "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.",
+    "description": "An error said to the Hive Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is)."
+  },
+  "tasks.error.kindNotAgents": {
+    "defaultMessage": "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.",
+    "description": "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Hive Assistant can."
+  },
   "tasks.error.labelFieldList": {
     "defaultMessage": "{field} must be a list",
     "description": "An error: the call gave the labels to add or remove as something other than a list. {field} is the name of the call's field (\"addLabels\" or \"removeLabels\"): keep it as it is."
@@ -142,6 +154,10 @@
   "tasks.error.noCard": {
     "defaultMessage": "There is no card #{n}.",
     "description": "An error: there is no card #{n} (a number) that the caller may see."
+  },
+  "tasks.error.noKindProposal": {
+    "defaultMessage": "Nothing proposes a kind for #{n}: its kind is {kind}.",
+    "description": "An error: confirming a card's proposed kind, but no agent proposed one (or it was answered already). {n} is the card's number; {kind} its kind, code or no-code (values: keep them as they are)."
   },
   "tasks.error.noWorkspace": {
     "defaultMessage": "No workspace is open",
@@ -366,6 +382,10 @@
   "tasks.history.imported": {
     "defaultMessage": "Brought back with {project} (it was #{was})",
     "description": "A line in a card's history: the card came back with its removed project {project} (its folder name), under a new number; {was} was its number before."
+  },
+  "tasks.history.kind": {
+    "defaultMessage": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
+    "description": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a test: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence."
   },
   "tasks.history.labels": {
     "defaultMessage": "Labels: {labels}",

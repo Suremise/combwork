@@ -686,6 +686,10 @@ Moving a **Done** card back to Doing (or further) reopens it: its work starts ag
 
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
 
+### No-code cards
+
+Some cards have no code to write: a decision, a write-up, a test to try. Make one with **No code (a decision, a write-up, a test…)** in the New Card dialog: its tile and its dialog say **No code**, and when its work is done it is submitted with a summary instead of commits, reviewed if your project reviews work, and goes to Done with nothing to merge. An agent that adds a card can only propose it as no code: the card shows **No code?** and its dialog asks you to **Confirm No Code** or **Keep as Code**. To change a card's kind after it was made, use **Make It Code…** or **Make It No Code…** beside its **Kind** in the dialog: as it is an exception to its rules, Hive asks first and records it on the card with your reason. The Hive Assistant changes a kind only with your reason; agents never change it.
+
 ### For you
 
 Some cards wait for you: a review or an OK that is yours to give, a question an agent asked (*"OK to push the release tag?"*), a rule an agent couldn't keep, or a card loop that reached its round limit. Each such card shows a **For you** chip with what it asks (Approve, Decide, Test, Sign in or Other; hover it to read the request), the **Task Board** icon on the activity bar counts them, and the **For you** box in the board's toolbar shows only those cards (with the search box, both apply).

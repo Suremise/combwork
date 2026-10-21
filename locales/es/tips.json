@@ -204,6 +204,8 @@
   "tips.myPrices.title": "Tus propios precios para Claude Code",
   "tips.newCard.text": "Presiona {key} para crear una tarjeta nueva en el proyecto en el que estás, sin dejar lo que haces.",
   "tips.newCard.title": "Anota una tarjeta",
+  "tips.noCodeCards.text": "Una decisión, un texto o una prueba no tienen nada que confirmar: marca Sin código en el diálogo Nueva tarjeta. Su trabajo se entrega con un resumen y pasa a Hecho sin nada que fusionar.",
+  "tips.noCodeCards.title": "Tarjetas sin código",
   "tips.off.message": "Ayuda → Consejos… los sigue teniendo, y Configuración → General los vuelve a activar.",
   "tips.off.title": "Consejos desactivados",
   "tips.overview.text": "El Resumen del espacio de trabajo muestra lo que usó cada proyecto, lo que se ejecuta ahora y el tablero, por día. {key}",

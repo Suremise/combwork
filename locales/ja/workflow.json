@@ -228,6 +228,7 @@
   "workflow.refused.why.userOk": "マージ前の承認を待っています。",
   "workflow.roundChoice": "{choice, select, carryOn {続ける} split {分割する} accept {フォローアップ付きで受け入れる} takeOver {自分で引き継ぐ} other {{choice}}}",
   "workflow.rule.approval.given": "マージ前の自分の承認",
+  "workflow.rule.card.kind": "カードの種類は作成時に決まる",
   "workflow.rule.done.contained": "Hiveがマージを確認",
   "workflow.rule.integrate.approved": "マージ前に作業をレビューする",
   "workflow.rule.integrate.checksPassed": "マージ結果でチェックに合格する",

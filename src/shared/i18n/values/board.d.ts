@@ -327,6 +327,23 @@ interface HiveMessageValues {
   'board.inbox.toReviewHeading': { n: string | number }
   'board.inbox.toReviewTip': undefined
   'board.inbox.uncommitted': { n: number }
+  'board.kind.anyway': undefined
+  'board.kind.askDetail': undefined
+  'board.kind.askMessage': undefined
+  'board.kind.askTitle': { kind: string; card: string | number }
+  'board.kind.change': { kind: string }
+  'board.kind.code': undefined
+  'board.kind.confirm': undefined
+  'board.kind.failed': undefined
+  'board.kind.field': undefined
+  'board.kind.keep': undefined
+  'board.kind.newChoice': undefined
+  'board.kind.noCode': undefined
+  'board.kind.noCodeTip': undefined
+  'board.kind.proposal': undefined
+  'board.kind.proposedTip': undefined
+  'board.kind.reason': undefined
+  'board.kind.working': undefined
   'board.lane.afterRound': { where: string | number; round: string | number }
   'board.lane.andMore': { n: number }
   'board.lane.blocked': { card: string | number }

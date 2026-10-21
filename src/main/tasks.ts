@@ -15,7 +15,9 @@ import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAs
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { FactStore } from './workflow/factStore'
+import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
 import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
@@ -915,7 +917,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 }
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[] },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind },
   actor: TaskActor
 ): Promise<TaskCard> {
   if (!workspace.path) throw hiveError(ERR.noWorkspace, undefined, { kind: 'conflict' })
@@ -939,6 +941,9 @@ async function createTaskLocked(
   const links = input.links ? await cardRefs(input.links, null, 'links', scope) : []
   const context = input.context ? contextOf(input.context) : []
   const problems = context.length ? await contextProblems(project && workspace.path ? join(workspace.path, project) : null, workspace.sharedDir, context) : []
+  // Its kind (#1277, §16.7.3): the user's or the Assistant's from the start; a project agent's only proposed (OP-6/OP-7).
+  const kind = kindOf(input.kind)
+  const proposes = kind === 'no-code' && actor.kind === 'agent'
   const n = await nextNumber(ws)
   const card: TaskCard = {
     number: n,
@@ -956,13 +961,18 @@ async function createTaskLocked(
     ...(context.length ? { context } : {}),
     ...(problems.length ? { contextProblems: problems } : {}),
     comments: [],
-    history: [entryOf(now, by, storedText(HISTORY.created, { column }))],
+    history: [entryOf(now, by, storedText(HISTORY.created, { column })), ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : [])],
     archived: false,
     createdAt: now,
     createdBy: by,
     updatedAt: now
   }
   await saveCard(ws, n, card, null)
+  if (kind === 'no-code') {
+    const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+    if (proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
+    else store.updateCard(n, { kind })
+  }
   log.info(`#${n} created by ${userText(by)}: ${userText(title)}`)
   changed(ws)
   return card
@@ -1179,6 +1189,87 @@ export async function moveColumns(n: number): Promise<TaskColumn[] | null> {
   const s = wf.state(rec)
   const r = wf.rulesetOf(rec, s.stage === 'done' ? { ...s, stage: 'todo' } : s)
   return TASK_COLUMNS.map((c) => c.id).filter((c) => c === 'hold' || c === head.column || r.stages.some((x) => STAGE_CATEGORY[x.id] === c))
+}
+
+/** A card's kind as a call gives it (#1277): `code` unless `no-code`; anything else is refused. */
+function kindOf(v: unknown): CardKind {
+  if (v === undefined || v === null || v === 'code') return 'code'
+  if (v === 'no-code') return 'no-code'
+  throw hiveError(KIND.bad, { kind: String(v) }, { kind: 'invalid' })
+}
+
+const KIND = {
+  bad: msg({ id: 'tasks.error.badKind', defaultMessage: 'A card is code or no-code, not {kind}.', description: "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a test). Keep code and no-code as they are (they are values)." }),
+  agents: msg({ id: 'tasks.error.kindNotAgents', defaultMessage: "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.", description: "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Hive Assistant can." }),
+  needsReason: msg({ id: 'tasks.error.kindNeedsReason', defaultMessage: "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.", description: "An error said to the Hive Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is)." }),
+  noProposal: msg({ id: 'tasks.error.noKindProposal', defaultMessage: 'Nothing proposes a kind for #{n}: its kind is {kind}.', description: "An error: confirming a card's proposed kind, but no agent proposed one (or it was answered already). {n} is the card's number; {kind} its kind, code or no-code (values: keep them as they are)." })
+}
+
+/** The card's open kind proposal (an agent's KindProposed not yet answered), from its facts: its kind, or null. */
+function kindProposal(store: FactStore, n: number): CardKind | null {
+  const facts = store.facts(n)
+  const p = facts.findLast((f) => f.kind === 'KindProposed')
+  if (!p) return null
+  return facts.some((f) => f.kind === 'KindDecided' && f.seq > p.seq) ? null : (p.data as { kind: CardKind }).kind
+}
+
+/**
+ * Changes a card's kind after it was made (#1277, §16.7.3): an exception to its rules, recorded as one `Override`
+ * (`card.kind`), the user's (asked first: `ask` unless `confirm`) or the Assistant's (with `reason`, the user's); never
+ * an agent's. An open proposal is answered by it too.
+ */
+export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { confirm?: boolean; reason?: string } = {}): Promise<{ ask: true } | TaskCard> {
+  if (actor.kind === 'agent') throw new TaskPermissionError(KIND.agents)
+  const to = kindOf(kind)
+  const ws = workspace
+  const reason = typeof o.reason === 'string' ? text(o.reason.trim(), 1000, 'blockedReason') : ''
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { n }))
+      const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+      const was = store.card(n).kind
+      if (was === to) return card
+      if (actor.kind === 'user' && !o.confirm) return { ask: true as const }
+      if (actor.kind === 'assistant' && !reason) throw new TaskConflictError(KIND.needsReason)
+      const before = structuredClone(card)
+      note(card, actorName(actor), storedText(HISTORY.kind, { how: 'changed', kind: to }))
+      await saveCard(ws, n, card, before)
+      const proposed = kindProposal(store, n)
+      store.updateCard(n, { kind: to })
+      store.tx((tx) => {
+        tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['card.kind'], move: `kind ${was}→${to}`, by: actor.kind === 'assistant' ? 'assistant' : 'user', reason } }) // i18n-ignore: a fact's kind and codes, not text
+        if (proposed) tx.append(n, { kind: 'KindDecided', actor: actorOf(actor), source: 'recorded', data: { kind: to, proposed } })
+      })
+      changed(ws)
+      return card
+    })
+  )
+}
+
+/**
+ * Answers a kind an agent proposed (#1277, OP-6/OP-7): the user's or the Assistant's. `accept` makes it the card's kind;
+ * else the card stays code. Refused when nothing proposes one (answered meanwhile).
+ */
+export async function confirmKind(n: number, accept: boolean, actor: TaskActor): Promise<TaskCard> {
+  if (actor.kind === 'agent') throw new TaskPermissionError(KIND.agents)
+  const ws = workspace
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+      const proposed = kindProposal(store, n)
+      if (!proposed) throw new TaskConflictError(withValues(KIND.noProposal, { n, kind: store.card(n).kind }))
+      const kind: CardKind = accept ? proposed : 'code'
+      const before = structuredClone(card)
+      note(card, actorName(actor), storedText(HISTORY.kind, { how: accept ? 'confirmed' : 'kept', kind }))
+      await saveCard(ws, n, card, before)
+      store.updateCard(n, { kind })
+      store.tx((tx) => tx.append(n, { kind: 'KindDecided', actor: actorOf(actor), source: 'recorded', data: { kind, proposed } }))
+      changed(ws)
+      return card
+    })
+  )
 }
 
 /** An answer the window sent that can't be one (the request's kind decides which fields it takes). */

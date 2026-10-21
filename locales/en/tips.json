@@ -819,6 +819,14 @@
     "defaultMessage": "Jot down a card",
     "description": "A tip's title."
   },
+  "tips.noCodeCards.text": {
+    "defaultMessage": "A decision, a write-up or a test has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
+  },
+  "tips.noCodeCards.title": {
+    "defaultMessage": "Cards with no code",
+    "description": "A tip's title (glossary: no-code card)."
+  },
   "tips.off.message": {
     "defaultMessage": "Help → Tips… still has them, and Settings → General turns them back on.",
     "description": "More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Hive: keep them as Hive shows them."

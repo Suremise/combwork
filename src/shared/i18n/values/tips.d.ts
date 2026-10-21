@@ -206,6 +206,8 @@ interface HiveMessageValues {
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
   'tips.newCard.title': undefined
+  'tips.noCodeCards.text': undefined
+  'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
   'tips.overview.text': { key: string | number }

@@ -8156,6 +8156,44 @@ body.pane-resizing-v .monaco-editor {
 .task-work-badge.old {
   opacity: 0.6;
 }
+/* A card's kind (#1277): No code, a quiet outlined pill with a note icon; a proposal (not confirmed) dashed, with a "?". */
+.task-for-you-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.task-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 1px;
+  padding-inline: 7px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted, var(--fg));
+  font-size: 11px;
+  white-space: nowrap;
+}
+.task-kind.proposed {
+  border-style: dashed;
+}
+.kind-field {
+  gap: 6px;
+}
+.kind-field .btn {
+  margin-inline-start: 6px;
+}
+.kind-proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.kind-proposal-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
 /* For you (#1276): a card waits for the user. A pill with a bell and the request's kind, in the accent colour. */
 .task-for-you-row {
   margin-block-start: 4px;

@@ -1771,6 +1771,16 @@ No-code cards have no revision: a submission is a summary (its submission id is 
 queue. With review they finish when the review (and approval, if any) passes; without review, submit finishes them.
 Changing the kind later is the user's, recorded as an override.
 
+**Built (#1277).** The kind is the card's `kind` column. The user (the New Card dialog's **No code (a decision, a
+write-up, a test…)**) and the Assistant (`kind` on `POST /v1/tasks` and `hive_create_task`) make a no-code card at
+once; a project agent's `kind: "no-code"` is only **proposed** (OP-7: a `KindProposed` fact, the card stays code): its
+tile marks it ("No code?") and its dialog asks **Confirm No Code** / **Keep as Code** (the Assistant: `confirmKind` on
+`PATCH /v1/tasks/{n}` and `hive_update_task`), answered by a `KindDecided` fact. Changed later, the user's change asks
+first (the rule *A card's kind is set when it is made*, `card.kind`; a reason; **Change Anyway**) and the Assistant's
+needs `override.reason`; either records one `Override` (`card.kind`); agents never change or answer it (`403`). The
+card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
+Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, as it does `stage`.
+
 #### 16.7.4 Other moves
 
 [P1, answering HB3's round 1 finding 15]

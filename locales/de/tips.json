@@ -204,6 +204,8 @@
   "tips.myPrices.title": "Eigene Preise für Claude Code",
   "tips.newCard.text": "Drück {key} für eine neue Karte im Projekt, in dem du gerade bist, ohne zu unterbrechen, was du tust.",
   "tips.newCard.title": "Schnell eine Karte notieren",
+  "tips.noCodeCards.text": "Eine Entscheidung, ein Text oder ein Test hat nichts zu committen: Setz im Dialog „Neue Karte“ das Häkchen bei „Ohne Code“. Ihre Arbeit wird mit einer Zusammenfassung eingereicht und kommt ohne Merge nach „Erledigt“.",
+  "tips.noCodeCards.title": "Karten ohne Code",
   "tips.off.message": "Unter Hilfe → Tipps… findest du sie weiterhin, und Einstellungen → Allgemein schaltet sie wieder ein.",
   "tips.off.title": "Tipps sind aus",
   "tips.overview.text": "Die Arbeitsbereichsübersicht zeigt, was jedes Projekt verbraucht hat, was gerade läuft und das Board, nach Tag. {key}",

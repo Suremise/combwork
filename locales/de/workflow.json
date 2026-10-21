@@ -228,6 +228,7 @@
   "workflow.refused.why.userOk": "Die Arbeit wartet auf die Zustimmung vor dem Merge.",
   "workflow.roundChoice": "{choice, select, carryOn {Fortfahren} split {Aufteilen} accept {Mit Nacharbeiten annehmen} takeOver {Selbst übernehmen} other {{choice}}}",
   "workflow.rule.approval.given": "Deine Zustimmung vor dem Merge",
+  "workflow.rule.card.kind": "Die Art einer Karte wird beim Anlegen festgelegt",
   "workflow.rule.done.contained": "Hive prüft den Merge",
   "workflow.rule.integrate.approved": "Arbeit wird vor dem Merge reviewt",
   "workflow.rule.integrate.checksPassed": "Checks bestehen auf dem gemergten Ergebnis",

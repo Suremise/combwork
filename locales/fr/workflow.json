@@ -228,6 +228,7 @@
   "workflow.refused.why.userOk": "elle attend l’accord avant la fusion.",
   "workflow.roundChoice": "{choice, select, carryOn {Continuer} split {La scinder} accept {Accepter avec des suivis} takeOver {La reprendre} other {{choice}}}",
   "workflow.rule.approval.given": "Ton accord avant la fusion",
+  "workflow.rule.card.kind": "Le type d’une carte est fixé à sa création",
   "workflow.rule.done.contained": "Hive vérifie la fusion",
   "workflow.rule.integrate.approved": "Le travail est relu avant d’être fusionné",
   "workflow.rule.integrate.checksPassed": "Les vérifications passent sur le résultat fusionné",

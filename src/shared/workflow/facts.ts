@@ -168,6 +168,10 @@ export interface FactData {
   /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
   Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
+  /** A project agent proposed the card's kind when it made it (§16.7.3, OP-6/OP-7, #1277): no code, until confirmed. */
+  KindProposed: { kind: CardKind }
+  /** The user or the Assistant answered a proposed kind (#1277): `kind` is the card's kind from now on. */
+  KindDecided: { kind: CardKind; proposed: CardKind }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */

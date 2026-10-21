@@ -87,6 +87,7 @@ export const MOVE_NAMES: Record<string, Msg> = {
 
 /** A rule as the user reads it (glossary 3: a gate is a rule), for a refusal's {rule} and {rules}: the option it comes from. */
 export const RULE_NAMES: Record<string, Msg> = {
+  'card.kind': msg({ id: 'workflow.rule.card.kind', defaultMessage: "A card's kind is set when it is made", description: "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a test) from when it is made; changing it later is an exception the user makes (glossary: override)." }),
   'start.notBlocked': msg({ id: 'workflow.rule.start.notBlocked', defaultMessage: "Blocked cards don't start", description: 'A rule of the workflow, named where a move skips or can\'t check it.' }),
   'start.dependenciesIntegrated': msg({ id: 'workflow.rule.start.dependenciesIntegrated', defaultMessage: 'Cards start only when the cards they wait for are done', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: N6, G14).' }),
   'start.slotAvailable': msg({ id: 'workflow.rule.start.slotAvailable', defaultMessage: 'Each card in its own folder', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G11 values): a card starts only when a folder is free.' }),

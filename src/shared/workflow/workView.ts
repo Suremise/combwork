@@ -189,7 +189,10 @@ export interface WorkView {
   /** Started by the upgrade from what could be read (an `Adopted` fact), and the column it was in. */
   adopted: boolean
   adoptedFrom?: 'doing' | 'review' | 'passed'
+  /** Its kind (#1277): its cycle's (Started's), else the card's own; null when neither is known (before 1.0). */
   kind: CardKind | null
+  /** A kind a project agent proposed when it made the card, not answered yet (OP-6/OP-7, #1277). */
+  kindProposed: CardKind | null
   /** Where the card works: `project`, or the slot's folder. */
   folder: string | null
   /** The line it works on (Git: its branch); null for None. */
@@ -231,6 +234,15 @@ export interface WorkCard {
   card: number
   stage: StageId
   preWorkflow: boolean
+  /** Its kind as the card has it (the `kind` column, #1277). */
+  kind?: CardKind
+}
+
+/** The kind a project agent proposed (`KindProposed`) and nobody has answered yet (`KindDecided`), or null (#1277). */
+export function kindProposed(facts: readonly Fact[]): CardKind | null {
+  const p = facts.findLast((f) => f.kind === 'KindProposed')
+  if (!p) return null
+  return facts.some((f) => f.kind === 'KindDecided' && f.seq > p.seq) ? null : (p.data as FactData['KindProposed']).kind
 }
 
 /** A fact's `platform.unknown`: each field that couldn't be read, and why (text only). */
@@ -280,7 +292,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     preWorkflow: c.preWorkflow,
     adopted: !!started?.adopted,
     ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
-    kind: started?.cardKind ?? null,
+    kind: started?.cardKind ?? c.kind ?? null,
+    kindProposed: kindProposed(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
     base: started?.base ?? null,
@@ -333,6 +346,9 @@ export interface WorkBadge {
   /** The target's revision with the card's change in it, once integrated (`Integrated`'s result): its merge commit. */
   merged: string | null
   forYou: number
+  /** Its kind (no code: no commits, §16.7.3) and a kind an agent proposed, not answered yet (#1277). */
+  kind: CardKind | null
+  kindProposed: CardKind | null
   /** A decision was recorded since the latest submission was made. */
   decisionSince: boolean
   lastSeq: number
@@ -366,6 +382,8 @@ export function workBadge(v: WorkView): WorkBadge {
     accepted: !!v.accepted,
     merged: v.integration?.result ?? null,
     forYou: v.forYou,
+    kind: v.kind,
+    kindProposed: v.kindProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     lastSeq: v.lastSeq
   }

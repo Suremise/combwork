@@ -228,6 +228,7 @@
   "workflow.refused.why.userOk": "it waits for the OK before merging.",
   "workflow.roundChoice": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
   "workflow.rule.approval.given": "Your OK before merging",
+  "workflow.rule.card.kind": "A card's kind is set when it is made",
   "workflow.rule.done.contained": "Hive checks the merge",
   "workflow.rule.integrate.approved": "Work is reviewed before it's merged",
   "workflow.rule.integrate.checksPassed": "Checks pass on the merged result",

@@ -1303,6 +1303,74 @@
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "A worktree agent's files with changes not committed yet, in the attention inbox (\"1 uncommitted file\")."
   },
+  "board.kind.anyway": {
+    "defaultMessage": "Change Anyway",
+    "description": "The button of the question before a card's kind is changed: makes the change, recorded as an override (glossary: override)."
+  },
+  "board.kind.askDetail": {
+    "defaultMessage": "Changing it anyway records an override on the card, with your reason.",
+    "description": "Under the rule a kind change skips, in the question before it: the change is recorded on the card as an exception to the rules (glossary: override), with the reason the user gives below."
+  },
+  "board.kind.askMessage": {
+    "defaultMessage": "This skips a rule of its project:",
+    "description": "The question before a card's kind is changed after it was made: the rule it skips is listed below (its name)."
+  },
+  "board.kind.askTitle": {
+    "defaultMessage": "{kind, select, code {Make {card} code?} other {Make {card} no code?}}",
+    "description": "Title of the question before a card's kind is changed after it was made. {kind} is the kind it would get (select keys), {card} the card's name."
+  },
+  "board.kind.change": {
+    "defaultMessage": "{kind, select, code {Make It No Code…} other {Make It Code…}}",
+    "description": "A button beside a card's kind in its dialog: changes it to the other kind, asking first (…): an exception to the card's rules. Select keys: the kind it is now."
+  },
+  "board.kind.code": {
+    "defaultMessage": "Code",
+    "description": "A card's kind in its dialog: work in commits (the default). Glossary: no-code card."
+  },
+  "board.kind.confirm": {
+    "defaultMessage": "Confirm No Code",
+    "description": "A button on the banner of a card an agent proposed as no code: makes it no code."
+  },
+  "board.kind.failed": {
+    "defaultMessage": "The card's kind wasn't changed",
+    "description": "An error toast's title: changing or confirming a card's kind failed. Its text says why."
+  },
+  "board.kind.field": {
+    "defaultMessage": "Kind",
+    "description": "A field label in the card dialog: the card's kind, code (work in commits) or no code (a decision, a write-up, a test). Glossary: no-code card."
+  },
+  "board.kind.keep": {
+    "defaultMessage": "Keep as Code",
+    "description": "A button on the banner of a card an agent proposed as no code: keeps it code (work in commits)."
+  },
+  "board.kind.newChoice": {
+    "defaultMessage": "No code (a decision, a write-up, a test…)",
+    "description": "A tick box in the New Card dialog: the card's work has no commits; it is submitted with a summary. Glossary: no-code card."
+  },
+  "board.kind.noCode": {
+    "defaultMessage": "No code",
+    "description": "A card's kind (a mark on its tile, and in its dialog): work with no commits, such as a decision, a write-up or a test; it is submitted with a summary. Glossary: no-code card."
+  },
+  "board.kind.noCodeTip": {
+    "defaultMessage": "No code: its work is a decision, a write-up or a test, submitted with a summary and no commits.",
+    "description": "Tooltip and accessible name of a card's No code mark (on its tile). Glossary: no-code card."
+  },
+  "board.kind.proposal": {
+    "defaultMessage": "No code? The agent that made this card proposes it: its work has no commits (a decision, a write-up, a test).",
+    "description": "A banner in a card's dialog: the agent that made the card proposed it as no code, and the user is to confirm it or keep it as code. Glossary: no-code card."
+  },
+  "board.kind.proposedTip": {
+    "defaultMessage": "No code? Proposed by the agent that made it: open the card to confirm it.",
+    "description": "Tooltip and accessible name of a card's mark when an agent proposed it as no code (no commits) and nobody has answered yet. Glossary: no-code card."
+  },
+  "board.kind.reason": {
+    "defaultMessage": "Reason (optional)",
+    "description": "The label of the field in the question before a card's kind is changed: why the user makes the exception. Optional."
+  },
+  "board.kind.working": {
+    "defaultMessage": "Saving…",
+    "description": "A button while the card's kind is being saved."
+  },
   "board.lane.afterRound": {
     "defaultMessage": "{where} in round {round}",
     "description": "Where a lane's finished card is, in its segment's label (Progress panel): its column ({where}, \"Passed\" or \"Done\") and the review round it passed in ({round}, a number above 1)."
