@@ -370,7 +370,9 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   if (r.command) out.push({ label: tr(msg({ id: 'board.details.command', defaultMessage: 'Command', description: "A label in a run's details (Progress panel): the command it ran follows." })), text: r.command, code: true })
   // What it ran for (#1220): its card and the revision (in full, for copying; the row shows it short).
   if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardName(r.card) })
-  if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)." })), text: r.revision, code: true })
+  if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the card's revision follows, the version of the card's work the run was for: a commit id, or for a project with no platform a hash of the card's files' content (not a commit)." })), text: r.revision, code: true })
+  // What it was tested on, when that isn't the card's revision (#1273): a shared folder's head, a reviewer's checkout.
+  if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
   if (r.counts) {
     const text = r.counts.counted

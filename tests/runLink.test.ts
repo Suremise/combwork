@@ -335,4 +335,18 @@ describe('runs keep what they ran for (#1220)', () => {
     expect(rows).toContainEqual({ label: 'Revision', text: id, code: true })
     expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Card')
   })
+
+  // #1273: what it was tested on, beside the card's revision, only when they differ.
+  it('its details show what it was tested on when that is not the card\'s revision', () => {
+    setLanguage('en', {})
+    const s = store()
+    const run: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061 })
+    const same = runDetails({ ...run, revision: id, testedCheckout: id }, 'hive', 2000, tr)
+    expect(same.map((d) => d.label)).not.toContain('Tested on')
+    const other = 'c'.repeat(40)
+    const rows = runDetails({ ...run, revision: id, testedCheckout: other }, 'hive', 2000, tr)
+    expect(rows).toContainEqual({ label: 'Revision', text: id, code: true })
+    expect(rows).toContainEqual({ label: 'Tested on', text: other, code: true })
+    expect(rows.map((d) => d.label).indexOf('Tested on')).toBe(rows.map((d) => d.label).indexOf('Revision') + 1)
+  })
 })
