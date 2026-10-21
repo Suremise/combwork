@@ -1468,7 +1468,7 @@ export interface DbLease {
 /**
  * The workspace database's connection for a save that may come as its workspace closes (a store's last save): not fenced
  * (#1379), so it still lands, leaving nothing open. The lease owns that exact connection (#1383): a board opened for it
- * is closed as its last lease ends unless something opened the workspace meanwhile, and a board closed meanwhile (its
+ * is closed as its last lease ends unless a window has the workspace open by then (keepBoard), and a board closed meanwhile (its
  * window closed, or closed and opened again) keeps this connection open for the lease, so its writer is never closed
  * under it, and the lease never closes another opening's board.
  */
@@ -1479,22 +1479,31 @@ export function leaseDb(workspacePath: string): DbLease {
   return {
     db: b.db,
     get kept() {
-      return !b.transient && !b.detached
+      return !b.detached && (!b.transient || held.has(keyOf(b.path)))
     },
     release() {
       if (ended) return
       ended = true
       if (--b.leases > 0) return
       if (b.detached) b.db.close()
-      else if (b.transient && boards.get(keyOf(b.path)) === b) closeBoard(b.path)
+      // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
+      // before or after this board was opened, and uses this connection as its board.
+      else if (b.transient && !held.has(keyOf(b.path)) && boards.get(keyOf(b.path)) === b) closeBoard(b.path)
     }
   }
 }
 
-/** A window opens the workspace (#1383): a board open now for a lease alone is its board from now on, kept open as the lease ends. */
+/** The workspaces a window has open (keepBoard): their boards are theirs, whoever opened them, and stay open as leases end. */
+const held = new Set<string>()
+
+/** A window opens the workspace (#1383): its board, open now or opened later by a lease, stays open as leases end. */
 export function keepBoard(workspacePath: string): void {
-  const b = boards.get(keyOf(workspacePath))
-  if (b) b.transient = false
+  held.add(keyOf(workspacePath))
+}
+
+/** The window closes the workspace: its board is closed (closeBoard), and a lease from now on closes what it opens. */
+export function letGoBoard(workspacePath: string): void {
+  held.delete(keyOf(workspacePath))
 }
 
 /** Runs `fn` with a lease on the workspace database (leaseDb), ended after it, however it ends. */

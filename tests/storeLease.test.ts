@@ -86,6 +86,34 @@ describe("a store's save holds its own connection (#1383)", () => {
     expect(nothingOpen(ws)).toBe(true)
   })
 
+  it("doesn't close the board it opened for a window that had the workspace open already, its board not opened yet", async () => {
+    const ws = workspace()
+    await w.open(ws)
+    // The window's board not opened yet (as before its first read): the save opens it.
+    board.closeBoard(ws)
+    const g = gate()
+    const started = gate()
+    const saving = withStoreLock(ws, 'sessions', '', async (db) => {
+      started.release()
+      await g.held
+      put(db, 'opened-by-save', '1')
+    })
+    await started.held
+    // The window reads its board meanwhile: the connection the save opened.
+    const live = board.workspaceDb(ws)
+    g.release()
+    await saving
+    expect(board.boardOpen(ws)).toBe(true)
+    expect(board.workspaceDb(ws)).toBe(live)
+    expect(storeValue(live.reader, 'sessions', '', 'opened-by-save')).toBe('1')
+    // Its saves from now on keep it open too.
+    await withStoreLock(ws, 'sessions', '', async (db) => put(db, 'later', '1'))
+    expect(board.workspaceDb(ws)).toBe(live)
+    await w.open(elsewhere)
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+  })
+
   it("goes on with its writer when the window closes the workspace meanwhile, then leaves nothing open", async () => {
     const ws = workspace()
     await w.open(ws)
