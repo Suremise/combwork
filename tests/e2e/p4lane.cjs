@@ -146,11 +146,18 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     }
     const shell = async (cmd) => {
       const before = shells().length
+      // A wake Hive types into B1 as the suite types (a verdict's, a line moved's) is taken with the suite's line as one
+      // wake, and the command isn't run: seen as that wake taken, it is typed again (a few times at most).
+      for (let tries = 0; tries < 3 && shells().length === before; tries++) {
+        await until(() => idle(b1.id), HUNG_MS)
+        const taken = wakes('B1').length
+        await typeTo(b1.id, `shell: ${cmd}`)
+        await until(() => shells().length > before || wakes('B1').length > taken, 60000)
+      }
       await until(() => idle(b1.id), HUNG_MS)
-      await typeTo(b1.id, `shell: ${cmd}`)
-      await until(() => shells().length > before, 60000)
-      await until(() => idle(b1.id), HUNG_MS)
-      return shells()[before]
+      const ran = shells().slice(before).find((s) => s.cmd === cmd)
+      if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line was taken with a wake each time)`)
+      return ran
     }
     /** The quick check through hive-progress on the card's revision now: true once a new counted CheckRan is on the card. */
     const counted = (f) => f.kind === 'CheckRan' && f.data?.counted === true
