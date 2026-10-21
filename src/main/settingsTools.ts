@@ -91,10 +91,14 @@ const RESTART_TEXT: Record<NonNullable<SettingEntry['restart']>, string> = {
   hive: 'when Hive restarts (Settings → Advanced offers Restart Hive)'
 }
 
+// A listing row's gist (#1312): its first sentence, cut at a word within 60 characters, so a query's rows stay lean.
 const firstSentence = (s: string): string => {
   const m = /^.*?[.!?](?=\s|$)/.exec(s.trim())
   const first = m ? m[0] : s.trim()
-  return first.length > 72 ? `${first.slice(0, 71).trimEnd()}…` : first
+  if (first.length <= 60) return first
+  const cut = first.slice(0, 59)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > 30 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '')}…`
 }
 
 /** A project's folder and config, for project settings (null without one). */

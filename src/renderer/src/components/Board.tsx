@@ -1918,7 +1918,7 @@ export function TaskDialog() {
                 </div>
               </div>
             )}
-            <div className="task-section-h clickable" onClick={() => setShowHistory(!showHistory)}>
+            <div className="task-section-h clickable" data-section="history" onClick={() => setShowHistory(!showHistory)}>
               <Icon name={showHistory ? 'chevron-down' : 'chevron-right'} /> {tr(msg({ id: 'board.dialog.history', defaultMessage: 'History ({n})', description: "A heading in the card dialog (click to show or hide): the card's history of changes, and how many entries ({n})." }), { n: card.history.length })}
             </div>
             {showHistory && (
