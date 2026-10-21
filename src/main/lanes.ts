@@ -391,11 +391,14 @@ function resultsOf(ws: WorkspaceService, l: LaneRecord): { card: number; revisio
   }
 }
 
-/** Ends a lane its cards finished (#1270): verified from the facts while rules are enforced, its merge commit the last result. */
-function endVerified(ws: WorkspaceService, l: LaneRecord, cards: readonly LaneCard[] | undefined, on: boolean, ended: EndedLane[]): void {
+/**
+ * Ends a lane its cards finished (#1270): verified from the facts while rules are enforced, its merge commit the last
+ * result; one given (`given`: the user's, the Assistant's or a script's, never an agent's) only when the facts name none.
+ */
+function endVerified(ws: WorkspaceService, l: LaneRecord, cards: readonly LaneCard[] | undefined, on: boolean, ended: EndedLane[], given: string | null = null): void {
   const results = resultsOf(ws, l)
   const last = [...results].reverse().find((r) => r.revision)?.revision ?? null
-  close(l, 'ended', cards, on ? last : l.mergeCommit)
+  close(l, 'ended', cards, on ? (last ?? given) : (given ?? l.mergeCommit))
   ended.push({ lane: l.id, project: l.project, results })
 }
 
@@ -573,10 +576,12 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, 'Only the user or the Assistant abandons a lane: tell the user if it should stop') // i18n-ignore: hive_lane's refusal, which only a project agent gets
       if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => `The lane ends by itself once all its cards are Done: ${v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone').map((c) => cardRef(c.number)).join(', ')} not yet`)) // i18n-ignore: hive_lane's refusal, which only a project agent gets
-      if (!o.abandoned && allDone(v.cards)) endVerified(ws, l, v.cards, on, verified)
-      else close(l, o.abandoned ? 'abandoned' : 'ended', v.cards, on ? null : o.mergeCommit)
+      // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
+      const given = on && o.agent ? null : (o.mergeCommit ?? null)
+      if (!o.abandoned && allDone(v.cards)) endVerified(ws, l, v.cards, on, verified, given)
+      else close(l, o.abandoned ? 'abandoned' : 'ended', v.cards, given)
       ended = true
-    } else if (!on && o.mergeCommit && !l.mergeCommit) {
+    } else if ((!on || !o.agent) && o.mergeCommit && !l.mergeCommit) {
       l.mergeCommit = o.mergeCommit
       ended = true
     }

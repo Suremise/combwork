@@ -167,9 +167,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const l7 = await startLane('B8', 'R1', 'one more', [await make('Eighth lane, one', 'todo')])
   check('seven lanes started, one ended and one abandoned', [l1, l2, l3, l4, l5, l6, l7].every(Boolean) && ended.body?.state === 'ended' && dropped.body?.state === 'abandoned', JSON.stringify([ended, dropped]))
   const order = () => section.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
-  // Running lanes first, newest first, then the paused one (#512), then the ended and abandoned ones in the order they
-  // finished, the latest last (#568).
-  const wantOrder = [l7, l6, l2, l1, l3, l4, l5]
+  // Running lanes first, newest first, then the paused ones (#512) newest first: R1's (its current card blocked) and
+  // B1's (one card at a time, #1270: its card in Passed isn't merged while later ones wait), then the ended and abandoned
+  // ones in the order they finished, the latest last (#568).
+  const wantOrder = [l7, l6, l2, l3, l1, l4, l5]
   check('the lanes show, a row each: running first (newest first), then paused, then ended and abandoned as they finished', !!(await until(async () => (await order()).join() === wantOrder.join(), HUNG_MS)), JSON.stringify({ got: await order(), want: wantOrder }))
   const row1 = section.locator(`.progress-lane[data-lane="${l1}"]`)
   const top1 = await row1.locator('.progress-lane-top').innerText()

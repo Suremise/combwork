@@ -1598,8 +1598,8 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     const a = agentCaller()
     const commit = body?.mergeCommit
     if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, 'mergeCommit must be a commit (its hash)')
-    // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): a commit given is ignored, said.
-    const ignored = commit && (await lanes.rulesEnforced()) ? { note: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' } : {} // i18n-ignore: an agent's reply (English)
+    // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
+    const ignored = commit && a && (await lanes.rulesEnforced()) ? { note: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' } : {} // i18n-ignore: an agent's reply (English)
     const end = async () => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}) })), ...ignored })
     if (!assistantCaller()) return end()
     const laneId = /^[\w.-]{1,64}$/.test(id) ? id : null

@@ -167,7 +167,8 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   const f = facts.get(focus.number)
   if (f?.forYou) return { reason: 'you', card: focus.number }
   if (f && f.rounds >= rec.rounds && focus.column === 'doing') return { reason: 'roundLimit', card: focus.number }
-  if (focus.column === 'passed') return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
+  // Waiting for a merge only while a card after it waits to start: with every card passed, the lane's merge is due.
+  if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }
   if (focus.column === 'review' && !focus.reviewing) return { reason: 'reviewer', card: focus.number }
   if (rec.pending && current !== null) return { reason: 'listChanges', card: current }

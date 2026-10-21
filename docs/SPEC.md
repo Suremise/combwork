@@ -2198,7 +2198,8 @@ a returned card gets its own slot and a fresh conversation) is put to Darren as 
   each card's result revision from its `Integrated` fact (none under Not checked, or a card from before 1.0), the last
   of them its merge commit. The runtime's `endLaneIfDone` action reads the lanes again. An agent's `hive_lane end`
   ends a lane only when every card is Done (else refused, 409), never abandons one (403: the user's and the
-  Assistant's), and a `mergeCommit` it gives is ignored with a note. A **`lane-ended`** event (once per lane: its
+  Assistant's), and a `mergeCommit` it gives is ignored with a note; one the user, the Assistant or a script gives is
+  kept only where the cards' facts name no merge. A **`lane-ended`** event (once per lane: its
   project, lane and each card's result) goes to code that follows lanes and to the Agent API's event stream.
 - **Why a lane waits, as data:** each running lane carries `status` (`LaneStatus`: a reason and its card) worked out in
   main from the board and its cards' facts: blocked (with why), On Hold, waiting for you (a For you request), the round
