@@ -205,17 +205,19 @@ export class MergeQueue {
    * The advance's authority, decided in the transaction that writes `IntegrationStarted` (§16.4.6, §16.9.1 step 6):
    * the entry still the card's open one, the card in Merging, approved at the current generation and not stale. A
    * decision, a cancel or a stale pass that landed after the queue's last check stops it here, before git is touched.
+   * Workflow rules turned off by now (while the queue waited for the repository lock, say): no advance begins, `rulesOff`.
    */
-  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<boolean> {
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff'> {
     return this.write(card, (w) => {
       const s = w.state()
       const e = s.entries.find((x) => x.id === entry.id)
       const open = !!e && (e.state === 'open' || (e.state === 'started' && this.rerun.has(e.id)))
       const r = w.ruleset!
       const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
-      if (!open || s.stage !== 'merging' || !approved) return false
+      if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
+      if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
       w.fact('IntegrationStarted', data)
-      return true
+      return 'started' as const
     })
   }
 
@@ -274,13 +276,20 @@ export class MergeQueue {
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
         continue
       }
-      // Workflow rules turned off meanwhile: no advance begins (an entry already begun finishes: recover).
+      // Workflow rules turned off meanwhile: no advance begins (an entry already begun finishes: recover). Decided again
+      // in the write of `IntegrationStarted` (startAdvance), after the wait for the lock.
       if (this.cfg.enforced && !this.cfg.enforced()) return this.pause(target, card, entry, 'rulesOff')
       const where = await G.checkouts(this.project)
       if (isUnknown(where)) return this.pause(target, card, entry, 'needsYou')
+      // Checked out in a folder, as far as is known now (advanceRef looks again under the lock).
       const folder = where[target] ?? null
       if (folder && this.cfg.pauseCheckedOut) return this.pause(target, card, entry, 'checkedOut', [folder])
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder) : await this.advanceRef(card, entry, target, expected, result)
+      // Checked out in a folder while the queue waited for the lock: looked at again, the checked-out way.
+      if (adv === 'checkedOut') {
+        if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
+        continue
+      }
       if (adv === 'moved') {
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
         entry = this.wf.state(card).entries.at(-1)!
@@ -403,12 +412,20 @@ export class MergeQueue {
   }
 
   /** The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`). */
-  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<'done' | 'moved' | 'denied'> {
+  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<'done' | 'moved' | 'denied' | 'checkedOut' | { pause: PauseReason; files?: string[] }> {
     const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
-    // Under the repository's lock (#1347): `IntegrationStarted` (its write checks the lease: the fence) and the ref's
-    // compare-and-swap, the lease checked once more just before the swap.
+    // Under the repository's lock (#1347): the target still checked out nowhere (the user or another Hive may have
+    // checked it out while the queue waited: a swap then would leave that folder's files behind), `IntegrationStarted`
+    // (its write checks the lease, the fence, and the rules) and the ref's compare-and-swap, the lease checked once more
+    // just before the swap.
     const r = await lock(async () => {
-      if (!(await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null }))) return 'denied' as const
+      const where = await G.checkouts(this.project)
+      if (isUnknown(where)) return { pause: 'needsYou' as const }
+      const folder = where[target]
+      if (folder) return this.cfg.pauseCheckedOut ? { pause: 'checkedOut' as const, files: [folder] } : ('checkedOut' as const)
+      const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
+      if (started === 'rulesOff') return { pause: 'rulesOff' as const }
+      if (started === 'denied') return 'denied' as const
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
       return (await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok ? ('done' as const) : ('moved' as const)
@@ -450,7 +467,9 @@ export class MergeQueue {
     }
     const ref = await G.lineHead(this.project, target)
     if (ref !== expected) return 'moved'
-    if (!(await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder }))) return 'denied'
+    const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
+    if (started === 'rulesOff') return { pause: 'rulesOff' }
+    if (started === 'denied') return 'denied'
     await this.cfg.hooks?.afterStarted?.(entry.id)
     await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'files' }))
     const rt = await this.git(folder, ['read-tree', '-m', '-u', expected, result])

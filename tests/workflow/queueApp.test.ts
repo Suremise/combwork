@@ -107,6 +107,42 @@ describe('the merge queue in the app (#1348)', () => {
     expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
   })
 
+  it('the target checked out while the queue waited for the repository lock: paused checkedOut, nothing advanced or touched', async () => {
+    const e = team()
+    detach(e)
+    const { card } = await queued(e)
+    const before = head(e)
+    const q = e.queue({
+      pauseCheckedOut: true,
+      lock: (fn) => {
+        sh(e.project, 'checkout', '-q', 'main')
+        return fn()
+      }
+    })
+    expect(await q.drain('main')).toMatchObject([{ outcome: 'paused', reason: 'checkedOut' }])
+    expect(head(e)).toBe(before)
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it('workflow rules turned off while the queue waited for the repository lock: no IntegrationStarted, paused rulesOff', async () => {
+    const e = team()
+    detach(e)
+    const { card } = await queued(e)
+    const before = head(e)
+    let enforced = true
+    const q = e.queue({
+      enforced: () => enforced,
+      lock: (fn) => {
+        enforced = false
+        return fn()
+      }
+    })
+    expect(await q.drain('main')).toMatchObject([{ outcome: 'paused', reason: 'rulesOff' }])
+    expect(head(e)).toBe(before)
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+  })
+
   it('workflow rules turned off during the checks: no advance (paused rulesOff); on again, it carries on from the test merge', async () => {
     const e = team()
     detach(e)

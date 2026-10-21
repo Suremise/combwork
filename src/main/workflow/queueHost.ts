@@ -45,8 +45,6 @@ interface Host {
   target: string
   running: Promise<void> | null
   again: boolean
-  /** Its target's entries recovered since this host was made (once per workspace open). */
-  recovered: boolean
 }
 
 const hosts = new Map<string, Host>()
@@ -62,7 +60,7 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
   const key = hostKey(ws.path, projectPath, target)
   let h = hosts.get(key)
   if (!h || !alive(h)) {
-    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false, recovered: false }
+    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false }
     hosts.set(key, h)
   }
   if (h.running) {
@@ -114,11 +112,11 @@ async function runHost(h: Host): Promise<void> {
         // An earlier runner's processes it couldn't end: paused (needs you), nothing runs.
         if (got.paused !== undefined) return
       }
+      // Each queue recovers its target's begun entries first: what to run again is the queue's own (an entry recovered to
+      // run again by an earlier queue, paused meanwhile, is found again here, not left Merging).
       const q = new MergeQueue(wf, queueConfig(h, runner))
-      if (!h.recovered) {
-        await q.recover(h.target)
-        h.recovered = true
-      }
+      const recovered = await q.recover(h.target)
+      for (const o of recovered) if (o.outcome === 'integrated' || o.outcome === 'failed') await dropQueuePin(h.projectPath, o.card)
       // Rules off: open entries wait (paused) before their advance; recovery above finished any advance begun.
       if (!workflowEnforced()) {
         await pauseForRulesOff(wf, q, h.target)
