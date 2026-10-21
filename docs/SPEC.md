@@ -2407,6 +2407,20 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
 
+**Group E's plain switches** (#1286; rows 24, 28, 29): Hive's own handling, the same for every CLI, so each is one row
+under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:
+- `hive.terminal.ctrlCVToCli` (off; at once): on, an agent pane's Ctrl+C and Ctrl+V go to the CLI as xterm sends them
+  (^C, ^V), selection or not; Hive's copy and paste stay on right-click (`shared/terminalInput.ts` `copyPasteKey`).
+- `hive.assistant.startView` (on): off, `assistantStartView` gives none, at the Assistant's start and after compaction.
+- `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
+  breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
+  `bracketedPaste`, a slash command) each line break or tab becomes a space. Other control characters stay out either
+  way, so nothing in a prompt can end a paste or press a key (`promptInput`).
+- `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
+  one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
+  a draft.
+Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants) wait for Darren's choice (#1292).
+
 ### 16.16 Other 1.0 rules
 
 - **Resume's busy state** [#1177]: every button that starts a session (Resume, Resume All, Start, the Sessions tab,

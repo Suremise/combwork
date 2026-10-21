@@ -211,6 +211,7 @@ export const SUITES = [
   { name: 'taskoverview' },
   { name: 'templates' },
   { name: 'templateshare' },
+  { name: 'terminalinput' },
   { name: 'termsize' },
   { name: 'testedclis' },
   { name: 'tilesview' },

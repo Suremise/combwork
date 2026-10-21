@@ -143,6 +143,8 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
+  'settings.advanced.hive.assistant.startView.desc': undefined
+  'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
@@ -155,6 +157,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcp.replySeconds.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
+  'settings.advanced.hive.prompt.asTyped.desc': undefined
+  'settings.advanced.hive.prompt.asTyped.title': undefined
+  'settings.advanced.hive.prompt.clearDraft.desc': undefined
+  'settings.advanced.hive.prompt.clearDraft.title': undefined
   'settings.advanced.hive.recorder.afterSeconds.desc': undefined
   'settings.advanced.hive.recorder.afterSeconds.title': undefined
   'settings.advanced.hive.recorder.keep.desc': undefined
@@ -173,6 +179,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.recorder.version.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
+  'settings.advanced.hive.terminal.ctrlCVToCli.desc': undefined
+  'settings.advanced.hive.terminal.ctrlCVToCli.title': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.desc': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined

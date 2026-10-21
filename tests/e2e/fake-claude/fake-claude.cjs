@@ -904,22 +904,38 @@ function drawTrust() {
   out(`\r\nQuick safety check: Do you trust the files in ${cwd}?\r\n ${trustMenu.on === 'No' ? '>' : ' '} No, exit\r\n ${trustMenu.on === 'Yes' ? '>' : ' '} Yes, I trust this folder\r\n Enter to confirm · Esc to cancel\r\n`)
 }
 let ctrlC = 0
+/** Inside a bracketed paste, which can come in several reads. */
+let inPaste = false
+/** fake-log-input.txt in its home at its start: each read of its input, as it came, goes into fake-input.jsonl there (#1286). */
+const inputLog = home && fs.existsSync(path.join(home, 'fake-log-input.txt')) ? path.join(home, 'fake-input.jsonl') : null
 if (process.stdin.isTTY) process.stdin.setRawMode(true)
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (data) => {
   lastInput = Date.now()
+  if (inputLog) fs.appendFileSync(inputLog, JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', data, at: new Date().toISOString() }) + '\n')
   // Down or Up in the trust menu moves its choice (two choices).
   if (trustMenu)
     for (const _ of data.matchAll(/\x1b\[[AB]/g)) {
       trustMenu.on = trustMenu.on === 'No' ? 'Yes' : 'No'
       drawTrust()
     }
-  const chars = data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  // A bracketed paste's start and end stay as a mark each (private-use characters): what is between them is text.
+  const chars = data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, (m) => (m === '\x1b[200~' ? '\ue000' : m === '\x1b[201~' ? '\ue001' : ''))
   // The read after a slow spell (#597): several characters, not a bracketed paste, are a paste, as in Claude Code.
   const pasted = slowRead && chars.length > 1 && !data.includes('\x1b[200~')
   slowRead = false
   if (pasted && /[\x15\r]/.test(chars)) lostEnters++
   for (const ch of chars) {
+    if (ch === '\ue000' || ch === '\ue001') {
+      inPaste = ch === '\ue000'
+      continue
+    }
+    // A line break or tab in a bracketed paste is text, as in Claude Code: the line keeps it (#1286).
+    if (inPaste && (ch === '\r' || ch === '\n' || ch === '\t')) {
+      line += ch === '\t' ? ch : '\n'
+      out(ch === '\t' ? ch : '\r\n')
+      continue
+    }
     // A Ctrl+U or an Enter in a paste is text: nothing is cleared or sent.
     if (pasted && (ch === '\x15' || ch === '\r')) continue
     if (ch === '\x03') {

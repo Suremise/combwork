@@ -12,7 +12,7 @@ export async function loadAdvanced(): Promise<void> {
 }
 
 /** An advanced value as Hive uses it in this window (its workspace's own, the override, or the default). */
-export function useAdvancedValue<T extends string | number | string[]>(id: string): T {
+export function useAdvancedValue<T extends string | number | string[] | boolean>(id: string): T {
   const state = useStore((s) => s.advanced)
   return advancedRow(advancedDef(id)!, state).value as T
 }

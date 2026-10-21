@@ -6,7 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { useRightClickToCli } from '../advanced'
+import { useAdvancedValue, useRightClickToCli } from '../advanced'
 import { deferredFocus } from '../deferredFocus'
 import { isAppShortcut } from '../commands'
 import { cardLinkProvider } from '../cardLinks'
@@ -14,7 +14,9 @@ import { fileLinkProvider } from '../fileLinks'
 import { useStore } from '../store'
 import { offerTip } from '../tips'
 import type { ProviderId } from '@shared/types'
+import { CTRL_CV_TO_CLI } from '@shared/advanced'
 import { osc52, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
+import { copyPasteKey } from '@shared/terminalInput'
 import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
 import { AttachmentChips } from './AttachmentChips'
@@ -355,6 +357,10 @@ export function TerminalView({
   const rightClickToCli = useRightClickToCli(provider)
   const rightClickToCliRef = useRef(rightClickToCli)
   rightClickToCliRef.current = rightClickToCli
+  // Settings → Advanced can give Ctrl+C and Ctrl+V to an agent's CLI instead (#1286).
+  const ctrlCVToCli = useAdvancedValue<boolean>(CTRL_CV_TO_CLI) && !!provider
+  const ctrlCVToCliRef = useRef(ctrlCVToCli)
+  ctrlCVToCliRef.current = ctrlCVToCli
   // The key handler is set once per terminal; these keep it pointed at the current agent.
   const pathRef = useRef(projectPath)
   pathRef.current = projectPath
@@ -403,14 +409,16 @@ export function TerminalView({
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
-      const mod = e.ctrlKey || e.metaKey
-      // Copy with Ctrl+C only when there is a selection; otherwise Ctrl+C interrupts the agent.
-      if (mod && !e.altKey && (e.key === 'c' || e.key === 'C') && term.hasSelection()) {
+      // Copy with Ctrl+C only when there is a selection; otherwise Ctrl+C interrupts the agent. Settings → Advanced can
+      // give both keys to the CLI, as xterm sends them (#1286).
+      const action = copyPasteKey(e, ctrlCVToCliRef.current, term.hasSelection())
+      if (action === 'cli') return true
+      if (action === 'copy') {
         void navigator.clipboard.writeText(term.getSelection())
         term.clearSelection()
         return false
       }
-      if (mod && !e.altKey && (e.key === 'v' || e.key === 'V')) {
+      if (action === 'paste') {
         void navigator.clipboard.readText().then(async (t) => {
           if (t) term.paste(t)
           else if (pathRef.current) {
@@ -713,6 +721,7 @@ export function TerminalView({
       className={cx('terminal-host', !visible && 'hidden')}
       data-pty={ptyKey}
       data-right-click={rightClickToCli ? 'cli' : 'hive'}
+      data-ctrl-cv={ctrlCVToCli ? 'cli' : 'hive'}
       style={{ ['--terminal-bg' as string]: terminalTheme().background, ...style }}
       ref={host}
     >
