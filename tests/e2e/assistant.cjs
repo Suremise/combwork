@@ -66,9 +66,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await lib.until(async () => (await panelWidth()) === 300, HUNG_MS)
   const inside = await page.evaluate(() => {
     const right = document.querySelector('.assistant-panel').getBoundingClientRect().right
-    return ['button[aria-label="Start"]', 'button[aria-label="More"]'].map((sel) => document.querySelector(`.assistant-header ${sel}`)?.getBoundingClientRect().right ?? Infinity).every((r) => r <= right + 0.5)
+    return ['button[aria-label="Start"]', 'button[aria-label="More"]', '.assistant-panel-fold'].map((sel) => document.querySelector(`.assistant-header ${sel}`)?.getBoundingClientRect().right ?? Infinity).every((r) => r <= right + 0.5)
   })
-  check('at its narrowest the header keeps Start and ⋯, inside the panel', inside)
+  check('at its narrowest the header keeps Start, ⋯ and Fold, inside the panel', inside)
   await page.locator('.assistant-header button[aria-label="More"]').click()
   check('…and ⋯ has Start too', await becomes(async () => (await page.locator('.menu-item', { hasText: /^Start$/ }).count()) === 1))
   await page.keyboard.press('Escape')
@@ -156,6 +156,21 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
+  // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and
+  // folding the panel leaves the Assistant running.
+  const fold = page.locator('.assistant-header .assistant-panel-fold')
+  check('the header has a fold button, with its shortcut', (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)', await fold.getAttribute('aria-label'))
+  await inv('settings:setKeybinding', 'assistant.toggle', 'Mod+Alt+J')
+  check('…the shortcut as rebound', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+J)'), await fold.getAttribute('aria-label'))
+  await inv('settings:setKeybinding', 'assistant.toggle', null)
+  await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)')
+  const runBefore = (await inv('session:live')).find((s) => s.agentId === 'assistant')?.runId
+  await fold.click()
+  check('clicking it folds the panel to its strip', await becomes(async () => (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail').count()) === 1))
+  const after = (await inv('session:live')).find((s) => s.agentId === 'assistant')
+  check('…and the Assistant keeps running', !!runBefore && after?.status === 'ready' && after.runId === runBefore, JSON.stringify({ runBefore, status: after?.status, runId: after?.runId }))
+  await page.locator('.assistant-rail').click()
+  await becomes(async () => (await page.locator('.assistant-panel').count()) === 1)
   // Its conversation is in the Assistant view's browser, and reads like any session.
   await page.locator('.assistant-panel .assistant-header button[aria-label="More"]').click()
   await page.locator('.menu-item', { hasText: 'All Conversations…' }).click()

@@ -591,13 +591,17 @@
     "defaultMessage": "The conversation has ended.",
     "description": "The Assistant's panel after its conversation ended."
   },
+  "assistant.panel.fold": {
+    "defaultMessage": "Fold the Assistant panel",
+    "description": "An item of the Assistant panel's More (⋯) menu, and its header's button: folds the panel to a strip at the window's edge; the Assistant keeps running. Fold as the Progress panel's button says it."
+  },
+  "assistant.panel.foldTip": {
+    "defaultMessage": "{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}",
+    "description": "Tooltip of the button in the Assistant panel's header that folds it to a strip at the window's edge, with its shortcut ({key}: \"Ctrl+Alt+I\")."
+  },
   "assistant.panel.forWorkspace": {
     "defaultMessage": "For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.",
     "description": "Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant."
-  },
-  "assistant.panel.hide": {
-    "defaultMessage": "Hide the Assistant",
-    "description": "An item of the Assistant panel's More (⋯) menu: hides the panel; the Assistant keeps running."
   },
   "assistant.panel.inactive": {
     "defaultMessage": "{count, plural, one {# inactive project} other {# inactive projects}}",
