@@ -1142,7 +1142,7 @@ export function MergeDialog() {
             {result?.conflicts ? tr(msg({ id: 'agents.mergeDialog.close', defaultMessage: 'Close', description: 'Button: closes the Merge dialog after a merge that would conflict.' })) : tr(CANCEL)}
           </button>
           {!result?.conflicts && (
-            <button className="btn primary" disabled={busy || !status || !!nothing || !status.into || !!blocked || slotTaken} onClick={() => void merge()}>
+            <button className="btn primary" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge()}>
               <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(MERGE)}
             </button>
           )}
@@ -1202,15 +1202,15 @@ export function MergeDialog() {
           <p style={{ marginTop: 0 }}>
             {nothing
               ? tr(msg({ id: 'agents.mergeDialog.nothing', defaultMessage: "There is nothing to merge: {branch} has no changes that aren't in {into}.", description: "The Merge dialog when the worktree's branch ({branch}) has nothing new for the project folder's branch ({into})." }), { branch: agent.worktree.branch, into: status.into ?? '' })
-              : tRich<ReactNode>(msg({ id: 'agents.mergeDialog.merges', defaultMessage: 'Merges {parts, select, both {<b>{commits, plural, one {# commit} other {# commits}}</b> and <b>{changes, plural, one {# uncommitted change} other {# uncommitted changes}}</b>} commits {<b>{commits, plural, one {# commit} other {# commits}}</b>} other {<b>{changes, plural, one {# uncommitted change} other {# uncommitted changes}}</b>}} from <code>{branch}</code> into <code>{into}</code>, the branch checked out in the project folder.', description: "At the top of the Merge dialog: what it merges ({parts}: both, commits and uncommitted changes; commits, only commits; other, only uncommitted changes), how many of each ({commits}, {changes}), from the worktree's branch ({branch}) into the project folder's ({into}). Keep the tags." }), {
-                  commits: status.ahead,
-                  changes: status.dirty,
-                  parts: status.ahead > 0 && status.dirty > 0 ? 'both' : status.ahead > 0 ? 'commits' : 'changes',
-                  branch: agent.worktree.branch,
-                  into: status.into ?? tr(msg({ id: 'agents.mergeDialog.noBranch', defaultMessage: '(no branch)', description: "In the Merge dialog, where the project folder's branch goes, when it isn't on one." })),
-                  b: BOLD,
-                  code: CODE
-                })}
+              : status.ahead > 0
+                ? tRich<ReactNode>(msg({ id: 'agents.mergeDialog.mergesCommits', defaultMessage: 'Merges <b>{commits, plural, one {# commit} other {# commits}}</b> from <code>{branch}</code> into <code>{into}</code>, the branch checked out in the project folder.', description: "At the top of the Merge dialog: how many commits ({commits}) it merges from the worktree's branch ({branch}) into the project folder's ({into}). Keep the tags." }), {
+                    commits: status.ahead,
+                    branch: agent.worktree.branch,
+                    into: status.into ?? tr(msg({ id: 'agents.mergeDialog.noBranch', defaultMessage: '(no branch)', description: "In the Merge dialog, where the project folder's branch goes, when it isn't on one." })),
+                    b: BOLD,
+                    code: CODE
+                  })
+                : tRich<ReactNode>(msg({ id: 'agents.mergeDialog.onlyUncommitted', defaultMessage: '<code>{branch}</code> has no commits to merge yet, only uncommitted changes.', description: "At the top of the Merge dialog when the worktree's branch ({branch}) has nothing committed to merge, only uncommitted files. Keep the tags." }), { branch: agent.worktree.branch, code: CODE })}
           </p>
           {blocked && (
             <div className="banner warn">
@@ -1224,7 +1224,11 @@ export function MergeDialog() {
               <Icon name="info" /> {tr(msg({ id: 'agents.mergeDialog.otherBase', defaultMessage: "{agent}'s branch started from {base}, but the project folder is on {into}.", description: "The Merge dialog when the agent's ({agent}) branch started from another branch ({base}) than the one the project folder is on now ({into})." }), { agent: agent.name, base: agent.worktree.base, into: status.into })}
             </div>
           )}
-          {status.dirty > 0 && <div className="detail">{tr(msg({ id: 'agents.mergeDialog.commitsFirst', defaultMessage: 'The uncommitted changes are committed on {branch} first, with the message below.', description: "The Merge dialog when the worktree has uncommitted changes: they are committed on its branch ({branch}) before merging." }), { branch: agent.worktree.branch })}</div>}
+          {status.dirty > 0 && (
+            <div className="banner warn" data-testid="merge-uncommitted">
+              <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.uncommitted', defaultMessage: "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Hive merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree." }), { files: status.dirty })}
+            </div>
+          )}
           <div className="choice-list">
             <label className={cx('choice', !squash && 'selected')}>
               <input type="radio" checked={!squash} onChange={() => setSquash(false)} />

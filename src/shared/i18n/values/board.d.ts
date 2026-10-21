@@ -161,10 +161,13 @@ interface HiveMessageValues {
   'board.details.ended': undefined
   'board.details.exitCode': undefined
   'board.details.gone': undefined
+  'board.details.install': undefined
+  'board.details.installAsWritten': undefined
   'board.details.interrupted': undefined
   'board.details.lastStep': { step: string | number }
   'board.details.line': { label: string | number; text: string | number }
   'board.details.log': undefined
+  'board.details.noInstall': undefined
   'board.details.notCounted': { name: string | number; why: string }
   'board.details.provider': undefined
   'board.details.revision': undefined
@@ -484,6 +487,8 @@ interface HiveMessageValues {
   'board.progress.filterProject': undefined
   'board.progress.fold': undefined
   'board.progress.hideDetails': { run: string | number }
+  'board.progress.hiveRun': undefined
+  'board.progress.mergeQueue': undefined
   'board.progress.miniWaiting': { agent: string | number; run: string | number }
   'board.progress.moreOthers': { n: number }
   'board.progress.moreRuns': { n: number }

@@ -427,8 +427,8 @@ export function isCompacting(live: { status: SessionStatus; statusMessage?: stri
 }
 
 /**
- * Why a worktree agent's work can't be merged now, or null. A merge commits the worktree's uncommitted files first,
- * so not while the agent is in the middle of a task (working, asking you something, waiting on background tasks or on cards).
+ * Why a worktree agent's work can't be merged now, or null. A merge takes its branch as committed (#1347), so not while
+ * the agent may still be committing to it, in the middle of a task (working, asking you something, waiting on background tasks or on cards).
  */
 export function mergeBlocked(name: string, status: SessionStatus | null | undefined, tr?: Tr): string | null {
   const why = status === 'starting' ? 'working' : status

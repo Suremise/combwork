@@ -203,7 +203,11 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   g('commit -q -am "main change"')
   fs.writeFileSync(path.join(wtPath, 'README.md'), '# Demo\n\nline one changed by reviewer\n')
   const mainHead = g('rev-parse HEAD').trim()
-  const conflict = await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
+  // Uncommitted files aren't merged (#1347): refused, counted, nothing committed for the agent.
+  const dirty = await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
+  check('a dirty worktree is refused, its files counted', !dirty.ok && dirty.uncommitted === 1 && g('status --porcelain', wtPath).includes('README.md'), JSON.stringify(dirty))
+  g('add -A', wtPath); g('commit -q -m "reviewer readme"', wtPath)
+  const conflict =await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
   check('conflict reported', !conflict.ok && conflict.conflicts?.includes('README.md'), JSON.stringify(conflict))
   check('main untouched after conflict', g('rev-parse HEAD').trim() === mainHead && g('status --porcelain').trim() === '')
   // Resolve on the branch by taking main's version, then merge cleanly

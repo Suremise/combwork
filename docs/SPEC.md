@@ -2039,6 +2039,28 @@ report it this way rather than retry.
    lock files differ from those the worktree last installed, the queue runs the project's install in a clean state
    (the setup script with a clean flag; for npm, `npm ci`) before the checks, so a dependency missing from the manifest
    fails here (#187). Team's merge checks always install clean.
+   **Built [#1349]:** the runner (`queueChecks.ts`) runs each G9 check's configured command (OP-24) one after another
+   in the queue's worktree, stopping at the first that isn't green, hidden, with a session command's environment (never
+   `ELECTRON_RUN_AS_NODE` or a session's `HIVE_*`), and ends its whole tree at a time limit (Advanced
+   `hive.queue.checkMinutes`, 90 minutes). Each check is a progress run of `source: 'hive'` ("Hive (merge queue)"),
+   titled "AM-12 · typecheck · a3f2c1d", with its output in a bounded log (its first 2 MB and last 64 KB). The queue
+   brackets each one and writes `CheckRan` at the **result** revision: green only if it exited 0 **and** counted (§16.13:
+   at exactly that revision, clean at the start and the end, nothing written to a tracked file and no HEAD reflog entry
+   between, by stat snapshot since the queue's folder isn't watched). Exit 0 but uncounted isn't green: the entry is
+   tested again from a fresh test merge, and after `MAX_RETESTS` (3) it pauses `uncounted` (the card's `CheckRan`
+   says why). The install is G9's **`mergeInstall`**: `onManifestChange` (the default, Pair's: a clean install whenever
+   the manifests' hash differs from the folder's last install, which holds whatever the option says) or `always`
+   (Team's: before every entry's checks). It is the worktree setup command in its clean form where Hive knows one (a
+   package manager's install with only known flags after it, those that change what it prints, how it fetches or which
+   scripts run: `npm install --no-audit` → `npm ci --no-audit`; pnpm and yarn with their frozen lock file), else **as
+   written**, which its run's details say (Hive has no clean form of a compound command, one naming packages, one with
+   another flag such as `--dry-run`, `--prefix` or `-g`, or another tool's). **Before every install** the queue folder's
+   `node_modules` is removed (a link removed as a link, never through), so no warm package outlives an install that
+   installed nothing: the checks then fail on what's missing rather than pass on what was there [HR3's #1349 round 2]; `npm ci` for a lock file with no setup command; or nothing, which the first check's run
+   says once. The install is a run too, titled with its command line, which can hold a token, so it is
+   `titleFromCommand` and the Agent API never gives its title out (#620). A log that can't be written (a full disk)
+   never stops a run: it is closed and given as no log, and every run started is finished. G9 empty: no checks and no
+   install, so a clean test merge alone merges.
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
@@ -2049,7 +2071,12 @@ report it this way rather than retry.
    card goes to Active, back to its builder. A conflict, red checks or a hook failure need a new revision (review
    again unless it's the same change); a transient failure is resubmitted unchanged, straight into the queue, at most
    twice (`requeue.allowed`, §16.8.1)
-   [note §9; answering HR2's round 1 finding 7]. **Pauses are not failures:** a busy or dirty target folder, a missing
+   [note §9; answering HR2's round 1 finding 7]. **Built [#1349], the certain cases** (`classifyCheckFailure`): a check
+   that couldn't start (a spawn error, or its program not found, told before it starts on Windows, where cmd exits 1 for
+   it), one ended by its time limit, or one killed from outside (a signal, Windows' interrupt status) is transient;
+   anything else is red. A process another program ends with TerminateProcess exits with the code that program gave,
+   which can't be told from the check's own, so it counts as red. Network errors are #1362's (Darren, 21 Oct: exit 75,
+   or Node's and npm's network error codes in the last 40 lines, an Advanced list). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target
@@ -2109,21 +2136,78 @@ touched:
 
 #### 16.9.3 Around the queue
 
-**Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G]: a **repository lock** across processes (the dev
-and installed Hive can't advance a target at once): a lock file in the repository's common git dir
-(`hive-merge.lock`: pid, process start time, Hive's profile), taken with exclusive create, stale when its process is
-gone. It **replaces** today's `.git/hive-merge` lock, which is in-process only (`withFileLock`, `fsutil.ts:512`), and
-the Git view's actions (§8) take it too. It is held **only for the advance** (§16.9.2), seconds. The test merge
+**Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G; #1338's round 1 finding 3] **Built [#1347]**: a
+**repository lock** across processes (the dev and installed Hive can't merge into or advance a target at once). It is
+a row, not a file's existence: one row (`repo_lock`: `id` 1, `token`, `pid`, `process_start`, `profile`, `taken_at`;
+a typed table) in a small SQLite database in the repository's common git dir (`hive-merge.lock`, so its worktrees
+share it; `repoLockCore.ts`). Taking it is `BEGIN IMMEDIATE` (SQLite's own cross-process lock) then: no row, or a row
+whose holder is **dead** (its pid gone, or running with another process start time: a reused pid), judged before the
+transaction and replaced only if the row is still the one judged (its token: compare and swap), so of two contenders
+on one dead holder exactly one takes it. A **live holder is never taken over**, however long it holds: the waiter's
+bound (Settings → Advanced, **Merges: wait for another Hive**, 30 s) only ends its own attempt, with "Another Hive is
+merging into this repository (<profile>)", which it also shows after a moment's wait. Release deletes the row by its
+token, so a late release after a takeover removes nothing of the new holder's. Why not a lock file taken with
+exclusive create: stale takeover by rename or unlink isn't atomic (two contenders can both judge it stale, and a late
+release can unlink a successor's file). It **replaces** the in-process `.git/hive-merge` lock (`withFileLock`, which
+still serializes this Hive's own takes of the row): the Git view's folder actions (§8), a worktree's merge (the Merge
+dialog, agents' and unused worktrees' merges) and the line updater's move of an agent's branch (§16.19.2, which waits
+quietly and tries again on its next pass) take it. No off switch: it is data safety (§16.6.4). It is held **only for
+the advance** (§16.9.2), seconds. The test merge
 (which runs the repository's hooks and may wait on signing) and the merge checks (an hour on Team) run without it:
 they write only the queue's worktree and `refs/hive/queue/*`, and the advance's expected value catches anything that
 moved meanwhile. A paused entry holds no lock. One queue per target still runs one entry at a time.
+
+**The runner** [Built #1360]: exactly one Hive runs a target's queue, across every Hive on the workspace (the dev and
+the installed one share its hive.db, S50). It holds the target's **lease** (a row in hive.db: the holder's profile,
+pid and process start time, when it was taken and last renewed). Another Hive takes the lease over **only once the
+holder process is gone** (its pid gone, or given to a process that started at another time), never because its
+renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>".
+
+Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
+check's detached server too: nothing may break away from it), held by Hive's process supervisor (the one agents'
+launches use), which ends with its Hive; closing the job ends everything in it. What escapes a job anyway (a packaged
+app's process, such as the Store's PowerShell, starts its children outside every job) is adopted into it or followed,
+as for agents; a process it follows is first written to the lease's journal (a file the supervisor flushes to disk),
+and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
+job and recorded in hive.db.
+
+**A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
+naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
+serve a living Hive's other targets and agents), is empty or gone; its journal is sealed (closed to writers for good:
+a supervisor that outlived its Hive can't write down anything more, and ends what it can't write down instead), then
+read, and could be; every process its records and its journal name is gone (ended by pid and start time, never by
+name); and its folder is removed, in that order, its duty dropped only after all of them. What a runner owns stays
+recorded as a duty of the target until then, however many runners crash in between; a journal that can't be read, or
+isn't whole, is never taken for empty; a folder that can't be removed pauses the queue naming it, until a later try
+removes it. A clean release (closing a
+workspace, quitting) ends and confirms its own job first, and leaves as duties what it couldn't confirm.
+
+Each fact the queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its
+lease stops at once, writing nothing. Each lease has **its own worktree** (`queue-<hash of project and target>-<lease>`,
+in the project's Hive worktrees folder): a takeover makes a new one, never an earlier runner's. A target's worktree is
+kept while the queue needs it (an open entry, an unfinished advance, an in-flight card whose ruleset says Hive merges
+into that target, a run in it) and removed when nothing does, or with its project. Unused Worktrees never lists a
+living runner's worktree.
+
+**Accepted (a limitation, not a guarantee):** a process that escapes a job and that the supervisor hasn't yet seen
+(about a second, or until the next process of the job ends) has no identity anywhere if Hive crashes in that moment,
+so a takeover can't end it, and it may go on doing whatever its command does. Worktrees share the repository and its
+refs, and a command can use any path: such a process isn't confined to the old lease's folder, needn't take Hive's
+repository lock, and could move a ref, the target's included. What Hive itself does stays safe: the takeover removes
+the old folder or pauses naming it, the queue's facts and pauses are fenced by the lease, and Hive's own advance is a
+compare-and-swap against the head it tested, so it never builds on a target that moved under it unseen.
 
 **Pins** [HB3's round 1 finding 11]: every submitted revision is pinned by a ref, `refs/hive/cards/<key>/<n>` (the
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose
 what was reviewed or approved. Ref paths compare keys case-insensitively (NTFS).
 
-**`mergeWorktree`** (`worktrees.ts:430`) changes [note §9, #1121]: it returns the merge commit, takes a target, and
-never auto-commits a dirty folder (today it `add -A` + commits, `:435-439`): a dirty slot refuses submit instead.
+**`mergeWorktree`** (`worktrees.ts`) [note §9, #1121] **Built [#1347]**: it returns the merge commit
+(`MergeResult.mergeCommit`), takes a target (default: the project folder's checked-out branch; a branch checked out
+nowhere is merged without touching a folder, the merged tree committed and the branch moved only from its tip; one
+checked out in another folder is refused; a target is the branch git keeps under that name in any case, since Windows'
+ref store is one ref for `main` and `MAIN`, and two branches differing only in case are refused), and never auto-commits a dirty worktree (before 1.0 it ran `add -A` and
+committed): it refuses with the files counted and the next step ("commit or stash them in the worktree, then merge"),
+which the Merge dialog shows before Merge (greyed out); a dirty slot refuses submit instead.
 The **Merge… dialog** stays for the user's own merges outside cards; for a card's line it shows the queue instead
 (OP-13).
 
@@ -2457,6 +2541,16 @@ copies (§16.10.5), leased to that run and written by nothing else, so it counts
 refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
 running again when the deliverables are quiet, which the refusal says. Hive running pre-review checks itself is OP-27.
+
+**The queue's runs, attributed to Hive** (§16.9.1 step 5). **Built [#1349]:** a run Hive starts itself has
+`source: 'hive'`, is the card's project's, and shows as **Hive (merge queue)** (`defaultName: 'mergeQueue'`, in the
+window's language; no provider, no agent to show). Only Hive updates or finishes it (a script's token gets `404`, as for
+another caller's run), it never goes stale (no reporter to fall quiet: Hive ends it itself, its time limit included), and
+it is kept in the run history like other runs, with its log path (Show log) and its `counts` once the queue has
+bracketed it. Its `CheckRan` is for the card at the test merge's result revision, `by: 'Hive (merge queue)'`, counted or
+not by the rules above; it never counts for a submission (its revision is the result, not the card's). `noInstall`
+marks the first check after an install that had nothing to run. The window's side (the row in Runs and Pulse) is
+#1356's e2e; the queue in the app is #1348's.
 
 The Progress panel stays; its 1.0 changes per phase are on the phase cards and are part of this spec:
 - **P3** [#1119 c]: run rows show "AM-12 · a3f2c1d" (links the card, copies the revision); details show Card, Revision

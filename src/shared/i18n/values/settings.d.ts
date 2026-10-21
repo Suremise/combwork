@@ -166,6 +166,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
   'settings.advanced.hive.mcp.replySeconds.title': undefined
+  'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
+  'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
   'settings.advanced.hive.prompt.asTyped.desc': undefined
@@ -174,6 +176,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.prompt.clearDraft.title': undefined
   'settings.advanced.hive.prompt.rawCardStart.desc': undefined
   'settings.advanced.hive.prompt.rawCardStart.title': undefined
+  'settings.advanced.hive.queue.checkMinutes.desc': undefined
+  'settings.advanced.hive.queue.checkMinutes.title': undefined
   'settings.advanced.hive.recorder.afterSeconds.desc': undefined
   'settings.advanced.hive.recorder.afterSeconds.title': undefined
   'settings.advanced.hive.recorder.keep.desc': undefined

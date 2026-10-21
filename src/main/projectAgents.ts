@@ -11,7 +11,8 @@ import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPat
 import { lockfileChanged, reuseNote } from '../shared/unusedWorktrees'
 import { config } from './config'
 import { toast } from './events'
-import { placeKey, samePlace, withFileLock } from './fsutil'
+import { placeKey, samePlace } from './fsutil'
+import { withRepoLock } from './repoLock'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
@@ -626,13 +627,14 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
 }
 
 /**
- * Merges a worktree's branch into the project folder's, the user's way: one merge at a time per project folder (two
- * would stage and commit into each other), holding the merge slot of the branch it merges into (#350), so an agent's
- * merge doesn't land in the middle. An agent's merge and an unused worktree's (#400) both go through it.
+ * Merges a worktree's branch into the project folder's, the user's way: one merge at a time per repository, across
+ * Hives too (the repository lock, #1347: two would stage and commit into each other), holding the merge slot of the
+ * branch it merges into (#350), so an agent's merge doesn't land in the middle. An agent's merge and an unused
+ * worktree's (#400) both go through it.
  */
 export async function mergeInProject(projectPath: string, worktree: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean }): Promise<MergeResult> {
   const into = await workspace.branch(projectPath)
-  const run = (): Promise<MergeResult> => withFileLock(join(projectPath, '.git', 'hive-merge'), () => wt.mergeWorktree(projectPath, worktree, opts))
+  const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => wt.mergeWorktree(projectPath, worktree, opts), { project: projectPath })
   return into ? await userMergeSlot(projectPath, into, run) : await run()
 }
 
@@ -640,7 +642,7 @@ export async function merge(projectPath: string, agentId: string, opts: { squash
   projectPath = workspace.assertProject(projectPath)
   const { def, worktree } = await worktreeOf(projectPath, agentId)
   if (opts.cleanup && sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.agent.stopToMerge', defaultMessage: 'Stop {agent} before merging and removing its worktree.', description: 'An error: a merge that also removes the worktree needs the agent {agent} (its name) stopped first.' }), { agent: def.name })
-  // Its uncommitted work is committed first: not while it is still in the middle of a task.
+  // Its branch is merged as committed: not while it may still commit to it, in the middle of a task.
   const status = sessions.liveFor(projectPath, agentId)?.status
   if (mergeBlocked(def.name, status)) throw helperError((t) => mergeBlocked(def.name, status, t))
   // One merge at a time, holding the slot (the Merge dialog waits until it is free). A branch removed afterwards isn't moved.
