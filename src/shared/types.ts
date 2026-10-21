@@ -1418,7 +1418,7 @@ export interface RuntimeFacts {
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
-  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked')[]
+  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision')[]
   column?: TaskColumn
   /** An agent watch's agents, by name (#416: its cards are none). */
   agents?: string[]

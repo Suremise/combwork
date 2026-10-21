@@ -868,6 +868,9 @@ const clip = (s: string, max = 80): string => {
   return one.length > max ? `${one.slice(0, max - 1)}…` : one
 }
 
+/** A reviewer's request to its builder (#912) as its history line, which watches count (#1272). */
+export const requestNote = (asked: string): StoredText => storedText(HISTORY.reviewerRequest, { text: clip(asked) })
+
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
 const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
 
@@ -1424,12 +1427,12 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[] } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[] }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -1587,6 +1590,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       card.links = await cardRefs(patch.links, n, 'links', scope, card.links)
       said.push(card.links.length ? storedText(HISTORY.linked, { cards: card.links.map((x) => `#${x}`).join(', ') }) : storedText(HISTORY.linksRemoved))
     }
+    // History lines of the caller's own (#1272: a reviewer's request, which watches count).
+    if (opts.note) said.push(...opts.note)
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card

@@ -116,6 +116,7 @@
   "tasks.history.reviewPassed": "レビュー合格",
   "tasks.history.reviewStarted": "レビューを開始",
   "tasks.history.reviewStopped": "{agent}のレビューが終了",
+  "tasks.history.reviewerRequest": "ビルダーに依頼：「{text}」",
   "tasks.history.safeguardStop": "**{agent}（セーフガードによる停止の後）**：{stops, plural, =0 {} other {{time}に{model, select, none {} other {{model}で}}安全分類器が応答を停止しました{stops, plural, =1 {} other {（このセッションで#回）}}。}}現在は{from}ではなく{to}で動作しています（{since}から）。{state, select, asks {CLIが対応を確認しています。} idle {停止後はアイドル状態です。声をかけてください。} other {}}{hasTools, select, yes {停止前の最後のツール呼び出し：{tools}。} other {}}{hasHelp, select, yes {{help}} other {}}",
   "tasks.history.takenFrom": "{agent}の担当を解除",
   "tasks.history.takenFromAgent": "エージェントの担当を解除",
