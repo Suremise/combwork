@@ -42,6 +42,7 @@
   "workflow.refused.integrate.upToDate.change": "Cette règle se définit dans Gestion de versions → Le travail est à jour avant d’être fusionné.",
   "workflow.refused.integrate.upToDate.message": "La carte {card} à la révision {revision} ne contient pas le dernier commit de la branche {target}.",
   "workflow.refused.integrate.upToDate.next": "La file de fusion la met à jour elle-même.",
+  "workflow.refused.move.needsOverride.change": "Ces règles se définissent dans Gestion de versions, où l’utilisateur peut les modifier.",
   "workflow.refused.move.needsOverride.message": "Déplacer la carte {card} vers {stage} passe outre ces règles : {rules}.",
   "workflow.refused.move.needsOverride.next": "Donne une raison pour la déplacer quand même, ou suis les étapes que les règles demandent.",
   "workflow.refused.move.notFromHere.message": "La carte {card} est en {stage} : l’action {move} n’est pas possible à partir de là.",

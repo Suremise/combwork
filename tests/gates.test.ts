@@ -203,6 +203,86 @@ describe('the Assistant moves cards across rules only with a reason (#1265, SPEC
   })
 })
 
+// HR2's round 1: a move is decided whole and written in one transaction; a refused card of a batch is left as it was.
+describe('a move is decided whole, and a refused one leaves nothing (#1265 round 2)', () => {
+  /** A Pair card given to a1, with a commit in a1's worktree: a drag from Todo can start and submit it. */
+  async function ready(blocked?: string): Promise<{ w: WS; card: number }> {
+    const { w, wt } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { agent: 'a1', ...(blocked ? { blocked } : {}) })
+    writeFileSync(join(wt, 'b.txt'), 'b\n')
+    git(wt, 'add', '-A')
+    git(wt, 'commit', '-qm', 'b')
+    return { w, card }
+  }
+
+  it("the Assistant's multi-step move without a reason: refused before anything is saved, its other fields and comment too", async () => {
+    const { w, card } = await ready()
+    const before = await inWorkspace(w, () => tasks.getTask(card, w))
+    const err = await update(w, card, { column: 'passed', title: 'Changed' }, assistant, { comment: 'Not saved' }).catch((e) => e)
+    expect(err).toBeInstanceOf(tasks.WorkflowRefusedError)
+    expect(err.refusal.values.rules).toMatch(/integrate\.approved/)
+    const after = await inWorkspace(w, () => tasks.getTask(card, w))
+    expect({ column: after.column, title: after.title, comments: after.comments }).toEqual({ column: before.column, title: before.title, comments: before.comments })
+    // Only the refusal's own record.
+    expect(kinds(w, card)).toEqual(['Refused'])
+  })
+
+  it("the window's multi-step move asks with nothing written; confirmed, it is written whole with one Override naming every rule", async () => {
+    const { w, card } = await ready('Waiting on the API')
+    const asked = await inWorkspace(w, () => tasks.moveTask(card, 'passed'))
+    expect(asked).toEqual({ ask: expect.arrayContaining(['start.notBlocked', 'integrate.approved']) })
+    expect(kinds(w, card)).toEqual(['Blocked'])
+    const moved = await inWorkspace(w, () => tasks.moveTask(card, 'passed', { confirm: true, reason: 'Hotfix' }))
+    expect(moved).toMatchObject({ moved: { column: 'passed' } })
+    const o = facts(w, card).filter((f) => f.kind === 'Override')
+    expect(o).toHaveLength(1)
+    expect((o[0].data as { rules: string[] }).rules).toEqual(expect.arrayContaining(['start.notBlocked', 'integrate.approved']))
+    expect(o[0].data).toMatchObject({ by: 'user', reason: 'Hotfix', move: 'todo→approved' })
+    // Start, submission and the review skipped, in one change: the Override after the submission it approves.
+    expect(kinds(w, card)).toEqual(['Blocked', 'Started', 'Moved', 'Submitted', 'Moved', 'Override', 'Moved'])
+    expect(foldCard(facts(w, card)).stage).toBe('approved')
+  })
+
+  it('a batch card refused after its runtime write (archived) is left as it was, facts and all; the other card changes', async () => {
+    const { w } = await workspace(null)
+    const kept = await create(w, 'Kept')
+    const moved = await create(w, 'Moved')
+    await inWorkspace(w, () => tasks.archiveTask(kept, true))
+    const before = await inWorkspace(w, () => tasks.getTask(kept, w))
+    const items = await inWorkspace(w, () => tasks.updateTasks([kept, moved], { column: 'doing' }, assistant))
+    expect(items[0].error).toBeTruthy()
+    expect(items[1]).toMatchObject({ error: null, card: { column: 'doing' } })
+    expect(await inWorkspace(w, () => tasks.getTask(kept, w))).toEqual(before)
+    expect(kinds(w, kept)).toEqual([])
+    expect(kinds(w, moved)).toEqual(['Started', 'Moved'])
+  })
+
+  it("the Assistant's control revoked while a batch card's move runs: that card left as it was, the one before it kept", async () => {
+    const { w } = await workspace(null)
+    const a = await create(w, 'A')
+    const b = await create(w, 'B')
+    let calls = 0
+    // The second card's commit check fails (its authority gone) after its runtime write.
+    const commit = (): void => {
+      if (++calls === 2) throw new tasks.TaskPermissionError({ m: { id: 'x', defaultMessage: 'Control was turned down' } } as never)
+    }
+    const items = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'doing' }, assistant, { commit }))
+    expect(items.map((i) => !!i.error)).toEqual([false, true])
+    expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
+    expect(kinds(w, b)).toEqual([])
+    expect(kinds(w, a)).toEqual(['Started', 'Moved'])
+  })
+
+  it("the Assistant's refusal says where its rules are changed (§16.8.3's third sentence)", async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const body = apiErrorReply(await update(w, card, { column: 'done' }, assistant).catch((e) => e)).body
+    expect(body).toMatchObject({ refused: true, change: expect.stringMatching(/Version Control/) })
+  })
+})
+
 describe('with nothing to enforce (#1265)', () => {
   it('S39: all off (Git and None): the user and the Assistant move any card anywhere, nothing asked, refused or overridden', async () => {
     for (const platform of ['git', 'none'] as const) {
@@ -229,6 +309,19 @@ describe('with nothing to enforce (#1265)', () => {
     expect(moved.column).toBe('done')
     expect(kinds(w, card)).toEqual(['Started', 'Moved', 'Moved'])
     expect(facts(w, card).at(-1)).toMatchObject({ kind: 'Moved', actor: 'assistant', data: { to: 'done', cause: 'intent' } })
+  })
+
+  it('with the rules not enforced, the intent path runs no guard: a blocked card starts, nothing refused or overridden', async () => {
+    const { w, repo } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { blocked: 'Waiting' })
+    await advanced.set(ENFORCE, false)
+    const wf = (await workflowFor(w, repo))!
+    const { reply } = await inWorkspace(w, () => tasks.runIntent(wf, card, builder, (x) => x.start(`#${card}`, 'agent:a1')))
+    expect(reply).toMatchObject({ ok: true, to: 'active' })
+    // A move past review asks nothing either: no Override.
+    expect(await inWorkspace(w, () => tasks.moveTask(card, 'done'))).toMatchObject({ moved: { column: 'done' } })
+    expect(kinds(w, card)).toEqual(['Blocked', 'Started', 'Moved', 'Moved'])
   })
 
   it("agents' column moves keep P3's path until #1268: an agent's move to Done isn't refused here", async () => {

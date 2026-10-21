@@ -1649,7 +1649,14 @@ moved to; the runtime writes the move's facts (the recorder writes none of them 
 and the card's 0.9 fields (column, place, history, agent, review) follow in each of its writes' transactions. **Interim
 until #1290 and #1275:** the user's moves don't ask yet (every one runs confirmed: a move that skips a rule records its
 `Override` with no reason), and a move to a column the ruleset doesn't have (Review with no review) keeps P3's recorded
-move; the window's `tasks:move` already returns the question (`ask: rules`) when not confirmed. Agents' column moves keep
+move; the window's `tasks:move` already returns the question (`ask: rules`) when not confirmed. **A drag is decided
+whole** [HR2's #1265 round 1]: its steps (start, submission, the review skipped) are gathered first, outside the lock,
+the submission on the state the start would leave; the rules they skip together are one question, one refusal or one
+`Override` (written after the submission it approves, past Review); then every step is written in one transaction,
+which a rule not decided on undoes (asked again). A submission refused for what no override makes true stops the drag
+after its start (§16.8.4), the start written alone. With the rules not enforced, the runtime runs no guard for any
+intent (`cfg.enforced`). A batch's card is a part of the batch's change undone on its own when refused (savepoint),
+its `Refused` kept. Agents' column moves keep
 P3's path until #1268. A builder with its own worktree starts there whatever the folder option says (it stands in for a
 slot, §16.19.1; P3 recorded it so too), with no `prepareSlot`.
 

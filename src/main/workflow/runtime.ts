@@ -120,6 +120,12 @@ export interface WorkflowConfig {
    * runtime turns it on; the P2 scenarios run with it.
    */
   reconcileActs?: boolean
+  /**
+   * Whether the ruleset's guards run (#1265: Settings → Advanced → Workflow rules are enforced): off, no guard refuses or
+   * is skipped, so nothing asks, is refused for a rule or records an Override; facts are recorded under the card's
+   * ruleset as ever. Read at each use; left out, always.
+   */
+  enforced?: () => boolean
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -174,6 +180,51 @@ export class Write {
   /** The card's state with what this write has added. */
   state(): CardState {
     return foldCard(this.tx.facts(this.card.id))
+  }
+}
+
+/** A start gathered outside the lock (§16.7): what its write records, and what its guards decide on. */
+interface StartGathered {
+  r: Ruleset
+  o: WorkflowOptions
+  data: FactData['Started']
+  existing: boolean
+  ins: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
+  before: Evidence
+  warnings: string[]
+}
+
+/** A submission gathered outside the lock: the revision with its endpoints, keys and files, and its guards' inputs. */
+interface SubmitGathered {
+  r: Ruleset
+  o: WorkflowOptions
+  /** The card as gathered (None: with the paths the submission sets, `setPaths`). */
+  card: CardRecord
+  s: CardState
+  from: StageId
+  agent: string | null
+  setPaths: string[] | null
+  revision: string | null
+  base: string | null
+  key: string | null
+  files: FactData['Submitted']['files']
+  commits?: string[]
+  paths?: string[]
+  inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
+  warnings: string[]
+  earlier: boolean
+  fin: FinishInputs | Record<string, never>
+  before: Evidence
+  only?: (id: GuardId) => boolean
+}
+
+/** The guards a no-code card's submission keeps (§16.7.3). */
+const NO_CODE_GUARDS: GuardId[] = ['submit.notDuplicate', 'submit.ownRunsStopped', 'submit.decisionsReceived']
+
+/** A drag's write undone (it throws, so its part of the change is undone): a refusal, or rules not decided on (ask again). */
+class DragUndone extends Error {
+  constructor(readonly refused: GuardRefusal) {
+    super(refused.rule)
   }
 }
 
@@ -317,12 +368,36 @@ export class Workflow {
   }
 
   private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
-    return (w.ruleset?.guards[move] ?? []).filter((id) => !only || only(id))
+    return this.idsOf(w.ruleset, move, only)
+  }
+
+  /** Whether the guards run (cfg.enforced: Settings → Advanced, #1265). */
+  enforced(): boolean {
+    return this.cfg.enforced ? this.cfg.enforced() : true
+  }
+
+  /** A move's guards in a ruleset, those `only` keeps; none while the rules aren't enforced. */
+  private idsOf(r: Ruleset | null, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
+    if (!this.enforced()) return []
+    return (r?.guards[move] ?? []).filter((id) => !only || only(id))
   }
 
   private guardInputs(w: Write, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>): GuardInputs {
-    const s = w.state()
-    return { card: { key: w.card.key, kind: w.card.kind, labels: w.card.labels, blocked: s.blocked }, state: s, ruleset: w.ruleset!, ...inputs }
+    return this.inputsOf(w.card, w.state(), w.ruleset!, inputs)
+  }
+
+  private inputsOf(card: CardRecord, s: CardState, r: Ruleset, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>): GuardInputs {
+    return { card: { key: card.key, kind: card.kind, labels: card.labels, blocked: s.blocked }, state: s, ruleset: r, ...inputs }
+  }
+
+  /** The rules a move's guards refuse on a state, read outside the write (a drag deciding what to ask): none, each once. */
+  private failingOf(card: CardRecord, s: CardState, r: Ruleset, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): string[] {
+    return [...new Set(evaluateAll(this.idsOf(r, move, only), this.inputsOf(card, s, r, inputs)).map((f) => f.rule))]
+  }
+
+  /** The same, in the write, on the card's facts as they are now. */
+  private failingIn(w: Write, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): string[] {
+    return [...new Set(evaluateAll(this.guardIds(w, move, only), this.guardInputs(w, inputs)).map((f) => f.rule))]
   }
 
   /**
@@ -346,36 +421,56 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     if (s.stage !== 'todo') return this.notFrom(card, actor, s, 'start')
+    const g = await this.gatherStart(card, s, actor, opts.builder)
+    if (!('data' in g)) return this.refuse(card, actor, 'start', g)
+    // Its ruleset is stored by the write that names it (write()), under the store's lock.
+    await this.cfg.hooks?.beforeWrite?.('start')
+    if (await this.revalidate(card, s, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+    const out = await this.write(card, g.r, actor, (w) => {
+      const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
+      if (changed) return changed
+      // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
+      const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
+      if (bad) return bad
+      this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
+      return null
+    })
+    if (out) return this.refuse(card, actor, 'start', out)
+    return this.ok(card, 'todo', 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+  }
+
+  /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */
+  private async gatherStart(card: CardRecord, s: CardState, actor: Actor, builderOpt?: string): Promise<StartGathered | GuardRefusal> {
     const r = this.rulesetOf(card, s)
     const o = r.options
-    const builder = agentOf(actor) ?? opts.builder ?? 'user'
+    const builder = agentOf(actor) ?? builderOpt ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
     const before = await this.evidenceOf(card, s, o)
     const plan = await this.platform(o).start(card, o, builder)
-    if (isUnknown(plan)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } })
+    if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
     const { existing, ...planned } = plan
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    // Its ruleset is stored by the write that names it (write()), under the store's lock.
-    await this.cfg.hooks?.beforeWrite?.('start')
-    if (await this.revalidate(card, s, o, before)) return this.regather(card, () => this.start(ref, actor, opts))
-    const out = await this.write(card, r, actor, (w) => {
-      const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, o, before)
-      if (changed) return changed
-      // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
-      const ins = { agent: agentOf(actor), waitingFor, slotFree: true }
-      const g = opts.drag ? this.across(w, 'start', 'active', ins, opts.drag) : this.check(w, 'start', ins)
-      if (g) return g
-      const overridden = w.written.some((f) => f.kind === 'Override')
-      w.fact('Started', data) // i18n-ignore: a fact's kind and codes, not text
-      w.move('active', overridden ? 'override' : actor === 'user' ? 'user' : 'intent')
-      if (data.folder !== 'project' && !existing) w.action('prepareSlot', { folder: data.folder, line: data.line, base: data.base })
-      return null
-    })
-    if (out) return this.refuse(card, actor, 'start', out)
-    return this.ok(card, 'todo', 'active', { folder: this.folderOf(this.state(card)), line: data.line, base: data.base, target: data.target }, warnings)
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: true }, before, warnings }
+  }
+
+  /** A start's facts and actions, in its write: `Started`, the move into Active, its folder prepared (a slot of its own). */
+  private applyStart(w: Write, g: StartGathered, cause: FactData['Moved']['cause']): void {
+    w.fact('Started', g.data) // i18n-ignore: a fact's kind and codes, not text
+    w.move('active', cause)
+    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base })
+  }
+
+  /** The card's state as it would be once a gathered start is written (a drag gathers its submission on it). */
+  private predicted(card: CardRecord, s: CardState, g: StartGathered): CardState {
+    const facts = this.store.facts(card.id)
+    const seq = (facts.at(-1)?.seq ?? 0) + 1
+    const at = new Date().toISOString()
+    const started: Fact<'Started'> = { seq, card: card.id, kind: 'Started', at, actor: 'hive', source: 'recorded', data: g.data } // i18n-ignore: a fact's kind and codes, not text
+    const moved: Fact<'Moved'> = { seq: seq + 1, card: card.id, kind: 'Moved', at, actor: 'hive', source: 'recorded', data: { from: s.stage, to: 'active', cause: 'user' } } // i18n-ignore: a fact's kind and codes, not text
+    return foldCard([...facts, started, moved])
   }
 
   /** put back: Active → Todo; its folder is released. */
@@ -440,7 +535,7 @@ export class Workflow {
   }
 
   /** Runs an intent again from the top, once (`revalidate`). */
-  private async regather(card: CardRecord, run: () => Promise<Reply>): Promise<Reply> {
+  private async regather<T>(card: CardRecord, run: () => Promise<T>): Promise<T> {
     this.regathering.add(card.id)
     try {
       return await run()
@@ -461,8 +556,8 @@ export class Workflow {
   }
 
   /** Refused when the evidence changed since it was taken, or can't be read now or then (unknown never satisfies). */
-  private evidenceChanged(w: Write, o: WorkflowOptions, before: Evidence): GuardRefusal | null {
-    const now = this.evidenceNow(w.card, w.state(), o, before.primed)
+  private evidenceChanged(w: Write, o: WorkflowOptions, before: Evidence, card: CardRecord = w.card): GuardRefusal | null {
+    const now = this.evidenceNow(card, w.state(), o, before.primed)
     return before.value !== null && now === before.value ? null : { rule: 'evidence.changed', values: { card: w.card.key } }
   }
 
@@ -641,7 +736,6 @@ export class Workflow {
     const r = this.rulesetOf(card, s)
     const o = r.options
     const agent = agentOf(actor)
-    const folder = this.folderOf(s)
     const from = s.stage
 
     // After a queue failure: the same approved, unstale revision goes straight back into the queue (no review, no round).
@@ -665,82 +759,101 @@ export class Workflow {
     }
     if (!(from === 'active' || ((from === 'approved' || from === 'review') && s.stale) || from === 'review')) return this.notFrom(card, actor, s, 'submit')
 
-    // The submission's platform side: revision, fixed endpoints, key and files, and the guards' platform inputs.
+    const g = await this.gatherSubmit(card, s, actor, args)
+    if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
+    // The same revision again: a new submission only with a note (§16.8.1).
+    const waiting = (from === 'review' || from === 'approved') && !g.s.stale
+    if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
+
+    await this.cfg.hooks?.beforeWrite?.('submit')
+    if (await this.revalidate(g.card, g.s, g.o, g.before)) return this.regather(card, () => this.submit(ref, actor, args))
+    const out = await this.write(card, g.r, actor, (w) => {
+      const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
+      if (changed) return changed
+      // Every refusal before anything is written: an override never commits without its move.
+      if (from === 'review' && !g.s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
+      const bad = args.drag ? this.across(w, 'submit', 'review', g.inputs, args.drag, g.only) : this.check(w, 'submit', g.inputs, g.only)
+      if (bad) return bad
+      this.applySubmit(w, g, args, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
+      return null
+    })
+    if (out) return this.refuse(card, actor, 'submit', out)
+    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length }, g.warnings)
+  }
+
+  /**
+   * A submission's slow part, outside the lock (it writes nothing): the card's revision with its fixed endpoints, key and
+   * files, and its guards' inputs. None's paths it sets are kept with it (`setPaths`), written by its write. `r`: the
+   * ruleset, for a state predicted after a start (a drag's) whose ruleset isn't stored yet.
+   */
+  private async gatherSubmit(card0: CardRecord, s0: CardState, actor: Actor, args: { revision?: string; paths?: string[] }, r: Ruleset = this.rulesetOf(card0, s0), predicted = false): Promise<SubmitGathered | GuardRefusal> {
+    let card = card0
+    let s = s0
+    const o = r.options
+    const agent = agentOf(actor)
+    const from = s.stage
     let revision: string | null = null
     let base: string | null = null
     let key: string | null = null
     let files: FactData['Submitted']['files'] = []
     let commits: string[] | undefined
     let paths: string[] | undefined
-    const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder }
+    const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder: this.folderOf(s) }
     const warnings: string[] = []
-    // The card's declared paths (None) are its data: set before the evidence is taken (args, else the pre-fill).
-    // Under the store's lock, as every write (in the app, a change of the board).
-    if (args.paths) card = await this.locked(() => this.store.updateCard(card.id, { paths: args.paths! }))
-    else if (card.kind === 'code' && o.platform === 'none' && !card.paths) card = await this.locked(() => this.store.updateCard(card.id, { paths: this.prefill(card) }))
+    // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
+    // pre-fill), written with the submission.
+    const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)
+    if (setPaths) card = { ...card, paths: setPaths }
     const before = await this.evidenceOf(card, s, o)
     if (card.kind === 'code') {
       const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit })
-      if (!plan.ok) return this.refuse(card, actor, 'submit', plan.refusal)
+      if (!plan.ok) return plan.refusal
       ;({ revision, base, key, files, commits, paths } = plan)
       Object.assign(inputs, plan.inputs)
       warnings.push(...plan.warnings)
-      // The adapter may have reconciled (a shared folder's attribution) or updated the card (None's paths).
-      card = this.store.card(card.id)
-      s = this.state(card)
+      // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
+      if (!predicted) {
+        card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
+        s = this.state(card)
+      }
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
     if (agent && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(agent)
-
-    // The same revision again: a new submission only with a note (§16.8.1).
-    const earlier = card.kind === 'code' ? s.submissions.find((x) => x.revision === revision) : undefined
-    const waiting = (from === 'review' || from === 'approved') && !s.stale
-    if (earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: revision!.slice(0, 7) } })
-
+    const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
-    await this.cfg.hooks?.beforeWrite?.('submit')
-    if (await this.revalidate(card, s, o, before)) return this.regather(card, () => this.submit(ref, actor, args))
-    const sAtGather = s
-    const out = await this.write(card, r, actor, (w) => {
-      const changed = this.stillAt(w, sAtGather, 'submit') ?? this.evidenceChanged(w, o, before)
-      if (changed) return changed
-      const noCode = card.kind === 'no-code'
-      const noCodeGuards: GuardId[] = ['submit.notDuplicate', 'submit.ownRunsStopped', 'submit.decisionsReceived']
-      // Every refusal before anything is written: an override never commits without its move.
-      if (from === 'review' && !s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, r).join(', ') } } as GuardRefusal
-      const only = noCode ? (id: GuardId) => noCodeGuards.includes(id) : undefined
-      const bad = args.drag ? this.across(w, 'submit', 'review', inputs, args.drag, only) : this.check(w, 'submit', inputs, only)
-      if (bad) return bad
-      const st = w.state()
-      const sub = w.fact('Submitted', { // i18n-ignore: a fact's kind and codes, not text
-        revision,
-        base,
-        head: revision,
-        key,
-        files,
-        round: st.rounds + 1,
-        generation: agent ? (st.received[agent] ?? 0) : st.generation,
-        sameRevision: !!earlier,
-        summary: args.summary,
-        ...(args.note ? { note: args.note } : {}),
-        ...(paths ? { paths } : {}),
-        ...(commits ? { commits } : {}),
-        ...(warnings.length ? { warnings } : {})
-      })
-      if (revision) w.action('pin', { ref: `refs/hive/cards/${card.key.toLowerCase()}/${st.submissions.length + 1}`, revision, submission: sub.seq })
-      if (o.review === 'none') {
-        this.finish(w, fin)
-        return null
-      }
-      w.move('review', w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
-      w.action('prepareReviewCopy', { revision })
-      if (reviewerAgent(o.review)) this.wake(w, this.reviewerOf(card), `${card.key} is in Review`) // i18n-ignore: a wake, agent-facing
-      else this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: card.key }))
-      return null
+    const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
+    return { r, o, card, s, from, agent, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}) }
+  }
+
+  /** A submission's facts and actions, in its write: `Submitted`, its pin, then Review (its reviewer woken or the user asked) or Finish. */
+  private applySubmit(w: Write, g: SubmitGathered, args: { summary: string; note?: string }, cause: FactData['Moved']['cause']): void {
+    if (g.setPaths) this.store.updateCard(g.card.id, { paths: g.setPaths })
+    const st = w.state()
+    const sub = w.fact('Submitted', { // i18n-ignore: a fact's kind and codes, not text
+      revision: g.revision,
+      base: g.base,
+      head: g.revision,
+      key: g.key,
+      files: g.files,
+      round: st.rounds + 1,
+      generation: g.agent ? (st.received[g.agent] ?? 0) : st.generation,
+      sameRevision: g.earlier,
+      summary: args.summary,
+      ...(args.note ? { note: args.note } : {}),
+      ...(g.paths ? { paths: g.paths } : {}),
+      ...(g.commits ? { commits: g.commits } : {}),
+      ...(g.warnings.length ? { warnings: g.warnings } : {})
     })
-    if (out) return this.refuse(card, actor, 'submit', out)
-    return this.ok(card, from, this.state(card).stage, { revision, base, files: files.length }, warnings)
+    if (g.revision) w.action('pin', { ref: `refs/hive/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
+    if (g.o.review === 'none') {
+      this.finish(w, g.fin)
+      return
+    }
+    w.move('review', cause)
+    w.action('prepareReviewCopy', { revision: g.revision })
+    if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review`) // i18n-ignore: a wake, agent-facing
+    else this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: g.card.key }))
   }
 
   /** start review: the reviewer takes the latest submission (§16.8.1). */
@@ -983,6 +1096,7 @@ export class Workflow {
 
   /** The rules a drag from one stage to another would skip (§16.8.4): the guards of the moves it jumps over. */
   skippedRules(card: CardRecord, r: Ruleset, from: StageId, to: StageId): string[] {
+    if (!this.enforced()) return []
     const a = ORDER.indexOf(from)
     const b = ORDER.indexOf(to)
     if (a < 0 || b < 0 || b <= a) return []
@@ -1028,7 +1142,9 @@ export class Workflow {
       const back = [...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')
       const was = back?.data.from ?? 'todo'
       const forward = ORDER.indexOf(to) > ORDER.indexOf(was) && to !== 'done'
-      if (to === was || forward) {
+      // Past where it was: back there and the intents of a drag from there, in one write (dragForward).
+      if (forward) return this.dragForward(card, was, to, by, opts, was)
+      if (to === was) {
         const out = await this.write(card, r, by, (w) => {
           const changed = this.stillAt(w, s, 'move')
           if (changed) return changed
@@ -1041,8 +1157,6 @@ export class Workflow {
           return null
         })
         if (out) return this.refuse(card, by, 'move', out)
-        // Leaving On Hold past where it was: back there first, then the intents that drag stands for, as from there.
-        if (forward) return this.dragForward(card, was, to, by, opts)
         return this.ok(card, from, this.state(card).stage)
       }
     }
@@ -1070,41 +1184,93 @@ export class Workflow {
     return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, to)
   }
 
-  /** A forward drag's intents, in order; it stops at the first that refuses with something other than a rule to skip. */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }): Promise<Moved | Ask | Refusal> {
+  /**
+   * A forward drag's intents (§16.8.4), decided whole and written in one write (HR2's #1265 round 1): each step is
+   * gathered first, outside the lock (a start; a submission on the state the start would leave; past Review, the review
+   * skipped), and the rules they would skip, together, are the question (the user's, nothing written), the refusal (the
+   * Assistant's without a reason: only its `Refused`) or one `Override` naming them all. A step refused for what no
+   * override makes true (nothing to submit, a fact that couldn't be read) refuses the drag, nothing written. The write
+   * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: back from On Hold to where the card
+   * was, first, in the same write.
+   */
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm : !opts.reason
-    const drag: Drag = { by, reason: opts.reason ?? '', ask: asking }
-    // A step's refusal: the rules it would skip become the question (the user) or a refusal naming them (the Assistant).
-    const asked = (r: Refusal): Ask | Refusal => (r.rule === 'move.needsOverride' && by === 'user' ? { ask: true, card: card.key, rules: String(r.values.rules).split(', ') } : r)
-    if (this.state(card).stage === 'todo') {
-      const r = await this.start(card.id, by, { builder: opts.builder, drag })
-      if (isRefusal(r)) return asked(r)
+    const s0 = this.state(card)
+    // Back from On Hold: the drag counts from where the card was.
+    const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
+    const r = this.rulesetOf(card, s0)
+    const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder) : null
+    if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
+    const s1 = gs ? this.predicted(card, s, gs) : s
+    const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, {}, gs ? gs.r : r, !!gs) : null
+    if (gsub && !('inputs' in gsub)) {
+      // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
+      // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
+      if (!gs) return this.refuse(card, by, 'submit', gsub)
+      const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
+      return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
     }
-    if (to === 'active') return this.ok(card, from, this.state(card).stage)
-    if (this.state(card).stage === 'active') {
-      const r = await this.submit(card.id, by, { summary: '', drag })
-      if (isRefusal(r)) return asked(r)
+    // Where the card is once submitted (null: Finish decides, with no review), and what is left to the stage dragged to.
+    const after: StageId | null = gsub ? (r.options.review === 'none' ? null : 'review') : s1.stage
+    const approved = !gsub && !!s1.latest && !s1.stale && !notApproved(s1, r, card.labels)
+    const queueOnly = approved && to === 'merging' && r.options.finish === 'hiveMerges' && ORDER.indexOf(s1.stage) < ORDER.indexOf('merging')
+    const pastReview = !approved && after !== null && ORDER.indexOf(after) < ORDER.indexOf(to)
+    if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
+    const rules = new Set<string>()
+    if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
+    if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
+    // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
+    if (pastReview && this.enforced()) rules.add('integrate.approved')
+    const skipped = [...rules]
+    const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+    if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+    await this.cfg.hooks?.beforeWrite?.('move')
+    if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+    if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+    const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
+    // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
+    const decided = (now: string[]): void => {
+      const more = now.filter((x) => !rules.has(x))
+      if (more.length) throw new DragUndone({ rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: [...skipped, ...more].join(', ') } })
     }
-    const s = this.state(card)
-    if (ORDER.indexOf(s.stage) >= ORDER.indexOf(to)) return this.ok(card, from, s.stage)
-    const rs = this.rulesetOf(card, s)
-    // Already approved (back from On Hold, or the OK given): Merging is just the queue, nothing skipped.
-    if (s.latest && !s.stale && !notApproved(s, rs, card.labels)) {
-      if (to !== 'merging' || rs.options.finish !== 'hiveMerges') return this.ok(card, from, s.stage)
-      const out = await this.write(card, rs, by, (w) => this.stillAt(w, s, 'move') ?? (this.enqueue(w), null))
-      return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
+    let out: GuardRefusal | null
+    try {
+      out = await this.write(card, r, by, (w) => {
+        const moved = this.stillAt(w, s0, 'move')
+        if (moved) return moved
+        // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
+        // approved for the latest submission), else first.
+        const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
+        const approves = pastReview && !!gsub
+        if (!approves) override()
+        if (fromHold) w.move(fromHold, 'user')
+        // The evidence on the state it was gathered on (back where it was, from On Hold): moved since, the write is undone.
+        const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+        if (changed) throw new DragUndone(changed)
+        if (gs) {
+          decided(this.failingIn(w, 'start', gs.ins))
+          this.applyStart(w, gs, cause)
+        }
+        if (gsub) {
+          // After the start, the submission's evidence as it was gathered on the state the start leaves.
+          const shifted = gs ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+          if (shifted) throw new DragUndone(shifted)
+          decided(this.failingIn(w, 'submit', gsub.inputs, gsub.only))
+          this.applySubmit(w, gsub, { summary: '' }, cause)
+          if (approves) override()
+        }
+        if (queueOnly) this.enqueue(w)
+        else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
+          if (to === 'merging' && r.options.finish === 'hiveMerges') this.enqueue(w)
+          else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
+        }
+        return null
+      })
+    } catch (e) {
+      if (!(e instanceof DragUndone)) throw e
+      if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
+      return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
     }
-    // Past Review (or the user's OK): the review and approvals are skipped, named, and the change counts as approved.
-    const rules = ['integrate.approved']
-    if (asking) return by === 'user' ? { ask: true, card: card.key, rules } : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: rules.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    const out = await this.write(card, rs, by, (w) => {
-      const changed = this.stillAt(w, s, 'move')
-      if (changed) return changed
-      w.fact('Override', { rules, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
-      if (to === 'merging' && rs.options.finish === 'hiveMerges') this.enqueue(w)
-      else w.move(hasStage(rs, 'approved') ? 'approved' : to, 'override')
-      return null
-    })
     return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
   }
 

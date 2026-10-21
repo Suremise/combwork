@@ -906,6 +906,41 @@ export const boardValue = (ws: WorkspaceService, key: string): string | null => 
 /** Sets one of the board's own values (inside boardWrite). */
 export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
 
+let savepoints = 0
+
+/**
+ * Part of the change running here that can be undone on its own (#1265: a workflow intent's write, a batch's card): if
+ * `fn` throws, its writes and what it asked to run after the change (afterBoardWrite) are undone, and the rest of the
+ * change goes on (the error is passed on). `keep(e)`: an error whose part is kept all the same (a refusal's own record).
+ * Outside a change of `ws`'s board, `fn` as it is.
+ */
+export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<T>, keep: (e: unknown) => boolean = () => false): Promise<T> {
+  const path = pathOf(ws)
+  const state = writing.getStore()
+  if (!state || !state.open || state.key !== keyOf(path)) return fn()
+  const db = boardOf(path).db.writer
+  const name = `part${++savepoints}`
+  const after = state.after.length
+  const changed = state.changed
+  db.exec(`SAVEPOINT ${name}`)
+  try {
+    const out = await fn()
+    db.exec(`RELEASE ${name}`)
+    return out
+  } catch (e) {
+    // Undone part way by SQLite meanwhile: the whole change fails (boardWrite), nothing to undo here.
+    if (!state.lost && db.isTransaction) {
+      if (!keep(e)) {
+        db.exec(`ROLLBACK TO ${name}`)
+        state.after.length = after
+        state.changed = changed
+      }
+      db.exec(`RELEASE ${name}`)
+    }
+    throw e
+  }
+}
+
 /** A write to the board's database: inside a change of `ws`'s board only, and only while its transaction is live (writeOp). */
 export function boardWriteOp<T>(ws: WorkspaceService, fn: (db: Db['writer']) => T): T {
   return writeOp(ws, (b) => fn(b.db.writer))

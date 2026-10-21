@@ -12,7 +12,7 @@
 import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
-import { boardWrite } from '../boardStore'
+import { boardSavepoint, boardWrite } from '../boardStore'
 import { config } from '../config'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
@@ -153,10 +153,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     get reconcileActs() {
       return workflowEnforced()
     },
-    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open.
+    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open; each
+    // write a part of it undone on its own if it throws (#1265: a batch's other cards, the caller's change, go on).
     locked: (fn) => {
       if (!alive()) return Promise.reject(hiveError(M.closed, undefined, { kind: 'conflict' }))
-      return boardWrite(ws, async () => fn(), { alive })
-    }
+      return boardWrite(ws, () => boardSavepoint(ws, async () => fn()), { alive })
+    },
+    enforced: workflowEnforced
   })
 }

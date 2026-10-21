@@ -171,6 +171,10 @@
     "defaultMessage": "The merge queue brings it up to date itself.",
     "description": "What happens next after the strict up-to-date rule refuses."
   },
+  "workflow.refused.move.needsOverride.change": {
+    "defaultMessage": "These rules are set in Version Control, where the user can change them.",
+    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."
+  },
   "workflow.refused.move.needsOverride.message": {
     "defaultMessage": "Moving {card} to {stage} skips: {rules}.",
     "description": "A move that skips rules: {rules} lists the rule names."

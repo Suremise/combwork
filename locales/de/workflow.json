@@ -42,6 +42,7 @@
   "workflow.refused.integrate.upToDate.change": "Diese Regel wird hier festgelegt: Versionsverwaltung → Arbeit ist vor dem Merge auf dem neuesten Stand.",
   "workflow.refused.integrate.upToDate.message": "{card} (Revision {revision}) enthält den Head von {target} nicht.",
   "workflow.refused.integrate.upToDate.next": "Die Merge-Warteschlange bringt sie selbst auf den neuesten Stand.",
+  "workflow.refused.move.needsOverride.change": "Diese Regeln werden unter Versionsverwaltung festgelegt, wo der Benutzer sie ändern kann.",
   "workflow.refused.move.needsOverride.message": "Das Verschieben von {card} nach {stage} überspringt: {rules}.",
   "workflow.refused.move.needsOverride.next": "Gib einen Grund an, um die Karte trotzdem zu verschieben, oder erledige die Schritte, die die Regeln verlangen.",
   "workflow.refused.move.notFromHere.message": "{card} ist in {stage}: „{move}“ ist von dort aus nicht möglich.",

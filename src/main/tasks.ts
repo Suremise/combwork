@@ -20,7 +20,7 @@ import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
 import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -1407,10 +1407,18 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
   for (const n of numbers) {
     const said: string[] = []
     try {
-      // A move through the card's rules (#1265): the runtime's reads are made in the batch's change (a batch is one).
-      const gate = await gateOf(workspace, n, patch, actor)
-      // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
-      const card = gate ? await moveThrough(gate, n, patch, actor, { said, commit: opts.commit }) : await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+      // Each card a part of the batch's change undone on its own when refused (HR2's #1265 round 1: the runtime may have
+      // written before a later check refused), keeping only a workflow refusal's own record (its Refused fact).
+      const card = await boardSavepoint(
+        workspace,
+        async () => {
+          // A move through the card's rules (#1265): the runtime's reads are made in the batch's change (a batch is one).
+          const gate = await gateOf(workspace, n, patch, actor)
+          // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
+          return gate ? await moveThrough(gate, n, patch, actor, { said, commit: opts.commit }) : await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+        },
+        (e) => e instanceof WorkflowRefusedError
+      )
       items.push({ number: n, card, said, error: null })
     } catch (e) {
       // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.
