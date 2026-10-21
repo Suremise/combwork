@@ -131,7 +131,7 @@ function stream(token) {
   const viewer = made.token
   const as = (method, route, body) => api(method, route, body, viewer)
   const status = await as('GET', '/v1/status')
-  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 6, JSON.stringify(status.body?.caller))
+  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 8, JSON.stringify(status.body?.caller))
 
   // --- An agent, for the merge slot, its activity and its own token's stream.
   await page.keyboard.press('Escape')

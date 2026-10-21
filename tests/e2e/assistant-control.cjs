@@ -269,6 +269,7 @@ const check = (name, ok, extra = '') => {
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
+
   // The list names cards by key with the number the tools take (#1219): each card's own key, from the board.
   const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key} (#${n})`
   const cardName = await named(cardNo)
@@ -295,19 +296,6 @@ const check = (name, ok, extra = '') => {
   await api('POST', '/v1/tasks/wait', { cancel: true })
   await api('POST', `/v1/lanes/${encodeURIComponent(rewatched.body?.lane?.id ?? unwatched.body?.lane?.id)}/end`, { abandoned: true })
 
-  // Undo (#1282): its own change, listed by its message and undone with its tool; what it changed comes back, and the
-  // undo is listed in Done by the Assistant. An id that isn't one of its own changes is refused.
-  await api('PATCH', `/v1/tasks/${o2}`, { labels: ['undo-me'] })
-  const kept = (await api('GET', '/v1/assistant/changes')).body
-  const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === o2 && c.fields.includes('labels'))
-  check('its change is kept for undo, by its message, with the field it set', !!relabel && kept.some((g) => typeof g.group === 'string' && g.changes.includes(relabel)), JSON.stringify(kept).slice(0, 400))
-  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, HIVE_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
-  const undoneReply = undoTool({ change: relabel?.id })
-  check('hive_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${o2}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
-  check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === o2), JSON.stringify((await inv('assistant:actions')).slice(-2)))
-  check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
-  check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
-
   // At most 30 changes for one message.
   let status = 200
   let n = 0
@@ -321,6 +309,25 @@ const check = (name, ok, extra = '') => {
   const columns = [(await api('GET', `/v1/tasks/${o1}`)).body.column, (await api('GET', `/v1/tasks/${o2}`)).body.column]
   check('a batch over the limit changes none of its cards and says how many fit', batch.status === 429 && batch.body?.fits === 0 && columns.every((c) => c === 'todo'), JSON.stringify({ status: batch.status, body: batch.body, columns }))
   check('and lists the batch as refused, not as changes', (await inv('assistant:actions')).some((x) => !x.ok && x.text === 'Change 2 cards on the board'))
+
+  // Undo (#1282): the user's next message starts a new group of the Assistant's changes (and a fresh limit). Its own
+  // change, listed by that message and undone with its tool: what it changed comes back, and the undo is listed in Done
+  // by the Assistant. An id that isn't one of its own changes is refused.
+  const before = (await api('GET', '/v1/assistant/changes')).body?.[0]?.group
+  const sinceBefore = (await live(home, 'assistant'))?.statusSince
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+  await until(async () => (async (s) => !!s && ['finished', 'ready'].includes(s.status) && s.statusSince !== sinceBefore)(await live(home, 'assistant')), HUNG_MS)
+  await api('PATCH', `/v1/tasks/${cardNo}`, { labels: ['undo-me'] })
+  const kept = (await api('GET', '/v1/assistant/changes')).body
+  const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === cardNo && c.fields.includes('labels'))
+  check('its change is kept for undo, by its message, with the field it set', !!relabel && kept[0]?.group !== before && kept[0].changes.includes(relabel), JSON.stringify(kept).slice(0, 400))
+  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, HIVE_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
+  const undoneReply = undoTool({ change: relabel?.id })
+  check('hive_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
+  check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
+  check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
+  check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
 
   // The tools its hive MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {
