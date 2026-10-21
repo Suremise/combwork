@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, rmdirSync, rmSync, statSync, unlinkSync, writeSync } from 'original-fs'
 import { join } from 'path'
+import { StringDecoder } from 'string_decoder'
 import { git } from '../git'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -133,6 +134,8 @@ export interface CheckEnd {
   exitCode: number | null
   signal: string | null
   output: string
+  /** The network code its last lines had, looked for by the runner as its output came (TailCodes): absent, `output` is looked in. */
+  tailCode?: string | null
 }
 
 /** Windows' STATUS_CONTROL_C_EXIT, unsigned and signed: a process ended by an interrupt. */
@@ -159,11 +162,88 @@ export function transientCause(e: CheckEnd, platform: NodeJS.Platform = process.
   if (e.exitCode === (platform === 'win32' ? 9009 : 127)) return { cause: 'notFound' }
   if (e.exitCode === TEMPFAIL) return { cause: 'exit75' }
   if (network) {
-    const tail = e.output.replace(/\s+$/, '').split(/\r?\n/).slice(-TAIL_LINES).join('\n')
-    const found = new RegExp(network.source, network.flags.replace('g', '')).exec(tail)
-    if (found) return { cause: 'network', code: found[0].slice(0, 64) }
+    const code = e.tailCode !== undefined ? e.tailCode : networkCodeIn(e.output, network)
+    if (code) return { cause: 'network', code }
   }
   return null
+}
+
+/** How much of a line still being written TailCodes keeps to look in; past it, it is looked at and only its end kept. */
+const LINE_CHARS = 64 * 1024
+/** What it keeps of that line: a code split there is still found (codes are short). */
+const LINE_OVERLAP = 256
+
+/**
+ * The network error code in a check's last TAIL_LINES lines, looked for as its output comes (#1362): each line is looked
+ * in whole as it ends, so a long line, or one split between chunks, neither hides a code nor pushes it out of the last
+ * lines, whatever the short output a result carries keeps. Bounded: a code (or none) per line for the last TAIL_LINES
+ * lines, and a line still being written up to LINE_CHARS. Blank lines at the end don't count.
+ */
+export class TailCodes {
+  private readonly re: RegExp | null
+  private codes: (string | null)[] = []
+  private blanks = 0
+  private line = ''
+  private lineCode: string | null = null
+  private lineBlank = true
+  private decoder = new StringDecoder('utf8')
+
+  constructor(re: RegExp | null) {
+    this.re = re && new RegExp(re.source, re.flags.replace(/[gy]/g, ''))
+  }
+
+  write(chunk: Buffer | string): void {
+    if (!this.re) return
+    const parts = (typeof chunk === 'string' ? chunk : this.decoder.write(chunk)).split('\n')
+    this.line += parts[0]
+    for (let i = 1; i < parts.length; i++) {
+      this.endLine()
+      this.line = parts[i]
+    }
+    if (this.line.length <= LINE_CHARS) return
+    this.look()
+    this.line = this.line.slice(-LINE_OVERLAP)
+  }
+
+  /** The output has ended (a last line without its newline counts): the first code in its last lines, or null. */
+  end(): string | null {
+    if (!this.re) return null
+    this.line += this.decoder.end()
+    if (this.line) this.endLine()
+    return this.codes.find((c) => c !== null) ?? null
+  }
+
+  private look(): void {
+    if (this.lineBlank && /\S/.test(this.line)) this.lineBlank = false
+    if (this.lineCode !== null) return
+    const found = this.re!.exec(this.line)
+    if (found) this.lineCode = found[0].slice(0, 64)
+  }
+
+  private endLine(): void {
+    this.look()
+    if (this.lineBlank) this.blanks++
+    else {
+      for (let n = Math.min(this.blanks, TAIL_LINES); n > 0; n--) this.push(null)
+      this.blanks = 0
+      this.push(this.lineCode)
+    }
+    this.line = ''
+    this.lineCode = null
+    this.lineBlank = true
+  }
+
+  private push(code: string | null): void {
+    this.codes.push(code)
+    if (this.codes.length > TAIL_LINES) this.codes.shift()
+  }
+}
+
+/** The network error code in the last TAIL_LINES lines of `output` (TailCodes on the whole of it), or null. */
+export function networkCodeIn(output: string, network: RegExp): string | null {
+  const tail = new TailCodes(network)
+  tail.write(output)
+  return tail.end()
 }
 
 /** Whether a failed check is the environment's failure ('transient') or the work's ('red'): transientCause's verdict. */
@@ -306,7 +386,9 @@ class BoundedLog {
 
   constructor(
     readonly path: string | null,
-    private io: LogIo
+    private io: LogIo,
+    /** Its network error codes, looked for in its whole last lines as the output comes (#1362). */
+    readonly codes: TailCodes = new TailCodes(null)
   ) {
     if (!path) return
     try {
@@ -336,6 +418,7 @@ class BoundedLog {
 
   write(chunk: Buffer): void {
     this.last = (this.last + chunk.toString('utf8')).slice(-OUTPUT_CHARS)
+    this.codes.write(chunk)
     if (this.fd === null) return
     const room = MAX_LOG_BYTES - this.written
     if (room > 0) {
@@ -489,7 +572,8 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
     } catch {
       logPath = null
     }
-    const log = new BoundedLog(logPath, io)
+    const codes = network()
+    const log = new BoundedLog(logPath, io, new TailCodes(codes))
     let end: CheckEnd = { spawnError: true, exitCode: null, signal: null, output: '' }
     let output = ''
     let cause: TransientFailure | null = null
@@ -506,7 +590,8 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
     } finally {
       output = log.close()
       const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
-      cause = ok ? null : transientCause({ ...end, output }, platform, network())
+      // Its last lines as they came, not the short output the result carries (a long line would push a code out of it).
+      cause = ok ? null : transientCause({ ...end, output, tailCode: log.codes.end() }, platform, codes)
       if (id) deps.runs?.finish(id, { ok, exitCode: end.exitCode, logPath: log.usable ? logPath : null, ...(cause ? { transient: cause } : {}) })
     }
     const ok = !end.spawnError && !end.timedOut && end.exitCode === 0

@@ -410,7 +410,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
         msg({
           id: 'board.details.transient',
           defaultMessage:
-            "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the merge queue tries the same revision again, at most twice.",
+            "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.",
           description: "A run's details in the Progress panel: why a failed merge check counts as temporary, picked by {cause} (keep each branch's key as it is); {code} is the network error code found in its output (ENOTFOUND, ECONNRESET…: keep it as it is). Code 75 is a number: keep it."
         }),
         { cause: r.transient.cause, code: r.transient.code ?? '' } // i18n-ignore: a select's key and an error code, never translated

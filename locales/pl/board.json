@@ -184,7 +184,7 @@
   "board.details.took": "Czas",
   "board.details.tookSoFar": "{took} do tej pory{expected, select, none {} other { · zwykle około {expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · zwykle około {expected}}}",
-  "board.details.transient": "{cause, select, spawn {Nie udało się go uruchomić} notFound {Nie znaleziono jego programu} timeout {Skończył mu się czas} killed {Został zakończony z zewnątrz} exit75 {Zakończył się kodem 75, czyli projektowym „tymczasowy błąd, spróbuj ponownie”} other {Błąd sieci w ostatnich wierszach ({code})}}: kolejka scalania ponawia tę samą rewizję, najwyżej dwa razy.",
+  "board.details.transient": "{cause, select, spawn {Nie udało się go uruchomić} notFound {Nie znaleziono jego programu} timeout {Skończył mu się czas} killed {Został zakończony z zewnątrz} exit75 {Zakończył się kodem 75, czyli projektowym „tymczasowy błąd, spróbuj ponownie”} other {Błąd sieci w ostatnich wierszach ({code})}}: karta została zwrócona wykonawcy, który może ponownie zgłosić tę samą rewizję (najwyżej dwa razy z rzędu) zamiast nowej.",
   "board.details.waitingSince": "Czeka od {since}: {waiting}",
   "board.dialog.addCard": "Dodaj kartę",
   "board.dialog.added": "{who, select, you {Dodano przez Ciebie} assistant {Dodano przez Asystenta} repair {Dodano przez Naprawę} other {Dodano przez agenta {by}}} {added} · zmieniono {changed}",

@@ -537,11 +537,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: QUEUE_NETWORK_CODES,
     group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.queue.networkCodes.title', defaultMessage: 'Merge queue: network errors that count as temporary', description: "An advanced setting's title (Settings → Advanced), listed under Hive. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, is tried again." }),
+    title: msg({ id: 'settings.advanced.hive.queue.networkCodes.title', defaultMessage: 'Merge queue: network errors that count as temporary', description: "An advanced setting's title (Settings → Advanced), listed under Hive. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.networkCodes.desc',
       defaultMessage:
-        "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the merge queue tries the same revision again (at most twice) instead of returning the card. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
+        "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
       description: 'What the advanced setting "Merge queue: network errors that count as temporary" does (Settings → Advanced). The error codes, (?!) and 75 are literal: keep them.'
     }),
     kind: 'pattern',

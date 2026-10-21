@@ -2085,7 +2085,11 @@ report it this way rather than retry.
    count as temporary**, a pattern with samples recorded from npm 11.17.0 and Node 24.19.0; `(?!)` turns it off). A code
    only earlier in the output, or in a check that passed, is nothing. Why is recorded as codes, never text: the
    `IntegrationFailed` fact's `cause` (`spawn`, `notFound`, `timeout`, `killed`, `exit75`, `network`) and `code` (the
-   network error code found), and the check's run says it in its details. **Pauses are not failures:** a busy or dirty target folder, a missing
+   network error code found), and the check's run says it in its details. Transient only permits: the card is still
+   returned to its builder (`returnCard`), and the builder's resubmission puts the same revision back; nothing retries by
+   itself. Codes are looked for as the output comes (`TailCodes`), each line whole as it ends, so the 40 lines are the
+   check's real last lines, not the short output a result carries (bounded: a code per line, a line in progress up to
+   64 KB, then only its end kept). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target

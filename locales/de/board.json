@@ -184,7 +184,7 @@
   "board.details.took": "Dauer",
   "board.details.tookSoFar": "{took} bisher{expected, select, none {} other { · erwartet etwa {expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · erwartet etwa {expected}}}",
-  "board.details.transient": "{cause, select, spawn {Er konnte nicht starten} notFound {Sein Programm wurde nicht gefunden} timeout {Seine Zeit ist abgelaufen} killed {Er wurde von außen beendet} exit75 {Er endete mit Code 75, dem „vorübergehender Fehler, erneut versuchen“ des Projekts} other {Ein Netzwerkfehler in seinen letzten Zeilen ({code})}}: Die Merge-Warteschlange versucht dieselbe Revision erneut, höchstens zweimal.",
+  "board.details.transient": "{cause, select, spawn {Er konnte nicht starten} notFound {Sein Programm wurde nicht gefunden} timeout {Seine Zeit ist abgelaufen} killed {Er wurde von außen beendet} exit75 {Er endete mit Code 75, dem „vorübergehender Fehler, erneut versuchen“ des Projekts} other {Ein Netzwerkfehler in seinen letzten Zeilen ({code})}}: Die Karte wurde an ihren Bearbeiter zurückgegeben, der dieselbe Revision erneut einreichen darf (höchstens zweimal hintereinander) statt einer neuen.",
   "board.details.waitingSince": "Wartet seit {since}: {waiting}",
   "board.dialog.addCard": "Karte hinzufügen",
   "board.dialog.added": "{who, select, you {Hinzugefügt von dir} assistant {Hinzugefügt vom Assistenten} repair {Hinzugefügt von „Reparieren“} other {Hinzugefügt von {by}}} {added} · geändert {changed}",

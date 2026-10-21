@@ -740,7 +740,7 @@
     "description": "How long a finished run took, in its details (Progress panel): {took} (\"4 min\"), then about how long runs like it take ({expected}, a duration, or none when unknown: keep that branch empty)."
   },
   "board.details.transient": {
-    "defaultMessage": "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the merge queue tries the same revision again, at most twice.",
+    "defaultMessage": "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.",
     "description": "A run's details in the Progress panel: why a failed merge check counts as temporary, picked by {cause} (keep each branch's key as it is); {code} is the network error code found in its output (ENOTFOUND, ECONNRESET…: keep it as it is). Code 75 is a number: keep it."
   },
   "board.details.waitingSince": {

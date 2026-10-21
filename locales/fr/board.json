@@ -184,7 +184,7 @@
   "board.details.took": "Durée",
   "board.details.tookSoFar": "{took} jusqu’ici{expected, select, none {} other { · prévu : environ {expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · prévu : environ {expected}}}",
-  "board.details.transient": "{cause, select, spawn {Elle n’a pas pu démarrer} notFound {Son programme est introuvable} timeout {Elle a dépassé son temps} killed {Elle a été arrêtée de l’extérieur} exit75 {Elle s’est terminée avec le code 75, le « échec temporaire, réessayez » du projet} other {Une erreur réseau dans ses dernières lignes ({code})}} : la file de fusion réessaie la même révision, deux fois au plus.",
+  "board.details.transient": "{cause, select, spawn {Elle n’a pas pu démarrer} notFound {Son programme est introuvable} timeout {Elle a dépassé son temps} killed {Elle a été arrêtée de l’extérieur} exit75 {Elle s’est terminée avec le code 75, le « échec temporaire, réessayez » du projet} other {Une erreur réseau dans ses dernières lignes ({code})}} : la carte a été renvoyée à son auteur, qui peut soumettre de nouveau la même révision (deux fois de suite au plus) au lieu d’une nouvelle.",
   "board.details.waitingSince": "En attente depuis {since} : {waiting}",
   "board.dialog.addCard": "Ajouter la carte",
   "board.dialog.added": "{who, select, you {Ajoutée par toi} assistant {Ajoutée par l’Assistant} repair {Ajoutée par la réparation} other {Ajoutée par l’agent {by}}} {added} · modifiée {changed}",
