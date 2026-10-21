@@ -1271,9 +1271,14 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
 #### 16.4.4 Reconciliation
 
 [#1112 C] Observed facts are reconciled against recorded ones, never refused. Reconciliation runs on an observe event,
-on window focus, when a card is read for a rule, and once at start. **In P3 it only records** [#1217]: the observed
-facts below are written (each once across Hives, by its dedupe key), and the table's moves, queue cancellations and
-wakes wait for P4; a card merged by hand stays where it is, with its `Integrated` fact. Its rules:
+on window focus, when a card is read for a rule, and once at start. **P3 only recorded** [#1217]: the observed
+facts below are written (each once across Hives, by its dedupe key). **From P4 it acts** [#1263]: the table's moves,
+queue cancellations, wakes and lane ends follow, through the project's runtime, while **workflow rules are enforced**
+(Settings → Advanced → *Workflow rules are enforced*, `hive.workflow.enforce`, on by default). Turned off, it records
+only, as in P3: a card merged by hand stays where it is, with its `Integrated` fact. What follows an observation is
+applied apart from recording it, once: an observation recorded while the rules were off is acted on at the next
+reconciliation once they're on again (an integration until the card is Done; a stale pass once, its builder's wake
+tied to its `Stale` fact) [HR2's #1263 round 1]. Its rules:
 
 | Observed | Then |
 |---|---|
@@ -1585,7 +1590,17 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - **Storage** (OP-5): the project's options in `project.json` (`workflow: { platform, preset, options }`), written with
   `workspace.mutateProjectConfig()`; workspace defaults in `workspace.json`, global defaults in config — resolved
   global → workspace → project like other settings (§5; `loopRounds` resolves project → workspace → constant today,
-  `src/shared/lanes.ts:58`) [note §11]. An option unset at a level inherits.
+  `src/shared/lanes.ts:58`) [note §11]. An option unset at a level inherits. **Built [#1263]:** the global and
+  workspace defaults are per platform (`workflow: { git: {…}, none: {…} }` in Hive's config and in `workspace.json`),
+  over the platform's all-off (§16.6.4), each option with its origin (platform, global, workspace, project). They are
+  checked as they are read: an unknown option, a value it doesn't take (its type, or one of its choices: a `finish`
+  of `typo`), a project's options for another platform or a contradiction (§16.5.4) makes the project work with every rule off (all-off), logged once, never an error at a
+  move. The upgrade (#1218) writes a project's options whole, so its own values win until the Version Control tab
+  (#1278) lets an option inherit again.
+- **One switch for every rule** [#1263, #1120's table]: Settings → Advanced → *Workflow rules are enforced*
+  (`hive.workflow.enforce`, on by default) turns every gate off at once, in every project, whatever their options:
+  facts are still recorded, nothing is refused or asked, and reconciliation records only (§16.4.4), as in P3. Each
+  rule has its own option too.
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_change_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).

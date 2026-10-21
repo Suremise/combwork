@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "Kein solches Bild",
   "service.transcripts.noTool": "Kein solcher Tool-Aufruf",
   "service.transcripts.none": "Diese Sitzung hat noch kein Transkript.",
+  "service.workflow.closed": "Der Arbeitsbereich dieser Karte wurde geschlossen",
   "service.workspace.advancedNotHere": "{setting} kann nicht für einen Arbeitsbereich festgelegt werden.",
   "service.workspace.agentGone": "Diesen Agenten gibt es nicht mehr.",
   "service.workspace.badName": "Projektnamen dürfen nicht mit „.“ beginnen oder {chars} enthalten",

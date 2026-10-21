@@ -3,7 +3,7 @@
 // derived state"). Facts carry platform-neutral words (revision, line, target, result); anything only one platform
 // has goes in `data.platform`, which only its adapter reads.
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
