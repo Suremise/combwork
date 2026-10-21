@@ -240,6 +240,7 @@ interface HiveMessageValues {
   'main.update.readyAuto': undefined
   'main.update.readyManual': undefined
   'main.update.restart': undefined
+  'main.update.testCopy': undefined
   'main.update.updated': { app: string | number; version: string | number }
   'main.update.updatedBody': undefined
   'main.update.whatsNew': undefined

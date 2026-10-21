@@ -238,6 +238,7 @@
   "main.update.readyAuto": "Hiveの終了時にインストールされます。今すぐ再起動することもできます。",
   "main.update.readyManual": "インストールするにはHiveを再起動してください。",
   "main.update.restart": "再起動して更新",
+  "main.update.testCopy": "テスト用の Hive は更新を確認しません。",
   "main.update.updated": "{app}を{version}に更新しました",
   "main.update.updatedBody": "このバージョンの変更点をご覧ください。",
   "main.update.whatsNew": "新機能",
