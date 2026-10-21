@@ -19,6 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
+import { markClosed, markOpen } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -142,6 +143,11 @@ export class WorkspaceService {
   static onIdsRead: ((ws: WorkspaceService, seen: ProjectSeen[]) => void) | null = null
   /** Told when a workspace starts closing (its path still set), so services drop what they keep for it. */
   static readonly closingListeners = new Set<(path: string) => void>()
+  /**
+   * Awaited as a workspace starts closing, its board still open: what must end and be written down first (the merge
+   * queue's runners give up their leases, #1360). A failure is logged and the close goes on.
+   */
+  static readonly closingTasks = new Set<(path: string) => Promise<void>>()
   /** The window showing this workspace: its events go there. */
   window: BrowserWindow | null = null
   /** Agents' worktree folders (lower-cased) and the project each belongs to. */
@@ -276,6 +282,7 @@ export class WorkspaceService {
       await this.close()
       this.generation++
       this.path = abs
+      markOpen(abs)
     })
     admission = admit.catch(() => undefined)
     await admit
@@ -311,11 +318,18 @@ export class WorkspaceService {
   }
 
   async close(): Promise<void> {
+    if (this.path) {
+      const was = this.path
+      for (const t of WorkspaceService.closingTasks) await t(was).catch((e) => log.warn('closing the workspace', e))
+    }
     this.generation++
     // What was said of the projects' platforms is this workspace's.
     this.platformOffers.clear()
-    this.life.abort(hiveError(M.closed, undefined, { kind: 'conflict' }))
+    const reason = hiveError(M.closed, undefined, { kind: 'conflict' })
+    this.life.abort(reason)
     const closing = this.path
+    // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
+    if (closing) markClosed(closing, reason)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -942,9 +956,14 @@ export class WorkspaceService {
     return { workspace: p.workspace, scope: p.scope }
   }
 
-  /** A session host's records (#1061: in the workspace's database). */
-  async sessionsFile(projectPath: string): Promise<SessionsFile> {
-    return readSessions(await this.sessionsPlace(projectPath))
+  /**
+   * A session host's records (#1061: in the workspace's database). `signal`: the opening of the workspace they're read
+   * for (background work); once it's aborted nothing is read, so a closed workspace's database isn't opened again (#1379).
+   */
+  async sessionsFile(projectPath: string, signal?: AbortSignal): Promise<SessionsFile> {
+    const place = await this.sessionsPlace(projectPath)
+    signal?.throwIfAborted()
+    return readSessions(place, signal)
   }
 
   /** One of a host's session records by its id (#1211: read by its key, not with every record), or undefined. */

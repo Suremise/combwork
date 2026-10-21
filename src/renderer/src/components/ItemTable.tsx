@@ -85,16 +85,19 @@ const words = (t: string | Msg): string => (typeof t === 'string' ? t : tr(t))
 /**
  * Items as a table (#1317, grown from the agents table, #529, #572: Darren's model for list dialogs): a header row,
  * hairline rules, one line an item; the first column any item (`first` its heading), columns after it, and each row's
- * actions at the right edge, aligned down the table, in a column of their own without a heading. Group headings span it.
- * How cells cut or wrap is the caller's className (the agents tables' cuts and shares, app.css).
+ * actions at the right edge, aligned down the table, in a column of their own without a heading (a row without them gives
+ * its last cell that room). Group headings span it.
+ * How cells cut or wrap is the caller's className (the agents tables' cuts and shares, app.css). `presentation`: a
+ * screen reader reads each row as the sentence its first cell holds (the table's role and headings left out), so the
+ * caller hides the cells' visible text from it and keeps the actions reachable.
  */
-export function ItemTable({ first, columns, rows, className, bodyClassName, data }: { first: string | Msg; columns: ItemColumn[]; rows: (ItemRow | ItemGroup)[]; className?: string; bodyClassName?: string; data?: Record<string, string> }) {
+export function ItemTable({ first, columns, rows, className, bodyClassName, data, presentation }: { first: string | Msg; columns: ItemColumn[]; rows: (ItemRow | ItemGroup)[]; className?: string; bodyClassName?: string; data?: Record<string, string>; presentation?: boolean }) {
   useLanguage()
   const actions = rows.some((r) => 'cells' in r && r.actions)
   const span = columns.length + 1 + (actions ? 1 : 0)
   return (
-    <table className={cx('table', 'item-table', className)} {...dataAttrs(data)}>
-      <thead>
+    <table className={cx('table', 'item-table', className)} role={presentation ? 'presentation' : undefined} {...dataAttrs(data)}>
+      <thead aria-hidden={presentation || undefined}>
         <tr>
           <th>{words(first)}</th>
           {columns.map((c, i) => (
@@ -113,11 +116,12 @@ export function ItemTable({ first, columns, rows, className, bodyClassName, data
             <tr key={r.key} className={r.className} {...dataAttrs(r.data)}>
               <td className={r.itemClassName}>{r.item}</td>
               {columns.map((c, i) => (
-                <td key={i} className={cx(c.className, r.cells[i]?.className)}>
+                // A row without actions lets its last cell take their room (a dialog's Will do, cut later).
+                <td key={i} className={cx(c.className, r.cells[i]?.className)} colSpan={actions && !r.actions && i === columns.length - 1 ? 2 : undefined}>
                   {r.cells[i]?.content}
                 </td>
               ))}
-              {actions && <td className="item-table-actions">{r.actions}</td>}
+              {actions && r.actions && <td className="item-table-actions">{r.actions}</td>}
             </tr>
           )
         )}

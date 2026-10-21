@@ -639,6 +639,14 @@
     "defaultMessage": "Ended without a report: its process ended before it said how it went",
     "description": "A run's state in its details (Progress panel): its process ended without reporting."
   },
+  "board.details.install": {
+    "defaultMessage": "Install",
+    "description": "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows."
+  },
+  "board.details.installAsWritten": {
+    "defaultMessage": "The setup command as written, after removing node_modules: Hive has no clean form of it",
+    "description": "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch."
+  },
   "board.details.interrupted": {
     "defaultMessage": "Stopped: its command was interrupted",
     "description": "A run's state in its details (Progress panel): its command was interrupted."
@@ -654,6 +662,10 @@
   "board.details.log": {
     "defaultMessage": "Log",
     "description": "A label in a run's details (Progress panel): the path of its log file follows."
+  },
+  "board.details.noInstall": {
+    "defaultMessage": "Nothing installed: the project has no setup command and no lock file",
+    "description": "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents & Worktrees) nor a package lock file."
   },
   "board.details.notCounted": {
     "defaultMessage": "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
@@ -1708,8 +1720,8 @@
     "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
   },
   "board.lanes.waits": {
-    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} hooks {paused: {agent}'s hooks aren't arriving} other {list changes after {card}}}",
-    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} other {list changes after {card}}}",
+    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
@@ -1930,6 +1942,14 @@
   "board.progress.hideDetails": {
     "defaultMessage": "Hide details for {run}",
     "description": "Tooltip of the button closing a run's details in the Progress panel ({run}: the run's title)."
+  },
+  "board.progress.hiveRun": {
+    "defaultMessage": "Hive’s merge queue ran it, not an agent: there is no agent to show.",
+    "description": "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
+  },
+  "board.progress.mergeQueue": {
+    "defaultMessage": "Hive (merge queue)",
+    "description": "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)."
   },
   "board.progress.miniWaiting": {
     "defaultMessage": "{agent}: {run} (waiting)",

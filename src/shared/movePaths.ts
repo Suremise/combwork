@@ -17,7 +17,7 @@ export interface PathMove {
  * overwritten), Open Recent or Working on.
  */
 export function moveHasWork(plan: MovePlan): boolean {
-  return plan.recent || plan.working.length > 0 || !!plan.cards?.length || plan.hosts.some((h) => h.worktrees.length > 0 || h.sessions > 0 || h.folders.some((f) => f.copy > 0 || f.kept.length > 0 || !!f.failed?.length))
+  return plan.recent || plan.working.length > 0 || !!plan.cards?.length || plan.hosts.some((h) => h.worktrees.length > 0 || h.sessions > 0 || h.folders.some((f) => f.copy > 0 || f.kept.length > 0 || !!f.failed?.length) || !!h.branches?.some((b) => !b.kept))
 }
 
 const trimEnd = (p: string): string => p.replace(/[\\/]+$/, '')

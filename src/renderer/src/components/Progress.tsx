@@ -43,6 +43,7 @@ type StoreState = Parameters<typeof findProject>[0]
 function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none." }))
   if (r.source === 'api') return tr(msg({ id: 'board.progress.scriptRun', defaultMessage: 'A script reported it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: a script reported the run." }))
+  if (r.source === 'hive') return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Hive’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
   const p = r.projectPath ? findProject(s, r.projectPath) : null
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
@@ -565,7 +566,7 @@ function DetailsToggle({ run: r, open, onToggle }: { run: ProgressRun; open: boo
 function RunWho({ run: r, project }: { run: ProgressRun; project: string | null }) {
   return (
     <>
-      {r.source === 'assistant' ? <AssistantMark /> : r.provider ? <ProviderIcon provider={r.provider} /> : <Icon name="terminal" />}
+      {r.source === 'assistant' ? <AssistantMark /> : r.source === 'hive' ? <Icon name="git-merge" /> : r.provider ? <ProviderIcon provider={r.provider} /> : <Icon name="terminal" />}
       <span className="progress-agent">{runAgentName(r, tr)}</span>
       {project && <span className="faint progress-project">{project}</span>}
     </>

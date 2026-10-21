@@ -49,6 +49,7 @@ import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
+import { releaseQueueRunners } from './workflow/queueRunner'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
@@ -72,7 +73,7 @@ import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeR
 import { initUpdater, installNow } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
-import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
@@ -595,6 +596,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   }
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
+  // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
+  await releaseQueueRunners()
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
@@ -973,6 +976,8 @@ app.whenReady().then(async () => {
   startObserving()
   // What it sees reconciled with the cards' facts: recorded (#1217), and acted on with the rules enforced (#1263).
   startReconciling()
+  // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
+  WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
   // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
   // its CLI hasn't taken yet, it is busy.

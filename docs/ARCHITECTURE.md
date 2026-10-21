@@ -10,6 +10,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/sessions.ts` | Launch/stop/resume per agent (any provider), normalised hooks → status, file locks (PreToolUse), transcript backups, usage and cost, Continue with… |
 | `src/shared/assistant.ts`, `assistantTools.ts`, `src/main/modes.ts`, `assistantControl.ts`, `assistantChanges.ts`, `assistantUndo.ts` (#1282: its changes kept and undone), `src/renderer/src/components/Assistant.tsx`, `AssistantView.tsx`, `Modes.tsx` | The Hive Assistant (one per workspace, a session host at `.hive/assistant` whose settings are overlaid from Settings → Assistant) and its modes (Coordinator, Planner, QA triager; files in `.hive/modes`, shipped in `resources/modes`; called personas until 0.9.3, #1084) |
 | `src/main/projectAgents.ts`, `src/main/worktrees.ts` | A project's agents (`agentLimit()`: 12 by default, 24 at most, #562; a page holds as many as the layout has panes): add/update/remove/merge; git worktree operations |
+| `src/main/repoLock.ts`, `repoLockCore.ts` | The repository lock (#1347, SPEC §16.9.3): one row in `hive-merge.lock` (SQLite) in the repository's common git dir, across Hives; a dead holder (pid gone or reused) taken over by compare and swap, a live one never; taken by merges, the Git view's folder actions and the line updater's move. The core has no Electron imports, so tests run it in plain Node children |
 | `src/shared/providers.ts`, `claude.ts`, `codex.ts`, `copilot.ts` | Provider descriptors (names, modes, models, capabilities) and settings resolution helpers |
 | `src/shared/models.ts`, `src/main/providers/*/models.ts` | Models and capabilities from the CLIs (Claude Code's initialize, codex debug models, Copilot's ACP session), with the editable fallbacks: what the pickers, the footer and the Agent API offer |
 | `src/main/providers/` | `ProviderAdapter` interface, registry, `claude/`, `codex/` and `copilot/` adapters (launch, hooks, transcripts, usage, conversation parsers) |
@@ -49,6 +50,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 │ providerService.ts  each provider's install info, setup tasks                │
 │ ptyHost.ts      node-pty processes, output buffers                           │
 │ agentProcesses.ts  each launch's process tree (a job object), leftovers      │
+│ processSupervisor.ts  the job host (C#) agents and the merge queue share     │
 │ launchGate.ts   holds a terminal's command until its job is made             │
 │ servers.ts      hook server (random port) + Agent API (configured port)      │
 │ skills.ts mcp.ts notes.ts git.ts files.ts   feature services                 │
@@ -249,15 +251,37 @@ where it stands in for later work: the store (P3 puts the tables in hive.db, wri
   sessions), `board_meta`, `archive_batches`; migrations in `BOARD_MIGRATIONS` (`boardStore.ts:34`), versioned and
   backed up by `db.ts`.
 - Lanes (`lanes.ts`) are bookkeeping; `mergeCommit` is the agent's text. Merge slots (`mergeSlots.ts`) are in-memory,
-  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts:430`) auto-commits and doesn't
-  return the merge commit; squash detection is `alreadyMerged` (`:417`). The Git view's actions fence the folder
-  (`folderFence.ts`, `gitRepo.ts:343`) and take a `.git/hive-merge` lock.
+  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts`) refuses a dirty worktree,
+  takes a target and returns the merge commit (#1347); squash detection is `alreadyMerged`. The Git view's actions fence
+  the folder (`folderFence.ts`, `gitRepo.ts`) and take the repository lock (`repoLock.ts`, #1347).
 
 **The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
 (`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a
 moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
+
+**The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
+takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
+holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease
+has a job object on Hive's process supervisor (`processSupervisor.ts`: the PowerShell and C# `HiveJobs` host that
+agents' launches use too, extracted from `agentProcesses.ts`; in the app the runner is given agents' host): named
+`Local\HiveQueue-<lease>`, kill-on-close, no breakaway, swept and followed as agents' jobs are (#543, #659, #678); the
+supervisor writes each process it follows to the lease's journal (`<worktrees>/.queue-journals/<lease>.followed`,
+flushed through) before following it, and ends one it can't write (`unowned …`, the runner pauses). A lease's duty is
+its job (`what = 'job'`), never the supervisor process. Commands start through a detached Node launcher (`queueJobs.ts`)
+that the supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before
+it is told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
+name, seals their journals (`sealJournal`: the file moved aside, a folder in its place, so an outlived supervisor can't
+append), reads them once, ends the processes their records and journals name still running, waits, removes their
+folders, and only then drops their duties and clears the journals (the seals stay); anything it can't rule out (a
+journal it can't read, a process or folder that won't go) pauses the queue needs-you, naming it, and leaves all of it
+for the next try. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
+(factStore.ts, an AsyncLocalStorage check run inside every store write) fences everything the queue's work writes,
+reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released
+runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close
+(`WorkspaceService.closingTasks`), quit and project removal release the runners (`releaseQueueRunners`,
+`forgetProjectQueues`).
 
 **Layers and modules (planned):**
 
@@ -267,7 +291,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
-| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
+| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
 | Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
@@ -292,7 +316,11 @@ likely only stat data moved (an outside `git status` refreshing the index, an ed
 touched). Even then the guards' inputs read in between may have seen another state and back (HR5, round 2: dirty,
 clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
 from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
-an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). The Assistant
+an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
+and each lane's look in a branch-update pass, is one `gitStep` (`platform/git.ts`, #1376): what it asks about fixed
+commits (an ancestor, a merge base, by full ids) is asked of git once in it per repository (its common git dir, read
+from `.git`: a project and its worktrees share answers, another repository never); nothing about refs, HEAD or files is
+kept, so every read of state (a regather's, the move's own at its boundary) asks git again. The Assistant
 suggested letting git answer (#1206 round 1) after HR5 found that reading the index in Hive (an earlier round) got
 attributes, v4 paths and required extensions wrong. **The practical guarantee:** git, the files and SQLite can't be
 one transaction, so the fingerprint proves only that nothing it covers changed between its two reads; a change after

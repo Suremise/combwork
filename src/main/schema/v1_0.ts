@@ -671,8 +671,63 @@ export const UNDO_OUTCOMES_STEP: SchemaStep = {
   ]
 }
 
-/** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP]
+/**
+ * The merge queue's runner (#1360, SPEC §16.9.3): one per project and target across every Hive on the workspace, its
+ * processes and its own worktree (workflow/queueRunner.ts).
+ */
+export const QUEUE_RUNNERS_STEP: SchemaStep = {
+  name: 'queue runners',
+  ddl: [
+    // A target's lease: who runs its queue now. `lease` names it (and its folder), `token` is the holder's secret that
+    // every fenced write and the release name; `pid` and `started` (Unix ms) are the holder process, taken over only once
+    // that process is gone. `renewed_at` is for display ("last seen"), never for a takeover.
+    `CREATE TABLE queue_runners (
+      project    TEXT    NOT NULL COLLATE NOCASE,
+      target     TEXT    NOT NULL,
+      lease      TEXT    NOT NULL UNIQUE,
+      token      TEXT    NOT NULL,
+      profile    TEXT    NOT NULL,
+      pid        INTEGER NOT NULL,
+      started    INTEGER NOT NULL,
+      taken_at   TEXT    NOT NULL,
+      renewed_at TEXT    NOT NULL,
+      PRIMARY KEY (project, target)
+    ) STRICT, WITHOUT ROWID`,
+    // What a runner owns: its lease's job (`what = 'job'`, pid 0: settled by the job's name, never by the supervisor
+    // holding it, which may serve a living Hive's other targets and agents) and each command's launcher (git in its
+    // folder, an install, a check), recorded before the command exists. What the job follows outside it is in the
+    // lease's journal (a file the supervisor writes, queueJobs.ts). A row is a duty, kept until its process and its
+    // lease's job are seen gone: by its runner's release, or by whichever runner of the target next takes the lease (a
+    // takeover), however many runners crash before that. A launcher's start is known only between two clock readings
+    // around it (`start_after`, `start_before`, Unix ms): a process with its pid that started outside them is another's.
+    // No foreign key: the duty outlives its lease row.
+    `CREATE TABLE queue_runner_procs (
+      lease        TEXT    NOT NULL,
+      project      TEXT    NOT NULL COLLATE NOCASE,
+      target       TEXT    NOT NULL,
+      pid          INTEGER NOT NULL,
+      start_after  INTEGER NOT NULL,
+      start_before INTEGER NOT NULL,
+      what         TEXT    NOT NULL CHECK (what IN ('job', 'testMerge', 'install', 'check')),
+      PRIMARY KEY (lease, pid)
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE INDEX queue_runner_procs_target ON queue_runner_procs (project, target)',
+    // A queue's worktree: its target and the lease it was made for (null: kept by a runner that released it cleanly, for
+    // the next one to use), for clean-up, Unused Worktrees and Repair.
+    `CREATE TABLE queue_worktrees (
+      folder  TEXT PRIMARY KEY COLLATE NOCASE,
+      project TEXT NOT NULL COLLATE NOCASE,
+      target  TEXT NOT NULL,
+      lease   TEXT
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE INDEX queue_worktrees_target ON queue_worktrees (project, target)',
+    // A pause naming a process Hive couldn't end (a dead runner's, at a takeover).
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN pid INTEGER'
+  ]
+}
+
+/** The 1.0 group's steps (P3's, then P4's, then P5's), in the order they are registered. */
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -762,7 +817,13 @@ export const QUERIES: Record<string, SchemaQuery> = {
     args: [1, 'p'],
     index: ['lane_cards_card', 'lane_pending_card']
   },
-  'queuePauses.of': { sql: 'SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.of': { sql: 'SELECT reason, card, pid FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
+  'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },
+  'queueRunnerProcs.of': { sql: 'SELECT pid, start_after, start_before, what FROM queue_runner_procs WHERE lease = ?', args: ['l1'], index: 'PRIMARY KEY' },
+  'queueRunnerProcs.ofTarget': { sql: 'SELECT * FROM queue_runner_procs WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_runner_procs_target' },
+  'queueWorktrees.of': { sql: 'SELECT folder, lease FROM queue_worktrees WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_worktrees_target' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },

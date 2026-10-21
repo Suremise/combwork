@@ -5,9 +5,10 @@
 // (checked out). A target that moved since the test is tested again; it never advances an untested target.
 //
 // P2 spike (#1118): the core of the queue over the spike's runtime. The repository lock across processes, hooks and
-// signing pauses, and the Progress panel's runs are P5's.
+// signing pauses are P5's. The merge checks (#1349) run as Hive's own runs (queueChecks.ts), each bracketed here: green
+// only when it exited 0 and its `CheckRan` counted for exactly the test merge's revision.
 
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { existsSync, readFileSync } from 'original-fs'
 import { join } from 'path'
 import { git } from '../git'
@@ -17,28 +18,55 @@ import { hasStage } from '../../shared/workflow/compile'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
-import type { CardRecord } from './factStore'
+import { withWriteFence, type CardRecord } from './factStore'
+import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
+import { bracketEnd, bracketStart } from './queueChecks'
+import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
+import type { RunCheck } from '../../shared/types'
 
 export interface CheckResult {
   ok: boolean
   /** The failure was the environment (a check that didn't start, a network error, a timeout), not a result. */
   transient?: boolean
   output: string
+  /** The command that ran, and its run's id (a progress run's, when Hive keeps runs). */
+  command?: string
+  run?: string
+  /** Tells the check's run how it counted (its details say why not). */
+  note?: (c: RunCheck) => void
 }
+
+/** What a merge check or install runs for: the card, and the test merge's result revision it runs on. */
+export interface CheckContext {
+  card: string
+  number: number
+  revision: string
+  /** Nothing was installed before the checks (no setup command and no lock file): this check's run says so. */
+  noInstall?: boolean
+}
+
+/** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; output: string } | { kind: 'uncounted' }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
   folder: string
-  /** Runs a named merge check (its configured command) in a folder. */
-  runCheck: (name: string, command: string, folder: string) => Promise<CheckResult>
-  /** Installs dependencies there; `clean` from scratch (`npm ci`). */
-  install?: (folder: string, clean: boolean) => Promise<CheckResult>
+  /** Runs a named merge check (its configured command) in a folder, on the test merge's result. */
+  runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
+  /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
+  install?: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
   /** The files whose change since the last install means a clean install (#187). */
   manifests?: string[]
   /** An agent builds in this folder (holds file locks there, or has a run going in it). */
   folderBusy?: (folder: string) => boolean
+  /**
+   * Whether this queue's runner still holds its target's lease (#1360, QueueRunner.holds): checked inside every store
+   * write the queue's work makes (its facts, reconciliation's, values, a pause: withWriteFence), which is refused whole
+   * once it doesn't, and the queue stops. Left out, always.
+   */
+  holds?: () => boolean
   /** Test seams: crash injection and races between the queue's steps. */
   hooks?: {
     afterTest?: (entry: string) => void | Promise<void>
@@ -56,12 +84,22 @@ export type QueueOutcome =
   | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
 
-export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou'
+/** `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says why). */
+export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted'
 
-/** How many times an entry is tested again for a target that moved, before it pauses (§16.9.1 step 6). */
+/**
+ * How many times an entry is tested again for a target that moved (§16.9.1 step 6), or for checks that passed without
+ * counting (#1349), before it pauses.
+ */
 export const MAX_RETESTS = 3
 
 const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
+
+/** A runner that lost its lease stops at once: no outcome (another Hive's runner carries on). */
+const lostIsNull = (e: unknown): null => {
+  if (e instanceof LeaseLost) return null
+  throw e
+}
 
 export class MergeQueue {
   /** Entries a restart's recovery found should run again from the test merge. */
@@ -84,9 +122,21 @@ export class MergeQueue {
     this.wf.store.setQueuePause(target, null)
   }
 
-  private pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): QueueOutcome {
-    this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) })
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): Promise<QueueOutcome> {
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) }))
     return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
+  }
+
+  /**
+   * Runs the queue's work with every store write it makes fenced by the runner's lease (withWriteFence): checked inside
+   * each write, which throws LeaseLost (undone whole) once the runner doesn't hold the target.
+   */
+  private fenced<T>(target: string, fn: () => Promise<T>): Promise<T> {
+    const holds = this.cfg.holds
+    if (!holds) return fn()
+    return withWriteFence(() => {
+      if (!holds()) throw new LeaseLost(target)
+    }, fn)
   }
 
   /** The queue's entries for a target, in the order they were requested: open, or recovered to run again. */
@@ -106,7 +156,7 @@ export class MergeQueue {
   async drain(target: string): Promise<QueueOutcome[]> {
     const out: QueueOutcome[] = []
     for (let i = 0; i < 50; i++) {
-      const o = await this.runOnce(target)
+      const o = await this.runOnce(target).catch(lostIsNull)
       if (!o) break
       out.push(o)
       if (o.outcome === 'paused') break
@@ -119,7 +169,7 @@ export class MergeQueue {
     if (this.paused(target)) return null
     const next = this.entries(target)[0]
     if (!next) return null
-    return this.process(next.card, next.entry)
+    return this.fenced(target, () => this.process(next.card, next.entry)).catch(lostIsNull)
   }
 
   private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
@@ -158,6 +208,7 @@ export class MergeQueue {
   private async process(card: CardRecord, entry: QueueEntry): Promise<QueueOutcome> {
     const target = entry.target
     let retests = 0
+    let uncounted = 0
     for (;;) {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
@@ -180,9 +231,14 @@ export class MergeQueue {
       const result = test.result
       await this.cfg.hooks?.afterTest?.(entry.id)
 
-      // The merge checks, on exactly that result (dependencies from scratch when the manifests changed).
-      const checks = await this.mergeChecks(card)
-      if (checks) return this.returnCard(card, entry, revision, target, 'checks', !!checks.transient, undefined, checks.output)
+      // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
+      // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
+      const checks = await this.mergeChecks(card, result)
+      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output)
+      if (checks.kind === 'uncounted') {
+        if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
+        continue
+      }
       await this.cfg.hooks?.afterChecks?.(entry.id)
 
       // The last check before the target moves: still approved (a decision since cancels the entry).
@@ -270,26 +326,53 @@ export class MergeQueue {
     return { result: h }
   }
 
-  /** Runs the merge checks (G9); null when they all pass. Installs clean first when the manifests changed (#187). */
-  private async mergeChecks(card: CardRecord): Promise<CheckResult | null> {
+  /**
+   * Runs the merge checks (G9) on the test merge's result, one after another, stopping at the first that isn't green.
+   * Installs clean first when the manifests changed since the folder's last install (#187, always), or before every
+   * entry's checks (`mergeInstall: 'always'`). Each check is bracketed and writes `CheckRan` at the result revision
+   * (§16.13): green only if it exited 0 and counted; exit 0 but uncounted is `uncounted`, never green.
+   */
+  private async mergeChecks(card: CardRecord, result: string): Promise<ChecksOutcome> {
     const o = this.wf.rulesetOf(card).options
-    if (!o.mergeChecks.length) return null
+    if (!o.mergeChecks.length) return { kind: 'green' }
     const f = this.cfg.folder
+    const ctx: CheckContext = { card: card.key, number: card.id, revision: result }
     const manifests = this.cfg.manifests ?? ['package.json', 'package-lock.json']
     const hash = createHash('sha256')
     for (const m of manifests) hash.update(existsSync(join(f, m)) ? readFileSync(join(f, m)) : `-${m}`)
     const now = hash.digest('hex')
     const key = `queue:installed:${f}`
-    if (this.cfg.install && this.wf.store.meta(key) !== now) {
-      const i = await this.cfg.install(f, true)
-      if (!i.ok) return { ok: false, transient: !!i.transient, output: i.output }
-      this.wf.store.setMeta(key, now)
+    let noInstall = false
+    if (this.cfg.install && (o.mergeInstall === 'always' || this.wf.store.meta(key) !== now)) {
+      const i = await this.cfg.install(f, true, ctx)
+      if (!i.ok) return { kind: 'red', transient: !!i.transient, output: i.output }
+      noInstall = !!i.skipped
+      await this.wf.locked(() => this.wf.store.setMeta(key, now))
     }
     for (const name of o.mergeChecks) {
-      const r = await this.cfg.runCheck(name, o.commands[name] ?? name, f)
-      if (!r.ok) return r
+      const command = o.commands[name] ?? name
+      const start = await bracketStart(f)
+      const r = await this.cfg.runCheck(name, command, f, { ...ctx, ...(noInstall ? { noInstall } : {}) })
+      noInstall = false
+      const b = await bracketEnd(f, result, start)
+      const data: FactData['CheckRan'] = {
+        name,
+        command: r.command ?? command,
+        revision: result,
+        tested: b.tested,
+        result: r.ok ? 'passed' : 'failed',
+        run: r.run ?? randomUUID(),
+        durationMs: Math.max(0, Date.now() - start.t0),
+        by: HIVE_RUNS,
+        counted: b.counted,
+        ...(b.whyNot ? { whyNot: b.whyNot } : {})
+      }
+      await this.write(card, (w) => w.fact('CheckRan', data))
+      r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
+      if (!r.ok) return { kind: 'red', transient: !!r.transient, output: r.output }
+      if (!b.counted) return { kind: 'uncounted' }
     }
-    return null
+    return { kind: 'green' }
   }
 
   /** The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`). */
@@ -394,6 +477,11 @@ export class MergeQueue {
    * recovery table, whose last row pauses the queue for that target ("needs you").
    */
   async recover(): Promise<{ card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[]> {
+    // A runner that lost its lease meanwhile stops, its recovery the next runner's.
+    return this.fenced('', () => this.recoverAll()).catch((e) => lostIsNull(e) ?? [])
+  }
+
+  private async recoverAll(): Promise<{ card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[]> {
     const out: { card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[] = []
     for (const card of this.wf.store.cards()) {
       const s = this.wf.state(card)
@@ -443,14 +531,14 @@ export class MergeQueue {
         const u = await git(this.project, ['update-ref', `refs/heads/${e.target}`, result, expected])
         if (u.ok) await done()
         else {
-          this.pause(e.target, card, e, 'needsYou', files)
+          await this.pause(e.target, card, e, 'needsYou', files)
           out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
         }
       } else if (phase === 'rollback' && (await at(expected))) {
         this.rerun.add(e.id)
         out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
       } else {
-        this.pause(e.target, card, e, 'needsYou', files)
+        await this.pause(e.target, card, e, 'needsYou', files)
         out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
       }
     }

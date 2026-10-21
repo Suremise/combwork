@@ -142,6 +142,12 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   check('the window was told the counts', st?.ahead === 0 && st?.dirty === 1, JSON.stringify(st))
   await page.screenshot({ path: path.join(lib.WORK, 'unmerged-2-dirty.png') })
 
+  // Uncommitted files aren't merged (#1347): the merge is refused, counting them, and nothing is committed for the agent.
+  const dirtyMerge = await inv('agents:merge', alpha, two.id, { squash: true, message: 'Squash Two', cleanup: false })
+  check('a merge with uncommitted files is refused, counting them', !dirtyMerge.ok && dirtyMerge.uncommitted === 1 && git(wt, 'status', '--porcelain').includes('c.ts'), JSON.stringify(dirtyMerge))
+  git(wt, 'add', '-A')
+  git(wt, 'commit', '-q', '-m', 'c')
+
   // A squash merge that keeps the worktree: the branch's commits aren't in master, but their changes are.
   const sq = await inv('agents:merge', alpha, two.id, { squash: true, message: 'Squash Two', cleanup: false })
   check('the squash merge succeeds', sq.ok, JSON.stringify(sq))

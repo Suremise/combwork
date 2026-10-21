@@ -93,8 +93,11 @@ export interface PlatformAdapter {
   finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs>
   /** The card's work moved on since `from` (a pass's revision): to what, and is it the same change (§16.3.2)? */
   headMoved(card: CardRecord, s: CardState, o: WorkflowOptions, from: { base: string | null; revision: string; key?: string | null }): Promise<HeadMove | null>
-  /** Is a change in a target (containment, §16.3.1)? None: never by containment (acceptance is recorded). */
-  contains(target: string, change: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>>
+  /**
+   * Is a change in a target (containment, §16.3.1)? None: never by containment (acceptance is recorded). `at`: the
+   * target's head as the caller just read it, asked about as it is.
+   */
+  contains(target: string, change: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>>
   /** A target's head now, for a recorded integration's result. */
   targetHead(target: string): Promise<Maybe<string | null>>
   /**

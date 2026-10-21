@@ -57,6 +57,8 @@ export const EXCLUDED = [
   [/^src\/main\/workflow\/factStore\.ts$/, "the fact log's SQL, no text"],
   [/^src\/main\/workflow\/cardWork\.ts$/, "SQL, and the Agent API's rows of a card's facts (agent-facing)"],
   [/^src\/main\/workflow\/runLink\.ts$/, "agent-facing: hive-progress's card, revision and check, and its refusals"],
+  [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
+  [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],
   [/^src\/main\/freshPath\.ts$/, 'a registry key, not text'],

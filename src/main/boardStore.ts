@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_RUNNERS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -20,6 +20,7 @@ import { withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { assertNotFencedOut } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
@@ -203,6 +204,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of UNDO_OUTCOMES_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1360: the merge queue's runner, one per project and target across Hives, its processes and its worktrees
+    // (workflow/queueRunner.ts), and a queue pause's process.
+    version: 14,
+    name: QUEUE_RUNNERS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of QUEUE_RUNNERS_STEP.ddl) db.exec(sql)
     }
   }
 ]
@@ -560,10 +571,12 @@ const failures = new Map<string, Error>()
  * reads the board before its cards are in. Throws when it couldn't be opened, saying why; the cards' files are then
  * as they were.
  */
-function boardOf(path: string): Board {
+function boardOf(path: string, transient = false): Board {
   const key = keyOf(path)
   const open = boards.get(key)
   if (open) return open
+  // Not opened again by work of an opening of it that has closed (#1379): it would stay open, holding the folder.
+  if (!transient) assertNotFencedOut(join(path, HIVE_DIR, DB_FILE))
   const failed = failures.get(key)
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
@@ -1430,6 +1443,11 @@ export function setArchiveBatches(ws: WorkspaceService, batches: ArchiveBatch[])
  * from files) as the board is. Their changes take the board's lock, so they never run inside one of its transactions.
  */
 export const workspaceDb = (workspacePath: string): Db => boardOf(workspacePath).db
+/**
+ * workspaceDb for a save that closes the board again when it wasn't open before (`boardOpen` first): not fenced (#1379),
+ * so a store's last save as its workspace closes still lands, leaving nothing open.
+ */
+export const transientDb = (workspacePath: string): Db => boardOf(workspacePath, true).db
 /** The lock the board's changes take, which the stores beside it take too. */
 export const boardLock = (workspacePath: string): string => `board-lock:${workspacePath}`
 /** Whether a workspace's database is open now (its workspace is, or something used it since). */

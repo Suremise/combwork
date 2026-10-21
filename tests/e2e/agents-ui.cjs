@@ -118,9 +118,11 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   fs.writeFileSync(path.join(t.worktree.path, 'b.txt'), 'b\n')
   await page.evaluate(([project, agentId]) => window.__hiveSet?.({ mergeFor: { project, agentId } }), [proj, t.id])
   await lib.agentMenu(page, 'Tester')
-  await page.locator('.menu-item', { hasText: 'Merge…' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: '1 uncommitted change' }).count()) === 1, 10000)
+  await page.locator('.menu-item', { hasText: 'Merge…' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count()) === 1, 10000)
   await page.screenshot({ path: path.join(scratch, 'ui-3-merge.png') })
-  check('merge dialog counts changes', await page.locator('.dialog', { hasText: '1 uncommitted change' }).count() === 1)
+  // Only committed work is merged (#1347): the dialog counts the uncommitted files, and Merge is off until they are committed.
+  check('merge dialog counts uncommitted files', await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count() === 1)
+  check('…and Merge is off', await page.locator('.dialog').getByRole('button', { name: 'Merge', exact: true }).isDisabled())
   await page.keyboard.press('Escape'); await sleep(300)
 
   // Project settings → Agents & Worktrees

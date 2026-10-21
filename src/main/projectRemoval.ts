@@ -16,6 +16,9 @@ import { archiveProjectCards, deleteProjectCards, importCards, projectCards, res
 import { REMOVED_DIR, workspace, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
 import { trash } from './trash'
+import { boardWrite } from './boardStore'
+import { FactStore } from './workflow/factStore'
+import { forgetProjectQueues } from './workflow/queueRunner'
 
 const log = createLogger('projects')
 
@@ -159,6 +162,8 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
       log.info(`Hid ${userText(name)}`)
       return { warnings: [] }
     }
+    // Its merge queues go with it (#1360): this Hive's runners released, their worktrees and records removed.
+    await forgetProjectQueues({ store: FactStore.forBoard(ws, { project: name, key: name }), project: p, root: join(ws.worktreesRoot, name), locked: (fn) => boardWrite(ws, async () => fn()) }).catch((e) => log.warn(`removing ${userText(name)}'s merge queue folders`, e))
     const done = how === 'remove' ? await removeFromHive(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
     // Its agents' terminals' kept sizes and output go with it (#489); a hidden project keeps them.
     forgetPtys(agentPtyKey(p, ''))

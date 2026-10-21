@@ -252,6 +252,23 @@ export function fileSchemaVersion(file: string): number {
 }
 
 /**
+ * A small database used only for a cross-process lock (the repository lock, `repoLockCore.ts`, #1347): one connection,
+ * no WAL (nothing stays beside the file between uses), SQLite's busy wait bounded by `busyMs` (a transaction on it
+ * lasts well under a millisecond, so contention is brief), and `schema` run once it is open.
+ */
+export function openLockDb(file: string, busyMs: number, schema: string): DatabaseSync {
+  const db = new DatabaseSync(file, { timeout: busyMs })
+  try {
+    db.exec('PRAGMA journal_mode = DELETE')
+    db.exec(schema)
+    return db
+  } catch (e) {
+    db.close()
+    throw e
+  }
+}
+
+/**
  * A copy of a database file kept for good (`keepAll`), made by a connection of its own holding the file's exclusive lock:
  * the proof no other connection has it open (Restore the 0.9 Board Backup, #1207). Closed after, which ends the lock.
  * DbInUseError when another connection has it; the caller's own must be closed first.

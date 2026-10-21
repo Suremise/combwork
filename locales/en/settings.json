@@ -659,6 +659,14 @@
     "defaultMessage": "hive tools: reply timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.merge.lockWaitSeconds.desc": {
+    "defaultMessage": "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Hive on this computer is merging into the same repository. After it, nothing is changed and Hive says which Hive holds the repository: try again once it has finished. Hive never takes the repository from a Hive that is still running.",
+    "description": "What the advanced setting \"Merges: wait for another Hive\" is for, and what happens when the wait ends (Settings → Advanced)."
+  },
+  "settings.advanced.hive.merge.lockWaitSeconds.title": {
+    "defaultMessage": "Merges: wait for another Hive",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine."
+  },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
     "description": "What the advanced setting \"Progress panel: lanes shown\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -690,6 +698,14 @@
   "settings.advanced.hive.prompt.rawCardStart.title": {
     "defaultMessage": "A card's start in its own words",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive types into an agent when a card is started on it."
+  },
+  "settings.advanced.hive.queue.checkMinutes.desc": {
+    "defaultMessage": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
+    "description": "What the advanced setting \"Merge queue: longest a merge check runs\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.checkMinutes.title": {
+    "defaultMessage": "Merge queue: longest a merge check runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target."
   },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",

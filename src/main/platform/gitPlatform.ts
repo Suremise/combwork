@@ -7,6 +7,7 @@ import { createHash } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
 import { dirname, join } from 'path'
 import { git } from '../git'
+import { withRepoLock } from '../repoLock'
 import type { CardState, FileChange } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
@@ -39,6 +40,8 @@ interface Primed {
   files: string[]
   /** A shared folder's own paths (what the evidence covers there), or null: the whole folder. */
   own: string[] | null
+  /** The index as prime read it (`ls-files --stage`, the whole folder's), for content's first answer only (#1373). */
+  staged?: Awaited<ReturnType<typeof git>>
 }
 
 export class GitPlatform implements PlatformAdapter {
@@ -58,15 +61,14 @@ export class GitPlatform implements PlatformAdapter {
     if (own) {
       const target = card.target || o.target || own.base || (await G.defaultBranch(this.project))
       if (isUnknown(target)) return target
-      const line = await G.branch(own.path)
-      const head = await G.head(own.path)
-      const th = await G.lineHead(this.project, target)
+      // In one git (#1376); the target read in the worktree, whose branches are the project's.
+      const { line, head, target: th } = await G.heads(own.path, target)
       if (isUnknown(line)) return line
       if (isUnknown(head)) return head
       if (isUnknown(th)) return th
       if (!head) return unknown(UNREADABLE.head, { where: own.path })
       if (!th) return unknown(UNREADABLE.head, { where: target })
-      const base = await G.mergeBase(own.path, head, th)
+      const base = head === th ? head : await G.mergeBase(own.path, head, th)
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
       return { folder: own.path, line, base, target, existing: true }
@@ -104,14 +106,22 @@ export class GitPlatform implements PlatformAdapter {
     // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
     if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [], own: null } satisfies Primed
     const folder = this.wf.folderOf(s)
-    const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
-    const ls = await git(folder, ['ls-files', '-z'])
-    if (!gd.ok || !ls.ok) return null
+    // Its git dir from its `.git` where it has one (no git process: #1373), else git's answer.
+    let gitDir = G.gitDirSync(folder)
+    if (!gitDir) {
+      const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
+      if (!gd.ok) return null
+      gitDir = gd.out.trim()
+    }
+    // The index's entries, once (#1373): the tracked files (a conflicted path's stages listed once), and content's first
+    // answer where it covers the whole folder.
+    const ls = await git(folder, ['ls-files', '--stage', '-z'])
+    if (!ls.ok) return null
     // In a shared folder only the builder's own paths count (others' edits are "not yours", §16.3.2's dirty).
     const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
-    const all = ls.out.split('\0').filter(Boolean)
+    const all = [...new Set(ls.out.split('\0').filter(Boolean).map((rec) => rec.slice(rec.indexOf('\t') + 1)))]
     const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
-    return { gitDir: gd.out.trim(), folder, files, own } satisfies Primed
+    return { gitDir, folder, files, own, ...(own ? {} : { staged: ls }) } satisfies Primed
   }
 
   /**
@@ -158,7 +168,10 @@ export class GitPlatform implements PlatformAdapter {
       // A shared folder with no paths of the builder's: nothing of the index or files is covered.
       if (!p.own || p.own.length) {
         const spec = p.own ? ['--', ...p.own] : []
-        const staged = await git(p.folder, ['ls-files', '--stage', '-z', ...spec])
+        // Prime's read of the index, just before, answers the first time (evidenceOf's); asked again (revalidate), git.
+        const first = p.staged
+        delete p.staged
+        const staged = first ?? (await git(p.folder, ['ls-files', '--stage', '-z', ...spec]))
         const differ = await git(p.folder, ['diff-files', '--name-only', '-z', ...spec])
         if (!staged.ok || !differ.ok) return null
         parts.push(`index:${createHash('sha256').update(staged.buf).digest('hex')}`)
@@ -209,14 +222,23 @@ export class GitPlatform implements PlatformAdapter {
     let revision: string | null
     let base: string | null
     let commits: string[] | undefined
+    let dirty: Maybe<string[]> | undefined
     if (this.wf.ownLine(s)) {
-      const h = await G.head(folder)
+      // Its head and the target's, with its uncommitted state when a guard asks for it, read together (#1376): the target
+      // read in the folder, whose branches are the project's.
+      const target = s.started!.target ?? ''
+      const now = args.guards.includes('submit.clean') && target ? await G.worktreeNow(folder, { target }) : null
+      // Unreadable that way (or no commit yet): each read on its own, as before.
+      const got = now && !isUnknown(now) && now.head ? now : null
+      const read = got ? null : await G.heads(folder, target)
+      const h = got ? got.head! : read!.head
       if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
       if (args.revision && args.revision !== h) return { ok: false, refusal: { rule: 'check.revisionMismatch', values: { revision: args.revision.slice(0, 7) } } }
       revision = h
+      dirty = got?.dirty
       // The change's base: the merge base with the target at this moment, fixed with the submission.
-      const th = await G.lineHead(this.project, s.started!.target ?? '')
-      const mb = !isUnknown(th) && th ? await G.mergeBase(this.project, th, h) : th
+      const th = got ? (got.target ?? null) : read!.target
+      const mb = !isUnknown(th) && th ? (th === h ? h : await G.mergeBase(this.project, th, h)) : th
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb
     } else {
@@ -242,7 +264,7 @@ export class GitPlatform implements PlatformAdapter {
     // The guards' platform inputs, gathered only for the guards the ruleset holds.
     const inputs: Partial<GuardInputs> = {}
     const shared = !this.wf.ownLine(s)
-    if (args.guards.includes('submit.clean')) inputs.dirty = await G.dirty(folder, !shared || !args.agent || !this.wf.cfg.locksOf ? undefined : this.wf.cfg.locksOf(args.agent))
+    if (args.guards.includes('submit.clean')) inputs.dirty = dirty ?? await G.dirty(folder,!shared || !args.agent || !this.wf.cfg.locksOf ? undefined : this.wf.cfg.locksOf(args.agent))
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
@@ -314,8 +336,8 @@ export class GitPlatform implements PlatformAdapter {
     return { to: h, base, same }
   }
 
-  contains(target: string, change: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>> {
-    return G.contains(this.project, target, change)
+  contains(target: string, change: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
+    return G.contains(this.project, target, change, at)
   }
 
   targetHead(target: string): Promise<Maybe<string | null>> {
@@ -323,22 +345,26 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   async lineNow(folder: string, target: string): Promise<Maybe<LineNow>> {
-    const line = await G.branch(folder)
-    if (isUnknown(line)) return line
-    const head = await G.head(folder)
-    if (isUnknown(head)) return head
-    const th = await G.lineHead(this.project, target)
-    if (isUnknown(th)) return th
+    // The target read in the folder: an agent's worktree is the project's, its branches the same (as the move reads it).
+    const now = await G.worktreeNow(folder, { target })
+    if (isUnknown(now)) return now
+    const { line, head, dirty, target: th } = now
+    if (!head) return unknown(UNREADABLE.head, { where: folder })
     if (!th) return unknown(UNREADABLE.head, { where: target })
-    const inTarget = await G.isAncestor(folder, head, th)
+    const inTarget = head === th || (await G.isAncestor(folder, head, th))
     if (isUnknown(inTarget)) return inTarget
-    const dirty = await G.dirty(folder)
-    if (isUnknown(dirty)) return dirty
     return { line, head, targetHead: th, inTarget, dirty }
   }
 
-  moveLine(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
-    return G.moveLineLocked(folder, to, expect, go)
+  async moveLine(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
+    // Under the repository lock (#1347): a merge into the repository, from this Hive or another, isn't moving refs meanwhile.
+    // Another Hive merging past the lock's wait: nothing moved, and the lane waits for the next pass.
+    // What the move itself throws (a move part way, not put back) is the caller's, as before.
+    let ran = false
+    return withRepoLock(folder, () => ((ran = true), G.moveLineLocked(folder, to, expect, go)), { quiet: true, project: this.project }).catch((e: unknown) => {
+      if (ran) throw e
+      return null
+    })
   }
 
   async commitsBetween(folder: string, from: string, to: string): Promise<Maybe<string[]>> {
