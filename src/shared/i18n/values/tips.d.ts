@@ -170,6 +170,8 @@ interface HiveMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
+  'tips.laneGates.text': undefined
+  'tips.laneGates.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
   'tips.language.text': undefined

@@ -9,6 +9,7 @@ import { config } from './config'
 import { emit, toast } from './events'
 import { createLogger } from './logger'
 import { exitBy } from './exitLog'
+import { testQuiet } from './testQuiet'
 
 const log = createLogger('updates')
 
@@ -42,7 +43,15 @@ const testCache = (): string => {
   return /^hive-test-updater-[\w-]+$/.test(name) ? name : 'hive-test-updater'
 }
 
+/**
+ * A packaged Hive a test started (HIVE_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
+ * GitHub for updates (#1332): each check fetches the release's latest.yml, which counts as a download there. The
+ * installed app is never started with it.
+ */
+const packagedTestCopy = (): boolean => app.isPackaged && testQuiet()
+
 function enabledReason(): string | null {
+  if (packagedTestCopy()) return tr(msg({ id: 'main.update.testCopy', defaultMessage: "A test copy of Hive doesn't check for updates.", description: 'Settings → Updates in a copy of Hive started by its tests, which never checks for updates.' }))
   if (app.isPackaged) return null
   if (testFeed()) return null
   return tr(msg({ id: 'main.update.devBuild', defaultMessage: 'Updates are checked by the installed app, not development builds.', description: 'Settings → Updates in a development build of Hive, which never updates.' }))
@@ -194,6 +203,7 @@ export function initUpdater(opts: { restart: () => void }): void {
   })
 
   const reason = enabledReason()
+  if (packagedTestCopy()) log.info('A test copy (HIVE_TEST_QUIET=1): no update checks, automatic or manual')
   if (reason) set({ status: 'disabled', error: reason }, true)
   else if (config.settings.updates.checkAutomatically) setTimeout(() => void check(false), Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY)
 
