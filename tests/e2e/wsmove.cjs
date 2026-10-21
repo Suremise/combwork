@@ -196,6 +196,15 @@ async function launch() {
     check('…Recreate refused while Second (missing too) still needs its git link', /Third.s worktree couldn.t be recreated: Recreating runs git worktree prune, which would also drop git.s link to .*second/.test(await text()), await text())
     check('…and Second’s link is still there', gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase().replace(/\\/g, '/')) || gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase()))
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report.png') })
+    // The report as a table (#1313): What · Was · Now · Result, problems first, each row's full line on hover.
+    check('…the report as a table, What · Was · Now · Result', (await dialog.locator('.repair-report thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|RESULT', JSON.stringify(await dialog.locator('.repair-report thead th').allInnerTexts()))
+    const outcomes = await dialog.locator('.repair-report tbody tr:not(.item-table-group)').evaluateAll((rows) => rows.map((r) => ['failed', 'skipped', 'done'].find((o) => r.classList.contains(`repair-${o}`))))
+    check('…problems first, then what is left to choose, then what was done', outcomes.length > 3 && outcomes.join(',') === [...outcomes].sort((a, b) => ['failed', 'skipped', 'done'].indexOf(a) - ['failed', 'skipped', 'done'].indexOf(b)).join(','), JSON.stringify(outcomes))
+    await inv('settings:update', { appearance: { theme: 'light' } })
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)
+    await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report-light.png') })
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), 10000)
     await dialog.locator('button', { hasText: 'Close' }).click()
     check('the banner stays while something is left', (await banner.count()) === 1)
     const pending = readJson(path.join(alpha2, '.hive', 'project.json')).pendingCopies ?? []

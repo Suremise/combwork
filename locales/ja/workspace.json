@@ -350,6 +350,8 @@
   "workspace.repair.recreateShort": "再作成",
   "workspace.repair.relink": "{located, select, yes {場所を指定済み · } other {}}git worktree repair",
   "workspace.repair.rename": "{remote, select, none {名前を変更} other {名前を変更（{remote}は古い名前のまま）}}",
+  "workspace.repair.result": "結果",
+  "workspace.repair.saved": "引き継ぎメモと保存済みの比較",
   "workspace.repair.scanned": "何もしない（Defenderがスキャンします）",
   "workspace.repair.sentence": "{what}{hasWas, select, yes {：以前は{was}} other {}}{hasNow, select, yes {、現在は{now}} other {}}。処理：{does}",
   "workspace.repair.sessions": "セッション",

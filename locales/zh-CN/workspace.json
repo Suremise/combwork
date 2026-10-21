@@ -350,6 +350,8 @@
   "workspace.repair.recreateShort": "重新创建",
   "workspace.repair.relink": "{located, select, yes {已定位 · } other {}}git worktree repair",
   "workspace.repair.rename": "{remote, select, none {重命名} other {重命名；{remote} 保留旧名称}}",
+  "workspace.repair.result": "结果",
+  "workspace.repair.saved": "交接说明和已保存的对比",
   "workspace.repair.scanned": "不操作（Defender 会扫描它）",
   "workspace.repair.sentence": "{what}{hasWas, select, yes {：原为 {was}} other {}}{hasNow, select, yes {，现为 {now}} other {}}；将：{does}",
   "workspace.repair.sessions": "会话",

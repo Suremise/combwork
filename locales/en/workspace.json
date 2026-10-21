@@ -1403,6 +1403,14 @@
     "defaultMessage": "{remote, select, none {rename} other {rename; {remote} keeps the old name}}",
     "description": "Repair's plan, the Will do column: an agent's branch named after the old place is renamed ({remote}: the remote it tracks, which keeps the old name, or none)."
   },
+  "workspace.repair.result": {
+    "defaultMessage": "Result",
+    "description": "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)."
+  },
+  "workspace.repair.saved": {
+    "defaultMessage": "Handovers and kept comparisons",
+    "description": "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name."
+  },
   "workspace.repair.scanned": {
     "defaultMessage": "nothing (Defender scans it)",
     "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder."

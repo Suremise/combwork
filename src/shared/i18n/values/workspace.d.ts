@@ -352,6 +352,8 @@ interface HiveMessageValues {
   'workspace.repair.recreateShort': undefined
   'workspace.repair.relink': { located: string }
   'workspace.repair.rename': { remote: string }
+  'workspace.repair.result': undefined
+  'workspace.repair.saved': undefined
   'workspace.repair.scanned': undefined
   'workspace.repair.sentence': { what: string | number; hasWas: string; was: string | number; hasNow: string; now: string | number; does: string | number }
   'workspace.repair.sessions': undefined

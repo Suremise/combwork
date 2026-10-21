@@ -443,6 +443,94 @@
     "defaultMessage": "{host}: {agent}'s worktree at {path} is linked to the project again.",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree."
   },
+  "main.move.result.cards": {
+    "defaultMessage": "{n, plural, one {# card, with its agents} other {# cards, with their agents}}",
+    "description": "Repair's report: cards that went to a project, in a list (main.move.result.given's {what}). {n} is how many."
+  },
+  "main.move.result.copied": {
+    "defaultMessage": "{n, plural, one {# file copied} other {# files copied}}",
+    "description": "Repair's report, the Result column: a coding agent's conversation and memory files copied to the new folder ({n}: how many)."
+  },
+  "main.move.result.copyFailed": {
+    "defaultMessage": "{n, plural, one {# file couldn't be copied} other {# files couldn't be copied}}",
+    "description": "Repair's report, the Result column: a coding agent's files that couldn't be copied (the row's tooltip lists them); Repair tries them again."
+  },
+  "main.move.result.copyKept": {
+    "defaultMessage": "{n, plural, one {# file already there with other content, kept} other {# files already there with other content, kept}}",
+    "description": "Repair's report, the Result column: a coding agent's files already in the new folder with other content, never overwritten (the row's tooltip lists them)."
+  },
+  "main.move.result.failed": {
+    "defaultMessage": "couldn't be updated: {why}",
+    "description": "Repair's report, the Result column: a step failed ({why}: the system's message); the next Repair tries again."
+  },
+  "main.move.result.given": {
+    "defaultMessage": "given to {to}: {what}",
+    "description": "Repair's report, the Result column of a board row: what was saved under a project's old name went to the project ({to}); {what} lists it (\"9 cards, 1 lane\")."
+  },
+  "main.move.result.gone": {
+    "defaultMessage": "gone, so it isn't renamed",
+    "description": "Repair's report, the Result column: an agent's branch to rename no longer exists."
+  },
+  "main.move.result.linked": {
+    "defaultMessage": "linked again",
+    "description": "Repair's report, the Result column: an agent's worktree is linked to the moved project again (git worktree repair)."
+  },
+  "main.move.result.missing": {
+    "defaultMessage": "{gone, select, yes {not found, its branch gone too: create, locate or remove its link} other {not found: recreate, locate or remove its link}}",
+    "description": "Repair's report, the Result column: an agent's worktree wasn't found; Repair waits for the user's choice (Repair's buttons)."
+  },
+  "main.move.result.notGiven": {
+    "defaultMessage": "couldn't all be given to {to}: {why}",
+    "description": "Repair's report, the Result column: what was saved under an old name couldn't all go to its project ({to}: the project, or none known; {why}: the system's message). Repair tries again."
+  },
+  "main.move.result.notRepaired": {
+    "defaultMessage": "couldn't be repaired{hasWhy, select, yes {: {why}} other {}}",
+    "description": "Repair's report, the Result column: an agent's worktree couldn't be linked again; {why} is git's message."
+  },
+  "main.move.result.original": {
+    "defaultMessage": "stays linked to the project at its old folder",
+    "description": "Repair's report, the Result column: a worktree stays with the project folder it was made from, which is still there (a copy was moved)."
+  },
+  "main.move.result.recent": {
+    "defaultMessage": "lists the new folder",
+    "description": "Repair's report, the Result column of Open Recent: the new folder replaces the old one."
+  },
+  "main.move.result.recreateFailed": {
+    "defaultMessage": "{made, select, new {couldn't be made new: {why}} other {couldn't be recreated: {why}}}",
+    "description": "Repair's report, the Result column: an agent's worktree couldn't be made again ({why}: the reason)."
+  },
+  "main.move.result.recreated": {
+    "defaultMessage": "{made, select, new {made new on {branch} (its branch was gone)} other {recreated on {branch}}}",
+    "description": "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone ({branch}: a branch name)."
+  },
+  "main.move.result.renameFailed": {
+    "defaultMessage": "couldn't be renamed: {why}",
+    "description": "Repair's report, the Result column: an agent's branch couldn't be renamed ({why}: git's or the system's message)."
+  },
+  "main.move.result.renamed": {
+    "defaultMessage": "{remote, select, none {renamed} other {renamed; it still tracks {remote}'s old name}}",
+    "description": "Repair's report, the Result column: an agent's branch was renamed; {remote} is the remote it tracks (origin), which keeps the old name, or none."
+  },
+  "main.move.result.sessions": {
+    "defaultMessage": "{n, plural, one {# session points here now} other {# sessions point here now}}",
+    "description": "Repair's report, the Result column: session records pointed to the new folder ({n}: how many)."
+  },
+  "main.move.result.taken": {
+    "defaultMessage": "kept: the new name is a branch already",
+    "description": "Repair's report, the Result column: an agent's branch isn't renamed, because a branch with the new name exists."
+  },
+  "main.move.result.unlinked": {
+    "defaultMessage": "link removed; its folder was left as it was",
+    "description": "Repair's report, the Result column: the agent no longer has a worktree; the folder, if any, is untouched."
+  },
+  "main.move.result.unrecorded": {
+    "defaultMessage": "renamed, but not recorded yet ({why}): Repair finishes it",
+    "description": "Repair's report, the Result column: git renamed an agent's branch, but Hive couldn't record it yet ({why}: the system's message)."
+  },
+  "main.move.result.working": {
+    "defaultMessage": "marked again: {projects}",
+    "description": "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again."
+  },
   "main.move.running": {
     "defaultMessage": "Stop the running agents first: {agents}.",
     "description": "Why Repair (after a workspace moved) can't start: agents are running. {agents} lists them (project · agent)."

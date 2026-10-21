@@ -2150,6 +2150,17 @@ textarea.input {
 .repair-plan tr.repair-sub td:first-child .short-path {
   padding-left: 18px;
 }
+/* Repair's report (#1313): a result wraps, so a problem's reason is read whole; its icon in the outcome's colour. */
+.repair-report td:nth-child(4),
+.repair-report td:nth-child(4) .short-path {
+  white-space: normal;
+}
+.repair-report tr.repair-done td:nth-child(4) .codicon {
+  color: var(--success);
+}
+.repair-report tr.repair-skipped td:nth-child(4) .codicon {
+  color: var(--fg-muted);
+}
 .repair-choice {
   height: 22px;
   padding: 0 6px;

@@ -1,5 +1,5 @@
 import { Children, useCallback, useEffect, useState } from 'react'
-import type { MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, WorkspaceMoved } from '@shared/types'
+import type { MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveReportWhat, WorkspaceMoved } from '@shared/types'
 import { providerName } from '@shared/providers'
 import { moveHasWork } from '@shared/movePaths'
 import { shortPath } from '@shared/shortPath'
@@ -157,6 +157,8 @@ const T = {
   theirsNote: msg({ id: 'workspace.repair.theirsNote', defaultMessage: "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.", description: "Repair's plan, under the table: the user's own Defender exclusion of an old folder." }),
   needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
   readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders." }),
+  result: msg({ id: 'workspace.repair.result', defaultMessage: 'Result', description: "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)." }),
+  saved: msg({ id: 'workspace.repair.saved', defaultMessage: 'Handovers and kept comparisons', description: "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name." }),
   sentence: msg({ id: 'workspace.repair.sentence', defaultMessage: '{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}', description: "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns." })
 }
 
@@ -178,6 +180,10 @@ interface Cells {
   said?: string
   doesNote?: { text: string; title?: string; warn?: boolean }
   warn?: boolean
+  /** Before the Will do (or Result) text: how a step of the report went (#1313). */
+  icon?: string
+  /** What a screen reader reads for the row, when not the plan's sentence: a report row's full line (#1313). */
+  sentence?: string
   actions?: React.ReactNode
   /** Before the What text: a folded row's expander. */
   lead?: React.ReactNode
@@ -215,7 +221,7 @@ const said = (p?: Spot): string => {
 }
 
 function planRow(k: string, c: Cells, className?: string): ItemRow {
-  const sentence = tr(T.sentence, { what: c.what, hasWas: said(c.was) ? 'yes' : 'no', was: said(c.was), hasNow: said(c.now) ? 'yes' : 'no', now: said(c.now), does: c.doesNote ? `${c.said ?? c.does}, ${c.doesNote.text}` : (c.said ?? c.does) })
+  const sentence = c.sentence ?? tr(T.sentence, { what: c.what, hasWas: said(c.was) ? 'yes' : 'no', was: said(c.was), hasNow: said(c.now) ? 'yes' : 'no', now: said(c.now), does: c.doesNote ? `${c.said ?? c.does}, ${c.doesNote.text}` : (c.said ?? c.does) })
   return {
     key: k,
     item: (
@@ -234,6 +240,11 @@ function planRow(k: string, c: Cells, className?: string): ItemRow {
       {
         content: (
           <span aria-hidden="true" className={cx('short-path', c.warn && 'warn-text')} title={c.doesNote ? `${c.said ?? c.does}; ${c.doesNote.title ?? c.doesNote.text}` : (c.said ?? c.does)}>
+            {c.icon && (
+              <>
+                <Icon name={c.icon} />{' '}
+              </>
+            )}
             {c.does}
             {c.doesNote && <span className={c.doesNote.warn ? 'warn-text' : 'faint'}> · {c.doesNote.text}</span>}
           </span>
@@ -369,6 +380,56 @@ function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
   return rows
 }
 
+/** What a report row is about, as the plan's What column says it (#1313). */
+function reportWhat(w: MoveReportWhat): string {
+  switch (w.kind) {
+    case 'worktree':
+      return tr(T.worktree, { agent: w.agent })
+    case 'branch':
+      return tr(T.branch, { agent: w.agent })
+    case 'sessions':
+      return tr(T.sessions)
+    case 'copy':
+      return tr(T.conversations, { provider: providerName(w.provider) })
+    case 'board':
+      return tr(T.board, { from: w.from })
+    case 'saved':
+      return tr(T.saved)
+    case 'recent':
+      return tr(T.recent)
+    case 'working':
+      return tr(T.workingOn)
+    case 'defender':
+      return tr(T.defender)
+  }
+}
+
+const OUTCOME_ORDER: Record<MoveReportRow['outcome'], number> = { failed: 0, skipped: 1, done: 2 }
+const OUTCOME_ICON: Record<MoveReportRow['outcome'], string> = { failed: 'warning', skipped: 'info', done: 'check' }
+
+/**
+ * Repair's report as the plan's table (#1313): What · Was · Now · Result, a group a project (problems first), then the
+ * workspace's. Each row's full line is its tooltip and what a screen reader reads.
+ */
+function ReportTable({ rows }: { rows: MoveReportRow[] }) {
+  const hosts = [...new Set(rows.filter((r) => r.host !== undefined).map((r) => r.host!))]
+  const ordered = (list: MoveReportRow[]): MoveReportRow[] => [...list].sort((a, b) => OUTCOME_ORDER[a.outcome] - OUTCOME_ORDER[b.outcome])
+  const place = (at: string | undefined, other: string | undefined, names?: boolean): Spot | undefined => (at === undefined ? undefined : names ? { text: at } : { path: at, other })
+  const out: (ItemRow | ItemGroup)[] = []
+  const add = (group: string, list: MoveReportRow[]): void => {
+    if (!list.length) return
+    out.push({ key: `group#${group}`, group, text: group })
+    ordered(list).forEach((r, i) =>
+      out.push(
+        planRow(`${group}#${i}`, { what: reportWhat(r.what), was: place(r.was, r.now, r.names), now: place(r.now, r.was, r.names), does: r.result, said: r.line, sentence: r.line, icon: OUTCOME_ICON[r.outcome], warn: r.outcome === 'failed' }, `repair-${r.outcome}`)
+      )
+    )
+  }
+  for (const h of hosts) add(h, rows.filter((r) => r.host === h))
+  add(tr(T.workspace), rows.filter((r) => r.host === undefined))
+  return <ItemTable first={T.what} columns={[{ label: T.was }, { label: T.now }, { label: T.result }]} rows={out} className={cx(/* i18n-ignore: class names */ 'fill repair-plan repair-report')} presentation />
+}
+
 /** The plan as one table (#1305), the project hover's agent table's look: a group a project, then the workspace's, then Defender's (#1302). */
 function PlanTable({ plan, defender, moving, onLocate, onChoose }: { plan: MovePlan; defender?: AvMovePlan | null; moving: boolean; onLocate: (k: string, agentId: string) => void; onChoose: (k: string, choice: Choice | null) => void }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
@@ -464,9 +525,15 @@ export function MoveRepairDialog() {
         {report ? (
           <>
             <p>{tr(report.failed.length ? M.problems : report.complete ? M.repaired : M.leftToDo)}</p>
-            {report.failed.length > 0 && <ReportList icon="error" className="warn-text" lines={report.failed} />}
-            {report.done.length > 0 && <ReportList icon="check" lines={report.done} />}
-            {report.skipped.length > 0 && <ReportList icon="info" className="faint" lines={report.skipped} />}
+            {report.rows.length > 0 ? (
+              <ReportTable rows={report.rows} />
+            ) : (
+              <>
+                {report.failed.length > 0 && <ReportList icon="error" className="warn-text" lines={report.failed} />}
+                {report.done.length > 0 && <ReportList icon="check" lines={report.done} />}
+                {report.skipped.length > 0 && <ReportList icon="info" className="faint" lines={report.skipped} />}
+              </>
+            )}
             {!report.complete && <p className="hint">{tr(M.stays)}</p>}
           </>
         ) : plan === undefined ? (

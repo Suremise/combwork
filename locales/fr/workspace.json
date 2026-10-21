@@ -350,6 +350,8 @@
   "workspace.repair.recreateShort": "Recréer",
   "workspace.repair.relink": "{located, select, yes {retrouvé · } other {}}git worktree repair",
   "workspace.repair.rename": "{remote, select, none {renommer} other {renommer ; {remote} garde l’ancien nom}}",
+  "workspace.repair.result": "Résultat",
+  "workspace.repair.saved": "Passations et comparaisons conservées",
   "workspace.repair.scanned": "rien (Defender l’analyse)",
   "workspace.repair.sentence": "{what}{hasWas, select, yes {, avant {was}} other {}}{hasNow, select, yes {, maintenant {now}} other {}} ; va : {does}",
   "workspace.repair.sessions": "Sessions",
