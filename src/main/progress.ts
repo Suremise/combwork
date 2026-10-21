@@ -15,8 +15,11 @@ export type ProgressCaller =
   | { source: 'agent'; workspacePath: string; projectPath: string; agentId: string; agentName: string; provider: ProviderId | null }
   | { source: 'assistant'; workspacePath: string; agentName: string; provider: ProviderId | null }
   | { source: 'api'; workspacePath: string }
-  /** Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them. */
-  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean }
+  /**
+   * Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
+   * `installAsWritten`, an install run as written (no clean form of it).
+   */
+  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean }
 
 /** Whether reports are taken now, and a number that changes every time that setting changes (off, or on again). */
 export interface ProgressGate {
@@ -161,6 +164,7 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       logPath: keptText(r.logPath, MAX_LOG_PATH),
       ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
       ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
+      ...(source === 'hive' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
       ...runFor(keptFor(r)),
       ...keptCounts(r.counts)
     })
@@ -374,6 +378,7 @@ export class ProgressStore {
       logPath: null,
       ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
       ...(caller.source === 'hive' && caller.noInstall ? { noInstall: true as const } : {}),
+      ...(caller.source === 'hive' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
       ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])

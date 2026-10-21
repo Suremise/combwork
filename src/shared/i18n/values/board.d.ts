@@ -162,6 +162,7 @@ interface HiveMessageValues {
   'board.details.exitCode': undefined
   'board.details.gone': undefined
   'board.details.install': undefined
+  'board.details.installAsWritten': undefined
   'board.details.interrupted': undefined
   'board.details.lastStep': { step: string | number }
   'board.details.line': { label: string | number; text: string | number }

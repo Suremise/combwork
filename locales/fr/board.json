@@ -160,6 +160,7 @@
   "board.details.exitCode": "Code de sortie",
   "board.details.gone": "Terminée sans rapport : son processus s’est arrêté avant d’indiquer le résultat",
   "board.details.install": "Installation",
+  "board.details.installAsWritten": "La commande de préparation telle qu’elle est écrite, après suppression de node_modules : Hive n’en connaît pas de forme propre",
   "board.details.interrupted": "Arrêtée : sa commande a été interrompue",
   "board.details.lastStep": "Dernière étape : {step}",
   "board.details.line": "{label} : {text}",

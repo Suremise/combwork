@@ -160,6 +160,7 @@
   "board.details.exitCode": "退出代码",
   "board.details.gone": "未报告即结束：进程在报告结果前就结束了",
   "board.details.install": "安装",
+  "board.details.installAsWritten": "按原样运行初始化命令，并先删除了 node_modules：Hive 不知道它的干净形式",
   "board.details.interrupted": "已停止：命令被中断",
   "board.details.lastStep": "最后：{step}",
   "board.details.line": "{label}：{text}",

@@ -3,15 +3,16 @@
 // tested again and then pauses, installs from scratch when the manifests changed (or always), transient vs red, the
 // environment a check gets, and S4's and S13's cores.
 import { afterEach, describe, expect, it } from 'vitest'
-import { readFileSync, writeFileSync } from 'fs'
+import { closeSync, mkdirSync, openSync, readFileSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, preset, takesOption } from '../../src/shared/workflow/options'
 import { resolveOptions } from '../../src/main/workflow/rulesets'
 import { MAX_RETESTS } from '../../src/main/workflow/mergeQueue'
-import { checkEnv, classifyCheckFailure, installCommand, programFound, queueChecks, type QueueRuns } from '../../src/main/workflow/queueChecks'
+import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, programFound, progressRuns, queueChecks, type LogIo, type QueueRuns } from '../../src/main/workflow/queueChecks'
 import { HIVE_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
+import { publicRun } from '../../src/main/apiEvents'
 import type { RunCheck } from '../../src/shared/types'
 
 let env: Env | null = null
@@ -114,16 +115,27 @@ describe("a check's environment", () => {
 })
 
 describe('the install from scratch', () => {
-  it('is the setup command with its clean flag, the setup command as it is, npm ci for a lock file, else none', () => {
+  it("is a package manager's install in its clean form with its flags; anything else as written; npm ci for a lock file; else none", () => {
     const dir = tempDir('qc-install-')
-    expect(installCommand('npm install', dir)).toBe('npm ci')
-    expect(installCommand('npm i', dir)).toBe('npm ci')
-    expect(installCommand('pnpm install', dir)).toBe('pnpm install --frozen-lockfile')
-    expect(installCommand('yarn', dir)).toBe('yarn install --frozen-lockfile')
-    expect(installCommand('make deps', dir)).toBe('make deps')
-    expect(installCommand('', dir)).toBeNull()
+    const clean = (command: string) => ({ command, how: 'clean' })
+    const written = (command: string) => ({ command, how: 'asWritten' })
+    expect(installPlan('npm install', dir)).toEqual(clean('npm ci'))
+    expect(installPlan('npm i', dir)).toEqual(clean('npm ci'))
+    expect(installPlan('npm install --no-audit --ignore-scripts --no-fund', dir)).toEqual(clean('npm ci --no-audit --ignore-scripts --no-fund'))
+    expect(installPlan('npm.cmd i --legacy-peer-deps', dir)).toEqual(clean('npm ci --legacy-peer-deps'))
+    expect(installPlan('npm ci --prefer-offline', dir)).toEqual(clean('npm ci --prefer-offline'))
+    expect(installPlan('pnpm install --prefer-offline', dir)).toEqual(clean('pnpm install --frozen-lockfile --prefer-offline'))
+    expect(installPlan('pnpm i --no-frozen-lockfile', dir)).toEqual(clean('pnpm install --frozen-lockfile'))
+    expect(installPlan('yarn', dir)).toEqual(clean('yarn install --frozen-lockfile'))
+    expect(installPlan('yarn --silent', dir)).toEqual(clean('yarn install --frozen-lockfile --silent'))
+    // Packages named, a compound command, another tool: run as written, never called clean.
+    expect(installPlan('npm install left-pad', dir)).toEqual(written('npm install left-pad'))
+    expect(installPlan('npm install && npm run build:deps', dir)).toEqual(written('npm install && npm run build:deps'))
+    expect(installPlan('npm i > install.log', dir)).toEqual(written('npm i > install.log'))
+    expect(installPlan('make deps', dir)).toEqual(written('make deps'))
+    expect(installPlan('', dir)).toBeNull()
     writeFileSync(join(dir, 'package-lock.json'), '{}')
-    expect(installCommand('  ', dir)).toBe('npm ci')
+    expect(installPlan('  ', dir)).toEqual(clean('npm ci'))
   })
 })
 
@@ -161,6 +173,89 @@ describe("Hive's runs in the Progress panel", () => {
     p.noteCheck(caller.workspacePath, r.id, { name: 'check', counted: false, whyNot: 'changed' })
     const [kept] = keptRuns(JSON.parse(JSON.stringify({ runs: p.list(caller.workspacePath) })), caller.workspacePath)
     expect(kept).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
+  })
+})
+
+describe("the runner's own runs, outside the queue", () => {
+  const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
+
+  it("an install's command line (a token in it) stays in Hive: the Agent API's public run and its event give no part of it", async () => {
+    const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
+    const ws = tempDir('qc-ws-')
+    const project = join(ws, 'app')
+    const r = queueChecks({ env: base, runs: progressRuns(store, () => true, ws, project), logDir: tempDir('qc-logs-'), timeoutMs: () => 60_000, setupCommand: () => 'echo fake-token-review-1349' })
+    expect(await r.install(tempDir('qc-folder-'), true, ctx)).toMatchObject({ ok: true })
+    const [run] = store.list(ws)
+    expect(run).toMatchObject({ source: 'hive', titleFromCommand: true, installAsWritten: true, state: 'passed' })
+    expect(run.title).toContain('fake-token-review-1349')
+    const pub = publicRun(run)
+    expect(pub).toMatchObject({ titleFromCommand: true, source: 'hive' })
+    expect(JSON.stringify(pub)).not.toContain('fake-token')
+    // A check's title is its name, which the project gave it: kept.
+    await r.runCheck('lint', 'echo ok', tempDir('qc-folder-'), ctx)
+    expect(publicRun(store.list(ws)[0])).toMatchObject({ title: 'AM-1 · lint · aaaaaaa', titleFromCommand: false })
+  })
+
+  /** A log whose writes fail after it opened (a full disk). */
+  function fullDisk(): LogIo & { closed: number } {
+    const io = {
+      closed: 0,
+      openSync: (path: string, flags: string) => openSync(path, flags),
+      writeSync: (): number => {
+        throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' })
+      },
+      closeSync: (fd: number) => {
+        io.closed++
+        closeSync(fd)
+      }
+    }
+    return io
+  }
+
+  it('a log that can\'t be written (a full disk) never escapes: the check ends, its run finishes with no log, the file is closed', async () => {
+    const io = fullDisk()
+    const r = runner({ logIo: io })
+    const out = await r.runCheck('check', script("console.log('x'.repeat(1000)); console.error('y')"), tempDir('qc-folder-'), ctx)
+    expect(out).toMatchObject({ ok: true, output: expect.stringContaining('x') })
+    expect(r.finished).toEqual([{ id: 'run1', ok: true, exitCode: 0, logPath: null }])
+    expect(io.closed).toBe(1)
+  })
+
+  it("a full disk on the startup failure's own line (a program not found) still finishes the run, transient, the file closed", async () => {
+    const io = fullDisk()
+    const r = runner({ logIo: io })
+    const out = await r.runCheck('check', 'hive-no-such-command-1349', tempDir('qc-folder-'), ctx)
+    expect(out).toMatchObject({ ok: false, transient: true })
+    expect(r.finished).toEqual([{ id: 'run1', ok: false, exitCode: null, logPath: null }])
+    expect(io.closed).toBe(1)
+  })
+
+  it('a long output keeps its first MAX_LOG_BYTES and its end in the log', async () => {
+    const r = runner()
+    await r.runCheck('check', script(`process.stdout.write('a'.repeat(${MAX_LOG_BYTES + 200000})); process.stdout.write('THE END')`), tempDir('qc-folder-'), ctx)
+    const log = readFileSync(r.finished[0].logPath!, 'utf8')
+    expect(log.startsWith('a'.repeat(1000))).toBe(true)
+    expect(log).toContain('bytes of output not kept')
+    expect(log.endsWith('THE END')).toBe(true)
+    expect(log.length).toBeLessThan(MAX_LOG_BYTES + 100_000)
+  })
+
+  it('a setup command with no clean form runs as written after node_modules is removed (a junction as a link, never through)', async () => {
+    const folder = tempDir('qc-folder-')
+    const other = tempDir('qc-other-')
+    mkdirSync(join(other, 'pkg'), { recursive: true })
+    writeFileSync(join(other, 'pkg', 'index.js'), 'kept\n')
+    symlinkSync(other, join(folder, 'node_modules'), 'junction')
+    const seen = join(tempDir('qc-seen-'), 'seen.json')
+    const r = runner({ setupCommand: () => `${script(`require('fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(require('fs').existsSync('node_modules')))`)} && echo done` })
+    expect(await r.install(folder, true, ctx)).toMatchObject({ ok: true })
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toBe(false)
+    expect(readFileSync(join(other, 'pkg', 'index.js'), 'utf8')).toBe('kept\n')
+    expect(r.started[0]).toMatchObject({ installAsWritten: true, titleFromCommand: true })
+    // A real folder of stale packages goes too.
+    mkdirSync(join(folder, 'node_modules', 'stale'), { recursive: true })
+    expect(await r.install(folder, true, ctx)).toMatchObject({ ok: true })
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toBe(false)
   })
 })
 

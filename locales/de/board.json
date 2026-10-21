@@ -160,6 +160,7 @@
   "board.details.exitCode": "Exitcode",
   "board.details.gone": "Ohne Bericht beendet: Der Prozess endete, bevor er das Ergebnis meldete",
   "board.details.install": "Installation",
+  "board.details.installAsWritten": "Der Einrichtungsbefehl wie geschrieben, nachdem node_modules entfernt wurde: Hive kennt keine saubere Form davon",
   "board.details.interrupted": "Gestoppt: Der Befehl wurde unterbrochen",
   "board.details.lastStep": "Zuletzt: {step}",
   "board.details.line": "{label}: {text}",

@@ -160,6 +160,7 @@
   "board.details.exitCode": "Exit code",
   "board.details.gone": "Ended without a report: its process ended before it said how it went",
   "board.details.install": "Install",
+  "board.details.installAsWritten": "The setup command as written, after removing node_modules: Hive has no clean form of it",
   "board.details.interrupted": "Stopped: its command was interrupted",
   "board.details.lastStep": "Last: {step}",
   "board.details.line": "{label}: {text}",

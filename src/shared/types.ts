@@ -2806,6 +2806,8 @@ export interface ProgressRun {
   counts?: RunCheck
   /** Hive's own run (#1349): nothing was installed before the merge checks (no setup command and no lock file). */
   noInstall?: true
+  /** Hive's own install run (#1349): the setup command as written, after node_modules was removed (Hive has no clean form of it). */
+  installAsWritten?: true
 }
 
 /** Why a run doesn't count as a check (SPEC §16.13), as its `CheckRan` says. */

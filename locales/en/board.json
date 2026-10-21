@@ -643,6 +643,10 @@
     "defaultMessage": "Install",
     "description": "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows."
   },
+  "board.details.installAsWritten": {
+    "defaultMessage": "The setup command as written, after removing node_modules: Hive has no clean form of it",
+    "description": "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch."
+  },
   "board.details.interrupted": {
     "defaultMessage": "Stopped: its command was interrupted",
     "description": "A run's state in its details (Progress panel): its command was interrupted."

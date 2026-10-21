@@ -2043,10 +2043,15 @@ report it this way rather than retry.
    tested again from a fresh test merge, and after `MAX_RETESTS` (3) it pauses `uncounted` (the card's `CheckRan`
    says why). The install is G9's **`mergeInstall`**: `onManifestChange` (the default, Pair's: a clean install whenever
    the manifests' hash differs from the folder's last install, which holds whatever the option says) or `always`
-   (Team's: before every entry's checks). It is the worktree setup command with its clean flag where it has one
-   (`npm install` → `npm ci`; pnpm and yarn's frozen lock file), the setup command as it is otherwise, `npm ci` for a
-   lock file with no setup command, or nothing, which the first check's run says once; a run too, named for its
-   command. G9 empty: no checks and no install, so a clean test merge alone merges.
+   (Team's: before every entry's checks). It is the worktree setup command in its clean form where Hive knows one (a
+   package manager's install with only flags after it: `npm install --no-audit` → `npm ci --no-audit`; pnpm and yarn
+   with their frozen lock file), else **as written** after the queue folder's `node_modules` is removed (a link removed as
+   a link, never through), which its run's details say (Hive has no clean form of a compound command, one naming
+   packages, or another tool's); `npm ci` for a lock file with no setup command; or nothing, which the first check's run
+   says once. The install is a run too, titled with its command line, which can hold a token, so it is
+   `titleFromCommand` and the Agent API never gives its title out (#620). A log that can't be written (a full disk)
+   never stops a run: it is closed and given as no log, and every run started is finished. G9 empty: no checks and no
+   install, so a clean test merge alone merges.
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's

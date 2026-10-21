@@ -160,6 +160,7 @@
   "board.details.exitCode": "Kod wyjścia",
   "board.details.gone": "Zakończono bez raportu: proces skończył się, zanim podał wynik",
   "board.details.install": "Instalacja",
+  "board.details.installAsWritten": "Polecenie konfiguracji w zapisanej postaci, po usunięciu node_modules: Hive nie zna jego czystej formy",
   "board.details.interrupted": "Zatrzymano: polecenie przerwano",
   "board.details.lastStep": "Ostatni: {step}",
   "board.details.line": "{label}: {text}",

@@ -160,6 +160,7 @@
   "board.details.exitCode": "終了コード",
   "board.details.gone": "報告なしで終了：結果を報告する前にプロセスが終了しました",
   "board.details.install": "インストール",
+  "board.details.installAsWritten": "node_modules を削除したうえで、セットアップコマンドを書かれたとおりに実行しました：Hive はそのクリーンな形を知りません",
   "board.details.interrupted": "停止：コマンドが中断されました",
   "board.details.lastStep": "最後：{step}",
   "board.details.line": "{label}：{text}",
