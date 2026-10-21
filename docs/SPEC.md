@@ -2664,6 +2664,9 @@ column a card is in (but a failed card from before returned to Review is its sub
 Doing moved on (P3's refusal); scripts (the workspace token); cards from before 1.0 until they start (as the user's,
 §16.7.1); and every agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
 written at adoption): the runtime folds a card's facts from its cached stage, so an adopted card's intents work (S40).
+With the old moves translated, a lane's next card waits until the one before it is Done (§16.11.2, OP-36) also for
+a builder following today's card-loop skill: its move of the next card to Doing is refused (`lane.oneAtATime`) until it
+reports the previous one merged (#1274's skill lines say so).
 
 **Other:** templates v1 wiped; agents' worktrees become slots (§16.10.8); keys suggested (§16.12).
 
