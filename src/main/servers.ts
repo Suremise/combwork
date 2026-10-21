@@ -2867,7 +2867,7 @@ route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
 async function recordCheck(run: ProgressRun): Promise<void> {
   try {
     const c = await bracketFinished(run)
-    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}) })
+    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.blocks ? { blocks: c.blocks } : {}) })
   } catch (e) {
     log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
   }

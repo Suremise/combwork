@@ -1,0 +1,236 @@
+// The Progress panel shows the gates (#1279), on fake Claude Code agents with the workflow rules on (a reviewer agent, a
+// check needed before Review, each card in a folder of its own): a lane card started before the one before it is Done is
+// refused, and its segment gets a red notch whose hover (and accessible name) says why and what next; a failed run of
+// that check says it blocks review for the card; the submit it refuses notches that card's segment, and the next move
+// clears it; a card passed but not merged pauses the lane, its header saying why; a new revision after the pass marks
+// the segment stale with both revisions; the user's move past the rules shows its mark with who, which rule and why. Its
+// screenshots in both themes and in German. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+const lib = require('./lib.cjs')
+const { _electron } = require('playwright-core')
+const { execFileSync } = require('child_process')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 30000
+
+const PORT = Number(lib.port(47841))
+const userData = path.join(lib.WORK, 'progressgates-profile')
+const ws = path.join(lib.WORK, 'progressgates-ws')
+const claudeHome = path.join(lib.WORK, 'progressgates-claude-home')
+const shots = path.join(lib.WORK, 'progressgates-shots')
+const alpha = path.join(ws, 'alpha')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
+const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env: lib.baseEnv(), encoding: 'utf8' }).trim()
+
+;(async () => {
+  for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // ok.txt is what the check looks for: ignored, so making it leaves the folder clean (a dirty one wouldn't count).
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\nok.txt\n' })
+  lib.git(alpha, ['branch', '-M', 'main'])
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
+  lib.enableProviders(userData)
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
+  cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
+  cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    await lib.appReady(page)
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await lib.openWorkspace(inv, page, ws)
+    await page.getByText('alpha', { exact: true }).first().click()
+    // A reviewer agent who isn't the builder; the check "quick" before Review; each card in a folder of its own (in the
+    // app, the builder's own worktree, until slots).
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'slots', preChecks: ['quick'], commands: { quick: `node -e "process.exit(require('fs').existsSync('ok.txt') ? 0 : 1)"` } } })
+    const builder = await lib.addAgent(inv, alpha, { name: 'B1', location: 'new-worktree' })
+    const reviewer = await lib.addAgent(inv, alpha, { name: 'R1' })
+    fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, alpha, builder.worktree?.path].filter(Boolean).map((d) => d.toLowerCase())))
+    const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
+    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready')))
+
+    // Each agent's own token, from its launch, as its hive tools read it.
+    const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
+    const launches = () => {
+      const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
+      return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
+    }
+    const tokenOf = async (id) => {
+      const sessionId = (await live(id))?.sessionId
+      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']))
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+    }
+    const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id) }
+    check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && tokens.builder !== tokens.reviewer)
+    const call = async (token, p, body) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
+    const asBuilder = (p, body) => call(tokens.builder, p, body)
+    const asReviewer = (p, body) => call(tokens.reviewer, p, body)
+    // The agent's shell (the fake's "shell:" step), as hive-progress runs in a session.
+    const shells = () => {
+      const f = path.join(claudeHome, 'fake-shell.jsonl')
+      return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
+    }
+    const shell = async (id, cmd) => {
+      const before = shells().length
+      await until(async () => (await live(id))?.status !== 'working')
+      await inv('pty:write', lib.ptyKey(alpha, id), `shell: ${cmd}`)
+      // Typed, then entered (the fake reads a line), as progressreport does.
+      await lib.sleep(300)
+      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      await until(() => shells().length > before, 60000)
+      return shells()[before]
+    }
+
+    const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
+    const a = (await inv('tasks:create', { title: 'Lane data', project: 'alpha' })).number
+    const b = (await inv('tasks:create', { title: 'Lane hover', project: 'alpha' })).number
+    const [keyA, keyB] = [(await card(a)).key, (await card(b)).key]
+    const lane = await call(tokens.builder, '/v1/lanes', { cards: [a, b], reviewer: 'R1', name: 'gates' })
+    check('the builder starts its lane', lane.status === 200 && !!lane.body?.lane?.id, JSON.stringify(lane))
+    const laneId = lane.body?.lane?.id
+
+    const panel = page.locator('.progress-panel')
+    await page.locator('.progress-rail').click()
+    check('the panel opens', !!(await until(async () => (await panel.count()) === 1)))
+    const row = panel.locator(`.progress-lane[data-lane="${laneId}"]`)
+    const seg = (n) => row.locator(`.lane-seg[data-card="${n}"]`)
+    const name = async (n) => (await seg(n).getAttribute('aria-label').catch(() => null)) ?? ''
+    const header = async () => ((await row.locator('.progress-lane-top').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    check('the lane shows', !!(await until(async () => (await row.count()) === 1)))
+    const shoot = async (shot) => {
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await page.screenshot({ path: path.join(shots, `${shot}-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+    }
+    /** A segment's hover shown, for a screenshot: its tooltip holds every line. */
+    const hover = async (n, has) => {
+      await seg(n).hover()
+      return until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(has))
+    }
+
+    // --- One card at a time: B before A is Done is refused, and its segment says so.
+    const early = await asBuilder(`/v1/tasks/${encodeURIComponent(keyB)}/start`)
+    check('starting the lane\'s second card first is refused (lane.oneAtATime)', early.status === 409 && early.body?.rule === 'lane.oneAtATime', JSON.stringify(early.body))
+    check('…its segment gets the refused notch', !!(await until(async () => (await seg(b).locator('.lane-seg-mark.refused').count()) === 1)))
+    check('…and its accessible name says why and what next, as the agent was told', !!(await until(async () => (await name(b)).includes(`${keyB} can't start yet: ${keyA}, before it in its lane, isn't Done.`))), await name(b))
+
+    // --- A starts, in a folder of its own.
+    const started = await asBuilder(`/v1/tasks/${encodeURIComponent(keyA)}/start`)
+    const slot = started.body?.data?.folder
+    check('the lane\'s first card starts in a folder of its own', started.status === 200 && !!slot && slot.toLowerCase() !== alpha.toLowerCase(), JSON.stringify(started.body))
+    check('…which is ready', !!(await until(() => fs.existsSync(path.join(slot, 'a.ts')))), slot)
+    fs.writeFileSync(path.join(slot, 'b.ts'), 'export const b = 2\n')
+    gitIn(slot, 'add', 'b.ts')
+    gitIn(slot, 'commit', '-qm', 'Lane data')
+    const first = gitIn(slot, 'rev-parse', 'HEAD')
+
+    // --- Its check fails: the run says it blocks review for A.
+    const failedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    check('the check fails', failedRun?.code === 1, JSON.stringify(failedRun))
+    const blocks = panel.locator('.progress-run-blocks')
+    check('…and its row says it blocks review for the card', !!(await until(async () => ((await blocks.first().textContent().catch(() => '')) ?? '') === `Blocks review for ${keyA}`)), await blocks.first().textContent().catch(() => ''))
+
+    // --- Submitted without it passing: refused, the card's segment notched with the reason.
+    const refused = await asBuilder(`/v1/tasks/${encodeURIComponent(keyA)}/submit`, { summary: 'Round 1 ready' })
+    check('the submit is refused (submit.checksPassed)', refused.status === 409 && refused.body?.rule === 'submit.checksPassed', JSON.stringify(refused.body))
+    check("…the card's segment gets the refused notch, its name the reason", !!(await until(async () => (await seg(a).locator('.lane-seg-mark.refused').count()) === 1 && (await name(a)).includes("Review refused: quick hasn't passed on"))), await name(a))
+    await page.mouse.move(5, 5)
+    check('…said in its hover too', !!(await hover(a, "Review refused: quick hasn't passed on")))
+    await shoot('refused')
+    await page.mouse.move(5, 5)
+
+    // --- The check passes, the submit goes through: the notch clears with the move.
+    fs.writeFileSync(path.join(slot, 'ok.txt'), 'yes\n')
+    const passedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    check('the check passes', passedRun?.code === 0, JSON.stringify(passedRun))
+    await until(async () => (await inv('tasks:work', a))?.checks.some((c) => c.name === 'quick' && c.result === 'passed' && c.counted))
+    const submitted = await asBuilder(`/v1/tasks/${encodeURIComponent(keyA)}/submit`, { summary: 'Round 1 ready' })
+    check('then the submit goes through, to Review', submitted.status === 200 && submitted.body?.to === 'review', JSON.stringify(submitted.body))
+    check("…and the card's notch clears with its move", !!(await until(async () => (await seg(a).locator('.lane-seg-mark.refused').count()) === 0)), await name(a))
+
+    // --- Passed, not merged: the lane pauses, and says why.
+    const review = await asReviewer(`/v1/tasks/${encodeURIComponent(keyA)}/start-review`)
+    const pass = await asReviewer(`/v1/tasks/${encodeURIComponent(keyA)}/verdict`, { pass: true, comment: 'Round 1: PASSED.' })
+    check('the reviewer passes it', review.status === 200 && pass.status === 200, JSON.stringify({ review: review.body, pass: pass.body }))
+    const why = async () => (await row.locator('.progress-lane-why').textContent().catch(() => '')) ?? ''
+    check('…the lane pauses, saying why under its header', !!(await until(async () => (await header()).includes('paused') && (await why()) === `waiting: ${keyA} not merged`)), `${await header()} | ${await why()}`)
+    check("…and its accessible name too", !!(await until(async () => ((await row.getAttribute('aria-label')) ?? '').includes(`paused, waiting: ${keyA} not merged`))), await row.getAttribute('aria-label'))
+    await shoot('paused')
+
+    // --- A new revision after the pass: stale, with both revisions.
+    fs.writeFileSync(path.join(slot, 'b.ts'), 'export const b = 3\n')
+    gitIn(slot, 'commit', '-qam', 'Another change')
+    const second = gitIn(slot, 'rev-parse', 'HEAD')
+    // Its Work section read once (as the card dialog does): Hive looks at its folder soon, once events settle. Asked
+    // again on every poll, that "soon" would keep moving.
+    await inv('tasks:work', a)
+    check('a new revision after the pass marks the segment stale', !!(await until(async () => (await seg(a).getAttribute('class'))?.includes('stale'))), await seg(a).getAttribute('class'))
+    check('…its name naming the revision it was for and the one now', (await name(a)).includes(`Pass was for ${first.slice(0, 7)}; now at ${second.slice(0, 7)}`), await name(a))
+    check('…said in its hover too', !!(await hover(a, `Pass was for ${first.slice(0, 7)}`)))
+    await shoot('stale')
+    await page.mouse.move(5, 5)
+
+    // --- The user moves it past its rules: the override's mark, with who, which rule and why.
+    const moved = await inv('tasks:move', a, 'done', { confirm: true, reason: 'Merged by hand' })
+    check('the user moves it to Done past its rules', !!(await until(async () => (await card(a))?.column === 'done')), JSON.stringify(moved))
+    check('…its segment shows the override mark', !!(await until(async () => (await seg(a).locator('.lane-seg-mark.override').count()) === 1)))
+    check('…its name saying who, past which rules and why', /You moved it past its rules: .+\. Reason: Merged by hand/.test(await name(a)), await name(a))
+    check('…said in its hover too', !!(await hover(a, 'Reason: Merged by hand')))
+    await shoot('override')
+
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+
+  // --- In another language: Hive started again in German, the same lane.
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_LANG: 'de' }) })
+  try {
+    const page = await de.firstWindow()
+    page.on('pageerror', (e) => check('no page errors in German', false, e.message))
+    await lib.fitWindow(de, page, { width: 1400, height: 850 })
+    await lib.appReady(page)
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    if (!(await page.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv, page, ws)
+    if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()
+    const seg = page.locator('.progress-lane .lane-seg.todo').first()
+    const label = async () => (await seg.getAttribute('aria-label').catch(() => null)) ?? ''
+    check('in German, the refused mark is there, said in German', !!(await until(async () => (await seg.locator('.lane-seg-mark.refused').count()) === 1 && /kann noch nicht starten/.test(await label()) && !(await label()).includes("can't start yet"))), await label())
+    await seg.hover()
+    await until(async () => (await page.locator('.lane-seg-tip').count()) === 1)
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await seg.hover()
+      await until(async () => (await page.locator('.lane-seg-tip').count()) === 1)
+      await page.screenshot({ path: path.join(shots, `refused-de-${theme}.png`) })
+    }
+  } finally {
+    await de.close().catch(() => undefined)
+  }
+  console.log(failed ? `\n${failed} FAILED` : '\nAll passed')
+  process.exit(failed ? 1 : 0)
+})().catch((e) => {
+  console.log(`FAIL ${e.stack ?? e}`)
+  process.exit(1)
+})

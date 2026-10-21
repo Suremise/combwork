@@ -143,6 +143,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
 export interface LaneCardFacts {
   stage: StageId
   forYou: boolean
+  /** What the user is asked for (the first open request's kind), while forYou. */
+  ask?: LaneStatus['ask']
   stale: boolean
   rounds: number
 }
@@ -170,7 +172,7 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   // The card the lane waits on: the first not Done when it has passed (merging next), else the one being worked.
   const focus = open[0].column === 'passed' ? open[0] : (open.find((c) => c.number === current) ?? open[0])
   const f = facts.get(focus.number)
-  if (f?.forYou) return { reason: 'you', card: focus.number }
+  if (f?.forYou) return { reason: 'you', card: focus.number, ...(f.ask ? { ask: f.ask } : {}) }
   // Waiting for a merge only while a card after it waits to start: with every card passed, the lane's merge is due.
   if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }

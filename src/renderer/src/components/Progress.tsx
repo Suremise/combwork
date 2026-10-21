@@ -320,10 +320,20 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
       {step && <div className="progress-step faint">{step}</div>}
       <div className="progress-status faint">{runStatusLine(r, now, tr)}</div>
       {r.summary && r.state === 'failed' && <div className="progress-summary">{r.summary}</div>}
+      {r.state === 'failed' && r.card && r.counts?.blocks && <RunBlocks run={r} />}
       {open && <RunDetails run={r} now={now} />}
     </div>
   )
 })
+
+/**
+ * A failed run that was its card's check required before Review (#1279): "Blocks review for HI-12", shown while the
+ * failed run is (until it is seen, as failures are).
+ */
+function RunBlocks({ run: r }: { run: ProgressRun }) {
+  const card = useStore((s) => cardLabelOf(s, r.card!))
+  return <div className="progress-run-blocks">{tr(msg({ id: 'board.progress.blocksReview', defaultMessage: 'Blocks review for {card}', description: "Under a failed run in the Progress panel: the run was a check the card's rules require before it can go to Review, so the card can't until it passes. {card} is the card's name (its key, such as HI-12). Glossary: check, rule." }), { card })}</div>
+}
 
 /**
  * What a run ran for (#1220), under its agent: "#1061 · a3f2c1d". The card opens it; the revision copies the whole

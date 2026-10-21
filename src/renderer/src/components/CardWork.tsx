@@ -6,6 +6,7 @@ import { revisionShort } from '@shared/platform/descriptors'
 import type { ProjectInfo, TaskCard } from '@shared/types'
 import { checksOn, type WorkBadge, type WorkCheck, type WorkOverride, type WorkRevision, type WorkVerdict, type WorkView } from '@shared/workflow/workView'
 import { RULE_NAMES } from '@shared/workflow/texts'
+import { refusalLines, type RuleId } from '@shared/workflow/refusals'
 import { overrideNote, type OverrideNames } from '@shared/laneBar'
 import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
@@ -284,7 +285,12 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
 }
 
 /** How the window names the rules a move skipped (a rule this Hive has no name for: its id). */
-export const OVERRIDE_NAMES: OverrideNames = { list: (items, type) => fmt.list(items, type), ruleName: (r) => (RULE_NAMES[r] ? tr(RULE_NAMES[r]) : r) }
+export const OVERRIDE_NAMES: OverrideNames = {
+  list: (items, type) => fmt.list(items, type),
+  ruleName: (r) => (RULE_NAMES[r] ? tr(RULE_NAMES[r]) : r),
+  // A refusal in the window's language, names (stages, moves, rules) by their messages, as the board says it (#1279).
+  refusal: (rule, values) => refusalLines(rule as RuleId, values, { one: (m, v) => tr(m, v), list: (items) => fmt.list(items, 'unit'), names: true })
+}
 
 /** A card moved past its rules (#1275, §16.8.4): who did it, which rules and why, in its tooltip and accessible name. */
 function OverrideMark({ o }: { o: WorkOverride }) {

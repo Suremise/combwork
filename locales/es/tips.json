@@ -164,6 +164,8 @@
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
+  "tips.laneGates.text": "En el panel Progreso, un carril dice bajo su cabecera qué espera, y una muesca roja en el segmento de una tarjeta significa que su última petición fue rechazada: pasa el ratón por encima para ver por qué y qué hacer.",
+  "tips.laneGates.title": "Mira por qué un carril no avanza",
   "tips.laneNotices.text": "Hive te avisa cuando la revisión de un carril no se supera, una tarjeta se bloquea o se estanca, o todas las tarjetas superaron la revisión y toca fusionar, con un aviso por carril. Configuración → Notificaciones decide dónde aparecen.",
   "tips.laneNotices.title": "Entérate de cómo va un carril, sin el Asistente",
   "tips.language.text": "Hive sigue el idioma de presentación de Windows cuando lo tiene. Configuración → General → Idioma elige otro; los idiomas traducidos por IA están marcados, y las mejoras son bienvenidas. A los agentes se les sigue hablando en inglés.",

@@ -1323,9 +1323,21 @@
     "defaultMessage": "Merged as {commit}",
     "description": "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)."
   },
+  "board.lane.workNoCode": {
+    "defaultMessage": "No-code card: no commits",
+    "description": "A line in a lane segment's hover (Progress panel): the card is a no-code card (its work isn't code), so it has no commits to show. Glossary: no-code card."
+  },
+  "board.lane.workRefused": {
+    "defaultMessage": "{message} {next}{times, plural, one {} other { (refused # times)}}",
+    "description": "A line in a lane segment's hover (Progress panel), for its red notch: the card's latest request was refused by its workflow rules: why ({message}) and what to do next ({next}), each a whole sentence already translated, then, when it was refused more than once in a row, how many times ({times}; nothing when once). Glossary: refused, rule."
+  },
   "board.lane.workRevision": {
     "defaultMessage": "{review, select, yes {Under review: {revision}} other {Revision: {revision}}}",
     "description": "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review."
+  },
+  "board.lane.workStalePass": {
+    "defaultMessage": "{now, select, none {Pass was for {approved}: it no longer holds} other {Pass was for {approved}; now at {current}}}",
+    "description": "A line in a lane segment's hover (Progress panel), with its stale mark: the card's pass was for one revision ({approved}, a short commit id) and the card is at another now ({current}); none: the revision now isn't known. Keep the select keys."
   },
   "board.lane.workVerdict": {
     "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
@@ -1398,6 +1410,14 @@
   "board.lanes.usualOrderSaid": {
     "defaultMessage": "Lanes back in the usual order",
     "description": "Said to screen readers after the Progress panel's lanes go back to their usual order (Usual Order, in a lane's menu)."
+  },
+  "board.lanes.waitingForYou": {
+    "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
+    "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
+  },
+  "board.lanes.waits": {
+    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} other {list changes after {card}}}",
+    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
@@ -1542,6 +1562,10 @@
   "board.progress.anAgent": {
     "defaultMessage": "Agent",
     "description": "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)."
+  },
+  "board.progress.blocksReview": {
+    "defaultMessage": "Blocks review for {card}",
+    "description": "Under a failed run in the Progress panel: the run was a check the card's rules require before it can go to Review, so the card can't until it passes. {card} is the card's name (its key, such as HI-12). Glossary: check, rule."
   },
   "board.progress.cantShow": {
     "defaultMessage": "Can't show {agent}",
