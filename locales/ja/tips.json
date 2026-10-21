@@ -99,6 +99,8 @@
   "tips.cardWork.title": "カードの作業の経過を確認する",
   "tips.cliOverrides.text": "Hiveは、セッション内での各CLIの動作を少しだけ変えています。たとえば、Copilotが自動で更新しないことや、Codexのターミナルのタイトルです。それぞれの変更は「設定」→「詳細」の各CLIの下でオフにでき、オフにするとHiveにできなくなることもそこで説明されています。",
   "tips.cliOverrides.title": "CLIをHiveの外と同じ動作に保つ",
+  "tips.cliOwnMode.text": "エージェントやプロジェクトの権限モードに「CLI自身の設定」を選ぶと、Hiveはモードを渡しません。CLIは自身の設定で決まるモードで起動します。バッジには「CLIの設定」と表示され、実行中のセッションで切り替えるとセッションが再起動します。",
+  "tips.cliOwnMode.title": "モードをCLI自身の設定に任せる",
   "tips.closeWindow.text": "複数のウィンドウを開いているとき、「ファイル」→「ウィンドウを閉じる」（{key}）はXボタンと同じく、このウィンドウだけを閉じます。「Hiveを終了（すべてのウィンドウ）」はすべてのウィンドウを閉じ、すべてのエージェントを停止します。",
   "tips.closeWindow.title": "1つのウィンドウを閉じる、またはすべて閉じる",
   "tips.commandName": "「{command}」",

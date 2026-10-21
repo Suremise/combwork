@@ -1,10 +1,11 @@
-import { agentLaunchSettings, modeOption, offeredModes, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, shownText } from '@shared/providers'
+import { agentLaunchSettings, canSwitchModeLive, modeBadgeLabel, modeOption, offeredModes, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, shownText } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { msg, tr } from '@shared/i18n'
 import type { AgentInfo, AppSettings, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { agentProviderOf, confirm, findProject, notify, set, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, findProject, isAssistantPath, notify, set, useLanguage, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { ContextMenu, Icon, Tooltip, type MenuEntry } from './ui'
 
@@ -50,7 +51,7 @@ async function switchLive(project: ProjectInfo, a: AgentInfo, mode: PermissionMo
   const desc = providerDescriptor(p)
   if (!(await confirmDangerousMode(p, mode, a.name))) return
   // Live whenever the provider can (#1014: Codex's Full Access too, after the confirmation); a restart only when it can't.
-  if (desc.capabilities.liveModeSwitch !== 'none' && desc.canSwitchLive(mode, live.permissionMode, null)) {
+  if (canSwitchModeLive(desc, mode, live.permissionMode, null)) {
     const r = await actions.attempt(tr(msg({ id: 'agents.permission.switchFailed', defaultMessage: 'Could not switch the permission mode', description: "An error's title: switching a running agent's permission mode failed." })), () => call('session:setMode', project.path, a.id, mode))
     if (!r || r.ok) return
     if (!r.restart) return notify('warning', tr(msg({ id: 'agents.permission.notSwitched', defaultMessage: 'Permission mode not switched', description: "A notification's title: Hive couldn't switch a running agent's permission mode (the message says why)." })), r.message)
@@ -82,17 +83,30 @@ async function setForNewSessions(project: ProjectInfo, a: AgentInfo, provider: P
 function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings): MenuEntry[] {
   const provider = agentProviderOf(project, a)
   const desc = providerDescriptor(provider)
-  const modes = offeredModes(provider, settings)
+  const modes = offeredModes(provider, settings, isAssistantPath(project.path))
   const many = project.agents.length > 1
   const live = a.live
   if (live && !live.settingUp) {
     const cur = live.permissionMode
     const asking = live.status === 'waiting'
+    // Started in the CLI's own setting (#1284): Hive doesn't know its mode, so every choice restarts the session.
+    const cliOwn = !!modeOption(provider, cur)?.cliOwn
     return [
       { header: true, label: many ? tr(msg({ id: 'agents.permission.menuAgent', defaultMessage: 'Permission mode — {agent}', description: "The permission mode menu's heading, for one of several agents ({agent}: its name)." }), { agent: a.name }) : tr(msg({ id: 'agents.permission.menu', defaultMessage: 'Permission mode', description: "The permission mode menu's heading." })) },
+      // A short line and its why under it, which wraps (the menu's details), so the menu keeps its width.
+      ...(cliOwn
+        ? [
+            {
+              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Hive can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
+              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
+              icon: 'info',
+              disabled: true
+            }
+          ]
+        : []),
       ...(asking ? [{ label: tr(msg({ id: 'agents.permission.answerFirst', defaultMessage: 'The agent is asking you something: answer it first', description: 'In the permission mode menu, while the agent waits for an answer: its mode can be switched once it is answered.' })), icon: 'warning', disabled: true }] : []),
       ...modes.map((m): MenuEntry => {
-        const liveOk = desc.capabilities.liveModeSwitch !== 'none' && desc.canSwitchLive(m.value, cur, null)
+        const liveOk = canSwitchModeLive(desc, m.value, cur, null)
         return {
           label: shownText(m.label, m.text?.label, tr),
           icon: m.value === cur ? 'check' : 'blank',
@@ -164,14 +178,16 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
   const provider = agentProviderOf(project, a)
   const mode = currentMode(project, a, settings)
   const option = modeOption(provider, mode)
-  const bypass = !!option?.danger
+  // Marked by the mode in effect: on the CLI's own setting, one without guardrails its CLI showed (#1284).
+  const bypass = !!modeOption(provider, (a.live ? modeInEffect(a.live) : undefined) ?? mode)?.danger
   const label = a.live?.modeSwitching
     ? tr(msg({ id: 'agents.permission.switching', defaultMessage: 'Switching to {mode}…', description: "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)." }), { mode: permissionLabel(provider, a.live.modeSwitching, tr) })
     : a.live?.planMode
-      ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: permissionLabel(provider, mode, tr) })
-      : permissionLabel(provider, mode, tr)
+      ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: modeBadgeLabel(provider, mode, tr) })
+      : modeBadgeLabel(provider, mode, tr)
   const kb = commandKeybinding('session.permissionMode')
-  const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle'
+  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Hive can't say where it starts (#1284).
+  const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle' && !option?.cliOwn
   const note = a.live && !a.live.modeSwitching && option?.cliNote ? shownText(option.cliNote, option.text?.cliNote, tr) : undefined
   const tip = tr(
     msg({ id: 'agents.permission.badgeTip', defaultMessage: '{live, select, yes {Permission mode of the running session} other {Permission mode new sessions start in}}: {mode}.{note, select, none {} other { {note}}} Click to change{key, select, none {} other { ({key})}}.{cycles, select, yes { You can also press Shift+Tab in the terminal.} other {}}{plan, select, yes { Shift+Tab in the terminal turns Plan mode on and off.} other {}}', description: "Tooltip of an agent's permission mode badge: whose mode it is (the running session's, or new sessions'), the mode ({mode}), why the CLI's own screen names it differently ({note}; none: leave that branch empty), the shortcut that opens the menu ({key}; none: empty), and whether Shift+Tab switches it in the terminal. Shift+Tab is a key: keep it." }),

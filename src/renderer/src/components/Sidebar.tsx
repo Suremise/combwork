@@ -3,6 +3,7 @@ import type { McpServerInfo, NoteFile, ProjectInfo, SkillInfo } from '@shared/ty
 import { AgentsTable, agentsText } from './AgentsTable'
 import { useLanes, type Lane } from '../laneSource'
 import { agentLaunchSettings, modeOption } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume } from '@shared/resumeAll'
 import { shownMergeSlot, shownStatusMessage } from '@shared/runtime'
 import * as actions from '../actions'
@@ -439,7 +440,8 @@ function ProjectsPanel() {
     // Marked when any agent starts (or runs) in its provider's no-guardrails mode.
     const bypass = !!settings && p.agents.some((a) => {
       const l = agentLaunchSettings(a, p.config, settings)
-      return !!modeOption(l.provider, a.live?.permissionMode ?? l.permissionMode)?.danger
+      // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
+      return !!modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)?.danger
     })
     // One dot per project: the most urgent of its agents.
     const state = projectState(p)

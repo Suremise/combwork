@@ -99,6 +99,8 @@
   "tips.cardWork.title": "See what a card’s work went through",
   "tips.cliOverrides.text": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
   "tips.cliOverrides.title": "Keep a CLI as it is outside Hive",
+  "tips.cliOwnMode.text": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
+  "tips.cliOwnMode.title": "Let the CLI's own config choose the mode",
   "tips.closeWindow.text": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
   "tips.closeWindow.title": "Close one window, or all of them",
   "tips.commandName": "“{command}”",

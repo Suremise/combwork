@@ -99,6 +99,8 @@
   "tips.cardWork.title": "Ve por lo que ha pasado el trabajo de una tarjeta",
   "tips.cliOverrides.text": "Hive cambia un poco cómo se comporta cada CLI en sus sesiones, por ejemplo que Copilot no se actualice solo o el título de la terminal de Codex. Cada cambio se puede desactivar en Configuración → Avanzado, bajo su CLI, que explica lo que Hive ya no puede hacer sin él.",
   "tips.cliOverrides.title": "Deja una CLI como está fuera de Hive",
+  "tips.cliOwnMode.text": "Elige «El ajuste propio de la CLI» como modo de permisos de un agente o de un proyecto y Hive no pasa ninguno: la CLI empieza en el modo que fija su propia configuración. La insignia dice «De la CLI», y cambiar una sesión en ejecución la reinicia.",
+  "tips.cliOwnMode.title": "Deja que la configuración de la CLI elija el modo",
   "tips.closeWindow.text": "Con varias ventanas abiertas, Archivo → Cerrar la ventana ({key}) cierra solo esta, como su X. Salir de Hive (todas las ventanas) cierra todas las ventanas y detiene todos sus agentes.",
   "tips.closeWindow.title": "Cierra una ventana, o todas",
   "tips.commandName": "“{command}”",

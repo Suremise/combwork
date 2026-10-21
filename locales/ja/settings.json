@@ -141,6 +141,8 @@
   "settings.advanced.error.text": "{title}にはテキストを指定します。",
   "settings.advanced.hive.agents.perProject.desc": "1つのプロジェクトに置けるエージェントの数です（#562）。必要がなければ{usual}、最大{most}です。エージェントはそれぞれ自分のCLIを実行するため、増やすほどメモリを使い、すべてのエージェントがプランの使用量制限を共有します。下げてもエージェントは削除されません。それより多いプロジェクトで追加できなくなるだけです。テンプレートとAgent APIもこの上限に従います。",
   "settings.advanced.hive.agents.perProject.title": "プロジェクトあたりのエージェント数",
+  "settings.advanced.hive.assistant.otherMcpServers.desc": "Hiveアシスタントは、Hive自身のツールだけでワークスペースを見守ります。ワークスペースの他のMCPサーバーは渡されません。オンにすると、すべてのプロジェクトにまたがって作業するため、次のセッションからワークスペースでオンになっているすべてのサーバー（MCPビューのスイッチ）を受け取ります。Hiveのツールで何をしてよいかは引き続き「操作範囲」の設定が決め、他のサーバーのツールはCLIの権限モードに従って確認します。CLI自身のサーバーも読み込むかどうかは、そのCLIの「ワークスペースのMCPサーバーだけを使う」の設定で決まります。",
+  "settings.advanced.hive.assistant.otherMcpServers.title": "アシスタントがワークスペースの他のMCPサーバーを使う",
   "settings.advanced.hive.assistant.startView.desc": "Hive Assistantのジャーナルがオンの間、Hiveは起動時とコンパクト化のたびに、ワークスペースの短い概要を渡します。進行中のものと待機中のもの、そしてジャーナルの最近のエントリです。オフにすると、実行中のアシスタントも含め、次の起動またはコンパクト化から概要を受け取らなくなり、必要なものはツールで読み取ります。",
   "settings.advanced.hive.assistant.startView.title": "アシスタントをHiveの開始ビューで始める",
   "settings.advanced.hive.console.showText.desc": "開発者コンソールにテキスト（プロンプト、返答、コマンド、ツールの引数）を、マスクなしであることを示すバナーの下に表示し、各記録は「テキスト」にチェックが入った状態で始まります。トークン、APIキー、サインイン情報はこの設定に関係なくマスクされます。エージェントのhive_consoleは機密情報を伏せたままで、テキストを含む記録が「診断情報をコピー」に添付されることはありません。",

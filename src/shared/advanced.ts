@@ -171,6 +171,9 @@ export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
 /** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
 export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
 
+/** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
+export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
+
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
@@ -499,6 +502,21 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'now'
+  },
+  // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
+  // only Hive's own. Control governs only Hive's tools either way; another server's tools ask as its CLI's mode says.
+  {
+    id: ASSISTANT_OTHER_MCP,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.assistant.otherMcpServers.title', defaultMessage: "The Assistant uses the workspace's other MCP servers", description: "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant." }),
+    desc: msg({
+      id: 'settings.advanced.hive.assistant.otherMcpServers.desc',
+      defaultMessage: "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
+      description: "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'sessions'
   },
   // Claude Code
   {
