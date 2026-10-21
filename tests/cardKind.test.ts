@@ -146,7 +146,7 @@ describe("a card's kind (#1277)", () => {
 
   it("after a start the card shows its kind now: changed both ways, a proposal confirmed; one made in Doing starts as its kind (HR3's round 1)", async () => {
     const w = await workspace()
-    const badge = (n: number) => workBadges(w).find((b) => b.card === n)
+    const badge = (card: number) => workBadges(w).find((b) => b.card === card)
     const c = await create(w, user)
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing', agent: 'a1' }, user))
     expect(kinds(w, c.number)).toContain('Started')
