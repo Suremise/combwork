@@ -64,6 +64,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneStartRequest,
+  LaneStartResult,
   ModelPrice,
   MemorySource,
   NoteFile,
@@ -330,7 +332,11 @@ export interface HiveRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[] }) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code' }) => TaskCard
+  /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
+  'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
+  /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
+  'tasks:confirmKind': (n: number, accept: boolean) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   'tasks:update': (n: number, patch: TaskPatch) => TaskCard
@@ -609,6 +615,11 @@ export interface HiveRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
+   * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.
+   */
+  'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

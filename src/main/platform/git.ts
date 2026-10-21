@@ -4,7 +4,7 @@
 //
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
-import { existsSync, readFileSync } from 'original-fs'
+import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, unlinkSync } from 'original-fs'
 import { isAbsolute, join } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
@@ -291,6 +291,98 @@ export async function isolate(repo: string, folder: string, line: string, base: 
   const r = await git(repo, ['worktree', 'add', '-b', line, folder, base])
   return r.ok ? folder : unknown(U.folderFor, { branch: line })
 }
+
+/**
+ * Moves a worktree's branch from `expect` (its branch checked out at that head, the worktree clean) to `to`, as
+ * `git reset --keep` would, serialized with whatever else uses the worktree (§16.19.2, #1271; HR2's round 2): under the
+ * worktree's own index lock, so no commit or other git write can run in it meanwhile (git refuses them, nothing lost),
+ * the branch, head and clean state are checked, then `go()` (the caller's authority, at the boundary itself); the files
+ * and index are brought from the head's tree to the target's through a separate index (`read-tree -m -u`, which
+ * refuses to overwrite a local change), and the branch moved only if it is still at that head (`update-ref <to>
+ * <head>`, compare and swap), else the files are put back. Never a reset of a branch that may have moved on.
+ * True when moved; git's reason when it refused; null when anything differed (another git command at work there, the
+ * branch or head changed, the worktree not clean, or `go()` no longer holds): nothing moved.
+ */
+export async function moveLineLocked(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
+  if (!expect.line) return null
+  const at = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
+  if (!at.ok) return null
+  const index = at.out.trim()
+  const lock = `${index}.lock`
+  const next = `${index}.hive-line`
+  let fd: number | null
+  try {
+    fd = openSync(lock, 'wx')
+  } catch {
+    return null
+  }
+  let placed = false
+  // The new index, once read: where it is (the separate file, then the lock), for putting the files back with it.
+  let staged = next
+  try {
+    const [line, h, d, t] = await Promise.all([branch(folder), head(folder), dirty(folder), expect.target ? lineHead(folder, expect.target) : Promise.resolve(to)])
+    // The target still where it was read too (`to`, its head then): moved on, it is looked at again.
+    if (isUnknown(line) || isUnknown(h) || isUnknown(d) || isUnknown(t) || line !== expect.line || h !== expect.head || t !== to || d.length || !go()) return null
+    copyFileSync(index, next)
+    const files = await git(folder, ['read-tree', '-m', '-u', expect.head, to], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
+    if (!files.ok) return (files.err || files.out || 'git read-tree failed').trim() // i18n-ignore: git's own words, or the command
+    /** Puts the files back as the head has them, from the new index wherever it is now; true when done. */
+    const filesBack = async (): Promise<boolean> => (await git(folder, ['read-tree', '-m', '-u', to, expect.head], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: staged } })).ok
+    // Every failure from here on puts back what was changed (HR2's round 3), conditionally: the files from the new index,
+    // the branch only if it is still where this moved it. Not all put back: thrown (LineMoveBroken), for the caller to
+    // hold the lane's next card and look again.
+    // 1. The new index into the lock, which stays held: published only once the branch has moved.
+    closeSync(fd)
+    fd = null
+    try {
+      renameSync(next, lock)
+      staged = lock
+    } catch (e) {
+      if (!(await filesBack())) throw new LineMoveBroken(`the files of ${expect.line} couldn't be put back after: ${(e as Error).message}`) // i18n-ignore: a log line's reason
+      return (e as Error).message
+    }
+    // 2. The branch, only from the head checked (compare and swap).
+    const ref = await git(folder, ['update-ref', '-m', 'Hive: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
+    if (!ref.ok) {
+      // The branch moved on (not through this worktree's index): its files back as they were, nothing moved.
+      if (!(await filesBack())) throw new LineMoveBroken(`the files of ${expect.line} couldn't be put back after its branch moved on`) // i18n-ignore: a log line's reason
+      return null
+    }
+    // 3. The index published: the lock renamed over it (tried again a few times: Windows refuses a rename while another
+    // process has the file open for a moment).
+    let failed: Error | null = null
+    for (let tries = 0; tries < PUBLISH_TRIES; tries++) {
+      try {
+        renameSync(lock, index)
+        placed = true
+        return true
+      } catch (e) {
+        failed = e as Error
+        await new Promise((r) => setTimeout(r, PUBLISH_RETRY_MS))
+      }
+    }
+    // Not published: the branch back to the head (only if still where this moved it), the files with it.
+    const back = await git(folder, ['update-ref', '-m', 'Hive: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
+    if (!back.ok || !(await filesBack())) throw new LineMoveBroken(`${expect.line} was moved to ${to.slice(0, 7)} but its index couldn't be written (${failed?.message}), and it couldn't be put back`) // i18n-ignore: a log line's reason
+    return failed?.message ?? 'the index could not be written' // i18n-ignore: a reason, agent- and log-facing
+  } finally {
+    if (fd !== null) closeSync(fd)
+    if (!placed) {
+      if (existsSync(next)) unlinkSync(next)
+      if (existsSync(lock)) unlinkSync(lock)
+    }
+  }
+}
+
+/** How often, and how far apart, the moved line's index is tried as it is published (moveLineLocked). */
+const PUBLISH_TRIES = 5
+const PUBLISH_RETRY_MS = 100
+
+/**
+ * A line moved part way that couldn't be put back (moveLineLocked): the branch, its files or its index may not agree.
+ * The caller holds the lane's next card and looks again (its `LineMoving` fact says a move began).
+ */
+export class LineMoveBroken extends Error {}
 
 /** Pins a revision by a ref so a deleted line, a force push or garbage collection can't lose it (§16.9.3). */
 export async function pin(repo: string, ref: string, rev: string): Promise<boolean> {

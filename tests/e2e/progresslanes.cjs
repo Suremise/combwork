@@ -1,5 +1,5 @@
 // The Progress panel's merge card and lanes (#484), on fake Claude Code agents: idle, it is as before (no merge card,
-// divider or lanes); lanes show pinned to the bottom, one row each with a segmented bar coloured and patterned by each
+// divider or lanes); lanes show right after the runs (#1309: Pulse lays out top to bottom, no gap), one row each with a segmented bar coloured and patterned by each
 // card's column, blocked reason and review rounds, folding a long lane's finished cards into "✓ n", one lane only as
 // tall as it is, four rows before the list scrolls and the section's top edge dragged (or Up and Down) for more or fewer
 // in whole lanes, never squeezing the runs, double-click for four, kept folded and through a restart (#569), running lanes first, the card being worked as current, an ended or abandoned lane frozen as it was left
@@ -307,7 +307,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('ended and abandoned lanes never animate, and name no current card', still.length === 4 && still.every((a) => a === 'none') && (await section.locator(`[data-lane="${l4}"] .progress-lane-current, [data-lane="${l5}"] .progress-lane-current`).count()) === 0, JSON.stringify(still))
   const panelBox = await panel.boundingBox()
   const sectionBox = await section.boundingBox()
-  check('the lanes are pinned to the bottom of the panel', Math.abs(sectionBox.y + sectionBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify({ panelBox, sectionBox }))
+  const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
+  check('the lanes follow the runs, with no gap (#1309: not pinned to the bottom)', Math.abs(sectionBox.y - (runsBox.y + runsBox.height)) <= 2 && sectionBox.y + sectionBox.height <= panelBox.y + panelBox.height + 1, JSON.stringify({ panelBox, runsBox, sectionBox }))
   // Hover: the card and its round.
   await row1.locator(`.lane-seg[data-card="${n3}"]`).hover()
   const tip = page.locator('.tip', { hasText: `${K(n3)} Panel layout` })
@@ -380,10 +381,11 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('a click on a segment opens its card', !!(await until(async () => (await dialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Lane hover', 5000)))
   await page.keyboard.press('Escape')
   await until(async () => (await dialog.count()) === 0, HUNG_MS)
-  // Folded to its bar, still at the bottom; and back.
+  // Folded to its bar, still right after the runs; and back.
   await section.locator('.progress-lanes-bar').click()
   const foldedBox = await section.boundingBox()
-  check('the lanes fold to their bar, at the bottom', (await list.count()) === 0 && foldedBox.height < 40 && Math.abs(foldedBox.y + foldedBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify(foldedBox))
+  const runsNow = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
+  check('the lanes fold to their bar, after the runs', (await list.count()) === 0 && foldedBox.height < 40 && Math.abs(foldedBox.y - (runsNow.y + runsNow.height)) <= 2, JSON.stringify({ foldedBox, runsNow }))
   await section.locator('.progress-lanes-bar').click()
   check('…and open again', !!(await until(async () => (await list.count()) === 1, HUNG_MS)))
   check('…with the lanes chosen', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))

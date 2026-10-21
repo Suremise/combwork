@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
 
 export type RuleId = GuardId | MoveRule
 
@@ -138,6 +138,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.move.needsOverride.message', defaultMessage: 'Moving {card} to {stage} skips: {rules}.', description: 'A move that skips rules: {rules} lists the rule names.' }),
     msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.", description: "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips." }),
     msg({ id: 'workflow.refused.move.needsOverride.change', defaultMessage: 'These rules are set in Version Control, where the user can change them.', description: 'Where the rules a move would skip are changed: the project\'s Version Control tab (a tab name: use it as Hive shows it).' })
+  ),
+  'lane.lineBehind': r(
+    msg({ id: 'workflow.refused.lane.lineBehind.message', defaultMessage: "{card} can't start yet: {line} still has {earlier}'s work, which was squashed into {target}.", description: "A refused start (§16.19.2): the builder's branch (in its own worktree) still has the previous card's commits, which were merged into the target as one squashed commit, so the next card's change would include them. {card} and {earlier} are card keys like AM-12; {line} a branch name; {target} the branch merged into." }),
+    msg({ id: 'workflow.refused.lane.lineBehind.next', defaultMessage: 'Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.', description: 'The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key.' }),
+    msg({ id: 'workflow.refused.lane.lineBehind.change', defaultMessage: "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Hive moves it or asks first.", description: 'Where it is decided whether Hive moves the branch itself or asks the user first (a setting name: use it as Hive shows it).' })
   ),
   'lane.oneAtATime': r(
     msg({ id: 'workflow.refused.lane.oneAtATime.message', defaultMessage: "{card} can't start yet: {earlier}, before it in its lane, isn't Done.", description: 'A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12.' }),

@@ -30,6 +30,7 @@
   "errors.hive.noRepo": "No git repository holds this project: exclude .hive in the version control or sync service you use.",
   "errors.hive.notIgnored": "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Hive doesn't edit .gitignore files.",
   "errors.image.not": "Not an image",
+  "errors.lane.builderRequired": "A lane's builder is required",
   "errors.lane.required": "Which lane to end is required",
   "errors.log.gone": "The log isn't there any more: {path}",
   "errors.log.none": "That run reported no log.",

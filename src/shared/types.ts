@@ -2647,7 +2647,22 @@ export interface LaneInfo {
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate'
+
+/** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
+export interface LaneStartRequest {
+  builder: string
+  reviewer: string | null
+  cards: number[]
+  note?: string
+  name?: string | null
+}
+
+/** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
+export interface LaneStartResult {
+  lane: LaneInfo
+  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed'; why?: string }[]
+}
 
 export interface LaneStatus {
   reason: LaneWaitReason

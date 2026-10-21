@@ -624,11 +624,12 @@ const tools: Tool[] = [
         blocked: { type: 'string', description: "Why it can't go on yet." },
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
-        context: contextArg
+        context: contextArg,
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' }
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, reply: 'short' })) as TaskChange)
+    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), reply: 'short' })) as TaskChange)
   },
   {
     name: 'hive_update_task',
@@ -655,13 +656,19 @@ const tools: Tool[] = [
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
         decision: { type: 'string', description: "Records a decision the user made about the card (scope, wording, a default), in a sentence; it is attributed to the user. Only what the user decided, never your own choice. Only the user changes or removes decisions." },
-        ...(ASSISTANT ? { override: overrideArg } : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
+        ...(ASSISTANT
+          ? {
+              override: overrideArg,
+              kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
+              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' }
+            }
+          : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
       },
       required: ['number']
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind']) if (a[k] !== undefined) body[k] = a[k]
       return changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
     }
   },
@@ -891,7 +898,11 @@ const offered = tools.filter((t) => (t.name !== 'hive_console' || DEV_CONSOLE) &
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0'), JOURNAL_SCOPE)
 
+/** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
+const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'
+
 async function instructions(): Promise<string> {
+  if (!GUIDED) return ''
   // Without a project (the Hive Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
@@ -1023,7 +1034,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         protocolVersion: params?.protocolVersion ?? '2025-06-18',
         capabilities: { tools: {} },
         serverInfo: { name: 'hive', version: VERSION },
-        instructions: await instructions()
+        ...(GUIDED ? { instructions: await instructions() } : {})
       })
     case 'notifications/initialized':
       return sayConnected()

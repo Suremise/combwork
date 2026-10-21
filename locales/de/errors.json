@@ -30,6 +30,7 @@
   "errors.hive.noRepo": "Dieses Projekt liegt in keinem Git-Repository: Schließe .hive in deiner Versionsverwaltung oder deinem Sync-Dienst aus.",
   "errors.hive.notIgnored": "Git ignoriert .hive hier noch immer nicht: Eine Regel in einer .gitignore (eine Zeile, die mit ! beginnt) holt es womöglich zurück. Hive bearbeitet keine .gitignore-Dateien.",
   "errors.image.not": "Kein Bild",
+  "errors.lane.builderRequired": "Der Bearbeiter einer Lane ist erforderlich",
   "errors.lane.required": "Die zu beendende Lane fehlt",
   "errors.log.gone": "Das Log ist nicht mehr da: {path}",
   "errors.log.none": "Dieser Lauf hat kein Log gemeldet.",

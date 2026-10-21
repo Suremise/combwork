@@ -8,7 +8,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { HiveChannel, HiveRequests } from '../shared/api'
 import * as updater from './updater'
-import type { ProviderId, QuitChoice } from '../shared/types'
+import type { LaneStartRequest, ProviderId, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
 import { extraArgsProblem, isKnownProvider, projectProviderConfig, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
@@ -39,6 +39,7 @@ import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
+import { startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
@@ -132,6 +133,7 @@ const M = {
   notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Hive can read." }),
   holdRequired: msg({ id: 'errors.mergeSlot.holdRequired', defaultMessage: 'Which hold to release is required', description: 'Releasing a merge slot without saying which (a programming error, rarely seen).' }),
   laneRequired: msg({ id: 'errors.lane.required', defaultMessage: 'Which lane to end is required', description: 'Ending a card loop without saying which (a programming error, rarely seen).' }),
+  laneBuilderRequired: msg({ id: 'errors.lane.builderRequired', defaultMessage: "A lane's builder is required", description: 'Starting a lane (a card loop) without saying which agent builds it (a programming error, rarely seen).' }),
   consoleHidden: msg({ id: 'errors.console.hidden', defaultMessage: 'The developer console is hidden: turn on Settings → Advanced → Show developer features.', description: 'Opening the developer console while it is turned off. "Settings → Advanced → Show developer features" is the way to the setting: translate it as Settings shows it.' }),
   sourcesList: msg({ id: 'errors.console.sourcesList', defaultMessage: 'The sources to watch must be a list.', description: "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)." }),
   notSource: msg({ id: 'errors.console.notSource', defaultMessage: 'Not a developer console source this window can record', description: "Recording a developer console source this window can't read." }),
@@ -632,6 +634,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
+    'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
+    'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
@@ -1069,6 +1073,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'lanes:end': (id, abandoned) => {
       if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
+    },
+    'lanes:start': (p, req) => {
+      const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
+      const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
+      if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
     },
     'costs:cards': (q) => {
       if (!workspace.path) return []

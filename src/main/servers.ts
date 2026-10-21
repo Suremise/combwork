@@ -70,7 +70,7 @@ import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { cardStages } from './boardStore'
-import { cardFacts, factRow } from './workflow/cardWork'
+import { cardFacts, cardKind, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
@@ -165,12 +165,19 @@ export async function startHookServer(): Promise<string> {
     }
     let done: (() => void) | null = null
     try {
-      const body = JSON.parse((await readBody(req)) || '{}')
+      const raw = await readBody(req)
+      const body = JSON.parse(raw || '{}')
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
-        // The reply becomes Claude Code's status line, so send nothing.
-        res.writeHead(204)
-        res.end()
+        // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
+        // the JSON as it came, for their command's input.
+        if (query.has('echo')) {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end(raw)
+        } else {
+          res.writeHead(204)
+          res.end()
+        }
         sessions.handleStatusLine(run, body)
         return
       }
@@ -1953,7 +1960,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const elsewhere = await tasks.refsOutside([...new Set([...c.blockedBy, ...c.links])], scope)
   // Its 1.0 stage (#1223, SPEC §16.4.3) from the card's row, after the document's fields: additive.
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), stage }
+  // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
+  const k = cardKind(workspace, c.number)
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2100,7 +2109,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, 'title is required')
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}) }
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, []) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.createTask(input, actor))
@@ -2119,12 +2128,30 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const comment = typeof body?.comment === 'string' ? body.comment.trim() : ''
   const actor = await taskActor()
   const changes: string[] = []
-  const apply = async (commit?: () => void): Promise<TaskCard> => {
+  // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
+  const kind = body?.kind
+  const confirmKind = body?.confirmKind
+  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, 'confirmKind is true (make it no-code, as proposed) or false (keep it as code).')
+  // Checked before anything is written (HR3's #1277 round 1): a kind no card has is refused whole.
+  if (kind !== undefined) tasks.kindOf(kind)
+  // The override's reason is the kind change's when no column moves with it.
+  if (kind !== undefined && patch.column === undefined) delete patch.override
+  const write = async (commit?: () => void): Promise<TaskCard> => {
+    if (confirmKind !== undefined) {
+      await tasks.confirmKind(n, confirmKind, actor, { commit })
+      changes.push(confirmKind ? 'Confirmed as no code' : 'Kept as code')
+    }
+    if (kind !== undefined) {
+      await tasks.setKind(n, kind, actor, { commit, reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
+      changes.push(`Kind: ${kind}`)
+    }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor) : await tasks.readTask(n, actor)
     if (comment) changes.push('Commented')
     return c
   }
+  // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
+  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await apply())
   const was = await tasks.getTask(n).catch(() => null)
@@ -2144,6 +2171,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
             : '',
       comment ? 'commented' : '',
       patch.decision !== undefined ? 'recorded a decision' : '',
+      confirmKind !== undefined ? (confirmKind ? 'confirmed it as no code' : 'kept it as code') : '',
+      kind !== undefined ? `made it ${kind}` : '',
       Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? 'changed it' : ''
     ]
       .filter(Boolean)

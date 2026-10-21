@@ -13,6 +13,7 @@ import { shownText } from '@shared/advanced'
 import { providerDescriptor, providerName } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
+import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
@@ -993,8 +994,7 @@ export function ContextMenu({ x, y, above, items, keyboard, onClose }: { x: numb
   useLayoutEffect(() => {
     const r = ref.current?.getBoundingClientRect()
     if (!r) return
-    const fits = y + r.height + 8 <= window.innerHeight
-    setPos({ x: Math.min(x, window.innerWidth - r.width - 8), y: fits || above === undefined ? Math.min(y, window.innerHeight - r.height - 8) : Math.max(8, above - r.height - 4) })
+    setPos(placeMenu({ x, y, above }, r, { width: window.innerWidth, height: window.innerHeight }))
   }, [x, y, above])
   useEffect(() => {
     const close = (e: MouseEvent): void => {

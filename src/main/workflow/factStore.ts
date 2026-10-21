@@ -437,6 +437,11 @@ export class FactStore {
     })
   }
 
+  /** This project's running lanes, by id, oldest first (#1271: whose builders' lines are looked at between cards). */
+  runningLanes(): string[] {
+    return this.conn.read((db) => (db.prepare("SELECT id FROM lanes WHERE project = ? COLLATE NOCASE AND state = 'active' ORDER BY ord").all(this.scope.project) as { id: string }[]).map((r) => r.id))
+  }
+
   /** A lane's builder agent (lanes.ts's), or null: the one to tell when its queued list applies (#1270). */
   laneBuilder(id: string): string | null {
     return this.conn.read((db) => (db.prepare('SELECT builder_id FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(id, this.scope.project) as { builder_id: string } | undefined)?.builder_id ?? null)

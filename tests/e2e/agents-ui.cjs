@@ -57,6 +57,44 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('the project header keeps project items only', !/New Session|Archive|Compact/.test(headerText) && (await page.locator('.project-header .mode-badge').count()) === 0, headerText.replace(/\s+/g, ' '))
   check('the status bar has no agent model or mode', (await page.locator('.statusbar .mode-badge, .statusbar .status-item', { hasText: /ctx$|Auto$/ }).count()) === 0)
 
+  // + Add ▾ keeps its width at the window's right edge (#1329): with the side panels folded, the button is near that
+  // edge, and its menu was as narrow as the room left (a fixed box with only `left` set), "At once, with your defaults"
+  // wrapping over three lines. Now it's as wide as with the panels open, shifted left, its description on one line.
+  const addShape = async () => {
+    await page.locator('.session-toolbar .add-menu').click()
+    await lib.until(async () => (await page.locator('.menu .menu-detail').count()) > 0, HUNG_MS)
+    const shape = await page.evaluate(() => {
+      const menu = document.querySelector('.menu').getBoundingClientRect()
+      const lines = [...document.querySelectorAll('.menu .menu-detail')].map((d) => Math.round(d.getBoundingClientRect().height / parseFloat(getComputedStyle(d).lineHeight)))
+      return { width: menu.width, right: menu.right, lines, anchor: document.querySelector('.session-toolbar .add-menu').getBoundingClientRect().left, inner: innerWidth }
+    })
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await page.locator('.menu').count()) === 0, HUNG_MS)
+    return shape
+  }
+  const sidePanels = [['Control+Alt+P', '.progress-panel'], ['Control+Alt+I', '.assistant-panel']]
+  const panelsOpen = async (open) => {
+    for (const [key, sel] of sidePanels) {
+      if ((await page.locator(sel).count() > 0) === open) continue
+      await page.evaluate(() => document.activeElement?.blur())
+      await page.keyboard.press(key)
+      await lib.until(async () => (await page.locator(sel).count() > 0) === open, HUNG_MS)
+    }
+  }
+  const panelsBefore = await Promise.all(sidePanels.map(async ([, sel]) => (await page.locator(sel).count()) > 0))
+  await panelsOpen(true)
+  const roomy = await addShape()
+  await panelsOpen(false)
+  const atEdge = await addShape()
+  check('#1329: with the panels folded, + Add ▾ is near the right edge (its menu has to shift)', atEdge.anchor + roomy.width > atEdge.inner - 8, JSON.stringify(atEdge))
+  check('#1329: …its menu keeps its width there, its description on one line, inside the window', atEdge.width === roomy.width && atEdge.lines.every((n) => n === 1) && atEdge.right <= atEdge.inner - 8, JSON.stringify({ roomy, atEdge }))
+  for (const [i, [key, sel]] of sidePanels.entries()) {
+    if ((await page.locator(sel).count() > 0) === panelsBefore[i]) continue
+    await page.evaluate(() => document.activeElement?.blur())
+    await page.keyboard.press(key)
+    await lib.until(async () => (await page.locator(sel).count() > 0) === panelsBefore[i], HUNG_MS)
+  }
+
   // Add Agent dialog (+ Add ▾, #975), new worktree option
   await lib.addMenuRun(page, 'Configure Agent and Add…'); await sleep(800)
   check('dialog open', await page.locator('.dialog', { hasText: 'Add an agent' }).count() === 1)

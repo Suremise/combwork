@@ -30,6 +30,7 @@
   "errors.hive.noRepo": "Nenhum repositório git contém este projeto: exclua .hive no controle de versão ou no serviço de sincronização que você usa.",
   "errors.hive.notIgnored": "O git ainda não ignora .hive aqui: uma regra em um .gitignore (uma linha que começa com !) pode trazê-lo de volta. O Hive não edita arquivos .gitignore.",
   "errors.image.not": "Não é uma imagem",
+  "errors.lane.builderRequired": "O executor da raia é obrigatório",
   "errors.lane.required": "É preciso dizer qual raia encerrar",
   "errors.log.gone": "O log não está mais lá: {path}",
   "errors.log.none": "Essa execução não informou nenhum log.",

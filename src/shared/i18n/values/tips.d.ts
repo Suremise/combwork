@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'tips.agentSettings.title': undefined
   'tips.agentStates.text': undefined
   'tips.agentStates.title': undefined
+  'tips.allKeysToCli.text': undefined
+  'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
   'tips.antivirus.text': undefined
@@ -99,6 +101,8 @@ interface HiveMessageValues {
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined
   'tips.cardWork.title': undefined
+  'tips.claudeStatusLine.text': undefined
+  'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined
   'tips.cliOverrides.title': undefined
   'tips.cliOwnMode.text': undefined
@@ -170,10 +174,14 @@ interface HiveMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
+  'tips.laneBranchSquash.text': undefined
+  'tips.laneBranchSquash.title': undefined
   'tips.laneGates.text': undefined
   'tips.laneGates.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
+  'tips.laneStart.text': undefined
+  'tips.laneStart.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
   'tips.leftoverProcesses.text': undefined
@@ -210,6 +218,8 @@ interface HiveMessageValues {
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
   'tips.newCard.title': undefined
+  'tips.noCodeCards.text': undefined
+  'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
   'tips.overview.text': { key: string | number }
@@ -238,7 +248,7 @@ interface HiveMessageValues {
   'tips.progressDetails.title': undefined
   'tips.progressFilter.text': undefined
   'tips.progressFilter.title': undefined
-  'tips.progressHistory.text': { recent: number; kept: number }
+  'tips.progressHistory.text': { kept: number }
   'tips.progressHistory.title': undefined
   'tips.progressLanes.text': undefined
   'tips.progressLanes.title': undefined
@@ -248,8 +258,8 @@ interface HiveMessageValues {
   'tips.progressLanesOrder.title': undefined
   'tips.progressPanel.text': { key: string | number }
   'tips.progressPanel.title': undefined
-  'tips.progressRecentFold.text': undefined
-  'tips.progressRecentFold.title': undefined
+  'tips.progressTabs.text': undefined
+  'tips.progressTabs.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
   'tips.projectKeys.text': undefined
