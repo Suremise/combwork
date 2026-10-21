@@ -210,7 +210,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     expect([wf.store.card(one).key, wf.store.card(two).key]).toEqual([`${key}-1`, `${key}-2`])
     for (const ref of [`${key}-2`, `${key.toLowerCase()}-2`, `#${two}`, `p-${two}`]) expect({ ref, got: wf.store.cardByKey(ref)?.id ?? null }).toEqual({ ref, got: two })
     expect(wf.store.cardByKey(`${key}-9`)).toBeNull()
-    expect(wf.resolve(`${key}-2`, builder)).toMatchObject({ id: two })
+    expect(wf.resolve(`${key}-2`, 'agent:a1')).toMatchObject({ id: two })
     // A trailer by key attributes the commit to that card.
     await inWorkspace(w, () => tasks.updateTask(one, { column: 'doing', agent: 'a1' }, user))
     await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
