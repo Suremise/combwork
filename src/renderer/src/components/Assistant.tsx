@@ -11,7 +11,8 @@ import type { AgentInfo, AgentPatch, AssistantAction, EffortLevel, PermissionMod
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { agentProviderOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStore, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStore, assistantOnLeft, setAssistantSide } from '../store'
+import { cardLabel } from '@shared/projectKeys'
 import { useInbox } from '../inbox'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
@@ -102,7 +103,7 @@ const M = {
   startTip: msg({ id: 'assistant.panel.startTip', defaultMessage: 'Start the Assistant', description: "Tooltip on the Assistant's Start button." }),
   more: msg({ id: 'assistant.panel.more', defaultMessage: 'More', description: "The Assistant panel's ⋯ button, which opens its More menu." }),
   status: msg({ id: 'assistant.panel.status', defaultMessage: 'Status: {text}', description: "The Assistant's status line under its header ({text}: \"Working\", \"Waiting for #12 → Review\")." }),
-  openCard: msg({ id: 'assistant.panel.openCard', defaultMessage: '{known, select, yes {Open card #{number}, in {column}} other {Open card #{number}}}', description: 'A card chip in the Assistant\'s status line, for screen readers ({column}: "Review").' }),
+  openCard: msg({ id: 'assistant.panel.openCard', defaultMessage: '{known, select, yes {Open card {number}, in {column}} other {Open card {number}}}', description: 'A card chip in the Assistant\'s status line, for screen readers ({number}: the card\'s name, its key, such as AM-12, or #12 for a card with none; {column}: "Review").' }),
   revertFailed: msg({ id: 'assistant.panel.revertFailed', defaultMessage: 'Could not revert the setting', description: "An error notice: a setting the Assistant changed couldn't be put back; the reason follows." }),
   notDone: msg({ id: 'assistant.panel.notDone', defaultMessage: 'Not done: {error}', description: "Tooltip on something the Assistant was refused, after when: why ({error}, from Hive's Agent API, in English)." }),
   reverted: msg({ id: 'assistant.panel.reverted', defaultMessage: 'reverted', description: 'Beside a setting the Assistant changed that was put back.' }),
@@ -110,8 +111,8 @@ const M = {
   revert: msg({ id: 'assistant.panel.revert', defaultMessage: 'Revert', description: 'A button beside a setting the Assistant changed: puts the old value back.' }),
   doneBy: msg({ id: 'assistant.panel.doneBy', defaultMessage: 'Done by the Assistant', description: "The heading of the list of what the Assistant did (a count follows)." }),
   markLabel: msg({ id: 'assistant.panel.markLabel', defaultMessage: '{name}: {state}{running, select, yes {{hasDetail, select, yes { · {detail}} other {}}} other { · not running}}', description: "An agent's state mark in the Assistant's workspace section: its name for screen readers and the first line of its tooltip. {state}: the state its mark draws (Working, Idle, Waiting for you, Stalled); {detail}: what it is doing, when that says more (\"e2e: 12 suites 4/12\"); \"not running\" while its session isn't. Lower case after the dot." }),
-  workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on #{number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on." }),
-  reviewing: msg({ id: 'assistant.panel.reviewing', defaultMessage: 'Reviewing #{number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it reviews." }),
+  workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
+  reviewing: msg({ id: 'assistant.panel.reviewing', defaultMessage: 'Reviewing {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
   progress: msg({ id: 'assistant.panel.progress', defaultMessage: '{hasStep, select, yes {Progress: {run} ({step})} other {Progress: {run}}}', description: "An agent's tooltip in the Assistant's overview: its test run ({run}: \"e2e: 12 suites 4/12\"; {step}: what it is on)." }),
   worktree: msg({ id: 'assistant.panel.worktree', defaultMessage: 'Worktree on {branch}', description: "An agent's tooltip in the Assistant's overview: its worktree's branch." }),
   noAgents: msg({ id: 'assistant.panel.noAgents', defaultMessage: 'no agents', description: "The Assistant's overview: a project with no agents. Lower case." }),
@@ -648,7 +649,7 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
   const line = assistantStatusLine(live, (iso) => formatTime(iso), approvals.map((q) => q.title))
-  const whole = tr(M.status, { text: `${line.text}${line.cards.map((n) => `#${n}`).join(', ')}${line.after}` })
+  const whole = tr(M.status, { text: `${line.text}${line.cards.map((n) => cardLabelOf({ tasks }, n)).join(', ')}${line.after}` })
   const toggle = (): void => {
     const key = doneOpenKey(ws)
     set((s) => ({ panes: { ...s.panes, [key]: open ? 0 : 1 } }))
@@ -666,7 +667,7 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
                   {line.text}
                   {line.cards.map((n) => {
                     const card = tasks.find((c) => c.number === n && !c.archived) ?? null
-                    return <TaskChip key={n} number={n} column={card?.column ?? null} short label={tr(M.openCard, { number: n, known: card ? 'yes' : 'no', column: card ? columnName(card.column, tr) : '' })} />
+                    return <TaskChip key={n} number={n} column={card?.column ?? null} short label={tr(M.openCard, { number: cardLabelOf({ tasks }, n), known: card ? 'yes' : 'no', column: card ? columnName(card.column, tr) : '' })} />
                   })}
                   {line.after}
                 </>
@@ -760,8 +761,8 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
   const first = tr(M.markLabel, { name: a.name, state: stateText, running: a.live ? 'yes' : 'no', hasDetail: detail ? 'yes' : 'no', detail })
   const rest = [
     tr(M.provider, { provider: providerDescriptor(agentProviderOf(p, a)).name }),
-    ...doing.map((c) => tr(M.workingOn, { number: c.number, title: c.title })),
-    ...reviewing.map((c) => tr(M.reviewing, { number: c.number, title: c.title })),
+    ...doing.map((c) => tr(M.workingOn, { number: cardLabel(c), title: c.title })),
+    ...reviewing.map((c) => tr(M.reviewing, { number: cardLabel(c), title: c.title })),
     ...(run ? [tr(M.progress, { run: runWords(run), hasStep: run.stepName ? 'yes' : 'no', step: run.stepName ?? '' })] : []),
     ...(a.worktree ? [tr(M.worktree, { branch: a.worktree.branch })] : [])
   ]

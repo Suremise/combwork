@@ -25,7 +25,7 @@
   "performance.cards.heading": "卡片",
   "performance.cards.lastHeld": "最后持有",
   "performance.cards.loadTarget": "卡片费用",
-  "performance.cards.open": "打开 #{number}",
+  "performance.cards.open": "打开 {number}",
   "performance.cards.project": "项目",
   "performance.cards.reviewer": "评审者",
   "performance.cards.rounds": "轮次",

@@ -73,6 +73,8 @@
   "actions.project.deactivateFailed": "Could not deactivate project",
   "actions.project.deactivateMessage": "{n, plural, one {{project} has a running session.} other {{project} has # agents running.}}",
   "actions.project.deactivateTitle": "{n, plural, one {Stop session and deactivate?} other {Stop agents and deactivate?}}",
+  "actions.project.key": "Key",
+  "actions.project.keyHint": "Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.",
   "actions.project.nameChars": "Names cannot contain {chars}",
   "actions.project.nameDot": "Names cannot start with \".\"",
   "actions.project.nameEmpty": "Enter a name",

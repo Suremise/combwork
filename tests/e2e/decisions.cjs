@@ -240,7 +240,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await mDialog.count()) === 0, 5000)
 
   // Save into Doing goes through Move to Doing, which saves the drafts first; its Try Again writes nothing twice.
-  const moveDialog = page.locator('.dialog', { hasText: `Move #${m} to Doing` })
+  const moveDialog = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, m)} to Doing` })
   const viaMoveToDoing = async (fail) => {
     await mDialog.locator('select').nth(2).selectOption('doing')
     await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()

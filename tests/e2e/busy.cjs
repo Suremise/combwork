@@ -57,7 +57,8 @@ const check = (name, ok, extra = '') => {
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
-  const cardDialog = (n) => page.locator('.dialog', { has: page.locator('.dialog-header h2', { hasText: new RegExp(`^#${n}$`) }) })
+  // Its title: its key and number (#1221), or #n for a card with no key.
+  const cardDialog = (n) => page.locator('.dialog', { has: page.locator('.dialog-header h2', { hasText: new RegExp(`(^| \\()#${n}\\)?$`) }) })
   const question = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
   const project = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')
 
@@ -98,10 +99,10 @@ const check = (name, ok, extra = '') => {
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('#999')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
   check('a failed save shows the error in the dialog', !!(await until(async () => /no card #999/.test(await d1.locator('.dialog-error').innerText().catch(() => '')), 5000)))
-  check('and starts nothing', (await page.locator('.dialog', { hasText: `Start #${c1.number}` }).count()) === 0 && (await card(c1.number)).description === 'Old description.')
+  check('and starts nothing', (await page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` }).count()) === 0 && (await card(c1.number)).description === 'Old description.')
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
-  const startDialog = page.locator('.dialog', { hasText: `Start #${c1.number}` })
+  const startDialog = page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` })
   check('Save and Start saves, then asks which agent', !!(await until(async () => (await startDialog.count()) === 1, 5000)) && (await card(c1.number)).description.startsWith('EDITED'))
 
   // --- Start is busy (#34): spinner, can't close, runs once ---
@@ -144,7 +145,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Delete: the question stays with a spinner until it's done ---
   await d2.getByRole('button', { name: 'Delete' }).click()
-  const del = page.locator('.dialog', { hasText: `Delete #${c2.number}?` })
+  const del = page.locator('.dialog', { hasText: `Delete ${c2.key ?? `#${c2.number}`}?` })
   await del.waitFor({ timeout: 3000 })
   await del.locator('.dialog-footer button').last().click()
   check('Delete shows Deleting…', !!(await until(async () => /Deleting…/.test(await del.innerText().catch(() => '')), HUNG_MS)))

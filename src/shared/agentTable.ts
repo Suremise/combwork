@@ -1,4 +1,5 @@
 import { agentDoingCards, agentReviewCards } from './tasks'
+import { cardLabel } from './projectKeys'
 import type { LaneState, TaskCard, TaskWatchInfo } from './types'
 
 /**
@@ -38,10 +39,10 @@ export function laneOrder<T extends { id: string }>(agents: readonly T[], lanes:
   return out
 }
 
-/** "#4 Attention inbox" (+1 when there are more), for a tooltip, a table's cell or a status line; empty for none. */
-export function cardsText(cards: readonly Pick<TaskCard, 'number' | 'title'>[]): string {
+/** "HI-4 Attention inbox" (#4 for a card with no key; +1 when there are more), for a tooltip, a table's cell or a status line; empty for none. */
+export function cardsText(cards: readonly Pick<TaskCard, 'number' | 'key' | 'title'>[]): string {
   if (!cards.length) return ''
-  return `#${cards[0].number} ${cards[0].title}${cards.length > 1 ? ` +${cards.length - 1}` : ''}`
+  return `${cardLabel(cards[0])} ${cards[0].title}${cards.length > 1 ? ` +${cards.length - 1}` : ''}`
 }
 
 /**

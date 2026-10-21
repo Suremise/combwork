@@ -8,7 +8,7 @@ import { shownMergeSlot, shownStatusMessage } from '@shared/runtime'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
-import { get, notify, projectState, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
+import { get, notify, projectKeyOf, projectState, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
@@ -276,6 +276,11 @@ function projectMenu(p: ProjectInfo): MenuEntry[] {
   ]
 }
 
+/** A project's tile text in the rail: its key (#1221), else its initials; 3 and 4 letters shrink to fit the tile. */
+function RailLabel({ text }: { text: string }) {
+  return <span className={cx('rail-initials', text.length > 2 && `rail-initials-${Math.min(text.length, 4)}`)}>{text}</span>
+}
+
 /** Short label for the rail: the initials of a multi-word name ("web-dashboard" → "WD"), else its first two letters ("hive" → "Hi"). */
 export function projectInitials(name: string): string {
   const words = name
@@ -316,6 +321,7 @@ function ProjectsRail() {
   const tasks = useStore((s) => s.tasks)
   const lanes = useLanes()
   const selected = useStore((s) => s.selectedProject)
+  const keys = useStore((s) => s.projectKeys)
   const menu = useContextMenu()
 
   const expand = (
@@ -376,7 +382,7 @@ function ProjectsRail() {
           aria-label={tr(M.railLabel, { project: p.name, status })}
           aria-description={table ? agentsText(p, tasks, lanesOf) : undefined}
         >
-          <span className="rail-initials">{projectInitials(p.name)}</span>
+          <RailLabel text={projectKeyOf({ projectKeys: keys }, p.path) ?? projectInitials(p.name)} />
           <span className={cx('dot', state?.status ?? (p.active ? 'idle' : 'stopped'), state?.unseen && 'unseen')} />
           {!!needs.get(p.path) && <span className="project-need-count">{needs.get(p.path)}</span>}
         </div>

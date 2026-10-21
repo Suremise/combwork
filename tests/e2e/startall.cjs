@@ -305,14 +305,16 @@ const check = (name, ok, extra = '') => {
   // --- Stop (2): the running agents as a table, Agent · State · Card, its card named; Cancel changes nothing.
   const card = (await inv('tasks:create', { title: 'Batch tables', project: 'alpha', column: 'doing', agent: w.id })).number
   // Once the window's board has it: the Worker's pane header shows the card.
-  await until(async () => (await lib.paneHeader(page, 'Worker').innerText().catch(() => '')).includes(`#${card}`), HUNG_MS)
+  await until(async () => (await lib.paneHeader(page, 'Worker').innerText().catch(() => '')).includes(await lib.cardLabel(inv, card)), HUNG_MS)
   // Idle reviews another card (started with its own token, as its CLI would): its row says "reviewing #n …".
   const reviewed = (await inv('tasks:create', { title: 'Review table', project: 'alpha', column: 'review', agent: s.id })).number
+  // The cards by key, as the window names them (#1221).
+  const [cardName, reviewedName] = [await lib.cardLabel(inv, card), await lib.cardLabel(inv, reviewed)]
   const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   const idleToken = launches().filter((l) => l.sessionId === before.i).at(-1)?.env?.HIVE_API_TOKEN
   const startReview = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${reviewed}`, { method: 'PATCH', headers: { Authorization: `Bearer ${idleToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ review: 'start' }) })
   check('Idle starts reviewing a card', !!idleToken && startReview.status === 200, `${!!idleToken} ${startReview.status}`)
-  await until(async () => (await lib.paneHeader(page, 'Idle').innerText().catch(() => '')).includes(`#${reviewed}`), HUNG_MS)
+  await until(async () => (await lib.paneHeader(page, 'Idle').innerText().catch(() => '')).includes(reviewedName), HUNG_MS)
   // What a screen reader gets: the accessibility tree's text (the table is hidden from it, so a cell is never said twice).
   const cdp = await page.context().newCDPSession(page)
   const axTexts = async () => (await cdp.send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored).map((n) => n.name?.value ?? '')
@@ -321,9 +323,9 @@ const check = (name, ok, extra = '') => {
   await stopDialog.waitFor({ timeout: 5000 })
   const stopTable = await tableOf(stopDialog)
   check('Stop all lists the running agents as a table: Agent, State, Card', JSON.stringify(stopTable.heads) === JSON.stringify(['Agent', 'State', 'Card']) && JSON.stringify(Object.keys(stopTable.rows).sort()) === JSON.stringify(['Idle', 'Worker']), JSON.stringify(stopTable))
-  check("…the Worker's card in its row, and the one Idle reviews in its", stopTable.rows.Worker?.[2]?.text === `#${card} Batch tables` && /Working/.test(stopTable.rows.Worker?.[1]?.text ?? '') && stopTable.rows.Idle?.[2]?.text === `reviewing #${reviewed} Review table`, JSON.stringify(stopTable.rows))
+  check("…the Worker's card in its row, and the one Idle reviews in its", stopTable.rows.Worker?.[2]?.text === `${cardName} Batch tables` && /Working/.test(stopTable.rows.Worker?.[1]?.text ?? '') && stopTable.rows.Idle?.[2]?.text === `reviewing ${reviewedName} Review table`, JSON.stringify(stopTable.rows))
   const stopAx = await axTexts()
-  check('…a screen reader gets each card too, the reviewed one as such', stopAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card #${card} Batch tables`)) && stopAx.some((t) => t.includes(`• Idle — `) && t.includes(`card reviewing #${reviewed} Review table`)), JSON.stringify(stopAx.filter((t) => t.includes('•'))))
+  check('…a screen reader gets each card too, the reviewed one as such', stopAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card ${cardName} Batch tables`)) && stopAx.some((t) => t.includes(`• Idle — `) && t.includes(`card reviewing ${reviewedName} Review table`)), JSON.stringify(stopAx.filter((t) => t.includes('•'))))
   // The table itself is out of the accessibility tree, so no cell of it is said twice.
   const tableIgnored = async () => {
     const { root } = await cdp.send('DOM.getDocument', { depth: 0 })
@@ -331,7 +333,7 @@ const check = (name, ok, extra = '') => {
     const { nodes } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false })
     return nodes.length > 0 && nodes.every((n) => n.ignored)
   }
-  check('…and the table itself is ignored by screen readers, so nothing is said twice', (await tableIgnored()) && !stopAx.includes(`#${card} Batch tables`), JSON.stringify(stopAx.filter((t) => /Batch tables/.test(t))))
+  check('…and the table itself is ignored by screen readers, so nothing is said twice', (await tableIgnored()) && !stopAx.includes(`${cardName} Batch tables`), JSON.stringify(stopAx.filter((t) => /Batch tables/.test(t))))
   check('…the table hidden from screen readers, its plain lines for them instead, and the note under it', stopTable.hidden && /• Worker — Working/.test(await plainLines(stopDialog)) && /conversations are kept/.test(await stopDialog.locator('.agents-detail-note').innerText()))
   await bothThemes('startall-stop-confirm')
   await stopDialog.getByRole('button', { name: 'Cancel' }).click()
@@ -346,7 +348,7 @@ const check = (name, ok, extra = '') => {
   check('it lists every agent, flagging the working one', /Worker — Working.*\(will be interrupted\)/.test(text) && /Idle — /.test(text) && /Stopped — Not running · A new session/.test(text), text)
   const newTable = await tableOf(dialog)
   const newAx = await axTexts()
-  check('…a screen reader gets each agent with its card and what happens to it', newAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card #${card} Batch tables`) && t.includes('Stopped (will be interrupted), then a new session')) && newAx.some((t) => t.includes(`card reviewing #${reviewed} Review table`)), JSON.stringify(newAx.filter((t) => t.includes('•'))))
+  check('…a screen reader gets each agent with its card and what happens to it', newAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card ${cardName} Batch tables`) && t.includes('Stopped (will be interrupted), then a new session')) && newAx.some((t) => t.includes(`card reviewing ${reviewedName} Review table`)), JSON.stringify(newAx.filter((t) => t.includes('•'))))
   check('…as a table: Agent, State, Card, What happens', JSON.stringify(newTable.heads) === JSON.stringify(['Agent', 'State', 'Card', 'What happens']) && Object.keys(newTable.rows).length === 3, JSON.stringify(newTable))
   check('…the working one stopped first, in the warning colour; the stopped one only starts', newTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then a new session' && newTable.rows.Worker[3].warn && newTable.rows.Stopped?.[3]?.text === 'A new session' && !newTable.rows.Stopped[3].warn && newTable.rows.Stopped?.[1]?.text === 'Not running', JSON.stringify(newTable.rows))
   await bothThemes('startall-confirm')

@@ -40,12 +40,12 @@
     "description": "In the Archive All dialog, above the cards agents are on, when the user ticked to archive them too ({n} cards)."
   },
   "board.archiveAll.heldRow": {
-    "defaultMessage": "#{card} {title} · {why}",
-    "description": "A card an agent is on, listed in the Archive All dialog: its number, title and who is on it ({why}: \"Alfie is working on it\")."
+    "defaultMessage": "{card} {title} · {why}",
+    "description": "A card an agent is on, listed in the Archive All dialog: its name (its key, such as AM-12, or #12 for a card with none), title and who is on it ({why}: \"Alfie is working on it\")."
   },
   "board.archiveAll.heldRowSkipped": {
-    "defaultMessage": "#{card} {title} · {why} · skipped",
-    "description": "A card an agent is on, listed in the Archive All dialog, which it leaves on the board: its number, title and who is on it ({why}: \"Alfie is working on it\")."
+    "defaultMessage": "{card} {title} · {why} · skipped",
+    "description": "A card an agent is on, listed in the Archive All dialog, which it leaves on the board: its name (its key, such as AM-12, or #12 for a card with none), title and who is on it ({why}: \"Alfie is working on it\")."
   },
   "board.archiveAll.heldSkipped": {
     "defaultMessage": "{n, plural, one {Skipped: a card an agent is on} other {Skipped: # cards agents are on}}",
@@ -152,16 +152,16 @@
     "description": "The archived cards' view when none match the board's search."
   },
   "board.archived.openRow": {
-    "defaultMessage": "Open #{card} {title}",
-    "description": "Accessible name of a row of the archived cards' table: opens the card. {card} is its number (after #), {title} its title."
+    "defaultMessage": "Open {card} {title}",
+    "description": "Accessible name of a row of the archived cards' table: opens the card. {card} is its name: its key, such as AM-12, or #12 for a card with none, {title} its title."
   },
   "board.archived.project": {
     "defaultMessage": "Project",
     "description": "A column header of the archived cards' table: the card's project."
   },
   "board.archived.selectRow": {
-    "defaultMessage": "Select #{card}",
-    "description": "Accessible name of a row's checkbox in the archived cards' table. {card} is the card's number (after #)."
+    "defaultMessage": "Select {card}",
+    "description": "Accessible name of a row's checkbox in the archived cards' table. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.archived.title": {
     "defaultMessage": "Title",
@@ -188,8 +188,8 @@
     "description": "Button above the archived cards' table: brings the {n} selected cards back to the board."
   },
   "board.archived.unarchiveTip": {
-    "defaultMessage": "Bring #{card} back to the end of {column}",
-    "description": "Tooltip on an archived card's Unarchive button. {card} is its number (after #), {column} the board column it was archived from."
+    "defaultMessage": "Bring {card} back to the end of {column}",
+    "description": "Tooltip on an archived card's Unarchive button. {card} is its name: its key, such as AM-12, or #12 for a card with none, {column} the board column it was archived from."
   },
   "board.batch.andMore": {
     "defaultMessage": "{cards} and {n, number} more",
@@ -288,8 +288,8 @@
     "description": "Menu item (a card's right-click menu) and button (its dialog) on an archived card: brings it back to the board."
   },
   "board.card.collapse": {
-    "defaultMessage": "Collapse #{card} to one line",
-    "description": "Tooltip on the chevron of a card: folds it to one line. {card} is its number (after #)."
+    "defaultMessage": "Collapse {card} to one line",
+    "description": "Tooltip on the chevron of a card: folds it to one line. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.card.contextBroken": {
     "defaultMessage": "{n, plural, one {Read first no longer resolves: {refs}} other {# Read first references no longer resolve: {refs}}}",
@@ -308,8 +308,8 @@
     "description": "Tooltip on a card's dependencies: the cards to finish first ({cards}: \"#3, #5\")."
   },
   "board.card.expand": {
-    "defaultMessage": "Expand #{card}",
-    "description": "Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its number (after #)."
+    "defaultMessage": "Expand {card}",
+    "description": "Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.card.stalled": {
     "defaultMessage": "Stalled: {why}",
@@ -328,20 +328,20 @@
     "description": "A number of cards (\"3 cards\"), in Archive All and the archived cards' batch picker."
   },
   "board.chip.card": {
-    "defaultMessage": "#{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}",
-    "description": "A card in the hover of an agent's card chip: its number, title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)."
+    "defaultMessage": "{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}",
+    "description": "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)."
   },
   "board.chip.clickToOpen": {
-    "defaultMessage": "Click to open #{card}.",
-    "description": "The last line of the hover of an agent's card chip. {card} is the card's number."
+    "defaultMessage": "Click to open {card}.",
+    "description": "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.chip.doing": {
     "defaultMessage": "Working on (Doing):",
     "description": "Heading in the hover of an agent's card chip, above the cards it works on. Doing is the board column."
   },
   "board.chip.open": {
-    "defaultMessage": "Open card #{card}",
-    "description": "A card chip's accessible name (on an agent's pane or row): opens the card. {card} is its number."
+    "defaultMessage": "Open card {card}",
+    "description": "A card chip's accessible name (on an agent's pane or row): opens the card. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.chip.reviewing": {
     "defaultMessage": "Reviewing:",
@@ -352,8 +352,8 @@
     "description": "A warning toast after saving the card dialog: the user's values won over a change made meanwhile. {fields} lists the fields (\"title, labels\")."
   },
   "board.clash.title": {
-    "defaultMessage": "#{card} was also changed while you edited it",
-    "description": "A warning toast's title after saving the card dialog: someone (an agent, say) changed the same fields meanwhile. {card} is the card's number (after #)."
+    "defaultMessage": "{card} was also changed while you edited it",
+    "description": "A warning toast's title after saving the card dialog: someone (an agent, say) changed the same fields meanwhile. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.column.doing": {
     "defaultMessage": "Doing",
@@ -568,8 +568,8 @@
     "description": "Button: removes the decision from the card."
   },
   "board.decision.removeMessage": {
-    "defaultMessage": "\"{decision}\" leaves #{card}. Its history keeps what it said.",
-    "description": "The confirmation before a decision is removed: {decision} is its text (cut short), {card} the card's number (after #)."
+    "defaultMessage": "\"{decision}\" leaves {card}. Its history keeps what it said.",
+    "description": "The confirmation before a decision is removed: {decision} is its text (cut short), {card} the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.decision.removeTip": {
     "defaultMessage": "Remove this decision",
@@ -600,8 +600,8 @@
     "description": "The confirmation before a card is deleted. {title} is the card's title. Recycle Bin is Windows' name for it."
   },
   "board.delete.title": {
-    "defaultMessage": "Delete #{card}?",
-    "description": "Title of the confirmation before a card is deleted. {card} is its number (after #)."
+    "defaultMessage": "Delete {card}?",
+    "description": "Title of the confirmation before a card is deleted. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.details.agent": {
     "defaultMessage": "Agent",
@@ -804,8 +804,8 @@
     "description": "A field label in the card dialog: the cards to finish before this one."
   },
   "board.dialog.dependsOnPlaceholder": {
-    "defaultMessage": "Cards to finish first, e.g. #3 #5",
-    "description": "Placeholder of the card dialog's Depends on box: card numbers (#3 #5 are examples)."
+    "defaultMessage": "Cards to finish first, e.g. AM-3 AM-5",
+    "description": "Placeholder of the card dialog's Depends on box: cards by name (AM-3 AM-5 are examples: a project key, a hyphen and a number; #3 works too)."
   },
   "board.dialog.description": {
     "defaultMessage": "Description",
@@ -872,8 +872,8 @@
     "description": "A field label in the card dialog: related cards."
   },
   "board.dialog.relatedPlaceholder": {
-    "defaultMessage": "Related cards, e.g. #7",
-    "description": "Placeholder of the card dialog's Related box: card numbers (#7 is an example)."
+    "defaultMessage": "Related cards, e.g. AM-7",
+    "description": "Placeholder of the card dialog's Related box: cards by name (AM-7 is an example: a project key, a hyphen and a number)."
   },
   "board.dialog.save": {
     "defaultMessage": "Save",
@@ -1008,8 +1008,8 @@
     "description": "An agent's state in the Move to Doing dialog's agent choice: its session isn't running."
   },
   "board.doing.title": {
-    "defaultMessage": "Move #{card} to Doing",
-    "description": "Title of the Move to Doing dialog: {card} is the card's number (after #). Doing is a board column."
+    "defaultMessage": "Move {card} to Doing",
+    "description": "Title of the Move to Doing dialog: {card} is the card's name: its key, such as AM-12, or #12 for a card with none. Doing is a board column."
   },
   "board.duration.hours": {
     "defaultMessage": "{h, number} h",
@@ -1240,28 +1240,28 @@
     "description": "The last item of a folded lane segment's list of cards (Progress panel), after the first eight card numbers: how many more there are ({n}). Hive joins it to the list (\"#1, #2 … #8 and 3 more\")."
   },
   "board.lane.blocked": {
-    "defaultMessage": "#{card}: blocked",
-    "description": "A lane segment's note in the Progress panel (its hover): the card is blocked, with no reason given. {card} is its number."
+    "defaultMessage": "{card}: blocked",
+    "description": "A lane segment's note in the Progress panel (its hover): the card is blocked, with no reason given. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.blockedReason": {
-    "defaultMessage": "#{card}: blocked: {reason}",
-    "description": "A lane segment's note in the Progress panel (its hover): the card is blocked, and why, in the user's or an agent's own words ({reason}). {card} is its number."
+    "defaultMessage": "{card}: blocked: {reason}",
+    "description": "A lane segment's note in the Progress panel (its hover): the card is blocked, and why, in the user's or an agent's own words ({reason}). {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.finished": {
     "defaultMessage": "{n, plural, one {# finished: {cards}} other {# finished: {cards}}}",
     "description": "A lane segment's label (Progress panel) for its finished cards folded into one: how many ({n}) and which ({cards}: \"#3, #4\")."
   },
   "board.lane.goneWhenEnded": {
-    "defaultMessage": "#{card} · not on the board when the lane ended",
-    "description": "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its number."
+    "defaultMessage": "{card} · not on the board when the lane ended",
+    "description": "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.holdReason": {
-    "defaultMessage": "#{card}: On Hold: {reason}",
-    "description": "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column), and why, in the user's own words ({reason}). {card} is its number."
+    "defaultMessage": "{card}: On Hold: {reason}",
+    "description": "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column), and why, in the user's own words ({reason}). {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.holdWaiting": {
-    "defaultMessage": "#{card}: On Hold: waiting for you to move it on",
-    "description": "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column) until the user moves it. {card} is its number."
+    "defaultMessage": "{card}: On Hold: waiting for you to move it on",
+    "description": "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column) until the user moves it. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.holdWaitingShort": {
     "defaultMessage": "On Hold, waiting for you",
@@ -1272,28 +1272,28 @@
     "description": "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Doing\" or \"Review\") and the review round it is in ({round}, a number)."
   },
   "board.lane.label": {
-    "defaultMessage": "#{card} {title} · {where}",
-    "description": "A lane segment's label (Progress panel): the card's number, title (the user's own words) and where it is ({where}: \"Review, round 2\")."
+    "defaultMessage": "{card} {title} · {where}",
+    "description": "A lane segment's label (Progress panel): the card’s name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and where it is ({where}: \"Review, round 2\")."
   },
   "board.lane.labelWhenEnded": {
-    "defaultMessage": "#{card} {title} · {where}, when the lane ended",
-    "description": "A lane segment's label (Progress panel), in a lane that has ended: the card's number, title (the user's own words) and where it was then ({where}: \"Review, round 2\")."
+    "defaultMessage": "{card} {title} · {where}, when the lane ended",
+    "description": "A lane segment's label (Progress panel), in a lane that has ended: the card’s name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and where it was then ({where}: \"Review, round 2\")."
   },
   "board.lane.more": {
     "defaultMessage": "{n, plural, one {# more: {cards}} other {# more: {cards}}}",
     "description": "A lane segment's label (Progress panel) for the cards that don't fit its bar, folded into one: how many ({n}) and which ({cards}: \"#3, #4\")."
   },
   "board.lane.notOnBoard": {
-    "defaultMessage": "#{card} · not on the board",
-    "description": "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its number."
+    "defaultMessage": "{card} · not on the board",
+    "description": "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.openForMore": {
     "defaultMessage": "Click to open the card for the rest",
     "description": "The last line of a lane segment's hover (Progress panel), under what its facts say: clicking the segment opens the card, which shows everything."
   },
   "board.lane.reviewFailed": {
-    "defaultMessage": "#{card}: review failed (round {round}): waiting for round {next}",
-    "description": "A lane segment's note in the Progress panel (its hover, under a red underline): the card's review round {round} failed and the next round ({next}) hasn't started. {card} is its number."
+    "defaultMessage": "{card}: review failed (round {round}): waiting for round {next}",
+    "description": "A lane segment's note in the Progress panel (its hover, under a red underline): the card's review round {round} failed and the next round ({next}) hasn't started. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.reviewerGist": {
     "defaultMessage": "Reviewer: {gist}",
@@ -1304,12 +1304,12 @@
     "description": "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Review\"), and that its review round {round} failed."
   },
   "board.lane.unrecorded": {
-    "defaultMessage": "#{card} {title} · not recorded: the lane ended before Hive kept where its cards were",
-    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card's number, {title} its title (the user's own words)."
+    "defaultMessage": "{card} {title} · not recorded: the lane ended before Hive kept where its cards were",
+    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none, {title} its title (the user's own words)."
   },
   "board.lane.unrecordedUntitled": {
-    "defaultMessage": "#{card} · not recorded: the lane ended before Hive kept where its cards were",
-    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card's number."
+    "defaultMessage": "{card} · not recorded: the lane ended before Hive kept where its cards were",
+    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.workChecks": {
     "defaultMessage": "Checks on it: {passed, number} passed, {failed, number} failed",
@@ -1396,12 +1396,12 @@
     "description": "Said to screen readers after the Progress panel's lanes go back to their usual order (Usual Order, in a lane's menu)."
   },
   "board.links.archivedTitle": {
-    "defaultMessage": "#{card} {title} · Archived (from {column}) · Ctrl+click to open",
-    "description": "The hover of a card number (#12) in a terminal, for an archived card: its number, title (the user's own words), the column it was archived from ({column}), and how to open it."
+    "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
+    "description": "The hover of a card number (#12) in a terminal, for an archived card: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words), the column it was archived from ({column}), and how to open it."
   },
   "board.links.title": {
-    "defaultMessage": "#{card} {title} · {column} · Ctrl+click to open",
-    "description": "The hover of a card number (#12) in a terminal: its number, title (the user's own words), its board column ({column}), and how to open it."
+    "defaultMessage": "{card} {title} · {column} · Ctrl+click to open",
+    "description": "The hover of a card number (#12) in a terminal: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words), its board column ({column}), and how to open it."
   },
   "board.menu.delete": {
     "defaultMessage": "Delete…",
@@ -2016,8 +2016,8 @@
     "description": "Why a card's work or review is stalled: its agent's session isn't running. {agent} is the agent's name."
   },
   "board.stalled.notWatching": {
-    "defaultMessage": "{agent} isn't watching #{card}: its turn ended with no card watch.",
-    "description": "Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card number (after #). A card watch is what wakes an agent when a card changes."
+    "defaultMessage": "{agent} isn't watching {card}: its turn ended with no card watch.",
+    "description": "Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes."
   },
   "board.stalled.removed": {
     "defaultMessage": "{agent} was removed.",
@@ -2028,24 +2028,24 @@
     "description": "Why a card's work is stalled: its agent (name unknown) was removed from the project."
   },
   "board.stalled.reviewVerdictWait": {
-    "defaultMessage": "{agent} started reviewing #{card} but has given no verdict, and has only been watching it for {waited}.",
-    "description": "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")."
+    "defaultMessage": "{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.",
+    "description": "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.reviewWait": {
-    "defaultMessage": "{agent} is watching #{card} but hasn't started reviewing it: in Review for {waited}.",
-    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
+    "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it: in Review for {waited}.",
+    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.reviewWaitBusy": {
-    "defaultMessage": "{agent} is watching #{card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.",
-    "description": "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
+    "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.",
+    "description": "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.reviewWaitSilent": {
-    "defaultMessage": "{agent} is watching #{card} but hasn't started reviewing it (it shows working, but has been silent for {silent, number} min: state unknown): in Review for {waited}.",
-    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card number (after #), {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
+    "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent, number} min: state unknown): in Review for {waited}.",
+    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.wakeUntaken": {
-    "defaultMessage": "{agent} hasn't taken the wake Hive typed for #{card}: it waits in its prompt.",
-    "description": "Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent's terminal, but the agent's CLI never sent it. {agent} is its name, {card} the card number (after #)."
+    "defaultMessage": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
+    "description": "Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent's terminal, but the agent's CLI never sent it. {agent} is its name, {card} the card's name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.start.busy": {
     "defaultMessage": "{status}. Choose it once it's idle.",
@@ -2108,20 +2108,20 @@
     "description": "A button on the toast after a card started: shows the agent it started on."
   },
   "board.start.started": {
-    "defaultMessage": "#{card} started on {agent}",
-    "description": "A toast's title after a card started: its number (after #) and the agent ({agent}, its name). The card's title follows."
+    "defaultMessage": "{card} started on {agent}",
+    "description": "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows."
   },
   "board.start.stopped": {
     "defaultMessage": "Stopped: starts a new conversation on the card.",
     "description": "Under a stopped agent in the Start dialog: starting the card starts it with a new conversation."
   },
   "board.start.title": {
-    "defaultMessage": "Start #{card}: {title}",
-    "description": "Title of the Start dialog: the card's number (after #) and title."
+    "defaultMessage": "Start {card}: {title}",
+    "description": "Title of the Start dialog: the card’s name: its key, such as AM-12, or #12 for a card with none and title."
   },
   "board.start.titleShort": {
-    "defaultMessage": "Start #{card}",
-    "description": "Title of the Start dialog when the card can't start: {card} is its number (after #)."
+    "defaultMessage": "Start {card}",
+    "description": "Title of the Start dialog when the card can't start: {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.start.worktreeAgent": {
     "defaultMessage": "A new agent in its own worktree",
@@ -2152,8 +2152,8 @@
     "description": "Tooltip on the board toolbar's ⋯ button: opens the board's menu (Archive All Cards…)."
   },
   "board.toolbar.search": {
-    "defaultMessage": "Search cards (#12, words, labels)",
-    "description": "Placeholder of the board's search box: finds cards by number (#12), words or labels."
+    "defaultMessage": "Search cards (AM-12, words, labels)",
+    "description": "Placeholder of the board's search box: finds cards by name (AM-12: a project key, a hyphen and a number; AM- finds all of that project's; #12 works too), words or labels."
   },
   "board.upgrade.askDetail": {
     "defaultMessage": "Close every other Hive that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",

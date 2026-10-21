@@ -58,7 +58,13 @@ const until = async (fn, ms = 10000) => {
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   // Prompts name a card by its key with the number the tools take (#1219): its own key, from the board.
   const named = async (n) => `${(await card(n)).key} (#${n})`
-  const make = async (title, extra = {}) => (await inv('tasks:create', { title, project: 'alpha', ...extra })).number
+  // The window names a card by key (#1221).
+  const keyOf = new Map()
+  const make = async (title, extra = {}) => {
+    const c = await inv('tasks:create', { title, project: 'alpha', ...extra })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
   const transcripts = () =>
     fs.existsSync(path.join(claudeHome, 'projects'))
       ? fs
@@ -79,7 +85,7 @@ const until = async (fn, ms = 10000) => {
   const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-header', { hasText: label }) })
   const order = (label) => column(label).locator('.task-card').evaluateAll((els) => els.map((x) => Number(x.dataset.task)))
   await until(async () => (await tile(f).count()) === 1, 5000)
-  const dialog = (n) => page.locator('.dialog', { hasText: `Move #${n} to Doing` })
+  const dialog = (n) => page.locator('.dialog', { hasText: `Move ${keyOf.get(n) ?? `#${n}`} to Doing` })
   const mode = (dlg, name) => dlg.locator('label.choice', { hasText: name }).first()
   const disabled = (loc) => loc.evaluate((x) => x.classList.contains('disabled'))
   const confirm = (dlg) => dlg.locator('.dialog-footer .btn.primary')

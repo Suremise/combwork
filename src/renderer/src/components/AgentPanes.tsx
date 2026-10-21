@@ -4,6 +4,7 @@ import { StateMark } from './StateMark'
 import { AGENT_STATE_LABEL, AGENT_STATES, agentState, mostUrgent as mostUrgentState, projectAgentStates, stateSummary } from '@shared/agentState'
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
+import { cardLabel } from '@shared/projectKeys'
 import { modelCaps } from '@shared/models'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
@@ -743,8 +744,8 @@ function AgentTabTip({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
   if (a.role) lines.push(tr(msg({ id: 'panes.tab.role', defaultMessage: 'Role: {role}', description: "A line of an agent tab's hover: its role (the user's own words)." }), { role: a.role }))
   // Only shown when it has a choice of its own (#537): the default, all of the project's servers, goes without saying.
   if (agentChoosesMcp(a)) lines.push(tr(msg({ id: 'panes.tab.mcp', defaultMessage: 'MCP servers: {servers}', description: "A line of an agent tab's hover: the MCP servers it has on ({servers})." }), { servers: agentMcpText(a) }))
-  for (const c of cards) lines.push(tr(msg({ id: 'panes.tab.workingOn', defaultMessage: 'Working on #{card} {title}', description: "A line of an agent tab's hover: a card it works on (its number and title, the user's own words)." }), { card: c.number, title: c.title }))
-  for (const c of reviewing) lines.push(tr(msg({ id: 'panes.tab.reviewing', defaultMessage: 'Reviewing #{card} {title}', description: "A line of an agent tab's hover: a card it reviews (its number and title, the user's own words)." }), { card: c.number, title: c.title }))
+  for (const c of cards) lines.push(tr(msg({ id: 'panes.tab.workingOn', defaultMessage: 'Working on {card} {title}', description: "A line of an agent tab's hover: a card it works on (its name (its key, such as AM-12, or #12 for a card with none) and title, the user's own words)." }), { card: cardLabel(c), title: c.title }))
+  for (const c of reviewing) lines.push(tr(msg({ id: 'panes.tab.reviewing', defaultMessage: 'Reviewing {card} {title}', description: "A line of an agent tab's hover: a card it reviews (its name (its key, such as AM-12, or #12 for a card with none) and title, the user's own words)." }), { card: cardLabel(c), title: c.title }))
   if (live) lines.push(tr(msg({ id: 'panes.tab.session', defaultMessage: 'Session: {session}', description: "A line of an agent tab's hover: the session it runs ({session}: its name)." }), { session: liveSessionLabel(project, live, usage) }))
   else if (a.resume) lines.push(tr(msg({ id: 'panes.tab.resumeOpens', defaultMessage: 'Resume opens: {session} ({when})', description: "A line of a stopped agent tab's hover: the session Resume opens ({session}: its name) and when it was last active ({when}: \"5 min ago\")." }), { session: sessionLabel(a.resume, project.name), when: timeAgo(a.resume.lastActiveAt) }))
   if (a.worktree) lines.push(tr(msg({ id: 'panes.tab.worktree', defaultMessage: 'Worktree {path} on {branch}, branched from {base}', description: "A line of a worktree agent tab's hover: its folder, its branch and the branch it was made from." }), { path: a.worktree.path, branch: a.worktree.branch, base: a.worktree.base }))

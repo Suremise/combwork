@@ -186,7 +186,7 @@ describe("an ended lane's segments (#512)", () => {
   const lc = (number: number, column: LaneCard['column'], over: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...over })
 
   it('shows each card as the lane left it, never failed (it keeps no verdicts)', () => {
-    expect(frozenSegment(lc(5, 'doing', { round: 2 }))).toEqual({ kind: 'card', number: 5, state: 'doing', failed: false, round: 2, label: '#5 Card 5 · Doing, round 2, when the lane ended', notes: [] })
+    expect(frozenSegment(lc(5, 'doing', { round: 2 }))).toEqual({ kind: 'card', number: 5, name: '#5', state: 'doing', failed: false, round: 2, label: '#5 Card 5 · Doing, round 2, when the lane ended', notes: [] })
     expect(frozenSegment(lc(6, 'passed', { round: 3 }))).toMatchObject({ state: 'passed', round: 3, label: '#6 Card 6 · Passed in round 3, when the lane ended' })
     expect(frozenSegment(lc(7, 'todo'))).toMatchObject({ state: 'todo', round: null, label: '#7 Card 7 · Todo, when the lane ended' })
     // Its hatching says why, as the lane left it (#706).
@@ -197,7 +197,7 @@ describe("an ended lane's segments (#512)", () => {
   })
 
   it("says when the lane kept no record of a card, never where the board has it now", () => {
-    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Hive kept where its cards were', notes: [] })
+    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, name: '#11', state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Hive kept where its cards were', notes: [] })
     expect(frozenSegment(lc(12, 'unrecorded', { title: '' })).label).toBe('#12 · not recorded: the lane ended before Hive kept where its cards were')
     // Not finished, not worked: such a lane has no current card to show.
     expect(laneSummary([frozenSegment(lc(11, 'unrecorded'))])).toMatchObject({ finished: 0, total: 1 })

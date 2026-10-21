@@ -6,7 +6,7 @@ import type { WorkBadge } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
-import { NO_PROJECTS, get, set, useLanguage, useStore } from '../store'
+import { NO_PROJECTS, cardLabelOf, get, set, useLanguage, useStore } from '../store'
 import { saveLaneOrder, useLaneOrder, type Lane } from '../laneSource'
 import { useNow } from '../usage'
 import { cx } from '../util'
@@ -354,7 +354,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
   useNow(60_000)
-  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr)) : laneCards(l.cards, tasks, tr)
+  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr)
   let stalled: { n: number; why: string } | null = null
   for (const n of l.frozen ? [] : l.cards) {
     const c = tasks.find((t) => t.number === n)
@@ -406,11 +406,11 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
           <div className="grow" />
           {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
           {stalled && (
-            <Tooltip content={`#${stalled.n}: ${stalled.why}`}>
+            <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
             </Tooltip>
           )}
-          {current !== null && !l.frozen && <span className="progress-lane-current">#{current}</span>}
+          {current !== null && !l.frozen && <span className="progress-lane-current">{cardLabelOf({ tasks }, current)}</span>}
           <span className="progress-lane-count faint">
             {unknown ? '–' : finished}/{total}
           </span>

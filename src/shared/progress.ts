@@ -335,7 +335,7 @@ export interface RunDetail {
  * project, provider), when it started and ended (in the user's date and time format), how long against what was
  * expected, its steps, its state and why, the exit code and a log the reporter named. `project` is its project's name.
  */
-export function runDetails(r: ProgressRun, project: string | null, now: number, tr: Tr): RunDetail[] {
+export function runDetails(r: ProgressRun, project: string | null, now: number, tr: Tr, cardName: (n: number) => string = cardRefText): RunDetail[] {
   const took = (r.finishedAt ?? now) - r.startedAt
   let steps: string | null = null
   if (r.total !== null) {
@@ -369,7 +369,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   const out: RunDetail[] = [{ label: tr(msg({ id: 'board.details.run', defaultMessage: 'Run', description: "A label in a run's details (Progress panel): the run's title follows." })), text: r.title }]
   if (r.command) out.push({ label: tr(msg({ id: 'board.details.command', defaultMessage: 'Command', description: "A label in a run's details (Progress panel): the command it ran follows." })), text: r.command, code: true })
   // What it ran for (#1220): its card and the revision (in full, for copying; the row shows it short).
-  if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardRefText(r.card) })
+  if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardName(r.card) })
   if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)." })), text: r.revision, code: true })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
   if (r.counts) {
@@ -410,9 +410,9 @@ export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName'>, 
 }
 
 /** A run's details as plain text for pasting (Copy details, #251): a "Label: text" line for each, then its summary. */
-export function runDetailsText(r: ProgressRun, project: string | null, now: number, tr: Tr): string {
+export function runDetailsText(r: ProgressRun, project: string | null, now: number, tr: Tr, cardName: (n: number) => string = cardRefText): string {
   const line = (label: string, text: string): string => tr(msg({ id: 'board.details.line', defaultMessage: '{label}: {text}', description: "A line of a run's details copied as text (Copy details, Progress panel): a label (\"Command\") and its text." }), { label, text })
-  const lines = runDetails(r, project, now, tr).map((d) => line(d.label, d.text))
+  const lines = runDetails(r, project, now, tr, cardName).map((d) => line(d.label, d.text))
   if (r.summary) lines.push(line(tr(msg({ id: 'board.details.summary', defaultMessage: 'Summary', description: "A label in a run's details copied as text (Copy details, Progress panel): the summary its reporter gave follows." })), r.summary))
   return lines.join('\n')
 }

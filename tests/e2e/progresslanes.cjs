@@ -74,7 +74,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('each agent has its own token', !!t1 && !!tr && !!t3 && new Set([t1, tr, t3]).size === 3, JSON.stringify(launches.map((l) => l.cwd)))
 
   // --- The board a lane reads: B1's eight cards, each somewhere else.
-  const make = async (title, column = 'todo', agent = b1.id) => (await inv('tasks:create', { title, project: 'alpha', column, agent })).number
+  // Each card's name as the window gives it (#1221): its key.
+  const keyOf = new Map()
+  const K = (n) => keyOf.get(n) ?? `#${n}`
+  const make = async (title, column = 'todo', agent = b1.id) => {
+    const c = await inv('tasks:create', { title, project: 'alpha', column, agent })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
   const lane1 = []
   for (const t of ['Lane data', 'Lane tools', 'Panel layout', 'Segment colours', 'Merge card', 'Lane hover', 'Docs and tip', 'Screenshots']) lane1.push(await make(t, 'doing'))
   const [n1, n2, n3, n4, n5, n6, n7, n8] = lane1
@@ -167,7 +174,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const row1 = section.locator(`.progress-lane[data-lane="${l1}"]`)
   const top1 = await row1.locator('.progress-lane-top').innerText()
   // #3 is back in Review while #4 is being fixed in Doing: the lane is on #4, the card being built (#512).
-  check('a lane says its pair, name, the card being worked and finished/total', /B1 \/ R1/.test(top1) && /lanes and loops/.test(top1) && new RegExp(`#${n4}\\b`).test(top1) && /2\/8/.test(top1), top1)
+  check('a lane says its pair, name, the card being worked and finished/total', /B1 \/ R1/.test(top1) && /lanes and loops/.test(top1) && new RegExp(`${K(n4)}\\b`).test(top1) && /2\/8/.test(top1), top1)
   const segClass = async (n) => (await row1.locator(`.lane-seg[data-card="${n}"]`).getAttribute('class')) ?? ''
   const want = { [n1]: 'done', [n2]: 'passed', [n3]: 'review', [n4]: 'doing', [n5]: 'todo', [n6]: 'blocked', [n7]: 'blocked', [n8]: 'todo' }
   const got = {}
@@ -297,7 +304,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('the lanes are pinned to the bottom of the panel', Math.abs(sectionBox.y + sectionBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify({ panelBox, sectionBox }))
   // Hover: the card and its round.
   await row1.locator(`.lane-seg[data-card="${n3}"]`).hover()
-  const tip = page.locator('.tip', { hasText: `#${n3} Panel layout` })
+  const tip = page.locator('.tip', { hasText: `${K(n3)} Panel layout` })
   check('hovering a segment shows the card and its round', !!(await until(async () => (await tip.count()) === 1, HUNG_MS)) && /Review, round 2/.test(await tip.innerText()), await page.locator('.tip').allInnerTexts().then((t) => t.join(' | ')))
   await row1.locator(`.lane-seg[data-card="${n4}"]`).hover()
   check("…and a failed one's", !!(await until(async () => /round 1 failed review/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
@@ -305,13 +312,13 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // What the marks mean (#706): the red underline's failed round and the reviewer's gist, the hatching's reason, in the
   // hover and in the segment's accessible name. A screenshot of each hover in both themes.
   const marks = [
-    [n4, 'failed', [`#${n4}: review failed (round 1): waiting for round 2`, 'Reviewer: Round 1: FAILED: 1 finding: the hover clips']],
-    [n6, 'blocked', [`#${n6}: blocked: Waiting for a design decision`]],
-    [n7, 'hold', [`#${n7}: On Hold: waiting for you to move it on`]]
+    [n4, 'failed', [`${K(n4)}: review failed (round 1): waiting for round 2`, 'Reviewer: Round 1: FAILED: 1 finding: the hover clips']],
+    [n6, 'blocked', [`${K(n6)}: blocked: Waiting for a design decision`]],
+    [n7, 'hold', [`${K(n7)}: On Hold: waiting for you to move it on`]]
   ]
   for (const [n, what, lines] of marks) {
     const seg = row1.locator(`.lane-seg[data-card="${n}"]`)
-    const tipOf = page.locator('.tip', { hasText: `#${n} ` })
+    const tipOf = page.locator('.tip', { hasText: `${K(n)} ` })
     const notes = async () => tipOf.locator('.lane-seg-note').allInnerTexts().catch(() => [])
     await page.mouse.move(0, 0)
     await seg.hover()
@@ -335,7 +342,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // What the cards' facts say (#1225), from the moves above: the revision under review and the last verdict on its
   // revision, a passed card's verdict, and a Done card's merge commit (the ended lane's own record: no merge fact).
   const head7 = String(lib.git(alpha, ['rev-parse', 'HEAD'])).trim().slice(0, 7)
-  const workLines = async (row, n) => page.locator('.tip', { hasText: `#${n} ` }).locator('.lane-seg-work').allInnerTexts().catch(() => [])
+  const workLines = async (row, n) => page.locator('.tip', { hasText: `${K(n)} ` }).locator('.lane-seg-work').allInnerTexts().catch(() => [])
   const work = [
     [row1, n3, 'review', (l) => l.includes(`Under review: ${head7}`) && l.some((x) => x.startsWith(`Last verdict: failed on ${head7}`))],
     [row1, n2, 'passed', (l) => l.some((x) => x.startsWith(`Last verdict: passed on ${head7}`))],
@@ -390,7 +397,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('a merge card shows on top', !!(await until(async () => (await mergeCard.count()) === 1, HUNG_MS)))
   const branch = b1.worktree?.branch
   const text = await mergeCard.innerText()
-  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging #${n8}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
+  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
   check('with a divider under it', (await panel.locator('.progress-divider').count()) === 1)
   const colours = await page.evaluate(() => {
     const card = getComputedStyle(document.querySelector('.progress-merge-card')).borderTopColor
@@ -445,7 +452,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const turn = await until(async () => (await inv('mergeSlots:list')).find((s) => s.holder?.name === 'B3' && !s.holder.taken), 5000)
   check("released, B3's turn (not taken yet) shows no card or divider", !!turn && !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)), JSON.stringify(await inv('mergeSlots:list')))
   const again = await api(t3, 'POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', cards: [long[18]], timeoutSeconds: 0 })
-  check('once B3 claims it, its card shows', again.body?.held === true && !!(await until(async () => new RegExp(`B3 is merging #${long[18]}`).test(await mergeCard.innerText().catch(() => '')), HUNG_MS)))
+  check('once B3 claims it, its card shows', again.body?.held === true && !!(await until(async () => new RegExp(`B3 is merging ${K(long[18])}`).test(await mergeCard.innerText().catch(() => '')), HUNG_MS)))
   await api(t3, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
   check('free: the merge card and divider go', !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)))
 
@@ -461,7 +468,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // R1's lane was paused on its blocked card; its builder moves on to the next one: working, not paused, on that card.
   const row3 = section.locator(`.progress-lane[data-lane="${l3}"]`)
   await inv('tasks:update', short[1], { column: 'doing' })
-  check('a builder that moves on past a blocked card: the lane is running, on the card being worked', !!(await until(async () => { const t = await row3.locator('.progress-lane-top').innerText(); return !/paused/.test(t) && new RegExp(`#${short[1]}\\b`).test(t) }, HUNG_MS)), await row3.locator('.progress-lane-top').innerText())
+  check('a builder that moves on past a blocked card: the lane is running, on the card being worked', !!(await until(async () => { const t = await row3.locator('.progress-lane-top').innerText(); return !/paused/.test(t) && new RegExp(`${K(short[1])}\\b`).test(t) }, HUNG_MS)), await row3.locator('.progress-lane-top').innerText())
   check('…its blocked card still flagged in its segment', /\bblocked\b/.test((await row3.locator(`.lane-seg[data-card="${short[0]}"]`).getAttribute('class')) ?? ''))
   // Running again, it sorts with the running lanes, newest first (it was started after B1's and B3's).
   check('…and moves up among the running lanes', !!(await until(async () => (await order()).join() === [l7, l6, l3, l2, l1, l4, l5].join(), HUNG_MS)), JSON.stringify(await order()))

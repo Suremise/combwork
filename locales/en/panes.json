@@ -584,8 +584,8 @@
     "description": "A line of a stopped agent tab's hover: the session Resume opens ({session}: its name) and when it was last active ({when}: \"5 min ago\")."
   },
   "panes.tab.reviewing": {
-    "defaultMessage": "Reviewing #{card} {title}",
-    "description": "A line of an agent tab's hover: a card it reviews (its number and title, the user's own words)."
+    "defaultMessage": "Reviewing {card} {title}",
+    "description": "A line of an agent tab's hover: a card it reviews (its name (its key, such as AM-12, or #12 for a card with none) and title, the user's own words)."
   },
   "panes.tab.role": {
     "defaultMessage": "Role: {role}",
@@ -600,8 +600,8 @@
     "description": "The first line of an agent tab's hover: its name, its provider (\"Claude Code\") and its state."
   },
   "panes.tab.workingOn": {
-    "defaultMessage": "Working on #{card} {title}",
-    "description": "A line of an agent tab's hover: a card it works on (its number and title, the user's own words)."
+    "defaultMessage": "Working on {card} {title}",
+    "description": "A line of an agent tab's hover: a card it works on (its name (its key, such as AM-12, or #12 for a card with none) and title, the user's own words)."
   },
   "panes.tab.worktree": {
     "defaultMessage": "Worktree {path} on {branch}, branched from {base}",
@@ -724,12 +724,12 @@
     "description": "A badge on an agent's tile: background tasks it started that still run."
   },
   "panes.tiles.chipLabel": {
-    "defaultMessage": "Card #{card}, {column}{blocked, select, yes {, blocked} other {}}",
-    "description": "Accessible name of the card chip on an agent's row in the focus view's strip: the card's number ({card}), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")."
+    "defaultMessage": "Card {card}, {column}{blocked, select, yes {, blocked} other {}}",
+    "description": "Accessible name of the card chip on an agent's row in the focus view's strip: the card’s name ({card}: its key, such as AM-12, or #12 for a card with none), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")."
   },
   "panes.tiles.chipLine": {
-    "defaultMessage": "#{card} {title} ({role, select, reviewing {reviewing, } other {}}{column}{blocked, select, yes {, blocked} other {}})",
-    "description": "A card in the hover of the card chip on an agent's row in the focus view's strip: its number ({card}), title (the user's own words), whether the agent reviews it (reviewing: add \"reviewing, \"), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")."
+    "defaultMessage": "{card} {title} ({role, select, reviewing {reviewing, } other {}}{column}{blocked, select, yes {, blocked} other {}})",
+    "description": "A card in the hover of the card chip on an agent's row in the focus view's strip: its name ({card}: its key, such as AM-12, or #12 for a card with none), title (the user's own words), whether the agent reviews it (reviewing: add \"reviewing, \"), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")."
   },
   "panes.tiles.context": {
     "defaultMessage": "Context {tokens}",
