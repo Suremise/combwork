@@ -2561,14 +2561,16 @@ verdict moves it. Each on the board's one intent path (`runIntent`), so the runt
 §16.8.3's, the Agent API's `409`) and the card's 0.9 fields follow; the change's other fields go with its first write,
 its comment with the write recording the intent. The short reply adds "As submit: next time call hive_submit". A batch
 translates each card's; a card an agent creates in Doing, Review or Passed is made in Todo and moved by its intent in
-one change. P3's path stays for: a column the card's ruleset lacks (Review with no review), a review there, and any
-move of a card in such a column or On Hold (as the user's moves, until the skills use the intents); a move back into
-Doing from Review, Passed or Done (more work the user asked for: no rule to skip; a Done card's new cycle recorded as
-P3 records it); a move to the
-column a card is in (but a failed card from before returned to Review is
-its submission), a move into Doing naming another agent (the runtime starts a card for its starter), another agent's
-card in Doing moved on (P3's refusal), scripts (the workspace token), cards from before 1.0 until they start, and every
-agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
+one change. **Every new cycle is a start, through Start's guards** [HR2's #1268 round 1]: from Todo, a Done card moved
+back to Doing (reopened: back to Todo and started in one write), a card On Hold never started, and a start naming
+another agent (started for it: its builder). **Each translation is one write** (a verdict with the review it starts),
+undone whole when refused or failing part way, the comment checked before anything is read or written. P3's path
+stays for: a column the card's ruleset lacks (Review with no review), a review there, and any move of a card in such a
+column or On Hold while being worked on (as the user's moves, until the skills use the intents); a move back into
+Doing from Review or Passed (fixes or more work in the same cycle: nothing started, no rule to skip); a move to the
+column a card is in (but a failed card from before returned to Review is its submission); another agent's card in
+Doing moved on (P3's refusal); scripts (the workspace token); cards from before 1.0 until they start (as the user's,
+§16.7.1); and every agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
 written at adoption): the runtime folds a card's facts from its cached stage, so an adopted card's intents work (S40).
 
 **Other:** templates v1 wiped; agents' worktrees become slots (§16.10.8); keys suggested (§16.12).

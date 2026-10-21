@@ -913,8 +913,10 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
   if (actor.kind === 'agent' && actor.self && (column === 'doing' || column === 'review' || column === 'passed') && (await agentTranslates(ws, actor, input))) {
     return cardBatch(ws, async () => {
       const card = await recording(actor, null, () => createTaskLocked({ ...input, column: 'todo' }, actor))
-      const g = await agentGateOf(ws, card.number, { column }, actor)
-      return g ? moveAsAgent(g, card.number, { column }, actor) : card
+      // Given to another agent: started for it (its builder), the card staying its.
+      const move: TaskPatch = { column, ...(card.agent && card.agent !== actor.self?.agentId ? { agent: card.agent } : {}) }
+      const g = await agentGateOf(ws, card.number, move, actor)
+      return g ? moveAsAgent(g, card.number, move, actor) : card
     })
   }
   const project = (column === 'doing' || column === 'review') && ws.path ? await projectName(scopeOf(actor) !== null && input.project === undefined ? scopeOf(actor)! : input.project).catch(() => '') : ''
@@ -1053,6 +1055,8 @@ interface AgentGate {
   wf: Workflow
   column?: 'doing' | 'review' | 'passed' | 'done' | 'todo'
   review?: 'start' | 'passed' | 'failed'
+  /** Doing: the agent the card is started for, when the change gives it to another. */
+  builder?: string
 }
 
 /** The hive tool of each intent an agent's old move stands for: what its reply says to call next time (#1268). */
@@ -1062,12 +1066,12 @@ const INTENT_TOOL: Record<string, string> = { start: 'hive_start_card', submit: 
  * Whether a project agent's change (its own token) is an old move translated into an intent, for one transition (#1268,
  * SPEC §16.17: P4 until P8 rewrites the skills): its `review` (start: start review; passed, failed: a verdict on the
  * latest submission) or its column (Doing: start, Review: submit, Passed: a passing verdict, Done: report merge, Todo:
- * put back), with the rules enforced, of a card from 1.0 in a project with a platform. Anything else keeps P3's path:
- * the rules off (the agents' moves of 0.9, its checks only), a card from before 1.0 until it starts, a column the card
- * is in already, back into Doing from further on (more work), a column its ruleset lacks (and a card in one, or On
- * Hold), another agent's card in Doing moved on (its
- * refusal), scripts (the workspace's token), and a start naming another agent (the runtime starts a card for the agent
- * that starts it).
+ * put back), with the rules enforced, of a card from 1.0 in a project with a platform. Every new cycle is a start (from
+ * Todo, a Done card reopened, a card On Hold never started; given to another agent: started for it). Anything else
+ * keeps P3's path: the rules off (the agents' moves of 0.9, its checks only), a card from before 1.0 until it starts, a
+ * column the card is in already, back into Doing from Review or Passed (the same cycle), a column its ruleset lacks (and
+ * a card in one, or On Hold while worked on), another agent's card in Doing moved on (its refusal), and scripts (the
+ * workspace's token).
  */
 async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<AgentGate | null> {
   if (actor.kind !== 'agent' || !actor.self) return null
@@ -1098,7 +1102,10 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
   // the user asks it to work on it).
   const s = wf.state(rec)
   const r = wf.rulesetOf(rec, s)
-  if (s.stage === 'hold' || !hasStage(r, s.stage) || !hasStage(r, review ? 'review' : CATEGORY_STAGE[column as TaskColumn])) return null
+  // A card On Hold never started is started by its move to Doing, as from Todo (HR2's #1268 round 1: a new cycle always
+  // goes through Start's guards); one held while being worked on goes back to it by P3's move.
+  const heldNew = s.stage === 'hold' && !s.started && column === 'doing' && !review
+  if ((s.stage === 'hold' && !heldNew) || (!heldNew && !hasStage(r, s.stage)) || !hasStage(r, review ? 'review' : CATEGORY_STAGE[column as TaskColumn])) return null
   if (review) return { wf, review }
   if (STAGE_CATEGORY[s.stage] === column) {
     // A card failed by a review before the transition, still in Review, returned for review by its agent (#214): its
@@ -1106,44 +1113,51 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
     const card = column === 'review' ? await getTask(n, ws).catch(() => null) : null
     if (!card || !returnsCard(actor, card) || !returnRound(card)) return null
   }
-  // Back into Doing from Review, Passed or Done (more work the user asked for, work-on-card): no rule to skip, so P3's
-  // move, as before; the recorder starts a Done card's new cycle. Only a card in Todo is started by its intent.
-  if (column === 'doing' && s.stage !== 'todo') return null
-  if (column === 'doing' && patch.agent !== undefined && (await agentIdIn(ws, head.project, patch.agent)) !== actor.self.agentId) return null
-  return { wf, column: column as AgentGate['column'] }
+  if (column !== 'doing') return { wf, column: column as AgentGate['column'] }
+  // Back into Doing from Review or Passed (fixes, more work the user asked for): the same cycle, nothing started, so P3's
+  // move, as before. A new cycle is a start, through Start's guards (HR2's #1268 round 1): from Todo, a Done card
+  // reopened, a card On Hold never started.
+  if (s.stage !== 'todo' && s.stage !== 'done' && !heldNew) return null
+  // Given to another agent in the same change: started for that agent (its builder); an agent no project has, or none
+  // (taken away), is P3's to refuse or keep in Doing unstarted.
+  if (patch.agent === undefined) return { wf, column: 'doing' }
+  const builder = patch.agent ? await agentIdIn(ws, head.project, patch.agent) : null
+  return builder ? { wf, column: 'doing', builder } : null
 }
 
-/** Whether a project agent's new card would have its column translated (#1268): the rules enforced, its project's runtime, no other agent named. */
+/** Whether a project agent's new card would have its column translated (#1268): the rules enforced, its project's runtime (another agent named: started for it). */
 async function agentTranslates(ws: WorkspaceService, actor: TaskActor & { kind: 'agent' }, input: { project?: string; agent?: string | null }): Promise<boolean> {
   const { workflowEnforced, workflowFor } = await import('./workflow/service')
   if (!ws.path || !workflowEnforced() || !actor.self) return false
   const scope = scopeOf(actor)
   const project = await projectName(scope !== null && input.project === undefined ? scope : input.project).catch(() => '')
-  if (!project || (input.agent && (await agentIdIn(ws, project, input.agent)) !== actor.self.agentId)) return false
+  if (!project || (input.agent && !(await agentIdIn(ws, project, input.agent)))) return false
   return !!(await workflowFor(ws, join(ws.path, project)).catch(() => null))
 }
 
 /**
  * An agent's old move or review as its intent (#1268), on the one intent path (`runIntent`): the runtime's guards
  * decide (a refusal is the 409 contract, with that intent's rule), its facts are written once, and the card's 0.9 fields
- * follow in each write. The change's other fields go with its first write; its comment (the submission's summary, the
- * verdict's comment, put back's why) with the write that records the intent (a verdict's, after the review it starts).
- * A start gives the card to the agent; every other write keeps the card's agent. The reply (`said`) names the intent's
- * tool to call next time.
+ * follow in its write. Each is one write (a verdict with the review it starts, a Done card's reopening with its start),
+ * so a refusal or an error leaves nothing of the change: its other fields and its comment (the submission's summary, the
+ * verdict's comment, put back's why) go with that write. A start gives the card to the agent it is for; every other
+ * write keeps the card's agent. The reply (`said`) names the intent's tool to call next time.
  */
 async function moveAsAgent(g: AgentGate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   const self = actor.kind === 'agent' ? actor.self : undefined
   const { column: target, review: _review, before, position, ...rest } = patch
   const named = `#${n}`
   const who = actorOf(actor)
-  const words = opts.comment?.trim() ?? ''
+  // The comment checked before anything is gathered or written (HR2's #1268 round 1): an empty or oversized one refuses
+  // the whole change, as P3's path does. Each translated intent is one write, so nothing else of it can half-apply.
+  const words = opts.comment === undefined ? '' : commentText(opts.comment)
   const verdict = g.review === 'passed' || g.review === 'failed' || g.column === 'passed'
   let commented = false
   const { reply, saved } = await runIntent(
     g.wf,
     n,
     actor,
-    (wf): Promise<Reply> => (g.review ? wf.agentReview(named, who, g.review, words) : wf.agentColumnMove(named, who, g.column!, { translate: true, summary: words })),
+    (wf): Promise<Reply> => (g.review ? wf.agentReview(named, who, g.review, words) : wf.agentColumnMove(named, who, g.column!, { translate: true, summary: words, ...(g.builder ? { builder: g.builder } : {}) })),
     (w, first) => {
       const v = w.written.find((f) => f.kind === 'Verdict')
       const started = w.written.some((f) => f.kind === 'Started')

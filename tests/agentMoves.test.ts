@@ -143,12 +143,79 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(k.filter((x) => x === 'Submitted')).toHaveLength(2)
     expect(k.filter((x) => x === 'Verdict')).toHaveLength(2)
     expect(k.filter((x) => x === 'ReviewStarted')).toHaveLength(2)
-    // More work the user asked for: back into Doing is P3's move (no rule to skip), a new cycle started.
+    // More work the user asked for: a Done card back into Doing is reopened and started, a new cycle (its start's).
     const again = await update(w, card, builder, { column: 'doing' }, 'More work')
     expect(again.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(again.said.some((l) => l.startsWith('As '))).toBe(false)
+    expect(again.said).toContain('As start: next time call hive_start_card')
     expect(kinds(w, card).filter((x) => x === 'Started')).toHaveLength(2)
+    expect(facts(w, card).filter((f) => f.kind === 'Moved').slice(-2).map((f) => (f.data as { to: string }).to)).toEqual(['todo', 'active'])
     expect(stage(w, card)).toBe('active')
+  })
+
+  // HR2's round 1 finding 1: a new cycle is always a start, through Start's guards; back into Doing for fixes isn't one.
+  it("a new cycle by an old move goes through Start's guards: a Done card reopened, one given to another agent, one On Hold, one made in Doing", async () => {
+    // Pair as the preset has it: a blocked card doesn't start (start.notBlocked).
+    const { w, repo, wt } = await workspace({ ...PAIR, dependenciesDone: true })
+    const block = (card: number, why: string | null) => update(w, card, user, { blocked: why ?? '' })
+    // A Done card, blocked: its builder's move back to Doing is refused by start.notBlocked; unblocked, it starts again.
+    const done = await started(w, wt)
+    await update(w, done, builder, { column: 'review' }, 'Ready')
+    await update(w, done, reviewer, { review: 'passed', column: 'passed' }, 'PASSED')
+    sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await update(w, done, builder, { column: 'done' })
+    await block(done, 'waiting for the design')
+    expect((await refused(update(w, done, builder, { column: 'doing' })))?.rule).toBe('start.notBlocked')
+    expect(stage(w, done)).toBe('done')
+    expect(kinds(w, done).filter((x) => x === 'Started')).toHaveLength(1)
+    await block(done, null)
+    expect((await update(w, done, builder, { column: 'doing' })).card.column).toBe('doing')
+    expect(kinds(w, done).filter((x) => x === 'Started')).toHaveLength(2)
+    // A Todo card given to another agent in the same move: started for that agent, under the same guards.
+    const given = await create(w, 'Given')
+    await block(given, 'not yet')
+    expect((await refused(update(w, given, builder, { column: 'doing', agent: 'a2' })))?.rule).toBe('start.notBlocked')
+    expect(kinds(w, given)).not.toContain('Started')
+    await block(given, null)
+    const g = await update(w, given, builder, { column: 'doing', agent: 'a2' })
+    expect(g.card).toMatchObject({ column: 'doing', agent: 'a2' })
+    expect(foldCard(facts(w, given)).started).toMatchObject({ builder: 'a2' })
+    // A card On Hold that never started: the move to Doing is its start.
+    const held = await create(w, 'Held')
+    await update(w, held, user, { column: 'hold', blocked: 'parked' })
+    expect((await refused(update(w, held, builder, { column: 'doing' })))?.rule).toBe('start.notBlocked')
+    expect(stage(w, held)).toBe('hold')
+    await block(held, null)
+    expect((await update(w, held, builder, { column: 'doing' })).said).toContain('As start: next time call hive_start_card')
+    expect(foldCard(facts(w, held)).started).toMatchObject({ builder: 'a1' })
+    // Made in Doing for another agent: started for it.
+    const made = await inWorkspace(w, () => tasks.createTask({ title: 'For the reviewer', column: 'doing', agent: 'Reviewer' }, builder))
+    expect(made).toMatchObject({ column: 'doing', agent: 'a2' })
+    expect(foldCard(facts(w, made.number)).started).toMatchObject({ builder: 'a2' })
+  })
+
+  // HR2's round 1 finding 2: a translated verdict is one write; refused or failing anywhere, nothing of the change stays.
+  it('a verdict that starts its review is all or nothing: a bad comment or a failing placement leaves the card as it was', async () => {
+    const { w, wt } = await workspace()
+    const card = await started(w, wt)
+    await update(w, card, builder, { column: 'review' }, 'Ready')
+    const before = await inWorkspace(w, () => tasks.getTask(card, w))
+    const unchanged = async () => {
+      const c = await inWorkspace(w, () => tasks.getTask(card, w))
+      expect([c.title, c.column, c.review ?? null, c.comments.length]).toEqual([before.title, 'review', null, before.comments.length])
+      expect(kinds(w, card).filter((k) => k === 'ReviewStarted' || k === 'Verdict')).toEqual([])
+      expect(stage(w, card)).toBe('review')
+    }
+    // An empty comment: refused before anything is gathered or written.
+    await expect(update(w, card, reviewer, { review: 'passed', column: 'passed', title: 'Should roll back' }, '')).rejects.toThrow(/comment is empty/)
+    await unchanged()
+    // A placement that fails in the verdict's own write (no such card to go before): the write is undone whole.
+    await expect(update(w, card, reviewer, { review: 'passed', column: 'passed', title: 'Should roll back', before: 9999 }, 'PASSED')).rejects.toThrow()
+    await unchanged()
+    // Then as it should be: one write, the review started and passed together.
+    const ok = await update(w, card, reviewer, { review: 'passed', column: 'passed', title: 'Renamed' }, 'PASSED')
+    expect(ok.card).toMatchObject({ title: 'Renamed', column: 'passed' })
+    const k = kinds(w, card)
+    expect(k.slice(k.indexOf('ReviewStarted'))).toEqual(['ReviewStarted', 'Verdict', 'Moved'])
   })
 
   it('S1: uncommitted changes refuse the move to Review with the next step; the card stays in Doing', async () => {
@@ -265,12 +332,19 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(review.said.some((l) => l.startsWith('As '))).toBe(false)
     expect((await update(w, card, reviewer, { review: 'start' })).card.review?.agent).toBe('a2')
     expect((await update(w, card, reviewer, { review: 'passed', column: 'passed' }, 'PASSED')).card.column).toBe('passed')
-    // On Hold is the user's; an agent the user asked takes the card out by P3's move.
+    // On Hold is the user's; an agent the user asked takes the card out. Held while being worked on, it goes back to it by
+    // P3's move; never started, its move to Doing is its start.
+    const working = await started(w, wt, 'w.txt')
+    await update(w, working, user, { column: 'hold' })
+    const back = await update(w, working, builder, { column: 'doing' })
+    expect(back.card).toMatchObject({ column: 'doing', agent: 'a1' })
+    expect(back.said.some((l) => l.startsWith('As '))).toBe(false)
+    expect(kinds(w, working).filter((k) => k === 'Started')).toHaveLength(1)
     const held = await create(w, 'Parked')
     await update(w, held, user, { column: 'hold' })
     const out = await update(w, held, builder, { column: 'doing' })
     expect(out.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(out.said.some((l) => l.startsWith('As '))).toBe(false)
+    expect(out.said).toContain('As start: next time call hive_start_card')
   })
 
   it("with workflow rules off, an agent's moves take P3's path: nothing translated, a failed review stays in Review", async () => {
