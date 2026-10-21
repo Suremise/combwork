@@ -84,6 +84,7 @@
   "main.move.branchBoth": "beide Namen sind Branches",
   "main.move.branchFailed": "{host}: Der Branch {from} von {agent} konnte nicht in {to} umbenannt werden ({why}).",
   "main.move.branchGone": "{host}: Der Branch {from} von {agent} existiert nicht mehr und wird daher nicht umbenannt.",
+  "main.move.branchQueued": "ein Schritt in der Warteschlange verwendet ihn noch; die nächste Reparatur benennt ihn um",
   "main.move.branchRenamed": "{host}: Der Branch {from} von {agent} heißt jetzt {to}.",
   "main.move.branchRenamedRemote": "{host}: Der Branch {from} von {agent} heißt jetzt {to}; er folgt noch {from} von {remote}, also pushe ihn unter dem neuen Namen, wenn du so weit bist.",
   "main.move.branchTaken": "{host}: Der Branch {from} von {agent} behält seinen Namen: {to} gibt es schon.",

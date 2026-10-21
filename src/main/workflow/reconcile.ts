@@ -95,22 +95,33 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
 }
 
 /**
+ * What following a card's pending rename found (#1305): `renamed`, the card follows it (this observer wrote LineRenamed,
+ * or another did first, or its cycle changed meanwhile: the caller reads the card again either way); `unchanged`, no
+ * rename covers its line, or git still has the old name (its line is read as it is); `unknown`, a rename points away
+ * from its line but git's names can't both be read: its line isn't observed this time, and never taken for gone.
+ */
+type Followed = 'renamed' | 'unchanged' | 'unknown'
+
+/**
  * A card whose line is the old name of a rename Repair began and hasn't finished (#1305, `pendingRename`): when the
  * old name is gone and the new one is there (git's step done), the card follows it (LineRenamed, as Repair writes it),
- * once, in its cycle. Whether it did: its line is then read by the new name, never taken for gone meanwhile.
+ * once: the write checks, under its lock, that the card is still in the cycle and on the line this observer read.
  */
-async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promise<boolean> {
+async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promise<Followed> {
   const line = s.started?.line
-  if (!line || !wf.cfg.pendingRename) return false
+  if (!line || !wf.cfg.pendingRename) return 'unchanged'
   const to = await wf.cfg.pendingRename(line)
-  if (!to || (await G.lineHead(wf.cfg.project, line)) !== null) return false
+  if (!to) return 'unchanged'
+  const old = await G.lineHead(wf.cfg.project, line)
+  if (isUnknown(old)) return 'unknown'
+  if (old !== null) return 'unchanged'
   const head = await G.lineHead(wf.cfg.project, to)
-  if (head === null || isUnknown(head)) return false
-  return wf.write(card, null, 'hive', (w) => {
-    if (!sameCycle(w, s) || w.state().started?.line !== line) return false
+  if (head === null || isUnknown(head)) return 'unknown'
+  await wf.write(card, null, 'hive', (w) => {
+    if (!sameCycle(w, s) || w.state().started?.line !== line) return
     w.fact('LineRenamed', { from: line, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
-    return true
   })
+  return 'renamed'
 }
 
 /**
@@ -134,7 +145,9 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
     const wrote = await wf.locked(() =>
       wf.store.tx((tx) => {
         const cur = foldCard(tx.facts(card.id))
-        if (cur.cycle !== cycle) return 'cycle' as const
+        // A new cycle since, or its line renamed since (#1305: LineRenamed): what this observer read is no longer the
+        // card's, and is dropped.
+        if (cur.cycle !== cycle || (line !== null && cur.started?.line !== line)) return 'cycle' as const
         if (cur.lastHeadFact !== prev) return null
         return tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to } })
       })
@@ -142,7 +155,7 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
     if (wrote === 'cycle' || wrote) return
     // Lost the race: read the winner and the platform now.
     s = wf.state(card)
-    if (s.cycle !== cycle) return
+    if (s.cycle !== cycle || (line !== null && s.started?.line !== line)) return
     prev = s.lastHeadFact
     from = s.head
     now = await read()
@@ -184,13 +197,20 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     if (card.stage !== 'done') return
   } else if (card.stage !== 'done') {
     // A rename Repair began and was cut short after git's step (#1305: a crash, a file it couldn't write): the card
-    // follows it now, before its line is read, rather than take it for gone.
-    if (await followRename(wf, card, s)) s = wf.state(card)
-    const line = s.started!.line!
-    await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
+    // follows it now, before its line is read, rather than take it for gone. Read again whatever it found: another
+    // observer may have followed it first.
+    const followed = await followRename(wf, card, s)
     s = wf.state(card)
-    const lh = await G.lineHead(project, line)
-    if (lh === null) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
+    const line = s.started?.line
+    // Every observation below writes only while the card is still on this line in this cycle (checked under the write's
+    // lock): a rename since stops it.
+    if (followed !== 'unknown' && line) {
+      await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
+      s = wf.state(card)
+      const lh = await G.lineHead(project, line)
+      // Never gone while a rename points away from it: the next run follows it once git's names can be read.
+      if (lh === null && !(await wf.cfg.pendingRename?.(line))) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.state().started?.line === line && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
+    }
   }
 
   card = wf.store.card(card.id)

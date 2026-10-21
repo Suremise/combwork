@@ -84,6 +84,7 @@
   "main.move.branchBoth": "どちらの名前のブランチもあります",
   "main.move.branchFailed": "{host}：{agent}のブランチ{from}を{to}に変更できませんでした（{why}）。",
   "main.move.branchGone": "{host}：{agent}のブランチ{from}はもうないため、名前を変更しません。",
+  "main.move.branchQueued": "待機中の処理がまだ使用しています。次の修復で名前を変更します",
   "main.move.branchRenamed": "{host}：{agent}のブランチ{from}は{to}になりました。",
   "main.move.branchRenamedRemote": "{host}：{agent}のブランチ{from}は{to}になりました。{remote}の{from}を追跡したままなので、準備ができたら新しい名前でプッシュしてください。",
   "main.move.branchTaken": "{host}：{agent}のブランチ{from}はそのままです：{to}は既にあります。",

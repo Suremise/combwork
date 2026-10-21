@@ -84,6 +84,7 @@
   "main.move.branchBoth": "obie nazwy są gałęziami",
   "main.move.branchFailed": "{host}: nie udało się zmienić nazwy gałęzi {from} agenta {agent} na {to} ({why}).",
   "main.move.branchGone": "{host}: gałąź {from} agenta {agent} już nie istnieje, więc jej nazwa nie zostanie zmieniona.",
+  "main.move.branchQueued": "oczekujący krok nadal jej używa; następna naprawa zmieni jej nazwę",
   "main.move.branchRenamed": "{host}: gałąź {from} agenta {agent} nazywa się teraz {to}.",
   "main.move.branchRenamedRemote": "{host}: gałąź {from} agenta {agent} nazywa się teraz {to}; nadal śledzi {from} w {remote}, więc wypchnij ją pod nową nazwą, gdy będziesz gotowy.",
   "main.move.branchTaken": "{host}: gałąź {from} agenta {agent} zachowuje nazwę: {to} już istnieje.",

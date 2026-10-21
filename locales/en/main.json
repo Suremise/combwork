@@ -339,6 +339,10 @@
     "defaultMessage": "{host}: {agent}'s branch {from} is gone, so it isn't renamed.",
     "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name."
   },
+  "main.move.branchQueued": {
+    "defaultMessage": "a queued step still uses it; Repair renames it next time",
+    "description": "Why Repair couldn't rename an agent's branch yet (in main.move.branchFailed's {why}): one of the board's queued steps (preparing a card's folder) names the branch."
+  },
   "main.move.branchRenamed": {
     "defaultMessage": "{host}: {agent}'s branch {from} is now {to}.",
     "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names."

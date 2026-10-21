@@ -84,6 +84,7 @@
   "main.move.branchBoth": "los dos nombres son ramas",
   "main.move.branchFailed": "{host}: no se pudo renombrar la rama {from} de {agent} a {to} ({why}).",
   "main.move.branchGone": "{host}: la rama {from} de {agent} ya no existe, así que no se renombra.",
+  "main.move.branchQueued": "un paso en cola aún la usa; la siguiente reparación la renombra",
   "main.move.branchRenamed": "{host}: la rama {from} de {agent} ahora es {to}.",
   "main.move.branchRenamedRemote": "{host}: la rama {from} de {agent} ahora es {to}; aún sigue a {from} de {remote}, así que súbela con el nombre nuevo cuando quieras.",
   "main.move.branchTaken": "{host}: la rama {from} de {agent} conserva su nombre: {to} ya existe.",

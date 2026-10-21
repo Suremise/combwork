@@ -84,6 +84,7 @@
   "main.move.branchBoth": "两个名称都是分支",
   "main.move.branchFailed": "{host}：{agent} 的分支 {from} 无法重命名为 {to}（{why}）。",
   "main.move.branchGone": "{host}：{agent} 的分支 {from} 已不存在，因此不重命名。",
+  "main.move.branchQueued": "队列中的步骤仍在使用它；下一次修复会为其重命名",
   "main.move.branchRenamed": "{host}：{agent} 的分支 {from} 现名为 {to}。",
   "main.move.branchRenamedRemote": "{host}：{agent} 的分支 {from} 现名为 {to}；它仍跟踪 {remote} 的 {from}，准备好后请用新名称推送。",
   "main.move.branchTaken": "{host}：{agent} 的分支 {from} 保留原名：{to} 已存在。",

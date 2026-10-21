@@ -84,6 +84,7 @@
   "main.move.branchBoth": "both names are branches",
   "main.move.branchFailed": "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).",
   "main.move.branchGone": "{host}: {agent}'s branch {from} is gone, so it isn't renamed.",
+  "main.move.branchQueued": "a queued step still uses it; Repair renames it next time",
   "main.move.branchRenamed": "{host}: {agent}'s branch {from} is now {to}.",
   "main.move.branchRenamedRemote": "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.",
   "main.move.branchTaken": "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.",

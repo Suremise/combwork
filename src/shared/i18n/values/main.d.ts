@@ -86,6 +86,7 @@ interface HiveMessageValues {
   'main.move.branchBoth': undefined
   'main.move.branchFailed': { host: string | number; agent: string | number; from: string | number; to: string | number; why: string | number }
   'main.move.branchGone': { host: string | number; agent: string | number; from: string | number }
+  'main.move.branchQueued': undefined
   'main.move.branchRenamed': { host: string | number; agent: string | number; from: string | number; to: string | number }
   'main.move.branchRenamedRemote': { host: string | number; agent: string | number; from: string | number; to: string | number; remote: string | number }
   'main.move.branchTaken': { host: string | number; agent: string | number; from: string | number; to: string | number }

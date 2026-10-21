@@ -198,10 +198,24 @@ const dropRename = (list: ProjectConfig['pendingBranchRenames'], agentId: string
 async function renameCardLines(ws: WorkspaceService, project: string, from: string, to: string): Promise<void> {
   const wf = await workflowFor(ws, project)
   if (!wf) return
+  const on = (line: string | null | undefined): boolean => line?.toLowerCase() === from.toLowerCase()
   for (const card of wf.store.cards()) {
-    if (wf.state(card).started?.line?.toLowerCase() !== from.toLowerCase()) continue
-    await wf.write(card, null, 'hive', (w) => w.fact('LineRenamed', { from, to, why: 'repair' })) // i18n-ignore: a fact's kind and codes, not text
+    if (!on(wf.state(card).started?.line)) continue
+    // Checked again under the write's lock: a card another observer has already renamed gets no second fact.
+    await wf.write(card, null, 'hive', (w) => {
+      if (on(w.state().started?.line)) w.fact('LineRenamed', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
+    })
   }
+}
+
+/**
+ * Whether an action queued for one of the project's cards still names line `from` (#1305): `prepareSlot`, which makes a
+ * slot's folder on a card's line (P7). Never an agent's own branch today (an agent's worktree is its card's existing
+ * folder, and isn't prepared), but a rename under one would make the slot on the old name, so the rename waits for it.
+ */
+async function queuedOn(ws: WorkspaceService, project: string, from: string): Promise<boolean> {
+  const wf = await workflowFor(ws, project)
+  return !!wf && wf.store.pendingActions().some((a) => a.kind === 'prepareSlot' && String(a.payload.line ?? '').toLowerCase() === from.toLowerCase())
 }
 
 type Move = PathMove & { of: string; owner?: MoveOwner }
@@ -592,6 +606,11 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       if (has(b.from)) {
         if (has(b.to)) {
           failed(tr(msg({ id: 'main.move.branchBoth', defaultMessage: 'both names are branches', description: "Why Repair couldn't rename an agent's branch (in main.move.branchFailed's {why}): a branch with the new name appeared meanwhile." })))
+          continue
+        }
+        if (await queuedOn(ws, h.path, b.from)) {
+          // Its pending entry stays: the next Repair renames it once the queued action has run.
+          failed(tr(msg({ id: 'main.move.branchQueued', defaultMessage: 'a queued step still uses it; Repair renames it next time', description: "Why Repair couldn't rename an agent's branch yet (in main.move.branchFailed's {why}): one of the board's queued steps (preparing a card's folder) names the branch." })))
           continue
         }
         const r = await git(h.path, ['branch', '-m', b.from, b.to])
