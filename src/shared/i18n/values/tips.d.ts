@@ -238,7 +238,7 @@ interface HiveMessageValues {
   'tips.progressDetails.title': undefined
   'tips.progressFilter.text': undefined
   'tips.progressFilter.title': undefined
-  'tips.progressHistory.text': { recent: number; kept: number }
+  'tips.progressHistory.text': { kept: number }
   'tips.progressHistory.title': undefined
   'tips.progressLanes.text': undefined
   'tips.progressLanes.title': undefined
@@ -248,8 +248,8 @@ interface HiveMessageValues {
   'tips.progressLanesOrder.title': undefined
   'tips.progressPanel.text': { key: string | number }
   'tips.progressPanel.title': undefined
-  'tips.progressRecentFold.text': undefined
-  'tips.progressRecentFold.title': undefined
+  'tips.progressTabs.text': undefined
+  'tips.progressTabs.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
   'tips.projectKeys.text': undefined

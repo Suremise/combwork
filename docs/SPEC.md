@@ -2450,6 +2450,16 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   limit). A finished check run for a card whose result failed and whose name is one of the card's ruleset's checks
   before review (`blocks()`, `checks.ts`) records `blocks: review` with how it counted (`RunCheck`, kept with the
   run), and its row says **Blocks review for AM-12** under the failure, for as long as the failed run shows.
+- **Tabs** [#1309, Darren 21 Oct]: the panel's header has a segmented control, Pulse · Merges · Runs · Lanes, words
+  that fold to icons below about 360 px (a container query on the panel), a tablist (arrow keys, Home, End), the tab
+  kept per workspace. Badges: agents waiting for a merge slot, lanes, and in red the **unresolved failures** (a failed
+  run with no later run of the same thing, a card's check or a command, that passed; dismissing doesn't resolve one).
+  Pulse lays out top to bottom with nothing pinned: the merge, the runs going on, a line for the unresolved failures
+  (it opens Runs on them), then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
+  every kept run by day, the same thing's runs on a day folded into one line ("AL-12 cardwork ×4 · 2 failed, then
+  passed"), with search and filters (failures, a lane's cards, an agent). Merges and Lanes show theirs alone. #1228's
+  fold of Recent is gone with Recent. The word stays **Runs** (Darren); `/v1/progress` is unchanged. A run's details
+  give times relative, the date and time in full on hover.
 - **P5** [#1121 c]: the merge slot card becomes the queue's summary per target (testing now, queued, just merged,
   returned with Open card and Show log), Pause/Resume and Remove from queue, the queue's runs attributed to Hive, the
   full queue view in the Version Control tab, state changes announced politely.
