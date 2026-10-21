@@ -423,7 +423,8 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     running: runningIn(ws, await projectFolders(ws)),
     hosts: planned,
     recent: !!from && config.get().recentWorkspaces.some((p) => samePath(p, from)),
-    working: from ? workingAt(from).filter((n) => !workingAt(here).includes(n)) : [],
+    // By each project's name now: one renamed with the move (juniper, now dialect) is marked under its new name.
+    working: from ? [...new Set(workingAt(from).map((n) => hosts.find((h) => !h.assistant && basename(h.from).toLowerCase() === n.toLowerCase())?.name ?? n))].filter((n) => !workingAt(here).includes(n)) : [],
     ...(cards.length ? { cards } : {}),
     ...(renames ? { branches: renames } : {})
   }

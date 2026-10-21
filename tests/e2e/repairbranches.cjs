@@ -93,7 +93,7 @@ const agentsOf = (project) => configOf(project).agents
       check('…JB3’s kept, in the warning colour', /JB3's branch: [^;]*; will kept: the new name is taken/.test(await text()) && (await dialog.locator('.repair-plan tr', { hasText: "JB3's branch" }).locator('.warn-text').count()) > 0, await text())
       // JB4's worktree recreated: its branch is renamed in this Repair too, not the one after.
       await dialog.locator('.repair-plan tr', { hasText: "JB4's worktree" }).getByRole('button', { name: 'Recreate worktree' }).click()
-      check('…JB4’s worktree recreated: its branch listed to rename now', !!(await lib.until(async () => /JB4's worktree: was [^;]*; will recreate on hive\/Scratch\/juniper\/jb4/.test(await text()) && /JB4's branch: was hive\/Scratch\/juniper\/jb4, now hive\/Tools\/juniper\/jb4; will rename/.test(await text()), HUNG_MS)), await text())
+      check('…JB4’s worktree recreated: its branch listed to rename now', !!(await lib.until(async () => /JB4's worktree: was [^;]*; will recreate on hive\/Tools\/juniper\/jb4/.test(await text()) && /JB4's branch: was hive\/Scratch\/juniper\/jb4, now hive\/Tools\/juniper\/jb4; will rename/.test(await text()), HUNG_MS)), await text())
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-plan.png') })
 
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()

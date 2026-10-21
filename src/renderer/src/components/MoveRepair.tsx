@@ -241,7 +241,11 @@ function hostRows(h: MoveHostPlan, open: ReadonlySet<string>, toggle: (k: string
           )
         }, 'repair-missing')
       )
-    } else if (w.how === 'recreate') rows.push(planRow(k, { what, was: { path: w.from }, now: w.to ? { path: w.to, other: w.from } : undefined, does: tr(T.recreate, { exists: w.branchExists ? 'yes' : 'no', branch: w.branch ?? '' }), actions: undo(k) }))
+    } else if (w.how === 'recreate') {
+      // The branch it is on after Repair: renamed in the same Repair when it's named after the old place (its row below).
+      const renamed = h.branches?.find((b) => b.agentId === w.agentId && !b.kept)
+      rows.push(planRow(k, { what, was: { path: w.from }, now: w.to ? { path: w.to, other: w.from } : undefined, does: tr(T.recreate, { exists: w.branchExists ? 'yes' : 'no', branch: renamed?.to ?? w.branch ?? '' }), actions: undo(k) }))
+    }
     else if (w.how === 'unlink') rows.push(planRow(k, { what, was: { path: w.from }, does: tr(T.unlink), actions: undo(k) }))
     else if (w.how === 'original') rows.push(planRow(k, { what, was: { path: w.from }, does: tr(T.original) }, 'faint'))
     else rows.push(planRow(k, { what, was, now: { path: w.to ?? '', other: w.from }, does: tr(T.relink, { located: w.how === 'located' ? 'yes' : 'no' }) }))
