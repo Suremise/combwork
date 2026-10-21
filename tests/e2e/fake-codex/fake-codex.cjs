@@ -60,18 +60,30 @@ if (args[0] === 'app-server') {
       const m = JSON.parse(buf.slice(0, i))
       buf = buf.slice(i + 1)
       if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
-      // config/read (#1285): the developer_instructions in fake-developer-instructions.txt in CODEX_HOME, as the layers
-      // Codex takes would give them, from the layer fake-developer-origin.txt names (user unless it says project);
-      // "!fail" answers with an error, as a Codex that can't read its config.
-      if (m.id === 2 && m.method === 'config/read') {
-        const file = (name) => process.env.CODEX_HOME && path.join(process.env.CODEX_HOME, name)
-        const read = (name) => (file(name) && fs.existsSync(file(name)) ? fs.readFileSync(file(name), 'utf8') : null)
-        const text = read('fake-developer-instructions.txt')
-        const origins = text === null ? {} : { developer_instructions: { name: { type: read('fake-developer-origin.txt') || 'user' } } }
-        process.stdout.write(JSON.stringify(text === '!fail' ? { id: 2, error: { message: 'config unreadable' } } : { id: 2, result: { config: text === null ? {} : { developer_instructions: text }, origins } }) + '\n')
-      } else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
+      if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
     }
   })
+  return
+}
+
+// `[options] debug prompt-input` (#1285): the session's prompt as Codex renders it, offline. Its developer message is
+// fake-developer-instructions.txt in CODEX_HOME (standing for whatever layers Codex took them from) unless the options
+// clear them (-c developer_instructions=""), then Codex's own texts; "!fail" exits with an error. Each run's options
+// go in fake-prompt-input.jsonl, so a test sees Hive passed the agent's own arguments untouched.
+const debugAt = args.indexOf('debug')
+if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
+  const opts = args.slice(0, debugAt)
+  const home = process.env.CODEX_HOME
+  if (home) fs.appendFileSync(path.join(home, 'fake-prompt-input.jsonl'), JSON.stringify({ cwd: process.cwd(), args: opts }) + '\n')
+  const file = home && path.join(home, 'fake-developer-instructions.txt')
+  const text = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
+  if (text === '!fail') {
+    process.stderr.write('Error: config unreadable\n')
+    process.exit(1)
+  }
+  const cleared = opts.some((a, i) => opts[i - 1] === '-c' && a === 'developer_instructions=""')
+  const content = [...(text !== null && text.trim() && !cleared ? [text] : []), '<skills_instructions>\n## Skills', '<permissions instructions>\nFilesystem sandboxing']
+  process.stdout.write(JSON.stringify([{ type: 'message', role: 'developer', content: content.map((t) => ({ type: 'input_text', text: t })) }, { type: 'message', role: 'user', content: [] }]))
   return
 }
 

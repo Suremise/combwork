@@ -2527,14 +2527,18 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
   without it: `sessions.hiveGuidance` gives none (Codex's `developer_instructions`, Copilot's custom instructions), and
   the hive server answers `initialize` with no `instructions` (`HIVE_GUIDANCE=0`). On Codex, Hive's guidance (and the
   Assistant's role) now follow the `developer_instructions` Codex itself would give the session, instead of replacing
-  them: Hive asks Codex's app server (`config/read` for the session's folder) at each launch it adds some to, so Codex's
-  own layers decide (a project's only while Codex trusts that project). The app server can't select a profile (0.163.0
-  refuses `--profile` there), so a profile the agent's Extra arguments select (`--profile`, `-p`, `--profile=`; the last
-  wins) is read from `CODEX_HOME\<name>.config.toml` and ranked where Codex ranks it: above the user's own config, below
-  a trusted project's (`config/read`'s `origins` says which layer its answer came from). `codexownhooks` checks each of
-  these against the installed Codex (`debug prompt-input` for the profile's rank, offline). Codex unable to answer, Hive
-  keeps the selected profile's, else the user's own `config.toml`'s, never a project's file. With none of Hive's, Hive
-  passes nothing and Codex's own apply. Hive never writes Codex's config.
+  them. Hive parses no profile and ranks no layer (the Assistant's design on #1285, after three rounds of corners):
+  Codex renders the session's prompt offline with the agent's own Extra arguments in its folder (`debug prompt-input`,
+  no sign-in or model), twice side by side, as is and with `-c developer_instructions=""` (an empty value clears every
+  layer below it). What the first's developer message has in front of the second's is the value; the same renders mean
+  none (missing, empty or blank); anything else, or a render failing, means Hive can't tell, and its guidance goes alone,
+  as before #1285, logged, the launch unblocked (`developerInstructionsOf`). About 200 ms, only when Hive adds some, and
+  kept per CLI, arguments, folder and the modification times of the config files Codex reads (CODEX_HOME's `config.toml`
+  and profiles, every `.codex/config.toml` from the folder up). `codexownhooks` checks the reading against the installed
+  Codex at every layer (the user's, a selected profile in each form Codex takes, a trusted and an untrusted project),
+  each missing, empty, blank or set: Codex 0.163.0 gives a trusted project's over the profile's over the user's, an
+  empty one clearing those below it, and refuses two profiles. With none of Hive's, Hive passes nothing and Codex's own
+  apply. Hive never writes Codex's config.
 - **Row 14, the Assistant's role and its guidance: no switch** (Darren, on #1120 point 4): the Assistant is its role and
   its Control; without them it is no Assistant, only an agent. `hive.guidance` doesn't reach it.
 

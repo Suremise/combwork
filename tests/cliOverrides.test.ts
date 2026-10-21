@@ -463,64 +463,76 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
   }
   afterEach(() => rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true }))
 
-  // What Codex itself says applies (its app server's config/read: a project's only while trusted, HR4's round 1), here
-  // the fake Codex's answer; e2e codexownhooks checks the real Codex gives a trusted project's and not an untrusted one's.
-  it("Codex: Hive's guidance after the developer_instructions Codex says apply, never in their place; none of Hive's, none passed", async () => {
+  // What Codex itself would give the session (#1285, the Assistant's design in round 4): its offline prompt rendered
+  // with the agent's own arguments, as is and with developer_instructions cleared. Hive parses no profile and ranks no
+  // layer; e2e codexownhooks checks the real Codex at every layer (HR4's probes). Here the fake Codex renders it.
+  it('reads them from two renders of the prompt: one text more in front is the value, the same renders none', async () => {
+    const { developerInstructionsOf } = await import('../src/main/providers/codex/adapter')
+    const rest = ['<skills_instructions>', '<permissions instructions>']
+    expect(developerInstructionsOf(['Mine.', ...rest], rest)).toBe('Mine.')
+    expect(developerInstructionsOf(['  Mine.\n', ...rest], rest)).toBe('Mine.')
+    // The same renders: none set, or set empty or blank (an empty one clears every layer below it, in Codex).
+    expect(developerInstructionsOf(rest, rest)).toBe('')
+    expect(developerInstructionsOf([], [])).toBe('')
+    // Anything else Hive can't tell apart, or a render missing: no answer (Hive's guidance alone).
+    expect(developerInstructionsOf(['Mine.', 'other', ...rest], rest)).toBeNull()
+    expect(developerInstructionsOf(['Mine.', '<skills_instructions> changed', rest[1]], rest)).toBeNull()
+    expect(developerInstructionsOf(null, rest)).toBeNull()
+    expect(developerInstructionsOf(rest, null)).toBeNull()
+  })
+
+  it("Codex: Hive's guidance after the developer_instructions Codex renders for the session's own arguments, never in their place", async () => {
     const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
-    // A Codex home of this test's own: the user's config.toml it reads is this one's.
+    // A Codex home of this test's own.
     const homeBefore = process.env.CODEX_HOME
     const home = join(base, 'developer-codex-home')
     process.env.CODEX_HOME = home
     mkdirSync(home, { recursive: true })
     const said = join(home, 'fake-developer-instructions.txt')
+    const runs = (): { args: string[] }[] => (existsSync(join(home, 'fake-prompt-input.jsonl')) ? readFileSync(join(home, 'fake-prompt-input.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+    const env = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }
     const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => {
-      const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }, ...over })
+      const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env, ...over })
       await codex.prepareLaunch(ctx)
       return developer(codexArgs(ctx))
     }
+    /** A config file Codex reads changed: Hive asks again (its answers are kept by what they depend on). */
+    const touch = (): void => writeFileSync(join(home, 'config.toml'), `# ${Math.random()}\n`)
     try {
-      // Codex gives none: Hive's alone.
+      // Codex renders none: Hive's alone.
       expect(await launched()).toBe('Hive guidance')
-      // Codex gives a trusted project's (as config/read layers them): Hive's after it, the Assistant's role after that.
-      writeFileSync(said, 'The project says this.')
-      expect(await launched()).toBe('The project says this.\n\nHive guidance')
-      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('The project says this.\n\nHive guidance\n\nYou are the Assistant.')
-      // Codex can't say: only the user's own config.toml, never a project's file, which Codex may not trust.
+      // Codex renders some (whatever layer they came from): Hive's after them, the Assistant's role after that.
+      writeFileSync(said, 'Codex says this.')
+      touch()
+      expect(await launched()).toBe('Codex says this.\n\nHive guidance')
+      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('Codex says this.\n\nHive guidance\n\nYou are the Assistant.')
+      // The agent's own arguments reach Codex untouched (it parses -pmine, -p=mine and the rest), with the cleared render.
+      const before = runs().length
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
+      const asked = runs().slice(before).map((r) => r.args)
+      expect(asked).toEqual(expect.arrayContaining([['-pmine', '-m', 'gpt-x'], ['-pmine', '-m', 'gpt-x', '-c', 'developer_instructions=""']]))
+      expect(asked).toHaveLength(2)
+      // Asked once for the same arguments, folder and config files: the next launch takes the answer kept.
+      const kept = runs().length
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
+      expect(runs()).toHaveLength(kept)
+      // Set empty or blank where Codex takes them: the same renders, Hive's alone.
+      for (const v of ['', '   ']) {
+        writeFileSync(said, v)
+        touch()
+        expect(await launched(), JSON.stringify(v)).toBe('Hive guidance')
+      }
+      // Codex can't render it: Hive's alone, as before #1285, and the launch goes on.
       writeFileSync(said, '!fail')
-      writeFileSync(join(home, 'config.toml'), 'developer_instructions = "Mine first."\n')
-      mkdirSync(join(base, 'proj', '.codex'), { recursive: true })
-      writeFileSync(join(base, 'proj', '.codex', 'config.toml'), 'developer_instructions = "PROJECT-ONLY"\n')
-      expect(await launched()).toBe('Mine first.\n\nHive guidance')
-      // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, Codex's own apply untouched.
+      touch()
+      expect(await launched()).toBe('Hive guidance')
+      // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, and Codex isn't asked.
+      const none = runs().length
       expect(await launched({ guidance: '' })).toBeNull()
-
-      // A profile the agent's Extra arguments select (HR4's round 2): Codex ranks it above the user's own config and
-      // below a trusted project's (0.163.0, e2e codexownhooks), which its app server can't select: Hive reads it.
-      writeFileSync(join(home, 'mine.config.toml'), 'developer_instructions = "PROFILE-ONLY"\n')
-      writeFileSync(said, 'USER-ONLY')
-      for (const form of [['--profile', 'mine'], ['-p', 'mine'], ['--profile=mine']]) expect(await launched({ extraArgs: form }), form.join(' ')).toBe('PROFILE-ONLY\n\nHive guidance')
-      // The last one wins, as Codex takes it; none selected, the user's.
-      expect(await launched({ extraArgs: ['-p', 'other', '--profile', 'mine'] })).toBe('PROFILE-ONLY\n\nHive guidance')
-      expect(await launched()).toBe('USER-ONLY\n\nHive guidance')
-      // A trusted project's (Codex says it came from the project) outranks the profile.
-      writeFileSync(said, 'PROJECT-TRUSTED')
-      writeFileSync(join(home, 'fake-developer-origin.txt'), 'project')
-      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('PROJECT-TRUSTED\n\nHive guidance')
-      rmSync(join(home, 'fake-developer-origin.txt'))
-      // A profile that sets none: what Codex said.
-      writeFileSync(said, 'USER-ONLY')
-      writeFileSync(join(home, 'mine.config.toml'), 'model = "gpt-x"\n')
-      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('USER-ONLY\n\nHive guidance')
-      // Codex can't say: the profile's, then the user's own config.toml's.
-      writeFileSync(join(home, 'mine.config.toml'), 'developer_instructions = "PROFILE-ONLY"\n')
-      writeFileSync(said, '!fail')
-      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('PROFILE-ONLY\n\nHive guidance')
-      // With guidance off, nothing of Hive's, so nothing passed: the profile's own apply as Codex takes them.
-      expect(await launched({ guidance: '', extraArgs: ['--profile', 'mine'] })).toBeNull()
+      expect(runs()).toHaveLength(none)
     } finally {
       process.env.CODEX_HOME = homeBefore
       rmSync(home, { recursive: true, force: true })
-      rmSync(join(base, 'proj', '.codex'), { recursive: true, force: true })
     }
   })
 
