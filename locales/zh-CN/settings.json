@@ -203,6 +203,8 @@
   "settings.advanced.hive.wait.cardMaxSeconds.title": "卡片等待：最长时间",
   "settings.advanced.hive.workflow.enforce.desc": "卡片移动时，Hive 会执行每个项目的工作流程规则：卡片进入评审、已批准或已完成之前其版本控制选项的要求，以及 Hive 发现卡片的工作在 Hive 之外被合并或更改后的后续处理。关闭后，所有项目中的所有规则会同时关闭：卡片放到哪里就移到哪里，不会拒绝或询问任何操作，Hive 只记录每张卡片的工作发生了什么，不会因此移动卡片或唤醒代理。",
   "settings.advanced.hive.workflow.enforce.title": "强制执行工作流程规则",
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": "当代理自己工作树中的卡片以压缩合并方式合并到目标后，代理的分支上仍有它的提交，因此通道中的下一张卡片会包含这些提交。开启时，在下一张卡片开始前，一旦代理空闲、其运行已结束且工作树干净，并且仅当分支上的所有内容都已在目标中时，Hive 会把分支移到目标；否则会在“待你处理”中询问你。关闭时，Hive 每次都会询问你：批准则由它移动分支一次，拒绝则由你自己处理。工作流程规则关闭时，Hive 从不移动分支。",
+  "settings.advanced.hive.workflow.updateAgentBranch.title": "压缩合并后更新代理的分支",
   "settings.advanced.logs.desc": "打开 Hive 日志文件所在的文件夹。",
   "settings.advanced.logs.tip": "报告问题时很有用。",
   "settings.advanced.logs.title": "日志",

@@ -13,6 +13,7 @@ import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
 import { ForYouChip, ForYouSection } from './ForYou'
+import { KindField, KindMark, KindProposal } from './CardKind'
 import { useForYou } from '../forYou'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
@@ -211,15 +212,16 @@ function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): 
  * and the card stays where the move stopped. `agent`: the Move to Doing dialog's choice. Whether it reached the column;
  * the board is read again either way (an optimistic move undone on Cancel or a refusal).
  */
-export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null } = {}): Promise<boolean> {
+export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null; rethrow?: boolean } = {}): Promise<boolean> {
   const name = cardLabelOf(get(), c.number)
   const where = tr(COLUMN_TEXT[column].label)
+  const { rethrow, ...move } = o
   try {
-    let r = await call('tasks:move', c.number, column, o)
+    let r = await call('tasks:move', c.number, column, move)
     if ('ask' in r) {
       const reason = await askToSkip(name, column, r.ask)
       if (reason === null) return false
-      r = await call('tasks:move', c.number, column, { ...o, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
     }
     if ('refused' in r) {
       notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
@@ -232,6 +234,8 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
     }
     return true
   } catch (e) {
+    // A dialog that offers Try Again (Move to Doing, the card dialog's Save) shows the failure itself.
+    if (rethrow) throw e
     notify('error', tr(MOVE_FAILED), errorMessage(e))
     return false
   } finally {
@@ -571,9 +575,10 @@ function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} projects={projects} />
-        {!!forYou?.length && (
+        {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code') && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
+            <KindMark b={work} />
           </div>
         )}
         <WorkBadges b={work} card={c} />
@@ -1564,6 +1569,10 @@ export function TaskDialog() {
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // What on it waits for the user (#1276): answered in its For you section.
   const forYouItems = useForYou().byCard.get(card?.number ?? -1)
+  // Its work's badges: its kind and a kind an agent proposed (#1277).
+  const badge = useWorkBadges().get(card?.number ?? -1)
+  // A new card's kind (#1277): no code, or code (the default).
+  const [noCode, setNoCode] = useState(false)
   // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
@@ -1621,6 +1630,7 @@ export function TaskDialog() {
     if (open === null || !ready) return
     setActionError(null)
     setAnswerDrafts({})
+    setNoCode(false)
     const c = typeof open === 'number' ? get().tasks.find((x) => x.number === open) : null
     setTitle(c?.title ?? '')
     setDescription(c?.description ?? '')
@@ -1709,7 +1719,7 @@ export function TaskDialog() {
   const persist = async (hold = false): Promise<void> => {
     if (!title.trim()) throw new Error(tr(NEEDS_TITLE))
     if (isNew) {
-      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}) })
+      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}) })
       const extra: TaskPatch = {}
       if (blocked.trim()) extra.blocked = blocked
       if (refs(blockedBy).length) extra.blockedBy = refs(blockedBy)
@@ -1750,7 +1760,7 @@ export function TaskDialog() {
       delete patch.column
       if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
       if (give) await call('tasks:update', card.number, { agent: give })
-      if (to !== undefined && !(await moveCard(card, to))) {
+      if (to !== undefined && !(await moveCard(card, to, { rethrow: true }))) {
         // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
         // the dialog's saved state follows, so Save again or Cancel never claims a column it isn't in.
         const at = get().tasks.find((t) => t.number === card.number)?.column ?? card.column
@@ -1926,6 +1936,7 @@ export function TaskDialog() {
             {tr(msg({ id: 'board.dialog.archivedBanner', defaultMessage: '{cause, select, hidden {Archived when {project} was hidden.} removed {Archived when {project} was removed from Hive.} done {Archived automatically after its days in Done (Settings → Board).} other {Archived.}} Bring it back to change it.', description: "A banner in an archived card's dialog: why it was archived (its project {project} hidden or removed, or after its days in the Done column: Settings → Board is where that is set), and that it must be brought back to be changed." }), { cause: card.archivedFor === 'project-hidden' ? 'hidden' : card.archivedFor === 'project-removed' ? 'removed' : card.archivedFor === 'done' ? 'done' : 'user', project: card.project })}
           </div>
         )}
+        {card && !card.archived && <KindProposal card={card} b={badge} readOnly={ro} />}
         {card && !card.archived && <ForYouSection card={card} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
@@ -1965,6 +1976,7 @@ export function TaskDialog() {
               </option>
             ))}
           </select>
+          <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>
@@ -2358,7 +2370,7 @@ export function MoveToDoingDialog() {
         }
         // Start doesn't place the card: where it was dropped, if it still can be (the order only).
         if (req.before !== undefined) await call('tasks:update', card.number, before).catch(() => undefined)
-      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before }))) {
+      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before, rethrow: true }))) {
         // Cancelled or refused (its toast says why): the dialog closes, the card where the move left it.
         moved = false
       }

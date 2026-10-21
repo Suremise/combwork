@@ -203,6 +203,8 @@
   "settings.advanced.hive.wait.cardMaxSeconds.title": "Card waits: longest",
   "settings.advanced.hive.workflow.enforce.desc": "Hive keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Hive sees a card's work merged or changed outside Hive. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Hive only records what happens to each card's work, without moving cards or waking agents for it.",
   "settings.advanced.hive.workflow.enforce.title": "Workflow rules are enforced",
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": "When a card from an agent's own worktree was squashed into its target, the agent's branch still has its commits, so its next card in the lane would include them. On, Hive moves the branch to the target before the next card starts, once the agent is idle, its runs have ended and its worktree is clean, and only when everything on it is in the target: anything else, it asks you under For you. Off, Hive asks you every time: approve to let it move the branch once, or decline and do it yourself. Hive never moves a branch with workflow rules turned off.",
+  "settings.advanced.hive.workflow.updateAgentBranch.title": "Bring an agent's branch up to date after a squash merge",
   "settings.advanced.logs.desc": "Open the folder containing Hive's log files.",
   "settings.advanced.logs.tip": "Useful when reporting a problem.",
   "settings.advanced.logs.title": "Logs",

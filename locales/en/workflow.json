@@ -31,6 +31,22 @@
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
     "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
   },
+  "workflow.forYou.lineAsk": {
+    "defaultMessage": "{line} still has {card}'s work, squashed into {target}: approve and Hive brings the branch up to date once, or decline and do it yourself before {next} starts.",
+    "description": "A For you request (approve or decline, §16.19.2): Settings → Advanced has Hive ask before moving an agent's branch after a squash merge. Approving lets Hive move it this once (git reset --keep, which never overwrites uncommitted work); declining leaves it to the user. {line} a branch name; {card} and {next} card keys like AM-12; {target} the branch merged into."
+  },
+  "workflow.forYou.lineRefused": {
+    "defaultMessage": "Git wouldn't bring {line} up to date with {target}: {reason}. {next} starts once the branch is up to date.",
+    "description": "A For you request (Decide, §16.19.2): Hive tried to move the builder's branch after a squash merge and git refused; the lane waits. {line} a branch name, {target} the branch merged into, {reason} git's own message (English), {next} a card key."
+  },
+  "workflow.forYou.lineUnfinished": {
+    "defaultMessage": "Hive's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
+    "description": "A For you request (Decide, §16.19.2): moving the builder's branch failed part way and Hive couldn't undo it, so the branch, its files or its index may disagree; the lane waits. {line} a branch name, {to} a short commit id, {target} the branch merged into, {next} a card key."
+  },
+  "workflow.forYou.lineWork": {
+    "defaultMessage": "{line} has work that isn't in {target}: {commits}. Decide what happens to it: {next} starts once the branch is up to date.",
+    "description": "A For you request (Decide, §16.19.2): the builder's branch has commits that weren't merged (made after the card was approved, say), so Hive won't move the branch and lose them; the lane waits. {line} a branch name, {target} the branch merged into, {commits} a list of short commit ids with their subjects, {next} a card key."
+  },
   "workflow.forYou.newDecision": {
     "defaultMessage": "{card} has a new decision: your review again?",
     "description": "A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12."
@@ -623,6 +639,18 @@
     "defaultMessage": "The merge queue brings it up to date itself.",
     "description": "What happens next after the strict up-to-date rule refuses."
   },
+  "workflow.refused.lane.lineBehind.change": {
+    "defaultMessage": "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Hive moves it or asks first.",
+    "description": "Where it is decided whether Hive moves the branch itself or asks the user first (a setting name: use it as Hive shows it)."
+  },
+  "workflow.refused.lane.lineBehind.message": {
+    "defaultMessage": "{card} can't start yet: {line} still has {earlier}'s work, which was squashed into {target}.",
+    "description": "A refused start (§16.19.2): the builder's branch (in its own worktree) still has the previous card's commits, which were merged into the target as one squashed commit, so the next card's change would include them. {card} and {earlier} are card keys like AM-12; {line} a branch name; {target} the branch merged into."
+  },
+  "workflow.refused.lane.lineBehind.next": {
+    "defaultMessage": "Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.",
+    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key."
+  },
   "workflow.refused.lane.oneAtATime.change": {
     "defaultMessage": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
     "description": "Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Hive shows it)."
@@ -914,6 +942,10 @@
   "workflow.rule.approval.given": {
     "defaultMessage": "Your OK before merging",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
+  },
+  "workflow.rule.card.kind": {
+    "defaultMessage": "A card's kind is set when it is made",
+    "description": "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a trial) from when it is made; changing it later is an exception the user makes (glossary: override)."
   },
   "workflow.rule.done.contained": {
     "defaultMessage": "Hive checks the merge",

@@ -972,15 +972,15 @@ kbd {
 .rail-tip .agents-table {
   margin-top: 6px;
 }
-.table.agents-table {
+.table.item-table {
   width: auto;
   font-size: 12px;
 }
-.table.agents-table th {
+.table.item-table th {
   padding: 2px 8px 3px;
   font-size: 10.5px;
 }
-.table.agents-table td {
+.table.item-table td {
   padding: 3px 8px;
   white-space: nowrap;
 }
@@ -989,14 +989,14 @@ kbd {
   padding-top: 1px;
   padding-bottom: 1px;
 }
-.table.agents-table th:first-child,
-.table.agents-table td:first-child {
+.table.item-table th:first-child,
+.table.item-table td:first-child {
   padding-left: 0;
 }
-.table.agents-table tr:hover td {
+.table.item-table tr:hover td {
   background: none;
 }
-.table.agents-table tbody tr:last-child td {
+.table.item-table tbody tr:last-child td {
   border-bottom: none;
 }
 .agents-table-name {
@@ -1037,8 +1037,8 @@ kbd {
 .agents-table td.agents-table-warn {
   color: var(--warning);
 }
-/* A heading row: the quit dialog's agents under their workspace (#572). */
-.agents-table tr.agents-table-group td {
+/* A heading row: the quit dialog's agents under their workspace (#572), a list dialog's group (#1317). */
+.item-table tr.item-table-group td {
   padding: 8px 0 2px;
   border-bottom: none;
   color: var(--fg-muted);
@@ -1067,6 +1067,45 @@ kbd {
 .agents-detail-note {
   margin-top: 8px;
   color: var(--fg-muted);
+}
+/* A list dialog's table (#1317, ItemTable): the agents tables' look (the rules above, .item-table), a dialog's width,
+   each column's share fixed by its first row's cells, so a long cell is cut with an ellipsis rather than widening the
+   table; each row's actions at its right edge, aligned down the table. */
+.dialog .table.item-table.fill {
+  width: 100%;
+  table-layout: fixed;
+}
+.item-table.fill td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table.item-table .item-table-actions {
+  width: 1%;
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.item-table.fill .item-table-actions {
+  width: var(--item-actions, 64px);
+}
+.item-table-actions .icon-btn + .icon-btn {
+  margin-left: 2px;
+}
+/* A path as the part that matters (#1317, ShortPath): one line, cut with an ellipsis; the full path in its tooltip. */
+.short-path {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-table td > .tip-wrap:has(> .short-path) {
+  display: block;
+  max-width: 100%;
+}
+.item-table td .short-path {
+  display: block;
 }
 /* Text for screen readers only (a table's plain-text form, #572). */
 .visually-hidden {
@@ -8169,6 +8208,44 @@ body.pane-resizing-v .monaco-editor {
 .task-work-badge.old {
   opacity: 0.6;
 }
+/* A card's kind (#1277): No code, a quiet outlined pill with a note icon; a proposal (not confirmed) dashed, with a "?". */
+.task-for-you-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.task-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 1px;
+  padding-inline: 7px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted, var(--fg));
+  font-size: 11px;
+  white-space: nowrap;
+}
+.task-kind.proposed {
+  border-style: dashed;
+}
+.kind-field {
+  gap: 6px;
+}
+.kind-field .btn {
+  margin-inline-start: 6px;
+}
+.kind-proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.kind-proposal-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
 /* For you (#1276): a card waits for the user. A pill with a bell and the request's kind, in the accent colour. */
 .task-for-you-row {
   margin-block-start: 4px;
@@ -9666,13 +9743,6 @@ button.progress-run-show:focus-visible {
 .show-all-fold .codicon {
   font-size: 14px;
 }
-.progress-panel .show-all-fold {
-  padding: 4px 12px;
-}
-.progress-recent-list.all {
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
 .progress-section {
   margin: 10px 12px 4px;
   font-size: 11px;
@@ -9680,27 +9750,142 @@ button.progress-run-show:focus-visible {
   letter-spacing: 0.06em;
   color: var(--fg-muted);
 }
-/* Recent's heading folds its runs away (#1228): the whole line is the button, the chevron in the margin's place. */
-.progress-section-toggle {
+/* The panel's tabs (#1309): a segmented control in its header, a word and an icon each; below about 360 px (a container
+   query on the panel, not the window) the words go and the icons stay, each with its name in its tooltip. */
+.progress-panel {
+  container-type: inline-size;
+  container-name: progress;
+}
+.progress-title-text {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-tabs {
+  margin-inline-start: var(--space-1);
+  font-weight: normal;
+}
+.progress-tabs .progress-tab {
+  position: relative;
+  padding: 0 var(--space-1);
+}
+.progress-tabs .progress-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.progress-tab-badge {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--fg);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.progress-tab-badge.failed {
+  background: var(--error);
+  color: #ffffff;
+}
+@container progress (max-width: 359px) {
+  .progress-tab-label,
+  .progress-title-text {
+    display: none;
+  }
+}
+/* A tab's content: the rest of the panel's height. Pulse lays out top to bottom, its lanes right after its runs (no
+   pinning, no gap between); Runs scrolls under its filters; Lanes shows every lane. */
+.progress-tab-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.progress-tab-pulse > .progress-body {
+  flex: 0 1 auto;
+}
+.progress-tab-merges {
+  overflow-y: auto;
+}
+.progress-lanes.full {
+  flex: 1 1 0;
+  min-height: 0;
+  border-top: 0;
+}
+.progress-lanes.full .progress-lanes-list {
+  flex: 1 1 0;
+  padding-top: var(--space-2);
+}
+/* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
+.progress-attention {
   display: flex;
   align-items: center;
-  gap: 4px;
-  width: calc(100% - 12px);
-  margin: 6px 0 0 4px;
-  padding: 4px 8px 4px 4px;
-  border: 0;
-  border-radius: 3px;
-  background: none;
-  font-family: inherit;
-  text-align: left;
+  gap: var(--space-1);
+  width: calc(100% - var(--space-4));
+  margin: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--error) 45%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--error) 10%, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
   cursor: pointer;
 }
-.progress-section-toggle:hover {
+.progress-attention > span {
+  flex: 1 1 auto;
+}
+.progress-attention > .codicon-error {
+  color: var(--error);
+}
+.progress-attention:hover {
+  background: color-mix(in srgb, var(--error) 18%, var(--bg));
+}
+/* The Runs tab's filters: words to find on a line of their own, then the choices, wrapping in a narrow panel. */
+.progress-runs-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.progress-runs-filters > .search-box,
+.progress-runs-search {
+  width: 100%;
+}
+.progress-runs-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.progress-runs-choices .select {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+.progress-runs-failed.active {
+  background: color-mix(in srgb, var(--error) 18%, var(--bg));
   color: var(--fg);
 }
-.progress-section-toggle:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+.progress-runs-failed .codicon {
+  color: var(--error);
+}
+/* A run and its retries the same day, one line (#1309): it opens to each run. */
+.progress-group-head {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.progress-group-runs {
+  margin-inline-start: var(--space-4);
+  border-inline-start: 1px solid var(--border-subtle);
 }
 .progress-recent {
   display: flex;
@@ -10067,6 +10252,31 @@ button.progress-run-show:focus-visible {
   font-size: 10px;
   line-height: 14px;
   letter-spacing: 0;
+}
+/* The latest run of a lane's current card (#1309): its colour and its shape, after the card's name. */
+.lane-run-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+.lane-run-dot.running {
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--info);
+}
+.lane-run-dot.passed {
+  background: var(--success);
+}
+.lane-run-dot.failed {
+  border-radius: 1px;
+  background:
+    linear-gradient(45deg, transparent 40%, var(--error) 40% 60%, transparent 60%),
+    linear-gradient(-45deg, transparent 40%, var(--error) 40% 60%, transparent 60%);
+}
+.lane-run-dot.other {
+  height: 3px;
+  border-radius: 1px;
 }
 .progress-lanes-list {
   flex: 0 1 auto;
