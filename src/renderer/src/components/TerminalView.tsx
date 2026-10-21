@@ -84,6 +84,33 @@ function countAtlasMerges(): boolean {
   return null
 }
 
+/**
+ * The text a terminal shows on a background colour of its program's (not the default), each run as a string, for tests:
+ * a program drawing its own selection (Copilot, #1299) shows it this way, and a user copies what they see highlighted.
+ */
+;(window as unknown as { __hiveTerminalHighlighted?: (key: string) => string[] | null }).__hiveTerminalHighlighted = (key) => {
+  const term = terminals.get(key)
+  if (!term) return null
+  const buf = term.buffer.active
+  const cell = buf.getNullCell()
+  const runs: string[] = []
+  for (let row = 0; row < term.rows; row++) {
+    const line = buf.getLine(buf.viewportY + row)
+    let run = ''
+    for (let col = 0; col <= term.cols; col++) {
+      const lit = col < term.cols && !!line?.getCell(col, cell) && !cell.isBgDefault()
+      if (lit) {
+        // The second half of a wide character has no text of its own.
+        if (cell.getWidth() > 0) run += cell.getChars() || ' '
+      } else if (run) {
+        runs.push(run)
+        run = ''
+      }
+    }
+  }
+  return runs
+}
+
 /** A terminal's size and scroll, for tests: scrolled to the bottom when viewportY is baseY; `mouse`, the mouse tracking its program turned on. */
 ;(window as unknown as { __hiveTerminalState?: (key: string) => { cols: number; rows: number; viewportY: number; baseY: number; mouse: string } | null }).__hiveTerminalState = (key) => {
   const term = terminals.get(key)
