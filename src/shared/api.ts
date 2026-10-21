@@ -26,6 +26,8 @@ import type {
   AddAgentOptions,
   AddedAgent,
   AssistantAction,
+  AssistantChangeGroup,
+  AssistantUndoResult,
   AssistantQuestion,
   AgentApiInfo,
   AgentBranchStatus,
@@ -593,6 +595,10 @@ export interface HiveRequests {
   'assistant:answer': (id: string, yes: boolean) => void
   /** Revert on a setting the Assistant changed (its activity list): sets it back, and lists that too (#186). */
   'assistant:revertSetting': (actionId: string) => void
+  /** The Assistant's changes kept for undo (#1282), by the user's message they came from, newest first (7 days). */
+  'assistant:changes': () => AssistantChangeGroup[]
+  /** The user undoes one of the Assistant's changes, or a message's: what each put back, and what it left and why. */
+  'assistant:undo': (sel: { change?: string; group?: string }) => AssistantUndoResult[]
   /** Switches this workspace's Assistant to a mode (a file in .hive/modes): told at once if it runs, else when it starts (#259). */
   'assistant:switchMode': (modeId: string, save?: boolean) => 'told' | 'later' | 'saved'
   /** This window's workspace's merge slots: those held or waited for (#350). */

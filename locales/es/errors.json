@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "Ese cambio del Asistente ya no se conserva: los cambios se conservan 7 días.",
+  "errors.assistantUndo.which": "Elige un cambio del Asistente para deshacer, o los cambios de un mensaje.",
   "errors.changes.notFile": "{file} no es un archivo de la carpeta {folder}.",
   "errors.console.hidden": "La consola de desarrollador está oculta: activa Configuración → Avanzado → Mostrar funciones para desarrolladores.",
   "errors.console.notRecording": "No es una grabación de la consola de desarrollador",

@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "助手的这项变更已不再保留：变更只保留 7 天。",
+  "errors.assistantUndo.which": "请选择要撤销的一项助手变更，或一条消息的全部变更。",
   "errors.changes.notFile": "{file} 不是 {folder} 中的文件。",
   "errors.console.hidden": "开发者控制台已隐藏：请打开“设置”→“高级”→“显示开发者功能”。",
   "errors.console.notRecording": "不是开发者控制台的录制内容",

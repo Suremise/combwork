@@ -3,7 +3,7 @@
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
-import type { ActivityTarget } from './assistantActivity'
+import type { ActivityKind, ActivityTarget } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
@@ -314,6 +314,57 @@ export type AssistantControl = 'look' | 'agents' | 'projects'
 
 /** Something the Hive Assistant did (or tried), for the list in its panel and hive.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
+/**
+ * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane
+ * record, an agent's settings, a Hive setting, an agent it started (stopped by undo), or one that can't be undone
+ * (`final`: a prompt or comment sent, a project made), which says why.
+ */
+export type AssistantChangeKind = 'card' | 'lane' | 'agent' | 'setting' | 'started' | 'final'
+
+/** One of the Assistant's changes as kept for undo: its line, what it was about, the fields it set, and whether undone. */
+export interface AssistantChangeRow {
+  id: string
+  /** The user's message it came from. */
+  group: string
+  at: string
+  kind: AssistantChangeKind
+  /** The Assistant's action it came from (its activity kind: `update-task`, `prompt-agent`…), for the window's words. */
+  act: ActivityKind
+  /** The Assistant's change as it said it ("change #12 on the board"), in English. */
+  what: string
+  card?: number
+  project?: string
+  /** The fields it set (a card's `labels`, `column`…; a lane's `cards`; a setting's `value`; `created` for a card it made). */
+  fields: string[]
+  /** Why it can't be undone (a `final` change), in English. */
+  final?: string
+  undoneAt?: string
+}
+
+/** The Assistant's changes for one message of the user's (#1282): when it was sent, and its changes, newest first. */
+export interface AssistantChangeGroup {
+  id: string
+  at: string
+  changes: AssistantChangeRow[]
+}
+
+/**
+ * What undoing one change did: the fields put back (`running`: an agent it started, stopped), and those left as they are,
+ * with why: someone changed it since, the card, lane or agent is gone, the lane has ended, or the change failed (`error`).
+ */
+export interface AssistantUndoResult {
+  change: string
+  act: ActivityKind
+  what: string
+  card?: number
+  undone: string[]
+  skipped: { field: string; why: 'changed' | 'gone' | 'ended' | 'failed'; error?: string }[]
+  /** Why nothing of it can be undone (a `final` change), in English. */
+  final?: string
+  /** It was undone before: nothing more was done. */
+  already?: true
+}
+
 export interface AssistantAction extends Partial<ActivityTarget> {
   id: string
   at: string

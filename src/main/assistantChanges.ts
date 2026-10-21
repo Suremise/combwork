@@ -1,0 +1,329 @@
+import { AsyncLocalStorage } from 'async_hooks'
+import { randomUUID } from 'crypto'
+import type { ActivityKind } from '../shared/assistantActivity'
+import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, LaneInfo, TaskCard } from '../shared/types'
+import { currentTurn, type AssistantTurn } from './assistantControl'
+import { boardRead, boardWrite, boardWriteOp } from './boardStore'
+import type { Db } from './db'
+import { changeActor } from './workflow/recorder'
+import type { WorkspaceService } from './workspace'
+
+/**
+ * The record undo is built on (#1282, SPEC §16.14): each change the Hive Assistant makes, with what it replaced and what
+ * it wrote, field by field, in hive.db's `assistant_changes` and `assistant_change_values` (schema/v1_0.ts), grouped by
+ * the user's message it came from (assistantControl's turn) and kept KEEP_DAYS days. A change the Assistant makes runs
+ * inside `recordingChanges` (servers.ts' assistantChange, its batches): a card it changes is recorded as the card is
+ * saved, in the same transaction (tasks.ts' saveCard calls noteCard), one change per card; a lane, an agent's settings,
+ * a Hive setting or an agent it started by the route that made it (noteChange); and what can't be undone (a prompt, a
+ * comment, a project made) with why, so the window can say so. Undoing them is assistantUndo.ts'.
+ */
+
+/** A value as recorded: what JSON can say (a missing one is null). */
+export type Value = null | boolean | number | string | Value[] | { [k: string]: Value }
+
+/** A lane's record as undo puts it back: its cards (a queued list as it will be), reviewer, rounds, wait and name. */
+export const laneValues = (l: LaneInfo): Record<string, Value> => ({ cards: l.queued ?? l.cards.map((c) => c.number), reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
+
+/** An agent's settings undo puts back: those the Assistant can change (servers.ts' agentSettings, and its name). */
+export const AGENT_FIELDS = ['name', 'provider', 'model', 'effort', 'permissionMode', 'use200kContext', 'mcpServers'] as const
+
+/** A field a change set: what it was, and what the change wrote. */
+export interface FieldChange {
+  field: string
+  old: unknown
+  new: unknown
+}
+
+/** How long changes are kept (OP-15), from the message they came from. */
+export const KEEP_DAYS = 7
+const KEEP_MS = KEEP_DAYS * 24 * 60 * 60_000
+
+/** The change being made here: its workspace, the user's message, its line, and the change recorded for each card. */
+interface Recording {
+  workspace: string
+  turn: AssistantTurn
+  act: ActivityKind
+  what: string
+  cards: Map<number, string>
+  recorded: number
+}
+const recording = new AsyncLocalStorage<Recording | null>()
+
+/**
+ * Runs one of the Assistant's changes (`act`: its action's kind; `what`: its line, "change #12 on the board"), recording
+ * what it changes for undo.
+ */
+export function recordingChanges<T>(workspacePath: string, act: ActivityKind, what: string, fn: () => Promise<T>): Promise<T> {
+  return recording.run({ workspace: workspacePath, turn: currentTurn(workspacePath), act, what, cards: new Map(), recorded: 0 }, fn)
+}
+
+/** Runs `fn` recording nothing, inside one of the Assistant's changes too: an undo's own writes aren't changes to undo. */
+export function notRecording<T>(fn: () => T): T {
+  return recording.run(null, fn)
+}
+
+/** How many changes the change running here has recorded so far (0 outside one). */
+export const recordedHere = (): number => recording.getStore()?.recorded ?? 0
+
+const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
+
+/** A card's fields undo puts back (SPEC §16.14): its words, labels, block, links, agent, column and project. */
+export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project'] as const
+export type CardField = (typeof CARD_FIELDS)[number]
+
+/** A card's field as a value. */
+export function cardValue(card: TaskCard, field: CardField): Value {
+  switch (field) {
+    case 'labels':
+      return [...card.labels]
+    case 'blockedBy':
+      return [...card.blockedBy]
+    case 'links':
+      return [...card.links]
+    case 'agent':
+      return card.agent ?? null
+    case 'blocked':
+      return card.blocked ?? null
+    default:
+      return card[field]
+  }
+}
+
+/** A value with its objects' keys in order: two that say the same compare equal. */
+const stable = (v: unknown): string => JSON.stringify(v ?? null, (_k, x: unknown) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x))
+/** Whether two values say the same. */
+export const sameValue = (a: unknown, b: unknown): boolean => stable(a) === stable(b)
+
+/**
+ * A card saved inside one of the Assistant's changes (tasks.ts' saveCard, in the board change's transaction): what it
+ * changed of the card's fields, as one change per card (a batch's cards each their own); a new card, as made by it. Only
+ * the Assistant's own saves count, not Hive's or another actor's inside the same call.
+ */
+export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: TaskCard): void {
+  const r = recording.getStore()
+  if (!r || !ws.path || !same(ws.path, r.workspace) || changeActor()?.kind !== 'assistant') return
+  const fields: FieldChange[] = before ? CARD_FIELDS.filter((f) => !sameValue(cardValue(before, f), cardValue(after, f))).map((f) => ({ field: f, old: cardValue(before, f), new: cardValue(after, f) })) : [{ field: 'created', old: false, new: true }]
+  if (!fields.length) return
+  boardWriteOp(ws, (db) => {
+    let id = r.cards.get(after.number)
+    if (!id) {
+      id = randomUUID()
+      r.cards.set(after.number, id)
+      insertChange(db, id, r, { kind: 'card', card: after.number, project: after.project || null })
+      r.recorded++
+    }
+    for (const f of fields) putField(db, id, f)
+    prune(ws, db)
+  })
+}
+
+/**
+ * Records one of the Assistant's changes that isn't a card's (a lane, an agent's settings, a Hive setting, an agent it
+ * started), or one that can't be undone (`final`: why), in the change running here. Its own board change. Returns its id,
+ * or null outside one of the Assistant's changes.
+ */
+export async function noteChange(ws: WorkspaceService, o: { kind: Exclude<AssistantChangeKind, 'card'>; project?: string | null; target?: string | null; card?: number | null; fields?: FieldChange[]; final?: string }): Promise<string | null> {
+  const r = recording.getStore()
+  if (!r || !ws.path || !same(ws.path, r.workspace)) return null
+  const id = randomUUID()
+  await boardWrite(ws, async () =>
+    boardWriteOp(ws, (db) => {
+      insertChange(db, id, r, o)
+      for (const f of o.fields ?? []) putField(db, id, f)
+      prune(ws, db)
+    })
+  )
+  r.recorded++
+  return id
+}
+
+function insertChange(db: Db['writer'], id: string, r: Recording, o: { kind: AssistantChangeKind; project?: string | null; target?: string | null; card?: number | null; final?: string }): void {
+  db.prepare('INSERT INTO assistant_changes (id, grp, grp_at, at, kind, act, what, card, project, target, final) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, r.turn.id, r.turn.at, new Date().toISOString(), o.kind, r.act, r.what, o.card ?? null, o.project ?? null, o.target ?? null, o.final ?? null) // i18n-ignore: SQL
+}
+
+/**
+ * A field of a change: what it replaced, written once (the first save of the change that set it), and what it wrote,
+ * replaced by each later save of the same change (a move through several stages ends where the last one left it).
+ */
+function putField(db: Db['writer'], change: string, f: FieldChange): void {
+  const had = db.prepare("SELECT 1 FROM assistant_change_values WHERE change = ? AND field = ? AND side = 'old' LIMIT 1").get(change, f.field) // i18n-ignore: SQL
+  if (!had) putValue(db, change, f.field, 'old', f.old)
+  db.prepare("DELETE FROM assistant_change_values WHERE change = ? AND field = ? AND side = 'new'").run(change, f.field) // i18n-ignore: SQL
+  putValue(db, change, f.field, 'new', f.new)
+}
+
+function putValue(db: Db['writer'], change: string, field: string, side: 'old' | 'new', v: unknown): void {
+  const put = db.prepare('INSERT INTO assistant_change_values (change, field, side, ord, path, type, text, num) VALUES (?, ?, ?, ?, ?, ?, ?, ?)') // i18n-ignore: SQL
+  for (const r of rowsOf(v)) put.run(change, field, side, r.ord, r.path, r.type, r.text ?? null, r.num ?? null)
+}
+
+/** Separates a member's keys in a value row's path: no key has it. */
+const SEP = '\u001f'
+
+/** A value's row (assistant_change_values): its place, path, type and what it holds. */
+export interface ValueRow {
+  ord: number
+  path: string
+  type: 'null' | 'bool' | 'num' | 'text' | 'arr' | 'obj'
+  text?: string | null
+  num?: number | null
+}
+
+/** A value as rows: itself at path '', each member of a list or object after it, its path its parent's and its key. */
+export function rowsOf(v: unknown): ValueRow[] {
+  const out: Omit<ValueRow, 'ord'>[] = []
+  const walk = (x: unknown, path: string): void => {
+    if (x === null || x === undefined) out.push({ path, type: 'null' })
+    else if (typeof x === 'boolean') out.push({ path, type: 'bool', num: x ? 1 : 0 })
+    else if (typeof x === 'number') out.push({ path, type: 'num', num: x })
+    else if (typeof x === 'string') out.push({ path, type: 'text', text: x })
+    else if (Array.isArray(x)) {
+      out.push({ path, type: 'arr' })
+      x.forEach((y, i) => walk(y, `${path}${SEP}${i}`))
+    } else if (typeof x === 'object') {
+      out.push({ path, type: 'obj' })
+      for (const [k, y] of Object.entries(x as Record<string, unknown>)) if (y !== undefined) walk(y, `${path}${SEP}${k}`)
+    } else out.push({ path, type: 'text', text: String(x) })
+  }
+  walk(v, '')
+  return out.map((r, ord) => ({ ...r, ord }))
+}
+
+/** A value from its rows (in their order). */
+export function valueOf(rows: readonly ValueRow[]): Value {
+  const containers = new Map<string, Value[] | { [k: string]: Value }>()
+  let root: Value = null
+  for (const r of rows) {
+    const v: Value = r.type === 'null' ? null : r.type === 'bool' ? r.num === 1 : r.type === 'num' ? (r.num ?? 0) : r.type === 'text' ? (r.text ?? '') : r.type === 'arr' ? [] : {}
+    if (r.path === '') root = v
+    else {
+      const i = r.path.lastIndexOf(SEP)
+      const parent = containers.get(r.path.slice(0, i))
+      if (Array.isArray(parent)) parent.push(v)
+      else if (parent) parent[r.path.slice(i + 1)] = v
+    }
+    if (r.type === 'arr' || r.type === 'obj') containers.set(r.path, v as Value[] | { [k: string]: Value })
+  }
+  return root
+}
+
+/** Prunes changes past KEEP_DAYS, once an hour at most per workspace (inside a write, with the change being recorded). */
+const pruned = new Map<string, number>()
+function prune(ws: WorkspaceService, db: Db['writer'], now = Date.now()): void {
+  const key = (ws.path ?? '').toLowerCase()
+  if (now - (pruned.get(key) ?? 0) < 60 * 60_000) return
+  pruned.set(key, now)
+  db.prepare('DELETE FROM assistant_changes WHERE grp_at < ?').run(new Date(now - KEEP_MS).toISOString()) // i18n-ignore: SQL
+}
+
+/** Prunes now, whenever it last did (tests; the window's list does it on its way). */
+export async function pruneChanges(ws: WorkspaceService, now = Date.now()): Promise<void> {
+  pruned.delete((ws.path ?? '').toLowerCase())
+  await boardWrite(ws, async () => boardWriteOp(ws, (db) => prune(ws, db, now)))
+}
+
+/** A change as recorded, with its fields' values. */
+export interface RecordedChange extends AssistantChangeRow {
+  groupAt: string
+  target?: string
+  values: FieldChange[]
+}
+
+interface ChangeRecordRow {
+  id: string
+  grp: string
+  grp_at: string
+  at: string
+  kind: AssistantChangeKind
+  act: ActivityKind
+  what: string
+  card: number | null
+  project: string | null
+  target: string | null
+  final: string | null
+  undone_at: string | null
+}
+
+/**
+ * The changes recorded within KEEP_DAYS: one by id, a group's (the user's message), or all of them; newest first. With
+ * their fields' values.
+ */
+export function recordedChanges(ws: WorkspaceService, sel: { change?: string; group?: string } = {}, now = Date.now()): RecordedChange[] {
+  const since = new Date(now - KEEP_MS).toISOString()
+  return boardRead(ws, (db) => {
+    const rows = (
+      sel.change
+        ? db.prepare('SELECT * FROM assistant_changes WHERE id = ? AND grp_at >= ?').all(sel.change, since) // i18n-ignore: SQL
+        : sel.group
+          ? db.prepare('SELECT * FROM assistant_changes WHERE grp = ? AND grp_at >= ? ORDER BY at DESC, rowid DESC').all(sel.group, since) // i18n-ignore: SQL
+          : db.prepare('SELECT * FROM assistant_changes WHERE grp_at >= ? ORDER BY grp_at DESC, at DESC, rowid DESC').all(since) // i18n-ignore: SQL
+    ) as unknown as ChangeRecordRow[]
+    const valuesOf = db.prepare('SELECT field, side, ord, path, type, text, num FROM assistant_change_values WHERE change = ? ORDER BY field, side, ord') // i18n-ignore: SQL
+    return rows.map((r) => {
+      const byField = new Map<string, { old: ValueRow[]; new: ValueRow[] }>()
+      for (const v of valuesOf.all(r.id) as unknown as (ValueRow & { field: string; side: 'old' | 'new' })[]) {
+        const f = byField.get(v.field) ?? { old: [], new: [] }
+        f[v.side].push(v)
+        byField.set(v.field, f)
+      }
+      const values = [...byField].map(([field, v]) => ({ field, old: valueOf(v.old), new: valueOf(v.new) }))
+      return {
+        id: r.id,
+        group: r.grp,
+        groupAt: r.grp_at,
+        at: r.at,
+        kind: r.kind,
+        act: r.act,
+        what: r.what,
+        ...(r.card !== null ? { card: r.card } : {}),
+        ...(r.project !== null ? { project: r.project } : {}),
+        ...(r.target !== null ? { target: r.target } : {}),
+        ...(r.final !== null ? { final: r.final } : {}),
+        ...(r.undone_at !== null ? { undoneAt: r.undone_at } : {}),
+        fields: values.map((f) => f.field),
+        values
+      }
+    })
+  })
+}
+
+/** The changes kept, by the user's message they came from, newest first (the window's undo list, the Assistant's tool). */
+export function changeGroups(ws: WorkspaceService, now = Date.now()): AssistantChangeGroup[] {
+  const groups = new Map<string, AssistantChangeGroup>()
+  for (const c of recordedChanges(ws, {}, now)) {
+    const g = groups.get(c.group) ?? { id: c.group, at: c.groupAt, changes: [] }
+    const { values: _values, groupAt: _at, target: _target, ...row } = c
+    g.changes.push(row)
+    groups.set(c.group, g)
+  }
+  return [...groups.values()]
+}
+
+/** Marks changes undone (as far as they could be: what was skipped stays as it was), so they aren't undone again. */
+export async function markUndone(ws: WorkspaceService, ids: readonly string[], at = new Date().toISOString()): Promise<void> {
+  if (!ids.length) return
+  await boardWrite(ws, async () =>
+    boardWriteOp(ws, (db) => {
+      const mark = db.prepare('UPDATE assistant_changes SET undone_at = ? WHERE id = ? AND undone_at IS NULL') // i18n-ignore: SQL
+      for (const id of ids) mark.run(at, id)
+    })
+  )
+}
+
+/** A lane the Assistant started (`before` null) or changed, recorded for undo: what of its record changed. */
+export async function noteLane(ws: WorkspaceService, before: LaneInfo | null, after: LaneInfo): Promise<void> {
+  if (!before) {
+    await noteChange(ws, { kind: 'lane', project: after.project, target: after.id, fields: [{ field: 'created', old: false, new: true }] })
+    return
+  }
+  const was = laneValues(before)
+  const now = laneValues(after)
+  const fields = Object.keys(now).filter((k) => !sameValue(was[k], now[k])).map((k) => ({ field: k, old: was[k], new: now[k] }))
+  if (fields.length) await noteChange(ws, { kind: 'lane', project: after.project, target: after.id, fields })
+}
+
+/** An agent's settings the Assistant changed (as read just before, and after), recorded for undo: those that changed. */
+export async function noteAgent(ws: WorkspaceService, project: string, was: AgentDef, now: AgentDef): Promise<void> {
+  const fields = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k])).map((k) => ({ field: k, old: was[k] ?? null, new: now[k] ?? null }))
+  if (fields.length) await noteChange(ws, { kind: 'agent', project, target: now.id, fields })
+}

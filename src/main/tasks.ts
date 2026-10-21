@@ -16,6 +16,7 @@ import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { noteCard } from './assistantChanges'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
 import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
@@ -393,7 +394,10 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
   const { number, title, description, project: _shown, key: _key, ...rest } = card
   putCard(ws, n, { number, title, description, project: saved, ...(projectId ? { projectId } : {}), ...rest })
   // Its facts, in the same transaction (#1216): what this change moved, started, submitted, reviewed, blocked or decided.
-  recordChange(ws, before !== undefined ? before : was ? clean(was, n, ids) : null, { ...card, project: saved })
+  const prior = before !== undefined ? before : was ? clean(was, n, ids) : null
+  recordChange(ws, prior, { ...card, project: saved })
+  // The Assistant's change of it, for undo (#1282): what it replaced, in the same transaction.
+  noteCard(ws, prior, card)
   // Its key now (#1219: a card moved to another project has that project's): what callers return of it.
   const key = cardKeys(ws, [n]).get(n)
   if (key) card.key = key

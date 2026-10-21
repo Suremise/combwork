@@ -4,12 +4,14 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
-import { publicReason, type ActivityAgent, type ActivityTarget } from '../shared/assistantActivity'
+import { publicReason, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
+import { changeGroups, noteAgent, noteChange, noteLane, recordedHere, recordingChanges } from './assistantChanges'
+import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { fallbackEfforts, modelGroups } from '../shared/models'
 import { agentRuntime, unknownStateText } from '../shared/runtime'
@@ -513,7 +515,14 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
-    const { done, said, brief, act: more, result } = await fn(guard)
+    // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
+    // An agent already running when a card is started on it wasn't started by this change: undo leaves it running.
+    const running = act.kind === 'start-task' && !!act.agent && !!act.project && !!sessions.liveFor(join(ws, act.project), act.agent.id)
+    const { done, said, brief, act: more, result } = await recordingChanges(ws, act.kind, what, async () => {
+      const out = await fn(guard)
+      await noteDone(requireWorkspace(), { ...act, ...out.act }, running)
+      return out
+    })
     const pub = brief ?? (said ? done : undefined)
     assistant.record(ws, { ...act, ...more }, done + (said ?? ''), undefined, pub !== undefined ? { brief: pub } : {})
     return result
@@ -523,8 +532,33 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
   }
 }
 
+/**
+ * Why each kind of the Assistant's change that undo can't take back can't be (#1282, SPEC §16.14), as the window and the
+ * undo tool say it. Card changes, lanes, agents' settings and settings are recorded by what made them; an agent it started
+ * here, so undo can stop it.
+ */
+const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
+  'prompt-agent': "A prompt that was sent can't be taken back.",
+  'message-agent': "A message that was sent can't be taken back.",
+  'comment-task': "A comment stays: undo doesn't take back what was said.",
+  'hand-over': "A hand-over can't be undone: the work went to the other agent.",
+  'create-project': 'A project it made stays: remove it from Hive if it isn\'t wanted.',
+  'activate-project': "A project it opened stays open: close it if it isn't wanted.",
+  'deactivate-project': 'A project it closed stays closed: open it again if it is wanted.',
+  'add-agent': "An agent it added stays: remove it in the project's agents if it isn't wanted.",
+  'stop-agent': "An agent it stopped isn't started again by undo: start it if it should run.",
+  'reorder-tasks': "The cards' order isn't put back.",
+  'lane-end': 'A lane that ended stays ended: start it again if it should go on.'
+}
+
+/** What the change running here leaves for undo once done (#1282): an agent it started, or why it can't be undone. */
+async function noteDone(ws: WorkspaceService, act: ActivityTarget, wasRunning: boolean): Promise<void> {
+  if ((act.kind === 'start-agent' || act.kind === 'start-task') && act.agent && act.project && !wasRunning) await noteChange(ws, { kind: 'started', project: act.project, target: act.agent.id, card: act.card ?? null })
+  else if (FINAL_WHY[act.kind] && !recordedHere()) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: FINAL_WHY[act.kind]! })
+}
+
 /** An agent as an action names it (#763). */
-const actAgent = (a: { id: string; name: string }): ActivityAgent => ({ id: a.id, name: a.name })
+const actAgent =(a: { id: string; name: string }): ActivityAgent => ({ id: a.id, name: a.name })
 /** A lane as an action names it: its id, project, cards and builder. */
 const laneAct = (l: Pick<LaneInfo, 'id' | 'project' | 'cards' | 'builder'>): Partial<ActivityTarget> => ({ lane: l.id, project: l.project, cards: l.cards.map((c) => c.number), agent: actAgent(l.builder) })
 
@@ -548,7 +582,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 7
+export const API_VERSION = 8
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -851,6 +885,9 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     if (changed) {
       // The event stream says which setting, not its values (`brief`).
       assistant.record(ws, act, `Changed ${path}${where}: ${oldText} → ${newText}`, undefined, { brief: `Changed ${path}${where}`, setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
+      // For undo (#1282): its value (and a provider's removed models) as it was and as set.
+      const fields = [{ field: 'value', old: r.old, new: r.new }, ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])]
+      await recordingChanges(ws, 'setting', `change ${path}${where}`, () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
     return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}) }
@@ -859,6 +896,48 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     throw err instanceof SettingRefused ? new HttpError(err.status, err.message) : err
   }
 }
+
+/** How many of its messages' changes the Assistant's list gives (its newest; GET /v1/assistant/changes). */
+const CHANGE_GROUPS_LISTED = 10
+
+/**
+ * The Assistant's own changes, kept for undo (#1282, SPEC §16.14): its newest messages' groups, each change with its id,
+ * its line, its card, the fields it set, whether it was undone, and why one can't be (`final`). Only the Assistant's.
+ */
+route('GET', '/v1/assistant/changes', async () => {
+  if (!assistantCaller()) throw new HttpError(403, 'Only the Hive Assistant has changes to undo: they are its own.')
+  return changeGroups(requireWorkspace())
+    .slice(0, CHANGE_GROUPS_LISTED)
+    .map((g) => ({ group: g.id, at: g.at, changes: g.changes.map((c) => ({ id: c.id, what: c.what, ...(c.card !== undefined ? { card: c.card } : {}), fields: c.fields, ...(c.final ? { final: c.final } : {}), ...(c.undoneAt ? { undone: true } : {}) })) }))
+})
+
+/**
+ * The Assistant undoes changes of its own (#1282): `change` (an id from GET /v1/assistant/changes), or `group` (a message's,
+ * or "latest": its newest message with a change not undone). Never another's: only its own are kept. A change of its
+ * own, listed in its panel; what was skipped (changed since, gone) is said.
+ */
+route('POST', '/v1/assistant/undo', async ({ body }) => {
+  const ws = requireWorkspace()
+  const change = typeof body?.change === 'string' && body.change ? body.change : undefined
+  let group = typeof body?.group === 'string' && body.group ? body.group : undefined
+  if (!change === !group) throw new HttpError(400, 'Name one change (change: its id) or one message\'s changes (group: its id, or "latest").')
+  if (group === 'latest') {
+    group = changeGroups(ws).find((g) => g.changes.some((c) => !c.undoneAt && !c.final))?.id
+    if (!group) throw new HttpError(404, 'None of your changes of the last 7 days is left to undo.')
+  }
+  return assistantChange('agents', change ? `undo a change of yours` : `undo your changes for a message`, { kind: 'undo' }, async () => {
+    let results: AssistantUndoResult[]
+    try {
+      results = await undoChanges(ws, change ? { change } : { group }, 'assistant')
+    } catch (e) {
+      throw e instanceof UndoNotFound ? new HttpError(404, e.message) : e
+    }
+    const undone = results.filter((r) => r.undone.length).length
+    const skipped = results.reduce((n, r) => n + r.skipped.length, 0)
+    const cards = [...new Set(results.flatMap((r) => (r.card !== undefined ? [r.card] : [])))]
+    return { done: `Undid ${undone} of ${results.length} change${results.length === 1 ? '' : 's'} of its own${skipped ? ` (${skipped} field${skipped === 1 ? '' : 's'} left: changed since or gone)` : ''}`, act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
+  })
+})
 
 route('POST', '/v1/projects', async ({ body }) => {
   const name = String(body?.name ?? '').trim()
@@ -980,7 +1059,10 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   const agentId = await agentParam(p, params[1] && decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async () => {
+    const was = await agentDefOf(p, agentId)
     const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) })
+    // What of its settings changed, for undo (#1282).
+    await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }
   })
@@ -1561,7 +1643,9 @@ route('POST', '/v1/lanes', async ({ body }) =>
     if (!assistantCaller()) return start()
     const builderAct = await knownAgent(basename(p), builder)
     return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
+      const before = await lanes.listLanes(ws, { project: basename(p) })
       const r = await start()
+      await noteLane(ws, r.did === 'started' ? null : (before.find((l) => l.id === r.lane.id) ?? null), r.lane)
       // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
       // lane watch (#531) on every running lane, or on this one, follows it.
       const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
@@ -1586,7 +1670,9 @@ route('POST', '/v1/lanes/join', async ({ body }) =>
     if (!assistantCaller()) return joined()
     const reviewerAct = await knownAgent(basename(p), reviewer)
     return assistantChange('agents', `join a lane in ${basename(p)}`, { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async () => {
+      const before = await lanes.listLanes(ws, { project: basename(p) })
       const r = await joined()
+      await noteLane(ws, before.find((l) => l.id === r.lane.id) ?? null, r.lane)
       return { done: `${r.lane.reviewer?.name ?? 'A reviewer'} joined lane ${r.lane.id} in ${basename(p)}`, act: { ...laneAct(r.lane), ...(r.lane.reviewer ? { agent: actAgent(r.lane.reviewer) } : {}) }, result: r }
     })
   })

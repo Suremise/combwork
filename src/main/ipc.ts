@@ -52,6 +52,8 @@ import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
+import { changeGroups } from './assistantChanges'
+import { UndoNotFound, userUndo } from './assistantUndo'
 import { advanced, updateSettingsChecked } from './advanced'
 import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
@@ -118,6 +120,8 @@ const M = {
   notPrefValue: msg({ id: 'errors.pref.notValue', defaultMessage: 'Not a {pref} value.', description: "Refusal of a per-project view setting's value. {pref} is the setting's internal name." }),
   notTipsChange: msg({ id: 'errors.tips.notChange', defaultMessage: 'Not a tips change.', description: 'Refusal of a call to change which tips were seen (a programming error, rarely seen).' }),
   workspaceNotFound: msg({ id: 'errors.workspace.notFound', defaultMessage: "The workspace folder {path} can't be found. It may have been moved or deleted, or be on a drive that isn't connected.", description: "Opening a workspace whose folder isn't there. {path} is the folder." }),
+  undoWhich: msg({ id: 'errors.assistantUndo.which', defaultMessage: "Choose one change of the Assistant's to undo, or one message's changes.", description: "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages." }),
+  undoGone: msg({ id: 'errors.assistantUndo.gone', defaultMessage: "That change of the Assistant's is no longer kept: changes are kept for 7 days.", description: "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more." }),
   noWorkspace: msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'An action needs an open workspace and this window has none.' }),
   notWorktree: msg({ id: 'errors.worktree.notGit', defaultMessage: "{path} isn't a git worktree (it has no .git file). Choose the folder the worktree was moved to.", description: "Repair: the folder chosen as an agent's moved worktree isn't one. {path} is that folder. Keep \".git\" as it is." }),
   removeHow: msg({ id: 'errors.project.removeHow', defaultMessage: 'Unknown way to remove a project: {how}', description: "Refusal of a call to remove a project in a way that doesn't exist (a programming error, rarely seen). {how} is what it asked for." }),
@@ -1042,6 +1046,19 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'assistant:revertSetting': async (actionId) => {
       if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
       await revertSetting(workspace.path, String(actionId))
+    },
+    'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()) : []),
+    'assistant:undo': async (sel) => {
+      if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      const s = sel && typeof sel === 'object' ? sel : {}
+      const change = typeof s.change === 'string' && s.change ? s.change : undefined
+      const group = typeof s.group === 'string' && s.group ? s.group : undefined
+      if (!change === !group) throw hiveError(M.undoWhich, undefined, { kind: 'invalid' })
+      try {
+        return await userUndo(currentWorkspace(), change ? { change } : { group })
+      } catch (e) {
+        throw e instanceof UndoNotFound ? hiveError(M.undoGone, undefined, { kind: 'conflict' }) : e
+      }
     },
     'mergeSlots:list': () => (workspace.path ? workspaceSlots(workspace.path) : []),
     'mergeSlots:release': (p, branch, holdId) => {

@@ -2475,6 +2475,27 @@ built on the fact log and the Assistant's activity list:
 - **The Assistant can undo its own** changes with a tool limited to them, recorded in its panel; never the user's or
   agents' changes.
 
+**Built in P4** [#1282] (main side; the panel is #1283):
+- **Recorded:** every change the Assistant makes through `assistantChange()` (and its batches) is kept in hive.db's
+  `assistant_changes` and `assistant_change_values` (a 1.0 group step), as it is made (`assistantChanges.ts`).
+  - A card's fields are recorded as the card is saved, in the same transaction.
+  - A lane, an agent's settings, a Hive setting and an agent it started are recorded by the route that made them.
+  - What can't be undone is recorded with why.
+  - Each change keeps what it replaced and what it wrote, per field, as typed rows (a list or table as a row per member,
+    never JSON). It is grouped by the user's message (`assistantControl`'s turn) and pruned after 7 days.
+- **Undone** (`assistantUndo.ts`) one change or a message's, newest first.
+  - A field goes back only while it still holds what the change wrote, checked at the write (a card's under its lock, a
+    setting's guard); one changed since is skipped and said.
+  - A card it made is archived unless someone else changed it since.
+  - A column move goes back through the rules with `override: { reason: "undo" }`.
+  - A lane it started is abandoned; its list, reviewer, rounds, wait and name go back through the lane record. A lane
+    that ended stays ended.
+  - An agent it started is stopped.
+  - An undo's own writes aren't recorded.
+- **The user** undoes from the window (IPC `assistant:changes`, `assistant:undo`: the panel's, #1283).
+- **The Assistant** undoes its own with `hive_undo` (`GET /v1/assistant/changes`, `POST /v1/assistant/undo`, Control
+  agents, its activity kind `undo`). It undoes a Hive setting only while Change settings is on.
+
 ### 16.15 Override switches for the CLIs
 
 [#966, #1120 c, #1123 c, #1167, #1174] Every Hive override of a CLI's own behaviour has a switch, or a recorded reason
