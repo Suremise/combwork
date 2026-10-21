@@ -238,6 +238,7 @@
   "main.update.readyAuto": "It installs when you quit Hive, or restart now.",
   "main.update.readyManual": "Restart Hive to install it.",
   "main.update.restart": "Restart and Update",
+  "main.update.testCopy": "A test copy of Hive doesn't check for updates.",
   "main.update.updated": "{app} updated to {version}",
   "main.update.updatedBody": "See what changed in this version.",
   "main.update.whatsNew": "What's New",

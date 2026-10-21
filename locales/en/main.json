@@ -955,6 +955,10 @@
     "defaultMessage": "Restart and Update",
     "description": "The notice's button: restarts Hive and installs the update."
   },
+  "main.update.testCopy": {
+    "defaultMessage": "A test copy of Hive doesn't check for updates.",
+    "description": "Settings → Updates in a copy of Hive started by its tests, which never checks for updates."
+  },
   "main.update.updated": {
     "defaultMessage": "{app} updated to {version}",
     "description": "A notice after Hive was updated. {app} is its name, {version} the new version."
