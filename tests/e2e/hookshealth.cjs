@@ -5,7 +5,8 @@
 // - its hooks turned off mid-session, its next prompt's work with no hook turns its pane to "Status unknown: no hooks
 //   from Claude Code" (a stalled mark) with the project's banner saying why and what to do, a Notifications entry
 //   once, nothing typed into it (the Agent API says why), and its lane paused: "paused: Builder's hooks aren't arriving";
-// - an agent started with its hooks off shows it from its start;
+// - an agent started with its hooks off shows it from its start; a Codex agent (the fake, whose first hook comes with its
+//   first prompt) started on a task with its hooks off shows it after that task, watched though it was still starting;
 // - Restart session from the banner with working hooks clears it, and the lane goes on.
 // Screenshots of the pane and the banner in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -19,6 +20,7 @@ const PORT = Number(lib.port(47938))
 const userData = path.join(lib.WORK, 'hookshealth-profile')
 const ws = path.join(lib.WORK, 'hookshealth-ws')
 const claudeHome = path.join(lib.WORK, 'hookshealth-claude-home')
+const codexHome = path.join(lib.WORK, 'hookshealth-codex-home')
 const shots = path.join(lib.WORK, 'hookshealth-shots')
 const alpha = path.join(ws, 'alpha')
 let failed = 0
@@ -38,15 +40,22 @@ const hooksOff = (agent, off) => {
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(alpha)
   const cenv = lib.fakeClaude(userData, claudeHome, [alpha])
+  // Codex too: its first hook comes only with its first prompt (a task given at its start, here).
+  fs.rmSync(codexHome, { recursive: true, force: true })
+  fs.mkdirSync(codexHome, { recursive: true })
+  fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+  lib.enableProviders(userData, ['claude-code', 'codex'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
+  cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.hooks.missingSeconds': 3 } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', HIVE_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -57,6 +66,7 @@ const hooksOff = (agent, off) => {
     await lib.openWorkspace(inv, page, ws)
     await inv('project:setActive', alpha, true)
     await lib.waitForProvider(inv)
+    await lib.waitForProvider(inv, 'codex')
     await page.getByText('alpha', { exact: true }).first().click()
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body) => {
@@ -140,6 +150,20 @@ const hooksOff = (agent, off) => {
     const muted = await until(async () => (await live(mute))?.hooksMissing, HUNG_MS)
     check('an agent started with its hooks off shows it from its start', muted?.after === 'start', JSON.stringify(muted))
     await inv('session:stop', alpha, mute.id)
+
+    // --- A Codex agent started on a task with its hooks off (its first hook would come with that task): its launch's
+    // task is watched from its start, though it is still starting then.
+    const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex', permissionMode: 'full-access' })
+    fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cx'), '')
+    // What it does with the card it is started on: 12 s of work, its Working line on screen.
+    fs.writeFileSync(path.join(codexHome, 'fake-wakes-Cx.txt'), 'work 12\n')
+    // Started on a card (Start on Card, as from the board), whose title is the fake's step: 12 s of work.
+    const cxCard = await inv('tasks:create', { title: 'work 12', project: 'alpha', column: 'todo' })
+    const startedCx = await inv('tasks:start', cxCard.number, { kind: 'agent', agentId: cx.id })
+    check('the Codex agent starts on its card', startedCx?.agentId === cx.id, JSON.stringify(startedCx))
+    const deafCx = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)
+    check("a Codex agent's launch task with no hook after it, at work on its screen: its hooks are missing", deafCx?.after === 'prompt', JSON.stringify(deafCx ?? (await live(cx))))
+    await inv('session:stop', alpha, cx.id)
 
     // --- Restart session with working hooks clears it, and the lane goes on.
     hooksOff('Builder', false)

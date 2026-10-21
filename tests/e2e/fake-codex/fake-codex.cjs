@@ -31,6 +31,9 @@
 // - It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected).
 // - A first prompt as its last plain argument (after "resume <id>" too) is its first turn, as Codex starts on one.
 // - Ctrl+C twice ends it with SessionEnd.
+// - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
+//   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
+//   FAKE_CODEX_VERSION 0.162.1 or later, "work N" draws Codex's Working line while it works.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -175,9 +178,15 @@ const setTitle = (t) => out(`\x1b]0;${t}\x07`)
 /** The turn under way: each prompt's own id, which its hooks carry (turn_id), as Codex 0.162.1's do. */
 let turnId = null
 
+/**
+ * Its hooks are off (#1336): while fake-nohooks-<agent> is in CODEX_HOME (read at each hook), no hook is sent; it works
+ * on as before.
+ */
+const hooksOff = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, `fake-nohooks-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+
 /** Sends a hook as Codex's curl command does; Hive's reply (JSON), or null. */
 async function hook(event, extra = {}) {
-  if (!hookUrl) return null
+  if (!hookUrl || hooksOff()) return null
   const res = await fetch(hookUrl, {
     method: 'POST',
     headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
@@ -332,6 +341,8 @@ async function scripted(step) {
   const call = parseHiveStep(step)
   if (call) await hiveCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
+  // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while it works (#1336: what Hive's screen reading looks for).
+  if (pause && /^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (${pause[1]}s • esc to interrupt)\r\n`)
   if (pause) await sleep(Number(pause[1]) * 1000)
   // "checkpoint": a command of its own, whose PostToolUse reply may carry Hive's notice (#650).
   const check = /\bcheckpoint\b/i.test(step)
@@ -341,6 +352,19 @@ async function scripted(step) {
     if (noticeIn(await hook('PostToolUse', c), 'checkpoint') && followsNotices()) await readInbox()
   }
   return any || !!(move || rev || comment || call || pause || check)
+}
+
+/**
+ * What it does after a wake it read (#1336), as the fake Claude Code does: the next line of fake-wakes-<agent>.txt in
+ * CODEX_HOME (taken), or null with none.
+ */
+function nextScripted() {
+  if (!process.env.CODEX_HOME) return null
+  const file = path.join(process.env.CODEX_HOME, `fake-wakes-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}.txt`)
+  if (!fs.existsSync(file)) return null
+  const [first, ...rest] = fs.readFileSync(file, 'utf8').split('\n')
+  fs.writeFileSync(file, rest.join('\n'))
+  return first.trim() || null
 }
 
 /** A prompt: its steps, separated by " then " ("question then review allow"). */
@@ -365,7 +389,7 @@ async function runPrompt(text) {
     if (rows.length && followsNotices()) await hiveCall('hive_inbox', { ack: rows.flatMap((x) => x.ids) })
     const read = rows.map((x) => x.text).join(' ')
     if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, at: new Date().toISOString() }) + '\n')
-    if (rows.length) text = work ? read : ''
+    if (rows.length) text = work ? read : nextScripted() || ''
   }
   let questions = 0
   let scriptedSteps = false

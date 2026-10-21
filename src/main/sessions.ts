@@ -1705,8 +1705,9 @@ class SessionManager {
         void this.onExit(projectPath, agent.id, state.runId, code, output)
       }
     })
-    // A task on its command line is its first prompt (#1336: a hook should follow it).
-    if (l.initialPrompt) this.notePrompt(l)
+    // A task on its command line is its first prompt (#1336: a hook should follow it), though it is still starting: no
+    // turn of its own runs yet.
+    if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
     // After each look at the transcript, the silence check: what the CLI recorded (a turn's end) comes first (#648); then
@@ -2297,23 +2298,29 @@ class SessionManager {
   }
 
   /**
-   * A prompt was sent to an agent (#1336): while it is idle, a hook should follow it, and its records' requests now are
-   * read for the hooks check to compare with.
+   * A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it,
+   * and its records' requests now are read for the hooks check to compare with. Read a moment late (a quick turn's
+   * request already in), the baseline only hides that evidence; unknown (unreadable), its records show nothing.
    */
-  private notePrompt(l: LiveSession): void {
+  private notePrompt(l: LiveSession, launch = false): void {
     const w = l.hooksWatch
-    const idle = ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
+    const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
     if (!w || !promptSent(w, Date.now(), idle)) return
     const s = w.submit!
     void this.requestsNow(l).then((n) => {
-      if (w.submit === s) s.requests = n ?? 0
+      if (w.submit === s) s.requests = n
     })
   }
 
-  /** The requests in an agent's records (its transcript) now, or null when they can't be read. */
+  /**
+   * The requests in an agent's records (its transcript) now; null when they can't be read. A new conversation with no
+   * transcript yet has none; a resumed one whose transcript can't be found is unknown, never none (its history would
+   * count as new work once read).
+   */
   private async requestsNow(l: LiveSession): Promise<number | null> {
-    const src = await this.liveTranscript(l).catch(() => null)
-    if (!src || !l.state.sessionId) return null
+    const src = await this.liveTranscript(l).catch(() => undefined)
+    if (src === undefined) return null
+    if (!src) return l.resumed ? null : 0
     return (await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider))?.requests ?? null
   }
 
@@ -2357,6 +2364,8 @@ class SessionManager {
     const told = `${st.agentId}\n${st.sessionId || st.runId}`
     if (this.hooksTold.has(told)) return
     this.hooksTold.add(told)
+    // A bounded few: the oldest go first.
+    if (this.hooksTold.size > 500) this.hooksTold.delete(this.hooksTold.values().next().value!)
     // A toast, kept in Notifications.
     toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath) // i18n-ignore: select keys, never shown
   }
