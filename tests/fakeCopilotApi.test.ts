@@ -57,12 +57,14 @@ describe("gh off a test Copilot's PATH, whatever its folder is called", () => {
     const was = process.env.PATH
     process.env.PATH = `${portable};${was}`
     try {
-      const env = copilotTestEnv({ url: 'http://127.0.0.1:1/v1' }, join(base, 'env-run'))
+      const env = copilotTestEnv({ url: 'http://127.0.0.1:1/v1' }, join(base, 'env-run'), { above: base })
       expect(env.PATH.split(';')).not.toContain(portable)
       const where = require('child_process').spawnSync('where.exe', ['gh'], { env: { PATH: env.PATH, PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot } })
       expect(where.status).not.toBe(0)
-      expect(env).toMatchObject({ COPILOT_HOME: join(base, 'env-run', 'copilot-home'), GH_CONFIG_DIR: join(base, 'env-run', 'copilot-gh'), USERPROFILE: join(base, 'env-run', 'copilot-userprofile'), COPILOT_OFFLINE: 'true' })
+      expect(env).toMatchObject({ COPILOT_HOME: join(base, 'env-run', 'copilot-home'), GH_CONFIG_DIR: join(base, 'env-run', 'copilot-gh'), USERPROFILE: base, HOME: base, COPILOT_OFFLINE: 'true' })
       for (const k of ['GH_TOKEN', 'GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN']) expect(env[k]).toBeUndefined()
+      // #1308: its profile is a folder above where it works, so Copilot's walk for skills stops there; never left out.
+      expect(() => copilotTestEnv({ url: 'http://127.0.0.1:1/v1' }, join(base, 'env-run'))).toThrow(/above/)
     } finally {
       process.env.PATH = was
     }
