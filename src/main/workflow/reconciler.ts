@@ -132,6 +132,12 @@ function runFor(f: Followed): Promise<void> {
 
 async function reconcileProject(f: Followed): Promise<void> {
   if (!f.alive() || boardReadOnly(f.ws)) return
+  // Repair is renaming lines (#1305): this run waits until it has, so no line is read between git's rename and the
+  // cards' LineRenamed. Its asked lines and cards are kept for then.
+  if (f.ws.repairingMove) {
+    schedule(f)
+    return
+  }
   const lines = [...f.lines]
   const asked = [...f.cards]
   f.lines.clear()
@@ -183,6 +189,11 @@ async function reconcileProject(f: Followed): Promise<void> {
     if (unsettled.has(t)) continue
     if (wf.store.meta(`target:${t}`) !== th) await wf.locked(() => wf.store.setMeta(`target:${t}`, th))
   }
+}
+
+/** Waits for a workspace's reconciliation runs under way (#1305: Repair renames lines once none reads them; new runs wait for it). */
+export async function reconcilersIdle(ws: WorkspaceService): Promise<void> {
+  await Promise.all([...followed.values()].filter((f) => f.ws === ws && f.running).map((f) => f.running))
 }
 
 /** Reconciles every project of a workspace soon (its open, a window focused). */

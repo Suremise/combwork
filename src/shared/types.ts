@@ -1072,6 +1072,12 @@ export interface ProjectConfig {
    */
   pendingCopies?: { from: string; to: string; of: string; owner?: MoveOwner }[]
   /**
+   * Agents' branches Repair is renaming (#1305), recorded before git's rename and dropped once git, the agent's record
+   * and the cards' lines all have the new name: a rename cut short (a file that couldn't be written) is finished by the
+   * next Repair, whichever of its steps were done.
+   */
+  pendingBranchRenames?: { agentId: string; from: string; to: string }[]
+  /**
    * Worktrees kept after their agent was replaced (#289: loading a template) before its first session ran the worktree
    * setup command: an agent that works in one again runs it first (needsSetup), so it isn't lost, nor run twice.
    */
@@ -1724,6 +1730,8 @@ export interface WorkspaceMoved {
    * Repair gives them to the project they belong to now. Absent when there are none.
    */
   cards?: MoveCards[]
+  /** How many agents' branches are still named after an old place (#1305), for Repair to rename; absent: none. */
+  branches?: number
 }
 
 /**
@@ -1764,6 +1772,25 @@ export interface MoveHostPlan {
   sessions: number
   /** What a CLI keeps by folder path (Claude Code's transcripts and memory), to copy to the new path's name. */
   folders: PathDataCopy[]
+  /** Agents' branches named after where the workspace or project was (#1305): renamed, their records with them. */
+  branches?: MoveBranch[]
+}
+
+/**
+ * An agent's branch in Hive's form, hive/<workspace>/<project>/<agent>, whose workspace or project part is an old one
+ * (#1305, Darren's decision on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
+ * which keeps the old name (pushing under the new one is the user's step). `kept`: why it isn't renamed now
+ * (`exists`: a branch of that name is already there). `pending`: a rename a Repair before began and couldn't finish
+ * (project.json's `pendingBranchRenames`), finished now from where it stopped.
+ */
+export interface MoveBranch {
+  agentId: string
+  agentName: string
+  from: string
+  to: string
+  remote?: string
+  kept?: 'exists'
+  pending?: boolean
 }
 
 /**

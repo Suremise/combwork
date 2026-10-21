@@ -18,6 +18,7 @@ import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectNam
 import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
+import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
@@ -1257,7 +1258,8 @@ export async function runIntent<R>(
           saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }), moved)
         }
       },
-      () => call(wf)
+      // One git step (#1376): what it asks git about fixed commits is asked once in it.
+      () => gitStep(() => call(wf))
     )
   )
   return { reply, saved }
