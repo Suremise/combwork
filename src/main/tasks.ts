@@ -15,10 +15,12 @@ import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAs
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
-import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
+import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import type { ForYouAnswer } from '../shared/workflow/workView'
+import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
 import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
@@ -1069,9 +1071,11 @@ export async function runIntent<R>(
         written: async (w) => {
           const extra = zero9(w, first)
           first = false
-          const p: TaskPatch = { ...extra.patch, column: STAGE_CATEGORY[w.current] }
           // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).
           const moved = w.written.findLast((f) => f.kind === 'Moved')?.seq ?? null
+          // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
+          // place, so a failed card still in Review isn't "returned for review" by it (#1269 round 3).
+          const p: TaskPatch = { ...extra.patch, ...(moved !== null ? { column: STAGE_CATEGORY[w.current] } : {}) }
           saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }), moved)
         }
       },
@@ -1111,8 +1115,11 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
 }
 
 async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
-  // Interim (#1290, #1275): the user's moves don't ask yet, so a move that skips a rule records its Override.
-  const r = await moveThroughRules(g, n, patch, actor, opts, true)
+  // The window's change (`ask`: IPC tasks:update, #1275) never skips a rule unasked: its moves go through tasks:move,
+  // which asks; one that would skip a rule here is refused with the rules it names. Hive's own calls for the user (a
+  // card's Start) confirm as before.
+  const { ask, ...rest } = opts
+  const r = await moveThroughRules(g, n, patch, actor, rest, !ask)
   if ('refused' in r) throw new WorkflowRefusedError(r.refused)
   // Stopped part way: the user sees where the card is; the Assistant is told why it stopped there (its start kept).
   if ('moved' in r && r.stopped && actor.kind !== 'user') throw new WorkflowRefusedError(r.stopped)
@@ -1124,15 +1131,100 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
  * The window's move (`tasks:move`, #1265): through the card's rules when they apply, asking first unless `confirm`
  * (the rules it would skip, nothing written), else a plain move. Never refused for a rule: the user overrides.
  */
-export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string } = {}): Promise<MoveResult> {
+export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null } = {}): Promise<MoveResult> {
   const actor: TaskActor = { kind: 'user' }
-  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
+  // `agent`: the Move to Doing dialog's choice (an agent, or nobody), given with the move.
+  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.agent !== undefined ? { agent: o.agent } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
   const gate = await gateOf(workspace, n, patch, actor, { anyStage: true })
   if (!gate) {
     const { override: _o, ...plain } = patch
     return { moved: await updateTask(n, plain, actor) }
   }
   return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm)
+}
+
+/**
+ * The rules the user's Start of a card would skip (#1275: its move into Doing, the start its rules stand for), asked
+ * before anything is done (no agent added, nothing launched): none when no rule applies or none is skipped. `agent`: the
+ * agent it is given to (null: one not added yet).
+ */
+export async function startAsks(n: number, agent: string | null): Promise<string[]> {
+  const actor: TaskActor = { kind: 'user' }
+  const gate = await gateOf(workspace, n, { column: 'doing', ...(agent ? { agent } : {}) }, actor, { anyStage: true })
+  if (!gate) return []
+  const r = await gate.wf.move(n, gate.to, 'user', { dry: true, ...(gate.builder ? { builder: gate.builder } : {}) })
+  return !isRefusal(r) && 'ask' in r ? r.rules : []
+}
+
+/**
+ * The columns a card can be moved to under its rules (IPC `tasks:columns`, #1275): its ruleset's stages as columns
+ * (On Hold always), where the window's drag highlights a drop; null when no rule applies to it (the rules off, a card
+ * from before 1.0, a project with no platform): every column. A Done card dragged on is reopened: its next cycle's.
+ */
+export async function moveColumns(n: number): Promise<TaskColumn[] | null> {
+  const ws = workspace
+  const { workflowEnforced, workflowFor } = await import('./workflow/service')
+  if (!ws.path || !workflowEnforced()) return null
+  const head = cardHeads(ws, [n])[0]
+  if (!head || typeof head.project !== 'string' || !head.project) return null
+  const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
+  const rec = (() => {
+    try {
+      return wf?.store.card(n) ?? null
+    } catch {
+      return null
+    }
+  })()
+  if (!wf || !rec || rec.preWorkflow) return null
+  const s = wf.state(rec)
+  const r = wf.rulesetOf(rec, s.stage === 'done' ? { ...s, stage: 'todo' } : s)
+  return TASK_COLUMNS.map((c) => c.id).filter((c) => c === 'hold' || c === head.column || r.stages.some((x) => STAGE_CATEGORY[x.id] === c))
+}
+
+/** An answer the window sent that can't be one (the request's kind decides which fields it takes). */
+const BAD_ANSWER = msg({ id: 'tasks.error.badAnswer', defaultMessage: "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).", description: "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)." })
+
+/**
+ * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (Darren's point 7: never
+ * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
+ * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
+ * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
+ * reply is kept with the answer and relayed to the waiting agent. Refused with the rule's text when the request was
+ * answered or retired meanwhile.
+ */
+export async function answerTask(n: number, request: string, a: ForYouAnswer): Promise<TaskCard> {
+  const ws = workspace
+  const actor: TaskActor = { kind: 'user' }
+  const bad = (): HiveError => hiveError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
+  if (!a || !['approved', 'declined', 'answered'].includes(a.outcome) || typeof request !== 'string' || !request) throw bad()
+  const reply = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
+  const decision = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
+  const head = ws.path ? cardHeads(ws, [n])[0] : undefined
+  if (!head) throw unknownTask(n)
+  const { workflowFor } = await import('./workflow/service')
+  const wf = typeof head.project === 'string' && head.project && ws.path ? await workflowFor(ws, join(ws.path, head.project)).catch(() => null) : null
+  const rec = (() => {
+    try {
+      return wf?.store.card(n) ?? null
+    } catch {
+      return null
+    }
+  })()
+  const req = wf && rec ? wf.state(rec).requests.find((r) => r.request === request) : undefined
+  if (!wf || !req) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+  // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
+  // its rounds); any other question, a reply or a decision. Checked before anything is written.
+  const choice = a.choice as RoundChoice | undefined
+  if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds }, LANE_MAX_ROUNDS)) throw bad()
+  const { reply: r } = await runIntent(
+    wf,
+    n,
+    actor,
+    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
+    (_w, first) => ({ patch: first && decision ? { decision } : {} })
+  )
+  if (isRefusal(r)) throw new WorkflowRefusedError(r)
+  return getTask(n, ws)
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */
@@ -1174,12 +1266,12 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -1252,7 +1344,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     }
     // An agent that moves a card into Doing from another column, naming no agent, is taking it (not in a project
     // change): also from another agent, who wasn't working on it since it wasn't in Doing ("Given to …" in its history).
-    const own = !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' ? selfIn(actor, card.project) : null
+    // Not when the change keeps its agent (#1267: a reviewer's failed verdict moves the card back into Doing, its builder's
+    // still, whoever it is given to by then).
+    const own = !opts.keepAgent && !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' ? selfIn(actor, card.project) : null
     const agent = patch.agent !== undefined ? patch.agent : (own ?? undefined)
     if (agent !== undefined && !(transferred && !agent)) {
       if (agent) {
@@ -1429,7 +1523,8 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
   const since = (r: NonNullable<TaskCard['review']>): string => r.since.slice(0, 16).replace('T', ' ')
   const n = card.number
   if (patch.review === 'start') {
-    if (patch.column !== undefined || patch.agent !== undefined) throw hiveError(msg({ id: 'tasks.error.reviewOnItsOwn', defaultMessage: 'Start a review on its own: the card stays where it is, with its agent.', description: 'An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own.' }))
+    // (The runtime's own start review, #1267, writes the column its stage leaves, which is Review: the card stays.)
+    if ((patch.column !== undefined && !(changeByRuntime() && patch.column === card.column)) || patch.agent !== undefined) throw hiveError(msg({ id: 'tasks.error.reviewOnItsOwn', defaultMessage: 'Start a review on its own: the card stays where it is, with its agent.', description: 'An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own.' }))
     if (card.column !== 'review') throw hiveError(msg({ id: 'tasks.error.reviewNotInReview', defaultMessage: '#{n} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).', description: 'An error: an agent tried to review card #{n} (a number), which is in the column {column} (select: a board column; translate each), not in Review. "doing" is the value the call takes: keep it as it is.' }), { n, column: card.column })
     if (card.review && card.review.agent !== me) throw hiveError(msg({ id: 'tasks.error.reviewTaken', defaultMessage: '{agent} is already reviewing #{n} (since {since} UTC).', description: 'An error: another agent ({agent}, its name) is already reviewing card #{n} (a number), since {since} (a date and time, UTC).' }), { agent: card.review.agentName, n, since: since(card.review) })
     const a = await agentOf(card.project, me)
@@ -1439,7 +1534,8 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
   }
   if (patch.review !== 'passed' && patch.review !== 'failed') throw hiveError(msg({ id: 'tasks.error.unknownReview', defaultMessage: 'Unknown review "{review}": start, passed or failed.', description: 'An error: the call\'s review was {review}, which it doesn\'t take. "start", "passed" and "failed" are the values it takes: keep them as they are.' }), { review: String(patch.review) })
   // A failed card stays in Review for its fixes: never on to Passed or Done with its verdict.
-  if (patch.review === 'failed' && patch.column !== undefined && patch.column !== 'review') throw hiveError(msg({ id: 'tasks.error.failedStays', defaultMessage: 'A failed review leaves #{n} in Review: give the verdict without column.', description: 'An error: a failed review also moved card #{n} (a number) out of Review; a failed card stays in Review. "column" is the name of the call\'s field: keep it as it is.' }), { n }, { kind: 'invalid' })
+  // (The runtime's own verdict, #1267, moves a failed card on itself: its column is the stage it left.)
+  if (patch.review === 'failed' && patch.column !== undefined && patch.column !== 'review' && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.failedStays', defaultMessage: 'A failed review leaves #{n} in Review: give the verdict without column.', description: 'An error: a failed review also moved card #{n} (a number) out of Review; a failed card stays in Review. "column" is the name of the call\'s field: keep it as it is.' }), { n }, { kind: 'invalid' })
   if (card.review && card.review.agent !== me) throw hiveError(msg({ id: 'tasks.error.verdictNotYours', defaultMessage: '{agent} is reviewing #{n}: its verdict is its own.', description: "An error: an agent tried to give a verdict on card #{n} (a number), which another agent ({agent}, its name) is reviewing." }), { agent: card.review.agentName, n })
   if (!card.review || card.column !== 'review') {
     throw hiveError(msg({ id: 'tasks.error.notReviewing', defaultMessage: 'You aren\'t reviewing #{n} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.', description: 'An error: an agent tried to give a verdict on card #{n} (a number), but it has no review going on it. "review" and "start" are the call\'s field and value: keep them as they are.' }), { n })

@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
   'workflow.forYou.review': { card: string | number }
+  'workflow.forYou.roundLimit': { card: string | number; rounds: number }
+  'workflow.forYouKind': { kind: string }
   'workflow.form.addCheck': undefined
   'workflow.form.agentsSection': undefined
   'workflow.form.cantSave': undefined
@@ -158,6 +160,8 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
+  'workflow.refused.loop.roundLimit.message': { card: string | number }
+  'workflow.refused.loop.roundLimit.next': undefined
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined
@@ -224,6 +228,7 @@ interface HiveMessageValues {
   'workflow.refused.why.requeueNotTransient': undefined
   'workflow.refused.why.stale': undefined
   'workflow.refused.why.userOk': undefined
+  'workflow.roundChoice': { choice: string }
   'workflow.rule.approval.given': undefined
   'workflow.rule.done.contained': undefined
   'workflow.rule.integrate.approved': undefined

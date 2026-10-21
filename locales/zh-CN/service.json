@@ -102,6 +102,7 @@
   "service.hiveVcs.exitCode": "退出码 {code}",
   "service.hiveVcs.noRepo": "此项目不在任何 git 仓库中。",
   "service.hiveVcs.rmFailed": "git rm --cached 失败：{why}",
+  "service.intent.noWorkflow": "#{n} 没有工作流程：它是关于工作区的卡片，或者其项目尚未选择版本控制。请改为在看板上移动它。",
   "service.keys.closed": "在更改键之前，工作区已关闭或窗口打开了另一个工作区：未做任何更改。",
   "service.keys.form": "项目键由 2 到 4 个字母（A 到 Z）组成。",
   "service.keys.notice": "卡片以其项目的键命名：{keys}。可在项目设置中更改键；旧键仍然有效。",

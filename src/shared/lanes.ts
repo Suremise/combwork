@@ -108,9 +108,11 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
-  const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard : laneCard)(n, cards.get(n) ?? null))
+  // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
+  const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
+  const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
   const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) })))
   const status = running(rec) ? laneStatus(rec, list, current, waiting, facts ?? null) : null
   const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
@@ -159,14 +161,16 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   if (!open.length) return null
   if (waiting && current !== null) {
     const c = open.find((x) => x.number === current)!
-    return c.column === 'hold' ? { reason: 'hold', card: c.number } : { reason: 'blocked', card: c.number, ...(c.blocked ? { blocked: c.blocked } : {}) }
+    if (c.column === 'hold') return { reason: 'hold', card: c.number }
+    // Its round limit's question open (§16.11.4, #1269): it waits for the user's answer.
+    if (c.roundLimit && !c.blocked) return { reason: 'roundLimit', card: c.number }
+    return { reason: 'blocked', card: c.number, ...(c.blocked ? { blocked: c.blocked } : {}) }
   }
   if (!facts) return null
   // The card the lane waits on: the first not Done when it has passed (merging next), else the one being worked.
   const focus = open[0].column === 'passed' ? open[0] : (open.find((c) => c.number === current) ?? open[0])
   const f = facts.get(focus.number)
   if (f?.forYou) return { reason: 'you', card: focus.number }
-  if (f && f.rounds >= rec.rounds && focus.column === 'doing') return { reason: 'roundLimit', card: focus.number }
   // Waiting for a merge only while a card after it waits to start: with every card passed, the lane's merge is due.
   if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }
@@ -323,7 +327,9 @@ const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.
 export function laneLine(l: LaneInfo): string {
   const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project})`
   const said = l.status ? `; ${laneStatusText(l.status)}` : ''
-  const state = l.state === 'paused' ? `paused, ${l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} is blocked`}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
+  const paused = l.cards.find((c) => c.number === l.pausedOn)
+  const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`
+  const state = l.state === 'paused' ? `paused, ${why}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
   return `${pair}${l.name ? ` ${l.name}` : ''}: ${state}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
 }
 

@@ -661,7 +661,7 @@
   },
   "board.details.revision": {
     "defaultMessage": "Revision",
-    "description": "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)."
+    "description": "A label in a run's details (Progress panel): the card's revision follows, the version of the card's work the run was for: a commit id, or for a project with no platform a hash of the card's files' content (not a commit)."
   },
   "board.details.run": {
     "defaultMessage": "Run",
@@ -702,6 +702,10 @@
   "board.details.summary": {
     "defaultMessage": "Summary",
     "description": "A label in a run's details copied as text (Copy details, Progress panel): the summary its reporter gave follows."
+  },
+  "board.details.testedOn": {
+    "defaultMessage": "Tested on",
+    "description": "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)."
   },
   "board.details.took": {
     "defaultMessage": "Took",
@@ -1442,6 +1446,38 @@
   "board.merge.unfold": {
     "defaultMessage": "Show the merge in full",
     "description": "Tooltip of the button unfolding a merge's card in the Progress panel."
+  },
+  "board.move.anyway": {
+    "defaultMessage": "Move Anyway",
+    "description": "The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override)."
+  },
+  "board.move.askDetail": {
+    "defaultMessage": "Moving it anyway records an override on the card, with your reason.",
+    "description": "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below."
+  },
+  "board.move.askMessage": {
+    "defaultMessage": "{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}",
+    "description": "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives."
+  },
+  "board.move.askTitle": {
+    "defaultMessage": "Move {card} to {column} anyway?",
+    "description": "Title of the question before a move that skips some of the card's workflow rules (glossary: rule). {card} is the card's name (its key, such as AM-12, or #12), {column} the board column it is moved to."
+  },
+  "board.move.notMoved": {
+    "defaultMessage": "Your other changes are saved; the card stays in {column}.",
+    "description": "In the card dialog, after Save: the user changed the card's Column, but its move was cancelled or refused (a toast says why); everything else was saved. {column} is the board column it is in."
+  },
+  "board.move.reason": {
+    "defaultMessage": "Reason (optional)",
+    "description": "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional."
+  },
+  "board.move.refused": {
+    "defaultMessage": "{card} can't move to {column}",
+    "description": "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Hive couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do."
+  },
+  "board.move.stopped": {
+    "defaultMessage": "{card} stopped in {column}",
+    "description": "A toast's title: a drag went part of the way (the card's work started) and stopped in {column} (a board column), for something no exception to the rules can make true. {card} is the card's name. The toast's text says why and what to do."
   },
   "board.newCard.button": {
     "defaultMessage": "New Card",
@@ -2226,6 +2262,10 @@
   "board.work.badgeOutside": {
     "defaultMessage": "Merged outside the rules",
     "description": "Tooltip and accessible name of a mark on a board card: the card was merged by hand before its rules passed. Glossary: rule."
+  },
+  "board.work.badgeOverride": {
+    "defaultMessage": "{by, select, assistant {The Assistant moved it past its rules} other {You moved it past its rules}}: {rules}. {hasReason, select, yes {Reason: {reason}} other {No reason given.}}",
+    "description": "Tooltip and accessible name of a mark on a board card (and a line in its lane segment's hover): a move made an exception to the card's workflow rules (glossary: override), by the user (other) or the Hive Assistant (assistant) (select: translate each); {rules} lists the rules it skipped (their names); then the reason the user or the Assistant gave (their own words), or that none was given. Glossary: rule, override."
   },
   "board.work.badgeStale": {
     "defaultMessage": "Stale: its pass no longer counts for its revision",

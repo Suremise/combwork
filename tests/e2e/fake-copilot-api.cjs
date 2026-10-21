@@ -240,10 +240,15 @@ function offlineEnv(api) {
  * its own COPILOT_HOME, a fake profile folder (Copilot also reads ~/.agents and the like), and the GitHub CLI's login
  * hidden (an empty GH_CONFIG_DIR, gh off PATH: with no stored login Copilot signs in with `gh auth token`). Never the
  * user's ~/.copilot, and no token variable (hiveEnv's allowlist passes none).
+ * `above`, the profile folder, is a folder above every folder this Copilot works in (its workspace, projects,
+ * worktrees, the Assistant's home): outside a git repository Copilot takes skills from every folder above its working
+ * folder up to its profile folder, so one under the user's profile (hive-test is) would otherwise reach the user's own
+ * ~\.claude\skills (#1308, tests/e2e/README.md).
  */
-function copilotTestEnv(api, dir) {
+function copilotTestEnv(api, dir, { above } = {}) {
+  if (!above) throw new Error('copilotTestEnv: give `above`, a folder above every folder Copilot works in (#1308)')
   const home = path.join(dir, 'copilot-home')
-  const profile = path.join(dir, 'copilot-userprofile')
+  const profile = above
   const gh = path.join(dir, 'copilot-gh')
   for (const d of [home, profile, gh]) fs.mkdirSync(d, { recursive: true })
   const PATH = pathWithoutGh(process.env.PATH || '')

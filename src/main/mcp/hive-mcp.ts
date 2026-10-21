@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
@@ -133,6 +133,70 @@ const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }
 const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its number (#12 is 12) or key ("HI-12").` })
 /** Numbers that aren't cards (a console's events). */
 const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
+
+/** The card of an intent (#1267, S48): its key or #number; a plain number is refused. */
+const intentCardArg = { type: 'string', description: 'The card: its key ("HI-12") or "#12" (a plain number is refused).' }
+
+/**
+ * A card's intents (#1267, SPEC §16.8.1), a tool each: the caller says what it did or wants, and Hive moves the card by
+ * its workflow's rules. A refusal names the rule, what to do next and who can override. Replies: the card, the stage it
+ * left and the one it is in, and what the intent says of it.
+ */
+function intentTools(): Tool[] {
+  const intent = (name: string, path: string, description: string, properties: Record<string, unknown>, required: string[], body: (a: Record<string, any>) => Record<string, unknown> = () => ({})): Tool => ({
+    name,
+    description,
+    inputSchema: { type: 'object', properties: { card: intentCardArg, ...properties }, required: ['card', ...required] },
+    run: async (a) => intentText((await api('POST', `/v1/tasks/${enc(String(a.card))}/${path}`, body(a))) as IntentDone)
+  })
+  const revision = { type: 'string', description: 'The revision submitted (a commit); default: the head of the card\'s folder.' }
+  const submission = { type: 'number', description: 'The submission it is about; default: the latest.' }
+  return [
+    intent('hive_start_card', 'start', "Start work on a card in Todo yourself: it moves to Doing and is yours. Replies with its folder, line, base and target.", {}, []),
+    intent('hive_put_back', 'put-back', 'Put a card in Doing back in Todo, unstarted. why is written as a comment.', { why: { type: 'string', description: 'Why it goes back.' } }, ['why'], (a) => ({ why: a.why })),
+    intent(
+      'hive_submit',
+      'submit',
+      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). Replies with warnings (files outside its paths, other agents\' changes in a shared folder).',
+      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' } },
+      ['summary'],
+      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })
+    ),
+    intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
+    intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review.", { submission }, [], (a) => ({ submission: a.submission })),
+    intent(
+      'hive_verdict',
+      'verdict',
+      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted.",
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
+      ['pass', 'comment'],
+      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+    ),
+    intent('hive_report_merge', 'report-merge', "Report a passed card's work merged: it moves to Done.", { result: { type: 'string', description: 'The merge commit.' } }, [], (a) => ({ result: a.result })),
+    intent(
+      'hive_ask_user',
+      'ask',
+      'Ask the user something about a card: it shows under For you with the card; no round is counted and it is not a stall. The answer comes to your inbox.',
+      {
+        kind: { type: 'string', enum: ['approve', 'decide', 'test', 'signIn', 'other'] },
+        text: { type: 'string', description: 'The question, in full.' },
+        revision: { type: 'string', description: 'The revision it is about (a commit); default: the card\'s latest submission.' },
+        checklist: { type: 'array', items: { type: 'string' }, description: 'For test: the steps to try, in order (at most 20).' }
+      },
+      ['text'],
+      (a) => ({ kind: a.kind, text: a.text, revision: a.revision, checklist: a.checklist })
+    ),
+    intent(
+      'hive_cannot_within_rules',
+      'cannot',
+      "Report that a card can't go on within a workflow rule: a decision for the user under For you, never a failed round or a stall.",
+      { rule: { type: 'string', description: 'The rule, as a refusal named it.' }, why: { type: 'string' } },
+      ['rule', 'why'],
+      (a) => ({ rule: a.rule, why: a.why })
+    ),
+    intent('hive_request_builder', 'request', "Ask a card's builder for something while you review it (a commit, a run): written as a comment; its builder is woken.", { text: { type: 'string' } }, ['text'], (a) => ({ text: a.text }))
+  ]
+}
 
 interface Tool {
   name: string
@@ -654,6 +718,9 @@ const tools: Tool[] = [
       return `Started ${cardName(r.card)} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
     }
   },
+  // A card's intents (#1267, SPEC §16.8.1): the caller says what it did, Hive moves the card by its workflow's rules.
+  ...intentTools(),
+
   {
     name: 'hive_list_skills',
     description: ASSISTANT

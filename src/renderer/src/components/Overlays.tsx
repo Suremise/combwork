@@ -201,10 +201,12 @@ export function Dialogs() {
       }
     >
       {dialog.message && <p style={{ marginTop: 0 }} className="muted">{dialog.message}</p>}
-      {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
+      {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} />}
       {dialog.detail && <div className="detail" style={{ marginBottom: 10 }}>{dialog.detail}</div>}
+      {dialog.fieldLabel && <label className="dialog-field-label" htmlFor="dialog-prompt-field">{dialog.fieldLabel}</label>}
       <input
         ref={inputRef}
+        id="dialog-prompt-field"
         className={cx('input', error && 'invalid')}
         style={{ width: '100%' }}
         value={value}
@@ -262,16 +264,16 @@ function DialogSelect({ select, picked, setPicked }: { select: { label: string; 
 }
 
 /** A confirm's list (paths): one per line, a long one wrapping inside itself, and a Copy button for them all (#347). */
-export function DialogList({ items }: { items: readonly string[] }) {
+export function DialogList({ items, copy = true }: { items: readonly string[]; copy?: boolean }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="dialog-list">
+    <div className={cx('dialog-list', !copy && 'plain')}>
       <ul>
         {items.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
-      <IconButton
+      {copy && <IconButton
         icon={copied ? 'check' : 'copy'}
         title={items.length === 1 ? tr(msg({ id: 'shell.dialog.copy', defaultMessage: 'Copy', description: 'Button beside a list in a dialog: copies it.' })) : tr(msg({ id: 'shell.dialog.copyAll', defaultMessage: 'Copy all', description: 'Button beside a list of several in a dialog: copies them all.' }))}
         onClick={() => {
@@ -279,7 +281,7 @@ export function DialogList({ items }: { items: readonly string[] }) {
           setCopied(true)
           setTimeout(() => setCopied(false), 1200)
         }}
-      />
+      />}
     </div>
   )
 }

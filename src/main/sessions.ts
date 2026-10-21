@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'crypto'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -525,6 +525,18 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
     writePty(key, text.slice(i, i + CHUNK))
     if (i + CHUNK < text.length) await new Promise((r) => setTimeout(r, 10))
   }
+}
+
+/**
+ * What Hive writes for a prompt's line (sendPrompt): pasted (bracketed), without control characters, so nothing in it
+ * can end the paste or press a key; typed, as it is. Kept as written (`asTyped`, #1286), its line breaks go into a
+ * paste as the Enter a terminal pastes them with, and typed, each line break or tab becomes a space (typed, a line
+ * break would send the prompt early and a tab complete a word); its other control characters are left out either way.
+ */
+export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
+  if (!asTyped) return paste ? line.replace(/[\x00-\x1f\x7f-\x9f]/g, '') : line
+  const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
+  return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
 }
 
 /**
@@ -1850,8 +1862,11 @@ class SessionManager {
       if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }))
     }
     try {
-      writePty(key, '\x15')
-      await pause(150)
+      // Settings → Advanced can leave the CLI's draft in front of it (#1286).
+      if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) {
+        writePty(key, '\x15')
+        await pause(150)
+      }
       const text = l.adapter.descriptor.capabilities.compactFocus ? (focus ?? '').replace(/\s+/g, ' ').trim() : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
@@ -2364,21 +2379,29 @@ class SessionManager {
     const since = Date.now()
     let typed = false
     let sent: { at: number; prompts: number; from: number } | null = null
+    // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
+    // whether it keeps the prompt as written.
+    const clearDraft = advanced.get<boolean>(PROMPT_CLEAR_DRAFT)
+    const asTyped = advanced.get<boolean>(PROMPT_AS_TYPED)
     try {
       check()
-      writePty(key, '\x15')
-      await new Promise((r) => setTimeout(r, 150))
-      check()
+      if (clearDraft) {
+        writePty(key, '\x15')
+        await new Promise((r) => setTimeout(r, 150))
+        check()
+      }
       typed = true
-      const line = text.replace(/\s+/g, ' ').trim()
+      const line = asTyped ? text : text.replace(/\s+/g, ' ').trim()
       // A CLI busy for a moment reads what Hive typed in one go, Ctrl+U and Enter included: Claude Code takes such a
       // read as a paste with those keys in it as text, and then Enter again doesn't send it either (#597). A bracketed
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, line) : null
-      if (l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')) writePty(key, `\x1b[200~${line.replace(/[\x00-\x1f\x7f-\x9f]/g, '')}\x1b[201~`)
-      else await typeInto(key, line, () => (check(), true))
+      const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
+      const out = promptInput(line, paste, asTyped)
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, out) : null
+      if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
+      else await typeInto(key, out, () => (check(), true))
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -2422,7 +2445,7 @@ class SessionManager {
         writePty(key, '\r')
       }
     } catch (e) {
-      if (typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
+      if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
       throw e
     } finally {
       if (sent && l) l.typed = sent

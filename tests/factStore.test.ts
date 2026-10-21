@@ -594,3 +594,59 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
     expect(statesIn(ws).map((s) => s.state)).toEqual(['done', 'done'])
   })
 })
+
+// #1294: cards named by #1219's keys; a prefix a project holds or held as a key is never read as the name form keys had
+// before (HR5's round 1: `HI-2` found the board's #2 in a project named `hi`).
+describe("a card by its key (#1294)", () => {
+  /** A board with projects (name, id, keys: current first, then old), each card given its project and number there. */
+  function board(cards: [project: string, projectNumber: number | null][], keys: [projectId: string, key: string, current: boolean][]): { file: string; ids: number[] } {
+    const file = join(base, `keys-${++n}.db`)
+    const ids = cards.map(([project]) => {
+      const s = FactStore.open(file, { project, key: project })
+      try {
+        return s.createCard({ title: project, kind: 'code', labels: [], blockedBy: [] }).id
+      } finally {
+        s.close()
+      }
+    })
+    const db = new DatabaseSync(file)
+    try {
+      for (const [projectId, key, current] of keys) db.prepare('INSERT INTO project_keys (key, project_id, current, since) VALUES (?, ?, ?, ?)').run(key, projectId, current ? 1 : 0, '2026-10-21T00:00:00Z')
+      cards.forEach(([project, pn], i) => {
+        if (pn !== null) db.prepare('UPDATE cards SET project_id = ?, project_number = ? WHERE number = ?').run(`p-${project}`, pn, ids[i])
+      })
+    } finally {
+      db.close()
+    }
+    return { file, ids }
+  }
+  const storeOf = (file: string, project: string): Store => {
+    const s = FactStore.open(file, { project, key: project, projectId: () => `p-${project}` })
+    stores.push(s)
+    return s
+  }
+  const byKey = (s: Store, refs: string[]): Record<string, number | null> => Object.fromEntries(refs.map((r) => [r, s.cardByKey(r)?.id ?? null]))
+
+  it("a project whose name is its key: its keys and #N find its cards; a key no card has is none, never the board's card with that number", () => {
+    // #1 another project's, #2 hi's first (HI-1): HI-2 is no card of hi's, though the board has a #2.
+    const { file, ids } = board([['other', 1], ['hi', 1]], [['p-other', 'OT', true], ['p-hi', 'HI', true], ['p-hi', 'HX', false]])
+    const hi = storeOf(file, 'hi')
+    expect([hi.projectKey(), hi.card(ids[1]).key]).toEqual(['HI', 'HI-1'])
+    expect(byKey(hi, ['HI-1', 'hi-1', 'HX-1', `#${ids[1]}`, 'HI-2', 'HX-2', 'HI-9', `#${ids[0]}`])).toEqual({ 'HI-1': ids[1], 'hi-1': ids[1], 'HX-1': ids[1], [`#${ids[1]}`]: ids[1], 'HI-2': null, 'HX-2': null, 'HI-9': null, [`#${ids[0]}`]: null })
+  })
+
+  it("another project's key is never this project's name form, nor finds that project's card here", () => {
+    // `ot` is named like another project's key (OT): its cards go by its own key, XY.
+    const { file, ids } = board([['other', 1], ['ot', 1]], [['p-other', 'OT', true], ['p-ot', 'XY', true]])
+    const ot = storeOf(file, 'ot')
+    expect(byKey(ot, ['XY-1', 'OT-1', `ot-${ids[1]}`, 'ZZ-1'])).toEqual({ 'XY-1': ids[1], 'OT-1': null, [`ot-${ids[1]}`]: null, 'ZZ-1': null })
+  })
+
+  it('the name form trailers were written with still finds a card where its name is no key; a card without a key keeps that name', () => {
+    const { file, ids } = board([['other', 1], ['hive', 1], ['alpha-web', null]], [['p-other', 'OT', true], ['p-hive', 'HI', true]])
+    const hive = storeOf(file, 'hive')
+    expect(byKey(hive, [`hive-${ids[1]}`, 'HI-1', 'hive-1'])).toEqual({ [`hive-${ids[1]}`]: ids[1], 'HI-1': ids[1], 'hive-1': null })
+    const web = storeOf(file, 'alpha-web')
+    expect([web.projectKey(), web.card(ids[2]).key, web.cardByKey(`alpha-web-${ids[2]}`)?.id]).toEqual(['alpha-web', `alpha-web-${ids[2]}`, ids[2]])
+  })
+})

@@ -117,7 +117,7 @@ import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
-import type { WorkBadge, WorkView } from './workflow/workView'
+import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -336,9 +336,15 @@ export interface HiveRequests {
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
    */
-  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string }) => TaskMoveResult
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null }) => TaskMoveResult
+  /** The columns a card can be moved to under its rules (#1275): where a drag may drop it; null: every column (no rule applies). */
+  'tasks:columns': (n: number) => TaskColumn[] | null
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
   'tasks:facts': (n: number) => Fact[]
+  /** What waits for the user (For you, #1269, SPEC §16.8.5): every live card's open requests, of one project (its folder name) or the workspace, oldest first, and their count. */
+  'tasks:forYou': (project?: string | null) => ForYouSummary
+  /** The user answers a card's request (For you): only the user. Refused when it was answered or retired meanwhile. */
+  'tasks:answer': (n: number, request: string, answer: ForYouAnswer) => TaskCard
   'tasks:comment': (n: number, text: string) => TaskCard
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
   'tasks:editDecision': (n: number, id: string, text: string | null) => TaskCard
@@ -352,7 +358,7 @@ export interface HiveRequests {
   /** To the Recycle Bin. */
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
-  'tasks:start': (n: number, target: TaskStartTarget) => { agentId: string; agentName: string; added: boolean }
+  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[] }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */

@@ -102,6 +102,7 @@
   "service.hiveVcs.exitCode": "終了コード{code}",
   "service.hiveVcs.noRepo": "このプロジェクトはgitリポジトリにありません。",
   "service.hiveVcs.rmFailed": "git rm --cachedが失敗しました：{why}",
+  "service.intent.noWorkflow": "#{n} にはワークフローがありません。ワークスペースのカードであるか、そのプロジェクトのバージョン管理がまだ選ばれていません。代わりにボード上で移動してください。",
   "service.keys.closed": "キーを変更する前にワークスペースが閉じられたか、ウィンドウが別のワークスペースを開きました。何も変更されていません。",
   "service.keys.form": "プロジェクトキーはAからZの英字2〜4文字です。",
   "service.keys.notice": "カードはプロジェクトのキーで呼ばれます：{keys}。キーはプロジェクトの設定で変更できます。古いキーも引き続き使えます。",

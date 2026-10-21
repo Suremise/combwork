@@ -16,7 +16,9 @@ import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
-import { agentActor, foldCard } from '../../shared/workflow/facts'
+import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE } from '../../shared/workflow/facts'
+import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { advanced } from '../advanced'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
 import { createLogger } from '../logger'
 import * as G from '../platform/git'
@@ -71,6 +73,9 @@ export function recording<T>(actor: ChangeActor, reads: Map<number, Reads> | nul
 export function recordingAs<T>(actor: ChangeActor, fn: () => Promise<T>): Promise<T> {
   return context.run({ actor, reads: context.getStore()?.reads ?? new Map() }, fn)
 }
+
+/** Whether the card change running here is one whose move the workflow runtime made (recordingByRuntime). */
+export const changeByRuntime = (): boolean => !!context.getStore()?.byRuntime
 
 /** Runs a card change whose move the workflow runtime made and recorded (#1265): its other changes are recorded here. */
 export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null = null): Promise<T> {
@@ -322,6 +327,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     if (!moves) moved = ctx?.byRuntime?.moved ?? null
     let submitted: number | null = null
     let verdict: number | null = null
+    let verdictFailed = false
     if (intoReview && moves) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
@@ -355,6 +361,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const s = facts()
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
       // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
+      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
       verdict = tx.append(n, {
         kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
         actor,
@@ -363,6 +370,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
         data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
       }).seq
     }
+    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     if ((before?.blocked ?? null) !== after.blocked) {
       if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } }) // i18n-ignore: a fact's kind and codes, not text
       else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} }) // i18n-ignore: a fact's kind and codes, not text
@@ -375,6 +383,29 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
     if (inLoop(ws, after)) loopWakes(tx, n, actor, after, { submitted, verdict, moved: moved !== null && (to === 'approved' || to === 'done') ? moved : null, decided }, STAGE_OF[after.column])
   })
+}
+
+/**
+ * Whether workflow rules are enforced (Settings → Advanced: service.ts' ENFORCE, read here without the service, which
+ * reaches back to the board).
+ */
+export const rulesEnforced = (): boolean => advanced.get<boolean>('hive.workflow.enforce')
+
+/**
+ * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the
+ * runtime does (`askAtLimit`), so a loop's verdicts given on the board (before #1268 moves them to the runtime) pause it
+ * too. Only for a card in a running lane, while the rules are enforced.
+ */
+function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string }): void {
+  if (!rulesEnforced()) return
+  const card = tx.card(n)
+  const s = foldCard(tx.facts(n), card.stage)
+  if (!atRoundLimit(s, card.rounds)) return
+  // The card's key as the runtime names it (service.ts: its project's name).
+  const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
+  const text = workflowEnglish(shown)
+  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
+  tx.action(n, 'notify', { text, shown }, asked.seq)
 }
 
 /**

@@ -177,6 +177,7 @@ interface HiveMessageValues {
   'board.details.stepsLabel': undefined
   'board.details.stepsLast': { done: number; total: number; step: string | number }
   'board.details.summary': undefined
+  'board.details.testedOn': undefined
   'board.details.took': undefined
   'board.details.tookSoFar': { took: string | number; expected: string }
   'board.details.tookTotal': { took: string | number; expected: string }
@@ -362,6 +363,14 @@ interface HiveMessageValues {
   'board.merge.time': { sofar: string | number; left: string | number }
   'board.merge.timeOver': { sofar: string | number }
   'board.merge.unfold': undefined
+  'board.move.anyway': undefined
+  'board.move.askDetail': undefined
+  'board.move.askMessage': { n: number }
+  'board.move.askTitle': { card: string | number; column: string | number }
+  'board.move.notMoved': { column: string | number }
+  'board.move.reason': undefined
+  'board.move.refused': { card: string | number; column: string | number }
+  'board.move.stopped': { card: string | number; column: string | number }
   'board.newCard.button': undefined
   'board.newCard.tip': undefined
   'board.overview.blocked': undefined
@@ -558,6 +567,7 @@ interface HiveMessageValues {
   'board.work.accepted': { when: string | number }
   'board.work.adopted': { column: string | number }
   'board.work.badgeOutside': undefined
+  'board.work.badgeOverride': { by: string; rules: string | number; hasReason: string; reason: string | number }
   'board.work.badgeStale': undefined
   'board.work.base': undefined
   'board.work.branch': undefined

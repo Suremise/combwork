@@ -62,13 +62,13 @@ const MAX_NOTE = 4000
  * can't be started, the card goes back where it was and a new agent is removed again. note: what to do now (such as
  * "address the latest review comment"), added to the prompt.
  */
-export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
+export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
   if (note && note.length > MAX_NOTE) throw hiveError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
   if (starting.has(key)) throw hiveError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '#{n} is already being started.', description: 'An error: card #{n} (a number) is being started already; a second Start of it is refused.' }), { n })
   starting.add(key)
   try {
-    return await startReserved(n, target, actor, note?.trim() || undefined)
+    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined)
   } finally {
     starting.delete(key)
   }
@@ -98,7 +98,7 @@ function startable(card: TaskCard): void {
   if (!card.project) throw hiveError(msg({ id: 'tasks.start.noProject', defaultMessage: '#{n} has no project. Give it one first: the agent works in that project.', description: 'An error: card #{n} (a number) belongs to no project (only the workspace), so no agent can start it; give it a project first.' }), { n: card.number }, { kind: 'invalid' })
 }
 
-async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
+async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
   const before = await getTask(n)
   startable(before)
   const p = workspace.assertProject(join(workspace.path!, before.project))
@@ -123,7 +123,7 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
   }
   let typed = false
   try {
-    const { typed: t, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note)
+    const { typed: t, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason)
     typed = t
     return result
   } finally {
@@ -145,7 +145,8 @@ async function giveCard(
   agentName: string,
   added: boolean,
   actor: TaskActor,
-  note: string | undefined
+  note: string | undefined,
+  reason?: string
 ): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean }> {
   const undoAgent = async (): Promise<void> => {
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
@@ -155,7 +156,8 @@ async function giveCard(
   // this Start read. Anything else is a newer decision (moved, reassigned, put in Done) and stays.
   let card: TaskCard
   try {
-    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }) }, actor, {
+    // The user's reason for a start that skips rules (#1275: the window asked first), kept with its Override.
+    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...(reason && actor.kind === 'user' ? { override: { reason } } : {}) }, actor, {
       check: (now) => {
         startable(now)
         if (now.project.toLowerCase() !== before.project.toLowerCase()) {

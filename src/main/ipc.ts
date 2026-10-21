@@ -74,7 +74,7 @@ import * as skills from './skills'
 import * as storage from './storage'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
-import { cardWork, workBadges } from './workflow/cardWork'
+import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
 import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
@@ -628,9 +628,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
-    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }),
+    // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
+    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
+    'tasks:columns': (n) => tasks.moveColumns(n),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
+    'tasks:forYou': (project) => {
+      const ws = currentWorkspace()
+      return ws.path ? forYou(ws, typeof project === 'string' ? project : null) : { items: [], count: 0 }
+    },
+    'tasks:answer': (n, request, answer) => tasks.answerTask(n, request, answer),
     'docs:section': (p, ref) => checkDocRef(p ? workspace.assertProject(p) : null, workspace.sharedDir, String(ref ?? '')),
     'tasks:comment': (n, text) => tasks.commentTask(n, text, { kind: 'user' }),
     'tasks:archive': (n, archived) => tasks.archiveTask(n, archived),
@@ -662,8 +669,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:addSetAside': (file) => tasks.addSetAsideCard(currentWorkspace(), file),
     'tasks:discardSetAside': (file) => tasks.discardSetAsideCard(currentWorkspace(), file),
     'tasks:delete': (n) => tasks.deleteTask(n),
-    'tasks:start': async (n, target) => {
-      const r = await startTask(n, target, { kind: 'user' })
+    'tasks:start': async (n, target, opts) => {
+      // A start that skips rules asks first (#1275), before any agent is added or anything launched.
+      if (!opts?.confirm) {
+        const ask = await tasks.startAsks(n, target.kind === 'agent' ? target.agentId : null)
+        if (ask.length) return { ask }
+      }
+      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason)
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
     },
     'tasks:work': (n) => {

@@ -24,6 +24,8 @@ import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
+import { roundLimitCards } from './workflow/cardWork'
+import { rulesEnforced } from './workflow/recorder'
 
 const log = createLogger('lanes')
 
@@ -346,7 +348,7 @@ const service = (): Promise<typeof import('./workflow/service')> => import('./wo
 async function enforced(): Promise<boolean> {
   return (await service()).workflowEnforced()
 }
-export const rulesEnforced = enforced
+export const lanesEnforced = enforced
 
 /**
  * What a running lane's status reads of its cards' facts (#1270): each card's fold, while workflow rules are enforced
@@ -381,7 +383,10 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const cards = await cardsOf(ws, lanes)
   const names = await namesOf(ws, lanes)
   const facts = await factsOf(ws, lanes)
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id)))
+  // The running lanes' cards waiting for the user at their round limit (§16.11.4): from their facts, while the rules
+  // are enforced (turned off, nothing pauses a lane for a rule).
+  const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */

@@ -47,7 +47,7 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'doing', { blocked: 'A question' }), lc(2, 'todo')], 1, true, null)).toEqual({ reason: 'blocked', card: 1, blocked: 'A question' })
     expect(laneStatus(rec, [lc(1, 'hold'), lc(2, 'todo')], 1, true, null)).toEqual({ reason: 'hold', card: 1 })
     expect(laneStatus(rec, [lc(1, 'review'), lc(2, 'todo')], 1, false, new Map([[1, ff({ stage: 'review', forYou: true })]]))).toEqual({ reason: 'you', card: 1 })
-    expect(laneStatus(rec, [lc(1, 'doing'), lc(2, 'todo')], 1, false, new Map([[1, ff({ rounds: 3 })]]))).toEqual({ reason: 'roundLimit', card: 1 })
+    expect(laneStatus(rec, [lc(1, 'doing', { roundLimit: true }), lc(2, 'todo')], 1, true, new Map([[1, ff({ rounds: 3 })]]))).toEqual({ reason: 'roundLimit', card: 1 })
     expect(laneStatus(rec, [lc(1, 'passed'), lc(2, 'todo')], null, false, new Map([[1, ff({ stage: 'approved' })]]))).toEqual({ reason: 'notMerged', card: 1 })
     expect(laneStatus(rec, [lc(1, 'passed'), lc(2, 'todo')], null, false, new Map([[1, ff({ stage: 'merging' })]]))).toEqual({ reason: 'merging', card: 1 })
     expect(laneStatus(rec, [lc(1, 'review', { reviewing: true }), lc(2, 'todo')], 1, false, new Map([[1, ff({ stage: 'review', stale: true })]]))).toEqual({ reason: 'stale', card: 1 })

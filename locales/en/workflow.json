@@ -47,6 +47,14 @@
     "defaultMessage": "{card} waits for your review",
     "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
   },
+  "workflow.forYou.roundLimit": {
+    "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
+    "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
+  },
+  "workflow.forYouKind": {
+    "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
+    "description": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces."
+  },
   "workflow.form.addCheck": {
     "defaultMessage": "Add Check",
     "description": "A button under the checks of “Checks pass before review”."
@@ -627,6 +635,14 @@
     "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
     "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
   },
+  "workflow.refused.loop.roundLimit.message": {
+    "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
+    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
+  },
+  "workflow.refused.loop.roundLimit.next": {
+    "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
+    "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."
@@ -890,6 +906,10 @@
   "workflow.refused.why.userOk": {
     "defaultMessage": "it waits for the OK before merging.",
     "description": "The {why} of a refused merge: the user's approval is missing."
+  },
+  "workflow.roundChoice": {
+    "defaultMessage": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
+    "description": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces."
   },
   "workflow.rule.approval.given": {
     "defaultMessage": "Your OK before merging",

@@ -410,7 +410,13 @@ loop events), inside `recordingByRuntime`, so the recorder writes no `Started`/`
 take it when `gateOf` says so (the rules enforced, a card from 1.0, a project with a platform, a stage its ruleset has;
 a batch's cards too, in the batch's change): `Workflow.move` with `confirm` for the user (interim until #1290/#1275),
 `override.reason` for the Assistant. A refusal is `WorkflowRefusedError` (its `refusal`), which `apiErrorReply` turns
-into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. Runtime writes outside an intent's write (a
+into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. For you (#1269): `tasks:answer` is
+`answerTask` (the user's only), `Workflow.answer` on the same path, its checks of what the answer may be (the request's
+kind and gate) made first, a Decide answer's decision added with its first write (`zero9`); `tasks:forYou` is
+`cardWork.forYou`, every live card's open requests folded from its facts on one snapshot. The round limit is asked by the
+runtime's `askAtLimit` (a verdict's fail, the user's decline) and by the recorder's `roundLimit` for a failed review given
+on the board (until #1268), from the card's lane's rounds (`CardRecord.rounds`); `lanes.ts` reads `roundLimitCards` to
+pause a lane on a card waiting for that answer (`LaneCard.roundLimit`), while the rules are enforced. Runtime writes outside an intent's write (a
 refusal's `Refused`, None's declared paths) go through `locked` too, and `start` stores its ruleset only in its write.
 Before P7 a builder's own worktree is its card's folder (`cfg.agentFolder`, from project.json; `StartPlan.existing`:
 no `prepareSlot`); `cfg.runsOf` is the agent's open Progress runs and background tasks (`setRunsGoing`, from index.ts).
@@ -452,7 +458,7 @@ reconciled when their target moved: an event's line, or a target whose head isn'
 (`board_meta` `workflow:<project>:target:<line>`; '' for a deleted target), so a reset while Hive was closed is found at
 the next open or focus, with one read per target. The checkpoint moves only once all of that target's Done cards were
 reconciled to the end (`ReconcileHooks.unknown` tells of a read that couldn't be made, and a failure counts too): one
-left undecided is looked at again at the next run. Trailers name cards by the project's name as its key (the adoption's), until #1219's keys.
+left undecided is looked at again at the next run. Trailers name cards by their keys (`Hive-Card: HI-12`, #1294); the name form the adoption keyed cards by before (`hive-1263`) still finds them (`cardByKey`) where the name is no project's key.
 Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
 (`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
 watch goes as the workspace closes.
@@ -548,7 +554,9 @@ column) is read from its documents as before. Tests and the e2e helpers read and
 **The fact store (#1215).** `workflow/factStore.ts` keeps one project's part of the workspace's hive.db (the 1.0 group's
 facts step, v7: #1208's facts tables and what the runtime keeps beside them, Darren's rule of 20 Oct applied by the
 Assistant: typed tables, never JSON values). A `CardRecord` is the board's card: its number (`id`), its key
-(`<project key>-<number>` until #1219's keys), title, labels and `blockedBy` from the card's rows, and the runtime's
+(#1294: `HI-12`, its project's key now and its number there, #1219's; the scope's name and its number for a card
+without one; `cardByKey` takes a key or an old key through #1219's resolver, `#N`, or that name form, but only for a prefix no
+project holds or held as a key: a key no card has here is none, never the board's card with that number), title, labels and `blockedBy` from the card's rows, and the runtime's
 columns of the row outside the card's JSON document (`stage`, `kind`, `target`, `pre_workflow`, and `card_paths` for
 None's declared paths and pre-fill), so `tasks.ts`' saves of the document keep them and the Agent API's card is
 unchanged; its `lane` and `reviewer` are its lane's (below). `stage` empty (a card no 1.0 rule has moved) reads as its column's stage;
