@@ -168,60 +168,92 @@ export function transientCause(e: CheckEnd, platform: NodeJS.Platform = process.
   return null
 }
 
-/** How much of a line still being written TailCodes keeps to look in; past it, it is looked at and only its end kept. */
+/** How much of a line still being written TailCodes holds before it settles what it can of it. */
 const LINE_CHARS = 64 * 1024
-/** What it keeps of that line: a code split there is still found (codes are short). */
-const LINE_OVERLAP = 256
+/**
+ * The real text kept on each side of what is still undecided in such a line: a match is taken only with half of this
+ * after it, and is searched with this much before it, so a match and what decides it (a word boundary, a lookaround)
+ * up to half of it come out the same however the output was chunked (codes are short).
+ */
+const LINE_CONTEXT = 512
 
 /**
- * The network error code in a check's last TAIL_LINES lines, looked for as its output comes (#1362): each line is looked
- * in whole as it ends, so a long line, or one split between chunks, neither hides a code nor pushes it out of the last
- * lines, whatever the short output a result carries keeps. Bounded: a code (or none) per line for the last TAIL_LINES
- * lines, and a line still being written up to LINE_CHARS. Blank lines at the end don't count.
+ * The network error code in a check's last TAIL_LINES lines, looked for as its output comes (#1362). The answer depends
+ * on the output, never on how it was chunked: each line is searched as a whole, from its real start, once it ends. A
+ * line still being written past LINE_CHARS is settled as far as its text decides: a match there counts only when it
+ * starts before its last LINE_CONTEXT characters and ends before its last half of that (what follows can't change it);
+ * one running into them is left undecided and searched again from its start. Only what is undecided is kept, after
+ * LINE_CONTEXT characters of the real text before it (searched from there with lastIndex, so a boundary or a lookbehind
+ * sees that text, never a start the trimming made). Bounded: a code (or none) per line for the last TAIL_LINES lines,
+ * and a line in progress up to about LINE_CHARS. Blank lines at the end don't count.
  */
 export class TailCodes {
   private readonly re: RegExp | null
   private codes: (string | null)[] = []
   private blanks = 0
   private line = ''
+  /** Where in `line` a match not decided yet may start. */
+  private from = 0
   private lineCode: string | null = null
   private lineBlank = true
   private decoder = new StringDecoder('utf8')
 
   constructor(re: RegExp | null) {
-    this.re = re && new RegExp(re.source, re.flags.replace(/[gy]/g, ''))
+    this.re = re && new RegExp(re.source, re.flags.replace(/[gy]/g, '') + 'g')
   }
 
   write(chunk: Buffer | string): void {
     if (!this.re) return
     const parts = (typeof chunk === 'string' ? chunk : this.decoder.write(chunk)).split('\n')
-    this.line += parts[0]
+    this.add(parts[0])
     for (let i = 1; i < parts.length; i++) {
       this.endLine()
-      this.line = parts[i]
+      this.add(parts[i])
     }
-    if (this.line.length <= LINE_CHARS) return
-    this.look()
-    this.line = this.line.slice(-LINE_OVERLAP)
+    if (this.line.length > LINE_CHARS) this.settle()
   }
 
   /** The output has ended (a last line without its newline counts): the first code in its last lines, or null. */
   end(): string | null {
     if (!this.re) return null
-    this.line += this.decoder.end()
+    this.add(this.decoder.end())
     if (this.line) this.endLine()
-    return this.codes.find((c) => c !== null) ?? null
+    return this.codes.find((c) => !!c) ?? null
   }
 
-  private look(): void {
-    if (this.lineBlank && /\S/.test(this.line)) this.lineBlank = false
-    if (this.lineCode !== null) return
-    const found = this.re!.exec(this.line)
-    if (found) this.lineCode = found[0].slice(0, 64)
+  private add(text: string): void {
+    this.line += text
+    if (this.lineBlank && /\S/.test(text)) this.lineBlank = false
+  }
+
+  /**
+   * The first match from `from`, if it starts before `before` and ends by `endBy` (the line's code); where a match not
+   * decided yet may start after it.
+   */
+  private scan(before: number, endBy: number): number {
+    const re = this.re!
+    re.lastIndex = this.from
+    const found = re.exec(this.line)
+    if (!found || found.index >= before) return before
+    if (found.index + found[0].length > endBy) return found.index
+    this.lineCode = found[0].slice(0, 64)
+    return before
+  }
+
+  /** A long line still being written: what its text decides is settled, and only what isn't is kept, with its context. */
+  private settle(): void {
+    const cut = this.line.length - LINE_CONTEXT
+    this.from = this.lineCode === null ? this.scan(cut, this.line.length - LINE_CONTEXT / 2) : cut
+    // A match still undecided this far back (a pattern matching a long stretch) is given up: the bound holds.
+    if (this.line.length - this.from > LINE_CHARS) this.from = cut
+    const drop = Math.max(0, this.from - LINE_CONTEXT)
+    this.line = this.line.slice(drop)
+    this.from -= drop
   }
 
   private endLine(): void {
-    this.look()
+    // Its real end: everything left is decided.
+    if (this.lineCode === null) this.scan(Infinity, Infinity)
     if (this.lineBlank) this.blanks++
     else {
       for (let n = Math.min(this.blanks, TAIL_LINES); n > 0; n--) this.push(null)
@@ -229,6 +261,7 @@ export class TailCodes {
       this.push(this.lineCode)
     }
     this.line = ''
+    this.from = 0
     this.lineCode = null
     this.lineBlank = true
   }

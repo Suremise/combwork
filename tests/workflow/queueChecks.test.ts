@@ -182,6 +182,46 @@ describe('which failed checks are temporary (#1362)', () => {
     expect(networkCodeIn('a\nENOTFOUND\nb', codes)).toBe('ENOTFOUND')
   })
 
+  it("the same answer whole or chunked, however the chunks fall around a long line's settled and kept edges (HR6's case among them)", () => {
+    const L = 64 * 1024
+    // What the rule says, on the whole text at once: the first match in its last 40 lines, trailing blank lines aside.
+    const oracle = (text: string): string | null => {
+      for (const line of text.replace(/\s+$/, '').split('\n').slice(-TAIL_LINES)) {
+        const found = new RegExp(codes.source, codes.flags).exec(line)
+        if (found) return found[0]
+      }
+      return null
+    }
+    const fed = (chunks: string[]): string | null => {
+      const t = new TailCodes(codes)
+      for (const c of chunks) t.write(c)
+      return t.end()
+    }
+    // HR6's: the line runs on past the code with an X (its probe wrote the X as a second chunk), and CRLF lines.
+    const texts = ['x'.repeat(L) + ' ENOTFOUNDX\n', 'ok\r\n'.repeat(5) + 'a'.repeat(2 * L) + ' ECONNRESET\r\nb\r\n']
+    for (const k of [-600, -260, -5, 0, 5, 260, 600]) {
+      const tail = 'y'.repeat(L / 2 + 2000) + '\n'
+      // A real code; one with a word character before it (no left boundary); one with a word character after it.
+      texts.push('x'.repeat(L + k) + ' ENOTFOUND ' + tail, 'x'.repeat(L + k) + 'ENOTFOUND ' + tail, 'x'.repeat(L + k) + ' ENOTFOUNDX' + tail)
+    }
+    for (const text of texts) {
+      const want = oracle(text)
+      const code = text.search(/E[A-Z_]{4,}/)
+      expect(networkCodeIn(text, codes), `whole, code at ${code}`).toBe(want)
+      expect(fed(text.match(/[\s\S]{1,1000}/g)!), `1000-character chunks, code at ${code}`).toBe(want)
+      const splits = new Set<number>()
+      for (let d = -700; d <= 700; d += 37) for (const at of [L + d, code + d]) if (at > 0 && at < text.length) splits.add(at)
+      for (const at of splits) expect(fed([text.slice(0, at), text.slice(at)]), `split at ${at}, code at ${code}`).toBe(want)
+      for (const a of [L - 1, L, L + 1, code - 1, code + 1]) {
+        for (const b of [a + 1, a + 5, a + 300, a + 600]) expect(fed([text.slice(0, a), text.slice(a, b), text.slice(b)]), `split at ${a} and ${b}, code at ${code}`).toBe(want)
+      }
+    }
+    // The cases themselves, so the oracle can't be wrong unnoticed: HR6's is red, a real code straddling the edge is found.
+    expect(oracle(texts[0])).toBeNull()
+    expect(oracle(texts[2])).toBe('ENOTFOUND')
+    expect(oracle(texts[3])).toBeNull()
+  })
+
   it("Hive's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
     const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
     const ws = tempDir('qc-ws-')

@@ -2088,8 +2088,12 @@ report it this way rather than retry.
    network error code found), and the check's run says it in its details. Transient only permits: the card is still
    returned to its builder (`returnCard`), and the builder's resubmission puts the same revision back; nothing retries by
    itself. Codes are looked for as the output comes (`TailCodes`), each line whole as it ends, so the 40 lines are the
-   check's real last lines, not the short output a result carries (bounded: a code per line, a line in progress up to
-   64 KB, then only its end kept). **Pauses are not failures:** a busy or dirty target folder, a missing
+   check's real last lines, not the short output a result carries. The answer depends on the output, never on how it was
+   chunked: a line still being written past 64 KB is settled only as far as its text decides (a match counts once 256
+   real characters follow it; one running closer to the unfinished end is searched again from its start), and only the
+   undecided part is kept, after 512 real characters before it, so a word boundary or lookbehind sees the real text,
+   never a start the trimming made. Bounded: a code per line for the last 40 lines, a line in progress up to about
+   64 KB; the limit is a match and what decides it within 256 characters (a code). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target
