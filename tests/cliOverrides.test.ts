@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { parse as parseToml } from 'smol-toml'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
@@ -284,7 +284,12 @@ describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP server
 // Codex merges Hive's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
 // each key a native one sets gets Hive's value, whatever the isolation switch, in the user's config or the project's.
 describe("Codex: Hive's hive server over a native one of that name", () => {
-  const homeBefore = process.env.CODEX_HOME
+  // The suite's own home, as beforeAll set it (read then, not as the module loads, when it isn't set yet: putting that
+  // back would leave the string "undefined", a folder in the current one, for the tests after these).
+  let homeBefore: string | undefined
+  beforeEach(() => {
+    homeBefore = process.env.CODEX_HOME
+  })
   // A new Codex home (and project) per case: config files are read by their modification time.
   let n = 0
   const where = (place: 'home' | 'project', toml: string): LaunchContext => {
@@ -413,15 +418,40 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'node mine.js && echo done', padding: 2 } }))
     const line = await launch()
     expect(line.padding).toBe(2)
-    expect(line.command).toMatch(/^curl(\.exe)? .*&statusline&echo" \| \(node mine\.js && echo done\)$/)
+    expect(line.command).toMatch(/^curl(\.exe)? .*&statusline&echo" \| \(\nnode mine\.js && echo done\n\)$/)
     // The project's own wins over the user's, as Claude Code takes them.
     mkdirSync(project, { recursive: true })
     writeFileSync(join(project, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'project-line' } }))
-    expect((await launch()).command).toMatch(/\| \(project-line\)$/)
+    expect((await launch()).command).toMatch(/\| \(\nproject-line\n\)$/)
     // None of theirs: Hive's own, as with the switch on.
     rmSync(join(claudeDir, 'settings.json'))
     rmSync(join(project, 'settings.json'))
     expect(await launch()).toEqual({ type: 'command', command: expect.stringMatching(/&statusline"$/), padding: 0 })
+  })
+
+  // Run as Claude Code runs it, with Git's bash (Claude Code's shell on Windows; found from git itself, never WSL's
+  // bash): the user's command, however written, gets the echoed JSON unchanged and its output is the status line.
+  it("off, chains any command that runs alone in bash: a comment at its end, several lines, a pipeline (HR4's round 1)", async () => {
+    const { execFileSync, spawnSync } = await import('child_process')
+    const bash = join(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '..', '..', '..', 'bin', 'bash.exe')
+    expect(existsSync(bash), bash).toBe(true)
+    const { hiveStatusLine } = await import('../src/main/providers/claude/launchSettings')
+    const json = '{"model":{"display_name":"Opus 5.5"},"note":"a  b\\n#c"}'
+    // Hive's forwarding command stands in as what it prints: the JSON its server echoed.
+    const forward = (echo: boolean): string => (echo ? `printf '%s' '${json}'` : 'true')
+    const run = (command: string): { out: string; code: number | null } => {
+      const line = hiveStatusLine(forward, { type: 'command', command, padding: 3 })
+      expect(line.padding).toBe(3)
+      const r = spawnSync(bash, ['-c', line.command], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } })
+      return { out: r.stdout, code: r.status }
+    }
+    expect(run('printf MYLINE # my status line')).toEqual({ out: 'MYLINE', code: 0 })
+    expect(run('read -r line\nprintf "first %s" "$(printf %s "$line" | head -c 10)"')).toEqual({ out: 'first {"model":{', code: 0 })
+    expect(run('cat | wc -c | tr -d " "')).toEqual({ out: `${json.length}\n`, code: 0 })
+    // The input whole, byte for byte.
+    expect(run('cat')).toEqual({ out: json, code: 0 })
+    // A command of its own that fails still fails alone: nothing of Hive's around it hides that.
+    expect(run('exit 3').code).toBe(3)
   })
 })
 
@@ -433,15 +463,41 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
   }
   afterEach(() => rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true }))
 
-  it("Codex: Hive's guidance after the user's own developer_instructions, never in their place; none of Hive's, none passed", () => {
-    expect(developer(codexArgs(context()))).toBe('Hive guidance')
-    mkdirSync(process.env.CODEX_HOME!, { recursive: true })
-    writeFileSync(join(process.env.CODEX_HOME!, 'config.toml'), 'developer_instructions = "Mine first."\n')
-    expect(developer(codexArgs(context()))).toBe('Mine first.\n\nHive guidance')
-    // The Assistant's role after it too.
-    expect(developer(codexArgs(context({ instructions: 'You are the Assistant.' })))).toBe('Mine first.\n\nHive guidance\n\nYou are the Assistant.')
-    // No guidance of Hive's (the switch off, or no Hive tools): theirs apply as Codex reads them, untouched.
-    expect(developer(codexArgs(context({ guidance: '' })))).toBeNull()
+  // What Codex itself says applies (its app server's config/read: a project's only while trusted, HR4's round 1), here
+  // the fake Codex's answer; e2e codexownhooks checks the real Codex gives a trusted project's and not an untrusted one's.
+  it("Codex: Hive's guidance after the developer_instructions Codex says apply, never in their place; none of Hive's, none passed", async () => {
+    const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
+    // A Codex home of this test's own: the user's config.toml it reads is this one's.
+    const homeBefore = process.env.CODEX_HOME
+    const home = join(base, 'developer-codex-home')
+    process.env.CODEX_HOME = home
+    mkdirSync(home, { recursive: true })
+    const said = join(home, 'fake-developer-instructions.txt')
+    const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => {
+      const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }, ...over })
+      await codex.prepareLaunch(ctx)
+      return developer(codexArgs(ctx))
+    }
+    try {
+      // Codex gives none: Hive's alone.
+      expect(await launched()).toBe('Hive guidance')
+      // Codex gives a trusted project's (as config/read layers them): Hive's after it, the Assistant's role after that.
+      writeFileSync(said, 'The project says this.')
+      expect(await launched()).toBe('The project says this.\n\nHive guidance')
+      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('The project says this.\n\nHive guidance\n\nYou are the Assistant.')
+      // Codex can't say: only the user's own config.toml, never a project's file, which Codex may not trust.
+      writeFileSync(said, '!fail')
+      writeFileSync(join(home, 'config.toml'), 'developer_instructions = "Mine first."\n')
+      mkdirSync(join(base, 'proj', '.codex'), { recursive: true })
+      writeFileSync(join(base, 'proj', '.codex', 'config.toml'), 'developer_instructions = "PROJECT-ONLY"\n')
+      expect(await launched()).toBe('Mine first.\n\nHive guidance')
+      // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, Codex's own apply untouched.
+      expect(await launched({ guidance: '' })).toBeNull()
+    } finally {
+      process.env.CODEX_HOME = homeBefore
+      rmSync(home, { recursive: true, force: true })
+      rmSync(join(base, 'proj', '.codex'), { recursive: true, force: true })
+    }
   })
 
   it('is a switch of its own under Hive, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {

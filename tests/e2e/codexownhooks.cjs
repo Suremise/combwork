@@ -4,7 +4,9 @@
 // - the user's Stop and PreToolUse hooks (their config.toml) and Hive's of the same events (-c hooks.<event>, the session
 //   flags) are listed side by side, each under its own key;
 // - the user's trust records (their config.toml's hooks.state) survive Hive's -c hooks.state table: their hooks stay
-//   trusted, and Hive's table names only its own session-flags keys.
+//   trusted, and Hive's table names only its own session-flags keys;
+// - config/read, which Hive asks which developer_instructions apply before putting its guidance after them (#1285,
+//   row 13), gives an untrusted project's the user's own and a trusted project's its own.
 // The -c forms are Hive's (codex/adapter.ts hookOverrides; a unit test, cliOverrides, pins its keys). A throwaway
 // CODEX_HOME of its own, never the user's ~/.codex nor the signed-in test home: hooks/list needs no sign-in.
 const lib = require('./lib.cjs')
@@ -97,6 +99,49 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   const withState = await hooksList([...hive, '-c', state])
   check("with Hive's hooks.state table, the user's hooks stay trusted", user(withState).length === 2 && user(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
   check("…and Hive's are trusted by their own records", ours(withState).length === 2 && ours(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
+
+  // ---- developer_instructions (#1285, HR4's round 1): Hive asks config/read which apply, and puts its guidance after
+  // them. Codex gives a project's only while it trusts the project (its config's projects table), else the user's own.
+  const configRead = (args) =>
+    new Promise((resolve) => {
+      const p = spawn('codex.exe', ['app-server', ...args], { cwd: proj, env: env(), windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
+      let buf = ''
+      const done = (v) => {
+        clearTimeout(timer)
+        p.kill()
+        resolve(v)
+      }
+      const timer = setTimeout(() => done({ error: 'no reply' }), HUNG_MS)
+      p.on('error', (e) => done({ error: String(e) }))
+      p.stdout.on('data', (d) => {
+        buf += d
+        let i
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i)
+          buf = buf.slice(i + 1)
+          let m
+          try {
+            m = JSON.parse(line)
+          } catch {
+            continue
+          }
+          if (m.id === 1) {
+            p.stdin.write(JSON.stringify({ method: 'initialized' }) + '\n')
+            p.stdin.write(JSON.stringify({ id: 2, method: 'config/read', params: { cwd: proj } }) + '\n')
+          } else if (m.id === 2) done(m.error ? { error: JSON.stringify(m.error) } : { value: m.result?.config?.developer_instructions })
+        }
+      })
+      p.stdin.write(JSON.stringify({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive-e2e', version: '1' } } }) + '\n')
+    })
+  fs.mkdirSync(path.join(proj, '.codex'), { recursive: true })
+  fs.writeFileSync(path.join(proj, '.codex', 'config.toml'), 'developer_instructions = "PROJECT-ONLY"\n')
+  const userConfig = (trust) => fs.writeFileSync(config, `developer_instructions = "USER-ONLY"\n[projects.${toml(proj)}]\ntrust_level = ${toml(trust)}\n`)
+  userConfig('untrusted')
+  const untrusted = await configRead([])
+  check("config/read gives the user's developer_instructions for an untrusted project, never the project's", untrusted.value === 'USER-ONLY', JSON.stringify(untrusted))
+  userConfig('trusted')
+  const trustedProject = await configRead([])
+  check("…and a trusted project's own over the user's", trustedProject.value === 'PROJECT-ONLY', JSON.stringify(trustedProject))
 
   // Its folder stays for the runner to prune: a Codex just ended can still hold its files for a moment.
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASS')

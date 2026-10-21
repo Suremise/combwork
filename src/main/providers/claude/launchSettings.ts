@@ -174,9 +174,11 @@ export function ownStatusLine(scopes: readonly { json: unknown }[]): StatusLine 
  * Hive's status line (#1285): its forwarding command (`forward`, posting Claude Code's status JSON to Hive), alone and
  * showing nothing, or with the user's own after it. Then Hive's server echoes the JSON back (the URL's `echo`), which
  * goes on the user's command's input as Claude Code would give it, and the user's command's output is the status line.
- * The user's command is grouped in brackets, which bash and cmd both take, so all of it reads that input.
+ * The user's command is grouped in a subshell, on lines of its own, so all of it reads that input and nothing of it (a
+ * comment at its end, several lines) can reach past the group: Claude Code runs status lines with bash (Git Bash on
+ * Windows), where that holds for any command that runs alone.
  */
 export function hiveStatusLine(forward: (echo: boolean) => string, own: StatusLine | null): StatusLine {
   if (!own) return { type: 'command', command: forward(false), padding: 0 }
-  return { ...own, command: `${forward(true)} | (${own.command})` }
+  return { ...own, command: `${forward(true)} | (\n${own.command}\n)` }
 }

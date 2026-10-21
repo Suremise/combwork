@@ -2516,17 +2516,21 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
 - **Row 12, `claude-code.override.statusLine`** ("Hive's status line in place of yours", on; sessions started
   afterwards): off, the status line in the user's Claude Code settings (the first scope that sets a command one,
   highest first: managed, their `--settings`, the project's local and shared files, theirs; `ownStatusLine`) runs after
-  Hive's: `curl … "<hook URL>&statusline&echo" | (<their command>)`, with their padding. Hive's hook server answers the
-  `echo` form with the JSON it was sent, so their command gets Claude Code's input whole on stdin, and its output is the
-  status line; Hive still reads the status. The brackets group their whole command in bash and cmd. With none of
-  theirs, Hive's alone. `claudestatusline` checks it on the real Claude Code (2.1.306).
+  Hive's: `curl … "<hook URL>&statusline&echo" | (`, their command on lines of its own, then `)`, with their padding.
+  Hive's hook server answers the `echo` form with the JSON it was sent, so their command gets Claude Code's input whole
+  on stdin, and its output is the status line; Hive still reads the status. Claude Code runs status lines with bash (Git
+  Bash on Windows): the subshell on its own lines keeps any command that runs alone whole (a comment at its end, several
+  lines), tested by running the chain in Git's bash. With none of theirs, Hive's alone. `claudestatusline` checks it on
+  the real Claude Code (2.1.306).
 - **Row 13, `hive.guidance`** ("Hive's guidance for agents", on; sessions started afterwards), separate from Settings →
   Agent API → Provide Hive tools, without which there is no guidance either: off, project agents get Hive's tools
   without it: `sessions.hiveGuidance` gives none (Codex's `developer_instructions`, Copilot's custom instructions), and
   the hive server answers `initialize` with no `instructions` (`HIVE_GUIDANCE=0`). On Codex, Hive's guidance (and the
-  Assistant's role) now follow the user's own `developer_instructions` (the user's `config.toml`, then the project's,
-  which wins; a profile's aren't read) instead of replacing them; with none of Hive's, theirs apply as Codex reads them.
-  Hive reads `config.toml`, never writes it.
+  Assistant's role) now follow the `developer_instructions` Codex itself would give the session, instead of replacing
+  them: Hive asks Codex's app server (`config/read` for the session's folder) at each launch it adds some to, so Codex's
+  own layers decide (a profile, and a project's only while Codex trusts that project: `codexownhooks` checks the
+  installed Codex). Codex unable to answer, Hive keeps only the user's own `config.toml`'s, never a project's file. With
+  none of Hive's, Hive passes nothing and Codex's own apply. Hive never writes Codex's config.
 - **Row 14, the Assistant's role and its guidance: no switch** (Darren, on #1120 point 4): the Assistant is its role and
   its Control; without them it is no Assistant, only an agent. `hive.guidance` doesn't reach it.
 

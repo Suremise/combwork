@@ -60,7 +60,13 @@ if (args[0] === 'app-server') {
       const m = JSON.parse(buf.slice(0, i))
       buf = buf.slice(i + 1)
       if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
-      if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
+      // config/read (#1285): the developer_instructions in fake-developer-instructions.txt in CODEX_HOME, as the layers
+      // Codex takes would give them; "!fail" answers with an error, as a Codex that can't read its config.
+      if (m.id === 2 && m.method === 'config/read') {
+        const file = process.env.CODEX_HOME && path.join(process.env.CODEX_HOME, 'fake-developer-instructions.txt')
+        const text = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
+        process.stdout.write(JSON.stringify(text === '!fail' ? { id: 2, error: { message: 'config unreadable' } } : { id: 2, result: { config: text === null ? {} : { developer_instructions: text } } }) + '\n')
+      } else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
     }
   })
   return
