@@ -35,7 +35,22 @@ export function shortPath(path: string, other?: string): string {
   let common = 0
   while (common < p.names.length && common < o.names.length && same(p.names[common], o.names[common])) common++
   const rest = p.names.slice(common)
-  // The same path, or the other one's folder: the name says which.
-  if (rest.length <= 1) return last
+  // The same path, or the other one's folder: the name says which, its long common start dropped too.
+  if (rest.length <= 1) return rest.length && o.names[common] ? shortName(last, o.names[common]) : last
   return common > 0 ? `${DROPPED}${p.sep}${rest.join(p.sep)}` : `${p.root}${rest.join(p.sep)}`
+}
+
+/** The shortest start a name drops: less is no shorter to read. */
+const NAME_KEEP = 12
+
+/**
+ * A folder name beside another that differs from it only at its end, as a CLI's folders named after a whole path are
+ * (Claude Code's `C--Users-…-Scratch-juniper` beside `C--Users-…-Tools-dialect`): what follows their common start, cut
+ * at a dash, after `…`; the name whole when they share little.
+ */
+export function shortName(name: string, other: string): string {
+  let n = 0
+  while (n < name.length && n < other.length && name[n].toLowerCase() === other[n].toLowerCase()) n++
+  const cut = name.lastIndexOf('-', n - 1) + 1
+  return cut >= NAME_KEEP && cut < name.length ? `${DROPPED}${name.slice(cut)}` : name
 }

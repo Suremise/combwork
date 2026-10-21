@@ -534,3 +534,29 @@ describe('merge holds Hive closed under are told in their project now (#508 roun
     }
   })
 })
+
+describe('a workspace moved with a project renamed (#1305): Working on by the name it has now', () => {
+  it('the plan names the project as it is called now, and Repair marks it so, never its old name', async () => {
+    const before = join(base, 'Scratch')
+    const wsPath = join(base, 'Tools')
+    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Hive was closed.
+    project(wsPath, 'dialect', { lastPath: join(before, 'juniper') })
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      w.config.lastPath = before
+      await w.saveWorkspaceConfig()
+      const { config } = await import('../src/main/config')
+      config.update((c) => {
+        c.activeProjects[before] = ['juniper']
+      })
+      const plan = await movePlan(w)
+      expect(plan?.working).toEqual(['dialect'])
+      const report = await repairMove(w)
+      expect(report.failed).toEqual([])
+      expect(config.get().activeProjects[wsPath]).toEqual(['dialect'])
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+})

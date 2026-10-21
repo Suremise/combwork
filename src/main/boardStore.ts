@@ -20,6 +20,7 @@ import { withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { assertNotFencedOut } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
@@ -570,10 +571,12 @@ const failures = new Map<string, Error>()
  * reads the board before its cards are in. Throws when it couldn't be opened, saying why; the cards' files are then
  * as they were.
  */
-function boardOf(path: string): Board {
+function boardOf(path: string, transient = false): Board {
   const key = keyOf(path)
   const open = boards.get(key)
   if (open) return open
+  // Not opened again by work of an opening of it that has closed (#1379): it would stay open, holding the folder.
+  if (!transient) assertNotFencedOut(join(path, HIVE_DIR, DB_FILE))
   const failed = failures.get(key)
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
@@ -1440,6 +1443,11 @@ export function setArchiveBatches(ws: WorkspaceService, batches: ArchiveBatch[])
  * from files) as the board is. Their changes take the board's lock, so they never run inside one of its transactions.
  */
 export const workspaceDb = (workspacePath: string): Db => boardOf(workspacePath).db
+/**
+ * workspaceDb for a save that closes the board again when it wasn't open before (`boardOpen` first): not fenced (#1379),
+ * so a store's last save as its workspace closes still lands, leaving nothing open.
+ */
+export const transientDb = (workspacePath: string): Db => boardOf(workspacePath, true).db
 /** The lock the board's changes take, which the stores beside it take too. */
 export const boardLock = (workspacePath: string): string => `board-lock:${workspacePath}`
 /** Whether a workspace's database is open now (its workspace is, or something used it since). */

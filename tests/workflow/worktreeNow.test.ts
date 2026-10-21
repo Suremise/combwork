@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { tempDir } from '../tempDir'
 import { B1, commit, gitRepo, moved, setup, sh } from './harness'
 import * as G from '../../src/main/platform/git'
+import { gitTestHooks } from '../../src/main/git'
 import { isUnknown } from '../../src/main/platform/types'
 import { preset } from '../../src/shared/workflow/options'
 
@@ -36,6 +37,32 @@ describe('worktreeNow', () => {
     sh(wt, 'checkout', '-q', '--detach')
     expect(await G.worktreeNow(wt, { target: 'gone', gitPaths: ['index'] })).toMatchObject({ line: null, head: await G.head(wt), dirty: [], target: null, gitPaths: [expect.stringMatching(/index$/)] })
     expect(await G.branch(wt)).toBeNull()
+  })
+
+  it('a branch with a diverged upstream: the same branch, head and files, with no ahead/behind count asked of git (#1377)', async () => {
+    const repo = gitRepo(join(tempDir('git-'), 'r'))
+    // A clone whose main is its upstream, both sides moved on.
+    const clone = join(repo, '..', 'clone')
+    execFileSync('git', ['clone', '-q', repo, clone])
+    sh(clone, 'config', 'core.autocrlf', 'false')
+    commit(repo, { 'theirs.txt': 'theirs\n' }, 'upstream moves')
+    sh(clone, 'fetch', '-q')
+    const mine = commit(clone, { 'mine.txt': 'mine\n' }, 'local moves')
+    writeFileSync(join(clone, 'new.txt'), 'new\n')
+    // Git counts it by default: the walk worktreeNow leaves out.
+    expect(sh(clone, 'status', '--porcelain=v2', '--branch')).toMatch(/^# branch\.ab \+1 -1$/m)
+    const asked: string[][] = []
+    gitTestHooks.started = (_cwd, args) => {
+      if (args[0] === 'status') asked.push([...args])
+    }
+    try {
+      expect(await G.worktreeNow(clone, { target: 'main' })).toEqual({ line: 'main', head: mine, dirty: ['new.txt'], target: mine, gitPaths: [] })
+    } finally {
+      gitTestHooks.started = undefined
+    }
+    expect(asked).toHaveLength(1)
+    expect(asked[0]).toContain('--no-ahead-behind')
+    expect(await G.dirty(clone)).toEqual(['new.txt'])
   })
 
   it('a repository with no commit yet: no head, its files still listed', async () => {

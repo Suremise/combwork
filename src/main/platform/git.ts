@@ -4,6 +4,7 @@
 //
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
+import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
@@ -20,6 +21,54 @@ export interface CommitInfo {
 }
 
 const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
+
+/** A step's answers about fixed commits (gitStep), shared by its reads; `done` once the step has ended. */
+interface Step {
+  answers: Map<string, Promise<unknown>>
+  done: boolean
+}
+const stepNow = new AsyncLocalStorage<Step>()
+const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+
+/**
+ * One workflow step (an intent, a lane's line looked at: #1376): what it asks git about fixed commits (an ancestor, a
+ * merge base: answers that can't change) is asked once in it, however many of its reads ask. Nothing about refs, HEAD or
+ * the files is kept (they move: each read asks git), and the answers go when the step ends. A step inside a step is
+ * the outer one's.
+ */
+export function gitStep<T>(fn: () => Promise<T>): Promise<T> {
+  if (stepNow.getStore()) return fn()
+  const step: Step = { answers: new Map(), done: false }
+  return stepNow.run(step, async () => {
+    try {
+      return await fn()
+    } finally {
+      step.done = true
+    }
+  })
+}
+
+/**
+ * `ask()` once per step for commits `ids` (full ids only) in `repo`'s repository, unknown answers asked again; outside
+ * a step, always asked. Keyed by the repository's common git dir (HR2's round 1): a project and its worktrees share
+ * answers (a line is read in the worktree, its containment in the project), another repository never. A folder whose
+ * repository can't be told from its `.git` (a subfolder) is always asked.
+ */
+function onceInStep<T>(repo: string, what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
+  const step = stepNow.getStore()
+  if (!step || step.done || !ids.every((id) => SHA.test(id))) return ask()
+  const common = commonDirSync(repo)
+  if (!common) return ask()
+  const key = [common.toLowerCase(), what, ...ids].join('\0')
+  const had = step.answers.get(key) as Promise<Maybe<T>> | undefined
+  if (had) return had
+  const p = ask().then((v) => {
+    if (isUnknown(v)) step.answers.delete(key)
+    return v
+  })
+  step.answers.set(key, p)
+  return p
+}
 
 /** The repository's common git dir (where branch refs live, for every worktree). */
 export async function commonDir(repo: string): Promise<Maybe<string>> {
@@ -40,6 +89,20 @@ export function gitDirSync(folder: string): string | null {
     return m ? resolvePath(folder, m[1].trim()) : null
   } catch {
     return null
+  }
+}
+
+/**
+ * A folder's repository's common git dir, read from its `.git` (a linked worktree's git dir names it in `commondir`)
+ * with no git process; null where `gitDirSync` can't say.
+ */
+function commonDirSync(folder: string): string | null {
+  const own = gitDirSync(folder)
+  if (!own) return null
+  try {
+    return resolvePath(own, readFileSync(join(own, 'commondir'), 'utf8').trim())
+  } catch {
+    return own
   }
 }
 
@@ -113,18 +176,37 @@ export async function defaultBranch(repo: string): Promise<Maybe<string>> {
   return b ?? unknown(U.defaultBranch, { folder: repo })
 }
 
-export async function isAncestor(repo: string, a: string, b: string): Promise<Maybe<boolean>> {
-  const r = await git(repo, ['merge-base', '--is-ancestor', a, b])
-  if (r.ok) return true
-  if (r.code === 1) return false
-  return unknown(U.contains, { revision: a.slice(0, 7), target: b.slice(0, 7) })
+export function isAncestor(repo: string, a: string, b: string): Promise<Maybe<boolean>> {
+  return onceInStep(repo, 'is-ancestor', [a, b], async () => {
+    const r = await git(repo, ['merge-base', '--is-ancestor', a, b])
+    if (r.ok) return true
+    if (r.code === 1) return false
+    return unknown(U.contains, { revision: a.slice(0, 7), target: b.slice(0, 7) })
+  })
 }
 
-export async function mergeBase(repo: string, a: string, b: string): Promise<Maybe<string | null>> {
-  const r = await git(repo, ['merge-base', a, b])
-  if (r.ok) return r.out.trim()
-  if (r.code === 1 && !r.err) return null
-  return unknown(U.branchedOff, { a, b })
+export function mergeBase(repo: string, a: string, b: string): Promise<Maybe<string | null>> {
+  return onceInStep(repo, 'merge-base', [a, b], async () => {
+    const r = await git(repo, ['merge-base', a, b])
+    if (r.ok) return r.out.trim()
+    if (r.code === 1 && !r.err) return null
+    return unknown(U.branchedOff, { a, b })
+  })
+}
+
+/**
+ * A folder's branch (null: detached), head, and a line's head (null: no such line), in one git (#1376): what
+ * `branch`, `head` and `lineHead` answer, asked together. Where the one read can't say (no commit yet, no such line, a
+ * HEAD that isn't a branch's), each is asked on its own.
+ */
+export async function heads(folder: string, target: string): Promise<{ line: Maybe<string | null>; head: Maybe<string>; target: Maybe<string | null> }> {
+  const r = await git(folder, ['rev-parse', 'HEAD', `refs/heads/${target}`, '--symbolic-full-name', 'HEAD'])
+  const out = r.ok ? lines(r.out).map((l) => l.trim()) : []
+  if (out.length === 3 && SHA.test(out[0]) && SHA.test(out[1]) && (out[2] === 'HEAD' || out[2].startsWith('refs/heads/'))) {
+    return { head: out[0], target: out[1], line: out[2] === 'HEAD' ? null : out[2].slice(11) }
+  }
+  const [line, h, t] = await Promise.all([branch(folder), head(folder), lineHead(folder, target)])
+  return { line, head: h, target: t }
 }
 
 /**
@@ -163,7 +245,8 @@ export interface WorktreeNow {
 export async function worktreeNow(folder: string, o: { target?: string; gitPaths?: string[] } = {}): Promise<Maybe<WorktreeNow>> {
   const asked = [...MARKERS, ...(o.gitPaths ?? [])]
   const where = (target?: string) => git(folder, ['rev-parse', '--path-format=absolute', ...asked.flatMap((m) => ['--git-path', m]), ...(target ? ['--revs-only', `refs/heads/${target}`, '--'] : [])])
-  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all']), where(o.target)])
+  // --no-ahead-behind (#1377): `--branch` would otherwise count the upstream's ahead and behind, a walk nothing here reads.
+  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--no-ahead-behind', '--untracked-files=all']), where(o.target)])
   if (!r.ok) return unknown(U.uncommitted, { folder })
   let line: string | null = null
   let oid: string | null = null
@@ -261,9 +344,10 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
  * Is the change base→rev in the target (§16.3.2 Containment)? In order: an ancestor of the target (a merge or a
  * fast-forward); a target commit since the base whose parent replays the change to its tree (a squash or a cherry-pick
  * of the whole change); else the whole target already holds it (a squash split across commits). Null when not found.
+ * `at`: the target's head as the caller read it (asked about that commit, not read again).
  */
-export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>> {
-  const t = await resolve(repo, target)
+export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
+  const t = at ?? (await resolve(repo, target))
   if (isUnknown(t)) return t
   if (!t) return unknown(U.target, { target })
   const anc = await isAncestor(repo, c.revision, t)
@@ -276,12 +360,13 @@ export async function contains(repo: string, target: string, c: { base: string; 
   const key = c.key !== undefined ? c.key : await candidateKey(repo, c.base, c.revision)
   if (isUnknown(key)) return key
   // The target's commits since the change's base (bounded, merges left out: a merge's change is covered above), keyed in
-  // one pass (`log -p -U0 | patch-id`); only those with the change's key are replayed, as a squash of it.
-  const log = await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--binary', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
-  if (!log.ok) return unknown(U.commitsOn, { target })
-  const ids = await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, log.out)
-  if (!ids.ok) return unknown(U.commitsOn, { target })
-  for (const line of lines(ids.out)) {
+  // one pass (`log -p -U0 | patch-id`); only those with the change's key are replayed, as a squash of it. A change with
+  // no key (empty) matches none of them: not listed (#1376).
+  const log = key === null ? null : await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--binary', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
+  if (log && !log.ok) return unknown(U.commitsOn, { target })
+  const ids = log ? await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, log.out) : null
+  if (ids && !ids.ok) return unknown(U.commitsOn, { target })
+  for (const line of ids ? lines(ids.out) : []) {
     const [k, commit] = line.split(/\s+/)
     if (!commit || k !== key) continue
     const parent = await resolve(repo, `${commit}^`)
@@ -356,9 +441,11 @@ export async function isolate(repo: string, folder: string, line: string, base: 
  */
 export async function moveLineLocked(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
   if (!expect.line) return null
-  const at = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
-  if (!at.ok) return null
-  const index = at.out.trim()
+  // The index in the folder's git dir, read from its `.git` (#1376), else git's answer (git's own if GIT_INDEX_FILE moves it).
+  const gitDir = process.env.GIT_INDEX_FILE ? null : gitDirSync(folder)
+  const at = gitDir ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
+  if (at && !at.ok) return null
+  const index = at ? at.out.trim() : join(gitDir!, 'index')
   const lock = `${index}.lock`
   const next = `${index}.hive-line`
   let fd: number | null

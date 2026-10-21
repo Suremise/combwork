@@ -29,6 +29,19 @@ function reviewed(): { facts: Fact[]; s1: number; s2: number } {
 }
 
 describe("a card's work view (#1223)", () => {
+  it('its line renamed (#1305: Repair renaming a branch named after an old place): the view follows it; only that line is renamed', () => {
+    seq = 0
+    const facts: Fact[] = [fact('Started', start({ folder: 'D:/ws.worktrees/a/b1', line: 'hive/Scratch/a/b1' }), 'agent:B1'), fact('Moved', moved('todo', 'active'))]
+    facts.push(fact('LineRenamed', { from: 'hive/Scratch/a/b1', to: 'hive/Tools/a/b1', why: 'repair' }))
+    expect(workView(card, facts).line).toBe('hive/Tools/a/b1')
+    // Written again (a Repair finishing a rename cut short), or for another line: nothing changes.
+    facts.push(fact('LineRenamed', { from: 'hive/Scratch/a/b1', to: 'hive/Elsewhere/a/b1', why: 'repair' }), fact('LineRenamed', { from: 'hive/other', to: 'hive/x', why: 'repair' }))
+    expect(workView(card, facts).line).toBe('hive/Tools/a/b1')
+    // A new cycle starts from its own Started's line.
+    facts.push(fact('Started', start({ line: 'hive/Tools/a/b1-2' }), 'agent:B1'))
+    expect(workView(card, facts).line).toBe('hive/Tools/a/b1-2')
+  })
+
   it('a card with no facts (before 1.0): its stage and nothing invented', () => {
     const v = workView({ card: 3, stage: 'done', preWorkflow: true }, [])
     expect(v).toMatchObject({ card: 3, stage: 'done', preWorkflow: true, adopted: false, kind: null, folder: null, line: null, base: null, target: null, revisions: [], verdicts: [], checks: [], integration: null, queue: null, rounds: 0, forYou: 0, lastSeq: 0 })
