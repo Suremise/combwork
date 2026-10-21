@@ -24,7 +24,7 @@ import * as G from '../platform/git'
 import { NoneAdapter } from '../platform/none'
 import { observer as appObserver, type FolderChanges } from '../platform/observe'
 import { isUnknown, type Maybe } from '../platform/types'
-import { snapshot } from './checks'
+import { blocks, snapshot } from './checks'
 import { cardFacts } from './cardWork'
 import { FactStore } from './factStore'
 import { folderHead, LINK_TTL_MS, type RunLink } from './runLink'
@@ -258,7 +258,7 @@ export function bracketStarted(runId: string, b: Bracket): void {
  * A run finished: its `CheckRan`, written in its card's facts inside a board change, or null when it wasn't bracketed,
  * didn't end with a result, or its workspace or card has gone meanwhile.
  */
-export async function bracketFinished(run: ProgressRun): Promise<CheckRanData | null> {
+export async function bracketFinished(run: ProgressRun): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
   const b = open.get(run.id)
   open.delete(run.id)
   if (!b || run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
@@ -277,7 +277,11 @@ export async function bracketFinished(run: ProgressRun): Promise<CheckRanData | 
     facts.tx((tx) => tx.append(b.for.card, { kind: 'CheckRan', actor, source: 'recorded', data }))
     return true
   })
-  return written ? data : null
+  if (!written) return null
+  // A failed check its card's rules require before Review (#1279): its row says it blocks review, until seen.
+  const wf = data.result !== 'passed' && b.ws.path ? await workflowFor(b.ws, join(b.ws.path, b.project)).catch(() => null) : null
+  const gate = wf ? await boardWrite(b.ws, async () => (cardOf(b) ? blocks(wf, facts.card(b.for.card), data) : null)).catch(() => null) : null
+  return gate ? { ...data, blocks: gate } : data
 }
 
 /** Brackets read at resolve (before hive-progress starts the command), by the link it gave out, until their start. */

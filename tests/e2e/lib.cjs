@@ -578,8 +578,10 @@ _electron.launch = async (...args) => {
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
   if (env.HIVE_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.HIVE_USER_DATA}`] }
   if (packaged) {
-    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS] }
+    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
     unmaximized(env.HIVE_USER_DATA)
+    noUpdateChecks(env.HIVE_USER_DATA)
+    if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
   }
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
@@ -667,6 +669,53 @@ function unmaximized(profile) {
     // Unreadable: Hive starts with its defaults.
   }
 }
+
+/**
+ * A packaged test Hive never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
+ * GitHub counts as a download. 1.0 doesn't for HIVE_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
+ * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: HIVE_UPDATE_DELAY, which
+ * every build reads), and a profile it has saved has automatic checks off, so it schedules no 6-hourly check either.
+ */
+const NO_UPDATE_CHECK = { HIVE_UPDATE_DELAY: String(2 ** 31 - 1) }
+function noUpdateChecks(profile) {
+  const file = profile && path.join(profile, 'config.json')
+  // A new profile is left alone: a config.json of settings alone would read as one from before every migration.
+  if (!file || !fs.existsSync(file)) return
+  try {
+    const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (cfg.settings?.updates?.checkAutomatically === false) return
+    cfg.settings = { ...cfg.settings, updates: { ...cfg.settings?.updates, checkAutomatically: false } }
+    fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
+  } catch {
+    // Unreadable: Hive starts with its defaults, and HIVE_UPDATE_DELAY still puts its check off.
+  }
+}
+
+/**
+ * The guard (#1332): when a suite ends, the log of each packaged Hive it started (hive.log and its older copy) must show
+ * no update check since that launch (electron-updater's "Checking for update", in Hive's [updates] scope), or the suite
+ * fails, whatever it said.
+ */
+const packagedLaunches = []
+function updateChecksLogged({ profile, since }) {
+  const found = []
+  for (const name of ['hive.1.log', 'hive.log']) {
+    let text = ''
+    try {
+      text = fs.readFileSync(path.join(profile, 'logs', name), 'utf8')
+    } catch {
+      continue
+    }
+    for (const line of text.split('\n')) if (line.slice(0, 24) >= since && /\[updates\] Checking for update/.test(line)) found.push(line.trim())
+  }
+  return found
+}
+process.on('exit', () => {
+  const found = packagedLaunches.flatMap(updateChecksLogged)
+  if (!found.length) return
+  console.error(`FAILED: a packaged test Hive checked GitHub for updates (#1332):\n${found.join('\n')}`)
+  process.exitCode = 1
+})
 
 /**
  * Run in a packaged test Hive's main process as soon as Playwright reaches it (#1253), making it quiet from outside, as
@@ -1237,4 +1286,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }

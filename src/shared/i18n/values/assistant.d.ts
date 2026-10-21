@@ -149,8 +149,9 @@ interface HiveMessageValues {
   'assistant.panel.defaultMode': { name: string | number }
   'assistant.panel.doneBy': undefined
   'assistant.panel.ended': undefined
+  'assistant.panel.fold': undefined
+  'assistant.panel.foldTip': { hasKey: string; key: string | number }
   'assistant.panel.forWorkspace': undefined
-  'assistant.panel.hide': undefined
   'assistant.panel.inactive': { count: number }
   'assistant.panel.listFailed': undefined
   'assistant.panel.manageModes': undefined

@@ -105,7 +105,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   })
 
   it('picks an area’s suites, a suite’s own file, and about for docs the app bundles', () => {
-    expect(affectedSuites(['src/renderer/src/components/Progress.tsx'], names).suites).toEqual(['i18nshots', 'progress', 'progresslanes', 'progressreport', 'progressstates', 'replysize'])
+    expect(affectedSuites(['src/renderer/src/components/Progress.tsx'], names).suites).toEqual(['i18nshots', 'progress', 'progressgates', 'progresslanes', 'progressreport', 'progressstates', 'replysize'])
     expect(affectedSuites(['tests/e2e/carddialog.cjs', 'docs/SPEC.md', 'CHANGELOG.md'], names).suites).toEqual(['about', 'carddialog'])
     expect(affectedSuites(['docs/USER_GUIDE.md'], names).suites).toEqual(['about', 'tipcorner', 'tips'])
     expect(affectedSuites(['README.md'], names).suites).toEqual([])
@@ -1382,6 +1382,34 @@ describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #
 
   it('a window already shown when it is reached is said (the launch then fails)', () => {
     expect(lib.keepPackagedQuiet(electron(true).modules)).toEqual(['Hive Desktop'])
+  })
+})
+
+describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', () => {
+  type Lib = { NO_UPDATE_CHECK: Record<string, string>; noUpdateChecks: (profile: string) => void; updateChecksLogged: (l: { profile: string; since: string }) => string[] }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+
+  it("a 0.9's first check is put off as far as a timer goes", () => {
+    expect(Number(lib.NO_UPDATE_CHECK.HIVE_UPDATE_DELAY)).toBe(2147483647)
+  })
+
+  it("a saved profile gets automatic checks off, its other settings kept; a new one is left alone", () => {
+    const profile = tempDir('hive-noupdates-')
+    lib.noUpdateChecks(profile)
+    expect(existsSync(join(profile, 'config.json'))).toBe(false)
+    writeFileSync(join(profile, 'config.json'), JSON.stringify({ version: 9, settings: { updates: { install: 'manual' }, general: { showTips: true } } }))
+    lib.noUpdateChecks(profile)
+    expect(JSON.parse(readFileSync(join(profile, 'config.json'), 'utf8'))).toEqual({ version: 9, settings: { updates: { install: 'manual', checkAutomatically: false }, general: { showTips: true } } })
+  })
+
+  it('the guard finds a check logged since the launch, in hive.log or its older copy, and only those', () => {
+    const profile = tempDir('hive-noupdates-')
+    mkdirSync(join(profile, 'logs'))
+    const check = '2026-10-21T10:00:05.000Z [INFO] [updates] Checking for update'
+    writeFileSync(join(profile, 'logs', 'hive.1.log'), `2026-10-21T09:00:00.000Z [INFO] [updates] Checking for update\n${check}\n`)
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-10-21T10:00:06.000Z [INFO] [updates] Update settings: check off\n')
+    expect(lib.updateChecksLogged({ profile, since: '2026-10-21T10:00:00.000Z' })).toEqual([check])
+    expect(lib.updateChecksLogged({ profile, since: '2026-10-21T11:00:00.000Z' })).toEqual([])
   })
 })
 

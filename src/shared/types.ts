@@ -1418,7 +1418,7 @@ export interface RuntimeFacts {
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
-  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked')[]
+  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision')[]
   column?: TaskColumn
   /** An agent watch's agents, by name (#416: its cards are none). */
   agents?: string[]
@@ -2604,6 +2604,8 @@ export interface LaneStatus {
   card: number | null
   /** blocked: the card's reason, as the board has it. */
   blocked?: string
+  /** you: what the user is asked for (the open request's kind, #1279). */
+  ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
 }
 
 /** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */
@@ -2731,4 +2733,6 @@ export interface RunCheck {
   name: string
   counted: boolean
   whyNot?: CheckWhyNot
+  /** A failed check the card's rules require before a gate (#1279): it blocks that gate (review) for the card. */
+  blocks?: 'review'
 }

@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
   await update({ assistant: { providers: { 'claude-code': { model: '' } } } })
   // Hidden from the header's ⋯ (#979: the header's own Hide button went into it).
   await page.locator('.assistant-header button[aria-label="More"]').click()
-  await page.locator('.menu .menu-item', { hasText: 'Hide the Assistant' }).click()
+  await page.locator('.menu .menu-item', { hasText: 'Fold the Assistant panel' }).click()
 
   // --- Without the CLI: the fallback lists, as edited, and Reset to defaults.
   await page.keyboard.press('Control+,')

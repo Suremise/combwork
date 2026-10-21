@@ -35,7 +35,7 @@ import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
 import { GPU_SWITCH, advancedAtStart, relaunchArgs, startGpu } from './gpu'
-import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT } from '../shared/advanced'
+import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, HIVE_GUIDANCE } from '../shared/advanced'
 import { startHeapSnapshots, startMemoryLog } from './memory'
 import { recordLiveCardsSoon } from './cardSessions'
 import { closeAllBoards, onBoardNotice } from './boardStore'
@@ -884,6 +884,8 @@ app.whenReady().then(async () => {
         ...(agentId ? { HIVE_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through hive-progress unasked.
         HIVE_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
+        // Whether it gives Hive's guidance as its instructions (#1285: Settings → Advanced, Hive's guidance for agents).
+        HIVE_GUIDANCE: advanced.get<boolean>(HIVE_GUIDANCE) ? '1' : '0',
         HIVE_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
         // Its reply timeout and wait caps (#367: Settings → Advanced).
         ...mcpAdvancedEnv(),
@@ -910,6 +912,8 @@ app.whenReady().then(async () => {
         const journal = journalSettingsOf(workspaceOf(projectPath))
         return withJournal(hiveInstructions('', 'assistant'), journal.enabled ? journal.scope : null)
       }
+      // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
+      if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
       return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general)), latest?.relPath)

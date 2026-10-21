@@ -63,6 +63,14 @@
     "defaultMessage": "Resume the Assistant with its current instructions",
     "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default."
   },
+  "settings.advanced.claude-code.override.statusLine.desc": {
+    "defaultMessage": "Hive starts Claude Code with a status line of its own, which sends Hive the session's model, context, cost and plan limits for the agent's footer and shows nothing under the input. Turned off, the status line in your Claude Code settings shows again: Hive's command still reads the status, then runs yours with the same input Claude Code gives it and shows what it prints. With no status line of yours, nothing changes.",
+    "description": "What the advanced setting \"Hive's status line in place of yours\" does (Settings → Advanced, under Claude Code)."
+  },
+  "settings.advanced.claude-code.override.statusLine.title": {
+    "defaultMessage": "Hive's status line in place of yours",
+    "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input."
+  },
   "settings.advanced.claude-code.safeguard.note.desc": {
     "defaultMessage": "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Hive misses such stops: no shield on the agent's pane, and Performance doesn't count them.",
     "description": "What the advanced setting \"Safeguard stop: transcript note\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -261,6 +269,14 @@
   },
   "settings.advanced.codex.prompt.drawnSeconds.title": {
     "defaultMessage": "Typed line: wait to be drawn",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": {
+    "defaultMessage": "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.",
+    "description": "What the advanced setting \"Reading a session's instructions: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them."
+  },
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": {
+    "defaultMessage": "Reading a session's instructions: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.queue.hint.desc": {
@@ -598,6 +614,14 @@
   "settings.advanced.hive.disableHardwareAcceleration.title": {
     "defaultMessage": "Disable hardware acceleration",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.guidance.desc": {
+    "defaultMessage": "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
+    "description": "What the advanced setting \"Hive's guidance for agents\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names, hive the name of Hive's MCP server and developer_instructions a Codex setting: keep them."
+  },
+  "settings.advanced.hive.guidance.title": {
+    "defaultMessage": "Hive's guidance for agents",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: the instructions Hive gives project agents on how to work with it."
   },
   "settings.advanced.hive.heapSnapshotNearLimit.desc": {
     "defaultMessage": "When Hive's main process nears its memory limit, it writes a snapshot of its memory to the heap folder in Hive's profile before it closes, to find out what filled it. A snapshot can be several gigabytes, holds whatever Hive had in memory (card text, transcripts, possibly tokens) and stays on this PC; Hive keeps the newest two. Takes effect when Hive restarts.",

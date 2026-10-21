@@ -391,6 +391,14 @@
     "defaultMessage": "See what a card’s work went through",
     "description": "A tip's title. Glossary: work (a card's Work section)."
   },
+  "tips.claudeStatusLine.text": {
+    "defaultMessage": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.claudeStatusLine.title": {
+    "defaultMessage": "Keep your own Claude Code status line",
+    "description": "A tip's title. The status line is the line Claude Code shows under its input."
+  },
   "tips.cliOverrides.text": {
     "defaultMessage": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -682,6 +690,14 @@
   "tips.laneBranchSquash.title": {
     "defaultMessage": "An agent's branch kept up to date between cards",
     "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
+  "tips.laneGates.text": {
+    "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
+  },
+  "tips.laneGates.title": {
+    "defaultMessage": "See why a lane isn’t moving",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",

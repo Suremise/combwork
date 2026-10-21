@@ -174,6 +174,9 @@ export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
 /** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
+/** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
+export const HIVE_GUIDANCE = 'hive.guidance'
+
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
@@ -532,6 +535,21 @@ const SOURCES: readonly AdvancedSource[] = [
     default: false,
     applies: 'sessions'
   },
+  // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
+  // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
+  {
+    id: HIVE_GUIDANCE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Hive's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Hive: the instructions Hive gives project agents on how to work with it." }),
+    desc: msg({
+      id: 'settings.advanced.hive.guidance.desc',
+      defaultMessage: "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
+      description: 'What the advanced setting "Hive\'s guidance for agents" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs\' names, hive the name of Hive\'s MCP server and developer_instructions a Codex setting: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions'
+  },
   // Claude Code
   {
     id: 'claude-code.trust.prompt',
@@ -810,6 +828,21 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
+  },
+  // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
+  // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
+  {
+    id: 'codex.promptInput.timeoutSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.title', defaultMessage: "Reading a session's instructions: timeout", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.desc', defaultMessage: "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.", description: 'What the advanced setting "Reading a session\'s instructions: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them.' }),
+    kind: 'number',
+    default: 15,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/help-codex-0.163.0-prompt-input.txt`, version: '0.163.0', text: 'Render the model-visible prompt input list as JSON', shows: "Codex's help for the command Hive runs, offline, to read a session's developer_instructions" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.mcp.toolTimeoutSeconds',
@@ -1196,6 +1229,22 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     override: true,
     samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: 'Only use MCP servers from --mcp-config,', shows: "Claude Code's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // Hive's status line in place of the user's (#1285, #966 row 12). Off, theirs shows again, chained after Hive's.
+  {
+    id: overrideId('claude-code', 'statusLine'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.override.statusLine.title', defaultMessage: "Hive's status line in place of yours", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.override.statusLine.desc',
+      defaultMessage: "Hive starts Claude Code with a status line of its own, which sends Hive the session's model, context, cost and plan limits for the agent's footer and shows nothing under the input. Turned off, the status line in your Claude Code settings shows again: Hive's command still reads the status, then runs yours with the same input Claude Code gives it and shows what it prints. With no status line of yours, nothing changes.",
+      description: 'What the advanced setting "Hive\'s status line in place of yours" does (Settings → Advanced, under Claude Code).'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/statusline-claude-2.1.296.json`, version: '2.1.296', text: '"context_window"', shows: "Claude Code's status line input, which Hive's command reads and passes on to yours" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'mcpIsolation'),

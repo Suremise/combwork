@@ -39,7 +39,7 @@ import { msg, tr } from '../shared/i18n'
 import { cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
-import { alreadyThere, cardChange, changesBetween, decodeSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
+import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
 import { waitMaxSeconds } from './advanced'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
 import { listWorktrees } from './worktrees'
@@ -163,12 +163,19 @@ export async function startHookServer(): Promise<string> {
     }
     let done: (() => void) | null = null
     try {
-      const body = JSON.parse((await readBody(req)) || '{}')
+      const raw = await readBody(req)
+      const body = JSON.parse(raw || '{}')
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
-        // The reply becomes Claude Code's status line, so send nothing.
-        res.writeHead(204)
-        res.end()
+        // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
+        // the JSON as it came, for their command's input.
+        if (query.has('echo')) {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end(raw)
+        } else {
+          res.writeHead(204)
+          res.end()
+        }
         sessions.handleStatusLine(run, body)
         return
       }
@@ -2271,6 +2278,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       for (const n of cond.cards) {
         const card = await read(n)
         const kinds = changesBetween(from.get(n)!, now.get(n)!, cond, !!cond.moveInto && !!cond.column && movedIntoSince(card, cond.column, sinceIso))
+        // A reviewer's request and a decision since the wait began (#1272), which marks don't keep; a project agent's own aren't news.
+        if (kinds !== 'gone') kinds.push(...handoffsSince(card, sinceIso, cond, actor.kind === 'agent' && actor.self ? actor.name : undefined))
         const reached = alreadyThere(now.get(n)!, cond) && !alreadyThere(from.get(n)!, cond)
         // A card gone (or out of the caller's view) is told as gone: nothing of its state but whether it was archived.
         if (kinds === 'gone') changes.push({ ...cardChange(n, null, 'gone'), ...(card?.archived ? { archived: true } : {}) })
@@ -2868,7 +2877,7 @@ route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
 async function recordCheck(run: ProgressRun): Promise<void> {
   try {
     const c = await bracketFinished(run)
-    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}) })
+    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.blocks ? { blocks: c.blocks } : {}) })
   } catch (e) {
     log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
   }

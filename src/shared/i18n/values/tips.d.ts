@@ -99,6 +99,8 @@ interface HiveMessageValues {
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined
   'tips.cardWork.title': undefined
+  'tips.claudeStatusLine.text': undefined
+  'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined
   'tips.cliOverrides.title': undefined
   'tips.cliOwnMode.text': undefined
@@ -172,6 +174,8 @@ interface HiveMessageValues {
   'tips.keepAwake.title': undefined
   'tips.laneBranchSquash.text': undefined
   'tips.laneBranchSquash.title': undefined
+  'tips.laneGates.text': undefined
+  'tips.laneGates.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
   'tips.language.text': undefined

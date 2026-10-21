@@ -368,7 +368,8 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
       const m = new Map<number, LaneCardFacts>()
       for (const n of l.cards) {
         const s = foldCard(store.facts(n))
-        m.set(n, { stage: s.stage, forYou: forYou(s).length > 0, stale: !!s.stale, rounds: s.rounds })
+        const asks = forYou(s)
+        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds })
       }
       out.set(l.id, m)
     } catch (e) {

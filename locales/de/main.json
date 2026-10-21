@@ -238,6 +238,7 @@
   "main.update.readyAuto": "Es wird installiert, wenn du Hive beendest – oder starte jetzt neu.",
   "main.update.readyManual": "Starte Hive neu, um es zu installieren.",
   "main.update.restart": "Neu starten und aktualisieren",
+  "main.update.testCopy": "Eine Testkopie von Hive sucht nicht nach Updates.",
   "main.update.updated": "{app} wurde auf {version} aktualisiert",
   "main.update.updatedBody": "Sieh dir an, was sich in dieser Version geändert hat.",
   "main.update.whatsNew": "Neuigkeiten",

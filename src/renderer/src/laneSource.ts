@@ -28,6 +28,8 @@ export interface Lane {
   endedAt: string | null
   /** The merge commit its builder reported when it ended (the board's record, before cards had facts: #1225's fallback). */
   mergeCommit: string | null
+  /** Why a running lane waits (#1270), as main computed it: its header says so (#1279). */
+  status: LaneInfo['status']
 }
 
 const NO_LANES: Lane[] = []
@@ -85,7 +87,7 @@ export function useLanes(load = true): Lane[] {
     const lanes = raw.flatMap((d): Lane[] => {
       const project = pathOf.get(d.project.toLowerCase())
       const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit }] : []
+      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null }] : []
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])

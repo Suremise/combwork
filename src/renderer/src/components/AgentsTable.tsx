@@ -6,6 +6,7 @@ import { agentCardText, agentRowsText, laneOrder, type TableLane } from '@shared
 import { watchText } from '@shared/agentWatch'
 import { batchOutcome, removeWorktreeText, type BatchKind, type BatchWorktree } from '@shared/startAll'
 import { statusText } from './ui'
+import { ItemTable, type ItemGroup, type ItemRow } from './ItemTable'
 import { cx } from '../util'
 import { useLanes } from '../laneSource'
 import { useLanguage, useStore } from '../store'
@@ -44,9 +45,6 @@ export interface AgentColumn {
   /** Its cell in the plain text, a message with the cell as {value} ("card {value}"); none: the cell as it is. */
   cell?: Msg
 }
-
-/** A column's heading or prefix in the language shown now. */
-const words = (t: string | Msg): string => (typeof t === 'string' ? t : tr(t))
 
 /** A row: the agent (its name and status dot; `off` when it isn't running) and one cell per column. */
 export interface AgentTableRow {
@@ -92,40 +90,34 @@ export function tableText(d: AgentTableData): string {
 export function AgentRowsTable({ columns, rows, className, bodyClassName }: { columns: AgentColumn[]; rows: (AgentTableRow | AgentTableGroup)[]; className?: string; bodyClassName?: string }) {
   useLanguage()
   const agents = rows.filter((r): r is AgentTableRow => 'cells' in r).length
+  // An ItemTable (#1317) whose item is the agent's name with its status dot, and whose cells are cut (app.css's shares).
+  const items = rows.map((r): ItemRow | ItemGroup =>
+    'group' in r
+      ? { ...r, className: cx('agents-table-group', r.className) }
+      : {
+          key: r.key,
+          item: (
+            <span>
+              <span className={cx('dot', r.dot)} />
+              {r.name}
+            </span>
+          ),
+          itemClassName: 'agents-table-cut agents-table-name', // i18n-ignore: class names
+          text: r.name,
+          cells: columns.map((c, i) => ({ content: <span>{r.cells[i]?.text || (c.kind === 'card' ? '—' : '')}</span>, text: r.cells[i]?.text ?? '', className: r.cells[i]?.warn ? 'agents-table-warn' : undefined })),
+          className: cx(r.off && 'off', r.className),
+          data: { agent: r.name }
+        }
+  )
   return (
-    <table className={cx('table', 'agents-table', `cols-${columns.length + 1}`, agents > AGENT_LIMIT_DEFAULT && 'many', className)} data-agents={agents}>
-      <thead>
-        <tr>
-          <th>{tr(msg({ id: 'panes.table.agent', defaultMessage: 'Agent', description: "An agents table's first column heading: the agent's name and status dot." }))}</th>
-          {columns.map((c, i) => (
-            <th key={i}>{words(c.label)}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className={bodyClassName}>
-        {rows.map((r) =>
-          'group' in r ? (
-            <tr key={r.key} className={cx('agents-table-group', r.className)} title={r.title}>
-              <td colSpan={columns.length + 1}>{r.group}</td>
-            </tr>
-          ) : (
-            <tr key={r.key} data-agent={r.name} className={cx(r.off && 'off', r.className)}>
-              <td className="agents-table-cut agents-table-name">
-                <span>
-                  <span className={cx('dot', r.dot)} />
-                  {r.name}
-                </span>
-              </td>
-              {columns.map((c, i) => (
-                <td key={i} className={cx('agents-table-cut', c.kind === 'card' && 'agents-table-card', c.kind === 'short' && 'agents-table-short', r.cells[i]?.warn && 'agents-table-warn')}>
-                  <span>{r.cells[i]?.text || (c.kind === 'card' ? '—' : '')}</span>
-                </td>
-              ))}
-            </tr>
-          )
-        )}
-      </tbody>
-    </table>
+    <ItemTable
+      first={msg({ id: 'panes.table.agent', defaultMessage: 'Agent', description: "An agents table's first column heading: the agent's name and status dot." })}
+      columns={columns.map((c) => ({ label: c.label, className: cx('agents-table-cut', c.kind === 'card' && 'agents-table-card', c.kind === 'short' && 'agents-table-short') }))}
+      rows={items}
+      className={cx('agents-table', `cols-${columns.length + 1}`, agents > AGENT_LIMIT_DEFAULT && 'many', className)}
+      bodyClassName={bodyClassName}
+      data={{ agents: String(agents) }}
+    />
   )
 }
 
