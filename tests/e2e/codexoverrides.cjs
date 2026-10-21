@@ -241,10 +241,8 @@ function codexCommandLine(runId) {
           last = s
           out.timeline.push({ ms: Date.now() - t0, status: s, message: msg ?? null })
         }
-        const sent = await lib.sendPrompt(inv, key, 'Create a file named approved.txt containing hi in the current folder with a shell command.', { submitted: async () => ['working', 'waiting', 'finished'].includes(await status()) })
-        check(`${label}: the prompt is taken (working)`, sent > 0, await status())
         // Every status until Codex's approval is on screen and Hive has shown the agent waiting (or the bound after it).
-        const asked = await lib.until(async () => {
+        const untilAsked = () => lib.until(async () => {
           const l = await live()
           note(l?.status, l?.statusMessage)
           if (l?.status === 'waiting' && out.waitingAt === null) [out.waitingAt, out.waitingMessage] = [Date.now() - t0, l.statusMessage ?? null]
@@ -253,6 +251,19 @@ function codexCommandLine(runId) {
           if (out.approvalShownAt !== null && Date.now() - t0 - out.approvalShownAt > WAITING_MS) return 'not waiting'
           return l?.status === 'finished' ? 'finished without asking' : null
         }, TURN_MS, 250)
+        const taken = async () => ['working', 'waiting', 'finished'].includes(await status())
+        // Whether to ask is the model's (on-request): it is told to, and once more if it ran the command in the sandbox
+        // without asking (it fails there, Read only), which is the model's choice, not Hive's.
+        const sent = await lib.sendPrompt(inv, key, 'Run this shell command with escalated permissions, requesting my approval: Set-Content approved.txt hi', { submitted: taken })
+        check(`${label}: the prompt is taken (working)`, sent > 0, await status())
+        let asked = await untilAsked()
+        out.attempts = 1
+        if (asked === 'finished without asking') {
+          out.attempts = 2
+          last = 'finished'
+          await lib.sendPrompt(inv, key, 'It failed in the sandbox. Run it again with escalated permissions (sandbox_permissions require_escalated), so I can approve it.', { submitted: async () => ['working', 'waiting'].includes(await status()) })
+          asked = await untilAsked()
+        }
         await page.screenshot({ path: path.join(scratch, `codexoverrides-${on ? 5 : 7}-title-${on ? 'on' : 'off'}-asked.png`) })
         fs.writeFileSync(path.join(scratch, `codexoverrides-title-${on ? 'on' : 'off'}-asked.txt`), await onScreen())
         check(`${label}: Codex asks for an approval`, out.approvalShownAt !== null, `${asked}; ${(await onScreen()).replace(/\s+/g, ' ').slice(-400)}`)
