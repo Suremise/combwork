@@ -314,7 +314,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
       ...(providerKey === 'codex' ? { PATH: lib.pathWithoutStoreAliases() } : {}),
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
-      ...(standIn ? copilotTestEnv(standIn, root) : {})
+      ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
     ;({ app, inv } = await lib.launch({ userData, env }))
   } catch (e) {
