@@ -972,15 +972,15 @@ kbd {
 .rail-tip .agents-table {
   margin-top: 6px;
 }
-.table.agents-table {
+.table.item-table {
   width: auto;
   font-size: 12px;
 }
-.table.agents-table th {
+.table.item-table th {
   padding: 2px 8px 3px;
   font-size: 10.5px;
 }
-.table.agents-table td {
+.table.item-table td {
   padding: 3px 8px;
   white-space: nowrap;
 }
@@ -989,14 +989,14 @@ kbd {
   padding-top: 1px;
   padding-bottom: 1px;
 }
-.table.agents-table th:first-child,
-.table.agents-table td:first-child {
+.table.item-table th:first-child,
+.table.item-table td:first-child {
   padding-left: 0;
 }
-.table.agents-table tr:hover td {
+.table.item-table tr:hover td {
   background: none;
 }
-.table.agents-table tbody tr:last-child td {
+.table.item-table tbody tr:last-child td {
   border-bottom: none;
 }
 .agents-table-name {
@@ -1037,8 +1037,8 @@ kbd {
 .agents-table td.agents-table-warn {
   color: var(--warning);
 }
-/* A heading row: the quit dialog's agents under their workspace (#572). */
-.agents-table tr.agents-table-group td {
+/* A heading row: the quit dialog's agents under their workspace (#572), a list dialog's group (#1317). */
+.item-table tr.item-table-group td {
   padding: 8px 0 2px;
   border-bottom: none;
   color: var(--fg-muted);
@@ -1067,6 +1067,45 @@ kbd {
 .agents-detail-note {
   margin-top: 8px;
   color: var(--fg-muted);
+}
+/* A list dialog's table (#1317, ItemTable): the agents tables' look (the rules above, .item-table), a dialog's width,
+   each column's share fixed by its first row's cells, so a long cell is cut with an ellipsis rather than widening the
+   table; each row's actions at its right edge, aligned down the table. */
+.dialog .table.item-table.fill {
+  width: 100%;
+  table-layout: fixed;
+}
+.item-table.fill td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table.item-table .item-table-actions {
+  width: 1%;
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.item-table.fill .item-table-actions {
+  width: var(--item-actions, 64px);
+}
+.item-table-actions .icon-btn + .icon-btn {
+  margin-left: 2px;
+}
+/* A path as the part that matters (#1317, ShortPath): one line, cut with an ellipsis; the full path in its tooltip. */
+.short-path {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-table td > .tip-wrap:has(> .short-path) {
+  display: block;
+  max-width: 100%;
+}
+.item-table td .short-path {
+  display: block;
 }
 /* Text for screen readers only (a table's plain-text form, #572). */
 .visually-hidden {
