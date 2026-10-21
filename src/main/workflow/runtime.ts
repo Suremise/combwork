@@ -192,7 +192,7 @@ export class Write {
 
   /** The card's state with what this write has added. */
   state(): CardState {
-    return foldCard(this.tx.facts(this.card.id))
+    return foldCard(this.tx.facts(this.card.id), this.was)
   }
 }
 
@@ -243,6 +243,11 @@ class DragUndone extends Error {
   }
 }
 
+/** Refuses from inside a write, undoing what it wrote (writeWhole, dragForward). */
+const undo = (g: GuardRefusal): never => {
+  throw new DragUndone(g)
+}
+
 export class Workflow {
   readonly store: FactStore
   readonly none: NoneAdapter
@@ -280,8 +285,13 @@ export class Workflow {
     return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12`, alias: '#1061' }, null)
   }
 
+  /**
+   * The card's state from its facts, from its cached stage: a card no 1.0 rule has moved (one adopted at the upgrade,
+   * whose stage is its column's, #1218) has no `Moved` saying where it is (#1268's S40); any `Moved` decides.
+   */
   state(card: CardRecord | number): CardState {
-    return foldCard(this.store.facts(typeof card === 'number' ? card : card.id))
+    const rec = typeof card === 'number' ? this.store.card(card) : card
+    return foldCard(this.store.facts(rec.id), rec.stage)
   }
 
   /** The current options, compiled and stored. */
@@ -340,6 +350,19 @@ export class Workflow {
     })
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
+  }
+
+  /**
+   * A write that may refuse after it has written part of its change (a reopening's move to Todo, a review it started):
+   * such a refusal is thrown with `undo` and the write's transaction undone whole, the refusal returned (#1268).
+   */
+  private async writeWhole(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write) => GuardRefusal | null): Promise<GuardRefusal | null> {
+    try {
+      return await this.write(card, ruleset, actor, fn)
+    } catch (e) {
+      if (e instanceof DragUndone) return e.refused
+      throw e
+    }
   }
 
   /** Runs a write under the lock its store needs (cfg.locked), else as it is. */
@@ -436,24 +459,35 @@ export class Workflow {
   // --- Intents and moves (§16.7.2).
 
   /** start: Todo → Active, the card's line and base recorded, its folder prepared (slots). */
-  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag } = {}): Promise<Reply> {
+  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.stage !== 'todo') return this.notFrom(card, actor, s, 'start')
+    // `reopen`: a Done card started again, or one On Hold never started (an agent's old move to Doing, #1268), back to
+    // Todo and started in one write, its new cycle gathered and guarded as from Todo (§16.7.4, as the user's reopening).
+    const reopening = !!opts.reopen && (s.stage === 'done' || (s.stage === 'hold' && !s.started))
+    if (s.stage !== 'todo' && !reopening) return this.notFrom(card, actor, s, 'start')
+    const from: CardState = reopening ? { ...s, stage: 'todo' } : s
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
     // user's own drag is theirs to make.
     const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
     if (lane) return this.refuse(card, actor, 'start', lane)
-    const g = await this.gatherStart(card, s, actor, opts.builder)
+    const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
     await this.cfg.hooks?.beforeWrite?.('start')
-    if (await this.revalidate(card, s, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+    if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
     let laneMoved = false
-    const out = await this.write(card, g.r, actor, (w) => {
-      const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
-      if (changed) return changed
+    const out = await this.writeWhole(card, g.r, actor, (w) => {
+      const moved = this.stillAt(w, s, 'start')
+      if (moved) return moved
+      // Back to Todo first: its evidence was gathered on that state.
+      if (reopening) w.move('todo', 'intent')
+      // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept (a lane's
+      // boundary applied in it too: the next write applies it again).
+      const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
+      const changed = this.evidenceChanged(w, g.o, g.before)
+      if (changed) return undone(changed)
       // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
       // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
       // then refused: the boundary passed either way), then the start is checked against it.
@@ -465,27 +499,28 @@ export class Workflow {
         const r = this.rulesetOf(now, w.state())
         if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
           laneMoved = true
-          return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
       }
       const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
-      if (waits) return waits
+      if (waits) return undone(waits)
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
-      if (bad) return bad
+      if (bad) return undone(bad)
       this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
       return null
     })
     if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
     if (out) return this.refuse(card, actor, 'start', out)
-    return this.ok(card, 'todo', 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+    return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */
   private async gatherStart(card: CardRecord, s: CardState, actor: Actor, builderOpt?: string): Promise<StartGathered | GuardRefusal> {
     const r = this.rulesetOf(card, s)
     const o = r.options
-    const builder = agentOf(actor) ?? builderOpt ?? 'user'
+    // The agent it is started for: one named (the user's drag, an agent's old move giving it to another, #1268), else the starter.
+    const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
     const before = await this.evidenceOf(card, s, o)
@@ -963,7 +998,7 @@ export class Workflow {
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */
-  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }): Promise<Reply> {
+  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; startReview?: boolean }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -978,9 +1013,19 @@ export class Workflow {
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     await this.cfg.hooks?.beforeWrite?.('verdict')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
-    const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'verdict', { agent, submission: args.submission })
-      if (bad) return bad
+    const out = await this.writeWhole(card, r, actor, (w) => {
+      const changed = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before)
+      if (changed) return changed
+      // `startReview`: its review started in the same write, under start review's guards (an agent's old verdict, #1268:
+      // one write, so a refusal or an error later in it leaves nothing of either).
+      if (args.startReview && sub) {
+        const notYet = this.check(w, 'startReview', { agent })
+        if (notYet) return notYet
+        w.fact('ReviewStarted', { reviewer: agent ?? 'user', submission: sub.id, revision: sub.revision })
+      }
+      const bad = this.check(w, 'verdict', { agent, submission: args.submission })
+      // Refused after the review it started: undone whole (writeWhole), the review start too.
+      if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
       w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
       if (!args.pass) {
@@ -1403,35 +1448,46 @@ export class Workflow {
 
   /**
    * An agent's `hive_update_task` column move (§16.7.1): refused with the intent to use; or, for one transition (P4
-   * to P8), translated into that intent through the same guards (§16.17).
+   * to P8), translated into that intent through the same guards (§16.17). `summary`: the move's comment, as the
+   * submission's summary, the verdict's comment or put back's why. Doing: `builder`, the agent it is started for (given
+   * to another); a Done card is reopened and started.
    */
-  async agentColumnMove(ref: unknown, actor: Actor, column: 'doing' | 'review' | 'passed' | 'done' | 'todo', opts: { translate?: boolean; summary?: string } = {}): Promise<Reply> {
+  async agentColumnMove(ref: unknown, actor: Actor, column: 'doing' | 'review' | 'passed' | 'done' | 'todo', opts: { translate?: boolean; summary?: string; builder?: string } = {}): Promise<Reply> {
     const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     if (!opts.translate) {
       const card = this.resolve(ref, actor)
       return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     }
     const reply = await (column === 'doing'
-      ? this.start(ref, actor)
+      ? this.start(ref, actor, { reopen: true, ...(opts.builder ? { builder: opts.builder } : {}) })
       : column === 'review'
         ? this.submit(ref, actor, { summary: opts.summary ?? '' })
         : column === 'passed'
-          ? this.verdictOnLatest(ref, actor)
+          ? this.verdictOnLatest(ref, actor, true, opts.summary ?? '')
           : column === 'done'
             ? this.reportMerge(ref, actor)
-            : this.putBack(ref, actor))
+            : this.putBack(ref, actor, opts.summary ? { why: opts.summary } : {}))
     return isRefusal(reply) ? reply : { ...reply, data: { ...reply.data, useNextTime: intent } }
   }
 
-  private async verdictOnLatest(ref: unknown, actor: Actor): Promise<Reply> {
+  /**
+   * An agent's `hive_update_task` `review` (§16.8.1), for one transition (P4 to P8): `start` is start review of the
+   * latest submission, `passed` and `failed` a verdict on it (its review started first when it wasn't).
+   */
+  async agentReview(ref: unknown, actor: Actor, review: 'start' | 'passed' | 'failed', comment = ''): Promise<Reply> {
+    const intent = review === 'start' ? 'start review' : 'verdict' // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const reply = await (review === 'start' ? this.startReview(ref, actor) : this.verdictOnLatest(ref, actor, review === 'passed', comment))
+    return isRefusal(reply) ? reply : { ...reply, data: { ...reply.data, useNextTime: intent } }
+  }
+
+  private async verdictOnLatest(ref: unknown, actor: Actor, pass: boolean, comment: string): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.latest && !(s.reviewing[s.latest.id] ?? []).includes(agentOf(actor) ?? '')) {
-      const started = await this.startReview(card.key, actor)
-      if (isRefusal(started)) return started
-    }
-    return this.verdict(card.key, actor, { pass: true, comment: '' })
+    // Its review started in the verdict's own write when it isn't yet (HR2's #1268 round 1: one write, all or nothing).
+    // The card as the caller named it (its key may not be one an agent can name: a project named in one letter, #1294).
+    const startReview = s.stage === 'review' && !!s.latest && !(s.reviewing[s.latest.id] ?? []).includes(agentOf(actor) ?? '')
+    return this.verdict(ref, actor, { pass, comment, ...(startReview ? { startReview } : {}) })
   }
 
   /** Remove from queue (the user's): `IntegrationCancelled`, recorded as an override; a rebuilt queue skips it. */

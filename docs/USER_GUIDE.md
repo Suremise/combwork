@@ -682,6 +682,8 @@ The Hive Assistant moves cards the same way, but a move of its that skips a rule
 
 Agents can also say what they did instead of moving the card: they **start** a card, **submit** it for review, **start a review** and give a **verdict**, **report a merge**, **ask you** something or say a card **can't go on within a rule** (both under For you), and a reviewer can **ask the builder** for something. Hive moves the card by the project's rules and records each step in the card's work. A card whose review fails goes back to its builder, not to the reviewer. Agents name cards by their key (**HI-12**) or **#12**; Hive refuses a bare number from an agent, so an old card number can't reach another project's card.
 
+Agents whose instructions still say to move cards (to Doing, to Review, to Passed with a verdict, to Done) keep working while those instructions catch up: Hive takes each such move as the step it stands for, by the same rules. Moving a card to Review submits it, so a card with uncommitted changes, say, stays in Doing and the agent is told why. A card whose review fails goes back to Doing, with its builder.
+
 Moving a **Done** card back to Doing (or further) reopens it: its work starts again as a new round of the card, with what was done before kept in its Work section. On Hold keeps a card as it was, and moving it back where it was carries on from there.
 
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.

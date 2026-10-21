@@ -47,8 +47,11 @@ const reviewer = { kind: 'agent', name: 'Reviewer (p)', self: { project: 'p', ag
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 let n = 0
 
-/** A workspace whose project `p` is a git repository on main, its builder working in a worktree on `card`, based on main. */
-async function workspace(opts: { shared?: boolean } = {}): Promise<{ ws: string; w: WS; repo: string; wt: string }> {
+/**
+ * A workspace whose project `p` is a git repository on main, its builder working in a worktree on `card`, based on main;
+ * `options`, its workflow options (else every option off).
+ */
+async function workspace(opts: { shared?: boolean; options?: object } = {}): Promise<{ ws: string; w: WS; repo: string; wt: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
@@ -61,7 +64,7 @@ async function workspace(opts: { shared?: boolean } = {}): Promise<{ ws: string;
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   // `shared`: both agents work in the project folder itself.
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }] }))
+  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }], ...(opts.options ? { workflow: { platform: 'git', preset: null, options: opts.options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -357,15 +360,21 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
   const actions = (w: WS, card: number): string[] => store.boardRead(w, (db) => (db.prepare("SELECT kind FROM card_actions WHERE card = ? AND json_extract(payload, '$.about') IS NULL ORDER BY id").all(card) as { kind: string }[]).map((r) => r.kind))
   const column = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card, w))).column
 
+  // A review by an agent: with the rules enforced, agents' moves are intents (#1268), and with every option off a
+  // submission is Done at once.
+  const REVIEWED = { ...allOff('git'), review: 'agent', noSelfReview: true }
+
   it('S7: a Passed card merged by hand is Done (outside), its lane told and its slot released', async () => {
-    const { w, repo, wt } = await workspace()
+    const { w, repo, wt } = await workspace({ options: REVIEWED })
     const { card, head } = await passedCard(w, wt)
+    // The intents' own actions (#1268: the review copy, the builder told it passed) before it.
+    const before = actions(w, card).length
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
     await reconcileNow(w, repo)
     expect(factsOf(w, card).find((f) => f.kind === 'Integrated')).toMatchObject({ actor: 'outside', data: { revision: head, by: 'outside' } })
     expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
     expect(await column(w, card)).toBe('done')
-    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    expect(actions(w, card).slice(before)).toEqual(['endLaneIfDone', 'releaseSlot'])
     // Again: nothing more.
     await reconcileNow(w, repo)
     expect(kinds(w, card).filter((k) => k === 'Integrated' || k === 'Moved').slice(-2)).toEqual(['Integrated', 'Moved'])
@@ -388,7 +397,7 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     expect(factsOf(part.w, partly).find((f) => f.kind === 'MergedInPart')).toMatchObject({ data: { revision: first, target: 'main' } })
     expect(await column(part.w, partly)).toBe('doing')
 
-    const rev = await workspace()
+    const rev = await workspace({ options: REVIEWED })
     const reviewed = (await inWorkspace(rev.w, () => tasks.createTask({ title: 'Reviewed', project: 'p' }, user))).number
     await inWorkspace(rev.w, () => tasks.updateTask(reviewed, { column: 'doing', agent: 'a1' }, user))
     commitIn(rev.wt, 'r.txt')

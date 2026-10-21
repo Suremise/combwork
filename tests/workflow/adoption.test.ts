@@ -274,7 +274,8 @@ describe("the upgrade's adoption (#1218)", () => {
     await inWorkspace(w, () => tasks.updateTask(2, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(2, { review: 'failed' }, r1, { comment: 'Needs a test' }))
     const after = factsOf(w, 'p', 2) as unknown as { kind: string; ruleset?: string }[]
-    expect(after.map((f) => f.kind)).toEqual(['Adopted', 'Moved', 'Submitted', 'ReviewStarted', 'Verdict'])
+    // The agents' old moves are intents (#1268): the submission's move after it, the failed verdict's back to Active.
+    expect(after.map((f) => f.kind)).toEqual(['Adopted', 'Submitted', 'Moved', 'ReviewStarted', 'Verdict', 'Moved'])
     for (const f of after) expect([f.kind, f.ruleset]).toEqual([f.kind, adopted])
   })
 })

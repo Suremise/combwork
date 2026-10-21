@@ -1707,8 +1707,8 @@ question names only the rules that refuse; a stage the card's ruleset lacks is r
 stages it has, and that they follow its Version Control options); a Done card dragged past Todo is reopened and started
 in one write (a new cycle, nothing skipped by the reopening); On Hold's returns as above; with the rules not enforced,
 every move just moves. Until the window asks through it (#1275), its drags (`tasks:update`) stay confirmed, and a column
-the ruleset lacks keeps P3's move there. Agents' column moves keep
-P3's path until #1268. A builder with its own worktree starts there whatever the folder option says (it stands in for a
+the ruleset lacks keeps P3's move there. Agents' column moves and reviews are their intents (§16.17's transition,
+**built [#1268]**). A builder with its own worktree starts there whatever the folder option says (it stands in for a
 slot, §16.19.1; P3 recorded it so too), with no `prepareSlot`.
 
 #### 16.7.2 The total table
@@ -2645,7 +2645,29 @@ when a role or name says *review*.
 → verdict pass (on the latest submission, by its reviewer), `done` → report merge, `doing` → start; each through the
 same guards, and its reply names the intent to use next time. P4 also updates the lines of card-loop, merge-ready,
 work-on-card and review-agent-work that its gates change (columns → intents), so the guidance agents follow on the P4
-and later RCs matches what ships; P8 then shrinks the skills to describe the rules [P1].
+and later RCs matches what ships; P8 then shrinks the skills to describe the rules [P1]. **Built [#1268]:** a project
+agent's `hive_update_task` (its own token) with the rules enforced, on a card from 1.0: `column` `doing`, `review`,
+`passed`, `done` and `todo` are start, submit (the comment its summary), a passing verdict on the latest submission (its
+review started first), report merge and put back (the comment its why); `review` `start`, `passed` and `failed` are start
+review and a verdict on the latest submission (§16.8.1), the comment the verdict's, a failed card back in Active as the
+verdict moves it. Each on the board's one intent path (`runIntent`), so the runtime's guards decide (a refusal is
+§16.8.3's, the Agent API's `409`) and the card's 0.9 fields follow; the change's other fields go with its first write,
+its comment with the write recording the intent. The short reply adds "As submit: next time call hive_submit". A batch
+translates each card's; a card an agent creates in Doing, Review or Passed is made in Todo and moved by its intent in
+one change (in a column its rules lack, made there as before: HR2's round 2). **Every new cycle is a start, through Start's guards** [HR2's #1268 round 1]: from Todo, a Done card moved
+back to Doing (reopened: back to Todo and started in one write), a card On Hold never started, and a start naming
+another agent (started for it: its builder). **Each translation is one write** (a verdict with the review it starts),
+undone whole when refused or failing part way, the comment checked before anything is read or written. P3's path
+stays for: a column the card's ruleset lacks (Review with no review), a review there, and any move of a card in such a
+column or On Hold while being worked on (as the user's moves, until the skills use the intents); a move back into
+Doing from Review or Passed (fixes or more work in the same cycle: nothing started, no rule to skip); a move to the
+column a card is in (but a failed card from before returned to Review is its submission); another agent's card in
+Doing moved on (P3's refusal); scripts (the workspace token); cards from before 1.0 until they start (as the user's,
+§16.7.1); and every agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
+written at adoption): the runtime folds a card's facts from its cached stage, so an adopted card's intents work (S40).
+With the old moves translated, a lane's next card waits until the one before it is Done (§16.11.2, OP-36) also for
+a builder following today's card-loop skill: its move of the next card to Doing is refused (`lane.oneAtATime`) until it
+reports the previous one merged (#1274's skill lines say so).
 
 **Other:** templates v1 wiped; agents' worktrees become slots (§16.10.8); keys suggested (§16.12).
 

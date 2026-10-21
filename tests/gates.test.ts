@@ -547,14 +547,14 @@ describe('with nothing to enforce (#1265)', () => {
     expect(kinds(w, card)).toEqual(['Blocked', 'Started', 'Moved', 'Moved'])
   })
 
-  it("agents' column moves keep P3's path until #1268: an agent's move to Done isn't refused here", async () => {
+  it("an agent's column move is its intent (#1268): its move to Done is report merge, refused from Doing, never overridden", async () => {
     const { w } = await workspace(PAIR)
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
-    const moved = await update(w, card, { column: 'done' }, builder)
-    expect(moved.column).toBe('done')
+    await expect(update(w, card, { column: 'done' }, builder)).rejects.toMatchObject({ refusal: { rule: 'move.notFromHere' } })
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
     expect(kinds(w, card)).not.toContain('Override')
-    expect(kinds(w, card)).not.toContain('Refused')
+    expect(kinds(w, card)).toContain('Refused')
   })
 })
 
