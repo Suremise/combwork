@@ -14,11 +14,12 @@ import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkill
 import { createLogger, userText } from '../../logger'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots } from '../types'
+import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
 import { claudeSafeguards } from './safeguards'
+import { claudeTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
@@ -449,6 +450,13 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   safeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
     return claudeSafeguards(appended, memo)
   }
+
+  /** Turns by prompt id (prompt_id in its hooks), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return claudeTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'id'
 
   /**
    * Claude Code's prompt after a safeguard stop (whether to switch models, a question it puts through its permission

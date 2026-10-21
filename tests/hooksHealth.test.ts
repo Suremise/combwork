@@ -8,7 +8,8 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { LaunchContext } from '../src/main/providers/types'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
-import { HOOKS_GRACE_MS, hookSeen, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
+import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptAnswered, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
+import { promptKey } from '../src/main/providers/turns'
 import { readyFor } from '../src/main/readiness'
 import { agentState } from '../src/shared/agentState'
 import { laneStatusText, laneView, type LaneRecord } from '../src/shared/lanes'
@@ -225,5 +226,112 @@ describe("why: Claude Code's settings turning hooks off", () => {
     expect(claudeCode.hooksOffIn(ctx)).toBeNull()
     writeFileSync(join(managed, 'ClaudeCode', 'managed-settings.json'), JSON.stringify({ allowManagedHooksOnly: true }))
     expect(claudeCode.hooksOffIn(ctx)).toBe('managed settings')
+  })
+})
+
+// #1371: the transcript's own turns, by the id its hooks carry (or, with none, by when they came).
+describe("a turn its transcript shows (#1371)", () => {
+  const since = 1_000
+  const turn = (id: string, at = 2_000, worked = true) => ({ id, at, worked })
+  const idWatch = () => newHooksWatch(since, false, 'id')
+
+  it('worked, and no hook named it: missing once the bound has passed since Hive found it, not a moment before', () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('E')], 10_000, since)
+    expect(hooksMissing(w, quiet, 10_000 + BOUND - 1, BOUND)).toBeNull()
+    expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('E')
+  })
+
+  it('its hook came first (a Stop before the transcript was written): never', () => {
+    const w = idWatch()
+    hookTurn(w, 5_000, 'E')
+    transcriptTurns(w, [turn('E')], 10_000, since)
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it('its hook came late, before the bound: never flagged', () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('E')], 10_000, since)
+    hookTurn(w, 10_000 + BOUND - 1, 'E')
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it("the turn before's response written late (after a local command): its prompt's hook came, so it's no sign", () => {
+    const w = idWatch()
+    hookTurn(w, 3_000, 'P')
+    transcriptTurns(w, [turn('cmd', 4_000, false)], 5_000, since)
+    transcriptTurns(w, [turn('P', 2_000)], 6_000, since)
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it("history (a prompt from before this launch began) and a turn the model never took up aren't signs", () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('old', since - 5_000), turn('cmd', 2_000, false)], 10_000, since)
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it('flagged: an earlier turn’s late hook neither answers it nor clears it; its own does', () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('A'), turn('E', 3_000)], 10_000, since)
+    hookTurn(w, 10_001, 'A')
+    expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    hookTurn(w, 70_002, 'A')
+    expect(transcriptAnswered(w, 'A', false)).toBe(false)
+    expect(transcriptAnswered(w, 'A', true)).toBe(false)
+    hookTurn(w, 70_003, 'E')
+    expect(transcriptAnswered(w, 'E', false)).toBe(true)
+    expect(w.flagged).toBeNull()
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it("flagged: a newer turn's hook answers it (one read after it, or a prompt the ledger takes as current and the transcript hasn't shown); a stale unknown one doesn't", () => {
+    const later = idWatch()
+    transcriptTurns(later, [turn('E'), turn('F', 3_000, false)], 10_000, since)
+    expect(hooksMissing(later, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    expect(transcriptAnswered(later, 'F', false)).toBe(true)
+    expect(hooksMissing(later, quiet, 100 * BOUND, BOUND)).toBeNull()
+
+    const fresh = idWatch()
+    transcriptTurns(fresh, [turn('E')], 10_000, since)
+    expect(hooksMissing(fresh, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    expect(transcriptAnswered(fresh, 'old-unknown', false)).toBe(false)
+    expect(transcriptAnswered(fresh, 'new-prompt', true)).toBe(true)
+    expect(hooksMissing(fresh, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it('read again from the start (another file, conversation or launch): what was waited on is let go', () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('E')], 10_000, since)
+    transcriptReset(w)
+    expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+
+  it("Copilot (no turn ids): its prompt hook answers it by the prompt's text, any hook after it was recorded by time; the turn before's last hook, a moment earlier, doesn't", () => {
+    const copilotTurn = (id: string, at: number, prompt: string) => ({ id, at, worked: true, prompt: promptKey(prompt) })
+    // The turn before ended (its agentStop came) just before this prompt was recorded: not this turn's hook.
+    const w = newHooksWatch(since, false, 'time')
+    hookSeen(w, 9_900)
+    hookTurn(w, 9_900, null, null)
+    transcriptTurns(w, [copilotTurn('I1', 10_000, 'say Deaf turn.')], 11_000, since)
+    expect(hooksMissing(w, quiet, 11_000 + BOUND, BOUND)).toBe('transcript')
+    // Flagged: any hook clears it (none names a turn).
+    expect(transcriptAnswered(w, null, false)).toBe(true)
+
+    // Its prompt hook (it runs before Copilot records the prompt), whether read before or after the transcript: heard.
+    const before = newHooksWatch(since, false, 'time')
+    hookSeen(before, 19_950)
+    hookTurn(before, 19_950, null, '  say   Healthy turn. ')
+    transcriptTurns(before, [copilotTurn('I2', 20_000, 'say Healthy turn.')], 21_000, since)
+    expect(hooksMissing(before, quiet, 100 * BOUND, BOUND)).toBeNull()
+    const after = newHooksWatch(since, false, 'time')
+    transcriptTurns(after, [copilotTurn('I3', 30_000, 'say Late hook.')], 31_000, since)
+    hookTurn(after, 31_500, null, 'say Late hook.')
+    expect(hooksMissing(after, quiet, 100 * BOUND, BOUND)).toBeNull()
+    // Any hook after it was recorded (a tool's, its Stop) answers it too.
+    const later = newHooksWatch(since, false, 'time')
+    transcriptTurns(later, [copilotTurn('I4', 40_000, 'say Tools.')], 41_000, since)
+    hookTurn(later, 40_100, null, null)
+    expect(hooksMissing(later, quiet, 100 * BOUND, BOUND)).toBeNull()
   })
 })

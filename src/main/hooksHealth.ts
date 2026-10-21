@@ -1,3 +1,5 @@
+import { promptKey } from './providers/turns'
+
 /**
  * Whether an agent's hooks are reaching Hive (#1336). Hive has no hooks-free mode (#1285): its hooks are how it knows what
  * an agent does. What can still go wrong is hooks that stop arriving while Hive thinks all is well (a CLI update changed
@@ -10,11 +12,27 @@
  * - a prompt: one sent while it was idle (the user's Enter, a line Hive typed, its launch's task) had no hook of a current
  *   turn after it for the bound, while its screen showed it working (it was idle when the prompt went, so that work is
  *   this prompt's), that standing a while too.
+ * - a turn its transcript shows (#1371): one the CLI's own records identify (Claude Code's promptId, Codex's turn_id,
+ *   Copilot's interactionId), begun by a prompt written since this launch started and taken up by the model, had no hook
+ *   for the bound since Hive found it. Its hooks answer it by that same id (prompt_id, turn_id, as the turn ledger reads
+ *   them), whenever they come, before or after the transcript is written. Copilot's carry none: its prompt hook answers
+ *   it by the prompt's text (Copilot records the prompt only once that hook has returned), and any hook that came after
+ *   the prompt was recorded (a late hook of the turn before arriving then is taken for it: it errs toward saying
+ *   nothing). A quick turn over before Hive's first look at its screen is caught this way, and Copilot too.
  * A long silent think never counts: its prompt's hook came. An Enter that started nothing (a menu, a local command) is
- * dropped once its screen shows it idle. Not yet (the Assistant's scope, #1371): a quick turn over before Hive's first
- * look at its screen isn't flagged by itself (a later turn long enough to be seen is, and a line Hive types meanwhile
- * shows as not taken, #430), nor a CLI without a screen reading (Copilot).
+ * dropped once its screen shows it idle, and a local command has no model work in its transcript. Not covered: a new
+ * Codex session's turns while its hooks are missing (with no hook it has no session id, so no rollout to read) until
+ * one is long enough to be seen on its screen, and Claude Code's task-notification wakes (whether their hooks come
+ * isn't certain).
  */
+
+/** How far apart Hive's clock and a transcript record's may be (both this machine's, written a moment apart). */
+export const HOOKS_SKEW_MS = 2_000
+/** How long before a Copilot prompt was recorded its prompt hook may have come (the hook runs first). */
+export const PROMPT_HOOK_WINDOW_MS = 60_000
+/** Hook turn ids kept per launch, and transcript turns waited on: the latest only. */
+const MAX_HEARD = 256
+const MAX_TURNS = 500
 
 /** How long the evidence of work must stand, with still no hook, before it counts (at most the bound). */
 export const HOOKS_GRACE_MS = 15_000
@@ -31,14 +49,112 @@ export interface HooksWatch {
   submit: { at: number } | null
   /** When its screen was first seen working on that prompt. */
   workAt: number | null
+  /** How its transcript's turns meet its hooks (the adapter's turnsJoin), or null: no transcript turns read. */
+  join: 'id' | 'time' | null
+  /** Turn ids its hooks carried (the latest), and when the last hook came. */
+  heard: Set<string>
+  /** Transcript turns worked and not heard yet: when Hive found each worked, and its place in the transcript. */
+  unheard: Map<string, { foundAt: number; seq: number; at: number; prompt?: string }>
+  /** With no turn ids ('time'): prompts its prompt hooks carried (by promptKey), and when each came (the latest). */
+  prompts: Map<string, number>
+  /** Each transcript turn's place in the order read (the latest), to tell a newer turn's hook from an older one's. */
+  order: Map<string, number>
+  seq: number
+  /** The transcript turn that showed its hooks missing, while that flag stands. */
+  flagged: string | null
 }
 
-export const newHooksWatch = (startedAt: number, startHook: boolean): HooksWatch => ({ hooks: 0, lastHookAt: null, startHook, startFrom: startedAt, submit: null, workAt: null })
+export const newHooksWatch = (startedAt: number, startHook: boolean, join: 'id' | 'time' | null = null): HooksWatch => ({
+  hooks: 0,
+  lastHookAt: null,
+  startHook,
+  startFrom: startedAt,
+  submit: null,
+  workAt: null,
+  join,
+  heard: new Set(),
+  unheard: new Map(),
+  prompts: new Map(),
+  order: new Map(),
+  seq: 0,
+  flagged: null
+})
+
+const keep = <T>(set: Set<T> | Map<T, unknown>, max: number): void => {
+  while (set.size > max) set.delete(set.keys().next().value!)
+}
 
 /** A hook came, of whatever turn (as it reaches Hive, before its turn in the launch's queue): its start is heard. */
 export function hookSeen(w: HooksWatch, now: number): void {
   w.hooks++
   w.lastHookAt = now
+}
+
+/**
+ * A hook, as the launch's queue takes it (in the order hooks came, beside the checks), came at `now`: the transcript turn
+ * it names is heard (`turn`: its turn id as the ledger reads it; any turn's, a stale one too: it proves that turn's hooks
+ * arrive); or with no ids (Copilot), the turn its prompt hook's text is the prompt of (`prompt`), and every turn whose
+ * prompt was recorded before the hook came.
+ */
+export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt: string | null = null): void {
+  if (turn) {
+    w.heard.delete(turn)
+    w.heard.add(turn)
+    keep(w.heard, MAX_HEARD)
+    w.unheard.delete(turn)
+  }
+  if (w.join !== 'time') return
+  const key = prompt ? promptKey(prompt) : null
+  if (key) {
+    w.prompts.delete(key)
+    w.prompts.set(key, now)
+    keep(w.prompts, MAX_HEARD)
+  }
+  for (const [id, u] of w.unheard) if (u.at <= now || (key && u.prompt === key)) w.unheard.delete(id)
+}
+
+/**
+ * Turns its transcript showed (the adapter's transcriptTurns), read at `now`: a worked turn begun since `since` (this
+ * launch's start; history never counts) that no hook has named is waited on from now. Each turn's place is kept.
+ */
+export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; worked: boolean; prompt?: string }[], now: number, since: number): void {
+  for (const t of turns) {
+    if (!w.order.has(t.id)) {
+      w.order.set(t.id, ++w.seq)
+      keep(w.order, MAX_TURNS)
+    }
+    if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id)) continue
+    const hookAt = t.prompt ? w.prompts.get(t.prompt) : undefined
+    const heard = w.join === 'time' ? (w.lastHookAt !== null && w.lastHookAt >= t.at) || (hookAt !== undefined && hookAt >= t.at - PROMPT_HOOK_WINDOW_MS) : w.heard.has(t.id)
+    if (heard) continue
+    w.unheard.set(t.id, { foundAt: now, seq: w.order.get(t.id)!, at: t.at, ...(t.prompt ? { prompt: t.prompt } : {}) })
+    keep(w.unheard, MAX_TURNS)
+  }
+}
+
+/** Its transcript is read again from the start (another file, conversation or launch): what it showed is let go. */
+export function transcriptReset(w: HooksWatch): void {
+  w.unheard.clear()
+  w.order.clear()
+}
+
+/**
+ * Whether a hook (as the launch's queue takes it) answers the transcript turn that raised the flag: that turn's own id,
+ * a newer turn's (one read after it, or, `current`, one the ledger takes as current and the transcript hasn't shown yet:
+ * a new prompt), or with no ids any hook. An older turn's late hook never does. Answered, the turns waited on up to the
+ * answering one are let go.
+ */
+export function transcriptAnswered(w: HooksWatch, turn: string | null, current: boolean): boolean {
+  const f = w.flagged
+  if (f === null) return false
+  const at = w.order.get(f) ?? 0
+  const pos = turn ? w.order.get(turn) : undefined
+  const answers = w.join === 'time' || turn === f || (pos !== undefined && pos > at) || (!!turn && pos === undefined && current)
+  if (!answers) return false
+  const upTo = pos ?? Infinity
+  for (const [id, u] of w.unheard) if (u.seq <= upTo) w.unheard.delete(id)
+  w.flagged = null
+  return true
 }
 
 /**
@@ -67,12 +183,17 @@ export interface HooksEvidence {
 }
 
 /**
- * Whether its hooks are missing now: 'start' or 'prompt' (what showed it), else null. `boundMs`: Settings → Advanced
+ * Whether its hooks are missing now: 'start', 'transcript' or 'prompt' (what showed it), else null. `boundMs`: Settings → Advanced
  * (hive.hooks.missingSeconds). It notes what it saw on the way (work begun, a question at the start, an Enter dropped).
  */
-export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | null {
+export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | 'transcript' | null {
   if (ev.startWaits) w.startFrom = now
   if (w.startHook && w.hooks === 0 && !ev.startWaits && now - w.startFrom >= boundMs) return 'start'
+  for (const [id, u] of w.unheard) {
+    if (now - u.foundAt < boundMs) continue
+    w.flagged = id
+    return 'transcript'
+  }
   const s = w.submit
   if (!s) return null
   const grace = Math.min(HOOKS_GRACE_MS, boundMs)
