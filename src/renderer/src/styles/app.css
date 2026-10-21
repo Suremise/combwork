@@ -4663,7 +4663,7 @@ h2.section#unused-worktrees {
 .btn.quiet:is(.act-stop, .act-remove, .act-start, .act-archive-start, .act-resume) {
   color: var(--fg);
   background: var(--bg-elevated);
-  border-color: transparent;
+  border-color: var(--border);
 }
 .btn.quiet:is(.act-stop, .act-remove, .act-start, .act-archive-start, .act-resume):not(:disabled) .codicon {
   color: var(--act-fg);
