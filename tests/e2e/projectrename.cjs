@@ -123,7 +123,7 @@ const oldCard = (n, proj, agent) =>
   await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
   const dialog = page.locator('.dialog', { has: page.locator('.move-repair') })
   await dialog.waitFor({ timeout: 10000 })
-  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Give the 2 cards saved under old-site \(#1, #2\) to site/.test(await dialog.innerText()), 10000)), await dialog.innerText())
+  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Board: old-site; will give 2 cards \(#1, #2\) to site/.test(await dialog.innerText()), 10000)), await dialog.innerText())
   await shots(page, 'repair-plan')
   await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
   check('Repair says what it did', !!(await lib.until(async () => /2 cards of old-site now belong to site/.test(await dialog.innerText()), 15000)), await dialog.innerText())

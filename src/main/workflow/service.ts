@@ -149,6 +149,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // Before P7's slots, an agent's own worktree is a card's folder (SPEC §16.19.1), as project.json has it.
+    // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
+    pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     agentFolder: async (agent) => {
       const a = projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent)
       return a?.worktree?.path ? { path: a.worktree.path, base: a.worktree.base ?? null } : null
