@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "Ta zmiana Asystenta nie jest już przechowywana: zmiany są przechowywane przez 7 dni.",
+  "errors.assistantUndo.which": "Wybierz jedną zmianę Asystenta do cofnięcia albo zmiany jednej wiadomości.",
   "errors.changes.notFile": "{file} nie jest plikiem folderu {folder}.",
   "errors.console.hidden": "Konsola deweloperska jest ukryta: włącz Ustawienia → Zaawansowane → Pokazuj funkcje deweloperskie.",
   "errors.console.notRecording": "To nie jest nagranie konsoli deweloperskiej",

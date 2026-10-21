@@ -35,6 +35,14 @@ interface WorkspaceState {
   actions: AssistantAction[]
   turnActions: number
   pending: Map<string, Pending>
+  /** The user's message the Assistant works on now (#1282): its changes are grouped by it for undo. */
+  turn: AssistantTurn | null
+}
+
+/** A message of the user's to the Assistant, as its changes are grouped (#1282): an id, and when it was sent. */
+export interface AssistantTurn {
+  id: string
+  at: string
 }
 
 const states = new Map<string, WorkspaceState>()
@@ -42,7 +50,7 @@ const states = new Map<string, WorkspaceState>()
 function stateOf(workspacePath: string): WorkspaceState {
   const k = workspacePath.toLowerCase()
   let s = states.get(k)
-  if (!s) states.set(k, (s = { token: '', actions: [], turnActions: 0, pending: new Map() }))
+  if (!s) states.set(k, (s = { token: '', actions: [], turnActions: 0, pending: new Map(), turn: null }))
   return s
 }
 
@@ -185,7 +193,18 @@ export function admit(workspacePath: string, token: string, need: AssistantContr
 
 /** The user sent the Assistant a message: a new turn, with a fresh limit. */
 export function newTurn(workspacePath: string): void {
-  stateOf(workspacePath).turnActions = 0
+  const s = stateOf(workspacePath)
+  s.turnActions = 0
+  s.turn = { id: randomUUID(), at: new Date().toISOString() }
+}
+
+/**
+ * The user's message the Assistant's changes now belong to (#1282): the latest it was sent, or, with none since Hive
+ * started (a change made before its first message here), one begun now.
+ */
+export function currentTurn(workspacePath: string): AssistantTurn {
+  const s = stateOf(workspacePath)
+  return (s.turn ??= { id: randomUUID(), at: new Date().toISOString() })
 }
 
 function emitQuestions(workspacePath: string): void {

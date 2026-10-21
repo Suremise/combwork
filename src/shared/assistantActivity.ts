@@ -30,7 +30,8 @@ export const ACTIVITY_KINDS = [
   'activate-project',
   'deactivate-project',
   'setting',
-  'revert-setting'
+  'revert-setting',
+  'undo'
 ] as const
 
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number]

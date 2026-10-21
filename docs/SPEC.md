@@ -2512,6 +2512,39 @@ built on the fact log and the Assistant's activity list:
 - **The Assistant can undo its own** changes with a tool limited to them, recorded in its panel; never the user's or
   agents' changes.
 
+**Built in P4** [#1282] (main side; the panel is #1283):
+- **Recorded:** every change the Assistant makes through `assistantChange()` (and its batches) is kept in hive.db's
+  `assistant_changes` and `assistant_change_values` (a 1.0 group step), as it is made (`assistantChanges.ts`).
+  - A card's fields are recorded as the card is saved, in the same transaction.
+  - A lane is recorded in its own save's transaction (lanes.ts), from the lane as read under its lock.
+  - An agent's settings are recorded from what its change saw under the project's lock. A Hive setting is recorded by its
+    route. An agent it started is recorded with the launch it started.
+  - What can't be undone is recorded with why: a prompt or message, and a card's decision, comment or place.
+  - Each change keeps what it replaced and what it wrote, per field, as typed rows (a list or table as a row per member,
+    never JSON). It is grouped by the user's message (`assistantControl`'s turn) and pruned after 7 days.
+- **Undone** (`assistantUndo.ts`) one change or a message's, newest first.
+  - A field goes back only while it still holds what the change wrote, checked at the write under that thing's own lock
+    (a card's, the lanes', the project's for an agent's settings, a setting's guard). One changed since is skipped and
+    said, the rest still go back. A price table's removed models are a field of their own.
+  - Every value a write changes, implicitly too, is checked: a card's project goes back with its agent in one transaction
+    (both or neither), only while its agent and review are as the move left them. A column move back never stops a review
+    started since. A provider goes back with everything a provider change resets (model, effort, permission mode, context,
+    its last conversation), each as the change left it, never while the agent runs; one it inherited is inherited again.
+  - What is reported is what the write saved, read inside it. A change is marked undone only when every field ended undone
+    or skipped for good; one that failed stays to be tried again.
+  - A card it made is archived only while its history goes no further than the change left it.
+  - A column move goes back through the rules with `override: { reason: "undo" }`.
+  - A lane it started is abandoned; its list, reviewer, rounds, wait and name go back through the lane record. A lane
+    that ended stays ended.
+  - An agent it started is stopped only while the launch the start returned still runs.
+  - Every successful change is listed: one that recorded nothing undoable gets a final row with why. An intent's facts
+    (a submission, a verdict, a question) stay beside its card fields' undo, and that is said. Undo itself isn't recorded.
+  - An undo's own writes aren't recorded. Each change is marked undone as soon as it is undone.
+- **The user** undoes from the window (IPC `assistant:changes`, `assistant:undo`: the panel's, #1283).
+- **The Assistant** undoes its own with `hive_undo` (`GET /v1/assistant/changes`, `POST /v1/assistant/undo`, Control
+  agents, its activity kind `undo`). Its control level and launch are checked again at each write: turned down or ended
+  partway through, the undo stops there. It undoes a Hive setting only while Change settings is on.
+
 ### 16.15 Override switches for the CLIs
 
 [#966, #1120 c, #1123 c, #1167, #1174] Every Hive override of a CLI's own behaviour has a switch, or a recorded reason

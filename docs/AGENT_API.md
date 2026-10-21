@@ -267,6 +267,8 @@ The changes below are the Assistant's only: other callers get `403`.
 | `POST /v1/projects/{name}/agents/{agent}/message` `{ "text", "card"? }` or `{ "cancel": true }` | Control agents | Leaves a running agent a message (#530) when it can't take a prompt now: a **delivery** (#647, see [Deliveries and the inbox](#deliveries-and-the-inbox)), saved, and the agent reads it with `hive_inbox` (#650: never typed in). Its doorbell is typed at once when the agent is idle, watching, or has ended its turn while its own background tasks run (`background`, #726) (a watching agent is woken by it, its watch carries on, and the line says so: `[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it. (Your watch is still on, …)`); a busy one is told at its next tool call or before its turn ends, else it waits for its next line: with a wake that comes first (a card or agent watch's, a loop wake), or a line of its own once it is idle, nobody types there and no earlier line waits. Several waiting go in one line. Each keeps the Assistant's permission until it is read: with Control turned down or the Assistant's launch that left it ended before then, it is refused, never given. `card` (#652): tied to that card's round under way (its failed reviews plus one; `409` unless the card is in Doing or Review), it is `stale`, never given, once the card has moved on (passed, out of Doing and Review, or another review failed), even if its doorbell has rung. At most 5 waiting, 4000 characters each (`400`/`409` past that); `409` for an agent not running. Kept across the agent's stops and Hive's restarts (refused once the Assistant's launch has ended). Replies `{ "id", "typed", "queued", "status", "round"? }` (`typed`: its doorbell was typed; `round`: the card round it is tied to), or `409` when it was cancelled, refused, expired or stale before the reply; `cancel` cancels those not read yet (its `hive_inbox` no longer gives them), and replies `{ "cancelled": n }`. The agent's activity has `inbox` with each one's state and times |
 | `POST /v1/projects/{name}/handover` | Control agents | Hand Over to… (below), without needing *Allow sending input to sessions*. `409` at once when the project's agents lack Hive's tools, the user has just typed in either agent's terminal, or (without a new handover) the project has no handover; later failures are listed in its actions |
 | `POST /v1/tasks/{n}/start` | Control agents | Starts a card on an agent (see [Task board](#task-board)) |
+| `GET /v1/assistant/changes` | any | Its own changes kept for undo, by the user's message ([Undoing the Assistant's changes](#undoing-the-assistants-changes)) |
+| `POST /v1/assistant/undo` `{ "change" }` or `{ "group" }` | Control agents | Undoes changes of its own, never another's |
 
 **Its journal** (#1031): the Assistant's only (other callers `403`), while Settings → Assistant → Journal is on (else `409`). Its tools call these.
 
@@ -291,6 +293,27 @@ Hive's settings, as Settings and Project Settings describe them (one catalog of 
 `GET /v1/settings/{id}` — one in full: `path` ("Settings → Sessions → Warn when a transcript is over"), `shownAs` (where the user sees it, in the language Hive shows, only when that isn't English: the rest stays English), `scope`, `value`, `default`, `takes` (its range, options or type), `desc`, `tip`, `helps` (when it is worth suggesting), `restart` (when a change applies, if not at once), `readOnly` (why the Assistant can't change it), `docs` (the user guide's heading). A table's value is its JSON (cut at 3,000 characters); in the listing it is its size. The Assistant's own settings with each provider are entries of their own (`assistant.<provider>.model`, `.effort`, `.permissionMode`, `.extraArgs`, `.use200kContext`): read-only to it. A project's setting takes `?project=<name>`.
 
 `PATCH /v1/settings/{id}` `{ "value", "project"? }` — the Hive Assistant only (others: `403`), and only with **Settings → Assistant → Control → Change settings** on (`403` otherwise, at once when the user turns it off). The value is checked as Settings checks it (`400` with the range or options), and the change is made as Settings makes it. Never for a sensitive setting (`403`): permission modes, the Agent API, what Hive runs (CLI paths, extra arguments, a project's setup command, background sessions, pre-release updates) and the Assistant's own settings (Control above all). A project's number or list takes `null` to inherit Hive's. An effort level must be one the effort picker offers for the model that would run (`takes` lists them), or `""` (the default; `inherit` for a project). Tables take JSON: `board.colors` an object of column → `#rrggbb` (only those named change), `<provider>.prices` the whole table of model → `{input, cachedInput, output, cacheWrite?}`, `<provider>.modelFallback` and `.effortFallback` the whole list of `{value, label}` (`older` for models); `null` puts back Hive's (for prices, as **Reset to defaults** does: the shipped models removed from the table come back too, and the change lists them). Shortcuts are read-only for now. The permission, and that the request's Assistant session (its launch's token) is still the running one, are checked again at the moment of the change, under the project's lock for a project's setting (for Revert, also that the value is still what the change set). The reply's `changed` says whether anything changed; for a table, `old` and `new` are the entries that changed. Replies with `old` and `new` (as shown) and `restart` when it applies later. It counts as one of the Assistant's changes, and its panel lists it with old → new and a **Revert** button (which the user, not the API, uses).
+
+### Undoing the Assistant's changes
+
+From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assistant makes through this API for 7 days, grouped by the user's message it came from: a card's fields (title, description, labels, blocked, links, agent, column, project) and the cards it made, a lane it started or changed, an agent's settings, a Hive setting, and an agent it started. It keeps them with what each replaced. Prompts, messages and comments, and what can't be taken back (a project made, an agent added), are listed with why.
+
+`GET /v1/assistant/changes` — the Assistant only (others: `403`): its newest 10 messages' changes, newest first: `[{ "group", "at", "changes": [{ "id", "what", "card"?, "fields": ["labels"], "final"?: "why it can't be undone", "undone"?: true }] }]`.
+
+`POST /v1/assistant/undo` `{ "change": "<id>" }` or `{ "group": "<id>" | "latest" }` — the Assistant undoes its own change, or every change of a message's, newest first. `latest` is its newest message with a change left to undo. A change of its own (Control agents), listed in its panel (`undo`).
+- Each field goes back to what the change replaced only while it still holds what the change wrote, checked at the moment of the write. One that someone has changed since is left as it is, never overwritten.
+- A card it made is archived, unless someone else has changed it since.
+- A column move goes back through the card's rules, as a move with the override reason `undo`.
+- A lane it started is abandoned; a lane's list, reviewer, rounds, wait or name go back.
+- An agent it started is stopped only while the launch it started still runs (what it did stays).
+- A Hive setting goes back only while Change settings is on. A provider's removed models go back only if they too are unchanged.
+- Its control level and its launch are checked again at each write: turned down to Look and advise, or its session ended, partway through a message's changes, the undo stops there and is refused, the changes undone so far kept.
+- A card's decision, comment or place in its column can't be undone: those changes are listed with why. So is every change of its that changed nothing undo puts back (an intent's facts, withdrawn messages): none is left out.
+- A card's project goes back with its agent, both or neither, only while its agent and review are as the move left them; a move back never stops a review started since. A provider goes back with everything a provider change resets, never while the agent runs.
+- A change is marked undone only when every field went back or was skipped for good; one that failed (`failed`) can be undone again.
+- An id that isn't one of its changes (they are its own only) is `404`, as is a message with none.
+
+Replies `{ "results": [{ "change", "what", "card"?, "undone": ["labels"], "skipped": [{ "field", "why": "changed" | "gone" | "ended" | "failed", "error"? }], "final"?, "already"?: true }] }`.
 
 ### Shared notes
 
@@ -668,6 +691,7 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `deactivate-project` | Was refused turning a project off (only refusals are listed) | `{ "kind": "deactivate-project", "ok": false, "error": "Not allowed by Settings → Assistant → Control", "project": "apiary" }` |
 | `setting` | Changed one of Hive's settings | `{ "kind": "setting", "ok": true, "settingId": "sessions.confirmStop" }` |
 | `revert-setting` | The user reverted a setting the Assistant changed (`revertOf`: that action's id) | `{ "kind": "revert-setting", "ok": true, "settingId": "sessions.confirmStop", "revertOf": "…" }` |
+| `undo` | Undid changes of its own (`hive_undo`), or the user undid them in its panel (`card` or `cards`: those whose changes were undone) | `{ "kind": "undo", "ok": true, "cards": [12, 14] }` |
 
 ---
 
@@ -725,6 +749,7 @@ The Hive Assistant's `hive` server always runs (even with this setting or the Ag
 | `hive_list_settings` | `GET /v1/settings`, a line per setting (what each does only with `query`) | any |
 | `hive_read_setting` | `GET /v1/settings/{id}`, as text | any |
 | `hive_update_setting` | `PATCH /v1/settings/{id}`, old → new | Change settings on (any level) |
+| `hive_undo` | `GET /v1/assistant/changes` (`list`), `POST /v1/assistant/undo`: what was undone, what was left and why | Control agents |
 
 It also has the board tools above (the card intents too, but not `hive_start_card`: it starts cards on agents with `hive_start_task`); Claude Code runs `hive_create_task`, `hive_update_task`, `hive_update_tasks`, `hive_reorder_tasks`, the card intents and `hive_lane` without asking from Control agents up. Claude Code runs these without asking (they are Hive's own, and limited by the control level); Codex gets a 15-minute tool timeout for them, since waiting and asking the user can take minutes.
 

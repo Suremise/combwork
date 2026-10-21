@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -185,6 +185,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of CARD_SEARCH_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1282: the Assistant's changes, with what each replaced, for undo (schema/v1_0.ts, assistantUndo.ts).
+    version: 12,
+    name: ASSISTANT_CHANGES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of ASSISTANT_CHANGES_STEP.ddl) db.exec(sql)
     }
   }
 ]

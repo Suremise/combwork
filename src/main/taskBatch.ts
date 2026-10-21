@@ -4,6 +4,7 @@ import { COLUMN_CHOICES, isTaskColumn } from '../shared/tasks'
 import * as assistant from './assistantControl'
 import { ChangeRefused } from './assistantControl'
 import * as tasks from './tasks'
+import { recordingChanges } from './assistantChanges'
 import { cardAgent, knownAgent } from './activityTargets'
 
 /**
@@ -70,7 +71,8 @@ const clip = (s: string, max: number): string => {
 export async function assistantBatch(ws: string, token: string, numbers: number[], patch: tasks.BatchPatch, actor: tasks.TaskActor): Promise<tasks.BatchItem[]> {
   const column = typeof patch.column === 'string' ? { column: patch.column } : {}
   const guard = assistant.admit(ws, token, 'agents', `change ${numbers.length} card${numbers.length === 1 ? '' : 's'} on the board`, { kind: 'update-tasks', cards: numbers, ...column })
-  const items = await tasks.updateTasks(numbers, patch, actor, { commit: guard })
+  // Each card's change recorded for undo as it is saved (#1282): a change of its own, in this message's group.
+  const items = await recordingChanges(ws, 'update-tasks', `change ${numbers.length} card${numbers.length === 1 ? '' : 's'} on the board`, () => tasks.updateTasks(numbers, patch, actor, { commit: guard }))
   // Each card's line names its card, its project and the agent it is with (#763): a viewer follows a bulk move card by
   // card. A refused card: the agent it was to be given, if there is one.
   for (const i of items) {

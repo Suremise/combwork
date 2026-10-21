@@ -436,6 +436,13 @@ const prose = (seed, n) => {
   measure('hive_create_task (as Assistant)', tool('hive_create_task', { title: 'Assistant card', project: 'alpha', description: prose(600, 1800) }, 'assistant'), 400)
   measure('hive_update_task (as Assistant)', tool('hive_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
   measure('hive_reorder_tasks (as Assistant)', tool('hive_reorder_tasks', { column: 'todo', cards: [todo[31], todo[32]] }, 'assistant'), 300)
+  // Undo (#1282): its messages' changes, a line each; one message's changes with their ids; what an undo did.
+  tool('hive_update_tasks', { numbers: [todo[33], todo[34]], addLabels: ['undo-me'] }, 'assistant')
+  const changeGroups = measure('hive_undo (list)', tool('hive_undo', { list: true }, 'assistant'), 10 * 300)
+  const changeLines = measure('hive_undo (list, a message)', tool('hive_undo', { list: true, group: changeGroups.split(' ')[0] }, 'assistant'), 40 * 200)
+  const relabel = changeLines.split('\n').find((l) => new RegExp(`#${todo[33]}\\b`).test(l) && /\(labels\)/.test(l))
+  const undone = measure('hive_undo', tool('hive_undo', { change: relabel?.split(':')[0] ?? '' }, 'assistant'), 300)
+  check('an undo says what it did, in a line', undone === 'Undid 1 of 1 change in full.', `${relabel} → ${undone}`)
 
   console.log('\n--- Agent API routes not behind a tool')
   const route = async (label, method, p, body) => measure(`API ${label}`, (await api(method, p, body)).text)

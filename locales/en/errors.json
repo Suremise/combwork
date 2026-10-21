@@ -1,4 +1,12 @@
 {
+  "errors.assistantUndo.gone": {
+    "defaultMessage": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
+    "description": "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
+  },
+  "errors.assistantUndo.which": {
+    "defaultMessage": "Choose one change of the Assistant's to undo, or one message's changes.",
+    "description": "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
+  },
   "errors.changes.notFile": {
     "defaultMessage": "{file} isn't a file of {folder}.",
     "description": "Changes tab: opening a file outside the folder it shows. {file} is the file, {folder} the folder."
