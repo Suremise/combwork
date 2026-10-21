@@ -27,7 +27,7 @@ In Hive an agent often works in its own git worktree on its own branch. The user
 
 ## Finishing
 
-Give the user the summary and say plainly whether the branch is ready, and if not, what's in the way. Who merges: in a card loop, the builder, at the lane's end, as its brief says (Merging, below). Otherwise the user, from Hive, where they review it first (its Merge dialog's squash or merge commit is their choice), or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to. If the user isn't watching this agent, a short `hive_notify` that the branch is ready helps them notice.
+Give the user the summary and say plainly whether the branch is ready, and if not, what's in the way. Who merges: in a card loop, whoever the project's workflow and the brief say; when it is the builder, each card as it passes, before the lane's next card starts (a lane takes one card at a time: card-loop), as its brief says (Merging, below). Otherwise the user, from Hive, where they review it first (its Merge dialog's squash or merge commit is their choice), or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to; for their OK on one (a push, a release), ask on the card with `hive_ask_user` (`kind: "approve"`): their answer is recorded and comes to your inbox. If the user isn't watching this agent, a short `hive_notify` that the branch is ready helps them notice.
 
 ## Merging, when the user or your brief asks you to
 
@@ -39,4 +39,4 @@ Other agents merge into the same base. What you merge must be what you checked, 
 5. **Merge** in the checkout where the base is (`git -C <that checkout> merge --no-ff <branch>`). If git says `index.lock` exists, another merge is under way there: wait and try again; never delete the lock.
 6. **Release the slot** once merged, and **report** the merge commit and the base commit your checks ran on.
 
-Then move the branch's cards from `passed` to `done`: Done means merged. Cards still in Review or Doing stay where they are.
+Then report each of the branch's passed cards merged with `hive_report_merge` (the merge commit): Hive checks its work is in the base and moves it to Done, which means merged. Cards still in Review or Doing stay where they are. A merge step you can't take within a rule (your CLI refused the commit, say) is `hive_cannot_within_rules` on the card (the rule, and why): it goes to the user.

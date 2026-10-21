@@ -14,7 +14,7 @@ Two agents take the same cards in turn: the **builder** does each card and sends
 From the user's request:
 - **role**: `builder` or `reviewer`;
 - **cards**: the numbers, in the order given (one at a time, never ahead);
-- **rounds**: how many rounds a card gets before you ask the user ("rounds: 10"). A round is one build and its review (below);
+- **rounds**: how many rounds a card gets before the user is asked ("rounds: 10"). A round is one build and its review (below);
 - **wait**: how long with no change before you tell the user ("wait: 4h");
 
 Rounds or wait the request doesn't give are the project's settings (Card loops: 10 rounds and 6 hours unless the user changed them): the lane's reply below says them.
@@ -29,14 +29,14 @@ Hive keeps a record of the loop, its **lane**, and shows it to the user. Registe
 
 Its reply gives the lane's rounds and wait: use them where your request gave none. Without a lane, 10 rounds and 6 hours.
 
-Hive follows the board from there and ends the lane when its cards are Done. A lane's cards change only between cards: given a new list (a card added, the order changed) once it's idle, the builder starts the lane again with it, and carries on from there. A running loop never sees a card added to the lane meanwhile, so for anything else a new lane is started. If the user calls the loop off, end the lane with `action: "end"`, `abandoned: true`; stopping to ask the user leaves it as it is. The lane is only a record: if the tool is missing or a call fails, carry on with the loop.
+Hive follows the board from there and ends the lane when its cards are Done: never end it or give it a merge commit yourself. It takes one card at a time: `hive_lane` with `action: "next"` names your next card to start or carry on, or why the lane waits (a card not merged yet, a question for the user). A lane's cards change only between cards: given a new list (a card added, the order changed) once it's idle, the builder starts the lane again with it, and carries on from there. A running loop never sees a card added to the lane meanwhile, so for anything else a new lane is started. If the user calls the loop off, end the lane with `action: "end"`, `abandoned: true`; stopping to ask the user leaves it as it is. The lane is only a record: if the tool is missing or a call fails, carry on with the loop.
 
 ## Waiting
 
 Wait with `hive_wait_for_tasks`, `wake: true`:
 - builder: the card, `changes: ["verdict", "column", "comment"]`, `column: "passed"` (a review's verdict, the card moved into Passed, or a comment, such as the reviewer asking for a commit);
 - reviewer, a new card: the card, `column: "review"` (only its arrival in Review counts, not the builder's comments; at once if it's already there);
-- reviewer, after failing a card: the card, `column: "review"`, `fresh: true` (its next round: it's still in Review now, so this waits for the builder to move it out and back, or to return it for review; without `fresh`, a card already in the column answers at once);
+- reviewer, after failing a card: the card, `column: "review"`, `fresh: true` (its next round: the builder's next submission brings it back; without `fresh`, a card still in the column answers at once);
 - reviewer, after asking for a commit: the card, `changes: ["comment"]` (the builder's reply naming it);
 - `limitMinutes`: the run's wait.
 
@@ -53,7 +53,7 @@ If a wake isn't possible (the tool says so), wait in the call instead: `hive_wai
 
 **The watch is your only standing wait.** A loop runs for hours, and a command left running in it outlives the run it was for. Watch your own test runs with something that ends with them (`hive-progress`, your CLI's notice that a background command ended), never `tail -f`, and stop any watcher, server or app copy you started before you move a card on or end your turn to wait. To wait for a time too (a merge slot to renew), give the watch that `limitMinutes`: never a sleep or a timer in a command.
 
-Hive also wakes a loop's agents itself (unless the project turned it off): the reviewer when a card arrives in Review, the builder on a verdict (in your inbox: "#12 (B1's card) is in Review. You review this card in its loop…"). Act on it as on your watch's wake. Watches are still how you wait: where yours tells you of the change, Hive's own wake isn't sent.
+Hive also wakes a loop's agents itself (unless the project turned it off): the reviewer when a card arrives in Review, the builder on a verdict or its reviewer's request (in your inbox: "#12 (B1's card) is in Review. You review this card in its loop…"). Act on it as on your watch's wake. Watches are still how you wait: where yours tells you of the change, Hive's own wake isn't sent.
 
 **While you work**, Hive tells you of what arrives in your inbox at your next tool call, or before your turn ends ("[Hive] New in your inbox: …"), without typing into your session: read it then with `hive_inbox`, as when woken.
 
@@ -66,12 +66,12 @@ Hive also wakes a loop's agents itself (unless the project turned it off): the r
 ## Builder
 
 For each card, in order:
-1. Do its work with the **work-on-card** skill: Doing first. **Commit the card's work before moving it to Review**, every round, and name the commit in the round's comment: the reviewer reviews that commit. Just before moving it to Review, start the watch for its verdict (above); then move it to Review with a summary comment and end your turn.
-2. Hive wakes you with the verdict. Woken by the reviewer asking for a commit instead: commit, reply on the card naming it, and watch again.
-3. **Passed** (a passing verdict, or moved to Passed): take the next card. Once your work is merged (merge-ready, when the user asks: it says how to merge, taking turns at the merge slot, when other branches merge too), your Passed cards go to Done.
-4. **Failed**: if the card has now failed as many reviews as **rounds** (with rounds: 2, its second failed review), that was its last round: don't fix it, stop and ask (below). Otherwise move it to Doing, fix the **blocking** findings, commit, comment on what changed (naming the commit), start the watch again, and move it back to Review: the next round, which wakes the reviewer (a failed card moved to Review without leaving it is returned for review, which wakes it too). Suggestions that aren't blocking can become follow-up cards (`hive_create_task`) rather than another round.
+1. Do its work with the **work-on-card** skill: started first (`hive_start_card`). **Commit the card's work before submitting it**, every round, and name the commit in the round's summary: the reviewer reviews that commit. Just before submitting it, start the watch for its verdict (above); then submit it (`hive_submit`, its summary saying what you did) and end your turn.
+2. Hive wakes you with the verdict. Woken by the reviewer asking for something instead (a commit, a run: its request is a comment on the card): do it, reply on the card naming it, and watch again.
+3. **Passed** (a passing verdict moved it on): its work is merged before the next card starts, since the lane takes one card at a time. Merge it as your brief says (merge-ready: taking turns at the merge slot, when other branches merge too), then report it with `hive_report_merge` (the merge commit), which moves it to Done. Where your project's workflow has someone else merge, wait for that. Then `hive_lane` `next` names your next card.
+4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings, commit, start the watch again, and submit it again with a summary of what changed (naming the commit): the next round, which wakes the reviewer. Suggestions that aren't blocking can become follow-up cards (`hive_create_task`) rather than another round. At the lane's round limit Hive asks the user how to go on itself (below).
 
-**The lane's end:** with every card passed, merge when the user or your brief says to (merge-ready). A step there that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is a stop and ask on the last card (below): with every card passed, nothing else shows the lane is waiting on them. Once they have done what you asked, clear `blocked` and finish the merge.
+**The lane's end:** once every card is Done, the lane ends by itself. A merge step that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is `hive_cannot_within_rules` on that card (the rule, and why): it goes to the user, who answers in your inbox; then finish the merge.
 
 **Checks in a round:** each move to Review carries a run record (work-on-card). After a round's fixes, rerun the checks those fixes affect (the project's notes may have a way to pick them), not every check again; but before a card can pass, the card's full checks must have run on its final code. The reviewer checks the record instead of repeating it, and runs the affected tests and its own probes (review-agent-work).
 
@@ -79,17 +79,17 @@ For each card, in order:
 
 For each card, in order:
 1. Wait for it to arrive in Review (above).
-2. Review it with the **review-agent-work** skill: `review: "start"`, then your verdict as the reviewer. **Review the commit the builder names.** Work sent uncommitted (or no commit named) isn't a failed round on that alone: start the watch for the builder's reply (above), comment asking for the commit, and end your turn; review the commit once it's named.
-3. **Blocking findings**: start the watch for its return (above), then `review: "failed"` with them in the comment, numbered, each with what to fix, and end your turn. Points that aren't blocking become follow-up cards, not another round.
-4. **Passed**: move it to Passed with the verdict (`review: "passed"`, `column: "passed"`): it passed review and waits to be merged. Done is for merged work, not yours to move. Take the next card.
+2. Review it with the **review-agent-work** skill: `hive_start_review` (its reply names the revision to review), then your verdict. **Review the commit the builder names.** Work sent uncommitted (or no commit named) isn't a failed round on that alone: start the watch for the builder's reply (above), ask for the commit with `hive_request_builder` (it wakes the builder), and end your turn; review the commit once it's named.
+3. **Blocking findings**: start the watch for its return (above), then `hive_verdict` with `pass: false` and them in the comment, numbered, each with what to fix (`failKind: "explanation"` when only how the work was explained falls short), and end your turn. It goes back to Doing for its builder. Points that aren't blocking become follow-up cards, not another round.
+4. **Passed**: `hive_verdict` with `pass: true`: it moves on and waits to be merged. Done is for merged work, not yours to move. Take the next card.
 
 ## Rounds and when to ask
 
 A round is one build and its review: round 1 is the first build and the first review, and each fix with its review is the next round. A card that passes its first review passed in round 1. Count each card's rounds.
 
-- **When the review of round *rounds* fails** (as many failed reviews as **rounds**): stop and ask, don't give up. The reviewer says in that failed verdict that it was the last round; the builder doesn't fix it again but stops and asks (below), with a line per round (what was found, and whether it was fixed), asking: carry on (how many more rounds), split the card, accept it with follow-up cards, or take it over.
+- **At the round limit** (a card that has failed as many reviews as **rounds**), Hive counts and asks the user itself, under For you: carry on (how many more rounds), split the card, accept it with follow-up cards, or take it over. The lane waits; the builder doesn't fix it again until their answer comes to its inbox, then carries on as it says.
 - **A finding that comes back** (the fix missed part of it): the reviewer says so in the failed verdict ("recurring from round 2") and the loop carries on; the line per round at the limit shows it. A finding the builder **disputes**, rather than missed, is a design question: stop and ask.
-- **Stop and ask** on a design question the card doesn't answer, on a blocked card, on a merge step that needs the user, when the wait passes with no change (Hive wakes you to say so), or when a card of the loop is archived or gone (the wake line says so: only the user brings it back). Stopping and asking, builder or reviewer, is always both: set `blocked` on the card where it is (`hive_update_task`, no move: a card in Review stays there) to the question, which shows it waiting on the user and wakes whoever watches the lane, and `hive_notify` the user, saying what you need decided. A card archived or gone can't be changed: `hive_notify` alone, and leave it as it is. A comment on the card alone reaches no one. No further verdict or round meanwhile; Hive tells you of the decision they record: clear `blocked` (empty) and carry on.
+- **Stop and ask** on a design question the card doesn't answer, on a blocked card, on a merge step that needs the user, when the wait passes with no change (Hive wakes you to say so), or when a card of the loop is archived or gone (the wake line says so: only the user brings it back). Stopping and asking, builder or reviewer, is `hive_ask_user` on the card where it is (`kind: "decide"`; `"approve"` for an OK only they can give, such as a push), saying what you need decided: it shows the card waiting on the user under For you, and wakes whoever watches the lane. A card archived or gone can't take one: `hive_notify` the user, and leave it as it is. A comment on the card alone reaches no one. No further verdict or round meanwhile; their answer comes to your inbox: carry on from where you asked.
 
 ## At the end
 
