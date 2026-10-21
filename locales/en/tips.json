@@ -795,6 +795,14 @@
     "defaultMessage": "More than {usual, plural, one {# agent} other {# agents}}",
     "description": "A tip's title. {usual} is how many agents a project can have by default (12)."
   },
+  "tips.moveAnyway.text": {
+    "defaultMessage": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: rule, override, Move anyway."
+  },
+  "tips.moveAnyway.title": {
+    "defaultMessage": "Move a card past its rules, with a reason",
+    "description": "A tip's title (glossary: rule)."
+  },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Hive prices every session from your table instead.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

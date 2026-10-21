@@ -4,7 +4,7 @@
 // abandoned lane keeps its cards as it left them, and a lane is on the card being worked (#512).
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
 import { allDone, keptLanes, laneLine, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
@@ -19,6 +19,14 @@ const base = tempDir('hive-lanes-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
+
+/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+afterEach(async () => {
+  await advanced.set(ENFORCE, true)
+})
 const { onHiveEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
@@ -221,6 +229,8 @@ describe('the lanes service', () => {
   }
 
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [c1, c2, c3] = [await make('One'), await make('Two'), await make('Three')]
     const a = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], rounds: 10, waitMinutes: 360, name: 'first', by: 'B1 (alpha)' })
     expect(a.did).toBe('started')
@@ -242,6 +252,8 @@ describe('the lanes service', () => {
   })
 
   it("a lane started without rounds or wait takes the project's settings, else the workspace's; given ones win (#412)", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [c1, c2, c3] = [await make('L1'), await make('L2'), await make('L3')]
     const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
     expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
@@ -273,6 +285,8 @@ describe('the lanes service', () => {
   })
 
   it("a builder's next loop, its last lane's cards passed but not merged: that lane ends (not abandoned), whoever registers first", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [p1, p2, n1, n2, m1] = [await make('P1'), await make('P2'), await make('N1'), await make('N2'), await make('M1')]
     const passed = async (...ns: number[]) => {
       for (const n of ns) await run(() => tasks.updateTask(n, { column: 'passed' }, user))
@@ -297,6 +311,8 @@ describe('the lanes service', () => {
   })
 
   it('only its builder or reviewer ends it, among agents; the user and the Assistant may', async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     const c = await make('E1')
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'B1 (alpha)' })).lane
     await expect(lanes.endLane(w, l.id, { project: 'alpha', agent: 'b2' })).rejects.toThrow(/builder or reviewer/)

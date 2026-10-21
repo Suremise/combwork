@@ -198,6 +198,8 @@
   "tips.modes.title": "Modes for the Assistant",
   "tips.moreAgents.text": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Agents per project in Settings → Advanced, up to {most, number}, for every workspace or just this one. Above {usual, number} it shows what they cost on your computer: the memory your running agents take, and how much is free.",
   "tips.moreAgents.title": "More than {usual, plural, one {# agent} other {# agents}}",
+  "tips.moveAnyway.text": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
+  "tips.moveAnyway.title": "Move a card past its rules, with a reason",
   "tips.myPrices.text": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Hive prices every session from your table instead.",
   "tips.myPrices.title": "Your own prices for Claude Code",
   "tips.newCard.text": "Press {key} for a new card for the project you are in, without leaving what you are doing.",

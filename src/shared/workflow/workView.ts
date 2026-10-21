@@ -132,6 +132,17 @@ export interface WorkMarks {
   leftTarget: FactData['LeftTarget'] | null
   /** The user (or the Assistant) moved the latest submission past its review and approvals. */
   overridden: boolean
+  /** The latest move past the card's rules since its work was last Done (§16.8.4): who, which rules, why. */
+  override: WorkOverride | null
+}
+
+/** A move past a card's rules (an `Override`): who made it, the move, the rules it skipped and why (may be empty). */
+export interface WorkOverride {
+  by: 'user' | 'assistant'
+  move: string
+  rules: string[]
+  reason: string
+  at: string
 }
 
 export interface WorkIntegration {
@@ -256,6 +267,10 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const accepted = s.accepted ? [...cycle].reverse().find((f) => f.kind === 'Accepted') : undefined
   const entry = s.entries.at(-1)
   const started = s.started
+  // Since its work was last Done (an earlier cycle that ended there): a drag's Override comes before its Started.
+  const doneAt = facts.findLast((f) => f.seq < s.cycle && f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.seq ?? 0
+  const lastOverride = facts.findLast((f) => f.kind === 'Override' && f.seq > doneAt)
+  const override = lastOverride ? ((d) => ({ by: d.by, move: d.move, rules: d.rules, reason: d.reason, at: lastOverride.at }))(lastOverride.data as FactData['Override']) : null
   return {
     card: c.card,
     stage: s.stage,
@@ -274,7 +289,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     revisions,
     verdicts,
     checks,
-    marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden },
+    marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
     queue: entry ? { entry: entry.id, revision: entry.revision, target: entry.target, state: entry.state, ...(entry.failure ? { failure: entry.failure.reason } : {}), ...(entry.cancelled ? { cancelled: entry.cancelled } : {}) } : null,
@@ -305,6 +320,8 @@ export interface WorkBadge {
   checks: { passed: number; failed: number; notCounted: number }
   stale: boolean
   overridden: boolean
+  /** The latest move past its rules since it was last Done (the board's override mark). */
+  override: WorkOverride | null
   outsideRules: boolean
   mergedInPart: boolean
   leftTarget: boolean
@@ -339,6 +356,7 @@ export function workBadge(v: WorkView): WorkBadge {
     checks: { passed: runs.filter((c) => c.result === 'passed').length, failed: runs.filter((c) => c.result !== 'passed').length, notCounted },
     stale: !!v.marks.stale,
     overridden: v.marks.overridden,
+    override: v.marks.override,
     outsideRules: v.marks.outsideRules.length > 0,
     mergedInPart: !!v.marks.mergedInPart,
     leftTarget: !!v.marks.leftTarget,

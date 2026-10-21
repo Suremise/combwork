@@ -5,7 +5,7 @@
 // The sessions are stand-ins here (the e2e lanewatch suite runs fake Claude Code agents).
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
@@ -159,6 +159,14 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   watches.testHooks.settleMs = 0
   // A check reads what Hive did after `await watches.settled()`: deliveries run in the background (#570).
   const lanes = await import('../src/main/lanes')
+
+  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  const { advanced } = await import('../src/main/advanced')
+  const { ENFORCE } = await import('../src/main/workflow/service')
+  const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+  afterEach(async () => {
+    await advanced.set(ENFORCE, true)
+  })
   const { sessions } = await import('../src/main/sessions')
   let k = 0
   const open = async (builders = 3) => {
@@ -372,6 +380,8 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   })
 
   it('a card added to a followed lane is followed from an empty start: a block it came with is told (round 1 finding)', async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
     const [a] = await newCards(w, 'b1', 1)
@@ -437,6 +447,8 @@ describe('lane watches (main/watches.ts, #531)', async () => {
 
     for (const verdict of ['failed', 'passed'] as const) {
       it(`a card added to a lane and ${verdict} meanwhile is told by the next watch, once`, async () => {
+        // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+        await rulesOff()
         const { w, home, st, a } = await woken(['failed', 'passed', 'blocked'])
         const [b] = await newCards(w, 'b1', 1)
         await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })

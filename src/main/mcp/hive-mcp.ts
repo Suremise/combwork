@@ -20,7 +20,7 @@ import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSl
 import { REPLY_MS, agentApiCall } from './agentApiCall'
 import { MAX_ROWS, agentWatchText, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
-import { laneChangeText, laneEndText, lanesText, type LaneChange } from '../../shared/lanes'
+import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
@@ -550,12 +550,12 @@ const tools: Tool[] = [
   {
     name: 'hive_lane',
     description: ASSISTANT
-      ? `Lanes: Hive's record of a builder and reviewer taking a project's cards in order (card-loop), shown to the user. Bookkeeping: a loop runs the same without one. start: project, builder, reviewer, cards in order, rounds, waitMinutes, name (the builder's running lane with any of these cards is updated instead, which its builder sees only between cards, once told the new list; rounds and waitMinutes left out are the project's card-loop settings). end: lane (its id), mergeCommit, or abandoned=true unmerged. list: running and lately ended lanes (project narrows, all=true every one kept). Replies with each lane in a line: its agents, state (active, paused while its current card is blocked, ended, abandoned), cards, rounds, wait and id.${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: start and end need Control agents.'}`
-      : "Your card loop's lane: Hive's record of a builder and reviewer taking cards in order, shown to the user. Bookkeeping: if a call fails, carry on with the loop. start (the builder): cards in order, reviewer, rounds, waitMinutes, name; again with a changed list updates it, between cards (a running loop never sees a card added meanwhile). rounds and waitMinutes left out are the project's card-loop settings. join (the reviewer): builder (its name), and cards if it hasn't started one yet. end: lane (its id), mergeCommit after the merge, or abandoned=true. list: your project's lanes. Replies with the lane in a line: its agents, state, cards, rounds, wait and id.",
+      ? `Lanes: Hive's record of a builder and reviewer taking a project's cards in order (card-loop), shown to the user. start: project, builder, reviewer, cards in order, rounds, waitMinutes, name (the builder's running lane with any of these cards is updated instead: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told; rounds and waitMinutes left out are the project's card-loop settings). A lane ends by itself once every card is Done. end: lane (its id) and abandoned=true to stop it unfinished. list: running and lately ended lanes (project narrows, all=true every one kept). Replies with each lane in a line: its agents, state (active, paused and why, ended, abandoned), cards, rounds, wait and id.${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: start and end need Control agents.'}`
+      : "Your card loop's lane: Hive's record of a builder and reviewer taking cards in order, shown to the user. start (the builder): cards in order, reviewer, rounds, waitMinutes, name; again with a changed list updates it (while a card is in flight, from when that card is Done: you are told). rounds and waitMinutes left out are the project's card-loop settings. join (the reviewer): builder (its name), and cards if it hasn't started one yet. next: your next card to start or carry on, or why the lane waits. The lane ends by itself once every card is Done; abandoning one is the user's. list: your project's lanes. Replies with the lane in a line: its agents, state, cards, rounds, wait and id.",
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'join', 'end', 'list'] },
+        action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg('Card numbers, in the order they are done.'),
         ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' } } : { builder: { type: 'string', description: "join: the builder's name." } }),
         reviewer: { type: 'string', description: 'Agent name or id.' },
@@ -581,7 +581,8 @@ const tools: Tool[] = [
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.HIVE_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.HIVE_AGENT_ID } : {}) }
       if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'name']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
-      if (a.action !== 'end') throw new Error('action must be start, join, end or list')
+      if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
+      if (a.action !== 'end') throw new Error('action must be start, join, next, end or list')
       if (typeof a.lane !== 'string' || !a.lane) throw new Error('lane is required: the id hive_lane list gives')
       return named((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo, laneEndText)
     }
