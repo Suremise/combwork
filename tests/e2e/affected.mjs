@@ -195,6 +195,8 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Purge.tsx'], suites: ['purge'] },
   { paths: ['src/main/antivirus.ts', 'src/shared/antivirus.ts', 'src/renderer/src/components/Antivirus.tsx'], suites: ['antivirus', 'performance'] },
   { paths: ['src/shared/tipPlacement.ts'], suites: ['tooltips'] },
+  // Where a menu opens (#1329): agents-ui checks + Add ▾ at the window's right edge; the others open menus.
+  { paths: ['src/shared/menuPlacement.ts'], suites: ['agents-ui', 'context', 'cardchip', 'keys'] },
   { paths: ['src/shared/uiPrefs.ts', 'src/renderer/src/projectPrefs.ts'], suites: ['skillprefs', 'skills', 'sessiontree'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/components/Tips.tsx', 'src/renderer/src/views/SettingsView.tsx'], suites: ['searchclear'] },
   { paths: ['src/main/taskStart.ts', 'src/main/tasks.ts', 'src/main/boardStore.ts', 'src/main/db.ts', 'src/shared/tasks.ts', 'src/shared/taskHistory.ts', 'src/renderer/src/components/Board.tsx', 'src/shared/edgeScroll.ts', 'src/main/cardBusy.ts', 'src/main/decisionNotices.ts', 'src/main/decisionWakes.ts', 'src/renderer/src/boardBatches.ts', 'src/main/coalesce.ts', 'src/renderer/src/components/SetAside.tsx', 'src/main/presence.ts', 'src/renderer/src/components/BoardUpgrade.tsx', 'src/main/schema/', 'src/main/workflow/factStore.ts', 'src/main/workflow/actionWorker.ts', 'src/main/workflow/cardWork.ts', 'src/renderer/src/cardWork.ts', 'src/main/workflow/adoption.ts', 'src/main/workflow/upgrade.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/reconcile.ts'], suites: ['reconcile', 'projectrename', 'setaside', 'board', 'boardupgrade', 'upgradelane', 'boardarchive', 'boardbulk', 'boardfold', 'boardscope', 'boardscroll', 'review', 'donemove', 'doingmove', 'carddialog', 'cardchip', 'taskoverview', 'busy', 'dialogs', 'decisions', 'decisionwake', 'replysize', 'cardcost'] },
@@ -303,6 +305,10 @@ export const AREAS = [
   { paths: ['src/main/providers/codex/', 'src/main/advancedValues.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/codexoverrides.cjs'], suites: ['codexoverrides'] },
   // The switches for an agent pane's Ctrl+C and Ctrl+V and for what Hive types (#1286).
   { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/shared/terminalInput.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/fake-claude.cjs', 'tests/e2e/terminalinput.cjs'], suites: ['terminalinput'] },
+  // Claude Code's status line, Hive's guidance and the user's own Codex hooks (#1285).
+  { paths: ['src/main/providers/claude/launchSettings.ts', 'src/main/providers/claude/adapter.ts', 'src/main/servers.ts', 'tests/e2e/claudestatusline.cjs'], suites: ['claudestatusline'] },
+  { paths: ['src/main/mcp/hive-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },
+  { paths: ['src/main/providers/codex/adapter.ts', 'tests/e2e/codexownhooks.cjs'], suites: ['codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.

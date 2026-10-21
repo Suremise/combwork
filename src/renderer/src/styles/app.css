@@ -383,9 +383,15 @@ kbd {
   color: var(--accent-ink);
 }
 
+/* Its natural width wherever it opens (#1329): a fixed box with only `left` set is as wide as the room between its left
+   edge and the window's right (shrink-to-fit), so one opened near that edge wrapped its descriptions into a narrow
+   column, and ContextMenu, measuring it there, moved it left by that narrow width. Narrower only in a window narrower
+   than the menu, where it wraps (.menu-text). */
 .menu {
   position: fixed;
   z-index: 1000;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   min-width: 240px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);

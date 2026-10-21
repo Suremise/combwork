@@ -99,6 +99,8 @@ interface HiveMessageValues {
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined
   'tips.cardWork.title': undefined
+  'tips.claudeStatusLine.text': undefined
+  'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined
   'tips.cliOverrides.title': undefined
   'tips.cliOwnMode.text': undefined
