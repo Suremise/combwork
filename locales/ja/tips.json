@@ -164,6 +164,8 @@
   "tips.hiveFolder.title": "プロジェクトの.hiveはこのPCに残る",
   "tips.hiveSkills.text": "エージェントとアシスタントは、work-on-card、review-agent-work、handoverなど、Hive独自のスキルを使えます。Hiveが最新に保ち、編集したスキルはそのまま残ります。",
   "tips.hiveSkills.title": "Hiveで作業するためのスキル",
+  "tips.hooksMissing.text": "CLI の更新やポリシーでエージェントのフックが Hive に届かなくなると、そのペインは誤っているかもしれない状態の代わりに「状態不明」と表示し、何も入力されず、レーンは一時停止します。Hive が理由を判別できるときは、ペインの上のバナーに表示されます。",
+  "tips.hooksMissing.title": "エージェントのフックが届かなくなったとき",
   "tips.imagesTab.text": "「添付ファイル」タブには、プロジェクトのセッションに貼り付けたりドロップしたりしたスクリーンショットとファイルが、セッションごとにまとめて保存されます。プレビューと種類による絞り込みがあり、すぐに再挿入できます。",
   "tips.imagesTab.title": "添付したものを1か所に",
   "tips.improveTranslation.text": "不自然な言葉や誤りを見つけましたか？「ヘルプ」→「この翻訳を改善」で、GitHubのプルリクエストで修正したり言語を追加したりする方法を確認できます。",

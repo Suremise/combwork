@@ -116,6 +116,11 @@ export interface ProviderCapabilities {
    */
   backgroundWakes: boolean
   /**
+   * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
+   * first prompt): none within a while of its start means its hooks aren't reaching Hive (#1336).
+   */
+  startHook?: boolean
+  /**
    * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
    * next resize (Copilot, #486): Hive gives it a size refresh, as resizing the window by hand would, once it has
    * started (its first status), again once it is ready, and after Hive switches its mode live.

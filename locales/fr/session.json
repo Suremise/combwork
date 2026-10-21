@@ -104,6 +104,7 @@
   "session.newConversation.pending": "L’agent vient de recevoir un prompt que sa CLI n’a pas encore pris.",
   "session.notice.finished": "{agent} a terminé",
   "session.notice.finishedBody": "L’agent a terminé son travail.",
+  "session.notice.hooksMissingTitle": "Hive ne reçoit pas les hooks de {agent}",
   "session.notice.longConversation": "{agent} : longue conversation",
   "session.notice.needsInput": "{agent} attend ta réponse",
   "session.notice.notWatching": "{agent} ne surveille pas {cards}",

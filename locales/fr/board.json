@@ -426,7 +426,7 @@
   "board.lanes.usualOrderDetail": "Couloirs en cours, les plus récents d’abord, puis ceux en pause",
   "board.lanes.usualOrderSaid": "Couloirs remis dans l’ordre habituel",
   "board.lanes.waitingForYou": "{n, plural, one {# t’attend} other {# t’attendent}}",
-  "board.lanes.waits": "{reason, select, blocked {{card} est bloquée} hold {{card} est suspendue} you {t’attend ({ask, select, approve {approbation} decide {une décision} test {un test} signIn {une connexion} other {une réponse}}) : {card}} roundLimit {t’attend : {card} a atteint la limite de tours} notMerged {en attente : {card} pas encore fusionnée} merging {en attente : {card} en cours de fusion} stale {périmée : {card} doit être soumise à nouveau} reviewer {en attente d’un relecteur pour {card}} other {changements de liste après {card}}}",
+  "board.lanes.waits": "{reason, select, blocked {{card} est bloquée} hold {{card} est suspendue} you {t’attend ({ask, select, approve {approbation} decide {une décision} test {un test} signIn {une connexion} other {une réponse}}) : {card}} roundLimit {t’attend : {card} a atteint la limite de tours} notMerged {en attente : {card} pas encore fusionnée} merging {en attente : {card} en cours de fusion} stale {périmée : {card} doit être soumise à nouveau} reviewer {en attente d’un relecteur pour {card}} hooks {en pause : les hooks de {agent} n’arrivent pas} other {changements de liste après {card}}}",
   "board.links.archivedTitle": "{card} {title} · Archivée (colonne {column}) · Ctrl+clic pour ouvrir",
   "board.links.title": "{card} {title} · {column} · Ctrl+clic pour ouvrir",
   "board.menu.delete": "Supprimer…",

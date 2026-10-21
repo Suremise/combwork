@@ -166,6 +166,8 @@ interface HiveMessageValues {
   'tips.hiveFolder.title': undefined
   'tips.hiveSkills.text': undefined
   'tips.hiveSkills.title': undefined
+  'tips.hooksMissing.text': undefined
+  'tips.hooksMissing.title': undefined
   'tips.imagesTab.text': undefined
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined

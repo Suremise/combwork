@@ -659,6 +659,14 @@
     "defaultMessage": "Skills for working with Hive",
     "description": "A tip's title."
   },
+  "tips.hooksMissing.text": {
+    "defaultMessage": "If a CLI update or a policy stops an agent’s hooks reaching Hive, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Hive can tell.",
+    "description": "A tip. Hooks: the calls an agent's coding agent makes to Hive as it works. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.hooksMissing.title": {
+    "defaultMessage": "When an agent’s hooks stop arriving",
+    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

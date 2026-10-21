@@ -104,6 +104,7 @@
   "session.newConversation.pending": "它的 CLI 尚未接收刚刚给它的提示词。",
   "session.notice.finished": "{agent} 已结束",
   "session.notice.finishedBody": "智能体已结束工作。",
+  "session.notice.hooksMissingTitle": "Hive 没有收到 {agent} 的钩子",
   "session.notice.longConversation": "{agent}：对话过长",
   "session.notice.needsInput": "{agent} 需要你的输入",
   "session.notice.notWatching": "{agent} 没有监视 {cards}",

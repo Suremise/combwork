@@ -428,7 +428,7 @@ interface HiveMessageValues {
   'board.lanes.usualOrderDetail': undefined
   'board.lanes.usualOrderSaid': undefined
   'board.lanes.waitingForYou': { n: number }
-  'board.lanes.waits': { reason: string; card: string | number; ask: string }
+  'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
   'board.menu.delete': undefined

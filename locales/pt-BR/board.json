@@ -426,7 +426,7 @@
   "board.lanes.usualOrderDetail": "Raias em execução, das mais novas às mais antigas, e depois as pausadas",
   "board.lanes.usualOrderSaid": "Raias de volta à ordem habitual",
   "board.lanes.waitingForYou": "{n, plural, one {# aguardando você} other {# aguardando você}}",
-  "board.lanes.waits": "{reason, select, blocked {{card} está bloqueado} hold {{card} está em espera} you {aguardando você ({ask, select, approve {aprovação} decide {uma decisão} test {um teste} signIn {um login} other {uma resposta}}): {card}} roundLimit {aguardando você: {card} atingiu o limite de rodadas} notMerged {aguardando: {card} sem merge} merging {aguardando: {card} em merge} stale {desatualizada: {card} precisa ser enviado de novo} reviewer {aguardando um revisor para {card}} other {mudanças na lista depois de {card}}}",
+  "board.lanes.waits": "{reason, select, blocked {{card} está bloqueado} hold {{card} está em espera} you {aguardando você ({ask, select, approve {aprovação} decide {uma decisão} test {um teste} signIn {um login} other {uma resposta}}): {card}} roundLimit {aguardando você: {card} atingiu o limite de rodadas} notMerged {aguardando: {card} sem merge} merging {aguardando: {card} em merge} stale {desatualizada: {card} precisa ser enviado de novo} reviewer {aguardando um revisor para {card}} hooks {pausada: os hooks de {agent} não estão chegando} other {mudanças na lista depois de {card}}}",
   "board.links.archivedTitle": "{card} {title} · Arquivado (de {column}) · Ctrl+clique para abrir",
   "board.links.title": "{card} {title} · {column} · Ctrl+clique para abrir",
   "board.menu.delete": "Excluir…",
