@@ -37,11 +37,13 @@ interface HiveMessageValues {
   'workflow.form.from.workspace': undefined
   'workflow.form.git': undefined
   'workflow.form.identity': { name: string | number; email: string | number }
+  'workflow.form.identityValue': { name: string | number; email: string | number }
   'workflow.form.inFlight': { n: number }
   'workflow.form.inherit': undefined
   'workflow.form.inheritTip': { value: string | number }
   'workflow.form.invalid': undefined
   'workflow.form.labels': undefined
+  'workflow.form.labelsValue': { labels: string | number }
   'workflow.form.lane': { builder: string | number; name: string | number }
   'workflow.form.laneUnnamed': { builder: string | number }
   'workflow.form.lanes': { n: number }

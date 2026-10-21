@@ -44,6 +44,8 @@ const T = {
   checkCommand: msg({ id: 'workflow.form.checkCommand', defaultMessage: 'Command', description: 'The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review).' }),
   addCheck: msg({ id: 'workflow.form.addCheck', defaultMessage: 'Add Check', description: 'A button under the checks of “Checks pass before review”.' }),
   removeCheck: msg({ id: 'workflow.form.removeCheck', defaultMessage: 'Remove', description: 'The tooltip of the button removing a check from “Checks pass before review”.' }),
+  labelsValue: msg({ id: 'workflow.form.labelsValue', defaultMessage: 'Cards with these labels: {labels}', description: 'A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels.' }),
+  identityValue: msg({ id: 'workflow.form.identityValue', defaultMessage: 'On, as {name} <{email}>', description: 'A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use.' }),
   noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
@@ -236,8 +238,15 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     if (key === 'review') return tr(form.platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
     const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
     if (values && typeof v === 'string' && values[v]) return tr(values[v])
-    if (key === 'okBefore') return tr(VALUE_TEXT.okBefore[(v as OkBefore).mode])
-    if (key === 'identity') return tr(v ? T.on : T.off)
+    // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
+    if (key === 'okBefore') {
+      const ok = v as OkBefore
+      return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
+    }
+    if (key === 'identity') {
+      const id = v as WorkflowOptions['identity']
+      return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
+    }
     if (key === 'reviewers') return fmt.number(v as number)
     if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
     if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)

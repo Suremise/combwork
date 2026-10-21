@@ -143,6 +143,10 @@
     "defaultMessage": "Commits as {name} <{email}>.",
     "description": "Under “Commits use the project’s identity”: the identity used, from git config."
   },
+  "workflow.form.identityValue": {
+    "defaultMessage": "On, as {name} <{email}>",
+    "description": "A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use."
+  },
   "workflow.form.inFlight": {
     "defaultMessage": "{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}",
     "description": "In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it."
@@ -162,6 +166,10 @@
   "workflow.form.labels": {
     "defaultMessage": "Labels, separated by commas",
     "description": "The placeholder of the labels field of “Your OK before merging”."
+  },
+  "workflow.form.labelsValue": {
+    "defaultMessage": "Cards with these labels: {labels}",
+    "description": "A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels."
   },
   "workflow.form.lane": {
     "defaultMessage": "Builder {builder}: {name}",

@@ -175,6 +175,17 @@ function board(sql, ...args) {
     await section.waitFor({ timeout: HUNG_MS })
     check('opened again: the policy shows Cards with these labels, its labels and the check’s command', !!(await lib.until(async () => (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release' && (await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))).includes('npm run test -- --silent'), HUNG_MS)))
 
+    // The warning shows what a structured value holds: a labels-only change names the old and new labels (HR6's round 3).
+    await row('okBefore').locator('input').fill('backend')
+    await row('okBefore').locator('input').blur()
+    await section.getByRole('button', { name: 'Save…' }).click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const labelsSaid = await dialog.innerText()
+    check('a labels-only change shows the old and the new labels', labelsSaid.includes('Your OK before merging: Cards with these labels: ui and release → Cards with these labels: backend'), labelsSaid)
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await section.getByRole('button', { name: 'Discard Changes' }).click()
+
     // --- Copy as JSON and Paste JSON… (the clipboard stubbed: never the real one).
     await page.evaluate(() => {
       window.__copied = null
