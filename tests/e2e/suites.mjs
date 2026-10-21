@@ -72,6 +72,7 @@ export const SUITES = [
   { name: 'codex-setup', needs: ['codex'] },
   { name: 'codex-storepwsh', needs: ['codex'], noHive: 'runs codex sandbox itself' },
   { name: 'codexfolder' },
+  { name: 'codexoverrides', needs: ['codex'] },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'consoletext' },
   { name: 'consolewindow' },
