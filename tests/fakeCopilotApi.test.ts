@@ -1,6 +1,6 @@
 // The offline Copilot test tier's helpers (tests/e2e/fake-copilot-api.cjs, #453): gh kept off a test Copilot's PATH
 // whatever its folder is called, and the scripted stand-in model's steps.
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -68,6 +68,14 @@ describe("gh off a test Copilot's PATH, whatever its folder is called", () => {
     } finally {
       process.env.PATH = was
     }
+  })
+
+  it('every caller gives it `above` (#1308: one left out throws in its setup)', () => {
+    const tests = join(__dirname)
+    const files = (readdirSync(tests, { recursive: true }) as string[]).filter((f) => /\.(c|m)?js$/.test(f) && !f.includes('node_modules'))
+    const calls = files.flatMap((f) => [...readFileSync(join(tests, f), 'utf8').matchAll(/copilotTestEnv\(([^)]*)\)/g)].filter((m) => !/^\s*api\s*,\s*dir/.test(m[1])).map((m) => `${f}: ${m[0]}`))
+    expect(calls.length).toBeGreaterThan(5)
+    expect(calls.filter((c) => !/\{ above: /.test(c))).toEqual([])
   })
 
   it("keeps a folder named like gh's that holds no gh", () => {
