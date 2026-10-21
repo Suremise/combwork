@@ -152,6 +152,10 @@ interface HiveMessageValues {
   'git.remotes.none': undefined
   'git.remotes.pushesTo': { url: string | number }
   'git.remotes.url': undefined
+  'git.repoLock.busy': { profile: string | number }
+  'git.repoLock.noGitDir': { folder: string | number; why: string | number }
+  'git.repoLock.waiting': { profile: string | number }
+  'git.repoLock.waitingFor': { seconds: number }
   'git.retry': undefined
   'git.section.branches': undefined
   'git.section.changes': undefined

@@ -189,6 +189,7 @@ export const SUITES = [
   { name: 'reorder' },
   { name: 'replysize' },
   { name: 'replytell' },
+  { name: 'repolock' },
   { name: 'resize' },
   { name: 'restart' },
   { name: 'resume' },

@@ -707,10 +707,6 @@
     "defaultMessage": "Close",
     "description": "Button: closes the Merge dialog after a merge that would conflict."
   },
-  "agents.mergeDialog.commitsFirst": {
-    "defaultMessage": "The uncommitted changes are committed on {branch} first, with the message below.",
-    "description": "The Merge dialog when the worktree has uncommitted changes: they are committed on its branch ({branch}) before merging."
-  },
   "agents.mergeDialog.conflict": {
     "defaultMessage": "Merging would conflict. Nothing was changed.",
     "description": "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing."
@@ -739,9 +735,9 @@
     "defaultMessage": "Keeps its commits and their messages, plus a merge commit.",
     "description": "Under the Merge choice (a git merge) for an unused worktree's branch."
   },
-  "agents.mergeDialog.merges": {
-    "defaultMessage": "Merges {parts, select, both {<b>{commits, plural, one {# commit} other {# commits}}</b> and <b>{changes, plural, one {# uncommitted change} other {# uncommitted changes}}</b>} commits {<b>{commits, plural, one {# commit} other {# commits}}</b>} other {<b>{changes, plural, one {# uncommitted change} other {# uncommitted changes}}</b>}} from <code>{branch}</code> into <code>{into}</code>, the branch checked out in the project folder.",
-    "description": "At the top of the Merge dialog: what it merges ({parts}: both, commits and uncommitted changes; commits, only commits; other, only uncommitted changes), how many of each ({commits}, {changes}), from the worktree's branch ({branch}) into the project folder's ({into}). Keep the tags."
+  "agents.mergeDialog.mergesCommits": {
+    "defaultMessage": "Merges <b>{commits, plural, one {# commit} other {# commits}}</b> from <code>{branch}</code> into <code>{into}</code>, the branch checked out in the project folder.",
+    "description": "At the top of the Merge dialog: how many commits ({commits}) it merges from the worktree's branch ({branch}) into the project folder's ({into}). Keep the tags."
   },
   "agents.mergeDialog.message": {
     "defaultMessage": "Commit message",
@@ -774,6 +770,10 @@
   "agents.mergeDialog.nothing": {
     "defaultMessage": "There is nothing to merge: {branch} has no changes that aren't in {into}.",
     "description": "The Merge dialog when the worktree's branch ({branch}) has nothing new for the project folder's branch ({into})."
+  },
+  "agents.mergeDialog.onlyUncommitted": {
+    "defaultMessage": "<code>{branch}</code> has no commits to merge yet, only uncommitted changes.",
+    "description": "At the top of the Merge dialog when the worktree's branch ({branch}) has nothing committed to merge, only uncommitted files. Keep the tags."
   },
   "agents.mergeDialog.otherBase": {
     "defaultMessage": "{agent}'s branch started from {base}, but the project folder is on {into}.",
@@ -818,6 +818,10 @@
   "agents.mergeDialog.titleUnused": {
     "defaultMessage": "Merge {branch}",
     "description": "Title of the Merge dialog for an unused worktree, named by its branch ({branch})."
+  },
+  "agents.mergeDialog.uncommitted": {
+    "defaultMessage": "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Hive merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",
+    "description": "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree."
   },
   "agents.merged.failed": {
     "defaultMessage": "Could not merge",

@@ -603,6 +603,22 @@
     "defaultMessage": "URL",
     "description": "Field of the Add a remote form."
   },
+  "git.repoLock.busy": {
+    "defaultMessage": "Another Hive is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
+    "description": "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it."
+  },
+  "git.repoLock.noGitDir": {
+    "defaultMessage": "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}",
+    "description": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message."
+  },
+  "git.repoLock.waiting": {
+    "defaultMessage": "Another Hive is merging into this repository ({profile})",
+    "description": "A notification's title: this Hive waits to merge into (or change) a repository because another Hive (its profile folder's name, {profile}, e.g. Hive-Dev) holds the repository's merge lock."
+  },
+  "git.repoLock.waitingFor": {
+    "defaultMessage": "Hive waits for it to finish, up to {seconds, number} s.",
+    "description": "The notification's text under \"Another Hive is merging into this repository\": how long this Hive waits for the other one, in seconds."
+  },
   "git.retry": {
     "defaultMessage": "Retry",
     "description": "Button: reads git again."
