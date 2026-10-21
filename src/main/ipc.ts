@@ -74,7 +74,7 @@ import * as skills from './skills'
 import * as storage from './storage'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
-import { cardWork, workBadges } from './workflow/cardWork'
+import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
 import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
@@ -631,6 +631,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
+    'tasks:forYou': (project) => {
+      const ws = currentWorkspace()
+      return ws.path ? forYou(ws, typeof project === 'string' ? project : null) : { items: [], count: 0 }
+    },
+    'tasks:answer': (n, request, answer) => tasks.answerTask(n, request, answer),
     'docs:section': (p, ref) => checkDocRef(p ? workspace.assertProject(p) : null, workspace.sharedDir, String(ref ?? '')),
     'tasks:comment': (n, text) => tasks.commentTask(n, text, { kind: 'user' }),
     'tasks:archive': (n, archived) => tasks.archiveTask(n, archived),
