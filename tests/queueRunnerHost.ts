@@ -1,6 +1,8 @@
-// A Hive's merge queue runner in a process of its own, for tests/queueRunner.test.ts (#1360): two of these on one hive.db
-// copy are two Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads one
-// JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Hive's log lines go there too).
+// A Hive's merge queue runner in a process of its own, for tests/queueRunner.test.ts (#1360): two or three of these on
+// one hive.db copy are Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads
+// one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Hive's log lines go there
+// too). Its seams come from its environment: QR_LINGER (its job's supervisor outlives it), QR_STALL_SETTLE (a takeover
+// that never gets past its first step).
 import { createInterface } from 'readline'
 import { FactStore } from '../src/main/workflow/factStore'
 import { QueueRunner } from '../src/main/workflow/queueRunner'
@@ -11,15 +13,27 @@ let runner: QueueRunner | null = null
 let renew = true
 const REPLY = 'queue-host: '
 
-type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'release' }
+type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'server' | 'release' }
+
+/** A check (`node -e`) that starts a detached process of its own and prints both pids; `stay`: it runs on, else it exits. */
+const check = (stay: boolean): string =>
+  `const k = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true }); k.unref(); console.log(process.pid + ' ' + k.pid); ${stay ? 'setInterval(() => {}, 1000)' : ''}`
 
 async function run(c: Command): Promise<Record<string, unknown>> {
   switch (c.op) {
     case 'acquire': {
-      const r = await QueueRunner.acquire({ store, project, target, root, profile, renewMs: 50, hooks: { renew: () => renew } })
-      if (!r.ok) return { ok: false, heldBy: r.heldBy }
+      const r = await QueueRunner.acquire({
+        store,
+        project,
+        target,
+        root,
+        profile,
+        renewMs: 50,
+        hooks: { renew: () => renew, lingeringJob: !!process.env.QR_LINGER, ...(process.env.QR_STALL_SETTLE ? { beforeSettle: () => new Promise<void>(() => undefined) } : {}) }
+      })
+      if (!r.ok) return { ok: false, heldBy: r.heldBy, problem: r.problem }
       runner = r.runner
-      return { ok: true, lease: runner.lease, folder: runner.folder() }
+      return { ok: true, lease: runner.lease, folder: runner.folder(), paused: r.paused ?? null }
     }
     case 'holds':
       return { holds: runner?.holds() ?? false }
@@ -32,13 +46,13 @@ async function run(c: Command): Promise<Record<string, unknown>> {
       const r = await runner!.git(project, ['worktree', 'add', '--detach', runner!.folder(), 'HEAD'])
       return { ok: r.ok, err: r.err }
     }
-    case 'sleeper': {
-      // A check that outlives its Hive, with a process of its own, both sleeping. Detached: Node's other children are in
-      // its job object, which Windows ends with it; these stand for what breaks away from it (a detached server, a shell's).
-      const script = "const k = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true }); console.log(k.pid); setInterval(() => {}, 1000)"
-      const child = await runner!.spawn('check', process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'ignore'], detached: true })
-      const grandchild = await new Promise<number>((res) => child.stdout!.once('data', (d) => res(Number(String(d).trim()))))
-      return { pid: child.pid, grandchild }
+    case 'sleeper':
+    case 'server': {
+      // sleeper: a check that runs on, with a detached child; server: a check that starts a detached server and exits.
+      const child = await runner!.spawn('check', process.execPath, ['-e', check(c.op === 'sleeper')])
+      const line = await new Promise<string>((res) => child.stdout!.once('data', (d) => res(String(d).trim())))
+      const [checkPid, detached] = line.split(' ').map(Number)
+      return { launcher: child.pid, check: checkPid, detached }
     }
     case 'release':
       await runner?.release()

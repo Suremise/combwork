@@ -17,7 +17,7 @@ import { hasStage } from '../../shared/workflow/compile'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
-import type { CardRecord } from './factStore'
+import { withWriteFence, type CardRecord } from './factStore'
 import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import type { Workflow, Write } from './runtime'
@@ -41,8 +41,9 @@ export interface QueueConfig {
   /** An agent builds in this folder (holds file locks there, or has a run going in it). */
   folderBusy?: (folder: string) => boolean
   /**
-   * Whether this queue's runner still holds its target's lease (#1360, QueueRunner.holds): checked inside each write
-   * the queue makes (its facts, a pause), which is refused whole once it doesn't, and the queue stops. Left out, always.
+   * Whether this queue's runner still holds its target's lease (#1360, QueueRunner.holds): checked inside every store
+   * write the queue's work makes (its facts, reconciliation's, values, a pause: withWriteFence), which is refused whole
+   * once it doesn't, and the queue stops. Left out, always.
    */
   holds?: () => boolean
   /** Test seams: crash injection and races between the queue's steps. */
@@ -97,18 +98,20 @@ export class MergeQueue {
   }
 
   private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): Promise<QueueOutcome> {
-    await this.wf.locked(() =>
-      this.wf.store.quiet(() => {
-        this.fence(target)
-        this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) })
-      })
-    )
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) }))
     return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
   }
 
-  /** Throws LeaseLost once the runner doesn't hold the target's lease (inside a write: it is refused whole). */
-  private fence(target: string): void {
-    if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
+  /**
+   * Runs the queue's work with every store write it makes fenced by the runner's lease (withWriteFence): checked inside
+   * each write, which throws LeaseLost (undone whole) once the runner doesn't hold the target.
+   */
+  private fenced<T>(target: string, fn: () => Promise<T>): Promise<T> {
+    const holds = this.cfg.holds
+    if (!holds) return fn()
+    return withWriteFence(() => {
+      if (!holds()) throw new LeaseLost(target)
+    }, fn)
   }
 
   /** The queue's entries for a target, in the order they were requested: open, or recovered to run again. */
@@ -141,16 +144,12 @@ export class MergeQueue {
     if (this.paused(target)) return null
     const next = this.entries(target)[0]
     if (!next) return null
-    return this.process(next.card, next.entry).catch(lostIsNull)
+    return this.fenced(target, () => this.process(next.card, next.entry)).catch(lostIsNull)
   }
 
-  /** A write of the queue's for a card, fenced: refused whole (LeaseLost) once its runner doesn't hold the target. */
-  private async write<T>(card: CardRecord, fn: (w: Write) => T, target?: string): Promise<T> {
+  private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
     const s = this.wf.state(card)
-    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', (w) => {
-      this.fence(target ?? s.entries.at(-1)?.target ?? '')
-      return fn(w)
-    })
+    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', fn)
   }
 
   /**
@@ -309,7 +308,7 @@ export class MergeQueue {
     if (this.cfg.install && this.wf.store.meta(key) !== now) {
       const i = await this.cfg.install(f, true)
       if (!i.ok) return { ok: false, transient: !!i.transient, output: i.output }
-      this.wf.store.setMeta(key, now)
+      await this.wf.locked(() => this.wf.store.setMeta(key, now))
     }
     for (const name of o.mergeChecks) {
       const r = await this.cfg.runCheck(name, o.commands[name] ?? name, f)
@@ -420,6 +419,11 @@ export class MergeQueue {
    * recovery table, whose last row pauses the queue for that target ("needs you").
    */
   async recover(): Promise<{ card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[]> {
+    // A runner that lost its lease meanwhile stops, its recovery the next runner's.
+    return this.fenced('', () => this.recoverAll()).catch((e) => lostIsNull(e) ?? [])
+  }
+
+  private async recoverAll(): Promise<{ card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[]> {
     const out: { card: string; entry: string; outcome: 'integrated' | 'rerun' | 'failed' | 'needsYou' }[] = []
     for (const card of this.wf.store.cards()) {
       const s = this.wf.state(card)

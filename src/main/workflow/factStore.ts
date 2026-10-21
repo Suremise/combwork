@@ -10,6 +10,7 @@
 // board's own guarded write path, and its reads are the board's, on one snapshot; on a connection of its own (`open`:
 // another Hive, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
 
+import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
 import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
@@ -90,11 +91,12 @@ export interface QueueLease {
   renewedAt: string
 }
 
-export type QueueProcKind = 'testMerge' | 'install' | 'check'
+export type QueueProcKind = 'supervisor' | 'testMerge' | 'install' | 'check'
 
-/** A process a runner started (queue_runner_procs): its pid, and the clock readings either side of its start. */
+/** A process a runner owns (queue_runner_procs): its pid, and the clock readings either side of its start. */
 export interface QueueProc {
   lease: string
+  target: string
   pid: number
   startAfter: number
   startBefore: number
@@ -154,6 +156,29 @@ const boardConn = (ws: WorkspaceService): Conn => ({
 })
 
 /** SQLite undid a store's own transaction part way (a full disk, an I/O error): nothing of it was saved. */
+/**
+ * The write fence of the work running here (#1360: a merge queue's, whose runner must still hold its target's lease):
+ * checked inside every write a store makes from that work, in the write's own transaction, and throwing to refuse it
+ * whole. Its facts, reconciliation's observed ones, values and pauses alike.
+ */
+const fences = new AsyncLocalStorage<() => void>()
+
+/** Runs `fn` with every store write it makes (in its async context) checked by `check` inside that write. */
+export function withWriteFence<T>(check: () => void, fn: () => Promise<T>): Promise<T> {
+  return fences.run(check, fn)
+}
+
+/** A connection whose writes check the fence of the work making them, inside each write. */
+const fenced = (c: Conn): Conn => ({
+  read: (fn) => c.read(fn),
+  write: (fn, quiet) =>
+    c.write((db) => {
+      fences.getStore()?.()
+      return fn(db)
+    }, quiet),
+  close: () => c.close()
+})
+
 const lostTx = (): Error => new Error("The fact store's write was undone part way: nothing of it was saved") // i18n-ignore: an error from SQLite's side, logged and thrown to the runtime's caller
 
 /**
@@ -235,10 +260,13 @@ export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCa
 export class FactStore {
   private now: () => Date
 
+  private readonly conn: Conn
+
   private constructor(
-    private readonly conn: Conn,
+    conn: Conn,
     readonly scope: Scope
   ) {
+    this.conn = fenced(conn)
     this.now = scope.now ?? (() => new Date())
   }
 
@@ -568,12 +596,16 @@ export class FactStore {
     return this.conn.write((db) => Number(db.prepare('DELETE FROM queue_runners WHERE lease = ? AND token = ?').run(lease, token).changes) > 0, true)
   }
 
-  queueProcs(lease: string): QueueProc[] {
-    return this.conn.read((db) => (db.prepare('SELECT pid, start_after, start_before, what FROM queue_runner_procs WHERE lease = ?').all(lease) as { pid: number; start_after: number; start_before: number; what: QueueProcKind }[]).map((r) => ({ lease, pid: r.pid, startAfter: r.start_after, startBefore: r.start_before, what: r.what })))
+  /** The processes a lease's runner owns, or (`lease` null) every lease's of a target: its duties, kept until seen gone. */
+  queueProcs(lease: string | null, target?: string): QueueProc[] {
+    type Row = { lease: string; target: string; pid: number; start_after: number; start_before: number; what: QueueProcKind }
+    return this.conn.read((db) =>
+      ((lease !== null ? db.prepare('SELECT * FROM queue_runner_procs WHERE lease = ?').all(lease) : db.prepare('SELECT * FROM queue_runner_procs WHERE project = ? AND target = ?').all(this.scope.project, target ?? '')) as Row[]).map((r) => ({ lease: r.lease, target: r.target, pid: r.pid, startAfter: r.start_after, startBefore: r.start_before, what: r.what }))
+    )
   }
 
   addQueueProc(p: QueueProc): void {
-    this.conn.write((db) => db.prepare('INSERT OR REPLACE INTO queue_runner_procs (lease, pid, start_after, start_before, what) VALUES (?, ?, ?, ?, ?)').run(p.lease, p.pid, p.startAfter, p.startBefore, p.what), true)
+    this.conn.write((db) => db.prepare('INSERT OR REPLACE INTO queue_runner_procs (lease, project, target, pid, start_after, start_before, what) VALUES (?, ?, ?, ?, ?, ?, ?)').run(p.lease, this.scope.project, p.target, p.pid, p.startAfter, p.startBefore, p.what), true)
   }
 
   dropQueueProc(lease: string, pid: number): void {

@@ -1,18 +1,22 @@
 // The merge queue's runner (#1360, SPEC §16.9.3): one runner per project and target across Hives on one hive.db, taken
-// over only from a dead process, its processes ended before a takeover goes on, a folder of its own per lease, and every
-// write it guards fenced by its lease. Two Hives are two Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
+// over only from a dead process; every process it starts owned by its lease's job (queueJobs.ts) and recorded before
+// the command exists; an earlier runner's duties settled (its jobs and processes ended and seen gone) before a new one
+// runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
+// fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
 import { existsSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { createInterface } from 'readline'
 import { buildSync } from 'esbuild'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
+import { gitTestHooks } from '../src/main/git'
 import { FactStore } from '../src/main/workflow/factStore'
+import { startLauncher } from '../src/main/workflow/queueJobs'
 import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
-import { windowsProbe, type ProcessProbe } from '../src/main/workflow/queueProcs'
+import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
 
@@ -28,6 +32,8 @@ interface Host {
 
 let bundle = ''
 const hosts: Host[] = []
+/** Processes a test made (checks, their detached children): any still running when it ends are ended. */
+const made: Listed[] = []
 
 beforeAll(() => {
   bundle = join(tempDir('qr-bundle-'), 'host.cjs')
@@ -40,11 +46,43 @@ afterEach(async () => {
     if (h.proc.exitCode === null && h.proc.signalCode === null) h.proc.kill()
     await h.exited
   }
+  await windowsProbe.end(made.splice(0))
 })
 
-/** Starts a Hive (a host process) on a workspace's hive.db, for a project, its worktrees folder and a target. */
-function host(ws: string, project: string, root: string, profile: string, target = 'main'): Host {
-  const proc = spawn(process.execPath, [bundle, boardFile(ws), project, root, profile, target], { env: baseEnv(), stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
+interface World {
+  ws: string
+  project: string
+  root: string
+  store: FactStore
+  close: () => Promise<void>
+}
+
+/** A workspace with a hive.db and a project repository, and the project's worktrees folder (none made yet). */
+function world(): World {
+  const ws = join(tempDir('qr-'), 'ws')
+  const project = gitRepo(join(ws, 'project'))
+  workspaceDb(ws)
+  const store = FactStore.open(boardFile(ws), { project: 'project', key: 'AM' })
+  return {
+    ws,
+    project,
+    root: join(`${ws}.worktrees`, 'project'),
+    store,
+    close: async () => {
+      // Whatever a failed test left recorded (a lingering supervisor) is ended as a runner would.
+      const list = (await windowsProbe.list()) ?? []
+      const left = store.queueProcs(null, 'main').flatMap((d) => list.filter((p) => p.pid === d.pid && p.started >= d.startAfter - 50 && p.started <= d.startBefore + 50))
+      await windowsProbe.end(left)
+      store.close()
+      closeBoard(ws)
+    }
+  }
+}
+
+/** Starts a Hive (a host process) on a world's hive.db, for its project, worktrees folder and `main`. */
+function host(w: World, profile: string, seams: { linger?: boolean; stallSettle?: boolean } = {}): Host {
+  const env = { ...baseEnv(), ...(seams.linger ? { QR_LINGER: '1' } : {}), ...(seams.stallSettle ? { QR_STALL_SETTLE: '1' } : {}) }
+  const proc = spawn(process.execPath, [bundle, boardFile(w.ws), w.project, w.root, profile, 'main'], { env, stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
   const waiting = new Map<number, (r: Record<string, unknown>) => void>()
   createInterface({ input: proc.stdout! }).on('line', (l) => {
     // Its replies (tests/queueRunnerHost.ts); the rest is Hive's log.
@@ -62,119 +100,197 @@ function host(ws: string, project: string, root: string, profile: string, target
       new Promise((res, rej) => {
         const id = ++n
         waiting.set(id, (r) => ('error' in r ? rej(new Error(String(r.error))) : res(r)))
-        proc.stdin!.write(JSON.stringify({ id, op }) + '\n')
+        proc.stdin!.write(`${JSON.stringify({ id, op })}\n`)
       })
   }
   hosts.push(h)
   return h
 }
 
-/** A workspace with a hive.db and a project repository, and the project's worktrees folder (none made yet). */
-function world(): { ws: string; project: string; root: string; store: FactStore; close: () => void } {
-  const ws = tempDir('qr-')
-  const project = gitRepo(join(ws, 'project'))
-  workspaceDb(ws)
-  const store = FactStore.open(boardFile(ws), { project: 'project', key: 'AM' })
-  return {
-    ws,
-    project,
-    root: join(`${ws}.worktrees`, 'project'),
-    store,
-    close: () => {
-      store.close()
-      closeBoard(ws)
-    }
-  }
+/** A process by its pid as running now (its start), kept to be ended if a test fails before it is. */
+async function identify(pid: number): Promise<Listed> {
+  const p = (await windowsProbe.list())!.find((x) => x.pid === pid)
+  if (!p) throw new Error(`process ${pid} isn't running`)
+  made.push(p)
+  return p
 }
 
-describe('one runner per target across Hives (#1360)', { timeout: 120_000 }, () => {
-  it('one runs, and the other doesn\'t while the first lives', async () => {
+const running = (p: Listed): Promise<boolean | null> => windowsProbe.alive(p.pid, p.started)
+
+/** Waits until a process has ended (bounded only against a hang). */
+const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: 30_000, interval: 200 })
+
+const forward = (p: string): string => p.replace(/\\/g, '/')
+
+describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () => {
+  it("one runs, and the other doesn't while the first lives", async () => {
     const w = world()
     try {
-      const a = host(w.ws, w.project, w.root, 'Hive-A')
-      const b = host(w.ws, w.project, w.root, 'Hive-B')
-      expect(await a.ask('acquire')).toMatchObject({ ok: true })
+      const a = host(w, 'Hive-A')
+      const b = host(w, 'Hive-B')
+      expect(await a.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Hive-A', pid: a.proc.pid } })
       expect(await a.ask('holds')).toMatchObject({ holds: true })
       expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-A', pid: a.proc.pid })
     } finally {
-      w.close()
+      await w.close()
     }
   })
 
   it('a stalled Hive keeps its queue: renewals stopped for as long as you like are never a takeover', async () => {
     const w = world()
     try {
-      const a = host(w.ws, w.project, w.root, 'Hive-A')
+      const a = host(w, 'Hive-A')
       await a.ask('acquire')
       await a.ask('stall')
       // Last seen a day ago (a Hive stuck that long): the lease's renewal is only what the panel shows.
-      const own = FactStore.open(boardFile(w.ws), { project: 'project', key: 'AM' })
-      const l = own.queueLease('main')!
+      const l = w.store.queueLease('main')!
       const dayAgo = new Date(Date.now() - 86_400_000).toISOString()
-      own.renewQueueLease(l.lease, l.token, dayAgo)
-      own.close()
-      const b = host(w.ws, w.project, w.root, 'Hive-B')
+      w.store.renewQueueLease(l.lease, l.token, dayAgo)
+      const b = host(w, 'Hive-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Hive-A', renewedAt: dayAgo } })
       expect(await a.ask('holds')).toMatchObject({ holds: true })
     } finally {
-      w.close()
+      await w.close()
     }
   })
 
-  it("a dead runner's queue is taken over: its recorded check (a tree) ended first, a new folder, the old one removed", async () => {
+  it("a crashed Hive's processes end with it, detached ones too: its job closes", async () => {
     const w = world()
     try {
-      const a = host(w.ws, w.project, w.root, 'Hive-A')
+      const a = host(w, 'Hive-A')
+      await a.ask('acquire')
+      const r = (await a.ask('sleeper')) as { check: number; detached: number }
+      const check = await identify(r.check)
+      const detached = await identify(r.detached)
+      a.proc.kill()
+      await a.exited
+      await ends(check)
+      await ends(detached)
+      // Its duties are still recorded: the next runner sees them gone and drops them.
+      const b = host(w, 'Hive-B')
+      expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
+      const mine = w.store.queueLease('main')!.lease
+      expect(w.store.queueProcs(null, 'main').every((p) => p.lease === mine)).toBe(true)
+    } finally {
+      await w.close()
+    }
+  })
+
+  it('a dead runner whose job outlived it is taken over: its job and recorded check ended first, a new folder, the old one removed', async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; folder: string }
       expect(await a.ask('worktree')).toMatchObject({ ok: true })
       expect(existsSync(got.folder)).toBe(true)
-      const { pid, grandchild } = (await a.ask('sleeper')) as { pid: number; grandchild: number }
-      const sleeper = await windowsProbe.list().then((l) => l!.find((p) => p.pid === pid)!)
-      const child = await windowsProbe.list().then((l) => l!.find((p) => p.pid === grandchild)!)
-      expect(w.store.queueProcs(got.lease).map((p) => p.what)).toContain('check')
-      // Hive A ends mid-check (a crash): its check and the check's own child run on.
+      const r = (await a.ask('sleeper')) as { check: number; detached: number }
+      const check = await identify(r.check)
+      const detached = await identify(r.detached)
+      const sup = await identify(w.store.queueProcs(got.lease).find((p) => p.what === 'supervisor')!.pid)
+      // Hive A ends mid-check (a crash); its job's supervisor here doesn't: the check and its child run on.
       a.proc.kill()
       await a.exited
-      expect(await windowsProbe.alive(sleeper.pid, sleeper.started)).toBe(true)
+      expect(await running(check)).toBe(true)
+      expect(await running(detached)).toBe(true)
 
-      const b = host(w.ws, w.project, w.root, 'Hive-B')
-      const took = (await b.ask('acquire')) as { ok: boolean; lease: string; folder: string }
-      expect(took.ok).toBe(true)
+      const b = host(w, 'Hive-B')
+      const took = (await b.ask('acquire')) as { ok: boolean; lease: string; folder: string; paused: number | null }
+      expect(took).toMatchObject({ ok: true, paused: null })
       expect(took.folder).not.toBe(got.folder)
-      expect(await windowsProbe.alive(sleeper.pid, sleeper.started)).toBe(false)
-      expect(await windowsProbe.alive(child.pid, child.started)).toBe(false)
+      expect(await running(check)).toBe(false)
+      expect(await running(detached)).toBe(false)
+      expect(await running(sup)).toBe(false)
       expect(existsSync(got.folder)).toBe(false)
-      expect(sh(w.project, 'worktree', 'list', '--porcelain')).not.toContain(got.folder.replace(/\\/g, '/'))
+      expect(forward(sh(w.project, 'worktree', 'list', '--porcelain'))).not.toContain(forward(got.folder))
       expect(w.store.queueProcs(got.lease)).toEqual([])
       expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-B', lease: took.lease, pid: b.proc.pid })
       expect(w.store.queueFolders('main').map((f) => f.folder)).toEqual([took.folder])
     } finally {
-      w.close()
+      await w.close()
     }
   })
 
-  it('a release ends its processes, then gives the lease up for the next Hive (keeping nothing the queue no longer needs)', async () => {
+  it('two crashes in a row (HR4 r1 #2): the runner that crashed mid-takeover leaves the duties, and the next settles them all before it runs', async () => {
     const w = world()
     try {
-      const a = host(w.ws, w.project, w.root, 'Hive-A')
+      const a = host(w, 'Hive-A', { linger: true })
+      const got = (await a.ask('acquire')) as { lease: string; folder: string }
+      await a.ask('worktree')
+      const r = (await a.ask('sleeper')) as { check: number; detached: number }
+      const check = await identify(r.check)
+      const detached = await identify(r.detached)
+      a.proc.kill()
+      await a.exited
+      // B takes the lease and its job, stops before ending anything (it never answers), then crashes.
+      const b = host(w, 'Hive-B', { stallSettle: true })
+      void b.ask('acquire').catch(() => undefined)
+      const bReady = (): boolean => {
+        const l = w.store.queueLease('main')
+        return !!l && l.profile === 'Hive-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'supervisor')
+      }
+      await vi.waitFor(() => expect(bReady()).toBe(true), { timeout: 90_000, interval: 100 })
+      b.proc.kill()
+      await b.exited
+      expect(await running(check)).toBe(true)
+      expect(await running(detached)).toBe(true)
+
+      const c = host(w, 'Hive-C')
+      expect(await c.ask('acquire')).toMatchObject({ ok: true, paused: null })
+      expect(await running(check)).toBe(false)
+      expect(await running(detached)).toBe(false)
+      const mine = w.store.queueLease('main')!.lease
+      expect(w.store.queueProcs(null, 'main').every((p) => p.lease === mine)).toBe(true)
+      expect(existsSync(got.folder)).toBe(false)
+    } finally {
+      await w.close()
+    }
+  })
+
+  it('a check that starts a detached server and exits (HR4 r1 #3): the server is in the job, and the release ends it', async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A')
+      const got = (await a.ask('acquire')) as { lease: string }
+      const r = (await a.ask('server')) as { check: number; detached: number }
+      const server = await identify(r.detached)
+      // The check has exited: its launcher's record goes, and the server runs on in the job.
+      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['supervisor']), { timeout: 30_000, interval: 100 })
+      expect(await running(server)).toBe(true)
+      await a.ask('release')
+      expect(await running(server)).toBe(false)
+      expect(w.store.queueLease('main')).toBeNull()
+      expect(w.store.queueProcs(null, 'main')).toEqual([])
+      const b = host(w, 'Hive-B')
+      expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
+    } finally {
+      await w.close()
+    }
+  })
+
+  it('a release ends a check still running, then gives the lease up for the next Hive (keeping nothing the queue no longer needs)', async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A')
       const got = (await a.ask('acquire')) as { folder: string }
       await a.ask('worktree')
-      const { pid } = (await a.ask('sleeper')) as { pid: number }
-      const sleeper = await windowsProbe.list().then((l) => l!.find((p) => p.pid === pid)!)
+      const r = (await a.ask('sleeper')) as { check: number; detached: number }
+      const check = await identify(r.check)
+      const detached = await identify(r.detached)
       await a.ask('release')
-      expect(await windowsProbe.alive(sleeper.pid, sleeper.started)).toBe(false)
+      expect(await running(check)).toBe(false)
+      expect(await running(detached)).toBe(false)
       expect(w.store.queueLease('main')).toBeNull()
       expect(existsSync(got.folder)).toBe(false)
-      const b = host(w.ws, w.project, w.root, 'Hive-B')
+      const b = host(w, 'Hive-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true })
     } finally {
-      w.close()
+      await w.close()
     }
   })
 })
 
-/** A probe for in-process tests: these pids are dead, every other alive; nothing to list or end. */
+/** A probe for in-process tests: these pids are dead, every other alive; nothing listed or ended. */
 const probeWith = (dead: Set<number>, self = { pid: 1001, started: 5 }): ProcessProbe => ({
   self: async () => self,
   alive: async (pid) => !dead.has(pid),
@@ -186,40 +302,43 @@ const probeWith = (dead: Set<number>, self = { pid: 1001, started: 5 }): Process
 const team = (): Env => setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } })
 
 /** A card approved and queued: started by B1, committed, submitted, passed by R1. */
-async function queued(e: Env): Promise<{ card: ReturnType<Env['wf']['createCard']> }> {
+async function queued(e: Env): Promise<{ card: ReturnType<Env['wf']['createCard']>; folder: string }> {
   const card = e.wf.createCard({ title: 'Change' })
   const s = await e.wf.start(card.key, B1)
   moved(s)
-  commit(s.data!.folder as string, { 'src/c.txt': 'c\n' }, `${card.key}: Change`)
+  const folder = s.data!.folder as string
+  commit(folder, { 'src/c.txt': 'c\n' }, `${card.key}: Change`)
   moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   moved(await e.wf.startReview(card.key, R1))
   moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
-  return { card }
+  return { card, folder }
 }
 
-describe("a runner's fence and folders (#1360)", () => {
-  let w: ReturnType<typeof world>
-  beforeAll(() => {
-    w = world()
-  })
-  afterAll(() => w.close())
+const rootOf = (e: Env): string => join(`${e.home}.worktrees`, 'project')
 
+describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
   it('a stale runner resuming after a takeover finds holds() false and writes nothing', async () => {
     const e = team()
     try {
       const { card } = await queued(e)
       const before = sh(e.project, 'rev-parse', 'main')
-      const a = (await QueueRunner.acquire({ store: e.store, project: e.project, target: 'main', root: join(`${e.home}.worktrees`, 'project'), profile: 'A', probe: probeWith(new Set()) })) as { ok: true; runner: QueueRunner }
+      const a = (await QueueRunner.acquire({ store: e.store, project: e.project, target: 'main', root: rootOf(e), profile: 'A', probe: probeWith(new Set()) })) as { ok: true; runner: QueueRunner }
       const runner = a.runner
-      // Mid-entry, after its test merge, another Hive finds A's process gone (as it looks from there) and takes over.
+      // Mid-entry, after its test merge, another Hive finds A's process gone (as it looks from there) and takes over:
+      // set going here, outside A's queue (whose work is fenced by A's lease), and let go from the queue's seam.
       const other = e.reopen()
       let b: QueueRunner | null = null
+      let go!: () => void
+      const takeover = new Promise<void>((res) => (go = res)).then(async () => {
+        b = ((await QueueRunner.acquire({ store: other, project: e.project, target: 'main', root: rootOf(e), profile: 'B', probe: probeWith(new Set([1001]), { pid: 2002, started: 7 }) })) as { ok: true; runner: QueueRunner }).runner
+      })
       const q = e.queue({
         folder: runner.folder(),
         holds: () => runner.holds(),
         hooks: {
           afterTest: async () => {
-            b = ((await QueueRunner.acquire({ store: other, project: e.project, target: 'main', root: join(`${e.home}.worktrees`, 'project'), profile: 'B', probe: probeWith(new Set([1001]), { pid: 2002, started: 7 }) })) as { ok: true; runner: QueueRunner }).runner
+            go()
+            await takeover
           }
         }
       })
@@ -233,12 +352,122 @@ describe("a runner's fence and folders (#1360)", () => {
       // And starts nothing: a spawn is refused before it starts, and nothing is recorded.
       await expect(runner.spawn('check', process.execPath, ['-e', ''])).rejects.toBeInstanceOf(LeaseLost)
       await expect(runner.git(e.project, ['status'])).rejects.toBeInstanceOf(LeaseLost)
-      expect(e.store.queueProcs(runner.lease)).toEqual([])
+      expect(e.store.queueProcs(runner.lease).filter((p) => p.what !== 'supervisor')).toEqual([])
       expect(e.store.queueLease('main')).toMatchObject({ profile: 'B', lease: b!.lease })
+      await runner.release()
       await b!.release()
     } finally {
       e.close()
     }
+  })
+
+  it('HR4 r1 #4: a stale queue finding its change merged outside Hive writes nothing: containment is fenced too', async () => {
+    const e = team()
+    try {
+      const { card, folder } = await queued(e)
+      sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(folder, 'rev-parse', 'HEAD'))
+      const facts = e.kinds(card.id)
+      const q = e.queue({ holds: () => false })
+      expect(await q.drain('main')).toEqual([])
+      expect(e.kinds(card.id)).toEqual(facts)
+      expect(e.wf.state(card).stage).toBe('merging')
+      expect(await q.recover()).toEqual([])
+      expect(e.kinds(card.id)).toEqual(facts)
+    } finally {
+      e.close()
+    }
+  })
+
+  it('HR4 r1 #4: the lease lost while the queue awaits git, before reconciliation writes: nothing written', async () => {
+    const e = team()
+    try {
+      const { card, folder } = await queued(e)
+      sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(folder, 'rev-parse', 'HEAD'))
+      const facts = e.kinds(card.id)
+      let lost = false
+      // Another Hive takes the lease while this one's first git read runs.
+      gitTestHooks.started = () => {
+        lost = true
+      }
+      const q = e.queue({ holds: () => !lost })
+      expect(await q.drain('main')).toEqual([])
+      expect(lost).toBe(true)
+      expect(e.kinds(card.id)).toEqual(facts)
+      // With its lease, the same queue observes the hand merge (the control).
+      gitTestHooks.started = undefined
+      lost = false
+      expect(await e.queue({ holds: () => true }).drain('main')).toMatchObject([{ outcome: 'integratedOutside' }])
+    } finally {
+      gitTestHooks.started = undefined
+      e.close()
+    }
+  })
+})
+
+describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () => {
+  let w: World
+  beforeAll(() => {
+    w = world()
+  })
+  afterAll(() => w.close())
+
+  it('HR4 r1 #1: a command never runs before its launcher is in the job and recorded: a record that fails runs nothing', async () => {
+    const marker = join(tempDir('qr-marker-'), 'ran')
+    const write = ['-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'record', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    const add = w.store.addQueueProc.bind(w.store)
+    let launcher = 0
+    // The record's write fails (a full disk, a lock): the launch is given up.
+    w.store.addQueueProc = (p) => {
+      if (p.what === 'check') {
+        launcher = p.pid
+        throw new Error('disk full')
+      }
+      add(p)
+    }
+    try {
+      await expect(a.runner.spawn('check', process.execPath, write)).rejects.toThrow('disk full')
+    } finally {
+      w.store.addQueueProc = add
+    }
+    // Its launcher has gone, having run nothing.
+    expect(launcher).toBeGreaterThan(0)
+    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === launcher)).toBe(false), { timeout: 30_000, interval: 100 })
+    expect(existsSync(marker)).toBe(false)
+    // Recorded, the same command runs.
+    expect(await a.runner.run('check', process.execPath, write)).toMatchObject({ ok: true, code: 0 })
+    expect(existsSync(marker)).toBe(true)
+    await a.runner.release()
+  })
+
+  it('HR4 r1 #1: a launcher whose Hive is gone before the go-ahead (its input closed) exits, running nothing', async () => {
+    const marker = join(tempDir('qr-marker-'), 'ran')
+    const { child } = startLauncher({ command: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`] }, { env: baseEnv() })
+    const code = new Promise<number | null>((res) => child.once('exit', (c) => res(c)))
+    child.stdin!.end()
+    expect(await code).toBe(70)
+    expect(existsSync(marker)).toBe(false)
+  })
+
+  it("a job that can't be seen empty keeps its duties for the next runner, which pauses until it can end them, then runs", async () => {
+    let endable = false
+    const cfg = { store: w.store, project: w.project, target: 'stuck', root: w.root, profile: 'A', hooks: { endJob: () => endable } }
+    const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    await a.runner.release()
+    // Released, but its job wasn't seen empty: its duties and folder stay, only the lease goes.
+    expect(w.store.queueLease('stuck')).toBeNull()
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor'])
+    const b = (await QueueRunner.acquire({ ...cfg, profile: 'B' })) as { ok: true; runner: QueueRunner; paused?: number }
+    expect(b.ok).toBe(true)
+    expect(b.paused).toBe(w.store.queueProcs(a.runner.lease)[0].pid)
+    expect(w.store.queuePause('stuck')).toMatchObject({ reason: 'needsYou', pid: b.paused })
+    // Once it can end them: settled, the pause it made lifted.
+    endable = true
+    expect(await b.runner.settle()).toBeNull()
+    expect(w.store.queueProcs(a.runner.lease)).toEqual([])
+    expect(w.store.queuePause('stuck')).toBeNull()
+    await b.runner.release()
+    expect(w.store.queueProcs(null, 'stuck')).toEqual([])
   })
 
   it('collision-safe names: targets a/b and a-b get different folders, each per lease', () => {
@@ -254,7 +483,7 @@ describe("a runner's fence and folders (#1360)", () => {
 
   it('a clean release keeps the folder the queue still needs, and the next runner takes it up', async () => {
     let needed = true
-    const cfg = { store: w.store, project: w.project, target: 'kept', root: w.root, profile: 'A', probe: probeWith(new Set()), needed: async () => needed }
+    const cfg = { store: w.store, project: w.project, target: 'kept', root: w.root, profile: 'A', needed: async () => needed }
     const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
     const r = await a.runner.git(w.project, ['worktree', 'add', '--detach', a.runner.folder(), 'HEAD'])
     expect(r.ok).toBe(true)

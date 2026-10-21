@@ -635,18 +635,23 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       renewed_at TEXT    NOT NULL,
       PRIMARY KEY (project, target)
     ) STRICT, WITHOUT ROWID`,
-    // The processes a runner started (git in its folder, an install, a check), recorded as each starts and removed when it
-    // ends: what a takeover ends of a dead runner's. A child's start time is known only between two clock readings around
-    // its start (`start_after`, `start_before`, Unix ms): a process with its pid that started outside them is another's.
-    // No foreign key: a takeover replaces the lease row and then ends what the old lease's rows name.
+    // The processes a runner owns: its supervisor (which holds the lease's job, queueJobs.ts) and each command's launcher
+    // (git in its folder, an install, a check), recorded before the command exists. A row is a duty, kept until its
+    // process and its lease's job are seen gone: by its runner's release, or by whichever runner of the target next takes
+    // the lease (a takeover), however many runners crash before that. A launcher's start is known only between two clock
+    // readings around it (`start_after`, `start_before`, Unix ms; a supervisor's exactly, both the same): a process with
+    // its pid that started outside them is another's. No foreign key: the duty outlives its lease row.
     `CREATE TABLE queue_runner_procs (
       lease        TEXT    NOT NULL,
+      project      TEXT    NOT NULL COLLATE NOCASE,
+      target       TEXT    NOT NULL,
       pid          INTEGER NOT NULL,
       start_after  INTEGER NOT NULL,
       start_before INTEGER NOT NULL,
-      what         TEXT    NOT NULL CHECK (what IN ('testMerge', 'install', 'check')),
+      what         TEXT    NOT NULL CHECK (what IN ('supervisor', 'testMerge', 'install', 'check')),
       PRIMARY KEY (lease, pid)
     ) STRICT, WITHOUT ROWID`,
+    'CREATE INDEX queue_runner_procs_target ON queue_runner_procs (project, target)',
     // A queue's worktree: its target and the lease it was made for (null: kept by a runner that released it cleanly, for
     // the next one to use), for clean-up, Unused Worktrees and Repair.
     `CREATE TABLE queue_worktrees (
@@ -752,6 +757,7 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },
   'queueRunnerProcs.of': { sql: 'SELECT pid, start_after, start_before, what FROM queue_runner_procs WHERE lease = ?', args: ['l1'], index: 'PRIMARY KEY' },
+  'queueRunnerProcs.ofTarget': { sql: 'SELECT * FROM queue_runner_procs WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_runner_procs_target' },
   'queueWorktrees.of': { sql: 'SELECT folder, lease FROM queue_worktrees WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_worktrees_target' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
