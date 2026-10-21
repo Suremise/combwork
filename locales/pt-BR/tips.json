@@ -196,6 +196,8 @@
   "tips.modes.title": "Modos para o Assistente",
   "tips.moreAgents.text": "Precisa de mais de {usual, plural, one {# agente} other {# agentes}} em um projeto? Aumente Agentes por projeto em Configurações → Avançado, até {most, number}, para todos os espaços de trabalho ou só para este. Acima de {usual, number}, ele mostra quanto eles custam no seu computador: a memória que seus agentes em execução usam e quanto está livre.",
   "tips.moreAgents.title": "Mais de {usual, plural, one {# agente} other {# agentes}}",
+  "tips.moveAnyway.text": "Arrastar um cartão além de uma regra do projeto (para Concluído antes da revisão, por exemplo) pergunta antes e nomeia as regras puladas. Mover mesmo assim registra uma exceção no cartão, com o seu motivo: um cadeado aberto no cartão mostra quem, quais regras e por quê.",
+  "tips.moveAnyway.title": "Mover um cartão passando por cima das regras, com um motivo",
   "tips.myPrices.text": "O custo do Claude Code é o número dele mesmo, da tabela de preços dele. Tem outras tarifas (um desconto, outro plano)? Defina Custos de sessão como Meus preços, e o Hive calcula o preço de cada sessão pela sua tabela.",
   "tips.myPrices.title": "Seus próprios preços para o Claude Code",
   "tips.newCard.text": "Pressione {key} para criar um cartão no projeto em que você está, sem sair do que está fazendo.",

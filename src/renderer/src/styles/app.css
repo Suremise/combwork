@@ -2788,6 +2788,15 @@ p.hint {
 .dialog-list li + li {
   margin-top: 2px;
 }
+/* A list to read, not to copy (the rules a move skips, #1275): in the dialog's own type. */
+.dialog-list.plain ul {
+  font-family: inherit;
+  font-size: inherit;
+}
+.dialog-field-label {
+  display: block;
+  margin-block-end: 4px;
+}
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
@@ -8146,6 +8155,10 @@ body.pane-resizing-v .monaco-editor {
 }
 .task-work-badge.old {
   opacity: 0.6;
+}
+/* A move past the card's rules (#1275): its own icon (an open lock) and colour, beside the other marks. */
+.task-work-badge.override .codicon {
+  color: var(--info);
 }
 .task-label {
   background: var(--bg-active);

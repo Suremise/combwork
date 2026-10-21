@@ -4,7 +4,9 @@ import { formatDateTime } from '@shared/dates'
 import { columnName } from '@shared/tasks'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { ProjectInfo, TaskCard } from '@shared/types'
-import { checksOn, type WorkBadge, type WorkCheck, type WorkRevision, type WorkVerdict, type WorkView } from '@shared/workflow/workView'
+import { checksOn, type WorkBadge, type WorkCheck, type WorkOverride, type WorkRevision, type WorkVerdict, type WorkView } from '@shared/workflow/workView'
+import { RULE_NAMES } from '@shared/workflow/texts'
+import { overrideNote, type OverrideNames } from '@shared/laneBar'
 import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
 import { notify, useStore } from '../store'
@@ -281,6 +283,21 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
   )
 }
 
+/** How the window names the rules a move skipped (a rule this Hive has no name for: its id). */
+export const OVERRIDE_NAMES: OverrideNames = { list: (items, type) => fmt.list(items, type), ruleName: (r) => (RULE_NAMES[r] ? tr(RULE_NAMES[r]) : r) }
+
+/** A card moved past its rules (#1275, §16.8.4): who did it, which rules and why, in its tooltip and accessible name. */
+function OverrideMark({ o }: { o: WorkOverride }) {
+  const text = overrideNote(o, tr, OVERRIDE_NAMES)
+  return (
+    <Tooltip content={text}>
+      <span className="task-work-badge override" aria-label={text} data-badge="override">
+        <Icon name="unlock" />
+      </span>
+    </Tooltip>
+  )
+}
+
 /**
  * A board card's work badges (#1224): the revision under review, the last verdict and on which revision, the checks on
  * it, and a stale or outside-the-rules mark. Quiet, on one line, each with an icon and an accessible name (colour never
@@ -289,7 +306,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
 export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { project: string; column: string } }) {
   const { short } = useProjectOf(card)
   if (!b || b.preWorkflow) return null
-  const shown = b.revision || b.verdict || b.checks.passed + b.checks.failed > 0 || b.stale || b.outsideRules
+  const shown = b.revision || b.verdict || b.checks.passed + b.checks.failed > 0 || b.stale || b.outsideRules || b.override
   if (!shown) return null
   const revisionText = b.revision ? tr(LANE.revision, { review: card.column === 'review' ? 'yes' : 'no', revision: short(b.revision) }) : ''
   const verdictText = b.verdict ? tr(LANE.verdict, { pass: b.verdict.pass ? 'yes' : 'no', revision: b.verdict.revision ? short(b.verdict.revision) : 'none', current: b.verdict.current ? 'yes' : 'no' }) : '' // i18n-ignore: select keys, never shown
@@ -332,6 +349,7 @@ export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { proj
           </span>
         </Tooltip>
       )}
+      {b.override && <OverrideMark o={b.override} />}
       {b.outsideRules && (
         <Tooltip content={tr(M.badgeOutside)}>
           <span className="task-work-badge warn" aria-label={tr(M.badgeOutside)}>

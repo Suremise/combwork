@@ -198,6 +198,8 @@ interface HiveMessageValues {
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }
   'tips.moreAgents.title': { usual: number }
+  'tips.moveAnyway.text': undefined
+  'tips.moveAnyway.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
