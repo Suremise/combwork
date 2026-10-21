@@ -19,6 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
+import { markClosed, markOpen } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -281,6 +282,7 @@ export class WorkspaceService {
       await this.close()
       this.generation++
       this.path = abs
+      markOpen(abs)
     })
     admission = admit.catch(() => undefined)
     await admit
@@ -323,8 +325,11 @@ export class WorkspaceService {
     this.generation++
     // What was said of the projects' platforms is this workspace's.
     this.platformOffers.clear()
-    this.life.abort(hiveError(M.closed, undefined, { kind: 'conflict' }))
+    const reason = hiveError(M.closed, undefined, { kind: 'conflict' })
+    this.life.abort(reason)
     const closing = this.path
+    // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
+    if (closing) markClosed(closing, reason)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -951,9 +956,14 @@ export class WorkspaceService {
     return { workspace: p.workspace, scope: p.scope }
   }
 
-  /** A session host's records (#1061: in the workspace's database). */
-  async sessionsFile(projectPath: string): Promise<SessionsFile> {
-    return readSessions(await this.sessionsPlace(projectPath))
+  /**
+   * A session host's records (#1061: in the workspace's database). `signal`: the opening of the workspace they're read
+   * for (background work); once it's aborted nothing is read, so a closed workspace's database isn't opened again (#1379).
+   */
+  async sessionsFile(projectPath: string, signal?: AbortSignal): Promise<SessionsFile> {
+    const place = await this.sessionsPlace(projectPath)
+    signal?.throwIfAborted()
+    return readSessions(place, signal)
   }
 
   /** One of a host's session records by its id (#1211: read by its key, not with every record), or undefined. */
