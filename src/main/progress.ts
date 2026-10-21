@@ -15,6 +15,8 @@ export type ProgressCaller =
   | { source: 'agent'; workspacePath: string; projectPath: string; agentId: string; agentName: string; provider: ProviderId | null }
   | { source: 'assistant'; workspacePath: string; agentName: string; provider: ProviderId | null }
   | { source: 'api'; workspacePath: string }
+  /** Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them. */
+  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean }
 
 /** Whether reports are taken now, and a number that changes every time that setting changes (off, or on again). */
 export interface ProgressGate {
@@ -75,6 +77,9 @@ export interface ProgressDeps {
 
 const key = (p: string): string => p.toLowerCase()
 
+/** The stored name of Hive's own runs (#1349); the window shows it in its language (`defaultName`). */
+export const HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, which agents read too
+
 /** Optional integer field: undefined when absent, else a whole number in range (400 otherwise). */
 function int(v: unknown, name: string, min: number, max: number): number | undefined {
   if (v === undefined || v === null) return undefined
@@ -93,7 +98,7 @@ function text(v: unknown, name: string, max: number): string | undefined {
 }
 
 const KEPT_STATES = new Set<unknown>(['passed', 'failed', 'stale', 'stopped'])
-const SOURCES = new Set<unknown>(['agent', 'assistant', 'api'])
+const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'hive'])
 
 /** A kept text field, cut to its limit, or null when it isn't text. */
 const keptText = (v: unknown, max: number): string | null => (typeof v === 'string' ? text(v, '', max) || null : null)
@@ -123,13 +128,14 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     out.push({
       id,
       workspacePath,
-      projectPath: source === 'agent' ? keptText(r.projectPath, 1000) : null,
+      projectPath: source === 'agent' || source === 'hive' ? keptText(r.projectPath, 1000) : null,
       agentId: source === 'agent' ? keptText(r.agentId, 200) : null,
-      agentName: named ?? (source === 'api' ? 'Script' : 'Agent'), // i18n-ignore: a run's stored name for a script, which agents read too
-      // A script's name is always Hive's (scripts don't name themselves, start()); an agent's only when it has none, or
-      // when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is read again after a save).
-      ...(source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
-      provider: PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
+      agentName: source === 'hive' ? HIVE_RUNS : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
+      // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
+      // read again after a save).
+      ...(source === 'hive' ? { defaultName: 'mergeQueue' as const } : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      provider: source !== 'hive' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
       command: keptText(r.command, MAX_COMMAND),
@@ -154,6 +160,7 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
       ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
       ...runFor(keptFor(r)),
       ...keptCounts(r.counts)
     })
@@ -336,11 +343,11 @@ export class ProgressStore {
     const run: ProgressRun = {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
-      projectPath: caller.source === 'agent' ? caller.projectPath : null,
+      projectPath: caller.source === 'agent' || caller.source === 'hive' ? caller.projectPath : null,
       agentId: caller.source === 'agent' ? caller.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : {}),
-      provider: caller.source === 'api' ? null : caller.provider,
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? HIVE_RUNS : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? { defaultName: 'mergeQueue' as const } : {}),
+      provider: caller.source === 'api' || caller.source === 'hive' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,
       command: command || null,
@@ -366,6 +373,7 @@ export class ProgressStore {
       exitCode: null,
       logPath: null,
       ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...(caller.source === 'hive' && caller.noInstall ? { noInstall: true as const } : {}),
       ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])
@@ -493,6 +501,8 @@ export class ProgressStore {
           continue
         }
         if (r.state !== 'running') continue
+        // Hive's own runs have no reporter to fall quiet: Hive ends each one itself (its time limit included).
+        if (r.source === 'hive') continue
         const stopped = r.source !== 'api' && !this.deps.ownerRunning(r)
         if (stopped || isOverdue(r, now)) {
           r.state = 'stale'
@@ -572,9 +582,14 @@ export class ProgressStore {
     this.ended(workspacePath)
   }
 
-  /** Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace. */
+  /**
+   * Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace but Hive's,
+   * and Hive (its merge queue) only its own for that project.
+   */
   private owns(caller: ProgressCaller, r: ProgressRun, forLimit = false): boolean {
     if (key(r.workspacePath) !== key(caller.workspacePath)) return false
+    if (caller.source === 'hive') return r.source === 'hive' && key(r.projectPath ?? '') === key(caller.projectPath)
+    if (r.source === 'hive') return false
     if (caller.source === 'api') return forLimit ? r.source === 'api' : true
     if (caller.source === 'assistant') return r.source === 'assistant'
     return r.source === 'agent' && r.agentId === caller.agentId && key(r.projectPath ?? '') === key(caller.projectPath)

@@ -170,6 +170,8 @@
   "settings.advanced.hive.prompt.clearDraft.title": "Hive 输入前清除 CLI 中的草稿",
   "settings.advanced.hive.prompt.rawCardStart.desc": "在智能体上开始一张卡片时，Hive 会用自己的话包装后交给它：它是看板上的哪张卡片、依赖什么、先读哪些文档，以及要遵循哪个技能。开启后，智能体只获得卡片的标题和描述，以及你开始时写下的内容。Hive 的其他提示（唤醒和消息）保持不变：那是 Hive 与其智能体交流的方式。",
   "settings.advanced.hive.prompt.rawCardStart.title": "卡片以它自己的文字开始",
+  "settings.advanced.hive.queue.checkMinutes.desc": "合并队列在结束合并前检查或安装之前允许其运行的时长。这样结束的检查是环境的失败，而不是工作的失败：卡片会带着这一标记退回，其构建者可以把同一修订版本再次送回队列。项目的检查确实需要更长时间时调高它；太长的话，一个卡住的检查会让队列停那么久。",
+  "settings.advanced.hive.queue.checkMinutes.title": "合并队列：合并前检查的最长运行时间",
   "settings.advanced.hive.recorder.afterSeconds.desc": "触发后，捕获记录要等待多久才保存，这样它也能包含随后发生的事情：CLI 接下来做了什么。",
   "settings.advanced.hive.recorder.afterSeconds.title": "飞行记录器：触发后等待",
   "settings.advanced.hive.recorder.keep.desc": "Hive 在 console-recordings 文件夹中保留多少条捕获记录：超出后删除最旧的。你在开发者控制台中自己录制的内容永远不会被删除。",

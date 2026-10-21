@@ -170,6 +170,8 @@
   "settings.advanced.hive.prompt.clearDraft.title": "Clear the CLI's draft before Hive types",
   "settings.advanced.hive.prompt.rawCardStart.desc": "When a card is started on an agent, Hive gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Hive's other prompts (its wakes and messages) stay as they are: they are how Hive and its agents talk.",
   "settings.advanced.hive.prompt.rawCardStart.title": "A card's start in its own words",
+  "settings.advanced.hive.queue.checkMinutes.desc": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
+  "settings.advanced.hive.queue.checkMinutes.title": "Merge queue: longest a merge check runs",
   "settings.advanced.hive.recorder.afterSeconds.desc": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
   "settings.advanced.hive.recorder.afterSeconds.title": "Flight recorder: wait after a trigger",
   "settings.advanced.hive.recorder.keep.desc": "How many captures Hive keeps in its console-recordings folder: past it, the oldest go. Recordings you made in the developer console are never removed.",
