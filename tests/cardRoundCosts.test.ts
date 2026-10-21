@@ -43,7 +43,7 @@ describe('roundSpans on the facts the runtime writes (#1226)', () => {
   })
   const pair = (more: Record<string, unknown> = {}): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], finish: 'agentMerges', ...more } as never))
   async function startedCard(e: Env) {
-    const card = e.wf.createCard({ title: 'Costed', reviewer: 'R1' })
+    const card = e.wf.createCard({ title: 'Costed' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const folder = s.data!.folder as string

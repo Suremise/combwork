@@ -118,11 +118,16 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
   let had = committed.get(cacheKey(path, store))
   const next = new Map<string, string>()
   transaction(db, () => {
-    if (!had || had.gen !== gen) had = { path, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
+    // A store others write too (the runtime's lanes, #1291) is compared with what the table has now.
+    if (!had || had.gen !== gen || def.shared) had = { path, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
     const before = had.docs
     // Those no longer in the list go first: a new entry may take what one of them held (an agent's one watch).
     const kept = new Set(keys)
-    for (const key of before.keys()) if (!kept.has(key)) deleteByKey(db, store, key)
+    for (const key of before.keys())
+      if (!kept.has(key)) {
+        deleteByKey(db, store, key)
+        def.onRemove?.(db, key)
+      }
     // A place is part of a lane's or watch's row: one that moved is written again, as one that changed.
     const placeOf = new Map<string, number>()
     if (store !== 'metrics') readPlaces(db, def.main).forEach((ord, k) => placeOf.set(k, ord))

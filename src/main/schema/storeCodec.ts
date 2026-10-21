@@ -112,6 +112,13 @@ export interface TableDef {
   decode: (main: Row, children: Record<string, Row[]>) => unknown
   /** An entry's row key in memory (lanes and watches: their id, made unique; metrics: span and start). */
   keyOf: (main: Row) => string
+  /**
+   * Rows another module keeps under an entry's key, removed when the entry leaves the store (not when it is written
+   * again): the runtime's part of a lane (#1291), kept beside lanes.ts's rows.
+   */
+  onRemove?: (db: DatabaseSync, key: string) => void
+  /** Others write the store's rows too (the runtime, a lane's cards and state): a save compares with the table, never its own last save. */
+  shared?: boolean
 }
 
 const LANE_KNOWN = new Set(['id', 'project', 'projectId', 'name', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'state', 'startedBy', 'startedAt', 'updatedAt', 'endedAt', 'mergeCommit', 'frozen'])
@@ -191,7 +198,12 @@ const LANES: TableDef = {
     }
     return withExtra(lane, parseExtra(m.extra))
   },
-  keyOf: (m) => String(m.id)
+  keyOf: (m) => String(m.id),
+  onRemove: (db, key) => {
+    db.prepare('DELETE FROM lane_runs WHERE lane = ?').run(key) // i18n-ignore: SQL
+    db.prepare('DELETE FROM lane_pending WHERE lane = ?').run(key) // i18n-ignore: SQL
+  },
+  shared: true
 }
 
 /** A watch's fields kept as JSON (its own view of what it watches, never queried across watches), by column. */

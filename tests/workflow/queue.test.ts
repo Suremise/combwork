@@ -20,7 +20,7 @@ const team = (over: Partial<ReturnType<typeof preset>> = {}, extra: Parameters<t
 
 /** A card approved and queued: started by B1, committed, submitted, passed by R1. */
 async function queued(e: Env, title = 'Change', files: Record<string, string> = { 'src/c.txt': 'c\n' }, labels: string[] = []) {
-  const card = e.wf.createCard({ title, reviewer: 'R1', labels })
+  const card = e.wf.createCard({ title, labels })
   const s = await e.wf.start(card.key, B1)
   moved(s)
   // With actions left pending (a crash's view), the folder is prepared here.
@@ -199,7 +199,9 @@ describe('the merge queue', () => {
     r.store.close()
 
     // (b) After the fact commit and before the reviewer's wake: delivered once after the restart, even run twice.
-    const b = e.wf.createCard({ title: 'Wake', reviewer: 'R1' })
+    const b = e.wf.createCard({ title: 'Wake' })
+    // The reviewer to wake is its lane's (#1291).
+    e.wf.startLane('Lb', [b.id], 'R1')
     const sb = await e.wf.start(b.key, B1)
     moved(sb)
     await e.wf.runActions()
@@ -288,7 +290,7 @@ describe('the merge queue', () => {
     sh(e.project, 'branch', '-q', '-D', line)
     await reconcile(e.wf, a)
     expect(e.wf.state(a)).toMatchObject({ stage: 'done' })
-    const b = e.wf.createCard({ title: 'AM-13 work', reviewer: 'R1' })
+    const b = e.wf.createCard({ title: 'AM-13 work' })
     const sb = await e.wf.start(b.key, B1)
     moved(sb)
     commit(sb.data!.folder as string, { 'thirteen.txt': '13\n' }, '13')

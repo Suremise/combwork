@@ -415,8 +415,8 @@ export const FACTS_STEP: SchemaStep = {
     // What the runtime keeps of a card besides its document (#1215; the Assistant for Darren, 20 Oct: typed, never JSON).
     // Columns of the card's row outside its JSON document, as `stage`: the Agent API's card is unchanged, and tasks.ts'
     // saves of the document keep them. `kind` code or no-code (§16.4.2); `target` a per-card target (OP-12); `lane` the
-    // runtime's lane whose ruleset the card uses and `lane_reviewer` its reviewer to wake (§16.11.1), until P4 wires the
-    // runtime to lanes.ts; `paths_declared` whether None's declared paths were ever set (an empty list is a declaration).
+    // runtime's lane whose ruleset the card uses and `lane_reviewer` its reviewer to wake (§16.11.1), until #1291's step
+    // reads them from lanes.ts's tables and drops them; `paths_declared` whether None's declared paths were ever set (an empty list is a declaration).
     "ALTER TABLE cards ADD COLUMN kind TEXT NOT NULL DEFAULT 'code' CHECK (kind IN ('code', 'no-code'))",
     'ALTER TABLE cards ADD COLUMN target TEXT',
     'ALTER TABLE cards ADD COLUMN lane TEXT',
@@ -433,7 +433,7 @@ export const FACTS_STEP: SchemaStep = {
     ) STRICT, WITHOUT ROWID`,
     'CREATE INDEX card_paths_path ON card_paths (path)',
     // The runtime's lanes (§16.11.1: their cards in order, the ruleset they started with, the card in flight, a list
-    // change queued for the next boundary), per project, until P4 makes lanes.ts' lanes the runtime's.
+    // change queued for the next boundary), per project, until #1291's step moves them into lanes.ts's tables.
     `CREATE TABLE workflow_lanes (
       project     TEXT    NOT NULL COLLATE NOCASE,
       id          TEXT    NOT NULL,
@@ -505,8 +505,41 @@ const KEYS: SchemaStep = {
   ]
 }
 
-/** P3's steps, in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS]
+/**
+ * One lane record (#1291): what the runtime keeps of a lane, beside lanes.ts's `lanes` and `lane_cards` (the lane, its
+ * agents, state and cards), keyed by the lane's id. Made before laneRecordStep.ts moves the runtime's tables in.
+ */
+export const LANE_RECORD_ADD = [
+  // The ruleset in force when the runtime started the lane (§16.6.5; null: one it didn't start, whose cards use the
+  // current options), the card in flight, and whether a list change is queued for the next card boundary (its cards in
+  // lane_pending; a queued empty list is still a change). A row only for a lane the runtime has read on. No foreign key: lanes.ts saves a changed lane again whole (its row deleted and inserted,
+  // storeTables.ts), and this must outlive that; a lane removed from the table takes it (storeCodec.ts `onRemove`).
+  `CREATE TABLE lane_runs (
+    lane         TEXT    PRIMARY KEY,
+    ruleset      TEXT,
+    current_card INTEGER,
+    has_pending  INTEGER NOT NULL DEFAULT 0 CHECK (has_pending IN (0, 1))
+  ) STRICT, WITHOUT ROWID`,
+  `CREATE TABLE lane_pending (
+    lane TEXT    NOT NULL,
+    ord  INTEGER NOT NULL,
+    card INTEGER NOT NULL,
+    PRIMARY KEY (lane, ord)
+  ) STRICT, WITHOUT ROWID`,
+  // A card's lane is read from its lists: a card queued for a lane uses its ruleset already.
+  'CREATE INDEX lane_pending_card ON lane_pending (card)'
+]
+
+/** The runtime's own lane tables and a card's lane columns, dropped once laneRecordStep.ts moved what they held. */
+export const LANE_RECORD_DROP = ['DROP TABLE workflow_lane_cards', 'DROP TABLE workflow_lanes', 'ALTER TABLE cards DROP COLUMN lane', 'ALTER TABLE cards DROP COLUMN lane_reviewer']
+
+const LANE_RECORD: SchemaStep = {
+  name: 'one lane record',
+  ddl: [...LANE_RECORD_ADD, ...LANE_RECORD_DROP]
+}
+
+/** P3's and P4's steps, in the order they are registered. */
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -578,8 +611,16 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'folderCommits.of': { sql: 'SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id', args: ['D:\\ws\\p'], index: 'folder_commits_seen' },
   'paths.ofCard': { sql: 'SELECT path FROM card_paths WHERE card = ? AND kind = ? ORDER BY ord', args: [1, 'declared'], index: 'PRIMARY KEY' },
   'paths.cardsOf': { sql: 'SELECT card FROM card_paths WHERE path = ?', args: ['src/a.txt'], index: 'card_paths_path' },
-  'workflowLanes.of': { sql: 'SELECT * FROM workflow_lanes WHERE project = ? AND id = ?', args: ['p', 'L'], index: 'PRIMARY KEY' },
-  'workflowLanes.cards': { sql: 'SELECT list, card FROM workflow_lane_cards WHERE project = ? AND lane = ? ORDER BY list, ord', args: ['p', 'L'], index: 'PRIMARY KEY' },
+  // factStore.ts: a lane as the runtime reads it (lanes.ts's row and what the runtime keeps beside it), a card's lanes.
+  'lanes.byId': { sql: 'SELECT state, reviewer_id FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE', args: ['L', 'p'], index: 'PRIMARY KEY' },
+  'laneRuns.of': { sql: 'SELECT ruleset, current_card, has_pending FROM lane_runs WHERE lane = ?', args: ['L'], index: 'PRIMARY KEY' },
+  'lanePending.of': { sql: 'SELECT card FROM lane_pending WHERE lane = ? ORDER BY ord', args: ['L'], index: 'PRIMARY KEY' },
+  'lanePending.ofCard': { sql: 'SELECT lane FROM lane_pending WHERE card = ?', args: [1], index: 'lane_pending_card' },
+  'lanes.ofCards': {
+    sql: "SELECT x.card, l.id, l.reviewer_id FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane WHERE x.card IN (SELECT number FROM cards WHERE number = ?) AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id",
+    args: [1, 'p'],
+    index: ['lane_cards_card', 'lane_pending_card']
+  },
   'queuePauses.of': { sql: 'SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'actions.delivered': { sql: 'SELECT id, delivered FROM card_actions WHERE delivered IS NOT NULL ORDER BY id', args: [], index: 'card_actions_delivered' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
