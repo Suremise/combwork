@@ -264,12 +264,14 @@ takes the target's lease (`queue_runners`, written through `factStore.ts` inside
 holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease
 has a job object on Hive's process supervisor (`processSupervisor.ts`: the PowerShell and C# `HiveJobs` host that
 agents' launches use too, extracted from `agentProcesses.ts`; in the app the runner is given agents' host): named
-`Local\HiveQueue-<lease>`, kill-on-close, no breakaway, swept and followed as agents' jobs are (#543, #659, #678), each
-process it follows told (`followed …`) and recorded. Commands start through a detached Node launcher (`queueJobs.ts`)
+`Local\HiveQueue-<lease>`, kill-on-close, no breakaway, swept and followed as agents' jobs are (#543, #659, #678); the
+supervisor writes each process it follows to the lease's journal (`<worktrees>/.queue-journals/<lease>.followed`,
+flushed through) before following it, and ends one it can't write (`unowned …`, the runner pauses). A lease's duty is
+its job (`what = 'job'`), never the supervisor process. Commands start through a detached Node launcher (`queueJobs.ts`)
 that the supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before
 it is told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
-name and their recorded processes still running (followed ones too), waits, and only then drops them; else the queue
-pauses needs-you. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
+name and the processes their records and journals name still running, waits, and only then drops them and the
+journals; else the queue pauses needs-you. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
 (factStore.ts, an AsyncLocalStorage check run inside every store write) fences everything the queue's work writes,
 reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released
 runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close

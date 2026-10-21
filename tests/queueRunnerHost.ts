@@ -2,7 +2,8 @@
 // one hive.db copy are Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads
 // one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Hive's log lines go there
 // too). Its seams come from its environment: QR_LINGER (its job's supervisor outlives it), QR_STALL_SETTLE (a takeover
-// that never gets past its first step).
+// that never gets past its first step); and from commands: `block` (its board writes wait for ever, as behind a busy
+// board), `other` (a second target's acquire that fails part way).
 import { spawn } from 'child_process'
 import { createInterface } from 'readline'
 import { FactStore } from '../src/main/workflow/factStore'
@@ -12,9 +13,12 @@ const [file, project, root, profile, target] = process.argv.slice(2)
 const store = FactStore.open(file, { project: 'project', key: 'AM' })
 let runner: QueueRunner | null = null
 let renew = true
+let blocked = false
+/** Its board writes, as the app's boardWrite would run them: waiting for ever once `block` was asked (a busy board). */
+const locked = <T>(fn: () => T): Promise<T> => (blocked ? new Promise<T>(() => undefined) : Promise.resolve().then(fn))
 const REPLY = 'queue-host: '
 
-type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'server' | 'follow' | 'release' }
+type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'server' | 'follow' | 'block' | 'other' | 'release' }
 
 /** A check (`node -e`) that starts a detached process of its own and prints both pids; `stay`: it runs on, else it exits. */
 const check = (stay: boolean): string =>
@@ -29,13 +33,32 @@ async function run(c: Command): Promise<Record<string, unknown>> {
         target,
         root,
         profile,
+        locked,
         renewMs: 50,
         hooks: { renew: () => renew, lingeringJob: !!process.env.QR_LINGER, ...(process.env.QR_STALL_SETTLE ? { beforeSettle: () => new Promise<void>(() => undefined) } : {}) }
       })
       if (!r.ok) return { ok: false, heldBy: r.heldBy, problem: r.problem }
       runner = r.runner
-      return { ok: true, lease: runner.lease, folder: runner.folder(), paused: r.paused ?? null }
+      return { ok: true, lease: runner.lease, folder: runner.folder(), paused: r.paused ?? null, supervisor: runner.supervisorPid }
     }
+    case 'other': {
+      // Another target in this same Hive (its supervisor shared), whose start fails part way: its folder's record.
+      const set = store.setQueueFolder.bind(store)
+      store.setQueueFolder = () => {
+        throw new Error('disk full')
+      }
+      try {
+        await QueueRunner.acquire({ store, project, target: 'other', root, profile, locked })
+        return { failed: false }
+      } catch (e) {
+        return { failed: true, why: (e as Error).message }
+      } finally {
+        store.setQueueFolder = set
+      }
+    }
+    case 'block':
+      blocked = true
+      return {}
     case 'holds':
       return { holds: runner?.holds() ?? false }
     case 'stall':

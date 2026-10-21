@@ -4,7 +4,7 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { createInterface } from 'readline'
@@ -79,10 +79,10 @@ function world(): World {
   }
 }
 
-/** Starts a Hive (a host process) on a world's hive.db, for its project, worktrees folder and `main`. */
-function host(w: World, profile: string, seams: { linger?: boolean; stallSettle?: boolean } = {}): Host {
+/** Starts a Hive (a host process) on a world's hive.db, for its project, worktrees folder and `main` (or another target). */
+function host(w: World, profile: string, seams: { linger?: boolean; stallSettle?: boolean; target?: string } = {}): Host {
   const env = { ...baseEnv(), ...(seams.linger ? { QR_LINGER: '1' } : {}), ...(seams.stallSettle ? { QR_STALL_SETTLE: '1' } : {}) }
-  const proc = spawn(process.execPath, [bundle, boardFile(w.ws), w.project, w.root, profile, 'main'], { env, stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
+  const proc = spawn(process.execPath, [bundle, boardFile(w.ws), w.project, w.root, profile, seams.target ?? 'main'], { env, stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
   const waiting = new Map<number, (r: Record<string, unknown>) => void>()
   createInterface({ input: proc.stdout! }).on('line', (l) => {
     // Its replies (tests/queueRunnerHost.ts); the rest is Hive's log.
@@ -181,13 +181,14 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     const w = world()
     try {
       const a = host(w, 'Hive-A', { linger: true })
-      const got = (await a.ask('acquire')) as { lease: string; folder: string }
+      const got = (await a.ask('acquire')) as { lease: string; folder: string; supervisor: number }
+      // Its supervisor outlives it (the seam), and is ended when the test ends.
+      await identify(got.supervisor)
       expect(await a.ask('worktree')).toMatchObject({ ok: true })
       expect(existsSync(got.folder)).toBe(true)
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
       const check = await identify(r.check)
       const detached = await identify(r.detached)
-      const sup = await identify(w.store.queueProcs(got.lease).find((p) => p.what === 'supervisor')!.pid)
       // Hive A ends mid-check (a crash); its job's supervisor here doesn't: the check and its child run on.
       a.proc.kill()
       await a.exited
@@ -200,7 +201,6 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(took.folder).not.toBe(got.folder)
       expect(await running(check)).toBe(false)
       expect(await running(detached)).toBe(false)
-      expect(await running(sup)).toBe(false)
       expect(existsSync(got.folder)).toBe(false)
       expect(forward(sh(w.project, 'worktree', 'list', '--porcelain'))).not.toContain(forward(got.folder))
       expect(w.store.queueProcs(got.lease)).toEqual([])
@@ -215,7 +215,8 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     const w = world()
     try {
       const a = host(w, 'Hive-A', { linger: true })
-      const got = (await a.ask('acquire')) as { lease: string; folder: string }
+      const got = (await a.ask('acquire')) as { lease: string; folder: string; supervisor: number }
+      await identify(got.supervisor)
       await a.ask('worktree')
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
       const check = await identify(r.check)
@@ -227,7 +228,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       void b.ask('acquire').catch(() => undefined)
       const bReady = (): boolean => {
         const l = w.store.queueLease('main')
-        return !!l && l.profile === 'Hive-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'supervisor')
+        return !!l && l.profile === 'Hive-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'job')
       }
       await vi.waitFor(() => expect(bReady()).toBe(true), { timeout: 90_000, interval: 100 })
       b.proc.kill()
@@ -255,7 +256,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       const r = (await a.ask('server')) as { check: number; detached: number }
       const server = await identify(r.detached)
       // The check has exited: its launcher's record goes, and the server runs on in the job.
-      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['supervisor']), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
       expect(await running(server)).toBe(true)
       await a.ask('release')
       expect(await running(server)).toBe(false)
@@ -268,24 +269,54 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     }
   })
 
-  it("HR4 r2 #1: a process outside the job that the supervisor follows (as a packaged app's escaped one) is recorded, and a takeover after a crash ends it", async () => {
+  it("HR4 r3 #1: a process the supervisor follows (as a packaged app's escaped one) is journalled before it is followed: a crash at once, its Hive's board writes stuck, and the next runner still ends it", async () => {
     const w = world()
     try {
       const a = host(w, 'Hive-A', { linger: true })
-      const got = (await a.ask('acquire')) as { lease: string }
+      const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
+      await identify(got.supervisor)
+      // From here A's board writes never complete (a busy board): nothing of the follow can reach hive.db.
+      await a.ask('block')
       const f = (await a.ask('follow')) as { followed: boolean; pid: number }
       expect(f.followed).toBe(true)
       const outside = await identify(f.pid)
-      // Told, and kept as a duty with its exact start.
-      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).some((p) => p.what === 'followed' && p.pid === f.pid && Math.abs(p.startAfter - outside.started) <= 1)).toBe(true), { timeout: 30_000, interval: 100 })
+      // Followed means written down already, durably, by the supervisor itself: A crashes at once.
       a.proc.kill()
       await a.exited
-      // Not in the job: ending the job wouldn't end it. Its duty does.
       expect(await running(outside)).toBe(true)
+      expect(readFileSync(join(w.root, '.queue-journals', `${got.lease}.followed`), 'utf8')).toMatch(new RegExp(`^${f.pid}:\\d+`, 'm'))
+      // Not in the job: ending the job wouldn't end it. Its journal does.
       const b = host(w, 'Hive-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await running(outside)).toBe(false)
       expect(w.store.queueProcs(got.lease)).toEqual([])
+      expect(existsSync(join(w.root, '.queue-journals', `${got.lease}.followed`))).toBe(false)
+    } finally {
+      await w.close()
+    }
+  })
+
+  it('HR4 r3 #2: a target whose start failed in a living Hive never leaves its shared supervisor to another Hive: B takes that target, and A, its other target and its checks run on', async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A')
+      const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
+      const sup = await identify(got.supervisor)
+      const r = (await a.ask('sleeper')) as { check: number; detached: number }
+      const check = await identify(r.check)
+      const detached = await identify(r.detached)
+      // In the same Hive, another target's start fails part way, after its job was made.
+      expect(await a.ask('other')).toMatchObject({ failed: true, why: 'disk full' })
+      expect(w.store.queueLease('other')).toBeNull()
+      expect(w.store.queueProcs(null, 'other')).toEqual([])
+      // Another Hive takes that target.
+      const b = host(w, 'Hive-B', { target: 'other' })
+      expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
+      expect(await running(sup)).toBe(true)
+      expect(await running(check)).toBe(true)
+      expect(await running(detached)).toBe(true)
+      expect(await a.ask('holds')).toMatchObject({ holds: true })
+      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-A' })
     } finally {
       await w.close()
     }
@@ -297,11 +328,12 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       const a = host(w, 'Hive-A')
       const got = (await a.ask('acquire')) as { lease: string }
       const f = (await a.ask('follow')) as { followed: boolean; pid: number }
+      expect(f.followed).toBe(true)
       const outside = await identify(f.pid)
-      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).some((p) => p.what === 'followed')).toBe(true), { timeout: 30_000, interval: 100 })
       await a.ask('release')
       expect(await running(outside)).toBe(false)
       expect(w.store.queueProcs(null, 'main')).toEqual([])
+      expect(existsSync(join(w.root, '.queue-journals', `${got.lease}.followed`))).toBe(false)
     } finally {
       await w.close()
     }
@@ -391,7 +423,7 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
       // And starts nothing: a spawn is refused before it starts, and nothing is recorded.
       await expect(runner.spawn('check', process.execPath, ['-e', ''])).rejects.toBeInstanceOf(LeaseLost)
       await expect(runner.git(e.project, ['status'])).rejects.toBeInstanceOf(LeaseLost)
-      expect(e.store.queueProcs(runner.lease).filter((p) => p.what !== 'supervisor')).toEqual([])
+      expect(e.store.queueProcs(runner.lease).filter((p) => p.what !== 'job')).toEqual([])
       expect(e.store.queueLease('main')).toMatchObject({ profile: 'B', lease: b!.lease })
       await runner.release()
       await b!.release()
@@ -491,9 +523,9 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
   it('HR4 r2 #2: a failed start gives its lease up: once the store works again, a retry in the same Hive runs', async () => {
     const cfg = { store: w.store, project: w.project, target: 'retry', root: w.root, profile: 'A' }
     const add = w.store.addQueueProc.bind(w.store)
-    // Recording its supervisor fails (a full disk, for a moment).
+    // Recording its job fails (a full disk, for a moment).
     w.store.addQueueProc = (p) => {
-      if (p.what === 'supervisor') throw new Error('disk full')
+      if (p.what === 'job') throw new Error('disk full')
       add(p)
     }
     try {
@@ -512,10 +544,10 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'gone', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     const missing = join(tempDir('qr-gone-'), 'no-such-folder')
     await expect(a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })).rejects.toThrow(/ENOENT/)
-    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor'])
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
     // The launcher starts and the command can't: its run fails (127), and its launcher's record goes with it.
     expect(await a.runner.run('check', 'no-such-command-hive-1360', [])).toMatchObject({ ok: false, code: 127 })
-    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor']), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
     await a.runner.release()
     expect(w.store.queueProcs(null, 'gone')).toEqual([])
   })
@@ -529,12 +561,11 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     k.unref()
     const outside = await identify(k.pid!)
     expect(await a.runner.followForTests(k.pid!)).toBe(true)
-    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what).sort()).toEqual(['followed', 'supervisor']), { timeout: 30_000, interval: 100 })
     await a.runner.release()
-    // Released, but its job wasn't seen empty: the followed process's duty and the folder stay, only the lease goes (and
-    // the supervisor's record: in this Hive, which goes on, it is the supervisor its agents use).
+    // Released, but its job wasn't seen empty: its duty, its journal and its folder stay; only the lease goes.
     expect(w.store.queueLease('stuck')).toBeNull()
-    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['followed'])
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
+    expect(readFileSync(join(w.root, '.queue-journals', `${a.runner.lease}.followed`), 'utf8')).toContain(`${k.pid}:`)
     expect(await running(outside)).toBe(true)
     const b = (await QueueRunner.acquire({ ...cfg, profile: 'B' })) as { ok: true; runner: QueueRunner; paused?: number }
     expect(b.ok).toBe(true)
@@ -549,6 +580,21 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queuePause('stuck')).toBeNull()
     await b.runner.release()
     expect(w.store.queueProcs(null, 'stuck')).toEqual([])
+  })
+
+  it("HR4 r3 #1: a process the supervisor can't journal is never followed: it is ended at once, and the queue pauses", async () => {
+    // Its journals' folder is a file: no journal can be written.
+    const notAFolder = join(tempDir('qr-journal-'), 'not-a-folder')
+    writeFileSync(notAFolder, 'x')
+    const cfg = { store: w.store, project: w.project, target: 'nojournal', root: w.root, profile: 'A', hooks: { journalDir: notAFolder } }
+    const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+    k.unref()
+    const outside = await identify(k.pid!)
+    expect(await a.runner.followForTests(k.pid!)).toBe(false)
+    await ends(outside)
+    await vi.waitFor(() => expect(w.store.queuePause('nojournal')).toMatchObject({ reason: 'needsYou', pid: k.pid }), { timeout: 30_000, interval: 100 })
+    await a.runner.release()
   })
 
   it('collision-safe names: targets a/b and a-b get different folders, each per lease', () => {

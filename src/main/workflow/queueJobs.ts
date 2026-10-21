@@ -7,9 +7,11 @@
 // which Windows ends with Hive, and once its handle goes every process in the job ends too, by the operating system's
 // guarantee; nothing in it may break away. What escapes it anyway (a packaged app's process, such as the Store's
 // PowerShell, starts its children outside every job) is adopted into it, or followed by the supervisor (#543, #659,
-// #678), and each followed process is told, for the runner to record as a duty: a followed process isn't in the job,
-// so the job closing doesn't end it. Another Hive taking a dead runner's lease over opens its job by name while
-// anything still holds it (a supervisor that outlived its Hive), ends what is in it and sees it empty.
+// #678); each process it follows is first written to the lease's journal (journalPath), flushed through to the disk,
+// and one it can't write down is ended at once ("unowned": the runner pauses): a followed process isn't in the job, so
+// the job closing doesn't end it, and the journal is how the next runner finds it after a crash. Another Hive taking a
+// dead runner's lease over opens its job by name while anything still holds it (a supervisor that outlived its Hive),
+// ends what is in it and sees it empty, and ends what the journal names.
 //
 // A command starts through the launcher (Node: Hive's own executable as Node, or Node itself in tests), started
 // detached (outside Hive's own job, whose children break away silently) and waiting on its input: it is put in the job
@@ -18,6 +20,8 @@
 
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
+import { join } from 'path'
+import { mkdir, readFile, rm } from 'original-fs/promises'
 import { JobHost } from '../processSupervisor'
 import { createLogger } from '../logger'
 
@@ -73,9 +77,12 @@ export class LeaseJob {
     readonly lease: string
   ) {}
 
-  /** Makes the lease's job (named, kill on close) on a supervisor; `{ problem }` when it can't (the host can't start, the name taken). */
-  static async open(host: JobHost, lease: string): Promise<LeaseJob | { problem: string }> {
-    const r = await host.request('open', lease)
+  /**
+   * Makes the lease's job (named, kill on close) on a supervisor, with its journal (journalPath); `{ problem }` when it
+   * can't (the host can't start, the name taken).
+   */
+  static async open(host: JobHost, lease: string, journal: string): Promise<LeaseJob | { problem: string }> {
+    const r = await host.request('open', lease, Buffer.from(journal, 'utf8').toString('base64url'))
     return r === 'ok' ? new LeaseJob(host, lease) : { problem: typeof r === 'string' ? r : 'the process supervisor did not answer' } // i18n-ignore: a reason, logged
   }
 
@@ -115,6 +122,38 @@ export async function endLeaseJob(host: JobHost, lease: string): Promise<boolean
 
 /** A FILETIME (the supervisor's start times) in Unix ms. */
 export const fileTimeMs = (created: string): number => Number((BigInt(created) - 116444736000000000n) / 10000n)
+
+/**
+ * A lease's journal (#1360): the file its job's supervisor writes each process it follows to, durably, before it
+ * follows it (HiveJobs.Journal), so another Hive can end those after a crash. In the project's worktrees folder (or
+ * `dir`, tests), made ready here.
+ */
+export async function journalPath(root: string, lease: string, dir?: string): Promise<string> {
+  const folder = dir ?? join(root, JOURNALS)
+  await mkdir(folder, { recursive: true }).catch(() => undefined)
+  return join(folder, `${lease}.followed`)
+}
+
+const JOURNALS = '.queue-journals'
+
+/** The processes a lease's journal names, by id and start (Unix ms); none when it has none (or no journal). */
+export async function journalOf(root: string, lease: string, dir?: string): Promise<{ pid: number; started: number }[]> {
+  let text: string
+  try {
+    text = await readFile(join(dir ?? join(root, JOURNALS), `${lease}.followed`), 'utf8')
+  } catch {
+    return []
+  }
+  return text
+    .split(/\r?\n/)
+    .map((l) => /^(\d+):(\d+)$/.exec(l.trim()))
+    .flatMap((m) => (m ? [{ pid: Number(m[1]), started: fileTimeMs(m[2]) }] : []))
+}
+
+/** Removes a lease's journal, once what it names is seen gone. */
+export async function clearJournal(root: string, lease: string, dir?: string): Promise<void> {
+  await rm(join(dir ?? join(root, JOURNALS), `${lease}.followed`), { force: true }).catch(() => undefined)
+}
 
 /**
  * The launcher (run by Node): waits for its input's first line, then runs the command it was given (HIVE_QUEUE_LAUNCH,

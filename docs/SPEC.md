@@ -2119,10 +2119,13 @@ renewals stopped: a stalled but living Hive keeps its queue, and the panel says 
 **Windows job object** that owns every process the runner starts for the life of its whole tree (a check's detached
 server too: nothing may break away from it), held by Hive's process supervisor (the one agents' launches use), which
 ends with its Hive; closing the job ends everything in it. What escapes a job anyway (a packaged app's process, such
-as the Store's PowerShell, starts its children outside every job) is adopted into it or followed, as for agents, and
-each process it follows is recorded too. A command starts only once it is in the job and recorded in hive.db. What a runner owns stays
+as the Store's PowerShell, starts its children outside every job) is adopted into it or followed, as for agents; a
+process it follows is first written to the lease's journal (a file the supervisor flushes to disk), and one it can't
+write down is ended at once and the queue pauses (needs you). A command starts only once it is in the job and recorded
+in hive.db. What a runner owns stays
 recorded as a duty of the target until it is seen gone: the next runner to take the lease ends the earlier runners'
-jobs and recorded processes still running, followed ones included (by pid and start time, never by name), and waits for them before it runs,
+jobs (by name, never the supervisor holding them, which may serve a living Hive's other targets and agents) and the
+processes their records and journals name that still run (by pid and start time, never by name), and waits for them before it runs,
 however many runners crashed in between; one it can't end pauses the queue (needs you, with its pid). Each fact the
 queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its lease stops at
 once, writing nothing. Each lease has **its own worktree** (`queue-<hash of project and target>-<lease>`, in the

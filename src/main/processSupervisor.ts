@@ -87,10 +87,13 @@ public static class HiveJobs {
   [StructLayout(LayoutKind.Sequential)] struct BasicLimits { public long a, b; public uint flags; public UIntPtr minWs, maxWs; public uint active; public UIntPtr affinity; public uint prio, sched; }
   [StructLayout(LayoutKind.Sequential)] struct IoCounters { public ulong a, b, c, d, e, f; }
   [StructLayout(LayoutKind.Sequential)] struct ExtLimits { public BasicLimits basic; public IoCounters io; public UIntPtr procMem, jobMem, peakProc, peakJob; }
-  /** The kill-on-close jobs (the merge queue's), by id: what they follow is told (TellFollowed), for their owner to keep. */
-  static HashSet<string> closing = new HashSet<string>();
-  /** Followed processes of kill-on-close jobs not told yet: "followed <job> <pid>:<created>". */
-  static List<string> followNotes = new List<string>();
+  /**
+   * The kill-on-close jobs (the merge queue's), by id, each with its journal: the file each process it follows is
+   * written to, durably, before it is followed (Journal), so another Hive can end it after a crash (#1360).
+   */
+  static Dictionary<string, string> closing = new Dictionary<string, string>();
+  /** A kill-on-close job's processes it couldn't journal, and so ended at once, not told yet: "unowned <job> <pid>". */
+  static List<string> queueNotes = new List<string>();
   /** The name of a merge queue lease's job, in this Windows session. */
   public static string QueueJobName(string id) { return "Local\\HiveQueue-" + id; }
   static Dictionary<string, IntPtr> jobs = new Dictionary<string, IntPtr>();
@@ -123,14 +126,45 @@ public static class HiveJobs {
     lock (turn) { t = tell; tell = false; }
     var w = Notices;
     if (t && w != null) try { w.WriteLine("new"); w.Flush(); } catch { }
-    TellFollowed();
+    TellQueue();
   }
-  /** Writes the followed processes of kill-on-close jobs not told yet (agents' jobs have none). */
-  public static void TellFollowed() {
+  /** Writes the kill-on-close jobs' notices not told yet (agents' jobs have none). */
+  public static void TellQueue() {
     List<string> notes;
-    lock (turn) { if (followNotes.Count == 0) return; notes = followNotes; followNotes = new List<string>(); }
+    lock (turn) { if (queueNotes.Count == 0) return; notes = queueNotes; queueNotes = new List<string>(); }
     var w = Notices;
     if (w != null) try { foreach (var n in notes) w.WriteLine(n); w.Flush(); } catch { }
+  }
+  /**
+   * Before a kill-on-close job follows a process: its identity ("pid:created") written to the job's journal and flushed
+   * through to the disk, so it outlives a crash of this host or of Hive. False when it couldn't be (no journal, a write
+   * that failed): the caller ends the process at once instead (fail closed).
+   */
+  static bool Journal(string id, int pid, long created) {
+    string path;
+    if (!closing.TryGetValue(id, out path) || string.IsNullOrEmpty(path)) return false;
+    try {
+      using (var f = new System.IO.FileStream(path, System.IO.FileMode.Append, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite, 4096, System.IO.FileOptions.WriteThrough)) {
+        byte[] b = Encoding.ASCII.GetBytes(pid + ":" + created + "\n");
+        f.Write(b, 0, b.Length);
+        f.Flush(true);
+      }
+      return true;
+    } catch { return false; }
+  }
+  /**
+   * Follows a process for job id (Take, Follow): a kill-on-close job's is journalled first, and one it can't journal is
+   * ended now (its handle can: PROCESS_TERMINATE) and told ("unowned"), never followed without a durable identity.
+   * Whether it is followed.
+   */
+  static bool FollowHeld(string id, int pid, IntPtr h, long created) {
+    if (closing.ContainsKey(id) && !Journal(id, pid, created)) {
+      TerminateProcess(h, 1);
+      queueNotes.Add("unowned " + id + " " + pid);
+      return false;
+    }
+    followed[pid] = new Held { job = id, h = h, created = created };
+    return true;
   }
   class Held { public string job; public IntPtr h; public long created; }
   /**
@@ -224,8 +258,7 @@ public static class HiveJobs {
         // ms, more under load), and one assigned before then nests that job in this one just the same (#678).
         if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) return false;
         if (!inAny && !Packaged(c) && AssignProcessToJobObject(job, c)) return true;
-        followed[pid] = new Held { job = id, h = c, created = cc };
-        if (closing.Contains(id)) followNotes.Add("followed " + id + " " + pid + ":" + cc);
+        if (!FollowHeld(id, pid, c, cc)) return false;
         keep = true;
         return true;
       } finally { if (!keep) CloseHandle(c); }
@@ -273,8 +306,7 @@ public static class HiveJobs {
       IntPtr h = OpenProcess(access | 0x1000, false, pid);
       long created, x, k, u;
       if (h == IntPtr.Zero || !jobs.ContainsKey(id) || !GetProcessTimes(h, out created, out x, out k, out u)) { if (h != IntPtr.Zero) CloseHandle(h); return false; }
-      followed[pid] = new Held { job = id, h = h, created = created };
-      if (closing.Contains(id)) followNotes.Add("followed " + id + " " + pid + ":" + created);
+      if (!FollowHeld(id, pid, h, created)) { CloseHandle(h); return false; }
       return true;
     }
   }
@@ -649,10 +681,10 @@ public static class HiveJobs {
   }
   /**
    * A merge queue lease's job (#1360): named (QueueJobName), kill on close (closing its last handle ends every process
-   * in it), no breakaway allowed; on the port, so joins are held and exits swept as agents' jobs are, and what it follows
-   * is told. "ok", or why not.
+   * in it), no breakaway allowed; on the port, so joins are held and exits swept as agents' jobs are; what it follows is
+   * written to its journal first (Journal). "ok", or why not.
    */
-  public static string Open(string id) {
+  public static string Open(string id, string journal) {
     Started();
     if (jobs.ContainsKey(id)) return "exists";
     IntPtr job = CreateNamedJob(IntPtr.Zero, QueueJobName(id));
@@ -663,7 +695,7 @@ public static class HiveJobs {
     lim.basic.flags = 0x2000;
     if (!SetLimits(job, 9, ref lim, Marshal.SizeOf(typeof(ExtLimits)))) { int e = Marshal.GetLastWin32Error(); CloseHandle(job); return "limits failed: " + e; }
     jobs[id] = job;
-    closing.Add(id);
+    closing[id] = journal;
     if (port != IntPtr.Zero) {
       ulong k = nextKey++;
       var info = new PortInfo { key = new IntPtr((long)k), port = port };
@@ -740,7 +772,8 @@ public static class HiveJobs {
         case "endexact": r = EndExact(a[2]); break;
         case "endtree": r = EndTree(a[2]); break;
         case "memory": r = Memory(a[2]); break;
-        case "open": r = Q(Open(a[2])); break;
+        // Its journal's path, in base64url (requests are words).
+        case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
         case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;
         case "empty": r = Empty(a[2]) ? "true" : "false"; break;
         // Tests only (the host refuses to send it otherwise): follows a process, as Take does a packaged app's.
@@ -765,7 +798,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
 [HiveJobs]::Notices = [Console]::Out
 [Console]::Out.WriteLine('ready')
-while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellFollowed() }
+while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellQueue() }
 `
 const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 /** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
@@ -797,15 +830,18 @@ export class JobHost {
   /** Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready. */
   private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void> }>()
 
-  /** Told of each process a kill-on-close job starts following (onFollowed). */
-  private followers = new Set<(job: string, pid: number, created: string) => void>()
+  /** Told of each process a kill-on-close job couldn't journal and ended (onUnowned). */
+  private unownedListeners = new Set<(job: string, pid: number) => void>()
 
   constructor(private readonly opts: JobHostOptions) {}
 
-  /** Calls fn with each process a kill-on-close job starts following (its job, id and start as a FILETIME). Returns its removal. */
-  onFollowed(fn: (job: string, pid: number, created: string) => void): () => void {
-    this.followers.add(fn)
-    return () => void this.followers.delete(fn)
+  /**
+   * Calls fn with each process a kill-on-close job found outside it and couldn't journal (so it ended it rather than
+   * follow it without a durable identity): its job and id. Returns its removal.
+   */
+  onUnowned(fn: (job: string, pid: number) => void): () => void {
+    this.unownedListeners.add(fn)
+    return () => void this.unownedListeners.delete(fn)
   }
 
   /** False once the host couldn't start: then nothing is tracked, and launches aren't held for it. */
@@ -884,10 +920,10 @@ export class JobHost {
             this.opts.onJoined()
             continue
           }
-          // A process a kill-on-close job (a merge queue's) follows: its id and start (FILETIME), for its owner to keep.
-          const followed = /^followed (\S+) (\d+):(\d+)$/.exec(line)
-          if (followed) {
-            for (const fn of this.followers) fn(followed[1], Number(followed[2]), followed[3])
+          // A process a kill-on-close job (a merge queue's) couldn't journal, and ended at once: its owner pauses.
+          const unowned = /^unowned (\S+) (\d+)$/.exec(line)
+          if (unowned) {
+            for (const fn of this.unownedListeners) fn(unowned[1], Number(unowned[2]))
             continue
           }
           const sp = line.indexOf(' ')
@@ -936,7 +972,7 @@ export class JobHost {
    * a reply that doesn't come within its wait (waitMs) means it is stuck: it is closed, its jobs lost (jobsLost), and the next
    * request starts a new one. So nothing (a launch, End, quitting) waits on it for longer.
    */
-  async request(command: HostCommand, job: string, ...args: (number | undefined)[]): Promise<unknown> {
+  async request(command: HostCommand, job: string, ...args: (number | string | undefined)[]): Promise<unknown> {
     // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs: "job,job,…".
     if (this.failed || !/^[\w:,-]+$/.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
     if (!(await this.start()) || !this.proc) return null
@@ -952,7 +988,8 @@ export class JobHost {
         if (this.proc === p) p.kill()
       }, this.opts.waitMs())
     })
-    const extra = args.filter((a): a is number => !!a && Number.isSafeInteger(a))
+    // Numbers, and words (a path goes as base64url): nothing that could split a request.
+    const extra = args.filter((a): a is number | string => (typeof a === 'number' ? !!a && Number.isSafeInteger(a) : typeof a === 'string' && /^[\w-]+$/.test(a)))
     p.stdin.write(`${n} ${command} ${job}${extra.map((a) => ` ${a}`).join('')}\n`)
     try {
       return await reply

@@ -635,12 +635,14 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       renewed_at TEXT    NOT NULL,
       PRIMARY KEY (project, target)
     ) STRICT, WITHOUT ROWID`,
-    // The processes a runner owns: its supervisor (which holds the lease's job, queueJobs.ts) and each command's launcher
-    // (git in its folder, an install, a check), recorded before the command exists. A row is a duty, kept until its
-    // process and its lease's job are seen gone: by its runner's release, or by whichever runner of the target next takes
-    // the lease (a takeover), however many runners crash before that. A launcher's start is known only between two clock
-    // readings around it (`start_after`, `start_before`, Unix ms; a supervisor's exactly, both the same): a process with
-    // its pid that started outside them is another's. No foreign key: the duty outlives its lease row.
+    // What a runner owns: its lease's job (`what = 'job'`, pid 0: settled by the job's name, never by the supervisor
+    // holding it, which may serve a living Hive's other targets and agents) and each command's launcher (git in its
+    // folder, an install, a check), recorded before the command exists. What the job follows outside it is in the
+    // lease's journal (a file the supervisor writes, queueJobs.ts). A row is a duty, kept until its process and its
+    // lease's job are seen gone: by its runner's release, or by whichever runner of the target next takes the lease (a
+    // takeover), however many runners crash before that. A launcher's start is known only between two clock readings
+    // around it (`start_after`, `start_before`, Unix ms): a process with its pid that started outside them is another's.
+    // No foreign key: the duty outlives its lease row.
     `CREATE TABLE queue_runner_procs (
       lease        TEXT    NOT NULL,
       project      TEXT    NOT NULL COLLATE NOCASE,
@@ -648,7 +650,7 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       pid          INTEGER NOT NULL,
       start_after  INTEGER NOT NULL,
       start_before INTEGER NOT NULL,
-      what         TEXT    NOT NULL CHECK (what IN ('supervisor', 'followed', 'testMerge', 'install', 'check')),
+      what         TEXT    NOT NULL CHECK (what IN ('job', 'testMerge', 'install', 'check')),
       PRIMARY KEY (lease, pid)
     ) STRICT, WITHOUT ROWID`,
     'CREATE INDEX queue_runner_procs_target ON queue_runner_procs (project, target)',
