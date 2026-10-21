@@ -1,0 +1,24 @@
+{
+  "name": "hive",
+  "enabled": true,
+  "disabled_reason": null,
+  "transport": {
+    "type": "stdio",
+    "command": "node",
+    "args": [
+      "C:/fake/hive-mcp.js"
+    ],
+    "env": {
+      "NODE_OPTIONS": ""
+    },
+    "env_vars": [],
+    "cwd": "C:/work/alpha"
+  },
+  "enabled_tools": [
+    "hive_list_tasks",
+    "hive_write_shared_note"
+  ],
+  "disabled_tools": null,
+  "startup_timeout_sec": 10.0,
+  "tool_timeout_sec": 900.0
+}

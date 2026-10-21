@@ -1,16 +1,18 @@
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { parse as parseToml } from 'smol-toml'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
-import { codex } from '../src/main/providers/codex/adapter'
+import { codex, outrankNativeHive } from '../src/main/providers/codex/adapter'
 import { copilot } from '../src/main/providers/copilot/adapter'
 import { copilotEnv } from '../src/main/providers/copilot/home'
-import { copilotCheckEnv } from '../src/main/providers/copilot/install'
+import { copilotCheckEnv, copilotSignIn, ignoredTokens } from '../src/main/providers/copilot/install'
 import { catalogArgs } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
 import { ADVANCED_DEFS, advancedDef, overrideId, rightClickToCliId } from '../src/shared/advanced'
+import { HIVE_TOOLS } from '../src/shared/assistantTools'
 import { tempDir } from './tempDir'
 
 // The off switches for Hive's overrides of the CLIs' own behaviour (#966, #1167): each one's effect on the launch, on and off.
@@ -51,7 +53,11 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
 describe('the override switches', () => {
   it('are booleans, on by default (what Hive does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
     const switches = ADVANCED_DEFS.filter((d) => d.override)
-    expect(switches.map((d) => d.id).sort()).toEqual(['claude-code.override.promptSnapshotOff', 'codex.override.terminalTitle', 'copilot.override.allMcpInstructions', 'copilot.override.noAutoUpdate'])
+    expect(switches.map((d) => d.id).sort()).toEqual([
+      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveHiveTools', 'claude-code.override.promptSnapshotOff',
+      'codex.override.mcpIsolation', 'codex.override.preApproveHiveTools', 'codex.override.terminalTitle',
+      'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveHiveTools', 'copilot.override.stripGitHubTokens'
+    ])
     for (const d of switches) {
       expect(d, d.id).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions' })
       expect(d.id).toBe(overrideId(d.group, d.id.split('.').slice(2).join('.')))
@@ -162,8 +168,11 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
 
   it('a snapshot holds only its own provider’s switches, each as it is now', async () => {
     await advanced.set(overrideId('copilot', 'noAutoUpdate'), false)
-    expect(overridesNow('copilot')).toEqual({ [overrideId('copilot', 'noAutoUpdate')]: false, [id]: true })
-    expect(overridesNow('claude-code')).toEqual({ [overrideId('claude-code', 'promptSnapshotOff')]: true })
+    const copilotNow = overridesNow('copilot')
+    expect(Object.keys(copilotNow).every((k) => k.startsWith('copilot.override.'))).toBe(true)
+    expect(copilotNow).toMatchObject({ [overrideId('copilot', 'noAutoUpdate')]: false, [id]: true })
+    expect(Object.keys(copilotNow).filter((k) => !copilotNow[k])).toEqual([overrideId('copilot', 'noAutoUpdate')])
+    expect(Object.keys(overridesNow('claude-code')).every((k) => k.startsWith('claude-code.override.'))).toBe(true)
   })
 })
 
@@ -184,7 +193,195 @@ describe('Copilot: not updating itself (row 22)', () => {
     // The user's own choice is left as it is.
     expect(copilotEnv({ COPILOT_AUTO_UPDATE: 'false' }).COPILOT_AUTO_UPDATE).toBe('false')
     expect(copilotEnv({ COPILOT_AUTO_UPDATE: 'true' }).COPILOT_AUTO_UPDATE).toBe('true')
-    // Other tools' tokens are still left out (#450): that is another override, with its own card (#1281).
+    // Other tools' tokens are still left out (#450): another switch (row 8, below).
     expect(copilotEnv({ GH_TOKEN: 'x' }).GH_TOKEN).toBeUndefined()
+  })
+})
+
+describe("Hive's tools pre-approved (row 3)", () => {
+  const assistant = (over: Partial<LaunchContext> = {}): LaunchContext => context({ trustedHiveTools: ['hive_list_tasks', 'hive_read_task'], ...over })
+
+  it('Claude Code: the Assistant’s trusted Hive tools with the switch on, none with it off', async () => {
+    const allowed = (): string[] => { const a = claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args; const i = a.indexOf('--allowedTools'); return i < 0 ? [] : a[i + 1].split(',') }
+    expect(allowed()).toEqual(['mcp__hive__hive_list_tasks', 'mcp__hive__hive_read_task'])
+    await advanced.set(overrideId('claude-code', 'preApproveHiveTools'), false)
+    expect(allowed()).toEqual([])
+    // Hive's tools are still there: only Claude Code's trust changed.
+    expect(claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args).toContain('--mcp-config')
+  })
+
+  it('Copilot: hive (an agent) or the Assistant’s subset with the switch on, nothing with it off', async () => {
+    const allowTools = (ctx: LaunchContext): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', ctx).args.filter((a) => a.startsWith('--allow-tool=hive'))
+    expect(allowTools(context())).toEqual(['--allow-tool=hive'])
+    expect(allowTools(assistant())).toEqual(['--allow-tool=hive(hive_list_tasks)', '--allow-tool=hive(hive_read_task)'])
+    await advanced.set(overrideId('copilot', 'preApproveHiveTools'), false)
+    expect(allowTools(context())).toEqual([])
+    expect(allowTools(assistant())).toEqual([])
+    expect(copilot.buildCommand('C:\\bin\\copilot.exe', context()).args).toContain('--additional-mcp-config')
+  })
+})
+
+describe("Copilot: other tools' GitHub tokens (row 8)", () => {
+  const env = { PATH: 'C:\\bin', GH_TOKEN: 'gho_x', github_token: 'ghp_y', COPILOT_GITHUB_TOKEN: 'c' }
+
+  it('are left out on every path with the switch on, and kept on every path with it off, the sign-in shown as the sessions get it', async () => {
+    const launch = (): Record<string, string> => copilot.buildCommand('C:\\bin\\copilot.exe', context({ env })).env!
+    // On: the session, the sign-in check and the catalogue (copilotEnv) leave them out; Agent Setup says so.
+    expect(launch().GH_TOKEN).toBeUndefined()
+    expect(launch().github_token).toBeUndefined()
+    expect(launch().COPILOT_GITHUB_TOKEN).toBe('c')
+    expect(copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'gho_x' }).GH_TOKEN).toBeUndefined()
+    expect(copilotEnv(env).GH_TOKEN).toBeUndefined()
+    expect(ignoredTokens({ GH_TOKEN: 'gho_x' })).toEqual(['GH_TOKEN'])
+    expect(copilotSignIn(copilotCheckEnv({ GH_TOKEN: 'gho_x' }), null, null)).toMatchObject({ loggedIn: false })
+    await advanced.set(overrideId('copilot', 'stripGitHubTokens'), false)
+    expect(launch()).toMatchObject({ GH_TOKEN: 'gho_x', github_token: 'ghp_y', COPILOT_GITHUB_TOKEN: 'c' })
+    expect(copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'gho_x' }).GH_TOKEN).toBe('gho_x')
+    expect(copilotEnv(env).GH_TOKEN).toBe('gho_x')
+    // Nothing is left out, so Agent Setup names none, and the sign-in shown is the token's, as the sessions get it.
+    expect(ignoredTokens({ GH_TOKEN: 'gho_x' })).toEqual([])
+    expect(copilotSignIn(copilotCheckEnv({ GH_TOKEN: 'gho_x' }), null, null)).toMatchObject({ loggedIn: true, source: 'token', variable: 'GH_TOKEN' })
+  })
+
+  it('a change checks Copilot again (its locate settings)', () => {
+    expect(copilot.locateSettings).toEqual(expect.arrayContaining([overrideId('copilot', 'stripGitHubTokens'), overrideId('copilot', 'noAutoUpdate')]))
+  })
+})
+
+describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP servers (row 5)", () => {
+  const hiveTable = (ctx: LaunchContext): string | undefined => codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.hive='))
+  const home = (): string => process.env.CODEX_HOME!
+  const nativeConfig = (toml: string): void => {
+    mkdirSync(home(), { recursive: true })
+    writeFileSync(join(home(), 'config.toml'), toml)
+  }
+  afterEach(() => rmSync(join(home(), 'config.toml'), { force: true }))
+
+  it("approves the whole hive server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
+    expect(hiveTable(context())).toContain('default_tools_approval_mode="approve"')
+    expect(hiveTable(context())).toContain('enabled=true')
+    const assistant = hiveTable(context({ trustedHiveTools: ['hive_list_tasks', 'hive_read_task'] }))!
+    expect(assistant).not.toContain('default_tools_approval_mode')
+    expect(assistant).toContain('tools={hive_list_tasks={approval_mode="approve"},hive_read_task={approval_mode="approve"}}')
+    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    for (const t of [hiveTable(context()), hiveTable(context({ trustedHiveTools: ['hive_list_tasks'] }))]) {
+      expect(t).not.toContain('approval_mode')
+      // Still Hive's server, on.
+      expect(t).toContain('enabled=true')
+    }
+  })
+
+  it('turns the user’s own servers off with the switch on, and leaves them with it off', async () => {
+    nativeConfig('[mcp_servers.mine]\ncommand = "node"\nargs = ["mine.js"]\n')
+    const off = (): boolean => codex.buildCommand('C:\\bin\\codex.exe', context()).args.includes('mcp_servers.mine.enabled=false')
+    expect(off()).toBe(true)
+    await advanced.set(overrideId('codex', 'mcpIsolation'), false)
+    expect(off()).toBe(false)
+  })
+
+})
+
+// Codex merges Hive's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
+// each key a native one sets gets Hive's value, whatever the isolation switch, in the user's config or the project's.
+describe("Codex: Hive's hive server over a native one of that name", () => {
+  const homeBefore = process.env.CODEX_HOME
+  // A new Codex home (and project) per case: config files are read by their modification time.
+  let n = 0
+  const where = (place: 'home' | 'project', toml: string): LaunchContext => {
+    const root = join(base, `native-${++n}`)
+    process.env.CODEX_HOME = join(root, 'codex-home')
+    const cwd = join(root, 'proj')
+    const dir = place === 'home' ? process.env.CODEX_HOME : join(cwd, '.codex')
+    mkdirSync(dir, { recursive: true })
+    mkdirSync(cwd, { recursive: true })
+    writeFileSync(join(dir, 'config.toml'), `[mcp_servers.hive]\n${toml}`)
+    return context({ cwd })
+  }
+  afterEach(() => {
+    process.env.CODEX_HOME = homeBefore
+  })
+  /** Hive's hive table as Codex is given it. */
+  const table = (ctx: LaunchContext): Record<string, any> => {
+    const arg = codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.hive='))!
+    return parseToml(`hive = ${arg.slice('mcp_servers.hive='.length)}`).hive as Record<string, any>
+  }
+  const places = ['home', 'project'] as const
+
+  it('its tool lists and its off switch: all of Hive’s tools shown, on, isolation on and off', async () => {
+    for (const isolation of [true, false])
+      for (const place of places) {
+        await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
+        const t = table(where(place, 'command = "node"\nargs = ["native.js"]\nenabled = false\nenabled_tools = ["only_this"]\ndisabled_tools = ["hive_notify"]\n'))
+        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['hive-mcp.js'], enabled: true, enabled_tools: [...HIVE_TOOLS], disabled_tools: [] })
+      }
+  })
+
+  it('how it starts: the session’s folder, Hive’s startup timeout (Codex’s own default, from Settings → Advanced), not required, its environment emptied', async () => {
+    for (const place of places) {
+      const ctx = where(place, 'command = "node"\ncwd = "Z:/does-not-exist"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\nrequired = true\nenv = { NODE_OPTIONS = "--inspect", HIVE_API_URL = "http://elsewhere" }\nenv_vars = ["SECRET"]\n')
+      expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 10, startup_timeout_ms: 10000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
+    }
+    // The startup timeout follows Settings → Advanced.
+    await advanced.set('codex.mcp.startupTimeoutSeconds', 45)
+    expect(table(where('home', 'command = "node"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\n'))).toMatchObject({ startup_timeout_sec: 45, startup_timeout_ms: 45000 })
+    // Hive's own env stays Hive's (here the context's server has none to set).
+    const own = outrankNativeHive([], { env: { HIVE_PROJECT: 'p' } }, 'all', 'C:\\p')
+    expect(own).toEqual({})
+  })
+
+  it("its approvals: Hive's for every tool it names, Codex's own policy (auto) for the rest", async () => {
+    const native = 'command = "node"\ndefault_tools_approval_mode = "approve"\ntools = { hive_write_shared_note = { approval_mode = "approve" }, hive_list_tasks = { approval_mode = "prompt" } }\n'
+    for (const place of places) {
+      // An agent: everything approved, the native per-tool "prompt" too.
+      expect(table(where(place, native)), place).toMatchObject({ default_tools_approval_mode: 'approve', tools: { hive_write_shared_note: { approval_mode: 'approve' }, hive_list_tasks: { approval_mode: 'approve' } } })
+      // The Assistant: its trusted tools approved, the native blanket and per-tool approvals of the rest taken back.
+      const a = table({ ...where(place, native), trustedHiveTools: ['hive_list_tasks'] })
+      expect(a, place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_list_tasks: { approval_mode: 'approve' }, hive_write_shared_note: { approval_mode: 'auto' } } })
+      // An Assistant trusted with nothing: nothing approved.
+      expect(table({ ...where(place, native), trustedHiveTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_write_shared_note: { approval_mode: 'auto' }, hive_list_tasks: { approval_mode: 'auto' } } })
+    }
+    // The switch off: nothing approved, for an agent either.
+    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    expect(table(where('home', native))).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_write_shared_note: { approval_mode: 'auto' }, hive_list_tasks: { approval_mode: 'auto' } } })
+  })
+
+  it('an HTTP one: refused, saying which file to rename it in (Codex itself would refuse the mix)', () => {
+    for (const place of places)
+      for (const http of ['url = "http://127.0.0.1:1/native"', 'bearer_token_env_var = "TOKEN"', 'http_headers = { X = "y" }']) {
+        const ctx = where(place, `${http}\n`)
+        const file = place === 'home' ? join(process.env.CODEX_HOME!, 'config.toml') : join(ctx.cwd, '.codex', 'config.toml')
+        expect(() => codex.buildCommand('C:\\bin\\codex.exe', ctx), `${place}: ${http}`).toThrow(`Your Codex config has an MCP server named hive, reached over HTTP (${file}).`)
+      }
+  })
+
+  it('none: nothing added', () => {
+    expect(outrankNativeHive([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
+  })
+})
+
+describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
+  it('Claude Code: --strict-mcp-config with the switch on; off, Hive’s file only (its servers still win by name)', async () => {
+    const args = (): string[] => claudeCode.buildCommand('C:\\bin\\claude.exe', context()).args
+    expect(args()).toContain('--strict-mcp-config')
+    await advanced.set(overrideId('claude-code', 'mcpIsolation'), false)
+    expect(args()).not.toContain('--strict-mcp-config')
+    expect(args()[args().indexOf('--mcp-config') + 1]).toBe(join(base, 'private', 'mcp.json'))
+  })
+
+  it('Copilot: built-ins and the user’s servers off with the switch on; off, none disabled, Hive’s by name least of all', async () => {
+    const home = process.env.COPILOT_HOME!
+    mkdirSync(home, { recursive: true })
+    writeFileSync(join(home, 'mcp-config.json'), JSON.stringify({ mcpServers: { mine: { command: 'node' }, hive: { command: 'node', args: ['native.js'] } } }))
+    try {
+      const args = (): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', context()).args
+      expect(args()).toContain('--disable-builtin-mcps')
+      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine'])
+      await advanced.set(overrideId('copilot', 'mcpIsolation'), false)
+      expect(args()).not.toContain('--disable-builtin-mcps')
+      expect(args()).not.toContain('--disable-mcp-server')
+      expect(args()).toContain('--additional-mcp-config')
+    } finally {
+      rmSync(join(home, 'mcp-config.json'), { force: true })
+    }
   })
 })
