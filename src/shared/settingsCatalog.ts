@@ -17,6 +17,8 @@ import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES } from './def
 import { PRICES_CHECKED } from './prices'
 import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { language, msg } from './i18n'
+import { takesOption, type OptionKey } from './workflow/options'
+import { OPTION_TEXT, VALUE_TEXT } from './workflow/optionTexts'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
@@ -68,6 +70,8 @@ interface Row {
   hidden?: boolean
   /** An advanced value (#367, shared/advanced.ts): its id there, and whether this entry is advanced.json's or the workspace's own. */
   advanced?: { id: string; scope: 'app' | 'workspace' }
+  /** A workflow option of the project's (#1278): project.json's `workflow.options[<this>]`, checked with the others in main. */
+  workflow?: OptionKey
 }
 
 /** A permission mode's name and what it does, as text: the window's words where the descriptor has them (#885). */
@@ -671,6 +675,7 @@ export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
   ),
   sectionInfo('sessions', msg({ id: 'settings.projectSection.sessions.label', defaultMessage: 'Sessions', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.sessions.desc', defaultMessage: 'Compacting and notifications for this project.', description: 'Under the heading of the section "Sessions" of Project Settings: what it holds.' })),
   sectionInfo('loops', msg({ id: 'settings.projectSection.loops.label', defaultMessage: 'Card loops', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.loops.desc', defaultMessage: 'How Hive helps agents that work through cards as builder and reviewer in this project.', description: 'Under the heading of the section "Card loops" of Project Settings: what it holds.' })),
+  sectionInfo('workflow', msg({ id: 'settings.projectSection.workflow.label', defaultMessage: 'Workflow', description: 'A section of Project Settings, in its list on the left (glossary 2.1: workflow).' }), msg({ id: 'settings.projectSection.workflow.desc', defaultMessage: 'How work moves from Todo to Done in this project: who reviews it, which checks pass first, who merges it and where cards are built. A change applies from the next card.', description: 'Under the heading of the section "Workflow" of Project Settings: what it holds.' })),
   sectionInfo('storage', msg({ id: 'settings.projectSection.storage.label', defaultMessage: 'Storage', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.storage.desc', defaultMessage: 'What Hive keeps for this project: transcript backups, archived sessions, attachments and the agents’ worktrees. Clean Up… moves old backups and attachments to the Recycle Bin; Purge… removes everything Hive keeps for its sessions.', description: 'Under the heading of the section "Storage" of Project Settings: what it holds. Clean Up… and Purge… are buttons: use their names as translated there.' })),
   sectionInfo('keys', msg({ id: 'settings.projectSection.keys.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.keys.desc', defaultMessage: 'Shortcuts for project and session commands while this project is selected, over the global ones.', description: 'Under the heading of the section "Keyboard Shortcuts" of Project Settings: what it holds.' })),
   sectionInfo('advanced', msg({ id: 'settings.projectSection.advanced.label', defaultMessage: 'Advanced', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.advanced.desc', defaultMessage: 'Where the settings are stored, and resetting them.', description: 'Under the heading of the section "Advanced" of Project Settings: what it holds.' }))
@@ -707,6 +712,35 @@ function projectProviderRows(p: ProviderDescriptor): Row[] {
 /** What Project Settings → Project key does (#1221): Project Settings gives its example in the project's own key. */
 export const PROJECT_KEY_DESC = msg({ id: 'settings.project.key.desc', defaultMessage: 'The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.', description: 'What the setting "Project key" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project\'s own key, such as WB-12.' })
 
+/**
+ * Project Settings → Workflow (#1278): the form is one row (the section draws it), and each option a row of its own for
+ * the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
+ * refused when saved (options.ts `notOffered`), as contradictions are.
+ */
+function workflowRows(): Row[] {
+  const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ section: 'workflow', key: `workflow.${key}`, workflow: key, title: OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
+  const V = VALUE_TEXT
+  return [
+    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.desc', defaultMessage: 'Pick a preset, or set each option. Each shows where its value comes from.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow).' }), type: 'custom', wide: true },
+    option('review', 'select', [['none', V.review.none], ['agent', V.review.agent], ['agentThenYou', V.review.agentThenYou], ['you', V.review.you]]),
+    option('reviewers', 'select', [['1', '1'], ['2', '2']]),
+    option('noSelfReview', 'boolean'),
+    option('preChecks', 'custom'),
+    option('commands', 'custom'),
+    option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
+    option('finish', 'select', [['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
+    option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash]]),
+    option('target', 'text'),
+    option('okBefore', 'custom'),
+    option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
+    option('identity', 'custom'),
+    option('stopOwnRuns', 'boolean'),
+    option('dependenciesDone', 'boolean'),
+    option('sharedFolderWarning', 'boolean'),
+    option('excluded', 'custom')
+  ]
+}
+
 const PROJECT_ROWS: Row[] = [
   { section: 'agents', key: 'key', title: msg({ id: 'settings.project.key.title', defaultMessage: 'Project key', description: "A setting's title (Project Settings → Agents & Worktrees): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)." }), desc: withValues(PROJECT_KEY_DESC, { example: 'AM-12' }), type: 'custom' },
   { section: 'agents', key: 'defaultProvider', title: msg({ id: 'settings.project.defaultProvider.title', defaultMessage: 'Default provider', description: "A setting's title (Project Settings → Agents & Worktrees)." }), desc: msg({ id: 'settings.project.defaultProvider.desc', defaultMessage: "The provider Add Agent uses for this project's new agents (the dialog can choose another). Inherit uses Settings → Providers → Default provider.", description: 'What the setting "Default provider" does, under its title (Project Settings → Agents & Worktrees).' }), tip: msg({ id: 'settings.project.defaultProvider.tip', defaultMessage: 'Each agent keeps the provider it was given; change it in the agent’s settings.', description: 'The info tip of the setting "Default provider" (Project Settings → Agents & Worktrees): more on what it does and when it applies.' }), type: 'custom' },
@@ -724,6 +758,7 @@ const PROJECT_ROWS: Row[] = [
   },
   { section: 'loops', key: 'loopRounds', title: msg({ id: 'settings.project.loopRounds.title', defaultMessage: 'Rounds', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopRounds.desc', defaultMessage: "How many rounds a card gets in this project's card loops before its agents stop and ask you, when you don't say. Empty inherits Settings → Workspace → Card loop rounds.", description: 'What the setting "Rounds" does, under its title (Project Settings → Card loops).' }), tip: msg({ id: 'settings.project.loopRounds.tip', defaultMessage: 'Saying "rounds: 5" when you start a loop still wins.', description: 'The info tip of the setting "Rounds" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LANE_MAX_ROUNDS, step: 1 },
   { section: 'loops', key: 'loopWaitHours', title: msg({ id: 'settings.project.loopWaitHours.title', defaultMessage: 'Wait (hours)', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopWaitHours.desc', defaultMessage: "How many hours an agent in this project's card loops waits with no change before it tells you, when you don't say. Empty inherits Settings → Workspace → Card loop wait.", description: 'What the setting "Wait (hours)" does, under its title (Project Settings → Card loops).' }), tip: msg({ id: 'settings.project.loopWaitHours.tip', defaultMessage: 'Saying "wait: 2h" when you start a loop still wins. Up to a day.', description: 'The info tip of the setting "Wait (hours)" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
+  ...workflowRows(),
   { section: 'storage', key: 'storage', title: msg({ id: 'settings.project.storage.title', defaultMessage: 'What Hive keeps', description: "A setting's title (Project Settings → Storage)." }), desc: msg({ id: 'settings.project.storage.desc', defaultMessage: 'Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.', description: 'What the setting "What Hive keeps" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there.' }), type: 'custom', wide: true },
   { section: 'keys', key: 'keybindings', title: msg({ id: 'settings.project.keybindings.title', defaultMessage: 'Shortcuts', description: "A setting's title (Project Settings → Keyboard Shortcuts)." }), desc: msg({ id: 'settings.project.keybindings.desc', defaultMessage: 'Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.', description: 'What the setting "Shortcuts" does, under its title (Project Settings → Keyboard Shortcuts).' }), type: 'custom', wide: true },
   { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents & Worktrees)." }), desc: msg({ id: 'settings.project.agents.desc', defaultMessage: "Up to 12 agents can work on the project at once (up to 24 with Settings → Advanced → Agents per project), each in the project folder or its own worktree. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents & Worktrees).' }), type: 'custom', wide: true },
@@ -758,6 +793,7 @@ const ACTIONS = new Set([
   'sessions.usageCacheClear',
   'sessions.resetPerformance',
   'workspace.hiddenProjects',
+  'project.workflow',
   'workspace.storage',
   'workspace.antivirus',
   'agentApi.status',
@@ -787,6 +823,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'assistant.mode': 'text',
   'project.defaultProvider': 'select',
   'project.worktreeCopy': 'text',
+  ...Object.fromEntries(['preChecks', 'commands', 'okBefore', 'identity', 'excluded'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
   ...Object.fromEntries(
     PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
@@ -885,6 +922,7 @@ const DOCS: Record<string, string> = {
 }
 const DOCS_BY_ID: Record<string, string> = {
   'project.key': 'Project keys', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'project.workflow': 'Workflow options', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWakes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
@@ -948,7 +986,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
     ...(off ? { off: englishText(off) } : {}),
     ...(confirmOn ? { confirmOn: { title: englishText(confirmOn.title), message: englishText(confirmOn.message), ...(confirmOn.detail ? { detail: englishText(confirmOn.detail) } : {}) } } : {}),
     text,
-    docs: row.advanced || id === 'advanced.values' ? 'Advanced settings' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a heading of the user guide, which stays English (D2)
+    docs: row.advanced || id === 'advanced.values' ? 'Advanced settings' : row.workflow ? 'Workflow options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a heading of the user guide, which stays English (D2)
     ...(HELPS[id] ? { helps: HELPS[id] } : {}),
     ...(action ? { action: true } : {}),
     ...(value ? { value } : {}),
@@ -995,6 +1033,8 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.scope === 'workspace') return loopDefaults(ws)[e.key === 'loopRounds' ? 'rounds' : 'waitHours']
   if (e.scope === 'project') {
     if (!project) return undefined
+    // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
+    if (e.workflow) return project.workflow?.options?.[e.workflow] ?? 'inherit'
     if (e.provider) return (projectProviderConfig(project, e.provider) as unknown as Record<string, unknown>)[e.key] ?? 'inherit'
     return (project as unknown as Record<string, unknown>)[e.key]
   }
@@ -1013,7 +1053,7 @@ export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.scope === 'workspace') return e.key === 'loopRounds' ? LOOP_ROUNDS : LOOP_WAIT_HOURS
-  if (e.scope === 'project') return e.provider ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
+  if (e.scope === 'project') return e.provider || e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
   if (e.assistantProvider) return ''
   if (e.id === 'providers.defaultProvider') return DEFAULT_SETTINGS.defaultProvider
   if (e.provider) {
@@ -1114,6 +1154,7 @@ export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingCon
     const def = advancedDef(e.advanced.id)
     return def ? checkAdvanced(def, raw) : { error: `${e.title} isn't known.` }
   }
+  if (e.workflow) return checkWorkflowValue(e, kind, raw)
   const inheritable = e.scope === 'project' && !!e.inherits
   if (inheritable && (raw === null || raw === 'inherit') && (kind === 'number' || kind === 'effort' || e.key === 'worktreeCopy')) return { value: kind === 'effort' ? 'inherit' : null }
   switch (kind) {
@@ -1161,6 +1202,36 @@ export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingCon
   }
 }
 
+/**
+ * A workflow option's value (#1278): null or "inherit" inherits; else what its option takes (options.ts), a choice by
+ * its value or its English label. Whether it fits the other options is main's check, as it is saved.
+ */
+function checkWorkflowValue(e: SettingEntry, kind: NonNullable<ReturnType<typeof settingKind>>, raw: unknown): { value: unknown } | { error: string } {
+  if (raw === null || raw === 'inherit') return { value: null }
+  let v: unknown = raw
+  if (kind === 'select') {
+    const hit = (settingOptions(e) ?? []).find((o) => o.value === String(raw) || o.label.toLowerCase() === String(raw).toLowerCase())
+    v = e.workflow === 'reviewers' && hit ? Number(hit.value) : hit?.value
+  } else if (kind === 'boolean') v = raw === 'on' || raw === 'true' ? true : raw === 'off' || raw === 'false' ? false : raw
+  else if (kind === 'text' && typeof raw === 'string') v = raw.trim()
+  if (v !== undefined && v !== 'inherit' && takesOption(e.workflow!, v)) return { value: v }
+  return { error: `${e.title} takes ${workflowTakes(e, kind)}.` } // i18n-ignore: the Assistant's tools (English)
+}
+
+/** What a workflow option takes, in words (the tools'). */
+export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKind>): string {
+  const shapes: Partial<Record<OptionKey, string>> = {
+    preChecks: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', // i18n-ignore: the Assistant's tools (English)
+    commands: 'an object of check name → command, e.g. {"lint": "npm run lint"}', // i18n-ignore: the Assistant's tools (English)
+    okBefore: 'an object {"mode": "never" | "labels" | "every", "labels": [...]}', // i18n-ignore: the Assistant's tools (English)
+    identity: 'null (off) or {"name": ..., "email": ...}', // i18n-ignore: the Assistant's tools (English)
+    excluded: 'a list of folders and files left out of the work, e.g. ["node_modules"]' // i18n-ignore: the Assistant's tools (English)
+  }
+  const choices = (settingOptions(e) ?? []).filter((o) => o.value !== 'inherit').map((o) => o.value)
+  const what = kind === 'boolean' ? 'true or false' : kind === 'select' ? `one of: ${choices.join(', ')}` : kind === 'text' ? `a branch name ("" for the repository's default branch)` : (shapes[e.workflow!] ?? 'a value') // i18n-ignore: the Assistant's tools (English)
+  return `${what}, or null to inherit` // i18n-ignore: the Assistant's tools (English)
+}
+
 /** The effort levels a setting takes, in words. */
 export function effortTakes(e: SettingEntry, levels: { value: string }[]): string {
   const base = e.scope === 'project' ? '"inherit"' : '"" (the default)' // i18n-ignore: the Assistant's tools (English)
@@ -1176,6 +1247,18 @@ export function settingPatch(
   value: unknown
 ): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workspace: { rounds?: number; waitHours?: number } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
   if (e.advanced) return { advanced: { ...e.advanced, value } }
+  if (e.scope === 'project' && e.workflow) {
+    // One option of the project's own (null: inherit), its preset kept as the one they started from (#1278).
+    const key = e.workflow
+    return {
+      project: (cfg) => {
+        const options: Record<string, unknown> = { ...cfg.workflow?.options }
+        if (value === null) delete options[key]
+        else options[key] = value
+        return { workflow: { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options } }
+      }
+    }
+  }
   if (e.scope === 'project') {
     const provider = e.provider
     if (provider) return { project: (cfg) => ({ providers: { ...cfg.providers, [provider]: { ...projectProviderConfig(cfg, provider), [e.key]: value } } }) }

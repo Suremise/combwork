@@ -13,7 +13,6 @@ import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { boardSavepoint, boardWrite } from '../boardStore'
-import { config } from '../config'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
 import { isUnknown } from '../platform/types'
@@ -22,7 +21,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
-import { resolveLogged, type ResolvedOptions } from './rulesets'
+import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow } from './runtime'
 
@@ -69,8 +68,7 @@ function projectOf(ws: WorkspaceService, projectPath: string): { path: string; n
 
 /** The project's options, resolved from the three levels (§16.6.6), each read now. */
 async function resolve(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }): Promise<ResolvedOptions> {
-  const cfg = await ws.projectConfig(project.path)
-  return resolveLogged(project.path, project.platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: cfg.workflow?.options })
+  return resolvedOf(ws, project.path, project.platform, await ws.projectConfig(project.path))
 }
 
 /**

@@ -177,7 +177,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_project_status',
-    description: "One project's status and settings, and its agents (each in the project folder or a git worktree) with their ids, branches and running sessions, as JSON.",
+    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each in the project folder or a git worktree) with their ids, branches and running sessions, as JSON.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
     run: (a) => api('GET', `/v1/projects/${proj(a)}`)
   },
