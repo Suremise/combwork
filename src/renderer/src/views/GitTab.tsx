@@ -181,13 +181,34 @@ function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>(channe
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)
   const [state, setState] = useState<{ for: string; data: T | null; error: string | null; loading: boolean; at: number }>({ for: project.path, data: null, error: null, loading: true, at: 0 })
   const loads = useRef(0)
-  const reload = useCallback(() => {
-    const n = ++loads.current
+  /** The read under way, and whether another was asked for meanwhile. */
+  const running = useRef<{ path: string; again: boolean } | null>(null)
+  const reload = useCallback(function read(): void {
     const path = project.path
-    setState((s) => (s.for === path ? { ...s, loading: true } : { for: path, data: null, error: null, loading: true, at: 0 }))
+    // One read at a time: those asked meanwhile are one more after it, with no state set now (#1366: as agents' sessions
+    // end, a usage change each set state in this effect, and fifty in a row was React's update loop, error #185).
+    if (running.current?.path === path) {
+      running.current.again = true
+      return
+    }
+    const n = ++loads.current
+    running.current = { path, again: false }
+    setState((s) => (s.for === path ? (s.loading ? s : { ...s, loading: true }) : { for: path, data: null, error: null, loading: true, at: 0 }))
+    const settled = (): void => {
+      if (n !== loads.current) return
+      const again = running.current?.again
+      running.current = null
+      if (again) read()
+    }
     void (call as (c: C, p: string) => Promise<T>)(channel, path).then(
-      (data) => n === loads.current && setState({ for: path, data, error: null, loading: false, at: Date.now() }),
-      (e) => n === loads.current && setState((s) => ({ ...s, for: path, error: errorMessage(e), loading: false }))
+      (data) => {
+        if (n === loads.current) setState({ for: path, data, error: null, loading: false, at: Date.now() })
+        settled()
+      },
+      (e) => {
+        if (n === loads.current) setState((s) => ({ ...s, for: path, error: errorMessage(e), loading: false }))
+        settled()
+      }
     )
   }, [channel, project.path])
   useEffect(reload, [reload, version, usage, project.branch])
