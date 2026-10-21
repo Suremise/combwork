@@ -9,9 +9,8 @@
 // while its worktree has an untracked file; each time, once that clears, Hive brings the branch to main (LineMoved),
 // the next card starts there and its change is only its own. Card 4 is squash-merged after a commit made past its
 // approval: For you, nothing moved, card 5 waits. Each check's run through hive-progress --check is counted. A
-// screenshot at each stage, once the window shows it. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// screenshot at each stage, once the window shows it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
-const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -49,14 +48,10 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   // The Assistant off (S54): a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  // The dev build, or the packaged Hive HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
   try {
-    const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    await lib.fitWindow(app, page, { width: 1400, height: 850 })
-    await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
