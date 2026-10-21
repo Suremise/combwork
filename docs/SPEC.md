@@ -1679,7 +1679,12 @@ the submission on the state the start would leave; the rules they skip together 
 which a rule not decided on undoes (asked again). A submission refused for what no override makes true stops the drag
 after its start (§16.8.4), the start written alone. With the rules not enforced, the runtime runs no guard for any
 intent (`cfg.enforced`). A batch's card is a part of the batch's change undone on its own when refused (savepoint),
-its `Refused` kept. Agents' column moves keep
+its `Refused` kept. **Built [#1290]:** the window's move (`tasks:move`) has §16.8.4's drag semantics whole: the
+question names only the rules that refuse; a stage the card's ruleset lacks is refused with why (`move.noStage`: the
+stages it has, and that they follow its Version Control options); a Done card dragged past Todo is reopened and started
+in one write (a new cycle, nothing skipped by the reopening); On Hold's returns as above; with the rules not enforced,
+every move just moves. Until the window asks through it (#1275), its drags (`tasks:update`) stay confirmed, and a column
+the ruleset lacks keeps P3's move there. Agents' column moves keep
 P3's path until #1268. A builder with its own worktree starts there whatever the folder option says (it stands in for a
 slot, §16.19.1; P3 recorded it so too), with no `prepareSlot`.
 

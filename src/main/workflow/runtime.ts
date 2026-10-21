@@ -284,7 +284,9 @@ export class Workflow {
    * (the one in force when the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
-    if (s.started) {
+    // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
+    // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
+    if (s.started && s.stage !== 'todo') {
       const f = this.store.facts(card.id).find((x) => x.seq === s.cycle)
       if (f?.ruleset) return this.store.ruleset(f.ruleset)
     }
@@ -1134,9 +1136,11 @@ export class Workflow {
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
-    const r = this.rulesetOf(card, s)
+    // A Done card dragged on is reopened: its next cycle's rules (as from Todo), not its last's.
+    const reopened = from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo')
+    const r = this.rulesetOf(card, reopened ? { ...s, stage: 'todo' } : s)
     // Never into a stage the card's ruleset doesn't have (no review: no Review; no merge step: no Approved or Merging).
-    if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: to, moves: r.stages.map((x) => x.id).join(', ') } })
+    if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
     if (to === 'hold') {
       const out = await this.write(card, r, by, (w) => {
@@ -1171,6 +1175,9 @@ export class Workflow {
         return this.ok(card, from, this.state(card).stage)
       }
     }
+    // Reopening a Done card past Todo (§16.7.4): no rule skipped by the reopening; back to Todo and a drag from there, a
+    // new cycle (its start), in one write.
+    if (from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo') && to !== 'done') return this.dragForward(card, from, to, by, opts, 'todo')
     // A forward drag into Active, Review, Approved or Merging stands for intents, and runs them in order (Start, then
     // submit, then the review skipped): never a bare move that leaves a card with no start, nothing to review or no
     // queue entry. Each step that skips nothing just happens; one that would skip a rule asks first (§16.8.4).
@@ -1201,15 +1208,16 @@ export class Workflow {
    * skipped), and the rules they would skip, together, are the question (the user's, nothing written), the refusal (the
    * Assistant's without a reason: only its `Refused`) or one `Override` naming them all. A step refused for what no
    * override makes true (nothing to submit, a fact that couldn't be read) refuses the drag, nothing written. The write
-   * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: back from On Hold to where the card
-   * was, first, in the same write.
+   * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
+   * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
   private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
-    const r = this.rulesetOf(card, s0)
+    // The rules of where the drag counts from (a reopened card's: its next cycle's).
+    const r = this.rulesetOf(card, s)
     const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder) : null
     if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
     const s1 = gs ? this.predicted(card, s, gs) : s

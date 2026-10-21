@@ -1008,7 +1008,7 @@ interface Gate {
  * before keeps P3's path until it starts) in a project with a platform, to a stage its ruleset has. A column its
  * ruleset doesn't have (Review with no review, say) keeps P3's recorded move until the board asks about it (#1290).
  */
-async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<Gate | null> {
+async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor, o: { anyStage?: boolean } = {}): Promise<Gate | null> {
   if (patch.column === undefined || !isTaskColumn(patch.column) || (actor.kind !== 'user' && actor.kind !== 'assistant')) return null
   // Imported when first needed: the service reaches the board's notices (#1266), which reach back here.
   const { workflowEnforced, workflowFor } = await import('./workflow/service')
@@ -1027,7 +1027,9 @@ async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: 
   if (!rec || rec.preWorkflow) return null
   const to = CATEGORY_STAGE[patch.column]
   const s = wf.state(rec)
-  if (s.stage === to || !hasStage(wf.rulesetOf(rec, s), to)) return null
+  // A stage its ruleset lacks: refused by the runtime with why (the window's move, `anyStage`); the board's other moves
+  // keep P3's recorded move until the window asks through tasks:move (#1275), so today's columns go on working.
+  if (s.stage === to || (!o.anyStage && !hasStage(wf.rulesetOf(rec, s), to))) return null
   const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : typeof head.agent === 'string' && head.agent ? head.agent : null
   return { wf, to, by: actor.kind, ...(agent ? { builder: agent } : {}) }
 }
@@ -1125,7 +1127,7 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
 export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string } = {}): Promise<MoveResult> {
   const actor: TaskActor = { kind: 'user' }
   const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
-  const gate = await gateOf(workspace, n, patch, actor)
+  const gate = await gateOf(workspace, n, patch, actor, { anyStage: true })
   if (!gate) {
     const { override: _o, ...plain } = patch
     return { moved: await updateTask(n, plain, actor) }
