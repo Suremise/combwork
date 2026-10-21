@@ -691,6 +691,14 @@
     "defaultMessage": "A card's start in its own words",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive types into an agent when a card is started on it."
   },
+  "settings.advanced.hive.queue.checkMinutes.desc": {
+    "defaultMessage": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
+    "description": "What the advanced setting \"Merge queue: longest a merge check runs\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.checkMinutes.title": {
+    "defaultMessage": "Merge queue: longest a merge check runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target."
+  },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
     "description": "What the advanced setting \"Flight recorder: wait after a trigger\" does (Settings → Advanced)."

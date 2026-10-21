@@ -172,6 +172,8 @@
   "settings.advanced.hive.prompt.clearDraft.title": "Czyść szkic w CLI, zanim Hive zacznie pisać",
   "settings.advanced.hive.prompt.rawCardStart.desc": "Gdy karta jest uruchamiana na agencie, Hive daje mu ją opakowaną we własne słowa: która to karta na tablicy, od czego zależy i które dokumenty przeczytać najpierw, oraz jakiego skilla użyć. Po włączeniu agent dostaje tylko tytuł i opis karty oraz to, co napisałeś przy jej uruchamianiu. Pozostałe prompty Hive (jego wybudzenia i wiadomości) zostają bez zmian: tak rozmawiają Hive i jego agenci.",
   "settings.advanced.hive.prompt.rawCardStart.title": "Start karty jej własnymi słowami",
+  "settings.advanced.hive.queue.checkMinutes.desc": "Jak długo kolejka scalania pozwala działać sprawdzeniu przed scaleniem lub instalacji, zanim je zakończy. Sprawdzenie zakończone w ten sposób to błąd środowiska, nie pracy: karta wraca tak oznaczona, a jej wykonawca może wysłać tę samą rewizję z powrotem do kolejki. Zwiększ, gdy sprawdzenia projektu naprawdę trwają dłużej; za długo, a zawieszone sprawdzenie wstrzyma kolejkę na tyle czasu.",
+  "settings.advanced.hive.queue.checkMinutes.title": "Kolejka scalania: najdłuższy czas sprawdzenia przed scaleniem",
   "settings.advanced.hive.recorder.afterSeconds.desc": "Jak długo Hive czeka po wyzwalaczu, zanim zapisze zrzut, żeby zawierał też to, co nastąpiło później: kolejne kroki CLI.",
   "settings.advanced.hive.recorder.afterSeconds.title": "Rejestrator lotu: oczekiwanie po wyzwalaczu",
   "settings.advanced.hive.recorder.keep.desc": "Ile zrzutów Hive przechowuje w folderze console-recordings: powyżej tej liczby usuwa najstarsze. Nagrania zrobione przez Ciebie w konsoli deweloperskiej nigdy nie są usuwane.",
