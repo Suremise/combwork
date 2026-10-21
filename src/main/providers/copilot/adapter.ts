@@ -14,7 +14,7 @@ import { createLogger, userText } from '../../logger'
 import { AGENTS_SKILLS, agentsSkillCopyPath, compareVersions, exportSubtitleText, hookIds, promptArg, runsThroughCmd, syncAgentsSkills, toSpawnable, userMemoryLabel } from '../common'
 import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
-import { overrides } from '../../advancedValues'
+import { launchOverrides } from '../../advancedValues'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
 import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
@@ -208,7 +208,7 @@ export class CopilotAdapter implements ProviderAdapter {
    * out, whatever the server is called).
    */
   private customInstructions(ctx: LaunchContext): string {
-    return [overrides(COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', ctx.instructions ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', ctx.instructions ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
@@ -254,7 +254,7 @@ export class CopilotAdapter implements ProviderAdapter {
     args.push('--plugin-dir', this.pluginDir(ctx))
     args.push('--additional-mcp-config', `@${join(ctx.privateDir, 'mcp.json')}`)
     // Hive's guidance is the hive MCP server's instructions: Copilot includes only allowlisted servers' without this.
-    if (overrides(COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
+    if (launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
     // Only the workspace's MCP servers, as for the other CLIs: Copilot's built-in GitHub servers and the user's and the
     // project's own are turned off for Hive's sessions (never by editing their config).
     args.push('--disable-builtin-mcps')
@@ -269,14 +269,14 @@ export class CopilotAdapter implements ProviderAdapter {
     if (ctx.model) args.push('--model', ctx.model)
     if (ctx.effort) args.push('--reasoning-effort', ctx.effort)
     args.push(...copilotModeFlags(ctx.permissionMode || COPILOT_DESCRIPTOR.defaultPermissionMode, ctx.cwd))
-    args.push(...noAutoUpdateArgs())
+    args.push(...noAutoUpdateArgs(launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate')))
     // Never --mouse or --no-mouse (#737): Copilot saves either into the user's own settings (~/.copilot/settings.json),
     // changing their Copilot outside Hive. It keeps its own mouse handling: Shift+drag makes the terminal's selection.
     args.push(...ctx.extraArgs)
     // A first task: Copilot starts interactive and runs it (after the folder-trust question, if it asks one).
     if (ctx.initialPrompt) args.push('-i', promptArg(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
-    const env = copilotEnv(ctx.env)
+    const env = copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'))
     // Hive's hook server is plain http on 127.0.0.1, which Copilot allows for hooks only with this.
     env.COPILOT_HOOK_ALLOW_LOCALHOST = '1'
     if (this.customInstructions(ctx)) {

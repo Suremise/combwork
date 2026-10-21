@@ -23,7 +23,7 @@ import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { advanced } from '../../advanced'
-import { overrides } from '../../advancedValues'
+import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
@@ -399,7 +399,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (ctx.instructions) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
     // A resumed conversation gets this launch's instructions (the Assistant's current mode), not the ones it started with:
     // a newer Claude Code would keep sending those. Not where the user's own arguments choose, nor with the switch off (#1167).
-    if (ctx.instructions && ctx.resume && overrides(CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
+    if (ctx.instructions && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
     if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)

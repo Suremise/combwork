@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
+import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
 import { codex } from '../src/main/providers/codex/adapter'
 import { copilot } from '../src/main/providers/copilot/adapter'
@@ -59,9 +60,8 @@ describe('the override switches', () => {
     expect(ADVANCED_DEFS.filter((d) => d.id.split('.')[1] === 'override' && !d.override)).toEqual([])
   })
 
-  it('pass right-click to the CLIs that track the mouse (row 25): Copilot and Codex, not Claude Code', () => {
-    for (const p of ['copilot', 'codex']) expect(advancedDef(rightClickToCliId(p)), p).toMatchObject({ kind: 'boolean', default: false, applies: 'now' })
-    expect(advancedDef(rightClickToCliId('claude-code'))).toBeUndefined()
+  it('pass right-click to each CLI (row 25): off by default, taken at once', () => {
+    for (const p of ['claude-code', 'codex', 'copilot']) expect(advancedDef(rightClickToCliId(p)), p).toMatchObject({ kind: 'boolean', default: false, applies: 'now' })
   })
 })
 
@@ -121,6 +121,49 @@ describe("Copilot: every MCP server's instructions (row 21)", () => {
     const bare = context({ privateDir: join(base, 'private-bare'), mcpServers: {} })
     await copilot.prepareLaunch(bare)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', bare).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
+  })
+})
+
+describe('a launch reads its switches once (overridesNow), so its stages agree when one changes meanwhile', () => {
+  const id = overrideId('copilot', 'allMcpInstructions')
+
+  it('Copilot: prepared with the instructions switch on, then turned off before the command is built', async () => {
+    const ctx = context({ privateDir: join(base, 'race-on'), overrides: overridesNow('copilot') })
+    await copilot.prepareLaunch(ctx)
+    await advanced.set(id, false)
+    const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
+    // Still the launch it was prepared as: the flag, and no instructions folder that was never written.
+    expect(cmd.args).toContain('--allow-all-mcp-server-instructions')
+    expect(cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
+  })
+
+  it('Copilot: prepared with it off, then turned on before the command is built', async () => {
+    await advanced.set(id, false)
+    const ctx = context({ privateDir: join(base, 'race-off'), overrides: overridesNow('copilot') })
+    await copilot.prepareLaunch(ctx)
+    await advanced.set(id, null)
+    const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
+    expect(cmd.args).not.toContain('--allow-all-mcp-server-instructions')
+    const dir = cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS
+    expect(dir).toBe(join(ctx.privateDir, 'instructions'))
+    expect(readFileSync(join(dir!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toContain('Hive guidance')
+  })
+
+  it("Codex: the title and whether Hive reads it come from the same launch's switch", async () => {
+    const ctx = context({ overrides: overridesNow('codex') })
+    await advanced.set(overrideId('codex', 'terminalTitle'), false)
+    expect(codex.buildCommand('C:\\bin\\codex.exe', ctx).args.some((a) => a.startsWith('tui.terminal_title='))).toBe(true)
+    expect(codex.titleAttention!('0.163.0', ctx)).toBeTypeOf('function')
+    // A launch read after the change gets neither.
+    const later = context({ overrides: overridesNow('codex') })
+    expect(codex.buildCommand('C:\\bin\\codex.exe', later).args.some((a) => a.startsWith('tui.terminal_title='))).toBe(false)
+    expect(codex.titleAttention!('0.163.0', later)).toBeNull()
+  })
+
+  it('a snapshot holds only its own provider’s switches, each as it is now', async () => {
+    await advanced.set(overrideId('copilot', 'noAutoUpdate'), false)
+    expect(overridesNow('copilot')).toEqual({ [overrideId('copilot', 'noAutoUpdate')]: false, [id]: true })
+    expect(overridesNow('claude-code')).toEqual({ [overrideId('claude-code', 'promptSnapshotOff')]: true })
   })
 })
 

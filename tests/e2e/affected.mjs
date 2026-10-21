@@ -288,6 +288,8 @@ export const AREAS = [
   { paths: ['src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['wakepaste-codex'] },
   // What a Codex launch through its app server would rely on (#653): checked against the installed Codex.
   { paths: ['src/main/providers/codex/'], suites: ['codex-appserver'] },
+  // Codex's Advanced switches (#1167): right-click passed to Codex, and its terminal title left to the user's config.
+  { paths: ['src/main/providers/codex/', 'src/main/advancedValues.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/codexoverrides.cjs'], suites: ['codexoverrides'] },
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // The fake Codex CLI: every suite that runs it.

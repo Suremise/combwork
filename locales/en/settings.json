@@ -31,6 +31,14 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
+    "defaultMessage": "Right-click in a Claude Code pane is Hive's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Hive passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
+    "description": "What the advanced setting \"Pass right-click to Claude Code\" is for (Settings → Advanced, under Claude Code). Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
+  "settings.advanced.claude-code.mouse.rightClickToCli.title": {
+    "defaultMessage": "Pass right-click to Claude Code",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.override.promptSnapshotOff.desc": {
     "defaultMessage": "When the Hive Assistant's conversation resumes, Hive starts Claude Code with --system-prompt-snapshot off, so the Assistant follows its role and Control settings as they are now. Turned off, Hive leaves the flag out and Claude Code keeps sending the instructions it recorded when the conversation began, until it compacts: a change to the Assistant's settings may not reach it until then. --system-prompt-snapshot in Extra arguments wins either way.",
     "description": "What the advanced setting \"Resume the Assistant with its current instructions\" does (Settings → Advanced, under Claude Code). --system-prompt-snapshot off is a command-line option and its value: keep them. Control is the name of the Assistant's settings page."
@@ -200,7 +208,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.override.terminalTitle.desc": {
-    "defaultMessage": "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, Hive leaves the title to your Codex config and tells it from Codex's hooks instead, as for Codex versions before 0.160: an approval Codex asks for can show later or not at all. Codex's setup in Agent Setup keeps Hive's title, which it waits on.",
+    "defaultMessage": "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Hive tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Agent Setup keeps Hive's title, which it waits on.",
     "description": "What the advanced setting \"Set Codex's terminal title\" does (Settings → Advanced, under Codex). Terminal title items is another setting's title: use it as Settings shows it. tui.terminal_title is a config key and \"Action Required\" is Codex's own text: keep them. Agent Setup is a dialog's name."
   },
   "settings.advanced.codex.override.terminalTitle.title": {
