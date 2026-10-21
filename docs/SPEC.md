@@ -1338,8 +1338,9 @@ side effects touch git, processes and other agents), so they are tied by **durab
   (`deliveries.action`, unique), which is the record that it was made: the worker runs a delivering action until it is
   marked, and every run after the first finds its delivery.
   **Notices: the guarantee is the durable record, not the toast** (the Assistant's calls on #1266, 21 Oct). Each
-  notice is a **line in its card's history** (*Notified you: its review failed*, translated; a lane's own events on the
-  lane's current card), written by Hive **in the same transaction as its action** (`notify` in the runtime's change,
+  notice is a **line in its card's history** (*Notified you: it is blocked: Which logo?*, translated; with what it
+  said: why it is blocked or stalled, as written, or the request's question, Hive's own kept as its message; a lane's
+  own events on the lane's current card), written by Hive **in the same transaction as its action** (`notify` in the runtime's change,
   `laneNotice` in the lane notices' change), so after any crash the user can still read it on the card, whatever became
   of what it told. The banner or Windows notification itself is **best effort**: attempted after the record commits, repeated at most once more after
   a run that ended uncertainly, never claimed to be exactly once. A notice is **repeatable**: one claim at a time runs

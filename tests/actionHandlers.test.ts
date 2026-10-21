@@ -872,7 +872,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     await vi.waitFor(async () => {
       await notices.checkLanesNow(w)
       await worker.actionsSettled()
-      expect(await notesOn(w, c)).toEqual([{ event: 'failed', lane: 'B1 / R1' }])
+      expect(await notesOn(w, c)).toEqual([{ event: 'failed', lane: 'B1 / R1', hasWhy: 'no', why: '' }])
     }, HANG)
     // In the card's history in the user's language, said by Hive.
     const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
@@ -914,7 +914,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     await worker.runActions(w)
     expect(st.notices).toHaveLength(2)
     expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 2 })
-    expect(await notesOn(w, c)).toEqual([{ event: 'blocked', lane: 'B1 / R1' }])
+    expect(await notesOn(w, c)).toEqual([{ event: 'blocked', lane: 'B1 / R1', hasWhy: 'yes', why: 'Which greeting?' }])
   })
 
   it("a request the runtime writes for the user is noted on its card in the same change (a history line before any toast)", async () => {
@@ -929,7 +929,71 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     const reply = await wf.askTheUser(c, 'user', { kind: 'decide', text: 'Which greeting?' })
     expect(reply).toMatchObject({ ok: true })
     await settled()
-    expect(await notesOn(w, c)).toEqual([{ event: 'request', lane: '' }])
+    expect(await notesOn(w, c)).toEqual([{ event: 'request', lane: '', hasWhy: 'yes', why: 'Which greeting?' }])
     expect(st.notices.length).toBe(before + 1)
+  })
+
+  it("a request's question is in its history line, kept after a restart (HR1's round 5 probe)", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await newCard(w)
+    await settled()
+    const { workflowFor } = await import('../src/main/workflow/service')
+    await (await workflowFor(w, alpha))!.askTheUser(c, 'user', { kind: 'decide', text: 'Which greeting should the offline installer show?' })
+    await settled()
+    await disposeWorkspaceService(w)
+    const again = createWorkspaceService()
+    await again.open(ws)
+    opened.push(again)
+    const line = (await inWorkspace(again, () => tasks.getTask(c, again))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
+    expect(line.what).toBe('Notified you: it needs you: Which greeting should the offline installer show?')
+  })
+
+  it("Hive's own request (its message, #1264) is kept as that message within the line, shown in the window's language", async () => {
+    const { w, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await newCard(w)
+    await settled()
+    const { lastActionId, noteRequestsSince } = await import('../src/main/workflowNotices')
+    // As the runtime's askUser writes one of its own requests: its English and its message.
+    await store.boardWrite(w, async () => {
+      const after = lastActionId(w)
+      FactStore.forBoard(w, { project: 'alpha', key: 'alpha' }).tx((tx) => tx.action(c, 'notify', { text: 'AL-1 is approved: OK to merge?', shown: { id: 'workflow.forYou.okBefore', values: { card: 'AL-1' } } }, null))
+      await noteRequestsSince(w, after)
+    })
+    const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
+    expect(line.whatText!.values!.why).toEqual({ id: 'workflow.forYou.okBefore', values: { card: 'AL-1' } })
+    expect(line.what).toBe('Notified you: it needs you: AL-1 is approved: OK to merge?')
+  })
+
+  it("a stall's detail is in its history line, kept after the stall has cleared and a restart", async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await settled()
+    await notices.checkLanesNow(w)
+    await settled()
+    // The card stalls (a session's state, which the board doesn't keep): the lanes as read say so, with why.
+    const real = watches.lanesNowIn
+    const why = "R1 is watching it but hasn't started reviewing it: in Review for 40 min"
+    const spy = vi.spyOn(watches, 'lanesNowIn').mockImplementation(async (...args) =>
+      (await real(...args)).map((l) => ({ ...l, mark: { ...l.mark, cards: { ...l.mark.cards, [c]: { ...l.mark.cards[c], s: true } } }, cards: l.cards.map((x) => (x.number === c ? { ...x, stalled: why } : x)) }))
+    )
+    try {
+      await notices.checkLanesNow(w)
+      await settled()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(JSON.stringify(st.notices)).toContain('has stalled')
+    // The stall clears (the next look reads it as it is), and Hive restarts: the line is still on the card.
+    await notices.checkLanesNow(w)
+    await settled()
+    await disposeWorkspaceService(w)
+    const again = createWorkspaceService()
+    await again.open(ws)
+    opened.push(again)
+    const lines = (await inWorkspace(again, () => tasks.getTask(c, again))).history.filter((h) => h.whatText?.id === 'tasks.history.notified').map((h) => h.what)
+    expect(lines).toEqual([`Notified you: it has stalled: ${why}`])
   })
 })

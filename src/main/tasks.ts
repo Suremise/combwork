@@ -3,12 +3,13 @@ import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { englishText, forAgents, withValues, type Text } from '../shared/advanced'
-import { msg, tr } from '../shared/i18n'
+import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, sortCards } from '../shared/tasks'
 import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
+import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
@@ -842,9 +843,12 @@ const clip = (s: string, max = 80): string => {
   return one.length > max ? `${one.slice(0, max - 1)}…` : one
 }
 
+/** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
+const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
+
 /** A history line's English, from its message and values: what agents read and Hive's own code matches (`what`). */
 const englishSaid = (s: StoredText): string => {
-  const t = storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), providerMessage)
+  const t = storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), lineMessage)
   if (t === null) throw new Error(`No history line ${s.id}`) // i18n-ignore: a mistake in Hive's code, never shown
   return t
 }

@@ -13,7 +13,8 @@ import { listLanes } from './lanes'
 import { createLogger } from './logger'
 import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
-import { HISTORY, storedText } from '../shared/taskHistory'
+import { HISTORY } from '../shared/taskHistory'
+import type { StoredText } from '../shared/types'
 import { allTasks, getTask, noteOnCard } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction, type ActionHandler } from './workflow/actionWorker'
@@ -219,7 +220,7 @@ async function look(ws: WorkspaceService): Promise<boolean> {
           db.prepare("INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, 'laneNotice', ?, NULL)").run(on, JSON.stringify({ lane: hit.label, events })) // i18n-ignore: SQL
           for (const e of events) {
             const card = e.card !== null && exists(e.card) ? e.card : current
-            if (card !== undefined) notes.push({ card, event: noteEvent(e), lane: hit.label })
+            if (card !== undefined) notes.push({ card, event: noteEvent(e), lane: hit.label, ...(e.detail ? { why: e.detail } : {}) })
           }
         }
         // Lanes no longer running (ended, abandoned, gone) are followed no more.
@@ -229,7 +230,7 @@ async function look(ws: WorkspaceService): Promise<boolean> {
       })
       if (planned === false) return false
       // The durable notice (SPEC §16.4.5): each event a line in its card's history, in this same change.
-      for (const n of planned) await noteOnCard(n.card, storedText(HISTORY.notified, { event: n.event, lane: n.lane }), ws)
+      for (const n of planned) await noteOnCard(n.card, noticeLine(n), ws)
       return true
     },
     { alive }
@@ -238,11 +239,20 @@ async function look(ws: WorkspaceService): Promise<boolean> {
   return written !== false
 }
 
-/** A notice's line in a card's history (HISTORY.notified): which event, and the lane's label. */
+/**
+ * A notice's line in a card's history (HISTORY.notified): which event, the lane's label, and what the notification said
+ * (`why`: why it is blocked or stalled, as written; a request's question, as the runtime kept it: its message, shown in
+ * the window's language, or someone's own words).
+ */
 interface Note {
   card: number
   event: 'failed' | 'blocked' | 'stalled' | 'mergeDue' | 'mergeStalled' | 'request'
   lane: string
+  why?: string | StoredText
+}
+/** A notice's history line (its `why` a value of its own: text, or a message nested within it). */
+function noticeLine(n: Note): StoredText {
+  return { id: HISTORY.notified.id, values: { event: n.event, lane: n.lane, hasWhy: n.why ? 'yes' : 'no', why: n.why ?? '' } as Record<string, string | number> }
 }
 function noteEvent(e: Told): Note['event'] {
   if (e.event === 'failed' || e.event === 'blocked') return e.event
@@ -256,8 +266,14 @@ function noteEvent(e: Told): Note['event'] {
  * which calls this before the change commits).
  */
 export async function noteRequestsSince(ws: WorkspaceService, after: number): Promise<void> {
-  const rows = boardRead(ws, (db) => db.prepare("SELECT card FROM card_actions WHERE kind = 'notify' AND id > ? ORDER BY id").all(after) as { card: number }[]) // i18n-ignore: SQL
-  for (const r of rows) await noteOnCard(r.card, storedText(HISTORY.notified, { event: 'request', lane: '' }), ws)
+  const rows = boardRead(ws, (db) => db.prepare("SELECT card, payload FROM card_actions WHERE kind = 'notify' AND id > ? ORDER BY id").all(after) as { card: number; payload: string }[]) // i18n-ignore: SQL
+  for (const r of rows) {
+    const p = JSON.parse(r.payload) as { text?: unknown; shown?: unknown }
+    // Its question as the runtime kept it: its own message (shown in the window's language), else its words as written.
+    const shown = p.shown && typeof p.shown === 'object' && typeof (p.shown as StoredText).id === 'string' ? (p.shown as StoredText) : null
+    const why = shown ?? (typeof p.text === 'string' && p.text ? p.text : undefined)
+    await noteOnCard(r.card, noticeLine({ card: r.card, event: 'request', lane: '', ...(why ? { why } : {}) }), ws)
+  }
 }
 
 /** The newest action's id now (0: none), for noteRequestsSince. */

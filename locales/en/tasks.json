@@ -408,8 +408,8 @@
     "description": "A line in a card's history: the list of cards that had to be done first was cleared."
   },
   "tasks.history.notified": {
-    "defaultMessage": "Notified you: {event, select, failed {its review failed} blocked {it is blocked} stalled {it has stalled} mergeDue {every card of lane {lane} passed review, so its merge is due} mergeStalled {the merge of lane {lane} has stalled} other {it needs you}}",
-    "description": "A line in a card's history: Hive sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Hive's record of a card loop."
+    "defaultMessage": "Notified you: {event, select, failed {its review failed} blocked {it is blocked} stalled {it has stalled} mergeDue {every card of lane {lane} passed review, so its merge is due} mergeStalled {the merge of lane {lane} has stalled} other {it needs you}}{hasWhy, select, yes {: {why}} other {}}",
+    "description": "A line in a card's history: Hive sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Hive's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Hive's own sentence already translated)."
   },
   "tasks.history.placed": {
     "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",

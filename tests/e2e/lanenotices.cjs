@@ -142,6 +142,7 @@ const check = (name, ok, extra = '') => {
     await dialog.getByText(/History \(\d+\)/).first().click()
     const noted = dialog.locator('.task-history', { hasText: 'Notified you: its review failed' })
     check("the card's history keeps the notice: \"Notified you: its review failed\"", !!(await until(async () => (await noted.count()) > 0, HUNG_MS)), await dialog.locator('.task-history').innerText().catch(() => ''))
+    check('…and with what it said: "Notified you: it is blocked: Release notes first?"', (await dialog.locator('.task-history', { hasText: 'Notified you: it is blocked: Release notes first?' }).count()) > 0, await dialog.locator('.task-history').innerText().catch(() => ''))
     await dialog.locator('.task-history').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-3-history.png') })
     await page.keyboard.press('Escape')

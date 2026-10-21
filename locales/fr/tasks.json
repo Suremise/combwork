@@ -101,7 +101,7 @@
   "tasks.history.movedBottom": "Déplacée en bas de la colonne {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
   "tasks.history.movedTop": "Déplacée en haut de la colonne {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
   "tasks.history.noDependencies": "Ne dépend plus d’autres cartes",
-  "tasks.history.notified": "T’a prévenu : {event, select, failed {sa relecture a été refusée} blocked {elle est bloquée} stalled {elle est à l’arrêt} mergeDue {toutes les cartes du couloir {lane} ont été validées en relecture : la fusion peut commencer} mergeStalled {la fusion du couloir {lane} est à l’arrêt} other {elle t’attend}}",
+  "tasks.history.notified": "T’a prévenu : {event, select, failed {sa relecture a été refusée} blocked {elle est bloquée} stalled {elle est à l’arrêt} mergeDue {toutes les cartes du couloir {lane} ont été validées en relecture : la fusion peut commencer} mergeStalled {la fusion du couloir {lane} est à l’arrêt} other {elle t’attend}}{hasWhy, select, yes { : {why}} other {}}",
   "tasks.history.placed": "Placée en {place, selectordinal, one {#re} other {#e}} position dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
   "tasks.history.renamed": "Renommée en « {title} »",
   "tasks.history.repaired": "Projet : {from} → {to} (renommé ou déplacé)",

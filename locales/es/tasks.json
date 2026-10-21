@@ -101,7 +101,7 @@
   "tasks.history.movedBottom": "Movida al final de la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}",
   "tasks.history.movedTop": "Movida al principio de la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}",
   "tasks.history.noDependencies": "Ya no depende de otras tarjetas",
-  "tasks.history.notified": "Te avisó: {event, select, failed {su revisión no se superó} blocked {está bloqueada} stalled {está estancada} mergeDue {todas las tarjetas del carril {lane} superaron la revisión: toca fusionar} mergeStalled {la fusión del carril {lane} está estancada} other {te necesita}}",
+  "tasks.history.notified": "Te avisó: {event, select, failed {su revisión no se superó} blocked {está bloqueada} stalled {está estancada} mergeDue {todas las tarjetas del carril {lane} superaron la revisión: toca fusionar} mergeStalled {la fusión del carril {lane} está estancada} other {te necesita}}{hasWhy, select, yes {: {why}} other {}}",
   "tasks.history.placed": "Colocada en el puesto {place, selectordinal, other {#.º}} de la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}",
   "tasks.history.renamed": "Cambió el título a “{title}”",
   "tasks.history.repaired": "Proyecto: {from} → {to} (se cambió el nombre o se movió)",
