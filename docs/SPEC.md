@@ -1792,6 +1792,22 @@ so it needs a new revision, or the user's **Retry merge** on the queue card (rec
 user knows is flaky [HR2's round 2 finding 1, HB3's E]. Only verdicts count as rounds, fails of either kind; queue failures and the
 user's approvals don't (a user's decline does).
 
+**Built in P4** [#1267]: each intent is `POST /v1/tasks/{card}/<intent>` (`put-back`, `submit`, `declare-paths`,
+`start-review`, `verdict`, `report-merge`, `ask`, `cannot`, `request`; **start** is `POST /v1/tasks/{card}/start`
+called by a project agent with its own token, the Assistant's call there still starting a card on an agent) and a hive
+tool each, OP-8's starting point (`hive_start_card`, `hive_put_back`, `hive_submit`, `hive_declare_paths`,
+`hive_start_review`, `hive_verdict`, `hive_report_merge`, `hive_ask_user`, `hive_cannot_within_rules`,
+`hive_request_builder`). Every agent has them, Codex's included (its enabled tools are the server's whole list, #913);
+the Assistant has them all but `hive_start_card` at Control agents, through `assistantChange()` (listed in its actions,
+refused at Look and advise). Each runs on the board's one intent path (#1265's `runIntent`), so the runtime's guards
+decide, its facts are written once, and the card's board fields follow in each write: start gives the card to the agent
+that starts it; a reviewer's verdict, request and the rest keep it its builder's; submit's summary, a verdict's and a
+request's text are comments. Replies are a line (`intentText`): the card, the stage it left and the one it is in, what
+the intent says (start: folder, line, base, target; start review: revision, base, files) and submit's warnings (G16:
+another agent's files in a shared folder, never a refusal; the card's work view shows them with the submission). Not
+yet taken: put back's why, and ask's revision and Test checklist (the runtime has no place for them before P5's For
+you).
+
 The `review` parameter of `hive_update_task` maps onto the intents for one release (P4): `start` onto **start review**
 (of the latest submission), `passed`/`failed` onto **verdict** on that submission; it is retired in P8 with the skills
 [P1]. Tool descriptions say the arguments and side effects; skills say the workflow (AGENTS.md's one owner per rule).
@@ -2210,6 +2226,8 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   `1061` meaning the old global card, which after the migration could be another project's existing per-project
   number. The existing tools that take `number` (`hive_read_task`, `hive_update_task`…) keep taking it as the old
   global number until P8 switches them to keys.
+- **Built in P4** [#1267]: the intents' routes refuse a project agent's plain number (`12`) with `card.plainNumber`,
+  its `next` naming the card's own key and `#12`; the Assistant and scripts may still give the number until P8.
 - **Built in P3** [#1219]: the 1.0 group's "project keys" step gives each project with cards a suggested key (the
   projects with the most cards choosing first) and every existing card its own number in its project; projects with no
   card get theirs when the workspace opens, and new ones when they appear. `putCard` numbers new and moved cards

@@ -118,6 +118,30 @@ export function changedText(c: TaskChange): string {
   return `${cardName(c)} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
 }
 
+/** What a card's intent did (#1267, SPEC §16.8.1): the card, the stage it left and the one it is in, what the intent says of it (start: folder, line, base, target; start review: revision, base, files), warnings. */
+export interface IntentDone {
+  ok: true
+  card: string
+  from: string
+  to: string
+  data?: Record<string, unknown>
+  warnings?: string[]
+}
+
+/** At most this many of a list in an intent's reply (start review's files): the rest counted. */
+const INTENT_LIST_MAX = 20
+
+/** "HI-12: active → review. revision: 3f2a…; base: 9c1d…" and a line per warning. */
+export function intentText(d: IntentDone): string {
+  const where = d.from && d.to ? (d.from === d.to ? `still ${d.to}` : `${d.from} → ${d.to}`) : 'done'
+  const value = (v: unknown): string =>
+    Array.isArray(v) ? (v.length > INTENT_LIST_MAX ? `${v.slice(0, INTENT_LIST_MAX).join(', ')} and ${v.length - INTENT_LIST_MAX} more` : v.join(', ') || 'none') : typeof v === 'object' ? JSON.stringify(v) : String(v)
+  const facts = Object.entries(d.data ?? {})
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${k}: ${value(v)}`)
+  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+}
+
 /** What a reorder did (reply: "short"). */
 export interface TaskReorder {
   column: TaskColumn

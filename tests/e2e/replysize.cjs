@@ -558,6 +558,17 @@ const prose = (seed, n) => {
   const journalBytes = Buffer.byteLength(`
 ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
   check("metrics: the Assistant's launch is the workspace's own, its core, role and mode each measured, and the journal's rule as its custom part", ga?.launches >= 1 && ga.guidanceBytes > 0 && ga.roleBytes > 0 && ga.modeBytes > 0 && ga.customBytes === journalBytes, `${JSON.stringify(ga)}; the journal's rule: ${journalBytes}`)
+
+  // A card's intents (#1267), as the coder with its own token: where the card went, in a line; a plain number refused.
+  const intent = (name, args) => {
+    const r = asCoder('tools/call', { name, arguments: args })
+    return { text: r.content[0].text, isError: !!r.isError }
+  }
+  const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
+  check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
+  measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}` }), 200)
+  const plainRefused = intent('hive_put_back', { card: String(todo[40]) })
+  check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))
   const reported = (after.providers ?? []).find((x) => x.provider === 'claude-code' && x.role === 'agent')
   check("metrics: the providers' own reported usage for sessions in the range", reported?.sessions >= 1 && reported.inputTokens > 0, JSON.stringify(after.providers))

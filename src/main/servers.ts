@@ -21,7 +21,7 @@ import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { newestComments, progressLabel, taskRow, withoutHistory, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
+import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
@@ -61,6 +61,7 @@ import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotG
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender } from '../shared/deliveries'
 import * as tasks from './tasks'
+import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
@@ -71,7 +72,7 @@ import { cardFacts, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
-import { CATEGORY_STAGE } from '../shared/workflow/facts'
+import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { recordDecisionsReceived } from './workflow/recorder'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
@@ -2313,8 +2314,117 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   }
 })
 
+/** A card in an intent's path (#1267): its number, and whether it was given plain (`12`), which an agent's isn't (S48). */
+const intentRef = (v: string): CardRefIn => ({ n: taskNumber(v), plain: /^\d+$/.test(decodeURIComponent(v).trim()) })
+
+/** What an intent is, in the Assistant's activity line. */
+const INTENT_WORDS: Record<CardIntent['kind'], string> = {
+  start: 'start',
+  putBack: 'put back',
+  submit: 'submit',
+  declarePaths: 'declare the paths of',
+  startReview: 'start the review of',
+  verdict: 'give the verdict on',
+  reportMerge: 'report the merge of',
+  ask: 'ask the user about',
+  cannot: 'report a rule blocking',
+  request: 'ask the builder of'
+}
+
+/** What an intent did, in the Assistant's activity line. */
+const INTENT_DONE: Record<CardIntent['kind'], string> = {
+  start: 'started',
+  putBack: 'put back',
+  submit: 'submitted',
+  declarePaths: 'declared its paths',
+  startReview: 'started its review',
+  verdict: 'gave the verdict',
+  reportMerge: 'reported its merge',
+  ask: 'asked the user',
+  cannot: 'reported a rule blocking it',
+  request: 'asked its builder'
+}
+
+/**
+ * A card's intent (#1267, SPEC §16.8.1) for its caller: an agent's own (known by its token), a script's, or the
+ * Assistant's through Settings → Assistant → Control. The reply is lean: the card, where it went, what the intent says
+ * of it. A refusal is the runtime's, 409 with its rule, what to do next and who can override.
+ */
+async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone> {
+  requireWorkspace()
+  const ref = intentRef(param)
+  const actor = await taskActor()
+  if (actor.kind !== 'assistant') return (await runCardIntent(ref, actor, intent)).done
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  const what = INTENT_WORDS[intent.kind]
+  return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
+    const { done, card } = await runCardIntent(ref, actor, intent)
+    const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
+    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done }
+  })
+}
+
+/** A body's text field, trimmed; required ones refused when missing or empty. */
+function textField(body: any, key: string, required: true): string
+function textField(body: any, key: string, required?: false): string | undefined
+function textField(body: any, key: string, required = false): string | undefined {
+  const v = body?.[key]
+  if (v === undefined || v === null || (typeof v === 'string' && !v.trim())) {
+    if (required) throw new HttpError(400, `${key} is required.`)
+    return undefined
+  }
+  if (typeof v !== 'string') throw new HttpError(400, `${key} is text.`)
+  return v.trim()
+}
+
+/** A body's list of paths (declare-paths, submit): text each, none empty. */
+function pathsField(body: any, required: boolean): string[] | undefined {
+  const v = body?.paths
+  if (v === undefined || v === null) {
+    if (required) throw new HttpError(400, 'paths is required: a list of paths, relative to the project.')
+    return undefined
+  }
+  if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new HttpError(400, 'paths is a list of paths, relative to the project.')
+  return v.map((p: string) => p.trim())
+}
+
+/** A body's submission number (start-review, verdict), when given. */
+function submissionField(body: any): number | undefined {
+  const v = body?.submission
+  if (v === undefined || v === null) return undefined
+  if (!Number.isInteger(v) || v < 1) throw new HttpError(400, 'submission is a submission number (1, 2…).')
+  return v
+}
+
+const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn', 'other']
+
+/** Each intent's route (POST /v1/tasks/:n/<route>) and its arguments from the body; start is /start's (below). */
+export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
+  'put-back': () => ({ kind: 'putBack' }),
+  submit: (body) => ({ kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false) }),
+  'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
+  'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
+  verdict: (body) => {
+    if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, 'pass is true or false.')
+    const failKind = body?.failKind ?? undefined
+    if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, `Unknown failKind "${String(failKind)}": content or explanation.`)
+    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
+  },
+  'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
+  ask: (body) => {
+    const askKind = body?.kind ?? 'other'
+    if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)
+    return { kind: 'ask', askKind, text: textField(body, 'text', true) }
+  },
+  cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
+  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) })
+}
+for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
+
+// An agent starting a card itself runs its start intent (#1267); the Assistant starts a card on an agent.
 route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   requireWorkspace()
+  if (agentCaller()) return cardIntent(params[0], { kind: 'start' })
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
   const target: TaskStartTarget = body?.agent

@@ -72,6 +72,9 @@ export function recordingAs<T>(actor: ChangeActor, fn: () => Promise<T>): Promis
   return context.run({ actor, reads: context.getStore()?.reads ?? new Map() }, fn)
 }
 
+/** Whether the card change running here is one whose move the workflow runtime made (recordingByRuntime). */
+export const changeByRuntime = (): boolean => !!context.getStore()?.byRuntime
+
 /** Runs a card change whose move the workflow runtime made and recorded (#1265): its other changes are recorded here. */
 export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null = null): Promise<T> {
   const c = context.getStore()
