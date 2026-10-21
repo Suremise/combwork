@@ -192,7 +192,7 @@ export class Write {
 
   /** The card's state with what this write has added. */
   state(): CardState {
-    return foldCard(this.tx.facts(this.card.id))
+    return foldCard(this.tx.facts(this.card.id), this.was)
   }
 }
 
@@ -280,8 +280,13 @@ export class Workflow {
     return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12`, alias: '#1061' }, null)
   }
 
+  /**
+   * The card's state from its facts, from its cached stage: a card no 1.0 rule has moved (one adopted at the upgrade,
+   * whose stage is its column's, #1218) has no `Moved` saying where it is (#1268's S40); any `Moved` decides.
+   */
   state(card: CardRecord | number): CardState {
-    return foldCard(this.store.facts(typeof card === 'number' ? card : card.id))
+    const rec = typeof card === 'number' ? this.store.card(card) : card
+    return foldCard(this.store.facts(rec.id), rec.stage)
   }
 
   /** The current options, compiled and stored. */
@@ -1374,7 +1379,8 @@ export class Workflow {
 
   /**
    * An agent's `hive_update_task` column move (§16.7.1): refused with the intent to use; or, for one transition (P4
-   * to P8), translated into that intent through the same guards (§16.17).
+   * to P8), translated into that intent through the same guards (§16.17). `summary`: the move's comment, as the
+   * submission's summary, the verdict's comment or put back's why.
    */
   async agentColumnMove(ref: unknown, actor: Actor, column: 'doing' | 'review' | 'passed' | 'done' | 'todo', opts: { translate?: boolean; summary?: string } = {}): Promise<Reply> {
     const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -1387,22 +1393,33 @@ export class Workflow {
       : column === 'review'
         ? this.submit(ref, actor, { summary: opts.summary ?? '' })
         : column === 'passed'
-          ? this.verdictOnLatest(ref, actor)
+          ? this.verdictOnLatest(ref, actor, true, opts.summary ?? '')
           : column === 'done'
             ? this.reportMerge(ref, actor)
-            : this.putBack(ref, actor))
+            : this.putBack(ref, actor, opts.summary ? { why: opts.summary } : {}))
     return isRefusal(reply) ? reply : { ...reply, data: { ...reply.data, useNextTime: intent } }
   }
 
-  private async verdictOnLatest(ref: unknown, actor: Actor): Promise<Reply> {
+  /**
+   * An agent's `hive_update_task` `review` (§16.8.1), for one transition (P4 to P8): `start` is start review of the
+   * latest submission, `passed` and `failed` a verdict on it (its review started first when it wasn't).
+   */
+  async agentReview(ref: unknown, actor: Actor, review: 'start' | 'passed' | 'failed', comment = ''): Promise<Reply> {
+    const intent = review === 'start' ? 'start review' : 'verdict' // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const reply = await (review === 'start' ? this.startReview(ref, actor) : this.verdictOnLatest(ref, actor, review === 'passed', comment))
+    return isRefusal(reply) ? reply : { ...reply, data: { ...reply.data, useNextTime: intent } }
+  }
+
+  private async verdictOnLatest(ref: unknown, actor: Actor, pass: boolean, comment: string): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    if (s.latest && !(s.reviewing[s.latest.id] ?? []).includes(agentOf(actor) ?? '')) {
-      const started = await this.startReview(card.key, actor)
+    // The card as the caller named it (its key may not be one an agent can name: a project named in one letter, #1294).
+    if (s.stage === 'review' && s.latest && !(s.reviewing[s.latest.id] ?? []).includes(agentOf(actor) ?? '')) {
+      const started = await this.startReview(ref, actor)
       if (isRefusal(started)) return started
     }
-    return this.verdict(card.key, actor, { pass: true, comment: '' })
+    return this.verdict(ref, actor, { pass, comment })
   }
 
   /** Remove from queue (the user's): `IntegrationCancelled`, recorded as an override; a rebuilt queue skips it. */
