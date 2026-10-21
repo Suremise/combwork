@@ -19,7 +19,8 @@ import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from
 import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
-import type { LaneList } from '../../shared/workflow/laneList'
+import { newLane, type LaneList } from '../../shared/workflow/laneList'
+import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -35,9 +36,9 @@ export interface CardRecord {
   target?: string
   /** None: the card's declared paths (§16.3.3); absent until it declares any. */
   paths?: string[]
-  /** The lane it is in, whose ruleset it uses (§16.11.1). */
+  /** The running lane of its project with it in its list or a queued one, whose ruleset it uses (§16.11.1): lanes.ts's (#1291). */
   lane?: string
-  /** The reviewer agent to wake (a lane's), else the pool. */
+  /** The reviewer agent to wake: its lane's, else the pool. */
   reviewer?: string
   /** A card from before 1.0 (§16.4.1). */
   preWorkflow?: boolean
@@ -180,11 +181,9 @@ interface CardCols {
   pre_workflow: number
   kind: CardKind
   target: string | null
-  lane: string | null
-  lane_reviewer: string | null
   paths_declared: number
 }
-const COLS = 'number, title, col, stage, pre_workflow, kind, target, lane, lane_reviewer, paths_declared'
+const COLS = 'number, title, col, stage, pre_workflow, kind, target, paths_declared'
 
 type Scope = { project: string; key: string; now?: () => Date }
 
@@ -241,6 +240,11 @@ export class FactStore {
       const labels = lists<string>(`SELECT card, label AS v FROM card_labels WHERE ${of} ORDER BY card, ord`)
       const blockedBy = lists<number>(`SELECT card, target AS v FROM card_links WHERE ${of} AND kind = 'blockedBy' ORDER BY card, ord`)
       const paths = lists<string>(`SELECT card, path AS v FROM card_paths WHERE ${of} AND kind = 'declared' ORDER BY card, ord`)
+      // Its lane (#1291): the newest running lane of this project with it in its list or its queued one.
+      const lanes = new Map<number, { lane: string; reviewer: string | null }>()
+      const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
+        JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id`
+      for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer })
       return rows.map((r) => ({
         id: r.number,
         key: this.keyOf(r.number),
@@ -250,8 +254,8 @@ export class FactStore {
         blockedBy: blockedBy.get(r.number) ?? [],
         ...(r.target !== null ? { target: r.target } : {}),
         ...(r.paths_declared ? { paths: paths.get(r.number) ?? [] } : {}),
-        ...(r.lane !== null ? { lane: r.lane } : {}),
-        ...(r.lane_reviewer !== null ? { reviewer: r.lane_reviewer } : {}),
+        ...(lanes.has(r.number) ? { lane: lanes.get(r.number)!.lane } : {}),
+        ...(lanes.get(r.number)?.reviewer ? { reviewer: lanes.get(r.number)!.reviewer! } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
         stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
@@ -278,7 +282,7 @@ export class FactStore {
   }
 
   /** A new card of this project on the board (the runtime's own; the board's are made by tasks.ts), in Todo unless `stage` says. */
-  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category'> & { stage?: StageId }): CardRecord {
+  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer'> & { stage?: StageId }): CardRecord {
     const stage = c.stage ?? 'todo'
     return this.conn.write((db) => {
       const n = takeNumberIn(db)
@@ -291,9 +295,9 @@ export class FactStore {
     })
   }
 
-  /** Changes what the runtime keeps of a card: its kind, target, declared paths, lane and lane's reviewer. */
-  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category'>>): CardRecord {
-    const other = Object.keys(patch).filter((k) => !['kind', 'target', 'paths', 'lane', 'reviewer', 'title', 'labels', 'blockedBy', 'preWorkflow'].includes(k))
+  /** Changes what the runtime keeps of a card: its kind, target and declared paths (its lane is its lanes', #1291). */
+  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer'>>): CardRecord {
+    const other = Object.keys(patch).filter((k) => !['kind', 'target', 'paths', 'title', 'labels', 'blockedBy', 'preWorkflow'].includes(k))
     if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
     return this.conn.write((db) => {
       if (patch.kind !== undefined) db.prepare('UPDATE cards SET kind = ? WHERE number = ?').run(patch.kind, id)
@@ -387,24 +391,45 @@ export class FactStore {
     return this.conn.write((db) => Number(db.prepare('INSERT OR IGNORE INTO folder_commits (folder, sha, card, how) VALUES (?, ?, ?, ?)').run(folder, sha, card, how).changes) > 0)
   }
 
+  /**
+   * One of this project's lanes as the runtime reads it (#1291: one record): lanes.ts's row and cards, and what the
+   * runtime keeps beside them (`lane_runs`, `lane_pending`); ended once lanes.ts's state isn't active.
+   */
   lane(id: string): LaneList | null {
-    const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT ruleset, current, ended, has_pending FROM workflow_lanes WHERE project = ? AND id = ?').get(p, id) as { ruleset: string; current: number | null; ended: number; has_pending: number } | undefined
+      const row = db.prepare('SELECT state FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(id, this.scope.project) as { state: string } | undefined
       if (!row) return null
-      const cards = (list: string): number[] => (db.prepare('SELECT card FROM workflow_lane_cards WHERE project = ? AND lane = ? AND list = ? ORDER BY ord').all(p, id, list) as { card: number }[]).map((r) => r.card)
-      return { id, cards: cards('cards'), ruleset: row.ruleset, pending: row.has_pending ? cards('pending') : null, current: row.current, ended: row.ended === 1 }
+      const run = db.prepare('SELECT ruleset, current_card, has_pending FROM lane_runs WHERE lane = ?').get(id) as { ruleset: string | null; current_card: number | null; has_pending: number } | undefined
+      const list = (table: 'lane_cards' | 'lane_pending'): number[] => (db.prepare(`SELECT card FROM ${table} WHERE lane = ? ORDER BY ord`).all(id) as { card: number }[]).map((r) => r.card)
+      return { id, cards: list('lane_cards'), ruleset: run?.ruleset ?? null, pending: run?.has_pending ? list('lane_pending') : null, current: run?.current_card ?? null, ended: row.state !== 'active' }
     })
   }
 
-  saveLane(l: LaneList): void {
-    const p = this.scope.project
+  /**
+   * The runtime starts a lane of this project (tests/workflow until #1270 wires the app's): lanes.ts's lane of that id,
+   * its cards and reviewer (if given) set, or a new one by Hive when there is none; with the ruleset in force now.
+   */
+  startLane(id: string, cards: number[], ruleset: string, reviewer?: string): LaneList {
     this.conn.write((db) => {
-      db.prepare('INSERT INTO workflow_lanes (project, id, ruleset, current, ended, has_pending) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (project, id) DO UPDATE SET ruleset = excluded.ruleset, current = excluded.current, ended = excluded.ended, has_pending = excluded.has_pending').run(p, l.id, l.ruleset, l.current, l.ended ? 1 : 0, l.pending ? 1 : 0)
-      db.prepare('DELETE FROM workflow_lane_cards WHERE project = ? AND lane = ?').run(p, l.id)
-      const ins = db.prepare('INSERT INTO workflow_lane_cards (project, lane, list, ord, card) VALUES (?, ?, ?, ?, ?)')
-      l.cards.forEach((c, i) => ins.run(p, l.id, 'cards', i, c))
-      l.pending?.forEach((c, i) => ins.run(p, l.id, 'pending', i, c))
+      const at = this.now().toISOString()
+      const had = db.prepare('SELECT project FROM lanes WHERE id = ?').get(id) as { project: string } | undefined
+      if (had && had.project.toLowerCase() !== this.scope.project.toLowerCase()) throw new Error(`lane ${id} is another project's`) // i18n-ignore: a programming error, never shown
+      if (!had) {
+        const ord = (db.prepare('SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM lanes').get() as { n: number }).n
+        db.prepare(
+          "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'hive', 'Hive', ?, ?, ?, ?, 'active', 'Hive', ?, ?)"
+        ).run(id, ord, this.scope.project, reviewer ?? null, reviewer ?? null, LOOP_ROUNDS, LOOP_WAIT_HOURS * 60, at, at)
+      } else if (reviewer) db.prepare('UPDATE lanes SET reviewer_id = ?, reviewer_name = ?, updated_at = ? WHERE id = ?').run(reviewer, reviewer, at, id)
+      writeLane(db, newLane(id, cards, ruleset), at)
+    })
+    return this.lane(id)!
+  }
+
+  /** Saves the runtime's part of one of this project's lanes: its list, its end, the card in flight, a queued change. */
+  saveLane(l: LaneList): void {
+    this.conn.write((db) => {
+      if (!db.prepare('SELECT 1 FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(l.id, this.scope.project)) throw new Error(`no lane ${l.id}`) // i18n-ignore: a programming error, never shown
+      writeLane(db, l, this.now().toISOString())
     })
   }
 
@@ -476,7 +501,7 @@ export class FactStore {
         facts: (card) => this.facts(card),
         card: (id) => this.card(id),
         putCard: (c) => {
-          const { id, key: _k, stage: _s, category: _c, ...patch } = c
+          const { id, key: _k, stage: _s, category: _c, lane: _l, reviewer: _r, ...patch } = c
           this.updateCard(id, patch)
         },
         meta: (k) => this.meta(k),
@@ -489,10 +514,28 @@ export class FactStore {
 }
 
 /** The columns beside the document a create or an update gives (each left as it is when not given). */
-function setColumns(db: DatabaseSync, id: number, c: { target?: string; paths?: string[]; lane?: string; reviewer?: string }): void {
+/**
+ * A lane's part the runtime writes: its list (lanes.ts's `lane_cards`), its end (as lanes.ts ends one; never reopened
+ * here), and what the runtime keeps beside it: the ruleset, the card in flight, a queued list change.
+ */
+function writeLane(db: DatabaseSync, l: LaneList, at: string): void {
+  const cards = (db.prepare('SELECT card FROM lane_cards WHERE lane = ? ORDER BY ord').all(l.id) as { card: number }[]).map((r) => r.card)
+  if (cards.length !== l.cards.length || cards.some((c, i) => c !== l.cards[i])) {
+    db.prepare('DELETE FROM lane_cards WHERE lane = ?').run(l.id)
+    const ins = db.prepare('INSERT INTO lane_cards (lane, ord, card) VALUES (?, ?, ?)')
+    l.cards.forEach((c, i) => ins.run(l.id, i, c))
+    db.prepare('UPDATE lanes SET updated_at = ? WHERE id = ?').run(at, l.id)
+  }
+  if (l.ended) db.prepare("UPDATE lanes SET state = 'ended', ended_at = ?, updated_at = ? WHERE id = ? AND state = 'active'").run(at, at, l.id)
+  db.prepare('INSERT INTO lane_runs (lane, ruleset, current_card, has_pending) VALUES (?, ?, ?, ?) ON CONFLICT (lane) DO UPDATE SET ruleset = excluded.ruleset, current_card = excluded.current_card, has_pending = excluded.has_pending').run(l.id, l.ruleset, l.current, l.pending ? 1 : 0)
+  db.prepare('DELETE FROM lane_pending WHERE lane = ?').run(l.id)
+  const ins = db.prepare('INSERT INTO lane_pending (lane, ord, card) VALUES (?, ?, ?)')
+  l.pending?.forEach((c, i) => ins.run(l.id, i, c))
+}
+
+/** The columns beside the document a create or an update gives (each left as it is when not given). */
+function setColumns(db: DatabaseSync, id: number, c: { target?: string; paths?: string[] }): void {
   if ('target' in c) db.prepare('UPDATE cards SET target = ? WHERE number = ?').run(c.target ?? null, id)
-  if ('lane' in c) db.prepare('UPDATE cards SET lane = ? WHERE number = ?').run(c.lane ?? null, id)
-  if ('reviewer' in c) db.prepare('UPDATE cards SET lane_reviewer = ? WHERE number = ?').run(c.reviewer ?? null, id)
   if (c.paths) {
     db.prepare('UPDATE cards SET paths_declared = 1 WHERE number = ?').run(id)
     db.prepare("DELETE FROM card_paths WHERE card = ? AND kind = 'declared'").run(id)

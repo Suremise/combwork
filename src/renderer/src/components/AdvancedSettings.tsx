@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, advancedShown, advancedTakesText, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { AGENT_LIMIT_DEFAULT, manyAgentsNote } from '@shared/defaults'
 import { msg, tr, tRich } from '@shared/i18n'
 import type { ProviderId } from '@shared/types'
@@ -216,7 +216,7 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
   useEffect(() => setDraft(shown(value)), [value])
   if (def.kind === 'boolean') return <Switch checked={value === true} label={label} onChange={(v) => void onCommit(v).catch(() => undefined)} />
   if (def.kind === 'number')
-    return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} onCommit={(v) => onCommit(v)} />
+    return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} unit={advancedUnit(def) ?? undefined} onCommit={(v) => onCommit(v)} />
   const commit = (): void => {
     const v = draft.trim()
     if (v === shown(value)) return

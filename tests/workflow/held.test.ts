@@ -19,7 +19,7 @@ afterEach(() => {
 const pairOpts = { ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }
 
 async function startedIn(e: Env, title: string, labels: string[] = []) {
-  const card = e.wf.createCard({ title, reviewer: 'R1', labels })
+  const card = e.wf.createCard({ title, labels })
   const s = await e.wf.start(card.key, B1)
   moved(s)
   const folder = s.data!.folder as string
@@ -124,7 +124,7 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
   it("in a shared folder, another agent staging its own file during the submit → submitted; the builder's own → refused", async () => {
     const locks: Record<string, string[]> = { B1: ['mine.txt'], B2: ['theirs.txt'] }
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }, { locksOf: (a) => locks[a] ?? [] }))
-    const card = e.wf.createCard({ title: 'Mine', reviewer: 'R1' })
+    const card = e.wf.createCard({ title: 'Mine' })
     moved(await e.wf.start(card.key, B1))
     commit(e.project, { 'theirs.txt': 'theirs\n' }, 'theirs')
     commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
@@ -134,7 +134,7 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
       sh(e.project, 'add', 'theirs.txt')
     })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
-    const other = e.wf.createCard({ title: 'Mine too', reviewer: 'R1' })
+    const other = e.wf.createCard({ title: 'Mine too' })
     moved(await e.wf.start(other.key, B1))
     commit(e.project, { 'mine.txt': 'mine again\n' }, 'mine again', { trailer: other.key })
     during(e, 'submit', () => void sh(e.project, 'rm', '-q', '--cached', 'mine.txt'))

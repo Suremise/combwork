@@ -11,6 +11,7 @@ import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
+import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -157,9 +158,20 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => moveKeys(db)
   },
   {
+    // #1291: one lane record. The runtime's lanes and a card's lane columns retired into lanes.ts's tables, with what
+    // the runtime keeps of a lane beside them (schema/laneRecordStep.ts).
+    version: 9,
+    name: LANE_RECORD_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      const n = moveLaneRecords(db)
+      if (n.lanes || n.dropped) log.info(`moved ${n.lanes} runtime lane(s) into the lanes (${n.added} new), left out ${n.dropped} with no cards`)
+    }
+  },
+  {
     // #1266: an action's delivery is recorded by its row in `deliveries` (the action's id, unique), and a notice counts its
     // tries instead; `card_actions.delivered` (#1215's stand-in) goes. And what lane notices have told (workflowNotices.ts).
-    version: 9,
+    version: 10,
     name: ACTIONS_DELIVERED_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => {

@@ -17,7 +17,7 @@ afterEach(() => {
 const pairOpts = { ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }
 
 async function startedIn(e: Env, title: string, file: string, extra: { target?: string; blockedBy?: number[] } = {}) {
-  const card = e.wf.createCard({ title, reviewer: 'R1', ...extra })
+  const card = e.wf.createCard({ title, ...extra })
   const s = await e.wf.start(card.key, B1)
   moved(s)
   const folder = s.data!.folder as string

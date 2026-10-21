@@ -2,13 +2,13 @@
 // Changing the list is never refused: while a card is in flight the change is queued and applied at the next card
 // boundary. The lane keeps the ruleset in force when it started until it ends (§16.6.5).
 //
-// P2 spike (#1118): not wired into the app yet.
+// Kept in lanes.ts's tables since #1291 (factStore.ts `lane`): one record per lane. #1270 makes it the app's.
 
 export interface LaneList {
   id: string
   cards: number[]
-  /** The ruleset in force when the lane started: its cards, Todo ones included, use it until the lane ends. */
-  ruleset: string
+  /** The ruleset in force when the runtime started the lane: its cards, Todo ones included, use it until the lane ends (null: a lane it didn't start, on the current options). */
+  ruleset: string | null
   /** A list change made while a card was in flight, applied at the next card boundary. */
   pending: number[] | null
   /** The card in flight (Active, Review, Approved or Merging), if any. */

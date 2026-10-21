@@ -11,7 +11,7 @@ import { createLogger, userText } from '../../logger'
 import { listOf } from '../../../shared/advanced'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
-import { COPILOT_ENV_STRIP, copilotEnv, copilotHome } from './home'
+import { COPILOT_ENV_STRIP, copilotEnv, copilotHome, stripsTokens } from './home'
 
 // The GitHub Copilot CLI's installation and sign-in, for Agent Setup (#452, from the #403 spike on CLI 1.0.93). The
 // adapter delegates locate, readiness and the install, update and sign-in tasks here.
@@ -107,7 +107,7 @@ export function copilotCheckEnv(base: NodeJS.ProcessEnv = process.env): Record<s
 
 /** The token variables set in Hive's own environment that Copilot agents don't get (none are read). */
 export function ignoredTokens(base: NodeJS.ProcessEnv = process.env): string[] {
-  return COPILOT_ENV_STRIP.filter((k) => !!base[k]?.trim())
+  return stripsTokens() ? COPILOT_ENV_STRIP.filter((k) => !!base[k]?.trim()) : []
 }
 
 /** Where the CLI may be: the path set in Settings, PATH, WinGet's Links folder, npm's global folder. */
