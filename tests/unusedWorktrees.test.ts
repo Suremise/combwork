@@ -193,6 +193,23 @@ describe('listing', () => {
     expect(existsSync(t.path)).toBe(true)
   })
 
+  it("the merge queue's folder isn't listed while a running runner holds it (#1360); once that runner's process has gone, it is", async () => {
+    const { FactStore } = await import('../src/main/workflow/factStore')
+    const { boardWrite } = await import('../src/main/boardStore')
+    const store = FactStore.forBoard(w, { project: 'proj', key: 'proj' })
+    const lease = `ab${++n}`
+    const t = join(root, `queue-0123456789ab-${lease}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', t)
+    const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
+    await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
+    expect(await find(t)).toBeUndefined()
+    // Its Hive crashed: the lease names a process that has ended.
+    const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
+    await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
+    expect(await find(t)).toMatchObject({ branch: null })
+    await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2')))
+  })
+
   // Read-only check loops share one operation's reads (#733): the project's worktree list, its main branch (its branches
   // and origin/HEAD) and main's commit once, however many worktrees; each worktree's own reads stay its own.
   /** The project folder's reads one step made, by what they read. */

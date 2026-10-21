@@ -10,6 +10,7 @@
 // board's own guarded write path, and its reads are the board's, on one snapshot; on a connection of its own (`open`:
 // another Hive, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
 
+import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
 import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
@@ -73,6 +74,40 @@ export interface QueuePause {
   reason: string
   card: string
   files?: string[]
+  /** A process Hive couldn't end (a dead runner's, at a takeover: #1360). */
+  pid?: number
+}
+
+/** A target's queue runner (#1360, queue_runners): who runs it, the holder process, when taken and last renewed. */
+export interface QueueLease {
+  target: string
+  lease: string
+  token: string
+  profile: string
+  pid: number
+  /** The holder process's start (Unix ms): with `pid`, the process itself. */
+  started: number
+  takenAt: string
+  renewedAt: string
+}
+
+export type QueueProcKind = 'job' | 'testMerge' | 'install' | 'check'
+
+/** A process a runner owns (queue_runner_procs): its pid, and the clock readings either side of its start. */
+export interface QueueProc {
+  lease: string
+  target: string
+  pid: number
+  startAfter: number
+  startBefore: number
+  what: QueueProcKind
+}
+
+/** A queue's worktree (queue_worktrees): its target and lease (null: kept for the next runner). */
+export interface QueueFolder {
+  folder: string
+  target: string
+  lease: string | null
 }
 
 /** A write inside one transaction: facts, the stage cache and actions together. */
@@ -98,7 +133,8 @@ export interface Tx {
 /** How a store reaches its database: each read on one snapshot, each write in a transaction it may write in. */
 interface Conn {
   read<T>(fn: (db: DatabaseSync) => T): T
-  write<T>(fn: (db: DatabaseSync) => T): T
+  /** `quiet`: a write the window shows nothing of (the queue runner's lease and processes): no `tasks-changed` for it. */
+  write<T>(fn: (db: DatabaseSync) => T, quiet?: boolean): T
   close(): void
 }
 
@@ -111,15 +147,38 @@ const boardConn = (ws: WorkspaceService): Conn => ({
   read: (fn) => boardRead(ws, fn),
   // A fact (observed ones too) changes what the window shows of a card (its work view, #1223): `tasks-changed` once
   // the change commits.
-  write: (fn) => {
+  write: (fn, quiet) => {
     const out = boardWriteOp(ws, fn)
-    boardChanged(ws)
+    if (!quiet) boardChanged(ws)
     return out
   },
   close: () => undefined
 })
 
 /** SQLite undid a store's own transaction part way (a full disk, an I/O error): nothing of it was saved. */
+/**
+ * The write fence of the work running here (#1360: a merge queue's, whose runner must still hold its target's lease):
+ * checked inside every write a store makes from that work, in the write's own transaction, and throwing to refuse it
+ * whole. Its facts, reconciliation's observed ones, values and pauses alike.
+ */
+const fences = new AsyncLocalStorage<() => void>()
+
+/** Runs `fn` with every store write it makes (in its async context) checked by `check` inside that write. */
+export function withWriteFence<T>(check: () => void, fn: () => Promise<T>): Promise<T> {
+  return fences.run(check, fn)
+}
+
+/** A connection whose writes check the fence of the work making them, inside each write. */
+const fenced = (c: Conn): Conn => ({
+  read: (fn) => c.read(fn),
+  write: (fn, quiet) =>
+    c.write((db) => {
+      fences.getStore()?.()
+      return fn(db)
+    }, quiet),
+  close: () => c.close()
+})
+
 const lostTx = (): Error => new Error("The fact store's write was undone part way: nothing of it was saved") // i18n-ignore: an error from SQLite's side, logged and thrown to the runtime's caller
 
 /**
@@ -201,10 +260,13 @@ export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCa
 export class FactStore {
   private now: () => Date
 
+  private readonly conn: Conn
+
   private constructor(
-    private readonly conn: Conn,
+    conn: Conn,
     readonly scope: Scope
   ) {
+    this.conn = fenced(conn)
     this.now = scope.now ?? (() => new Date())
   }
 
@@ -478,10 +540,10 @@ export class FactStore {
   queuePause(target: string): QueuePause | null {
     const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string } | undefined
+      const row = db.prepare('SELECT reason, card, pid FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null } | undefined
       if (!row) return null
       const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}) }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}) }
     })
   }
 
@@ -491,10 +553,84 @@ export class FactStore {
     this.conn.write((db) => {
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
       if (!pause) return
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card) VALUES (?, ?, ?, ?)').run(p, target, pause.reason, pause.card)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid) VALUES (?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
       pause.files?.forEach((f, i) => ins.run(p, target, i, f))
     })
+  }
+
+  // --- The queue's runner (#1360): its lease, its processes, its worktrees. Quiet writes: the window shows none of them.
+
+  /** The lease of this project's queue for a target, or null when no runner holds it. */
+  queueLease(target: string): QueueLease | null {
+    return this.conn.read((db) => {
+      const r = db.prepare('SELECT * FROM queue_runners WHERE project = ? AND target = ?').get(this.scope.project, target) as Record<string, string | number> | undefined
+      return r ? { target: r.target as string, lease: r.lease as string, token: r.token as string, profile: r.profile as string, pid: r.pid as number, started: r.started as number, takenAt: r.taken_at as string, renewedAt: r.renewed_at as string } : null
+    })
+  }
+
+  /**
+   * Takes a target's lease: when no runner holds it (`replacing` null), or in place of the one whose token is `replacing`
+   * (a takeover, decided outside the write: it is taken only while that lease is still the target's). Whether it was taken.
+   */
+  takeQueueLease(l: QueueLease, replacing: string | null): boolean {
+    const p = this.scope.project
+    return this.conn.write((db) => {
+      if (replacing === null) return Number(db.prepare('INSERT INTO queue_runners (project, target, lease, token, profile, pid, started, taken_at, renewed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').run(p, l.target, l.lease, l.token, l.profile, l.pid, l.started, l.takenAt, l.renewedAt).changes) > 0
+      return Number(db.prepare('UPDATE queue_runners SET lease = ?, token = ?, profile = ?, pid = ?, started = ?, taken_at = ?, renewed_at = ? WHERE project = ? AND target = ? AND token = ?').run(l.lease, l.token, l.profile, l.pid, l.started, l.takenAt, l.renewedAt, p, l.target, replacing).changes) > 0
+    }, true)
+  }
+
+  /** Whether the lease is still held with this token (inside a write: as that write sees it). */
+  holdsQueueLease(lease: string, token: string): boolean {
+    return this.conn.read((db) => !!db.prepare('SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?').get(lease, token))
+  }
+
+  /** Notes a held lease as seen now (display only); false when it isn't held any more. */
+  renewQueueLease(lease: string, token: string, at: string): boolean {
+    return this.conn.write((db) => Number(db.prepare('UPDATE queue_runners SET renewed_at = ? WHERE lease = ? AND token = ?').run(at, lease, token).changes) > 0, true)
+  }
+
+  /** Gives up a lease: only its own row (by token), never a successor's. */
+  dropQueueLease(lease: string, token: string): boolean {
+    return this.conn.write((db) => Number(db.prepare('DELETE FROM queue_runners WHERE lease = ? AND token = ?').run(lease, token).changes) > 0, true)
+  }
+
+  /** The processes a lease's runner owns, or (`lease` null) every lease's of a target: its duties, kept until seen gone. */
+  queueProcs(lease: string | null, target?: string): QueueProc[] {
+    type Row = { lease: string; target: string; pid: number; start_after: number; start_before: number; what: QueueProcKind }
+    return this.conn.read((db) =>
+      ((lease !== null ? db.prepare('SELECT * FROM queue_runner_procs WHERE lease = ?').all(lease) : db.prepare('SELECT * FROM queue_runner_procs WHERE project = ? AND target = ?').all(this.scope.project, target ?? '')) as Row[]).map((r) => ({ lease: r.lease, target: r.target, pid: r.pid, startAfter: r.start_after, startBefore: r.start_before, what: r.what }))
+    )
+  }
+
+  addQueueProc(p: QueueProc): void {
+    this.conn.write((db) => db.prepare('INSERT OR REPLACE INTO queue_runner_procs (lease, project, target, pid, start_after, start_before, what) VALUES (?, ?, ?, ?, ?, ?, ?)').run(p.lease, this.scope.project, p.target, p.pid, p.startAfter, p.startBefore, p.what), true)
+  }
+
+  dropQueueProc(lease: string, pid: number): void {
+    this.conn.write((db) => db.prepare('DELETE FROM queue_runner_procs WHERE lease = ? AND pid = ?').run(lease, pid), true)
+  }
+
+  /** This project's queue worktrees (for a target), as recorded. */
+  queueFolders(target?: string): QueueFolder[] {
+    const p = this.scope.project
+    return this.conn.read((db) =>
+      (target === undefined ? db.prepare('SELECT folder, target, lease FROM queue_worktrees WHERE project = ?').all(p) : db.prepare('SELECT folder, target, lease FROM queue_worktrees WHERE project = ? AND target = ?').all(p, target)) as unknown as QueueFolder[]
+    )
+  }
+
+  setQueueFolder(f: QueueFolder): void {
+    this.conn.write((db) => db.prepare('INSERT INTO queue_worktrees (folder, project, target, lease) VALUES (?, ?, ?, ?) ON CONFLICT (folder) DO UPDATE SET target = excluded.target, lease = excluded.lease').run(f.folder, this.scope.project, f.target, f.lease), true)
+  }
+
+  dropQueueFolder(folder: string): void {
+    this.conn.write((db) => db.prepare('DELETE FROM queue_worktrees WHERE folder = ?').run(folder), true)
+  }
+
+  /** Several of the runner's quiet writes, and the reads between them, as one write (a fence's check and what it guards). */
+  quiet<T>(fn: () => T): T {
+    return this.conn.write(() => fn(), true)
   }
 
   /** One of this project's values (a scalar: a line's last head seen, a folder's installed manifests' hash). */
