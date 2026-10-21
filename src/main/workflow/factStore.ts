@@ -79,6 +79,8 @@ export interface Tx {
   /** A ruleset stored once by its id (a start's, #1216). */
   saveRuleset(r: Ruleset): void
   action(card: number, kind: string, payload: Record<string, unknown>, fact: number | null): number
+  /** Whether an action of a kind was written for a fact of the card (an effect applied once, #1263). */
+  hasAction(card: number, kind: string, fact: number): boolean
   facts(card: number): Fact[]
   card(id: number): CardRecord
   putCard(card: CardRecord): void
@@ -335,6 +337,11 @@ export class FactStore {
   }
 
   /** This project's pending actions, in the order written. */
+  /** Whether an action of a kind was written for a fact of a card, whatever became of it (an effect applied once, #1263). */
+  hasAction(card: number, kind: string, fact: number): boolean {
+    return this.conn.read((db) => !!db.prepare('SELECT 1 FROM card_actions WHERE card = ? AND kind = ? AND fact = ? LIMIT 1').get(card, kind, fact))
+  }
+
   pendingActions(): ActionRow[] {
     return this.conn.read((db) => (db.prepare("SELECT a.* FROM card_actions a JOIN cards c ON c.number = a.card WHERE a.state = 'pending' AND c.project = ? ORDER BY a.id").all(this.scope.project) as Record<string, string | number | null>[]).map(actionOf))
   }
@@ -448,6 +455,7 @@ export class FactStore {
         },
         action: (card, kind, payload, fact) => this.conn.write(() => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid)),
         saveRuleset: (r) => this.saveRuleset(r),
+        hasAction: (card, kind, fact) => this.hasAction(card, kind, fact),
         facts: (card) => this.facts(card),
         card: (id) => this.card(id),
         putCard: (c) => {

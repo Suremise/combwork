@@ -567,6 +567,10 @@
     "defaultMessage": "This session has no transcript yet.",
     "description": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet."
   },
+  "service.workflow.closed": {
+    "defaultMessage": "The workspace this card belongs to has closed",
+    "description": "An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace."
+  },
   "service.workspace.advancedNotHere": {
     "defaultMessage": "{setting} can't be set for a workspace.",
     "description": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive."

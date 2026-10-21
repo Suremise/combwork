@@ -35,13 +35,17 @@ export function clearActionHandlers(): void {
 interface RunOf {
   ws: WorkspaceService
   path: string
+  life: AbortSignal
   alive: () => boolean
 }
 
 /**
  * Per workspace file, the run going on: whether another was asked for meanwhile, and the workspaces (windows) that asked
  * for it, each as it was when it asked. The run goes on in the newest of them still open: one whose window closed or
- * switched hands what is left to another that asked (HR4's #1215 round 2), never ending a request still wanted.
+ * switched hands what is left to another that asked (HR4's #1215 round 2), never ending a request still wanted. One
+ * requester per window and lifetime (#1240): asking again replaces its earlier request (made the newest), and requests
+ * no longer alive are dropped as one comes in, so the list is at most the windows open on the file, however often
+ * changes ask while a run goes on.
  */
 const runs = new Map<string, { again: boolean; by: RunOf[]; done: Promise<void> }>()
 
@@ -55,11 +59,11 @@ export function runActions(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return Promise.resolve()
   const life = ws.lifetime
-  const at: RunOf = { ws, path, alive: () => !life.aborted && ws.lifetime === life && ws.path === path }
+  const at: RunOf = { ws, path, life, alive: () => !life.aborted && ws.lifetime === life && ws.path === path }
   const key = boardFile(path).toLowerCase()
   const running = runs.get(key)
   if (running) {
-    running.by.push(at)
+    running.by = [...running.by.filter((x) => x.alive() && !(x.ws === ws && x.life === life)), at]
     running.again = true
     return running.done
   }
@@ -90,6 +94,11 @@ export function runActions(ws: WorkspaceService): Promise<void> {
   })()
   runs.set(key, run)
   return run.done
+}
+
+/** For tests: how many requesters the run going on for a workspace's file holds (0: none going on). */
+export function runRequesters(path: string): number {
+  return runs.get(boardFile(path).toLowerCase())?.by.length ?? 0
 }
 
 /** A change of the run's board, only while its workspace is the one the run began in (checked again inside the lock). */

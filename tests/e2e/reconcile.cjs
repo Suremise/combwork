@@ -1,4 +1,4 @@
-// Reconciliation in the dev build (#1217, record-only in P3): a card started by its agent, which works in a git worktree
+// Reconciliation in the dev build (#1217; with workflow rules enforced since #1263, a Doing card still only gets marks): a card started by its agent, which works in a git worktree
 // on its own branch; a commit made there with plain git, outside Hive, is seen by the watcher and recorded on the card as
 // an observed HeadMoved within the debounce, read over IPC; the card doesn't move. Then the branch merged into main by
 // hand: Integrated, by outside, the card still where it was. No agents run. Dev build, throwaway profile and workspace.

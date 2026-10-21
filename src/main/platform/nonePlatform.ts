@@ -10,7 +10,7 @@ import type { CardRecord } from '../workflow/factStore'
 import { reconcileNone, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import type { Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import { NoneAdapter } from './none'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
@@ -51,6 +51,13 @@ export class NonePlatform implements PlatformAdapter {
     if (card.kind === 'no-code') return null
     const r = this.hashing.revision(card.paths ?? [])
     return isUnknown(r) ? r : r.revision
+  }
+
+  /** The card's paths' hash: what the run is for and what it is tested on (its content is its revision); a name is a hash as given. */
+  async runRevision(card: CardRecord, _s: CardState, _folder: string | null, named: string | null): Promise<RunRevision> {
+    const r = await this.revisionNow(card)
+    const revision = isUnknown(r) ? null : r
+    return { revision, tested: revision, testedIs: 'content', ...(named !== null ? { named } : {}) }
   }
 
   /** None's submission: the card's declared paths (pre-filled from what its agents changed if it has none yet). */

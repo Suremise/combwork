@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "Nie ma takiego obrazu",
   "service.transcripts.noTool": "Nie ma takiego wywołania narzędzia",
   "service.transcripts.none": "Ta sesja nie ma jeszcze transkrypcji.",
+  "service.workflow.closed": "Obszar roboczy tej karty został zamknięty",
   "service.workspace.advancedNotHere": "{setting}: tego ustawienia nie można zmienić dla obszaru roboczego.",
   "service.workspace.agentGone": "Ten agent już nie istnieje.",
   "service.workspace.badName": "Nazwa projektu nie może zaczynać się od „.” ani zawierać znaków {chars}",

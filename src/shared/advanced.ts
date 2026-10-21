@@ -409,6 +409,20 @@ const SOURCES: readonly AdvancedSource[] = [
     workspace: true,
     applies: 'now'
   },
+  // The one switch for every workflow rule at once (#1263, #1120's table); each rule has its own option too.
+  {
+    id: 'hive.workflow.enforce',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.workflow.enforce.title', defaultMessage: 'Workflow rules are enforced', description: "An advanced setting's title (Settings → Advanced), listed under Hive. The workflow rules are the checks a card passes as it moves across the board (review, checks, merging), set per project in its Version Control options." }),
+    desc: msg({
+      id: 'settings.advanced.hive.workflow.enforce.desc',
+      defaultMessage: "Hive keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Hive sees a card's work merged or changed outside Hive. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Hive only records what happens to each card's work, without moving cards or waking agents for it.",
+      description: 'What the advanced setting "Workflow rules are enforced" does, and what turning it off does (Settings → Advanced). Version Control is the name of a tab in Project Settings, and Review, Approved and Done are board stages: use them as Hive shows them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
   // Claude Code
   {
     id: 'claude-code.trust.prompt',

@@ -2,7 +2,7 @@
 // answers gathered before the transaction. Each holds (null) or refuses with its rule and values; an answer the
 // platform couldn't give refuses as unknown, naming what couldn't be read (§16.3.1).
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app (#1263): the runtime (main/workflow/service.ts) runs them; #1265 on route the board's moves through it.
 
 import type { Ruleset } from './compile'
 import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState } from './facts'

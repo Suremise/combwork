@@ -67,7 +67,7 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { cardStages } from './boardStore'
 import { cardFacts, factRow } from './workflow/cardWork'
-import { bracketFinished, bracketFor, bracketResolved, bracketStarted, takeResolved, type Bracket } from './workflow/runChecks'
+import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE } from '../shared/workflow/facts'
@@ -2619,6 +2619,7 @@ route('GET', '/v1/progress', async () => {
 const runLinkDeps: RunLinkDeps = {
   card: (n) => tasks.getTask(n).then((c) => (c.archived ? null : { project: c.project, column: c.column, agent: c.agent }), () => null),
   doing: (projectPath, agentId) => tasks.agentCards(basename(projectPath), agentId).then((cs) => cs.filter((c) => c.column === 'doing').map((c) => c.number)),
+  cardRun: (n, folder, named) => cardRunRevision(requireWorkspace(), n, folder, named),
   head: folderHead,
   commitOf: commitIn,
   projectName: (projectPath) => basename(projectPath),
