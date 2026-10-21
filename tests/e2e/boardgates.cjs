@@ -2,9 +2,11 @@
 // agent and the agent merging: a drag to Done with no merge asks ("Move AL-1 to Done anyway?", each rule by name,
 // Reason (optional), Move Anyway), and Move Anyway records the override and shows its mark with who, which rules and why
 // (S16's user part); Cancel leaves the card where it was, nothing recorded; a drag to Review with nothing to submit is
-// refused with the refusal's sentences and the card stays; in a project with every rule off (S39), nothing asks and a
-// column its rules don't have (Review) takes no drop. Screenshots of the question and the mark in both themes, and the
-// question in Polish. Dev build, throwaway profile and workspace.
+// refused with the refusal's sentences and the card stays; the card dialog's Column moved part of the way says where the
+// card is (HR3's #1275 round 1); Move to Doing's Assign and start on a blocked card asks too, Cancel doing nothing (no
+// agent started) and Move Anyway starting it with one override and its reason (round 1); in a project with every rule
+// off (S39), nothing asks and a column its rules don't have (Review) takes no drop. Screenshots of the question and the
+// mark in both themes, and the question in Polish. Dev build, fake Claude Code, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -16,6 +18,8 @@ const userData = path.join(lib.WORK, 'boardgates-profile')
 const ws = path.join(lib.WORK, 'boardgates-ws')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
+const gamma = path.join(ws, 'gamma')
+const claudeHome = path.join(lib.WORK, 'boardgates-claude-home')
 const alphaWt = path.join(ws, 'alpha-b1')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -24,9 +28,11 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   lib.gitProject(beta)
+  lib.gitProject(gamma)
   // Alpha: a reviewer agent, the agent merges, each builder in its own worktree (B1's, on its branch). Beta: every rule
   // off (S39), its agents in the project folder.
   const main = String(lib.git(alpha, ['branch', '--show-current'])).trim()
@@ -34,20 +40,24 @@ const check = (name, ok, extra = '') => {
   const b1 = { id: 'b1', name: 'B1' }
   const r1 = { id: 'r1', name: 'R1' }
   const projects = [
-    [alpha, [{ ...b1, worktree: { path: alphaWt, branch: 'b1-work', base: main } }, r1], { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' }],
-    [beta, [b1, r1], null]
+    [alpha, [{ ...b1, worktree: { path: alphaWt, branch: 'b1-work', base: main } }, r1], { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', dependenciesDone: true }],
+    [beta, [b1, r1], null],
+    // Gamma: a reviewer agent, nothing checked, its agents in the project folder (HR3's card-dialog repro).
+    [gamma, [b1, r1], { review: 'agent', noSelfReview: true, finish: 'notChecked', folder: 'project' }]
   ]
   for (const [dir, agents, options] of projects) {
     fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
     fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   }
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, alphaWt, beta, gamma].map((x) => x.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -128,6 +138,58 @@ const check = (name, ok, extra = '') => {
     check('…in its sentences: what, and what to do, the card named by its key', said.includes(`${(await card(b)).key} has no change to review`) && said.includes('Commit the work, then submit.'), said)
     check('…and the card stays in Doing', (await card(b))?.column === 'doing' && (await column('Doing').locator(`.task-card[data-task="${b}"]`).count()) === 1)
     await refusal.first().screenshot({ path: path.join(lib.WORK, 'boardgates-refused-dark.png') })
+
+    // --- The card dialog's Column moved part of the way (HR3's #1275 round 1, finding 2): Todo → Review starts the card
+    // and stops at its submission (nothing to submit). The dialog says where it is now, and its Column follows.
+    const p = (await inv('tasks:create', { title: 'Write the notes', project: 'gamma', agent: 'b1' })).number
+    await lib.until(async () => (await tile(p).count()) === 1, HUNG_MS)
+    await tile(p).click()
+    const edit = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await edit.waitFor({ timeout: HUNG_MS })
+    await edit.locator('select:has(option[value="review"])').selectOption('review')
+    await edit.getByRole('button', { name: 'Save', exact: true }).click()
+    const stoppedToast = page.locator('.toast', { hasText: 'stopped in Doing' })
+    check('the card dialog: a move stopped part way is said (stopped in Doing)', !!(await lib.until(async () => (await stoppedToast.count()) > 0, HUNG_MS)))
+    const dialogError = async () => (await edit.locator('.dialog-error').innerText().catch(() => '')).replace(/\s+/g, ' ')
+    check('…and the dialog says where the card is now, not where it was', !!(await lib.until(async () => (await dialogError()).includes('the card stays in Doing'), HUNG_MS)), await dialogError())
+    check('…its Column shows it, as the board has it', (await edit.locator('select:has(option[value="review"])').inputValue()) === 'doing' && (await card(p))?.column === 'doing', `${await edit.locator('select:has(option[value="review"])').inputValue()} / ${(await card(p))?.column}`)
+    await edit.getByRole('button', { name: 'Cancel' }).click()
+    await lib.until(async () => (await edit.count()) === 0, HUNG_MS)
+
+    // --- Move to Doing's Assign and start on a blocked card (HR3's #1275 round 1, finding 1): it asks before anything
+    // is done; Cancel starts nothing, Move Anyway starts it with one override and the reason.
+    const s = await create('Start the design', 'alpha')
+    await inv('tasks:update', s, { blocked: 'Needs a design decision' })
+    const doingDialog = page.locator('.dialog', { hasText: 'to Doing' }).filter({ has: page.locator('label.choice') })
+    const assignAndStart = async () => {
+      await drag(s, 'Doing')
+      await doingDialog.waitFor({ timeout: HUNG_MS })
+      await doingDialog.locator('label.choice', { hasText: 'Assign and start' }).first().click()
+      await doingDialog.locator('label.choice', { has: page.locator('strong', { hasText: /^\s*B1$/ }) }).click()
+      await doingDialog.locator('.dialog-footer .btn.primary').click()
+    }
+    const live = async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === 'b1')
+    await assignAndStart()
+    const startAsk = page.locator('.dialog', { hasText: 'to Doing anyway?' })
+    check('Assign and start on a blocked card asks first', !!(await lib.until(async () => (await startAsk.count()) === 1, HUNG_MS)))
+    const startAsked = (await startAsk.innerText().catch(() => '')).replace(/\s+/g, ' ')
+    check('…naming the rule it skips by its name', /This skips a rule of its project:/.test(startAsked) && !startAsked.includes('start.notBlocked'), startAsked)
+    await startAsk.screenshot({ path: path.join(lib.WORK, 'boardgates-start-ask-dark.png') })
+    await startAsk.getByRole('button', { name: 'Cancel' }).click()
+    await lib.until(async () => (await startAsk.count()) === 0, HUNG_MS)
+    await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel.
+    check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && !(await live()), JSON.stringify({ column: (await card(s))?.column, facts: await facts(s) }))
+    // The Move to Doing dialog may still be open behind it (the start didn't happen): close it.
+    if (await doingDialog.count()) await doingDialog.getByRole('button', { name: 'Cancel' }).click()
+    await lib.until(async () => (await doingDialog.count()) === 0, HUNG_MS)
+    await assignAndStart()
+    await lib.until(async () => (await startAsk.count()) === 1, HUNG_MS)
+    await startAsk.locator('input').fill('Decided in the call')
+    await startAsk.getByRole('button', { name: 'Move Anyway' }).click()
+    check('Move Anyway starts it, in Doing with B1', !!(await lib.until(async () => (await card(s))?.column === 'doing' && (await card(s))?.agent === 'b1', HUNG_MS)), JSON.stringify(await card(s)))
+    const sFacts = await inv('tasks:facts', s)
+    check('…with one override, its reason, and its start', sFacts.filter((f) => f.kind === 'Override').length === 1 && sFacts.find((f) => f.kind === 'Override')?.data.reason === 'Decided in the call' && sFacts.some((f) => f.kind === 'Started'), JSON.stringify(sFacts.map((f) => [f.kind, f.data?.reason])))
+    check('…and the agent starts with it', !!(await lib.until(live, HUNG_MS)))
 
     // --- Every rule off (S39): nothing asks; a column its rules don't have (Review) takes no drop.
     const c = await create('Read the docs', 'beta')

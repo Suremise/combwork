@@ -599,6 +599,25 @@ describe('the window asks before a move that skips rules (#1275)', () => {
     expect(await inWorkspace(off.w, () => tasks.moveColumns(c2))).toBeNull()
   })
 
+  it("a window Start that skips rules is asked before anything is done (HR3's round 1): what it skips, nothing written; with the user's reason, one Override", async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { blocked: 'Needs a design decision' })
+    const before = kinds(w, card)
+    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual(['start.notBlocked'])
+    expect(kinds(w, card)).toEqual(before)
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
+    // A card nothing blocks asks nothing.
+    const free = await create(w, 'Free')
+    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual([])
+    // Started with the user's reason (the question answered), as Start makes its move (taskStart's giveCard; the launch
+    // itself is boardgates'): one Override carrying it, then its start.
+    await update(w, card, { agent: 'a1', column: 'doing', override: { reason: 'Decided in the call' } })
+    const o = facts(w, card).filter((f) => f.kind === 'Override')
+    expect(o).toMatchObject([{ actor: 'user', data: { rules: ['start.notBlocked'], reason: 'Decided in the call' } }])
+    expect(kinds(w, card)).toContain('Started')
+  })
+
   it("Move to Doing's choice goes with the move: the agent chosen is the builder its start records", async () => {
     const { w, wt } = await workspace(PAIR)
     const card = await create(w)

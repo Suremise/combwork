@@ -1204,12 +1204,14 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
+    // `dry` (the user's, #1275): only whether it would ask, and which rules; nothing written (a window Start asks first).
+    if (opts.dry && by !== 'user') throw new Error('a dry move is the user\'s') // i18n-ignore: a programming error, never shown
     // The Assistant's move on, while the card waits for the user at its round limit: only the user's answer resumes it.
     const limit = ORDER.indexOf(to) > ORDER.indexOf(from === 'hold' ? 'active' : from) ? this.atLimit(card, s, by) : null
     if (limit) return this.refuse(card, by, 'move', limit)
@@ -1220,6 +1222,7 @@ export class Workflow {
     if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
     if (to === 'hold') {
+      if (opts.dry) return this.ok(card, from, to)
       const out = await this.write(card, r, by, (w) => {
         const changed = this.stillAt(w, s, 'move')
         if (changed) return changed
@@ -1237,6 +1240,7 @@ export class Workflow {
       // Past where it was: back there and the intents of a drag from there, in one write (dragForward).
       if (forward) return this.dragForward(card, was, to, by, opts, was)
       if (to === was) {
+        if (opts.dry) return this.ok(card, from, to)
         const out = await this.write(card, r, by, (w) => {
           const changed = this.stillAt(w, s, 'move')
           if (changed) return changed
@@ -1262,7 +1266,8 @@ export class Workflow {
     // Out of On Hold, the rules a move skips count from where the card was, not from Todo.
     const heldFrom = from === 'hold' ? ([...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')?.data.from ?? 'todo') : from
     const skipped = this.skippedRules(card, r, heldFrom, to)
-    if (skipped.length && by === 'user' && !opts.confirm) return { ask: true, card: card.key, rules: skipped }
+    if (skipped.length && by === 'user' && (!opts.confirm || opts.dry)) return { ask: true, card: card.key, rules: skipped }
+    if (opts.dry) return this.ok(card, from, to)
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
       // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
@@ -1288,8 +1293,8 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
-    const asking = by === 'user' ? !opts.confirm : !opts.reason
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+    const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
@@ -1303,6 +1308,7 @@ export class Workflow {
       // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
       // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
       if (!gs) return this.refuse(card, by, 'submit', gsub)
+      if (opts.dry) return this.dragForward(card, from, 'active', by, opts, fromHold)
       const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
       return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
     }
@@ -1319,6 +1325,7 @@ export class Workflow {
     if (pastReview && this.enforced()) rules.add('integrate.approved')
     const skipped = [...rules]
     const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+    if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
     if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
     await this.cfg.hooks?.beforeWrite?.('move')
     if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))

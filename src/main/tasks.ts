@@ -1144,6 +1144,19 @@ export async function moveTask(n: number, column: TaskColumn, o: { before?: numb
 }
 
 /**
+ * The rules the user's Start of a card would skip (#1275: its move into Doing, the start its rules stand for), asked
+ * before anything is done (no agent added, nothing launched): none when no rule applies or none is skipped. `agent`: the
+ * agent it is given to (null: one not added yet).
+ */
+export async function startAsks(n: number, agent: string | null): Promise<string[]> {
+  const actor: TaskActor = { kind: 'user' }
+  const gate = await gateOf(workspace, n, { column: 'doing', ...(agent ? { agent } : {}) }, actor, { anyStage: true })
+  if (!gate) return []
+  const r = await gate.wf.move(n, gate.to, 'user', { dry: true, ...(gate.builder ? { builder: gate.builder } : {}) })
+  return !isRefusal(r) && 'ask' in r ? r.rules : []
+}
+
+/**
  * The columns a card can be moved to under its rules (IPC `tasks:columns`, #1275): its ruleset's stages as columns
  * (On Hold always), where the window's drag highlights a drop; null when no rule applies to it (the rules off, a card
  * from before 1.0, a project with no platform): every column. A Done card dragged on is reopened: its next cycle's.

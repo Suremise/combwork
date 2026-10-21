@@ -1889,7 +1889,9 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   Doing dialog with its agent, the card dialog's Column) goes through `tasks:move`; `tasks:update` from the window
   no longer skips a rule unasked (one that would is refused, naming the rules). A move that asks shows the question
   (*"Move AM-12 to Done anyway?"*, each rule it skips by its name, **Reason (optional)**, **Move Anyway** / Cancel),
-  then moves with `confirm` and the reason; Cancel, or a step refused for something no override can make true, puts
+  then moves with `confirm` and the reason. A window **Start** (the Start dialog, Move to Doing's Assign and start) asks
+  the same before anything is done (`tasks:start` returns `ask` from the runtime's dry move, `startAsks`: no agent
+  added, nothing launched), then starts with the reason kept on its `Override`. Cancel, or a step refused for something no override can make true, puts
   the card back where it was or where the drag stopped, with the refusal's three sentences in a toast. As a drag
   starts, the window asks which columns the card's rules have (`tasks:columns`: its ruleset's stages as columns, On
   Hold always; a reopened Done card's next cycle's; none when no rule applies): a column they don't have takes no

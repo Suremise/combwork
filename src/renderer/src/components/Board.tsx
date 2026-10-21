@@ -187,6 +187,22 @@ const refusalText = (r: Refusal, name: string): string => {
 }
 
 /**
+ * The question before a move (or a Start) that skips rules (#1275): the rules by name, a reason, Move Anyway. The reason
+ * given (maybe empty), or null when the user cancels.
+ */
+function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): Promise<string | null> {
+  return prompt({
+    title: tr(MOVE.askTitle, { card: name, column: tr(COLUMN_TEXT[column].label) }),
+    message: tr(MOVE.askMessage, { n: rules.length }),
+    list: rules.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
+    listOnly: true,
+    detail: tr(MOVE.detail),
+    fieldLabel: tr(MOVE.reason),
+    confirmLabel: tr(MOVE.anyway)
+  })
+}
+
+/**
  * Moves a card to a column through its rules (`tasks:move`, #1275, SPEC §16.8.4): a move that skips some asks first
  * (the rules it skips, a reason, Move Anyway), then records one override; a step no override can make true shows why,
  * and the card stays where the move stopped. `agent`: the Move to Doing dialog's choice. Whether it reached the column;
@@ -198,15 +214,7 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
   try {
     let r = await call('tasks:move', c.number, column, o)
     if ('ask' in r) {
-      const reason = await prompt({
-        title: tr(MOVE.askTitle, { card: name, column: where }),
-        message: tr(MOVE.askMessage, { n: r.ask.length }),
-        list: r.ask.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
-        listOnly: true,
-        detail: tr(MOVE.detail),
-        fieldLabel: tr(MOVE.reason),
-        confirmLabel: tr(MOVE.anyway)
-      })
+      const reason = await askToSkip(name, column, r.ask)
       if (reason === null) return false
       r = await call('tasks:move', c.number, column, { ...o, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
     }
@@ -1701,7 +1709,12 @@ export function TaskDialog() {
       if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
       if (give) await call('tasks:update', card.number, { agent: give })
       if (to !== undefined && !(await moveCard(card, to))) {
-        throw new Error(tr(MOVE.notMoved, { column: tr(COLUMN_TEXT[card.column].label) }))
+        // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
+        // the dialog's saved state follows, so Save again or Cancel never claims a column it isn't in.
+        const at = get().tasks.find((t) => t.number === card.number)?.column ?? card.column
+        orig.current = { ...fields, column: at }
+        setColumn(at)
+        throw new Error(tr(MOVE.notMoved, { column: tr(COLUMN_TEXT[at].label) }))
       }
       if (clashed.length) {
         notify(
@@ -2142,10 +2155,20 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
   )
 }
 
-/** Starts a card (the Start and Move to Doing dialogs) and says so, with Show. */
-async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<void> {
-  const r = await call('tasks:start', card.number, target)
+/**
+ * Starts a card (the Start and Move to Doing dialogs) and says so, with Show. A start that skips rules asks first
+ * (#1275), before any agent is added or anything launched: false when the user cancels (nothing done).
+ */
+async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<boolean> {
+  let r = await call('tasks:start', card.number, target)
+  if ('ask' in r) {
+    const reason = await askToSkip(cardLabel(card), 'doing', r.ask)
+    if (reason === null) return false
+    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    if ('ask' in r) return false
+  }
   notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
+  return true
 }
 
 export function TaskStartDialog() {
@@ -2187,9 +2210,13 @@ export function TaskStartDialog() {
 
   const go = async (): Promise<void> => {
     if (!pick.ready) return
-    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here.
-    const r = await action.run('start', () => startCard(card, project, pick.target()))
-    if (!r) return
+    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here. A start the
+    // user cancelled at its question (#1275) leaves it open, nothing done.
+    let started = false
+    const r = await action.run('start', async () => {
+      started = await startCard(card, project, pick.target())
+    })
+    if (!r || !started) return
     close()
     set({ taskOpen: null })
     await loadTasks()
@@ -2280,7 +2307,11 @@ export function MoveToDoingDialog() {
     const r = await action.run(mode, async () => {
       await req.prepare?.()
       if (mode === 'start') {
-        await startCard(card, project, pick.target())
+        // Cancelled at its question (#1275): nothing done, the card where it was.
+        if (!(await startCard(card, project, pick.target()))) {
+          moved = false
+          return
+        }
         // Start doesn't place the card: where it was dropped, if it still can be (the order only).
         if (req.before !== undefined) await call('tasks:update', card.number, before).catch(() => undefined)
       } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before }))) {
