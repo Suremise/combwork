@@ -458,7 +458,7 @@ reconciled when their target moved: an event's line, or a target whose head isn'
 (`board_meta` `workflow:<project>:target:<line>`; '' for a deleted target), so a reset while Hive was closed is found at
 the next open or focus, with one read per target. The checkpoint moves only once all of that target's Done cards were
 reconciled to the end (`ReconcileHooks.unknown` tells of a read that couldn't be made, and a failure counts too): one
-left undecided is looked at again at the next run. Trailers name cards by their keys (`Hive-Card: HI-12`, #1294); the name form the adoption keyed cards by before (`hive-1263`) still finds them (`cardByKey`).
+left undecided is looked at again at the next run. Trailers name cards by their keys (`Hive-Card: HI-12`, #1294); the name form the adoption keyed cards by before (`hive-1263`) still finds them (`cardByKey`) where the name is no project's key.
 Platform reads are made outside the lock; `wf.write` stores the ruleset its facts name in its own transaction
 (`currentRuleset(false)` reads without storing). A run stops once its workspace closes or its window opens another; its
 watch goes as the workspace closes.
@@ -555,7 +555,8 @@ column) is read from its documents as before. Tests and the e2e helpers read and
 facts step, v7: #1208's facts tables and what the runtime keeps beside them, Darren's rule of 20 Oct applied by the
 Assistant: typed tables, never JSON values). A `CardRecord` is the board's card: its number (`id`), its key
 (#1294: `HI-12`, its project's key now and its number there, #1219's; the scope's name and its number for a card
-without one; `cardByKey` takes a key or an old key through #1219's resolver, `#N`, or that name form), title, labels and `blockedBy` from the card's rows, and the runtime's
+without one; `cardByKey` takes a key or an old key through #1219's resolver, `#N`, or that name form, but only for a prefix no
+project holds or held as a key: a key no card has here is none, never the board's card with that number), title, labels and `blockedBy` from the card's rows, and the runtime's
 columns of the row outside the card's JSON document (`stage`, `kind`, `target`, `pre_workflow`, and `card_paths` for
 None's declared paths and pre-fill), so `tasks.ts`' saves of the document keep them and the Agent API's card is
 unchanged; its `lane` and `reviewer` are its lane's (below). `stage` empty (a card no 1.0 rule has moved) reads as its column's stage;

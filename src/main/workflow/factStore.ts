@@ -14,8 +14,8 @@ import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
 import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
-import { cardKeys, cardOfKey, currentKeys } from '../schema/keysStep'
-import { KEY_FORM } from '../../shared/projectKeys'
+import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
+import { KEY_FORM, normalKey } from '../../shared/projectKeys'
 import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
 import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
@@ -290,6 +290,9 @@ export class FactStore {
    * A card of this project by its key (`HI-12`, any case; an old key of its project's too, and a card's name in a project
    * it left: #1219's resolver), its old number (`#1061`), or the name keys had before (`<name>-<old number>`, the scope's
    * name, which may hold hyphens: Hive-Card trailers written before #1294 say it), or null.
+   * A prefix any project holds or held as a key is a key, never that name form (HR5's #1294 round 1): a key no card has
+   * here, or another project's card, is null, not the card with that number on the board. So where a project's name is
+   * one of its keys, a name-form trailer finds only a card from before 1.0 (which kept its number in its project, #1219).
    */
   cardByKey(key: string): CardRecord | null {
     const ofThis = (n: number): CardRecord | null => this.records('number = ? AND project = ?', [n, this.scope.project])[0] ?? null
@@ -298,10 +301,10 @@ export class FactStore {
     if (old) return ofThis(Number(old[1]))
     const m = /^(.+)-(\d+)$/.exec(v)
     if (!m) return null
-    const keyed = KEY_FORM.test(m[1]) ? this.conn.read((db) => cardOfKey(db, m[1], Number(m[2]))) : null
-    const card = keyed !== null ? ofThis(keyed) : null
-    if (card) return card
-    if (!this.scope.key || m[1].toLowerCase() !== this.scope.key.toLowerCase()) return null
+    const prefix = m[1]
+    const keyed = KEY_FORM.test(prefix) ? this.conn.read((db) => (keysHeld(db).some((k) => k.key === normalKey(prefix)) ? { card: cardOfKey(db, prefix, Number(m[2])) } : null)) : null
+    if (keyed) return keyed.card === null ? null : ofThis(keyed.card)
+    if (!this.scope.key || prefix.toLowerCase() !== this.scope.key.toLowerCase()) return null
     return ofThis(Number(m[2]))
   }
 
