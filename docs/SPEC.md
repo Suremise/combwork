@@ -2298,6 +2298,20 @@ target, how to report, and the user's optional note. Under 1.0 most of a brief (
 Done) is the rules themselves. The Assistant's briefs become the same brief plus its notes. The lane's row has **End
 lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [HB3's round 1 finding 14].
 
+**Built [#1280]:** **Start Lane** opens from the Todo column's menu (its cards in the column's order, the first card's
+project's), a Todo card's menu, the board's ⋯ menu and the Progress panel's Lanes tab (its button, and a running
+lane's menu). It picks the project, the builder, the reviewer (refused without one when the rules have a reviewer agent
+review the work), the cards in order (up, down, out; added from the project's Todo), a name and a note. `lanes:start`
+checks the cards are the project's and not Done, refuses an agent busy now (working, starting, waiting, background,
+watching, sign-in: the dialog's **Wait and Start** waits until both are idle, then starts; Cancel stops waiting),
+records the lane (`startLane`, by "the user") and starts each agent with its brief (`shared/laneBrief.ts`: the cards,
+the builder's folder and branch, the target, the reviewer, a line per option in force: review, checks before review
+with `hive-progress --check`, who merges, your OK; the intents; the note; with the rules off, that cards move as put):
+a stopped agent is launched with it as a task delivery (`launchWith`), an idle one gets a new conversation
+(`newConversation`, the old one kept); nothing is typed into a CLI, so no slash command ever is. An agent that fails
+to start leaves the lane recorded and says why. A running lane's menu has **End Lane** and **Abandon Lane…** (asks
+first; `lanes:end`).
+
 #### 16.11.4 Rounds and following a lane
 
 - Rounds count reviewed submissions: a `Verdict` fail (content or explanation) or the user's decline (§16.8.1); queue

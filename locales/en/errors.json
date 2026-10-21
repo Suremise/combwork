@@ -115,6 +115,10 @@
     "defaultMessage": "Not an image",
     "description": "Copy image: the file isn't an image Hive can read."
   },
+  "errors.lane.builderRequired": {
+    "defaultMessage": "A lane's builder is required",
+    "description": "Starting a lane (a card loop) without saying which agent builds it (a programming error, rarely seen)."
+  },
   "errors.lane.required": {
     "defaultMessage": "Which lane to end is required",
     "description": "Ending a card loop without saying which (a programming error, rarely seen)."

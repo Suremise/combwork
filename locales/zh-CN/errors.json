@@ -28,6 +28,7 @@
   "errors.hive.noRepo": "此项目不在任何 git 仓库中：请在你使用的版本控制或同步服务中排除 .hive。",
   "errors.hive.notIgnored": "Git 在此处仍未忽略 .hive：某个 .gitignore 中的规则（以 ! 开头的行）可能把它重新包含了进来。Hive 不会编辑 .gitignore 文件。",
   "errors.image.not": "不是图片",
+  "errors.lane.builderRequired": "需要指定通道的构建者",
   "errors.lane.required": "必须指定要结束的通道",
   "errors.log.gone": "日志已不存在：{path}",
   "errors.log.none": "该运行没有报告日志。",

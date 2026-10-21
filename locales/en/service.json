@@ -443,6 +443,38 @@
     "defaultMessage": "That project has no id yet, so it can’t have a key: open it in Hive first.",
     "description": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)."
   },
+  "service.laneStart.busy": {
+    "defaultMessage": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for your answer} background {is waiting on background tasks it started} signin {needs you to sign in again} other {is waiting on cards (a card watch)}}. Start the lane once it's idle, or choose another agent.",
+    "description": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle."
+  },
+  "service.laneStart.done": {
+    "defaultMessage": "{card} is Done already.",
+    "description": "An error starting a lane from the window: a card chosen ({card}, its key) is already Done."
+  },
+  "service.laneStart.needsReviewer": {
+    "defaultMessage": "{project}'s rules have a reviewer agent review each card: choose a reviewer.",
+    "description": "An error starting a lane from the window: the project's workflow options have a reviewer agent review the work, and no reviewer was chosen."
+  },
+  "service.laneStart.noCards": {
+    "defaultMessage": "Choose the cards for the lane.",
+    "description": "An error starting a lane (a builder and a reviewer working through cards in turn) from the window: no card was chosen."
+  },
+  "service.laneStart.notTheProjects": {
+    "defaultMessage": "{card} isn't one of {project}'s cards, or it is archived.",
+    "description": "An error starting a lane from the window: a card chosen ({card}, its key) isn't this project's ({project}), or is archived."
+  },
+  "service.laneStart.sameAgent": {
+    "defaultMessage": "The builder can't be its own reviewer.",
+    "description": "An error starting a lane from the window: the same agent was chosen as builder and reviewer."
+  },
+  "service.laneStart.starting": {
+    "defaultMessage": "{agent}'s lane is being started already.",
+    "description": "An error starting a lane from the window: one with the same builder ({agent}) is being started right now."
+  },
+  "service.laneStart.unknownAgent": {
+    "defaultMessage": "{agent} isn't one of {project}'s agents.",
+    "description": "An error starting a lane from the window: the builder or reviewer chosen ({agent}) isn't an agent of the project ({project})."
+  },
   "service.lanes.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error changing a workspace's lanes (card loops) while no workspace is open in the window."

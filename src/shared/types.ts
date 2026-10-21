@@ -2598,6 +2598,21 @@ export interface LaneInfo {
  */
 export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate'
 
+/** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
+export interface LaneStartRequest {
+  builder: string
+  reviewer: string | null
+  cards: number[]
+  note?: string
+  name?: string | null
+}
+
+/** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
+export interface LaneStartResult {
+  lane: LaneInfo
+  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed'; why?: string }[]
+}
+
 export interface LaneStatus {
   reason: LaneWaitReason
   /** The card it is about. */

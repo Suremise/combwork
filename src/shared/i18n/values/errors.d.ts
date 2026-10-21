@@ -30,6 +30,7 @@ interface HiveMessageValues {
   'errors.hive.noRepo': undefined
   'errors.hive.notIgnored': undefined
   'errors.image.not': undefined
+  'errors.lane.builderRequired': undefined
   'errors.lane.required': undefined
   'errors.log.gone': { path: string | number }
   'errors.log.none': undefined

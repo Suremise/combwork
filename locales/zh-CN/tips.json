@@ -176,6 +176,8 @@
   "tips.laneGates.title": "查看通道为何没有进展",
   "tips.laneNotices.text": "当通道的评审未通过、卡片被阻塞或停滞，或所有卡片均已通过评审、该合并时，Hive 会通知你，每个通道一条通知。在“设置 → 通知”中决定通知显示的位置。",
   "tips.laneNotices.title": "无需助手，也能了解通道进展",
+  "tips.laneStart.text": "右键单击待办列并选择“用这些卡片启动通道…”：选择构建者和评审者，排好卡片顺序，两者都会带着说明开始。可在进度面板中通道的行上结束或放弃它。",
+  "tips.laneStart.title": "自己启动通道",
   "tips.language.text": "Hive 会跟随 Windows 的显示语言（如果支持）。“设置”→“常规”→“语言”可以选择其他语言；由 AI 翻译的语言会有标记，欢迎改进。与智能体交流时仍使用英语。",
   "tips.language.title": "用你的语言使用 Hive",
   "tips.leftoverProcesses.text": "智能体启动的预览服务器或 tail -f 可能在它停止后继续运行，占用项目文件夹或端口。Hive 会在智能体窗格的 ⋯ 菜单中列出它们，并提供结束选项；“设置”→“智能体与工作树”可以设为每次都结束它们。",

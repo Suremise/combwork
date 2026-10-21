@@ -10208,6 +10208,65 @@ button.progress-run-show:focus-visible {
   line-height: 14px;
   letter-spacing: 0;
 }
+/* Start lane… (#1280): the Lanes tab's button, and the dialog's cards in order, each with its moves. */
+.progress-lanes-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-2) 0;
+}
+.progress-empty .progress-lanes-start {
+  margin-top: var(--space-2);
+}
+.lane-start-cards {
+  counter-reset: lane-card;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.lane-start-cards > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  counter-increment: lane-card;
+}
+.lane-start-cards > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+.lane-start-cards > li:not(.lane-start-none)::before {
+  content: counter(lane-card) '.';
+  min-width: 1.5em;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.lane-start-key {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.lane-start-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lane-start-none {
+  padding: var(--space-2);
+}
+.lane-start-add {
+  margin-top: var(--space-1);
+}
+.lane-start-note {
+  resize: vertical;
+}
+.lane-start-busy {
+  margin-bottom: 0;
+  color: var(--warning);
+}
 /* The latest run of a lane's current card (#1309): its colour and its shape, after the card's name. */
 .lane-run-dot {
   flex-shrink: 0;

@@ -10,6 +10,7 @@ import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, Compa
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
+import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
 import { RemoveProjectDialog } from './components/ProjectRemoval'
@@ -85,7 +86,7 @@ function handleEvent(e: HiveEvent): void {
       const ws = e.workspace
       // Another workspace in this window: its Assistant panel shows as that workspace left it, and its board.
       const other = ws?.path !== get().workspace?.path
-      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, taskDoing: null })
+      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
       // Drop warnings about projects that belong to a workspace that is no longer open.
@@ -487,6 +488,7 @@ export function App() {
       <TaskDialog />
       <ArchiveAllDialog />
       <TaskStartDialog />
+      <LaneStartDialog />
       <MoveToDoingDialog />
       <RemoveProjectDialog />
       <AboutDialog />

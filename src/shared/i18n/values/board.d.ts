@@ -110,6 +110,7 @@ interface HiveMessageValues {
   'board.columns.expandCards': undefined
   'board.columns.expandTip': { column: string | number; description: string | number }
   'board.columns.more': { column: string | number }
+  'board.columns.startLane': undefined
   'board.context.close': undefined
   'board.context.loading': undefined
   'board.context.open': undefined
@@ -355,12 +356,46 @@ interface HiveMessageValues {
   'board.lane.workRevision': { review: string; revision: string | number }
   'board.lane.workStalePass': { now: string; approved: string | number; current: string | number }
   'board.lane.workVerdict': { pass: string; revision: string; current: string }
+  'board.laneStart.addCard': undefined
+  'board.laneStart.agentState': { agent: string | number; status: string | number }
+  'board.laneStart.builder': undefined
+  'board.laneStart.busyNow': { agents: string | number; n: number }
+  'board.laneStart.cancel': undefined
+  'board.laneStart.cards': undefined
+  'board.laneStart.down': { card: string | number }
+  'board.laneStart.intro': undefined
+  'board.laneStart.name': undefined
+  'board.laneStart.noAgents': undefined
+  'board.laneStart.noCards': undefined
+  'board.laneStart.noReviewer': undefined
+  'board.laneStart.notRunning': undefined
+  'board.laneStart.notStarted': { agent: string | number }
+  'board.laneStart.notStartedText': { why: string | number; agent: string | number }
+  'board.laneStart.note': undefined
+  'board.laneStart.project': undefined
+  'board.laneStart.remove': { card: string | number }
+  'board.laneStart.reviewer': undefined
+  'board.laneStart.show': undefined
+  'board.laneStart.start': undefined
+  'board.laneStart.started': { pair: string | number }
+  'board.laneStart.startedText': { n: number }
+  'board.laneStart.starting': undefined
+  'board.laneStart.title': undefined
+  'board.laneStart.up': { card: string | number }
+  'board.laneStart.waitAndStart': undefined
+  'board.laneStart.waiting': { agents: string | number }
+  'board.lanes.abandon': undefined
+  'board.lanes.abandonConfirm': undefined
+  'board.lanes.abandonMessage': undefined
+  'board.lanes.abandonTitle': { lane: string | number }
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
   'board.lanes.barUnrecorded': { pair: string | number; total: number }
   'board.lanes.edge': undefined
   'board.lanes.edgeTip': { lanes: string | number }
   'board.lanes.edgeValue': { shown: string | number; count: number }
+  'board.lanes.end': undefined
+  'board.lanes.endFailed': { lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
   'board.lanes.moveDown': undefined
@@ -369,6 +404,7 @@ interface HiveMessageValues {
   'board.lanes.none': undefined
   'board.lanes.show': undefined
   'board.lanes.stalled': undefined
+  'board.lanes.start': undefined
   'board.lanes.state': { state: string }
   'board.lanes.title': undefined
   'board.lanes.usualOrder': undefined
@@ -383,6 +419,7 @@ interface HiveMessageValues {
   'board.menu.nextRound': undefined
   'board.menu.open': undefined
   'board.menu.start': undefined
+  'board.menu.startLane': undefined
   'board.merge.fold': undefined
   'board.merge.region': undefined
   'board.merge.time': { sofar: string | number; left: string | number }
@@ -592,6 +629,7 @@ interface HiveMessageValues {
   'board.toolbar.forYou': { n: number }
   'board.toolbar.more': undefined
   'board.toolbar.search': undefined
+  'board.toolbar.startLane': undefined
   'board.upgrade.askDetail': undefined
   'board.upgrade.askMessage': undefined
   'board.upgrade.askTitle': undefined

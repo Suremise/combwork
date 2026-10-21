@@ -176,6 +176,8 @@
   "tips.laneGates.title": "See why a lane isn’t moving",
   "tips.laneNotices.text": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
   "tips.laneNotices.title": "Hear how a lane goes, without the Assistant",
+  "tips.laneStart.text": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
+  "tips.laneStart.title": "Start a lane yourself",
   "tips.language.text": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Hive in your language",
   "tips.leftoverProcesses.text": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Hive lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
