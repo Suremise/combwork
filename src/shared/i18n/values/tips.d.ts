@@ -120,6 +120,8 @@ interface HiveMessageValues {
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined
   'tips.copyDiagnostics.title': undefined
+  'tips.ctrlCvToCli.text': undefined
+  'tips.ctrlCvToCli.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined

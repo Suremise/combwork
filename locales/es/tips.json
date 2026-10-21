@@ -118,6 +118,8 @@
   "tips.copilotModes.title": "Qué preguntan antes los agentes de Copilot",
   "tips.copyDiagnostics.text": "Ayuda → Copiar diagnóstico… reúne la versión de Hive, tus agentes de programación, las opciones principales y el final del registro para un informe de error, sin nombres, carpetas ni tokens.",
   "tips.copyDiagnostics.title": "¿Encontraste un error? Copiar diagnóstico",
+  "tips.ctrlCvToCli.text": "En el panel de un agente, Ctrl+C copia una selección y Ctrl+V pega. Activa Configuración → Avanzado → Ctrl+C y Ctrl+V van a la CLI para enviar ambas teclas a la CLI, como en cualquier otro terminal; el clic derecho sigue copiando y pegando.",
+  "tips.ctrlCvToCli.title": "Da Ctrl+C y Ctrl+V a la CLI del agente",
   "tips.dateFormat.text": "Hive muestra las fechas como {date} y las horas como {time}. Configuración → General → Formato de fecha y Formato de hora las cambian en todas partes, también en los nombres de las sesiones que llevan su hora de inicio.",
   "tips.dateFormat.title": "Fechas a tu manera",
   "tips.defaultProvider.text": "Proveedor predeterminado es Automático salvo que elijas uno: los agentes nuevos usan el primer agente de programación activado e instalado, así que Codex o GitHub Copilot solos funcionan sin Claude Code. Elige uno en Configuración → Proveedores para usarlo siempre.",

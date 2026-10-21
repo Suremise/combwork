@@ -475,6 +475,14 @@
     "defaultMessage": "Found a bug? Copy Diagnostics",
     "description": "A tip's title."
   },
+  "tips.ctrlCvToCli.text": {
+    "defaultMessage": "In an agent's pane Ctrl+C copies a selection and Ctrl+V pastes. Turn on Settings → Advanced → Ctrl+C and Ctrl+V go to the CLI to send both keys to the CLI instead, as in any other terminal; right-click still copies and pastes.",
+    "description": "A tip. Ctrl+C and Ctrl+V name keys: use the key names your language uses. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.ctrlCvToCli.title": {
+    "defaultMessage": "Give Ctrl+C and Ctrl+V to the agent's CLI",
+    "description": "A tip's title. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
   "tips.dateFormat.text": {
     "defaultMessage": "Hive shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."

@@ -298,6 +298,8 @@ export const AREAS = [
   { paths: ['src/main/providers/codex/'], suites: ['codex-appserver'] },
   // Codex's Advanced switches (#1167): right-click passed to Codex, and its terminal title left to the user's config.
   { paths: ['src/main/providers/codex/', 'src/main/advancedValues.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/codexoverrides.cjs'], suites: ['codexoverrides'] },
+  // The switches for an agent pane's Ctrl+C and Ctrl+V and for what Hive types (#1286).
+  { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/shared/terminalInput.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/fake-claude.cjs', 'tests/e2e/terminalinput.cjs'], suites: ['terminalinput'] },
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // The fake Codex CLI: every suite that runs it.
