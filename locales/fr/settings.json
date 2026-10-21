@@ -603,6 +603,8 @@
   "settings.project.fileLocks.desc": "Ce qui se passe quand un agent essaie de modifier un fichier qu’un autre agent du dossier de ce projet est en train de modifier. Hériter utilise Paramètres → Agents et worktrees → Verrous de fichiers.",
   "settings.project.fileLocks.tip": "S’applique aux agents qui partagent un dossier (les agents dans leur propre worktree n’entrent jamais en conflit). Un agent réserve un fichier quand il le modifie et le libère à la fin de son tour. Les modifications faites par des commandes shell ne sont pas couvertes.",
   "settings.project.fileLocks.title": "Verrous de fichiers",
+  "settings.project.key.desc": "Les 2 à 4 lettres qui nomment les cartes de ce projet, comme dans {example}. Si vous la changez, l’ancienne clé les retrouve toujours.",
+  "settings.project.key.title": "Clé du projet",
   "settings.project.keybindings.desc": "Modifie un raccourci pour en donner un propre à ce projet ; Réinitialiser le ramène au raccourci global. Enregistré dans le dossier .hive du projet, qui n’entre pas dans les commits.",
   "settings.project.keybindings.title": "Raccourcis",
   "settings.project.loopRounds.desc": "Combien de tours une carte a dans les boucles de cartes de ce projet avant que ses agents s’arrêtent et te demandent, quand tu ne le précises pas. Vide : hérite de Paramètres → Espace de travail → Tours des boucles de cartes.",

@@ -605,6 +605,8 @@ interface HiveMessageValues {
   'settings.project.fileLocks.desc': undefined
   'settings.project.fileLocks.tip': undefined
   'settings.project.fileLocks.title': undefined
+  'settings.project.key.desc': { example: string | number }
+  'settings.project.key.title': undefined
   'settings.project.keybindings.desc': undefined
   'settings.project.keybindings.title': undefined
   'settings.project.loopRounds.desc': undefined

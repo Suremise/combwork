@@ -1,6 +1,6 @@
 import { msg, type Msg } from './i18n/msg'
 import type { BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
-import { cardName, cardRef } from './projectKeys'
+import { cardLabel, cardName, cardRef } from './projectKeys'
 
 /**
  * The window's tr() (#798), passed in: agent scripts (hive-mcp.js) import this module and must not load the
@@ -198,10 +198,10 @@ export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'ar
   if (!a) return null
   // #777: it did watch the card; its wake, which Hive typed, waits untaken in its prompt (its CLI didn't take the line).
   if (a.untaken) {
-    if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Hive typed for #{card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card number (after #).' }), { agent: a.name, card: card.number })
+    if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
     return `${a.name} hasn't taken the wake Hive typed for ${cardName(card)}: it waits in its prompt.` // i18n-ignore: agent-facing (the Agent API's stalled)
   }
-  if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching #{card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card number (after #). A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: card.number })
+  if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching {card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: cardLabel(card) })
   return `${a.name} isn't watching ${cardName(card)}: its turn ended with no card watch.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
@@ -249,10 +249,10 @@ export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'arc
   if (!w) return null
   const min = Math.round(ms / 60_000)
   if (tr) {
-    const values = { agent: w.name, card: card.number, waited: durationText(min * 60_000, tr) }
-    if (w.silentMinutes !== undefined) return tr(msg({ id: 'board.stalled.reviewWaitSilent', defaultMessage: "{agent} is watching #{card} but hasn't started reviewing it (it shows working, but has been silent for {silent, number} min: state unknown): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card number (after #), {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), { ...values, silent: w.silentMinutes })
-    if (w.status === 'working') return tr(msg({ id: 'board.stalled.reviewWaitBusy', defaultMessage: "{agent} is watching #{card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
-    return tr(msg({ id: 'board.stalled.reviewWait', defaultMessage: "{agent} is watching #{card} but hasn't started reviewing it: in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
+    const values = { agent: w.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) }
+    if (w.silentMinutes !== undefined) return tr(msg({ id: 'board.stalled.reviewWaitSilent', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent, number} min: state unknown): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), { ...values, silent: w.silentMinutes })
+    if (w.status === 'working') return tr(msg({ id: 'board.stalled.reviewWaitBusy', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
+    return tr(msg({ id: 'board.stalled.reviewWait', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it: in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
   }
   const state = w.silentMinutes !== undefined ? ` (it shows working, but has been silent for ${w.silentMinutes} min: state unknown)` : w.status === 'working' ? ' (it is working on something else)' : '' // i18n-ignore: agent-facing (the Agent API's stalled)
   return `${w.name} is watching ${cardName(card)} but hasn't started reviewing it${state}: in Review for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
@@ -278,7 +278,7 @@ export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column'
   const ms = times.length ? now - Math.max(...times) : NaN
   if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
   const min = Math.round(ms / 60_000)
-  if (tr) return tr(msg({ id: 'board.stalled.reviewVerdictWait', defaultMessage: '{agent} started reviewing #{card} but has given no verdict, and has only been watching it for {waited}.', description: "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card number (after #), {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")." }), { agent: w.name, card: card.number, waited: durationText(min * 60_000, tr) })
+  if (tr) return tr(msg({ id: 'board.stalled.reviewVerdictWait', defaultMessage: '{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.', description: "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")." }), { agent: w.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
   return `${w.name} started reviewing ${cardName(card)} but has given no verdict, and has only been watching it for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
@@ -358,11 +358,24 @@ export function newSinceStart(card: Pick<TaskCard, 'history'>, d: { at: string }
   return start > 0 && (Date.parse(d.at) || 0) > start
 }
 
-/** A card matches the board's search: its number (#12 or 12), title, description, labels, project or agent. */
-export function cardMatches(c: Pick<TaskCard, 'number' | 'title' | 'description' | 'project' | 'agentName' | 'labels'>, q: string): boolean {
+/**
+ * A card matches the board's search: its key (#1221: `AM-12` or `am-12`; `AM-` for all of that project's; a project's old
+ * key too), its number (#12 or 12), title, description, labels, project or agent. A key form no project has (`re-`) is
+ * searched as words. `keys`: the projects' keys and old keys (without them, only a card's own key is matched); `moved`:
+ * the names moved cards keep in the projects they left (`HI-1` → card), which find them too.
+ */
+export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'description' | 'project' | 'agentName' | 'labels'>, q: string, keys: readonly { key: string; aliases: readonly string[] }[] = [], moved: Readonly<Record<string, number>> = {}): boolean {
   const s = q.trim().toLowerCase()
   if (!s) return true
   if (/^#?\d+$/.test(s)) return c.number === Number(s.replace('#', ''))
+  const k = /^([a-z]{2,4})-(\d{0,9})$/.exec(s)
+  const typed = k?.[1].toUpperCase()
+  const project = typed ? keys.find((x) => x.key === typed || x.aliases.includes(typed)) : undefined
+  if (k && (project || (!keys.length && c.key?.startsWith(`${typed}-`)))) {
+    const now = project?.key ?? typed
+    if (k[2] && moved[`${typed}-${Number(k[2])}`] === c.number) return true
+    return !!c.key && (k[2] ? c.key === `${now}-${Number(k[2])}` : c.key.startsWith(`${now}-`))
+  }
   return [c.title, c.description, c.project, c.agentName ?? '', ...c.labels].some((x) => x.toLowerCase().includes(s))
 }
 

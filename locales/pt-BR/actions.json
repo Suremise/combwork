@@ -73,6 +73,8 @@
   "actions.project.deactivateFailed": "Não foi possível desativar o projeto",
   "actions.project.deactivateMessage": "{n, plural, one {O projeto {project} tem uma sessão em execução.} other {O projeto {project} tem # agentes em execução.}}",
   "actions.project.deactivateTitle": "{n, plural, one {Parar a sessão e desativar?} other {Parar os agentes e desativar?}}",
+  "actions.project.key": "Chave",
+  "actions.project.keyHint": "Os cartões dele se chamam {first}, {second} e assim por diante. Você pode mudar a chave depois em Configurações do projeto.",
   "actions.project.nameChars": "Os nomes não podem conter {chars}",
   "actions.project.nameDot": "Os nomes não podem começar com “.”",
   "actions.project.nameEmpty": "Digite um nome",

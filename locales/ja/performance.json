@@ -25,7 +25,7 @@
   "performance.cards.heading": "カード",
   "performance.cards.lastHeld": "最終担当",
   "performance.cards.loadTarget": "カードのコスト",
-  "performance.cards.open": "#{number}を開く",
+  "performance.cards.open": "{number}を開く",
   "performance.cards.project": "プロジェクト",
   "performance.cards.reviewer": "レビュアー",
   "performance.cards.rounds": "ラウンド",

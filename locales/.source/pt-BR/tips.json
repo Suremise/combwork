@@ -236,6 +236,8 @@
   "tips.progressRecentFold.title": "Fold Recent away",
   "tips.projectCards.text": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
   "tips.projectCards.title": "A project's cards at a glance",
+  "tips.projectKeys.text": "Each project has a key of 2 to 4 letters that names its cards: AM-12. Search the board or the command palette for AM-12, or AM- for all of that project’s cards; an old #12 still works. Change a key in Project Settings.",
+  "tips.projectKeys.title": "Cards are named by their project’s key",
   "tips.projectTabs.text": "When space is short, a project's tabs shrink to icons, and the tab you're on keeps its name while it fits. Hover a tab for its name and shortcut.",
   "tips.projectTabs.title": "Tabs that make room",
   "tips.projectTabsKeys.text": "Alt+1 to Alt+8 open a project's tabs in the order they show, Session to Git. Memory, Skills, Templates and MCP are in More ▾ at the end, and in the menu bar's Project menu.",

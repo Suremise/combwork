@@ -121,6 +121,7 @@ export const SUITES = [
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },
+  { name: 'keysui' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
   { name: 'leftovers' },

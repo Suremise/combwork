@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { ALL_PROJECTS, RECENT_RUNS, SHOW_ALL, activeFilter, agentChoices, ProgressSync, barLook, cardRefText, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isListed, isOpenRun, isRecent, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
+import { ALL_PROJECTS, RECENT_RUNS, SHOW_ALL, activeFilter, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isListed, isOpenRun, isRecent, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { findProject, flashPane, get, notify, projectKey, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
+import { cardLabelOf, findProject, flashPane, get, notify, projectKey, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
 import { useNow } from '../usage'
 import { cx, formatKeybinding } from '../util'
 import { AssistantMark } from './AssistantMark'
@@ -330,7 +330,7 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
  * commit id.
  */
 function RunFor({ run: r }: { run: ProgressRun }) {
-  const card = r.card ? cardRefText(r.card) : null
+  const card = useStore((s) => (r.card ? cardLabelOf(s, r.card) : null))
   return (
     <div className="progress-run-for faint">
       {card && (
@@ -453,7 +453,7 @@ function RunDetails({ run: r, now }: { run: ProgressRun; now: number }) {
   useDateStyle()
   const project = useStore((s) => (r.projectPath ? (findProject(s, r.projectPath)?.name ?? null) : null))
   const why = useStore((s) => whyNotShown(s, r))
-  const rows = runDetails(r, project, now, tr)
+  const rows = runDetails(r, project, now, tr, (n) => cardLabelOf(get(), n))
   return (
     <div className="progress-details" role="region" aria-label={tr(msg({ id: 'board.progress.detailsOf', defaultMessage: 'Details of {run}', description: "Accessible name of a run's details in the Progress panel ({run}: the run's title)." }), { run: r.title })} onClick={(e) => e.stopPropagation()}>
       <dl>
@@ -478,7 +478,7 @@ function RunDetails({ run: r, now }: { run: ProgressRun; now: number }) {
             <Icon name="copy" /> {tr(msg({ id: 'board.progress.copyCommand', defaultMessage: 'Copy command', description: "Button in a run's details (Progress panel): copies the command it ran." }))}
           </button>
         )}
-        <button type="button" className="btn small subtle" onClick={() => copy('details', runDetailsText(r, project, now, tr))}>
+        <button type="button" className="btn small subtle" onClick={() => copy('details', runDetailsText(r, project, now, tr, (n) => cardLabelOf(get(), n)))}>
           <Icon name="copy" /> {tr(msg({ id: 'board.progress.copyDetails', defaultMessage: 'Copy details', description: "Button in a run's details (Progress panel): copies all of them as text, to paste elsewhere." }))}
         </button>
         {r.logPath && (

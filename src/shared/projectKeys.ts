@@ -76,6 +76,12 @@ export const cardKey = (projectKey: string, projectNumber: number): string => `$
 export const nameWithKey = (n: number, key: string | undefined | null): string => (key ? `${key} (#${n})` : `#${n}`)
 export const cardName = (c: { number: number; key?: string }): string => (c.key ? nameWithKey(c.number, c.key) : cardRef(c.number))
 
+/**
+ * A card as the window names it (#1221, #704: "the ID is the ID"): its key, `AM-12`; `#12` for a card with none (a
+ * workspace card, a project with no key yet, a number no card on the board has). One form wherever a card is named.
+ */
+export const cardLabel = (c: { number: number; key?: string }): string => c.key || `#${c.number}`
+
 /** How a text names a card by its number: "HI-1230 (#1240)" where its workspace is known, `#1240` where it isn't. */
 export type CardNames = (n: number) => string
 const plain: CardNames = (n) => `#${n}`

@@ -21,6 +21,7 @@ import { git } from '../git'
 import { createLogger, userText } from '../logger'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { refSync } from './git'
+import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
 
 const log = createLogger('observe')
@@ -83,7 +84,7 @@ class DirWatch {
         if (this.w !== w) return
         const n = name === null || name === undefined ? null : String(name)
         // #964: the folder gone, Windows names it by its full path in a stream that doesn't stop.
-        if (n && isAbsolute(n)) return this.end('its folder is gone')
+        if (n && isAbsolute(n)) return this.end('its folder is gone') // i18n-ignore: a log line's reason
         this.onEvent(n)
       })
       w.on('error', (e) => this.end(e instanceof Error ? e.message : String(e)))
@@ -102,7 +103,7 @@ class DirWatch {
   verify(): boolean {
     if (!this.w) return false
     if (identity(this.path) === this.ino) return true
-    this.end('its folder was moved or replaced')
+    this.end('its folder was moved or replaced') // i18n-ignore: a log line's reason
     this.poke()
     return false
   }
@@ -627,19 +628,19 @@ export class Observer {
    */
   async changedBetween(folder: string, t0: number, t1: number, counts?: (paths: string[]) => string[]): Promise<Maybe<FolderChanges>> {
     const l = this.logOf(folder)
-    if (!l) return unknown(`the writes in ${folder}`)
+    if (!l) return unknown(UNREADABLE.writes, { folder })
     // An event is timed when it arrives, after its write: those arriving until the folder settles count too (a write by
     // someone else just after t1 then counts as a change: the safe side).
     const settled = await settle(l)
     const seen = l.between(t0, Math.max(t1, settled))
-    if (!seen) return unknown(`the writes in ${folder}`)
+    if (!seen) return unknown(UNREADABLE.writes, { folder })
     const marks = [...new Set(seen.filter((e) => e.path.startsWith(':')).map((e) => e.path))]
     let files = [...new Set(seen.filter((e) => !e.path.startsWith(':')).map((e) => e.path))]
     if (counts) files = counts(files)
     else if (files.length && this.isGitFolder(l.folder)) {
       const r = await git(l.folder, ['check-ignore', '-z', '--stdin'], undefined, files.join('\0'))
       // Exit 1: none of them is ignored. Anything else is git failing: unknown, never "nothing changed".
-      if (!r.ok && r.code !== 1) return unknown(`what git ignores in ${folder}`)
+      if (!r.ok && r.code !== 1) return unknown(UNREADABLE.ignored, { folder })
       const ignored = new Set(r.out.split('\0').filter(Boolean))
       files = files.filter((f) => !ignored.has(f))
     }

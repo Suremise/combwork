@@ -250,12 +250,14 @@ const check = (name, ok, extra = '') => {
 
   // --- A card watch: its cards as chips that open the card, and until when.
   check('it watches two cards', await say('hive hive_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
-  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => /^Status: Waiting for #1 #2 → Review \(watch until \d{1,2}:\d{2}( [AP]M)?\)$/.test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
+  // Its cards by key (#1221).
+  const [L1, L2] = [await lib.cardLabel(inv, 1), await lib.cardLabel(inv, 2)]
+  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
   const chips = status().locator('.card-chip')
   check('…each card the app’s card chip', (await chips.count()) === 2 && (await chips.first().locator('.codicon').count()) === 1)
   const tint = await chips.first().evaluate((el) => ({ colored: el.classList.contains('colored'), column: el.dataset.column, col: el.style.getPropertyValue('--col') }))
   check('…tinted with its column’s colour', tint.colored && tint.column === 'todo' && !!tint.col, JSON.stringify(tint))
-  await status().locator('.card-chip', { hasText: '#2' }).click()
+  await status().locator('.card-chip', { hasText: L2 }).click()
   const dialog = page.locator('.dialog', { hasText: '#2' })
   check('…that opens its card', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
   await page.keyboard.press('Escape')
@@ -276,7 +278,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)
   check('narrow: the status line is cut short with “…”', !!narrowed && cut.ellipsis === 'ellipsis', JSON.stringify(cut))
   await status().locator('.assistant-status-text').hover()
-  check('…its tooltip has the whole line', !!(await lib.until(async () => /Status: Waiting for #1, #2 → Review \(watch until/.test((await page.locator('.tip:visible').allInnerTexts()).join(' ')), HUNG_MS)))
+  check('…its tooltip has the whole line', !!(await lib.until(async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ').includes(`Status: Waiting for ${L1}, ${L2} → Review (watch until`), HUNG_MS)))
   await page.mouse.move(0, 0)
   await head.click()
   await lib.until(async () => (await rows.count()) === 3, HUNG_MS)

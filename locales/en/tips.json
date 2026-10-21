@@ -947,6 +947,14 @@
     "defaultMessage": "A project's cards at a glance",
     "description": "A tip's title."
   },
+  "tips.projectKeys.text": {
+    "defaultMessage": "Each project has a key of 2 to 4 letters that names its cards: AM-12. Search the board or the command palette for AM-12, or AM- for all of that project’s cards; an old #12 still works. Change a key in Project Settings.",
+    "description": "A tip. AM-12 and AM- are examples of a card's name and a project's key: keep them as they are. Names of Hive's menus, views, settings and commands (Project Settings): keep them as Hive shows them."
+  },
+  "tips.projectKeys.title": {
+    "defaultMessage": "Cards are named by their project’s key",
+    "description": "A tip's title. A key is 2–4 letters, such as AM, that a project's cards are named by (AM-12)."
+  },
   "tips.projectTabs.text": {
     "defaultMessage": "When space is short, a project's tabs shrink to icons, and the tab you're on keeps its name while it fits. Hover a tab for its name and shortcut.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -603,6 +603,8 @@
   "settings.project.fileLocks.desc": "Qué pasa cuando un agente intenta editar un archivo que está editando otro agente en la carpeta de este proyecto. Heredar usa Configuración → Agentes y worktrees → Bloqueos de archivos.",
   "settings.project.fileLocks.tip": "Se aplica a los agentes que comparten una carpeta (los agentes con su propio worktree nunca chocan). Un agente reclama un archivo al editarlo y lo libera cuando termina su turno. Las ediciones hechas con comandos de shell no se cubren.",
   "settings.project.fileLocks.title": "Bloqueos de archivos",
+  "settings.project.key.desc": "Las 2 a 4 letras que dan nombre a las tarjetas de este proyecto, como en {example}. Si la cambias, la clave anterior las sigue encontrando.",
+  "settings.project.key.title": "Clave del proyecto",
   "settings.project.keybindings.desc": "Cambia uno para darle a este proyecto el suyo; Restablecer lo devuelve al atajo global. Se guarda en la carpeta .hive del proyecto, que no se incluye en los commits.",
   "settings.project.keybindings.title": "Atajos",
   "settings.project.loopRounds.desc": "Cuántas rondas tiene una tarjeta en los ciclos de tarjetas de este proyecto antes de que sus agentes se detengan y te pregunten, cuando no lo indicas. Si está vacío, hereda Configuración → Espacio de trabajo → Rondas de los ciclos de tarjetas.",

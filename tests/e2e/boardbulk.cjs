@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
   await item('Archive All in Doing (2)…').click()
   await until(async () => (await dialog.count()) === 1, 5000)
   const text = await dialog.innerText()
-  check('a card an agent is working on is listed as skipped', new RegExp(`#${busy} Being built · B4 is working on it · skipped`).test(text), text)
+  check('a card an agent is working on is listed as skipped', text.includes(`${await lib.cardLabel(inv, busy)} Being built · B4 is working on it · skipped`), text)
   check('…and the confirm archives only the other', /Archive 1 card in Doing\?/.test(text) && (await dialog.getByRole('button', { name: 'Archive 1 card' }).count()) === 1)
   await dialog.getByRole('checkbox', { name: 'Also archive cards agents are working on' }).check()
   check('ticking the box counts it in, with a warning', (await dialog.getByRole('button', { name: 'Archive 2 cards' }).count()) === 1 && /Their agents lose their card/.test(await dialog.innerText()))
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', race, { column: 'doing', agent: b4.id })
   const raced = page.locator('.toast', { hasText: `Archived ${todoCount - 1} card` }).last()
   check('the card an agent took meanwhile stays on the board', !!(await until(async () => (await order('todo')).length === 0, 8000)) && (await archivedNow(race)) === false)
-  check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, 5000)) && new RegExp(`One card was left on the board: #${race} moved to Doing`).test(await raced.innerText()), await raced.innerText().catch(() => ''))
+  check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, 5000)) && (await raced.innerText()).includes(`One card was left on the board: ${await lib.cardLabel(inv, race)} moved to Doing`), await raced.innerText().catch(() => ''))
   await app.evaluate(() => {
     delete process.env.HIVE_TEST_SLOW_IPC
   })

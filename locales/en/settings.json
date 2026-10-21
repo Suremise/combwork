@@ -2415,6 +2415,14 @@
     "defaultMessage": "File locks",
     "description": "A setting's title (Project Settings → Agents & Worktrees)."
   },
+  "settings.project.key.desc": {
+    "defaultMessage": "The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.",
+    "description": "What the setting \"Project key\" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project's own key, such as WB-12."
+  },
+  "settings.project.key.title": {
+    "defaultMessage": "Project key",
+    "description": "A setting's title (Project Settings → Agents & Worktrees): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)."
+  },
   "settings.project.keybindings.desc": {
     "defaultMessage": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.",
     "description": "What the setting \"Shortcuts\" does, under its title (Project Settings → Keyboard Shortcuts)."

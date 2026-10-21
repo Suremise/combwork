@@ -1,5 +1,6 @@
 import { msg } from './i18n/msg'
 import { columnName, type Tr } from './tasks'
+import { cardLabel } from './projectKeys'
 import type { LaneCard, LaneState, TaskCard, TaskColumn } from './types'
 import type { WorkBadge } from './workflow/workView'
 
@@ -18,6 +19,8 @@ export type SegmentState = 'done' | 'passed' | 'review' | 'doing' | 'todo' | 'bl
 export interface CardSegment {
   kind: 'card'
   number: number
+  /** Its name as the window gives it (#1221): its key, else #n. */
+  name?: string
   state: SegmentState
   /** Its latest review failed and it hasn't gone back for the next round yet. */
   failed: boolean
@@ -101,12 +104,12 @@ export function failedVerdictGist(c: Pick<TaskCard, 'history' | 'comments'>): st
  * Why a blocked segment is hatched (#706): "#7: blocked: <its reason's first line>", "#7: On Hold: <reason>", or with no
  * reason, On Hold until the user moves it; null for an ended lane's card On Hold with none (its label says it all).
  */
-function blockedNote(n: number, hold: boolean, blocked: string | null, live: boolean, tr: Tr): string | null {
+function blockedNote(name: string, hold: boolean, blocked: string | null, live: boolean, tr: Tr): string | null {
   const reason = blocked ? oneLine(blocked) : ''
-  if (reason && hold) return tr(msg({ id: 'board.lane.holdReason', defaultMessage: '#{card}: On Hold: {reason}', description: "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column), and why, in the user's own words ({reason}). {card} is its number." }), { card: n, reason })
-  if (reason) return tr(msg({ id: 'board.lane.blockedReason', defaultMessage: '#{card}: blocked: {reason}', description: "A lane segment's note in the Progress panel (its hover): the card is blocked, and why, in the user's or an agent's own words ({reason}). {card} is its number." }), { card: n, reason })
-  if (!hold) return tr(msg({ id: 'board.lane.blocked', defaultMessage: '#{card}: blocked', description: "A lane segment's note in the Progress panel (its hover): the card is blocked, with no reason given. {card} is its number." }), { card: n })
-  return live ? tr(msg({ id: 'board.lane.holdWaiting', defaultMessage: '#{card}: On Hold: waiting for you to move it on', description: "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column) until the user moves it. {card} is its number." }), { card: n }) : null
+  if (reason && hold) return tr(msg({ id: 'board.lane.holdReason', defaultMessage: '{card}: On Hold: {reason}', description: "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column), and why, in the user's own words ({reason}). {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name, reason })
+  if (reason) return tr(msg({ id: 'board.lane.blockedReason', defaultMessage: '{card}: blocked: {reason}', description: "A lane segment's note in the Progress panel (its hover): the card is blocked, and why, in the user's or an agent's own words ({reason}). {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name, reason })
+  if (!hold) return tr(msg({ id: 'board.lane.blocked', defaultMessage: '{card}: blocked', description: "A lane segment's note in the Progress panel (its hover): the card is blocked, with no reason given. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name })
+  return live ? tr(msg({ id: 'board.lane.holdWaiting', defaultMessage: '{card}: On Hold: waiting for you to move it on', description: "A lane segment's note in the Progress panel (its hover): the card is On Hold (a board column) until the user moves it. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name }) : null
 }
 
 /**
@@ -164,7 +167,9 @@ export function segmentName(s: CardSegment): string {
 
 /** A card number's segment, from the card as it is on the board (or not: archived and deleted cards may be missing). */
 export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr): CardSegment {
-  if (!card) return { kind: 'card', number: n, state: 'todo', failed: false, round: null, label: tr(msg({ id: 'board.lane.notOnBoard', defaultMessage: '#{card} · not on the board', description: "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its number." }), { card: n }), notes: [] }
+  // Named by its key where it has one (#1221).
+  const name = card ? cardLabel(card) : `#${n}`
+  if (!card) return { kind: 'card', number: n, name, state: 'todo', failed: false, round: null, label: tr(msg({ id: 'board.lane.notOnBoard', defaultMessage: '{card} · not on the board', description: "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name }), notes: [] }
   const state = stateOf(card)
   const { failures, failedNow, reviewed } = reviewRounds(card)
   const inRound = card.column === 'doing' || card.column === 'review'
@@ -176,19 +181,19 @@ export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr): Card
   const notes: string[] = []
   // The red underline: which round failed and what comes next, then the reviewer's own one-line gist.
   if (failed) {
-    notes.push(tr(msg({ id: 'board.lane.reviewFailed', defaultMessage: '#{card}: review failed (round {round}): waiting for round {next}', description: "A lane segment's note in the Progress panel (its hover, under a red underline): the card's review round {round} failed and the next round ({next}) hasn't started. {card} is its number." }), { card: n, round: round ?? 0, next: (round ?? 0) + 1 }))
+    notes.push(tr(msg({ id: 'board.lane.reviewFailed', defaultMessage: '{card}: review failed (round {round}): waiting for round {next}', description: "A lane segment's note in the Progress panel (its hover, under a red underline): the card's review round {round} failed and the next round ({next}) hasn't started. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name, round: round ?? 0, next: (round ?? 0) + 1 }))
     const gist = failedVerdictGist(card)
     if (gist) notes.push(tr(msg({ id: 'board.lane.reviewerGist', defaultMessage: 'Reviewer: {gist}', description: "A lane segment's note in the Progress panel: the first line of the reviewer's failed verdict ({gist}, in the reviewer's own words)." }), { gist }))
   }
   // The red cross-hatching: why it can't go on.
-  const why = state === 'blocked' ? blockedNote(n, card.column === 'hold', card.blocked, true, tr) : null
+  const why = state === 'blocked' ? blockedNote(name, card.column === 'hold', card.blocked, true, tr) : null
   if (why) notes.push(why)
-  return { kind: 'card', number: n, state, failed, round, label: segmentLabel(n, card.title, what, tr), notes }
+  return { kind: 'card', number: n, name, state, failed, round, label: segmentLabel(name, card.title, what, tr), notes }
 }
 
 /** "#405 Built-in loop wakes · Review, round 2": a card segment's label. */
-const segmentLabel = (n: number, title: string, where: string, tr: Tr): string =>
-  tr(msg({ id: 'board.lane.label', defaultMessage: '#{card} {title} · {where}', description: "A lane segment's label (Progress panel): the card's number, title (the user's own words) and where it is ({where}: \"Review, round 2\")." }), { card: n, title, where })
+const segmentLabel = (name: string, title: string, where: string, tr: Tr): string =>
+  tr(msg({ id: 'board.lane.label', defaultMessage: '{card} {title} · {where}', description: "A lane segment's label (Progress panel): the card’s name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and where it is ({where}: \"Review, round 2\")." }), { card: name, title, where })
 
 /** A lane card's state as the lane last read it (LaneCard): a gone card reads as still to do, as one not on the board. */
 export function laneCardState(c: LaneCard): SegmentState {
@@ -205,22 +210,22 @@ export function laneCardState(c: LaneCard): SegmentState {
  * A segment as the lane left it when it ended or was abandoned (#512): frozen, so a card another lane works on now never
  * shows as worked here too. The lane keeps no review verdicts, so a frozen segment marks no failed round.
  */
-export function frozenSegment(c: LaneCard, tr: Tr): CardSegment {
+export function frozenSegment(c: LaneCard, tr: Tr, name = `#${c.number}`): CardSegment {
   const state = laneCardState(c)
-  if (c.column === 'gone') return { kind: 'card', number: c.number, state, failed: false, round: null, label: tr(msg({ id: 'board.lane.goneWhenEnded', defaultMessage: '#{card} · not on the board when the lane ended', description: "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its number." }), { card: c.number }), notes: [] }
+  if (c.column === 'gone') return { kind: 'card', number: c.number, name, state, failed: false, round: null, label: tr(msg({ id: 'board.lane.goneWhenEnded', defaultMessage: '{card} · not on the board when the lane ended', description: "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name }), notes: [] }
   // Ended without a record of its cards: said so, rather than the board's now presented as when it ended.
   if (c.column === 'unrecorded') {
     const label = c.title
-      ? tr(msg({ id: 'board.lane.unrecorded', defaultMessage: '#{card} {title} · not recorded: the lane ended before Hive kept where its cards were', description: "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card's number, {title} its title (the user's own words)." }), { card: c.number, title: c.title })
-      : tr(msg({ id: 'board.lane.unrecordedUntitled', defaultMessage: '#{card} · not recorded: the lane ended before Hive kept where its cards were', description: "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card's number." }), { card: c.number })
-    return { kind: 'card', number: c.number, state, failed: false, round: null, label, notes: [] }
+      ? tr(msg({ id: 'board.lane.unrecorded', defaultMessage: '{card} {title} · not recorded: the lane ended before Hive kept where its cards were', description: "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none, {title} its title (the user's own words)." }), { card: name, title: c.title })
+      : tr(msg({ id: 'board.lane.unrecordedUntitled', defaultMessage: '{card} · not recorded: the lane ended before Hive kept where its cards were', description: "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: name })
+    return { kind: 'card', number: c.number, name, state, failed: false, round: null, label, notes: [] }
   }
   const inRound = c.column === 'doing' || c.column === 'review'
   const round = inRound || isFinished(state) ? c.round : null
   const what = whereText(c.column, round, round !== null && inRound ? 'in-round' : round !== null && round > 1 ? 'after' : 'none', 'plain', tr)
-  const why = state === 'blocked' ? blockedNote(c.number, c.column === 'hold', c.blocked, false, tr) : null
-  const label = tr(msg({ id: 'board.lane.labelWhenEnded', defaultMessage: '#{card} {title} · {where}, when the lane ended', description: "A lane segment's label (Progress panel), in a lane that has ended: the card's number, title (the user's own words) and where it was then ({where}: \"Review, round 2\")." }), { card: c.number, title: c.title, where: what })
-  return { kind: 'card', number: c.number, state, failed: false, round, label, notes: why ? [why] : [] }
+  const why = state === 'blocked' ? blockedNote(name, c.column === 'hold', c.blocked, false, tr) : null
+  const label = tr(msg({ id: 'board.lane.labelWhenEnded', defaultMessage: '{card} {title} · {where}, when the lane ended', description: "A lane segment's label (Progress panel), in a lane that has ended: the card’s name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and where it was then ({where}: \"Review, round 2\")." }), { card: name, title: c.title, where: what })
+  return { kind: 'card', number: c.number, name, state, failed: false, round, label, notes: why ? [why] : [] }
 }
 
 /**
@@ -316,9 +321,10 @@ export function segmentsThatFit(widthPx: number): number {
 /** Joins a list in the window's language (`fmt.list`): this module is also reached from hive-mcp, which never loads the translations. */
 type ListOf = (items: string[], type?: 'conjunction' | 'unit') => string
 
-/** "#3, #4, #5", or the first eight and how many more as the list's last item ("#1, #2 … #8 and 3 more"). */
-function cardList(ns: number[], tr: Tr, list: ListOf): string {
-  const shown = ns.slice(0, 8).map((n) => `#${n}`)
+/** "AM-3, AM-4, #5" (by key where they have one), or the first eight and how many more as the list's last item ("#1, #2 … #8 and 3 more"). */
+function cardList(segs: CardSegment[], tr: Tr, list: ListOf): string {
+  const ns = segs.map((c) => c.name ?? `#${c.number}`)
+  const shown = ns.slice(0, 8)
   return ns.length > 8 ? list([...shown, tr(msg({ id: 'board.lane.andMore', defaultMessage: '{n, plural, one {# more} other {# more}}', description: "The last item of a folded lane segment's list of cards (Progress panel), after the first eight card numbers: how many more there are ({n}). Hive joins it to the list (\"#1, #2 … #8 and 3 more\")." }), { n: ns.length - 8 })]) : list(shown, 'unit')
 }
 
@@ -330,11 +336,11 @@ export function fitSegments(cards: CardSegment[], max: number, tr: Tr, list: Lis
   if (cards.length <= max) return cards
   const finished = cards.filter((c) => isFinished(c.state))
   const rest = cards.filter((c) => !isFinished(c.state))
-  const out: LaneSegment[] = finished.length ? [{ kind: 'finished', numbers: finished.map((c) => c.number), label: tr(msg({ id: 'board.lane.finished', defaultMessage: '{n, plural, one {# finished: {cards}} other {# finished: {cards}}}', description: "A lane segment's label (Progress panel) for its finished cards folded into one: how many ({n}) and which ({cards}: \"#3, #4\")." }), { n: finished.length, cards: cardList(finished.map((c) => c.number), tr, list) }) }] : []
+  const out: LaneSegment[] = finished.length ? [{ kind: 'finished', numbers: finished.map((c) => c.number), label: tr(msg({ id: 'board.lane.finished', defaultMessage: '{n, plural, one {# finished: {cards}} other {# finished: {cards}}}', description: "A lane segment's label (Progress panel) for its finished cards folded into one: how many ({n}) and which ({cards}: \"#3, #4\")." }), { n: finished.length, cards: cardList(finished, tr, list) }) }] : []
   const room = Math.max(1, max - out.length)
   if (rest.length <= room) return [...out, ...rest]
   const more = rest.slice(room - 1)
-  return [...out, ...rest.slice(0, room - 1), { kind: 'more', numbers: more.map((c) => c.number), label: tr(msg({ id: 'board.lane.more', defaultMessage: '{n, plural, one {# more: {cards}} other {# more: {cards}}}', description: "A lane segment's label (Progress panel) for the cards that don't fit its bar, folded into one: how many ({n}) and which ({cards}: \"#3, #4\")." }), { n: more.length, cards: cardList(more.map((c) => c.number), tr, list) }) }]
+  return [...out, ...rest.slice(0, room - 1), { kind: 'more', numbers: more.map((c) => c.number), label: tr(msg({ id: 'board.lane.more', defaultMessage: '{n, plural, one {# more: {cards}} other {# more: {cards}}}', description: "A lane segment's label (Progress panel) for the cards that don't fit its bar, folded into one: how many ({n}) and which ({cards}: \"#3, #4\")." }), { n: more.length, cards: cardList(more, tr, list) }) }]
 }
 
 /** A lane's header numbers: its finished cards out of all, and the card it is on (currentCard). */

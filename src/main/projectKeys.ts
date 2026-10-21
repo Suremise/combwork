@@ -4,7 +4,8 @@ import { resolve } from 'path'
 import { addProjectKeys, boardOpen, boardWrite, boardChanged, cardKeyOf, cardNamed, hasCard, keysNoticeDue, keysNoticeSaid, projectKeys, setProjectKey } from './boardStore'
 import { fmt, msg, tr } from '../shared/i18n'
 import { projectNow } from '../shared/projectIds'
-import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames } from '../shared/projectKeys'
+import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames, type KeyHeld } from '../shared/projectKeys'
+import type { WorkspaceInfo } from '../shared/types'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { workspaceFor, type WorkspaceService } from './workspace'
@@ -89,19 +90,66 @@ export async function keyProjects(ws: WorkspaceService): Promise<string[]> {
   if (!path) return []
   const ids = await ws.projectIds()
   if (!stillIn(ws, path, life)) return []
-  const projects = [...ids.byId].map(([id, p]) => ({ id, name: folderOf(p) })).sort((a, b) => a.name.localeCompare(b.name, 'en'))
+  const projects = [...ids.byId].map(([id, p]) => ({ id, name: folderOf(p), path: resolve(p).toLowerCase() })).sort((a, b) => a.name.localeCompare(b.name, 'en'))
   if (!projects.length) return []
   const held = new Set(projectKeys(ws).filter((k) => k.current).map((k) => k.projectId))
   if (projects.every((p) => held.has(p.id))) return []
   return boardWrite(ws, async () => {
     if (!stillIn(ws, path, life)) return []
-    const added = addProjectKeys(ws, projects.map((p) => ({ id: p.id, pick: (keys) => suggestKey(p.name, p.id, keys) })))
+    // A project made in the New Project dialog takes the key chosen there (#1221), reserved for it until then; the
+    // others a suggestion, never a key reserved for a project being made.
+    const pick = (p: (typeof projects)[number], keys: { key: string; projectId: string }[]): string => {
+      const chosen = wanted.get(path.toLowerCase())?.get(p.path)
+      return chosen && !keyProblem(chosen, p.id, keys) ? chosen : suggestKey(p.name, p.id, [...keys, ...reserved(path, p.path)])
+    }
+    const added = addProjectKeys(ws, projects.map((p) => ({ id: p.id, pick: (keys) => pick(p, keys) })))
     if (added.length) {
       log.info(`${added.length} project(s) given a key: ${added.join(', ')}`)
       boardChanged(ws)
     }
     return added
   })
+}
+
+/**
+ * The keys chosen for projects being made (the New Project dialog, #1221), by workspace folder, then project folder
+ * (lower case): reserved from the check before the folder is made until the project has it, so a key change or another
+ * new project in that workspace meanwhile is refused it (#1221 round 1, finding 2). Keys are a workspace's own: a
+ * reservation never reaches another workspace (round 2, finding 1).
+ */
+const wanted = new Map<string, Map<string, string>>()
+
+/** The keys reserved for projects being made in the workspace at `wsPath`, as keys held (but `except`'s own). */
+const reserved = (wsPath: string, except: string | null = null): KeyHeld[] => [...(wanted.get(wsPath.toLowerCase()) ?? [])].filter(([p]) => p !== except).map(([p, key]) => ({ key, projectId: `new:${p}` }))
+
+/**
+ * Makes a project folder (the New Project dialog) with the key chosen for it: refused, saying why, before the folder
+ * is made when the key can't be one (as a key change is); none given, it gets the suggestion, as a folder opened does.
+ */
+export async function createProjectWithKey(ws: WorkspaceService, name: string, key?: string | null): Promise<WorkspaceInfo> {
+  const k = key ? normalKey(String(key)) : null
+  const wsPath = ws.path?.toLowerCase() ?? null
+  const path = ws.path ? resolve(ws.path, String(name ?? '').trim()).toLowerCase() : null
+  // Checked and reserved at once, with nothing awaited between: from here no one else in this workspace can take it.
+  if (k && wsPath) refuseKey(k, '', [...projectKeys(ws), ...reserved(wsPath, path)])
+  const mine = wsPath ? (wanted.get(wsPath) ?? new Map<string, string>()) : null
+  if (k && path && wsPath && mine) wanted.set(wsPath, mine.set(path, k))
+  try {
+    const info = await ws.createProject(name)
+    // Its id read now, so it has its key before this returns (the chosen one is only known meanwhile).
+    const ids = await ws.projectIds({ fresh: true })
+    await keyProjects(ws)
+    // Never another key in its place without saying so (another Hive on the same workspace could have taken it).
+    const id = path ? ids.byPath.get(path) : undefined
+    const now = id ? projectKeys(ws).find((h) => h.projectId === id && h.current)?.key : undefined
+    if (k && now && now !== k) throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+    return info
+  } finally {
+    if (path && wsPath && mine?.get(path) === k) {
+      mine.delete(path)
+      if (!mine.size) wanted.delete(wsPath)
+    }
+  }
 }
 
 /** Why a key can't be a project's, in the window's language (Project Settings). */
@@ -111,6 +159,17 @@ const PROBLEM = {
   prefix: msg({ id: 'service.keys.prefix', defaultMessage: '{key} and another project’s key {other} begin alike: no key can be the start of another.', description: "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed." }),
   closed: msg({ id: 'service.keys.closed', defaultMessage: 'The workspace was closed, or the window opened another, before the key was changed: nothing changed.', description: "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed." }),
   unknownProject: msg({ id: 'service.keys.unknownProject', defaultMessage: 'That project has no id yet, so it can’t have a key: open it in Hive first.', description: "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)." })
+}
+
+/** Refuses a key the project `id` can't take, saying why. */
+function refuseKey(k: string, id: string, held: KeyHeld[]): void {
+  const problem = keyProblem(k, id, held)
+  if (problem === 'form') throw hiveError(PROBLEM.form, undefined, { kind: 'invalid' })
+  if (problem === 'taken') throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+  if (problem === 'prefix') {
+    const other = held.find((h) => h.projectId !== id && (normalKey(h.key).startsWith(k) || k.startsWith(normalKey(h.key))))!.key
+    throw hiveError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
+  }
 }
 
 /**
@@ -128,19 +187,19 @@ export async function changeProjectKey(ws: WorkspaceService, projectPath: string
   return boardWrite(ws, async () => {
     if (!stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
     const held = projectKeys(ws)
-    const problem = keyProblem(k, id, held)
-    if (problem === 'form') throw hiveError(PROBLEM.form, undefined, { kind: 'invalid' })
-    if (problem === 'taken') throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
-    if (problem === 'prefix') {
-      const other = held.find((h) => h.projectId !== id && (normalKey(h.key).startsWith(k) || k.startsWith(normalKey(h.key))))!.key
-      throw hiveError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
-    }
+    refuseKey(k, id, [...held, ...reserved(path)])
     if (held.some((h) => h.projectId === id && h.current && normalKey(h.key) === k)) return k
     setProjectKey(ws, id, k)
     log.info(`${userText(folderOf(projectPath))}'s key is now ${k}`)
     boardChanged(ws)
     return k
   })
+}
+
+/** Each project's key and its old keys, as the board's search reads them (#1221: `AM-`, an old key). */
+export function keysForSearch(ws: WorkspaceService): { key: string; aliases: string[] }[] {
+  const held = projectKeys(ws)
+  return held.filter((k) => k.current).map((k) => ({ key: k.key, aliases: held.filter((x) => x.projectId === k.projectId && !x.current).map((x) => x.key) }))
 }
 
 /** A project's key, current (null before it has one). */

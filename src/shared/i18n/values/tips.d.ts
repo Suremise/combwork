@@ -238,6 +238,8 @@ interface HiveMessageValues {
   'tips.progressRecentFold.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
+  'tips.projectKeys.text': undefined
+  'tips.projectKeys.title': undefined
   'tips.projectTabs.text': undefined
   'tips.projectTabs.title': undefined
   'tips.projectTabsKeys.text': undefined

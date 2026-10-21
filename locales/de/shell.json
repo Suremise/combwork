@@ -244,6 +244,7 @@
   "shell.palette.command": "{category}: {command}",
   "shell.palette.goToProject": "Zu Projekt wechseln: {project}",
   "shell.palette.noMatch": "Keine passenden Befehle",
+  "shell.palette.openCard": "Karte öffnen: {card} {title}",
   "shell.palette.placeholder": "Befehl oder Projektnamen eingeben",
   "shell.palette.projectsPlaceholder": "Zu Projekt wechseln",
   "shell.providers.choose": "Anbieter auswählen",
