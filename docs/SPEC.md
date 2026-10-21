@@ -1621,6 +1621,16 @@ are, `tasks.ts:854`, `:705`, `:752`): 1.0 closes that.
 | The Assistant | `hive_update_task` column moves, within Control, as today; a move that skips a rule needs `override: { reason }` explicitly, else refused with the rules it would skip [note §3]. | |
 | Hive | Actions (§16.5.3) and reconciliation. | — |
 
+**Built [#1265]:** the user's and the Assistant's column moves go through the card's runtime (`tasks.ts` `gateOf` →
+`Workflow.move`) when the rules are enforced (§16.6.6's switch), the card is from 1.0 and its ruleset has the stage
+moved to; the runtime writes the move's facts (the recorder writes none of them for such a change: one owner per fact),
+and the card's 0.9 fields (column, place, history, agent, review) follow in each of its writes' transactions. **Interim
+until #1290 and #1275:** the user's moves don't ask yet (every one runs confirmed: a move that skips a rule records its
+`Override` with no reason), and a move to a column the ruleset doesn't have (Review with no review) keeps P3's recorded
+move; the window's `tasks:move` already returns the question (`ask: rules`) when not confirmed. Agents' column moves keep
+P3's path until #1268. A builder with its own worktree starts there whatever the folder option says (it stands in for a
+slot, §16.19.1; P3 recorded it so too), with no `prepareSlot`.
+
 #### 16.7.2 The total table
 
 [P1, answering HR2's round 1 finding 2] The table is written over five dimensions; every supported combination has a

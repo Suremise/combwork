@@ -46,6 +46,8 @@ interface HiveMessageValues {
   'tasks.error.orderChanged': { n: string | number }
   'tasks.error.orderElsewhere': { n: string | number; other: string; column: string }
   'tasks.error.orderNone': undefined
+  'tasks.error.overrideNotAgents': undefined
+  'tasks.error.overrideShape': undefined
   'tasks.error.ownCardsOnly': { project: string | number }
   'tasks.error.projectThenAgent': undefined
   'tasks.error.refsList': { field: string | number }

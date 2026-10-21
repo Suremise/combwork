@@ -1003,7 +1003,7 @@ export async function updateTask(...args: Parameters<typeof updateTaskLocked>): 
 function checkOverride(patch: TaskPatch, actor: TaskActor): void {
   if (patch.override === undefined) return
   if (actor.kind === 'agent') throw new TaskPermissionError(msg({ id: 'tasks.error.overrideNotAgents', defaultMessage: "Agents can't override workflow rules: only the user or the Assistant can.", description: 'An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can.' }))
-  if (!patch.override || typeof patch.override !== 'object' || typeof patch.override.reason !== 'string') throw hiveError(msg({ id: 'tasks.error.overrideShape', defaultMessage: 'An override is { "reason": "<why>" }.', description: 'An error: an override was passed in another shape. Keep the JSON as it is.' }), undefined, { kind: 'invalid' })
+  if (!patch.override || typeof patch.override !== 'object' || typeof patch.override.reason !== 'string') throw hiveError(msg({ id: 'tasks.error.overrideShape', defaultMessage: 'An override needs a reason: why the card moves across its rules, as text.', description: 'An error: an override (moving a card across a workflow rule) was passed without its reason as text.' }), undefined, { kind: 'invalid' })
 }
 
 /** A column move the workflow runtime makes: the card's runtime, the stage it goes to, by whom, and the agent a start gives it to. */
