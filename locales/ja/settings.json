@@ -172,6 +172,8 @@
   "settings.advanced.hive.prompt.clearDraft.title": "Hiveが入力する前にCLIの下書きを消去する",
   "settings.advanced.hive.prompt.rawCardStart.desc": "エージェントでカードを開始すると、Hiveはそれを自分の言葉で包んで渡します（ボード上のどのカードか、何に依存し、最初にどのドキュメントを読むか、どのスキルに従うか）。オンにすると、エージェントはカードのタイトルと説明、開始時にあなたが書いた内容だけを受け取ります。Hiveのほかのプロンプト（呼び出しやメッセージ）はそのままです。それがHiveとエージェントのやり取りの仕方だからです。",
   "settings.advanced.hive.prompt.rawCardStart.title": "カードの開始をそのままの言葉で",
+  "settings.advanced.hive.queue.checkMinutes.desc": "マージキューがマージ前のチェックやインストールを終了させるまでに実行を許す時間です。こうして終了したチェックは作業ではなく環境の失敗として扱われ、カードはそのように示されて戻り、ビルダーは同じリビジョンをキューに戻せます。プロジェクトのチェックが実際にもっと時間がかかる場合は値を上げてください。長すぎると、止まったチェックがその間キューを止めます。",
+  "settings.advanced.hive.queue.checkMinutes.title": "マージキュー：マージ前のチェックの最長実行時間",
   "settings.advanced.hive.recorder.afterSeconds.desc": "トリガーの後、キャプチャを保存するまで待つ時間です。これにより、その後に起きたこと（CLIが次に何をしたか）もキャプチャに含まれます。",
   "settings.advanced.hive.recorder.afterSeconds.title": "フライトレコーダー：トリガー後の待ち時間",
   "settings.advanced.hive.recorder.keep.desc": "Hiveがconsole-recordingsフォルダーに残すキャプチャの数です。超えると古いものから削除されます。開発者コンソールで自分で作成した記録は削除されません。",

@@ -14,6 +14,8 @@ export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
 export type Finisher = 'hiveMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept'
 /** G11: where cards are built. None always works in the project folder (OP-16). */
 export type FolderMode = 'slots' | 'project'
+/** G9's install: from scratch when the manifests changed (the default, and always so), or before every merge. */
+export type MergeInstall = 'onManifestChange' | 'always'
 /** G10: your OK before merging. */
 export interface OkBefore {
   mode: 'never' | 'labels' | 'every'
@@ -42,6 +44,11 @@ export interface WorkflowOptions {
   strict: boolean
   /** G9: named checks on the merged result (Hive merges only). */
   mergeChecks: string[]
+  /**
+   * G9's install from scratch (#1349, S13): before the merge checks, a clean install whenever the result's manifests
+   * differ from the last install in the queue's folder (always, whatever this says), or before every entry's checks.
+   */
+  mergeInstall: MergeInstall
   /** G10. */
   okBefore: OkBefore
   /** G11. */
@@ -99,6 +106,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   target: '',
   strict: false,
   mergeChecks: [],
+  mergeInstall: 'onManifestChange',
   okBefore: { mode: 'never', labels: [] },
   folder: 'project',
   identity: null,
@@ -158,13 +166,14 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     style: 'merge',
     target: 'main',
     mergeChecks: checks.quick,
+    mergeInstall: 'onManifestChange',
     folder: 'slots',
     stopOwnRuns: true,
     dependenciesDone: true,
     slotsUpToDate: true
   }
   if (id === 'pair') return pair
-  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, okBefore: { mode: 'labels', labels: ['ui', 'release'] } }
+  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] } }
 }
 
 /** Why a combination of options can't be saved (§16.5.4's contradictions), each a whole sentence. */
@@ -225,6 +234,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   target: (v) => typeof v === 'string',
   strict: bool,
   mergeChecks: strings,
+  mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
   okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
   folder: oneOf<FolderMode>(['slots', 'project']),
   identity: (v) => v === null || (isRecord(v) && typeof v.name === 'string' && typeof v.email === 'string'),
