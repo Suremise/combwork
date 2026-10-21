@@ -134,6 +134,22 @@ function countAtlasMerges(): boolean {
   return new Promise((resolve) => (term ? term.write(data, () => resolve(true)) : resolve(false)))
 }
 
+/**
+ * Mouse reports a terminal would send its program (xterm's SGR or X10 encodings), held back while a test holds them,
+ * for tests (#1167): a right-click passed to a real CLI can be seen without the CLI acting on it (its paste would read
+ * the machine's clipboard). `__hiveHoldMouseReports(key, true)` starts holding; `false` stops and returns what was held.
+ * Development and test builds only (null in a packaged one).
+ */
+const heldMouseReports = new Map<string, string[]>()
+const MOUSE_REPORT = /^\x1b\[(?:<\d+;\d+;\d+[Mm]|M[\s\S]{3})+$/
+;(window as unknown as { __hiveHoldMouseReports?: (key: string, hold: boolean) => string[] | null }).__hiveHoldMouseReports = (key, hold) => {
+  if (useStore.getState().appInfo?.isPackaged !== false) return null
+  const held = heldMouseReports.get(key) ?? []
+  if (hold) heldMouseReports.set(key, held)
+  else heldMouseReports.delete(key)
+  return held
+}
+
 /** Scrolls a terminal by some lines without any input, as xterm's own late scroll syncs do, for tests. */
 ;(window as unknown as { __hiveTerminalScrollLines?: (key: string, lines: number) => void }).__hiveTerminalScrollLines = (key, lines) => terminals.get(key)?.scrollLines(lines)
 
@@ -470,6 +486,11 @@ export function TerminalView({
     const disposeInput = term.onData((d) => {
       // Enter sends the prompt, and with it what was attached: its chips go.
       if (d === '\r') clearChips(ptyKey)
+      const held = heldMouseReports.get(ptyKey)
+      if (held && MOUSE_REPORT.test(d)) {
+        held.push(d)
+        return
+      }
       void call('pty:write', ptyKey, d)
     })
     // IPC keeps event order, so anything received before the buffer reply is already in the buffer.

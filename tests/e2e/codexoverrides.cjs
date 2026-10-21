@@ -7,9 +7,10 @@
 //    Required" from the title to show the agent waiting on an approval. Off (for sessions started afterwards): the flag is
 //    left out and the hooks (PermissionRequest) tell Hive instead. One tiny prompt each that needs an approval in
 //    Read only, approved in the terminal; each status the agent showed, with when, goes to codexoverrides.json.
-// The clipboard is stubbed in the page, never the real one for Hive. A right-click passed to Codex is Codex's own: it may
-// paste the machine's clipboard into its input, which is never sent (the input is cleared, the session stopped) and never
-// written to a file or log here (only whether its input changed). gpt-6-luna at low effort.
+// 3. Claude Code's pane (the fake Claude Code, which like Claude Code 2.1.305 tracks no mouse): Pass right-click to
+//    Claude Code turns Hive's copy/paste off and back at once; passed, a right-click sends nothing and Hive does nothing.
+// The clipboard is stubbed in the page, and no CLI ever gets a mouse button: while right-click is passed, the pane's
+// mouse reports are held back (__hiveHoldMouseReports, test builds), never the machine's clipboard. gpt-6-luna at low effort.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -30,6 +31,7 @@ const WAITING_MS = 30000
 const TEXT = 'SELECTME alpha beta gamma delta'
 const TITLE_ID = 'codex.override.terminalTitle'
 const RIGHT_ID = 'codex.mouse.rightClickToCli'
+const CLAUDE_RIGHT_ID = 'claude-code.mouse.rightClickToCli'
 // Codex's approval of a shell command (0.163): "Would you like to run the following command?", "1. Yes, proceed (y)".
 const APPROVAL = /Would you like to run the following command|Yes, proceed/
 const record = { rightClick: {}, titleOn: null, titleOff: null }
@@ -60,11 +62,14 @@ function codexCommandLine(runId) {
 
 ;(async () => {
   prepare()
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  // The fake Claude Code for part 3 (its folder trusted, so it asks nothing).
+  const claudeEnv = lib.fakeClaude(userData, path.join(scratch, 'cxover-claude-home'), [proj])
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   let page
   let inv
   let def
+  let claudeDef
   const live = async () => (await inv('session:live')).find((l) => l.agentId === def.id)
   const status = async () => (await live())?.status
   const stop = async () => {
@@ -171,29 +176,33 @@ function codexCommandLine(runId) {
       check('…and the input is cleared again', !!(await lib.until(async () => !(await onScreen()).includes('SELECTME'), HUNG_MS, 100)), await lineWith('SELECTME'))
       await setClip('')
 
-      // Pass right-click to Codex, with the agent running: at once, no restart.
-      await inv('advanced:set', RIGHT_ID, true)
-      check('Pass right-click to Codex: right-click goes to Codex at once', !!(await lib.until(async () => (await rightClickGoesTo()) === 'cli', HUNG_MS, 100)), await rightClickGoesTo())
-      const same = await live()
-      check('…without a restart (the same Codex process and launch)', same?.pid === pid && same.runId === runId && same.status === 'ready', JSON.stringify(same && { status: same.status, pid: same.pid }))
-      await page.screenshot({ path: path.join(scratch, 'codexoverrides-3-passed.png') })
-      const n3 = (await copied()).length
-      const r3 = await reads()
-      const inputBefore = (await onScreen()).length
-      const screenBefore = await onScreen()
-      await setClip('NOTHIVE')
-      await drag(true)
-      await rightClick()
-      // The right-click is Codex's now: whether Hive did anything is settled once the page has run its handlers (the
-      // next evaluation runs after them); Codex's own reaction is recorded, never what it pasted (the machine's clipboard).
-      check("…a right-click then: Hive neither copies nor pastes (no clipboard write or read by Hive)", (await copied()).length === n3 && (await reads()) === r3 && !(await onScreen()).includes('NOTHIVE'), `${(await copied()).length - n3} write(s), ${(await reads()) - r3} read(s)`)
-      check('…and Codex keeps running (the same process)', !!(await live()) && (await live()).pid === pid, JSON.stringify(await live().then((l) => l && { status: l.status, pid: l.pid })))
-      // A short look on purpose, recorded and never checked: whether Codex redrew anything for the passed button.
-      const codexChanged = await lib.until(async () => (await onScreen()) !== screenBefore, 3000, 200)
-      record.rightClick.passedToCodex = { hiveWrites: (await copied()).length - n3, hiveReads: (await reads()) - r3, codexScreenChanged: !!codexChanged, screenLengthDelta: (await onScreen()).length - inputBefore, status: await status() }
-      console.log(`INFO right-click passed to Codex: its screen ${codexChanged ? 'changed' : 'did not change'} within 3 s (what it shows isn't recorded)`)
-      await inv('pty:write', key, '\x15')
-      await setClip('')
+      // Pass right-click to Codex, with the agent running: at once, no restart. The pane's mouse reports are held back
+      // meanwhile (__hiveHoldMouseReports) and never reach Codex, whose own paste would read the machine's clipboard: the
+      // test sees the button's reports Hive would have sent, and that Hive itself neither copies nor pastes.
+      const hold = (on) => page.evaluate(([k, h]) => window.__hiveHoldMouseReports(k, h), [key, on])
+      const holding = Array.isArray(await hold(true))
+      check('the pane holds its mouse reports back (a test build)', holding)
+      if (holding) {
+        try {
+          await inv('advanced:set', RIGHT_ID, true)
+          check('Pass right-click to Codex: right-click goes to Codex at once', !!(await lib.until(async () => (await rightClickGoesTo()) === 'cli', HUNG_MS, 100)), await rightClickGoesTo())
+          const same = await live()
+          check('…without a restart (the same Codex process and launch)', same?.pid === pid && same.runId === runId && same.status === 'ready', JSON.stringify(same && { status: same.status, pid: same.pid }))
+          await page.screenshot({ path: path.join(scratch, 'codexoverrides-3-passed.png') })
+          const n3 = (await copied()).length
+          const r3 = await reads()
+          await drag(true)
+          await rightClick()
+          // A right button's press and release, as xterm encodes them for Codex's SGR tracking (?1006h): ESC [ < 2 ; x ; y M, then m.
+          const reports = await lib.until(async () => { const h = await hold(true); return h.some((r) => /\x1b\[<2;\d+;\d+M/.test(r)) && h.some((r) => /\x1b\[<2;\d+;\d+m/.test(r)) ? h : null }, HUNG_MS, 100)
+          check('…a right-click then goes to Codex: its press and release, as mouse reports', !!reports, JSON.stringify(await hold(true)))
+          check("…and Hive neither copies nor pastes (no clipboard write or read by Hive)", (await copied()).length === n3 && (await reads()) === r3, `${(await copied()).length - n3} write(s), ${(await reads()) - r3} read(s)`)
+          check('…and Codex keeps running (the same process)', !!(await live()) && (await live()).pid === pid, JSON.stringify(await live().then((l) => l && { status: l.status, pid: l.pid })))
+          record.rightClick.passedToCodex = { hiveWrites: (await copied()).length - n3, hiveReads: (await reads()) - r3, rightButtonReports: (reports ?? []).filter((r) => /\x1b\[<2;/.test(r)).length }
+        } finally {
+          await hold(false)
+        }
+      }
 
       // Off again: Hive's again, at once.
       await inv('advanced:set', RIGHT_ID, false)
@@ -204,7 +213,6 @@ function codexCommandLine(runId) {
       const back = await lib.until(async () => ((await onScreen()).includes('BACKAGAIN') ? await onScreen() : null), HUNG_MS, 100)
       check('…and a right-click pastes once again (one read)', !!back && back.split('BACKAGAIN').length === 2 && (await reads()) === r4 + 1, `${(await reads()) - r4} read(s)`)
       check('…still the same Codex process', (await live())?.pid === pid, JSON.stringify(await live().then((l) => l && { pid: l.pid })))
-      // No screenshot here: what Codex may have pasted from the machine's clipboard could still be in its input.
       await inv('pty:write', key, '\x15')
       await setClip('')
     }
@@ -277,9 +285,54 @@ function codexCommandLine(runId) {
     record.titleOff = await titleRun(false)
     await inv('advanced:set', TITLE_ID, true)
     if (source) await inv('console:subscribe', [])
+
+    // ---- 3. Claude Code's pane: the fake Claude Code, tracking no mouse (as Claude Code 2.1.305 at its prompt).
+    claudeDef = await lib.addAgent(inv, proj, { name: 'Claude', provider: 'claude-code' })
+    const ckey = lib.ptyKey(proj, claudeDef.id)
+    await inv('session:start', proj, { agentId: claudeDef.id })
+    const claudeLive = async () => (await inv('session:live')).find((l) => l.agentId === claudeDef.id)
+    const cready = await lib.until(async () => ((await claudeLive())?.status === 'ready' ? await claudeLive() : null), READY_MS, 300)
+    check('Claude Code (fake): ready', !!cready, JSON.stringify(await claudeLive().then((l) => l && { status: l.status })))
+    if (cready) {
+      await lib.showAgent(page, 'Claude')
+      const cGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), ckey)
+      const cmouse = () => page.evaluate((k) => window.__hiveTerminalState(k)?.mouse, ckey)
+      check('Claude Code tracks no mouse', (await cmouse()) === 'none', await cmouse())
+      check("right-click is Hive's by default", (await cGoesTo()) === 'hive', await cGoesTo())
+      const pt = await lib.until(() => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [ckey, '? for shortcuts']), HUNG_MS, 200)
+      check('its prompt is on screen', !!pt)
+      const cRightClick = () => page.mouse.click(pt.x, pt.y, { button: 'right' })
+      // Hive's: with nothing selected, a right-click pastes (one read of the stubbed clipboard).
+      await setClip('CLAUDEPASTE')
+      const c0 = await reads()
+      await cRightClick()
+      check("…a right-click pastes (Hive's: one read)", !!(await lib.until(async () => (await reads()) === c0 + 1, HUNG_MS, 100)), `${(await reads()) - c0} read(s)`)
+      await inv('pty:write', ckey, '\x15')
+      // Passed to Claude Code: Hive neither copies nor pastes, and nothing goes to it (it asked for no mouse reports).
+      const chold = (on) => page.evaluate(([k, h]) => window.__hiveHoldMouseReports(k, h), [ckey, on])
+      if (Array.isArray(await chold(true))) {
+        try {
+          await inv('advanced:set', CLAUDE_RIGHT_ID, true)
+          check('Pass right-click to Claude Code: right-click goes to Claude Code at once', !!(await lib.until(async () => (await cGoesTo()) === 'cli', HUNG_MS, 100)), await cGoesTo())
+          const [n5, r5] = [(await copied()).length, await reads()]
+          await cRightClick()
+          // Settled once the page has run the click's handlers: the next evaluation runs after them.
+          check('…a right-click then: Hive neither copies nor pastes', (await copied()).length === n5 && (await reads()) === r5, `${(await copied()).length - n5} write(s), ${(await reads()) - r5} read(s)`)
+          check('…and sends Claude Code no mouse report (it tracks none)', (await chold(true)).length === 0, JSON.stringify(await chold(true)))
+          check('…and Claude Code keeps running', (await claudeLive())?.pid === cready.pid, JSON.stringify(await claudeLive().then((l) => l && { status: l.status })))
+          await page.screenshot({ path: path.join(scratch, 'codexoverrides-9-claude-passed.png') })
+        } finally {
+          await chold(false)
+        }
+        await inv('advanced:set', CLAUDE_RIGHT_ID, false)
+        check("off again: Claude Code's right-click is Hive's at once", !!(await lib.until(async () => (await cGoesTo()) === 'hive', HUNG_MS, 100)), await cGoesTo())
+      } else check('the pane holds its mouse reports back (a test build)', false)
+      await setClip('')
+    }
   } finally {
     fs.writeFileSync(path.join(scratch, 'codexoverrides.json'), JSON.stringify(record, null, 2))
     if (def) await stop().catch(() => {})
+    if (claudeDef) await inv('session:stop', proj, claudeDef.id).catch(() => {})
     await app.close().catch(() => {})
   }
   console.log(`INFO title on: ${JSON.stringify(record.titleOn && { approval: record.titleOn.approvalShownAt, waiting: record.titleOn.waitingAt, finished: record.titleOn.finishedAt, timeline: record.titleOn.timeline })}`)
