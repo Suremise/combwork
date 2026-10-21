@@ -118,7 +118,7 @@ export function LanesSection({ lanes, all, width, runs = [], full = false }: { l
       { label: tr(msg({ id: 'board.lanes.usualOrder', defaultMessage: 'Usual Order', description: "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own." })), icon: 'list-ordered', detail: tr(msg({ id: 'board.lanes.usualOrderDetail', defaultMessage: 'Running lanes newest first, paused ones after them', description: 'Under Usual Order in a lane\'s context menu (Progress panel): what the usual order is.' })), disabled: !custom, onClick: usual },
       // Ending one needs no tool (#1280, SPEC §16.11.3): End Lane, and Abandon Lane after asking.
       { separator: true },
-      { label: tr(msg({ id: 'board.lanes.end', defaultMessage: 'End Lane', description: "A lane's context menu item in the Progress panel: ends the lane (its agents' card loop is over; the cards stay as they are). Glossary: lane." })), icon: 'check', onClick: () => void endLane(l, false) },
+      { label: tr(msg({ id: 'board.lanes.end', defaultMessage: 'End Lane', description: "A lane's context menu item in the Progress panel: ends the lane (its agents' card loop is over; the cards stay as they are). Glossary: lane." })), icon: 'flag', onClick: () => void endLane(l, false) },
       { label: tr(msg({ id: 'board.lanes.abandon', defaultMessage: 'Abandon Lane…', description: "A lane's context menu item in the Progress panel: gives the lane up unmerged, after asking. Glossary: lane." })), icon: 'close', danger: true, onClick: () => void endLane(l, true) },
       { separator: true },
       { label: tr(START_LANE), icon: 'add', onClick: () => openLaneStart(l.project) }
