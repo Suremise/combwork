@@ -24,7 +24,8 @@ import { removePath, samePlace } from '../fsutil'
 import { git, GIT_PREFIX } from '../git'
 import { createLogger, userText } from '../logger'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
-import { jobName, JobSupervisor, startLauncher } from './queueJobs'
+import type { JobHost } from '../processSupervisor'
+import { endLeaseJob, fileTimeMs, LeaseJob, queueHost, startLauncher } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
@@ -46,6 +47,8 @@ export class LeaseLost extends Error {
 
 export interface RunnerConfig {
   store: FactStore
+  /** Hive's process supervisor (the app passes agents', processSupervisor()); left out, the queue's own (queueHost). */
+  host?: JobHost
   /** The workspace folder: its runners are released as it closes. */
   workspace?: string
   /** The project folder (its repository). */
@@ -113,7 +116,9 @@ const holderOf = (l: QueueLease): Holder => ({ profile: l.profile, pid: l.pid, r
 export class QueueRunner {
   private released = false
   private timer: NodeJS.Timeout | null = null
-  private sup: JobSupervisor | null = null
+  private job: LeaseJob | null = null
+  private host: JobHost | null = null
+  private unfollow: (() => void) | null = null
   private readonly probe: ProcessProbe
 
   private constructor(
@@ -175,7 +180,7 @@ export class QueueRunner {
         // never touched), once its job is closed: a retry, in this Hive or another, can take it at once. What was
         // recorded stays, for the next runner's settle.
         runner.stop()
-        await runner.sup?.close()
+        await runner.closeJob()
         await locked(cfg, () => store.dropQueueLease(lease, token)).catch((x) => log.warn(`giving up the merge queue's lease for ${userText(cfg.target)} after a failed start`, x))
         if (!(e instanceof LeaseLost)) throw e
         const h = store.queueLease(cfg.target)
@@ -211,18 +216,49 @@ export class QueueRunner {
     )
   }
 
-  /** Starts the lease's job and records its supervisor (a duty from now on); a problem when it can't. */
+  /**
+   * Makes the lease's job on the supervisor and records the supervisor (a duty from now on: a takeover ends it if it
+   * outlived its Hive), by its pid and start; a problem when it can't. From then on each process the job follows (a
+   * packaged app's escaped one) is recorded too, as it is told.
+   */
   private async startJob(): Promise<string | null> {
-    const s = await JobSupervisor.start(jobName(this.lease), { linger: this.cfg.hooks?.lingeringJob })
-    if ('problem' in s) return s.problem
-    this.sup = s
+    const host = this.cfg.host ?? queueHost({ linger: this.cfg.hooks?.lingeringJob })
+    const job = await LeaseJob.open(host, this.lease)
+    if ('problem' in job) return job.problem
+    this.host = host
+    this.job = job
+    this.unfollow = host.onFollowed((lease, pid, created) => {
+      if (lease !== this.lease) return
+      const at = fileTimeMs(created)
+      void this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid, startAfter: at, startBefore: at, what: 'followed' })).catch((e) => log.warn('recording a process the merge queue follows', e))
+    })
+    // Windows itself, whatever probe the runner is given for its holders (tests give their own): the start is the record.
+    const sup = host.pid ? ((await defaultProbe().list()) ?? []).find((p) => p.pid === host.pid) : undefined
+    if (!sup) {
+      await this.closeJob()
+      return "its process supervisor couldn't be identified" // i18n-ignore: a reason, logged
+    }
     try {
-      await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid: s.pid, startAfter: s.started, startBefore: s.started, what: 'supervisor' }))
+      await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid: sup.pid, startAfter: sup.started, startBefore: sup.started, what: 'supervisor' }))
     } catch (e) {
-      await s.close()
+      await this.closeJob()
       throw e
     }
     return null
+  }
+
+  /** Tests only: the job follows a process, as the supervisor follows a packaged app's (refused outside tests). */
+  followForTests(pid: number): Promise<unknown> {
+    return this.job ? this.job.follow(pid) : Promise.resolve(null)
+  }
+
+  /** Lets the lease's job go (closing it ends anything left in it) and stops recording what it follows. */
+  private async closeJob(): Promise<void> {
+    this.unfollow?.()
+    this.unfollow = null
+    const job = this.job
+    this.job = null
+    await job?.close()
   }
 
   /**
@@ -231,9 +267,9 @@ export class QueueRunner {
    * nothing run, when the runner no longer holds (LeaseLost), its job has gone, or the launcher couldn't be put in the
    * job or recorded. The child is the launcher: its output and exit code are the command's.
    */
-  async spawn(what: Exclude<QueueProcKind, 'supervisor'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<ChildProcess> {
-    const sup = this.sup
-    if (!sup?.alive || this.released) throw new LeaseLost(this.target)
+  async spawn(what: Exclude<QueueProcKind, 'supervisor' | 'followed'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<ChildProcess> {
+    const job = this.job
+    if (!job || this.released) throw new LeaseLost(this.target)
     const { child, after, before } = startLauncher({ command, args, shell: !!opts.shell }, { cwd: opts.cwd as string | undefined, env: opts.env })
     // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
     // never left to the process's: the first is the start's error, later ones are logged.
@@ -260,7 +296,7 @@ export class QueueRunner {
     // Not started: nothing to record or end; the start's own error (it is told on the next tick).
     if (!pid) throw startError ?? (await failed)
     try {
-      if (!(await sup.assign(pid, after, before))) throw new Error(`${command} couldn't be put in the merge queue's job`) // i18n-ignore: as above
+      if (!(await job.assign(pid, after, before))) throw new Error(`${command} couldn't be put in the merge queue's job`) // i18n-ignore: as above
       await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid, startAfter: after, startBefore: before, what }))
     } catch (e) {
       giveUp()
@@ -276,7 +312,7 @@ export class QueueRunner {
   }
 
   /** Runs a command (spawn) to its end: its output and exit code. */
-  async run(what: Exclude<QueueProcKind, 'supervisor'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<RunResult> {
+  async run(what: Exclude<QueueProcKind, 'supervisor' | 'followed'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<RunResult> {
     const child = await this.spawn(what, command, args, opts)
     const out: Buffer[] = []
     const err: Buffer[] = []
@@ -290,24 +326,26 @@ export class QueueRunner {
   }
 
   /** git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX), through `run`. */
-  git(cwd: string, args: string[], what: Exclude<QueueProcKind, 'supervisor'> = 'testMerge'): Promise<RunResult> {
+  git(cwd: string, args: string[], what: Exclude<QueueProcKind, 'supervisor' | 'followed'> = 'testMerge'): Promise<RunResult> {
     return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd })
   }
 
   /**
-   * Gives the lease up (a workspace closing, Hive quitting, its project removed): its job ended and seen empty first, so
-   * no process of its runs; then its folder kept for the next runner if the queue still needs it (else removed), its
-   * records dropped, and its lease row deleted by its own token (nothing of a successor's). If the job can't be seen
-   * empty, its records and folder stay as duties for the next runner, which ends what is left before it runs, and only
-   * the lease goes. Once.
+   * Gives the lease up (a workspace closing, Hive quitting, its project removed): its job ended and seen empty first
+   * (with the processes it follows), so no process of its runs; then its folder kept for the next runner if the queue
+   * still needs it (else removed), its records dropped, and its lease row deleted by its own token (nothing of a
+   * successor's). If the job can't be seen empty, its job is let go all the same (closing it ends what is in it) and
+   * its records and folder stay as duties for the next runner (a followed process isn't in the job), which ends what is
+   * left before it runs, and only the lease goes: but never its supervisor's record, which, in this Hive that goes on,
+   * is the supervisor its agents use. Once.
    */
   async release(): Promise<void> {
     if (this.released) return
     this.stop()
     const store = this.cfg.store
-    const ended = !!this.sup && (this.cfg.hooks?.endJob?.() ?? true) && (await this.sup.end())
-    if (ended) await this.sup!.close()
-    else log.warn(`The merge queue for ${userText(this.target)} couldn't see its processes end: the next runner ends them before it runs`)
+    const ended = !!this.job && (this.cfg.hooks?.endJob?.() ?? true) && (await this.job.end())
+    await this.closeJob()
+    if (!ended) log.warn(`The merge queue for ${userText(this.target)} couldn't see its processes end: the next runner ends them before it runs`)
     const keep = ended && this.cfg.needed ? await this.cfg.needed().catch(() => true) : !ended
     // Its own, by token: a lease taken over meanwhile (its pid looked gone to another Hive) keeps its successor's row and
     // folders, and the successor settles what was recorded.
@@ -316,8 +354,8 @@ export class QueueRunner {
     await locked(this.cfg, () =>
       store.quiet(() => {
         if (!store.holdsQueueLease(this.lease, this.token)) return
+        for (const p of store.queueProcs(this.lease)) if (ended || p.what === 'supervisor') store.dropQueueProc(this.lease, p.pid)
         if (ended) {
-          for (const p of store.queueProcs(this.lease)) store.dropQueueProc(this.lease, p.pid)
           if (keep) store.setQueueFolder({ folder: this.dir, target: this.target, lease: null })
           else store.dropQueueFolder(this.dir)
         }
@@ -363,12 +401,13 @@ export class QueueRunner {
     if (duties.length) {
       await this.cfg.hooks?.beforeSettle?.()
       for (const lease of new Set(duties.map((d) => d.lease))) {
-        const ok = this.cfg.hooks?.endJob?.() !== false && (await this.sup!.endJob(jobName(lease)))
+        const ok = this.cfg.hooks?.endJob?.() !== false && (await endLeaseJob(this.host!, lease))
         if (!ok) return this.pauseFor(duties.find((d) => d.lease === lease && d.what === 'supervisor')?.pid ?? duties.find((d) => d.lease === lease)!.pid)
       }
       const list = await this.probe.list()
       if (!list) return this.pauseFor(duties[0].pid)
-      const roots = duties.flatMap((d) => list.filter((p) => matches(p, d)))
+      // Never this runner's own supervisor (one Hive's runners share it): it holds the job this one runs in.
+      const roots = duties.filter((d) => !(d.what === 'supervisor' && d.pid === this.host?.pid)).flatMap((d) => list.filter((p) => matches(p, d)))
       if (roots.length) {
         log.info(`Ending ${roots.length} process(es) an earlier merge queue runner left running`)
         const tree = uniq(roots.flatMap((root) => treeOf(list, root)))

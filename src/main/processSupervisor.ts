@@ -1,0 +1,991 @@
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
+import { tmpdir } from 'os'
+import { join } from 'path'
+
+/**
+ * Hive's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Hive (its C#
+ * through Add-Type) holding Windows job objects, that both agents' launches (agentProcesses.ts) and the merge queue's
+ * runners (workflow/queueRunner.ts) use, never a copy of it each.
+ *
+ * Each job owns the processes put in it and everything they start from then on; what escapes it (a packaged app's
+ * process, such as the Store's PowerShell, starts its children outside every job) is adopted into it, or followed with
+ * its handle held, by the sweeps. An agent's launch's job is unnamed and ends nothing when it closes (quitting Hive
+ * leaves running what the user chose to keep). A merge queue lease's job is named after its lease and kill on close
+ * (no process of a queue outlives its job), and each process it follows is told ("followed <job> <pid>:<created>"),
+ * for its runner to keep as a duty (a followed process isn't in the job, so closing it doesn't end one).
+ */
+
+/** At most this many processes a job lists (the rest are counted, and ended with it). */
+export const MAX_LISTED = 50
+/** How often the host adopts what escaped its jobs (Sweep, #543), while it holds any; listing and ending sweep first. */
+const SWEEP_MS = 1000
+/** How long the host gathers the exits of a job's processes before sweeping for what they left outside (Listen). */
+const EXIT_BATCH_MS = 250
+
+const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+
+/** Why the host couldn't start (its owner says it in its own words). */
+export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
+
+/** The host's requests (HiveJobs.Answer). */
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'follow'
+
+export interface JobHostOptions {
+  /** How long it gets to start, and then to answer each request. */
+  waitMs: () => number
+  /** Test copies' modes (HIVE_TEST_PROCESS_TRACKER: fail, silent, mute); '' otherwise. */
+  testMode: () => string
+  log: { warn: (msg: string, e?: unknown) => void }
+  /** A process joined a job, or was taken into one ("new"). */
+  onJoined: () => void
+  /** It ended unexpectedly, its jobs with it. */
+  onLost: (why: string) => void
+  /** It couldn't start: nothing is tracked. */
+  onFailed: (why: HostFailure) => void
+  /** Starts its PowerShell instead (tests: one that outlives its Hive). */
+  launch?: (file: string, args: string[]) => ChildProcessWithoutNullStreams
+  /** Test requests allowed (`follow`): unpackaged builds and unit tests only. */
+  testRequests?: boolean
+}
+
+// Raw: the C# keeps its backslashes. Exported for the unit tests, which drive it with stale process identities.
+export const HOST_SOURCE = String.raw`
+using System;
+using System.Collections.Generic;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class HiveJobs {
+  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr a, IntPtr name);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr proc);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool CloseHandle(IntPtr h);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetExitCodeProcess(IntPtr h, out uint code);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateJobObject(IntPtr job, uint code);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateProcess(IntPtr proc, uint code);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int cls, IntPtr info, int len, IntPtr ret);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool IsProcessInJob(IntPtr proc, IntPtr job, out bool result);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetProcessTimes(IntPtr h, out long created, out long exited, out long kernel, out long user);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateToolhelp32Snapshot(uint flags, int pid);
+  [DllImport("kernel32.dll")] static extern void GetSystemTimeAsFileTime(out long now);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern uint WaitForSingleObject(IntPtr h, uint ms);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode)] static extern int GetPackageFullName(IntPtr proc, ref int len, StringBuilder name);
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool Process32FirstW(IntPtr snap, ref ProcessEntry e);
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool Process32NextW(IntPtr snap, ref ProcessEntry e);
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] struct ProcessEntry {
+    public uint size, usage, pid; public IntPtr heap; public uint module, threads, parent; public int priority; public uint flags;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst=260)] public string exe;
+  }
+  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateIoCompletionPort(IntPtr file, IntPtr port, UIntPtr key, uint threads);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetQueuedCompletionStatus(IntPtr port, out uint message, out UIntPtr key, out IntPtr detail, uint ms);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job, int cls, ref PortInfo info, int len);
+  [StructLayout(LayoutKind.Sequential)] struct PortInfo { public IntPtr key; public IntPtr port; }
+  // The merge queue's jobs (#1360): named, kill on close.
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode, EntryPoint="CreateJobObjectW")] static extern IntPtr CreateNamedJob(IntPtr a, string name);
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode, EntryPoint="OpenJobObjectW")] static extern IntPtr OpenNamedJob(uint access, bool inherit, string name);
+  [DllImport("kernel32.dll", SetLastError=true, EntryPoint="SetInformationJobObject")] static extern bool SetLimits(IntPtr job, int cls, ref ExtLimits info, int len);
+  [StructLayout(LayoutKind.Sequential)] struct BasicLimits { public long a, b; public uint flags; public UIntPtr minWs, maxWs; public uint active; public UIntPtr affinity; public uint prio, sched; }
+  [StructLayout(LayoutKind.Sequential)] struct IoCounters { public ulong a, b, c, d, e, f; }
+  [StructLayout(LayoutKind.Sequential)] struct ExtLimits { public BasicLimits basic; public IoCounters io; public UIntPtr procMem, jobMem, peakProc, peakJob; }
+  /** The kill-on-close jobs (the merge queue's), by id: what they follow is told (TellFollowed), for their owner to keep. */
+  static HashSet<string> closing = new HashSet<string>();
+  /** Followed processes of kill-on-close jobs not told yet: "followed <job> <pid>:<created>". */
+  static List<string> followNotes = new List<string>();
+  /** The name of a merge queue lease's job, in this Windows session. */
+  public static string QueueJobName(string id) { return "Local\\HiveQueue-" + id; }
+  static Dictionary<string, IntPtr> jobs = new Dictionary<string, IntPtr>();
+  /** Processes each job adopted (Sweep), for the log. */
+  static Dictionary<string, int> adopted = new Dictionary<string, int>();
+  /** Requests (the main thread), the port's thread and the timer's take turns. */
+  static readonly object turn = new object();
+  static System.Threading.Timer sweeper;
+  /** Every job reports to one port: a process joining it, and one ending (each job by its key). */
+  static IntPtr port = IntPtr.Zero;
+  static Dictionary<ulong, string> byKey = new Dictionary<ulong, string>();
+  static ulong nextKey = 1;
+  /**
+   * Where a process joining a job (or taken into one) is told, as a line "new" (#1134: main writes its running marker
+   * again); null tells nothing (the unit tests' own scripts). Told once per job until that job is listed again or its
+   * launch starts (told), so a build starting hundreds of processes says it once per marker write. A notice due (tell)
+   * is written outside the turn (Tell), and listing never takes one back: listing one job says nothing of another's
+   * process that joined just before (round 1 of #1134).
+   */
+  public static System.IO.TextWriter Notices;
+  static HashSet<string> told = new HashSet<string>();
+  static bool tell = false;
+  /** Public for the unit tests, which give joins and listings in an order of their own. Under the turn. */
+  public static void Joined(string id) { if (told.Add(id)) tell = true; }
+  /** What joins job id after this is told again: what joined before is in its listing. Under the turn. */
+  static void Untold(string id) { told.Remove(id); }
+  /** Writes the notice due, if any. Public for the unit tests. */
+  public static void Tell() {
+    bool t;
+    lock (turn) { t = tell; tell = false; }
+    var w = Notices;
+    if (t && w != null) try { w.WriteLine("new"); w.Flush(); } catch { }
+    TellFollowed();
+  }
+  /** Writes the followed processes of kill-on-close jobs not told yet (agents' jobs have none). */
+  public static void TellFollowed() {
+    List<string> notes;
+    lock (turn) { if (followNotes.Count == 0) return; notes = followNotes; followNotes = new List<string>(); }
+    var w = Notices;
+    if (w != null) try { foreach (var n in notes) w.WriteLine(n); w.Flush(); } catch { }
+  }
+  class Held { public string job; public IntPtr h; public long created; }
+  /**
+   * The jobs' processes, each held open from joining until it ends: while held, its id can't name another process, and
+   * its start time can be read after it has exited, when its escaped children are adopted.
+   */
+  static Dictionary<int, Held> held = new Dictionary<int, Held>();
+  /**
+   * Escaped processes that aren't put in their parent's job, being in a job already (the Store's PowerShell is in its
+   * package's, #659) or a packaged app's, which Windows puts in its package's job as it starts (#678): followed instead,
+   * held open, listed and ended with the job, and their own escaped children taken in as they are found.
+   */
+  static Dictionary<int, Held> followed = new Dictionary<int, Held>();
+  /**
+   * Adopts what escaped the jobs (#543): a packaged app's process (the Microsoft Store's PowerShell 7) starts its
+   * children outside every job, so they would neither be listed nor ended. Each live process whose parent is in a job
+   * (running, or held as it ends), that is itself not in that job, joins it if it is in no job and isn't a packaged
+   * app's (its own children join by themselves from then on), or is followed (Take); those it started before are found
+   * in the same sweep. The parent must have started before the child: a parent id not held could name a later process
+   * that took a dead parent's id.
+   * Swept as each process of a job ends (so a shell that starts something and exits at once is caught), before listing
+   * or ending a job, and every ${SWEEP_MS} ms (for an escaped child's own children).
+   */
+  public static int Sweep() {
+    lock (turn) {
+      if (jobs.Count == 0) return 0;
+      var parents = new Dictionary<int, int>();
+      // Taken before the snapshot: a process created after it can't be one the snapshot saw.
+      long at; GetSystemTimeAsFileTime(out at);
+      // TH32CS_SNAPPROCESS
+      IntPtr snap = CreateToolhelp32Snapshot(2, 0);
+      if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return 0;
+      try {
+        var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
+        for (bool more = Process32FirstW(snap, ref e); more; more = Process32NextW(snap, ref e)) if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
+      } finally { CloseHandle(snap); }
+      var owner = new Dictionary<int, string>();
+      foreach (var j in jobs) foreach (int pid in List(j.Key)) owner[pid] = j.Key;
+      foreach (var h in held) if (jobs.ContainsKey(h.Value.job)) owner[h.Key] = h.Value.job;
+      foreach (var f in followed) if (jobs.ContainsKey(f.Value.job)) owner[f.Key] = f.Value.job;
+      var tried = new HashSet<int>();
+      int n = 0;
+      for (bool found = true; found; ) {
+        found = false;
+        foreach (var kv in parents) {
+          string id;
+          if (owner.ContainsKey(kv.Key) || tried.Contains(kv.Key) || !owner.TryGetValue(kv.Value, out id)) continue;
+          tried.Add(kv.Key);
+          if (!Take(id, kv.Key, kv.Value, at)) continue;
+          Joined(id);
+          owner[kv.Key] = id;
+          int c; adopted.TryGetValue(id, out c); adopted[id] = c + 1;
+          n++;
+          found = true;
+        }
+      }
+      // Followed processes that have ended: their children were looked at above, while their ids were still held.
+      foreach (int pid in new List<int>(followed.Keys)) {
+        uint code;
+        if (GetExitCodeProcess(followed[pid].h, out code) && code == 259) continue;
+        CloseHandle(followed[pid].h);
+        followed.Remove(pid);
+      }
+      return n;
+    }
+  }
+  /**
+   * Takes an escaped process into job id: adopted into it if it is in no job, else followed. pid and parent are as a
+   * snapshot taken at time "at" saw them: an id may name another process by now, so a process opened by it (the
+   * candidate, or a parent not held) that was created after the snapshot isn't the one it saw (#543). Public for the
+   * unit tests, which hand it stale identities.
+   */
+  public static bool Take(string id, int pid, int parent, long at) {
+    lock (turn) {
+      IntPtr job;
+      if (!jobs.TryGetValue(id, out job)) return false;
+      // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
+      IntPtr c = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
+      if (c == IntPtr.Zero) return false;
+      bool keep = false;
+      try {
+        bool inJob, inAny; uint code; long cc, pc, x, k, u;
+        if (!IsProcessInJob(c, job, out inJob) || inJob) return false;
+        if (!GetExitCodeProcess(c, out code) || code != 259) return false;
+        if (!GetProcessTimes(c, out cc, out x, out k, out u) || cc > at) return false;
+        if (!Started(parent, at, out pc) || pc > cc) return false;
+        // Only a process in no job joins: one in another job is followed (#659). Windows would nest the jobs: the Store's
+        // PowerShell's is its package's, which every Store PowerShell started later joins, and when it had no parent it
+        // became this launch's, so the next ones (any agent's or app's) were listed and ended with this launch. A packaged
+        // app's process is followed even in no job: Windows puts it in its package's job only once it has started (a few
+        // ms, more under load), and one assigned before then nests that job in this one just the same (#678).
+        if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) return false;
+        if (!inAny && !Packaged(c) && AssignProcessToJobObject(job, c)) return true;
+        followed[pid] = new Held { job = id, h = c, created = cc };
+        if (closing.Contains(id)) followNotes.Add("followed " + id + " " + pid + ":" + cc);
+        keep = true;
+        return true;
+      } finally { if (!keep) CloseHandle(c); }
+    }
+  }
+  /** Whether a process is a packaged app's (has a package identity); one that can't be told counts as packaged. */
+  static bool Packaged(IntPtr proc) {
+    int len = 0;
+    // APPMODEL_ERROR_NO_PACKAGE
+    return GetPackageFullName(proc, ref len, null) != 15700;
+  }
+  /** When a job's process started: held (its id kept), or looked up now, if created before "at". */
+  static bool Started(int pid, long at, out long created) {
+    Held h;
+    if (held.TryGetValue(pid, out h) || followed.TryGetValue(pid, out h)) { created = h.created; return true; }
+    created = 0;
+    IntPtr p = OpenProcess(0x1000, false, pid);
+    if (p == IntPtr.Zero) return false;
+    long x, k, u;
+    try { return GetProcessTimes(p, out created, out x, out k, out u) && created <= at; } finally { CloseHandle(p); }
+  }
+  /**
+   * Holds a process the port says joined job id, if it is in that job: a notification read late may carry an id that
+   * names another process by now (#543). Public for the unit tests.
+   */
+  public static bool Hold(string id, int pid) {
+    lock (turn) {
+      IntPtr job;
+      if (held.ContainsKey(pid) || !jobs.TryGetValue(id, out job)) return false;
+      // SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION: Settle asks whether it has exited.
+      IntPtr h = OpenProcess(0x100000 | 0x1000, false, pid);
+      if (h == IntPtr.Zero) return false;
+      bool inJob; long created, x, k, u;
+      if (IsProcessInJob(h, job, out inJob) && inJob && GetProcessTimes(h, out created, out x, out k, out u)) {
+        held[pid] = new Held { job = id, h = h, created = created };
+        return true;
+      }
+      CloseHandle(h);
+      return false;
+    }
+  }
+  /** Follows pid in job id with a handle of the given access (the unit tests: one that can't end it). */
+  public static bool Follow(string id, int pid, uint access) {
+    lock (turn) {
+      IntPtr h = OpenProcess(access | 0x1000, false, pid);
+      long created, x, k, u;
+      if (h == IntPtr.Zero || !jobs.ContainsKey(id) || !GetProcessTimes(h, out created, out x, out k, out u)) { if (h != IntPtr.Zero) CloseHandle(h); return false; }
+      followed[pid] = new Held { job = id, h = h, created = created };
+      if (closing.Contains(id)) followNotes.Add("followed " + id + " " + pid + ":" + created);
+      return true;
+    }
+  }
+  public static bool IsHeld(int pid) { lock (turn) return held.ContainsKey(pid); }
+  public static bool IsFollowed(int pid) { lock (turn) return followed.ContainsKey(pid); }
+  /** When pid started (FILETIME), while it runs; 0 when it doesn't (gone, exited) or can't be read. */
+  public static long CreatedOf(int pid) {
+    IntPtr p = OpenProcess(0x1000, false, pid);
+    if (p == IntPtr.Zero) return 0;
+    try { uint code; long c, x, k, u; return GetExitCodeProcess(p, out code) && code == 259 && GetProcessTimes(p, out c, out x, out k, out u) ? c : 0; } finally { CloseHandle(p); }
+  }
+  /** "pid:created,…" as pairs; malformed entries are left out. */
+  static List<KeyValuePair<int, long>> Pairs(string list) {
+    var r = new List<KeyValuePair<int, long>>();
+    foreach (string e in list.Split(',')) {
+      string[] pc = e.Split(':'); int pid; long created;
+      if (pc.Length == 2 && int.TryParse(pc[0], out pid) && long.TryParse(pc[1], out created) && pid > 0 && created > 0) r.Add(new KeyValuePair<int, long>(pid, created));
+    }
+    return r;
+  }
+  /**
+   * Processes kept from before Hive restarted, by id and start time ("pid:created,…", #614): those still running as
+   * the same process, as JSON ["pid:created", …]: an identity is the pair, never the id alone. An id that names
+   * another process by now (another start time) is left out.
+   */
+  public static string Identify(string list) {
+    var b = new StringBuilder("[");
+    bool first = true;
+    foreach (var p in Pairs(list)) {
+      if (CreatedOf(p.Key) != p.Value) continue;
+      b.Append(first ? "" : ",").Append('"').Append(p.Key).Append(':').Append(p.Value).Append('"');
+      first = false;
+    }
+    return b.Append(']').ToString();
+  }
+  /**
+   * Ends processes by id and start time ("pid:created,…", #614), each only while it is still that process: one gone, or
+   * whose id names another process by now, counts as ended. JSON {"ended":n,"failed":n}: those failed still run.
+   */
+  public static string EndExact(string list) {
+    int ended = 0, failed = 0;
+    foreach (var e in Pairs(list)) {
+      // PROCESS_TERMINATE | SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
+      IntPtr p = OpenProcess(0x0001 | 0x100000 | 0x1000, false, e.Key);
+      if (p == IntPtr.Zero) {
+        // ERROR_INVALID_PARAMETER: no process has the id. Anything else: one does, and Windows won't let Hive end it.
+        if (Marshal.GetLastWin32Error() == 87) ended++; else failed++;
+        continue;
+      }
+      try {
+        uint code; long c, x, k, u;
+        if (!GetProcessTimes(p, out c, out x, out k, out u) || c != e.Value || !GetExitCodeProcess(p, out code) || code != 259) { ended++; continue; }
+        if (TerminateProcess(p, 1) && WaitForSingleObject(p, 2000) == 0) ended++; else failed++;
+      } finally { CloseHandle(p); }
+    }
+    return "{\"ended\":" + ended + ",\"failed\":" + failed + "}";
+  }
+  /** A process EndTree will end: its id and start time, and its handle, held from when it was checked until it is ended. */
+  public struct Picked { public int pid; public long created; public IntPtr h; }
+  /**
+   * What EndTree ends (#1008), the OS's answers passed in (the unit tests give their own): each root ("pid:created")
+   * only while it is still that process, and below it, by the parent ids of a snapshot taken at "at", each child that is
+   * still running, started after its parent and not after the snapshot. Each is checked through a handle opened on it
+   * and held (open; close lets one go), so its id can't name another process before it is ended: a process an id names
+   * by now (started after the snapshot), and a root that has gone are never taken or followed. What Hive can't end is
+   * never passed over in silence: a root that runs but can't be opened or read is in failed ("pid:created"), and so is a
+   * child that runs and can't be opened to end it but whose start time a query-only look (peek: its start time, 0 when
+   * it has gone, -1 when it can't be read) shows to be one of the run's; a child that runs and can't be told either way
+   * is in unverified (its id). Nothing below those is followed.
+   */
+  public static List<Picked> PickTree(string list, Dictionary<int, List<int>> children, long at, Func<int, IntPtr> open, Func<int, bool> absent, Func<IntPtr, long> createdOf, Func<IntPtr, bool> running, Action<IntPtr> close, Func<int, long> peek, List<string> failed, List<int> unverified) {
+    var picked = new List<Picked>();
+    var seen = new HashSet<int>();
+    var queue = new Queue<Picked>();
+    foreach (var r in Pairs(list)) {
+      if (seen.Contains(r.Key)) continue;
+      IntPtr h = open(r.Key);
+      if (h == IntPtr.Zero) { if (!absent(r.Key)) failed.Add(r.Key + ":" + r.Value); continue; }
+      long rc = createdOf(h);
+      bool runs = running(h);
+      if (rc != r.Value || !runs) {
+        close(h);
+        // Running, its start time unreadable: it may well be the root, and still runs.
+        if (rc == 0 && runs) failed.Add(r.Key + ":" + r.Value);
+        continue;
+      }
+      seen.Add(r.Key);
+      queue.Enqueue(new Picked { pid = r.Key, created = r.Value, h = h });
+    }
+    while (queue.Count > 0) {
+      var p = queue.Dequeue();
+      picked.Add(p);
+      List<int> c;
+      if (!children.TryGetValue(p.pid, out c)) continue;
+      foreach (int k in c) {
+        if (seen.Contains(k)) continue;
+        IntPtr h = open(k);
+        if (h == IntPtr.Zero) {
+          if (absent(k)) continue;
+          // It runs, and Hive can't end it: said if it is the run's (or might be), never passed over.
+          long pc = peek(k);
+          if (pc == -1) unverified.Add(k);
+          else if (pc > 0 && pc >= p.created && pc <= at) failed.Add(k + ":" + pc);
+          continue;
+        }
+        long kc = createdOf(h);
+        bool kr = running(h);
+        if (kc == 0 || kc < p.created || kc > at || !kr) {
+          close(h);
+          if (kc == 0 && kr) unverified.Add(k);
+          continue;
+        }
+        seen.Add(k);
+        queue.Enqueue(new Picked { pid = k, created = kc, h = h });
+      }
+    }
+    return picked;
+  }
+  /**
+   * Ends processes by id and start time ("pid:created,…") with all they started that runs now (#1008: a test run's
+   * whole tree), as PickTree picks them, each through the handle it was checked with. JSON {"ended":n,"failed":n,
+   * "failedIds":["pid:created",…],"unverified":[pid,…]}: those failed still run (one Hive couldn't open among them), to
+   * try again; unverified, the ids of the run's children (as far as Hive can tell) that run and it could neither end nor check.
+   */
+  public static string EndTree(string list) {
+    var children = new Dictionary<int, List<int>>();
+    // Taken before the snapshot: a process created after it can't be one the snapshot saw.
+    long at; GetSystemTimeAsFileTime(out at);
+    // TH32CS_SNAPPROCESS
+    IntPtr snap = CreateToolhelp32Snapshot(2, 0);
+    if (snap != IntPtr.Zero && snap != new IntPtr(-1)) {
+      try {
+        var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
+        for (bool more = Process32FirstW(snap, ref e); more; more = Process32NextW(snap, ref e)) {
+          if (e.pid == 0) continue;
+          List<int> c;
+          if (!children.TryGetValue((int)e.parent, out c)) children[(int)e.parent] = c = new List<int>();
+          c.Add((int)e.pid);
+        }
+      } finally { CloseHandle(snap); }
+    }
+    var failed = new List<string>();
+    int error = 0;
+    // PROCESS_TERMINATE | SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
+    Func<int, IntPtr> open = (pid) => { IntPtr h = OpenProcess(0x0001 | 0x100000 | 0x1000, false, pid); error = h == IntPtr.Zero ? Marshal.GetLastWin32Error() : 0; return h; };
+    // ERROR_INVALID_PARAMETER: no process has the id.
+    Func<int, bool> absent = (pid) => error == 87;
+    Func<IntPtr, long> createdOf = (h) => { long c, x, k, u; return GetProcessTimes(h, out c, out x, out k, out u) ? c : 0; };
+    Func<IntPtr, bool> running = (h) => { uint code; return GetExitCodeProcess(h, out code) && code == 259; };
+    // PROCESS_QUERY_LIMITED_INFORMATION alone: what a process Hive can't end is, if it can tell.
+    Func<int, long> peek = (pid) => {
+      IntPtr q = OpenProcess(0x1000, false, pid);
+      if (q == IntPtr.Zero) return Marshal.GetLastWin32Error() == 87 ? 0 : -1;
+      try { long c = createdOf(q); return !running(q) ? 0 : c == 0 ? -1 : c; } finally { CloseHandle(q); }
+    };
+    var unverified = new List<int>();
+    var picked = PickTree(list, children, at, open, absent, createdOf, running, (h) => CloseHandle(h), peek, failed, unverified);
+    int ended = 0;
+    foreach (var p in picked) {
+      try {
+        if (!running(p.h) || (TerminateProcess(p.h, 1) && WaitForSingleObject(p.h, 2000) == 0)) ended++;
+        else failed.Add(p.pid + ":" + p.created);
+      } finally { CloseHandle(p.h); }
+    }
+    var b = new StringBuilder("{\"ended\":" + ended + ",\"failed\":" + failed.Count + ",\"failedIds\":[");
+    for (int i = 0; i < failed.Count; i++) b.Append(i > 0 ? "," : "").Append(Q(failed[i]));
+    b.Append("],\"unverified\":[");
+    for (int i = 0; i < unverified.Count; i++) b.Append(i > 0 ? "," : "").Append(unverified[i]);
+    return b.Append("]}").ToString();
+  }
+  /** Exits gathered for the next Settle: each pid with the entry held for it as its exit was read (null: none). */
+  static List<KeyValuePair<int, Held>> exits = new List<KeyValuePair<int, Held>>();
+  /** When the gathered exits are settled (on clock), ${EXIT_BATCH_MS} ms after the first of them. */
+  static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+  static long due = 0;
+  /**
+   * A notification from the port for job id: a process joining is held, one ending is gathered for the next Settle with
+   * the entry its job held for it then. Public for the unit tests, which give the events in an order of their own (#604).
+   */
+  public static void Notify(string id, uint message, int pid) {
+    lock (turn) {
+      // JOB_OBJECT_MSG_NEW_PROCESS
+      if (message == 6) { if (Hold(id, pid)) Joined(id); return; }
+      // JOB_OBJECT_MSG_EXIT_PROCESS, JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS
+      if (message != 7 && message != 8) return;
+      Held h;
+      if (!held.TryGetValue(pid, out h) || h.job != id) h = null;
+      if (exits.Count == 0) due = clock.ElapsedMilliseconds + ${EXIT_BATCH_MS};
+      exits.Add(new KeyValuePair<int, Held>(pid, h));
+    }
+  }
+  /**
+   * Sweeps for what the gathered exits left outside, then lets go of what was held for them. Only the entry held as an
+   * exit was read, and only once its process has exited (#604): its job forgotten meanwhile, the id is free, and may
+   * name another job's process by now, held under the same id; and a late join may have held, by an id already free
+   * again, another process of the same job, which still runs. Either way that entry is another process's, let go at its
+   * own exit. Public for the unit tests.
+   */
+  public static void Settle() {
+    lock (turn) {
+      try {
+        Sweep();
+        foreach (var e in exits) {
+          Held h;
+          if (e.Value == null || !held.TryGetValue(e.Key, out h) || !ReferenceEquals(h, e.Value) || WaitForSingleObject(h.h, 0) != 0) continue;
+          CloseHandle(h.h);
+          held.Remove(e.Key);
+        }
+      } finally { exits.Clear(); }
+    }
+  }
+  /** The job holding pid (Hold), or null. Public for the unit tests. */
+  public static string HeldBy(int pid) { lock (turn) { Held h; return held.TryGetValue(pid, out h) ? h.job : null; } }
+  /**
+   * The port's thread: holds each process as it joins a job. Those that end are swept for together, at most
+   * ${EXIT_BATCH_MS} ms after the first of them (a build ends hundreds of processes, and a sweep's snapshot of every
+   * process costs a few ms), adopting what they left outside; then they are let go.
+   */
+  static void Listen() {
+    for (;;) {
+      bool waiting; long left;
+      lock (turn) { waiting = exits.Count > 0; left = due - clock.ElapsedMilliseconds; }
+      if (waiting && left <= 0) {
+        try { Settle(); } catch { }
+        continue;
+      }
+      uint message; UIntPtr key; IntPtr detail;
+      if (!GetQueuedCompletionStatus(port, out message, out key, out detail, waiting ? (uint)left : 0xFFFFFFFF)) continue;
+      int pid = (int)detail.ToInt64();
+      try {
+        lock (turn) {
+          string id;
+          if (byKey.TryGetValue(key.ToUInt64(), out id)) Notify(id, message, pid);
+        }
+      } catch { }
+      Tell();
+    }
+  }
+  public static string Add(string id, int pid) {
+    if (sweeper == null) sweeper = new System.Threading.Timer(_ => { try { Sweep(); Tell(); } catch { } }, null, ${SWEEP_MS}, ${SWEEP_MS});
+    // A new launch: its CLI joining is told, whatever was told before (main may not have listed it since).
+    lock (turn) Untold(id);
+    if (port == IntPtr.Zero) {
+      port = CreateIoCompletionPort(new IntPtr(-1), IntPtr.Zero, UIntPtr.Zero, 1);
+      if (port != IntPtr.Zero) new System.Threading.Thread(Listen) { IsBackground = true }.Start();
+    }
+    IntPtr job;
+    if (!jobs.TryGetValue(id, out job)) {
+      job = CreateJobObject(IntPtr.Zero, IntPtr.Zero);
+      if (job == IntPtr.Zero) return "create failed: " + Marshal.GetLastWin32Error();
+      jobs[id] = job;
+      // JobObjectAssociateCompletionPortInformation: without it, escaped children are still adopted by the sweeps.
+      if (port != IntPtr.Zero) {
+        ulong k = nextKey++;
+        var info = new PortInfo { key = new IntPtr((long)k), port = port };
+        if (SetInformationJobObject(job, 7, ref info, Marshal.SizeOf(typeof(PortInfo)))) byKey[k] = id;
+      }
+    }
+    // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
+    IntPtr p = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
+    if (p == IntPtr.Zero) return "the process has gone (" + Marshal.GetLastWin32Error() + ")";
+    uint code;
+    // STILL_ACTIVE: a process that has exited (its id kept alive by a handle) isn't the launch's any more.
+    if (!GetExitCodeProcess(p, out code) || code != 259) { CloseHandle(p); return "the process has exited"; }
+    bool ok = AssignProcessToJobObject(job, p);
+    int err = Marshal.GetLastWin32Error();
+    CloseHandle(p);
+    return ok ? "ok" : "assign failed: " + err;
+  }
+  public static int[] List(string id) {
+    IntPtr job;
+    if (!jobs.TryGetValue(id, out job)) return new int[0];
+    for (int n = 256; n <= 65536; n *= 4) {
+      int size = 2 * 4 + IntPtr.Size * n;
+      IntPtr buf = Marshal.AllocHGlobal(size);
+      try {
+        if (!QueryInformationJobObject(job, 3, buf, size, IntPtr.Zero)) { if (Marshal.GetLastWin32Error() == 234) continue; return new int[0]; }
+        int count = Marshal.ReadInt32(buf, 4);
+        int[] r = new int[count];
+        for (int i = 0; i < count; i++) r[i] = (int)Marshal.ReadIntPtr(buf, 8 + i * IntPtr.Size).ToInt64();
+        return r;
+      } finally { Marshal.FreeHGlobal(buf); }
+    }
+    return new int[0];
+  }
+  /**
+   * Ends the job's processes and the ones it follows. False when any still runs (a followed one Windows wouldn't end
+   * stays followed and listed, so End can be tried again); one already gone counts as ended.
+   */
+  public static bool Kill(string id) {
+    IntPtr job;
+    Sweep();
+    if (!jobs.TryGetValue(id, out job) || !TerminateJobObject(job, 1)) return false;
+    bool all = true;
+    foreach (var f in followed) {
+      uint code;
+      if (f.Value.job != id || TerminateProcess(f.Value.h, 1)) continue;
+      if (!GetExitCodeProcess(f.Value.h, out code) || code == 259) all = false;
+    }
+    return all;
+  }
+  public static void Forget(string id) {
+    IntPtr job;
+    if (!jobs.TryGetValue(id, out job)) return;
+    CloseHandle(job);
+    jobs.Remove(id);
+    adopted.Remove(id);
+    told.Remove(id);
+    closing.Remove(id);
+    foreach (var k in new List<ulong>(byKey.Keys)) if (byKey[k] == id) byKey.Remove(k);
+    foreach (var pid in new List<int>(held.Keys)) if (held[pid].job == id) { CloseHandle(held[pid].h); held.Remove(pid); }
+    foreach (var pid in new List<int>(followed.Keys)) if (followed[pid].job == id) { CloseHandle(followed[pid].h); followed.Remove(pid); }
+  }
+  /** A JSON string. */
+  public static string Q(string s) {
+    var b = new StringBuilder("\"");
+    foreach (char c in s ?? "") {
+      if (c == '"' || c == '\\') b.Append('\\').Append(c);
+      else if (c < ' ') b.Append("\\u").Append(((int)c).ToString("x4"));
+      else b.Append(c);
+    }
+    return b.Append('"').ToString();
+  }
+  /** The job's processes as JSON: how many, and the first max with their names and command lines. */
+  /** The job's processes and the running ones it follows. */
+  public static int[] Members(string id) {
+    lock (turn) {
+      var members = new List<int>(List(id));
+      foreach (var f in followed) { uint code; if (f.Value.job == id && GetExitCodeProcess(f.Value.h, out code) && code == 259) members.Add(f.Key); }
+      return members.ToArray();
+    }
+  }
+  public static string Describe(string id, int max) {
+    Sweep();
+    // What joins it from here on is told again: what joined before is in this listing.
+    lock (turn) Untold(id);
+    int[] all = Members(id);
+    int took; adopted.TryGetValue(id, out took);
+    var b = new StringBuilder("{\"total\":" + all.Length + ",\"adopted\":" + took + ",\"processes\":[");
+    if (all.Length > 0) {
+      var where = new StringBuilder();
+      for (int i = 0; i < all.Length && i < max; i++) where.Append(i > 0 ? " OR " : "").Append("ProcessId=").Append(all[i]);
+      bool first = true;
+      using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process WHERE " + where))
+        foreach (ManagementObject p in q.Get()) {
+          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
+          first = false;
+        }
+    }
+    return b.Append("]}").ToString();
+  }
+  /** The memory each job's processes use now (working sets, as Task Manager counts them), for "job,job,…": a JSON array in the same order (#562). */
+  public static string Memory(string ids) {
+    var b = new StringBuilder("[");
+    string[] list = ids.Split(',');
+    for (int i = 0; i < list.Length; i++) {
+      long bytes = 0;
+      foreach (int pid in Members(list[i])) {
+        try { using (var p = System.Diagnostics.Process.GetProcessById(pid)) bytes += p.WorkingSet64; } catch (Exception) { }
+      }
+      b.Append(i > 0 ? "," : "").Append(bytes);
+    }
+    return b.Append("]").ToString();
+  }
+  /** The port and the sweeper, as Add starts them with the first job. */
+  static void Started() {
+    if (sweeper == null) sweeper = new System.Threading.Timer(_ => { try { Sweep(); Tell(); } catch { } }, null, ${SWEEP_MS}, ${SWEEP_MS});
+    if (port == IntPtr.Zero) {
+      port = CreateIoCompletionPort(new IntPtr(-1), IntPtr.Zero, UIntPtr.Zero, 1);
+      if (port != IntPtr.Zero) new System.Threading.Thread(Listen) { IsBackground = true }.Start();
+    }
+  }
+  /**
+   * A merge queue lease's job (#1360): named (QueueJobName), kill on close (closing its last handle ends every process
+   * in it), no breakaway allowed; on the port, so joins are held and exits swept as agents' jobs are, and what it follows
+   * is told. "ok", or why not.
+   */
+  public static string Open(string id) {
+    Started();
+    if (jobs.ContainsKey(id)) return "exists";
+    IntPtr job = CreateNamedJob(IntPtr.Zero, QueueJobName(id));
+    if (job == IntPtr.Zero) return "create failed: " + Marshal.GetLastWin32Error();
+    if (Marshal.GetLastWin32Error() == 183) { CloseHandle(job); return "exists"; }
+    var lim = new ExtLimits();
+    // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    lim.basic.flags = 0x2000;
+    if (!SetLimits(job, 9, ref lim, Marshal.SizeOf(typeof(ExtLimits)))) { int e = Marshal.GetLastWin32Error(); CloseHandle(job); return "limits failed: " + e; }
+    jobs[id] = job;
+    closing.Add(id);
+    if (port != IntPtr.Zero) {
+      ulong k = nextKey++;
+      var info = new PortInfo { key = new IntPtr((long)k), port = port };
+      if (SetInformationJobObject(job, 7, ref info, Marshal.SizeOf(typeof(PortInfo)))) byKey[k] = id;
+    }
+    return "ok";
+  }
+  /** Unix ms of a FILETIME. */
+  static long Ms(long ft) { return (ft - 116444736000000000L) / 10000; }
+  /**
+   * Puts a waiting launcher in job id, only while it is the process that started between two clock readings (Unix ms,
+   * #1360): an id given again since names a process that started later. "ok", or why not.
+   */
+  public static string Assign(string id, int pid, long after, long before) {
+    IntPtr job;
+    if (!jobs.TryGetValue(id, out job)) return "no job";
+    // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
+    IntPtr p = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
+    if (p == IntPtr.Zero) return "the process has gone (" + Marshal.GetLastWin32Error() + ")";
+    try {
+      uint code; long c, x, k, u;
+      if (!GetExitCodeProcess(p, out code) || code != 259) return "the process has exited";
+      if (!GetProcessTimes(p, out c, out x, out k, out u)) return "no start time";
+      long at = Ms(c);
+      if (at < after - 50 || at > before + 50) return "another process (started " + at + ")";
+      return AssignProcessToJobObject(job, p) ? "ok" : "assign failed: " + Marshal.GetLastWin32Error();
+    } finally { CloseHandle(p); }
+  }
+  /** Whether job id has no process, and follows none still running (after a sweep). */
+  public static bool Empty(string id) {
+    Sweep();
+    return Members(id).Length == 0;
+  }
+  /**
+   * Another merge queue lease's job, by its name (#1360): every process in it ended, and waited for (15 s at most) until
+   * it has none. "ended"; "nojob" when there is none (closed: kill on close ended what was in it); else why not. Outside
+   * the turn: it waits.
+   */
+  public static string EndNamed(string id) {
+    // JOB_OBJECT_TERMINATE | JOB_OBJECT_QUERY
+    IntPtr h = OpenNamedJob(0x0008 | 0x0004, false, QueueJobName(id));
+    if (h == IntPtr.Zero) { int e = Marshal.GetLastWin32Error(); return e == 2 ? "nojob" : "open failed: " + e; }
+    try {
+      TerminateJobObject(h, 1);
+      // JobObjectBasicAccountingInformation: ActiveProcesses, after four times and two counts.
+      IntPtr buf = Marshal.AllocHGlobal(48);
+      try {
+        for (int i = 0; i < 150; i++) {
+          if (!QueryInformationJobObject(h, 1, buf, 48, IntPtr.Zero)) return "query failed: " + Marshal.GetLastWin32Error();
+          if (Marshal.ReadInt32(buf, 40) == 0) return "ended";
+          System.Threading.Thread.Sleep(100);
+        }
+        return "busy";
+      } finally { Marshal.FreeHGlobal(buf); }
+    } finally { CloseHandle(h); }
+  }
+  /** One request ("<n> <command> <job> [pid]") answered as "<n> <JSON>". */
+  public static string Answer(string line) {
+    string[] a = line.Split(' ');
+    string r;
+    // It waits (EndNamed): outside the turn, so the port and the sweeps go on meanwhile.
+    if (a.Length > 2 && a[1] == "endnamed") {
+      try { r = Q(EndNamed(a[2])); } catch (Exception e) { r = Q("error: " + e.Message); }
+      return a[0] + " " + r;
+    }
+    try {
+      lock (turn)
+      switch (a.Length > 2 ? a[1] : "") {
+        case "add": r = Q(Add(a[2], int.Parse(a[3]))); break;
+        case "list": r = Describe(a[2], ${MAX_LISTED + 1}); break;
+        case "kill": r = Kill(a[2]) ? "true" : "false"; break;
+        case "forget": Forget(a[2]); r = "true"; break;
+        case "identify": r = Identify(a[2]); break;
+        case "endexact": r = EndExact(a[2]); break;
+        case "endtree": r = EndTree(a[2]); break;
+        case "memory": r = Memory(a[2]); break;
+        case "open": r = Q(Open(a[2])); break;
+        case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;
+        case "empty": r = Empty(a[2]) ? "true" : "false"; break;
+        // Tests only (the host refuses to send it otherwise): follows a process, as Take does a packaged app's.
+        case "follow": r = Follow(a[2], int.Parse(a[3]), 0x0001 | 0x100000) ? "true" : "false"; break;
+        default: r = Q("unknown command"); break;
+      }
+    } catch (Exception e) { r = Q("error: " + e.Message); }
+    return a[0] + " " + r;
+  }
+}
+`
+
+/**
+ * The host's loop: one request per line ("<n> <command> <job> [pid]"), one reply per line ("<n> <JSON>"), all in the
+ * C#; between them, a line "new" when a process has joined a job (Notices, #1134). No cmdlet but Add-Type, so PowerShell loads no other module (and writes no module cache, which goes into the
+ * working folder when LOCALAPPDATA is unset). The C# comes first on its input, a line of base64 (HOST_INPUT): a command
+ * line holds at most 32,767 characters, and -EncodedCommand doubles them and more.
+ */
+const HOST_SCRIPT = `
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
+[HiveJobs]::Notices = [Console]::Out
+[Console]::Out.WriteLine('ready')
+while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellFollowed() }
+`
+const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
+/** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
+const MUTE_SCRIPT = `
+$null = [Console]::In.ReadLine()
+[Console]::Out.WriteLine('ready')
+while ($null -ne ($line = [Console]::In.ReadLine())) { if ($env:HIVE_TEST_TRACKER_HEARD) { [IO.File]::AppendAllText($env:HIVE_TEST_TRACKER_HEARD, $line + [Environment]::NewLine) } }
+`
+
+export interface JobList {
+  total: number
+  /** How many of its processes the host adopted after they escaped the job (Sweep, #543). */
+  adopted?: number
+  processes: { pid: number; parent?: number; name: string; cmd: string; created?: string }[]
+}
+
+/**
+ * The one PowerShell holding the jobs, started on first use; null once it couldn't start (nothing is tracked then).
+ * What is its owner's (how long to wait, test modes, its log, what to do when it fails or stops, notices) is given.
+ */
+export class JobHost {
+  private proc: ChildProcessWithoutNullStreams | null = null
+  private ready: Promise<boolean> | null = null
+  private next = 1
+  private waiting = new Map<number, (reply: unknown) => void>()
+  private failed = false
+  /** Closed (Hive quitting): no helper starts again, not even for a request already on its way (a refresh's next look). */
+  private closed = false
+  /** Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready. */
+  private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void> }>()
+
+  /** Told of each process a kill-on-close job starts following (onFollowed). */
+  private followers = new Set<(job: string, pid: number, created: string) => void>()
+
+  constructor(private readonly opts: JobHostOptions) {}
+
+  /** Calls fn with each process a kill-on-close job starts following (its job, id and start as a FILETIME). Returns its removal. */
+  onFollowed(fn: (job: string, pid: number, created: string) => void): () => void {
+    this.followers.add(fn)
+    return () => void this.followers.delete(fn)
+  }
+
+  /** False once the host couldn't start: then nothing is tracked, and launches aren't held for it. */
+  get usable(): boolean {
+    return !this.failed
+  }
+
+  /** Starts the host if it isn't running: whether it runs. */
+  async ensure(): Promise<boolean> {
+    return !this.failed && (await this.start())
+  }
+
+  private start(): Promise<boolean> {
+    if (this.closed) return Promise.resolve(false)
+    if (this.ready) return this.ready
+    // Test copies (unpackaged): HIVE_TEST_PROCESS_TRACKER=fail acts out a PC where PowerShell refuses the helper.
+    if (this.opts.testMode() === 'fail') {
+      this.opts.onFailed({ kind: 'test' })
+      this.failed = true
+      return Promise.resolve(false)
+    }
+    this.ready = new Promise<boolean>((resolve) => {
+      let up = false
+      let p: ChildProcessWithoutNullStreams
+      try {
+        // Test copies: HIVE_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
+        // one that is ready but never answers (each request it reads noted in HIVE_TEST_TRACKER_HEARD), until its input closes.
+        const mode = this.opts.testMode()
+        const script = Buffer.from(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : mode === 'mute' ? MUTE_SCRIPT : HOST_SCRIPT, 'utf16le').toString('base64')
+        // In the temp folder: nothing it might write lands in whatever folder Hive was started from.
+        const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', script] // i18n-ignore: PowerShell's arguments
+        p = this.opts.launch ? this.opts.launch(POWERSHELL, args) : spawn(POWERSHELL, args, { windowsHide: true, stdio: 'pipe', cwd: tmpdir() })
+      } catch (e) {
+        this.opts.log.warn('could not start the process job host: agents\u2019 leftover processes are not tracked', e)
+        this.opts.onFailed({ kind: 'noPowerShell', error: (e as Error).message })
+        this.failed = true
+        return resolve(false)
+      }
+      this.proc = p
+      const state = { up: false, gone: new Promise<void>((r) => p.once('exit', () => r())) }
+      // A helper that never started (no pid) has nothing to wait for.
+      if (p.pid === undefined) state.gone = Promise.resolve()
+      this.alive.set(p, state)
+      void state.gone.then(() => this.alive.delete(p))
+      p.stdin.write(HOST_INPUT)
+      // A helper that doesn't say it is ready in time is taken for broken, for the rest of this run: launches go on
+      // untracked (decision B), rather than waiting for it.
+      const readyBy = setTimeout(() => {
+        if (up || this.proc !== p) return
+        this.proc = null
+        this.ready = null
+        p.kill()
+        this.opts.log.warn(`the process job host didn't start within ${Math.round(this.opts.waitMs() / 1000)} s: agents\u2019 leftover processes are not tracked`)
+        this.opts.onFailed({ kind: 'slowHelper', seconds: Math.round(this.opts.waitMs() / 1000) })
+        this.failed = true
+        resolve(false)
+      }, this.opts.waitMs())
+      let buf = ''
+      let err = ''
+      p.stdout.setEncoding('utf8')
+      p.stderr.setEncoding('utf8')
+      p.stderr.on('data', (d: string) => (err = (err + d).slice(-2000)))
+      p.stdout.on('data', (d: string) => {
+        buf += d
+        let i: number
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim()
+          buf = buf.slice(i + 1)
+          if (!up && line === 'ready') {
+            up = state.up = true
+            clearTimeout(readyBy)
+            resolve(true)
+            continue
+          }
+          if (line === 'new') {
+            this.opts.onJoined()
+            continue
+          }
+          // A process a kill-on-close job (a merge queue's) follows: its id and start (FILETIME), for its owner to keep.
+          const followed = /^followed (\S+) (\d+):(\d+)$/.exec(line)
+          if (followed) {
+            for (const fn of this.followers) fn(followed[1], Number(followed[2]), followed[3])
+            continue
+          }
+          const sp = line.indexOf(' ')
+          const n = Number(line.slice(0, sp))
+          const done = this.waiting.get(n)
+          if (!done) continue
+          this.waiting.delete(n)
+          try {
+            done(JSON.parse(line.slice(sp + 1)))
+          } catch {
+            done(null)
+          }
+        }
+      })
+      const ended = (why: string): void => {
+        clearTimeout(readyBy)
+        if (this.proc !== p) {
+          // Closed before it was ready: nothing waits for it to start any more.
+          if (!up) resolve(false)
+          return
+        }
+        this.proc = null
+        this.ready = null
+        for (const done of this.waiting.values()) done(null)
+        this.waiting.clear()
+        if (!up) {
+          this.opts.log.warn(`the process job host didn't start (${why}): agents\u2019 leftover processes are not tracked. ${err.trim().slice(0, 300)}`)
+          this.opts.onFailed(/language mode|ConstrainedLanguage|Add-Type/i.test(err) ? { kind: 'refused' } : { kind: 'helperFailed', why })
+          this.failed = true
+          resolve(false)
+        } else {
+          // Its jobs went with it: what they held is no longer tracked (and keeps running).
+          this.opts.log.warn(`the process job host ended (${why})`)
+          this.opts.onLost(why)
+        }
+      }
+      p.on('error', (e) => ended(e.message))
+      p.on('exit', (code) => ended(`exit ${code}`)) // i18n-ignore: how the helper ended, a technical detail kept as it came (the log, Diagnostics)
+      p.stdin.on('error', () => undefined)
+    })
+    return this.ready
+  }
+
+  /**
+   * One request's reply (null: no host, or none). Starting the host is bounded by its own wait (start); once it runs,
+   * a reply that doesn't come within its wait (waitMs) means it is stuck: it is closed, its jobs lost (jobsLost), and the next
+   * request starts a new one. So nothing (a launch, End, quitting) waits on it for longer.
+   */
+  async request(command: HostCommand, job: string, ...args: (number | undefined)[]): Promise<unknown> {
+    // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs: "job,job,…".
+    if (this.failed || !/^[\w:,-]+$/.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
+    if (!(await this.start()) || !this.proc) return null
+    const p = this.proc
+    const n = this.next++
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const reply = new Promise<unknown>((resolve) => {
+      this.waiting.set(n, resolve)
+      timer = setTimeout(() => {
+        if (!this.waiting.delete(n)) return
+        resolve(null)
+        this.opts.log.warn(`the process job host didn't answer within ${Math.round(this.opts.waitMs() / 1000)} s (${command}): closing it`)
+        if (this.proc === p) p.kill()
+      }, this.opts.waitMs())
+    })
+    const extra = args.filter((a): a is number => !!a && Number.isSafeInteger(a))
+    p.stdin.write(`${n} ${command} ${job}${extra.map((a) => ` ${a}`).join('')}\n`)
+    try {
+      return await reply
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  /** The helper's process id while it runs (tests: to end it as a crash would). */
+  get pid(): number | null {
+    return this.proc?.pid ?? null
+  }
+
+  /**
+   * Closes the host (Hive quitting): its jobs close without ending anything. A helper that hasn't said it is ready holds
+   * no jobs, and may never read its input: it is ended. No helper starts after this. Resolves once every helper started
+   * has exited, so nothing of theirs (their working folder, the temp folder) is held any more (#1020).
+   */
+  close(): Promise<void> {
+    this.closed = true
+    const p = this.proc
+    this.proc = null
+    this.ready = null
+    try {
+      p?.stdin.end()
+    } catch {
+      // Already gone.
+    }
+    // Requests on their way get no answer: said now, not once they time out (a refresh's next look would follow).
+    for (const done of this.waiting.values()) done(null)
+    this.waiting.clear()
+    for (const [q, { up }] of this.alive) if (!up) q.kill()
+    return Promise.all([...this.alive.values()].map((h) => h.gone)).then(() => undefined)
+  }
+}
+

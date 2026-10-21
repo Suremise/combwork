@@ -648,7 +648,7 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       pid          INTEGER NOT NULL,
       start_after  INTEGER NOT NULL,
       start_before INTEGER NOT NULL,
-      what         TEXT    NOT NULL CHECK (what IN ('supervisor', 'testMerge', 'install', 'check')),
+      what         TEXT    NOT NULL CHECK (what IN ('supervisor', 'followed', 'testMerge', 'install', 'check')),
       PRIMARY KEY (lease, pid)
     ) STRICT, WITHOUT ROWID`,
     'CREATE INDEX queue_runner_procs_target ON queue_runner_procs (project, target)',

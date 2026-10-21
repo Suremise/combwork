@@ -49,6 +49,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 │ providerService.ts  each provider's install info, setup tasks                │
 │ ptyHost.ts      node-pty processes, output buffers                           │
 │ agentProcesses.ts  each launch's process tree (a job object), leftovers      │
+│ processSupervisor.ts  the job host (C#) agents and the merge queue share     │
 │ launchGate.ts   holds a terminal's command until its job is made             │
 │ servers.ts      hook server (random port) + Agent API (configured port)      │
 │ skills.ts mcp.ts notes.ts git.ts files.ts   feature services                 │
@@ -261,16 +262,19 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
 holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease
-has a job object (`queueJobs.ts`): a supervisor (PowerShell and C#, a child of Hive, so it ends with it) holds the job,
-named `Local\HiveQueue-<lease>`, kill-on-close, no breakaway; commands start through a detached Node launcher that the
-supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before it is
-told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by name and
-their recorded processes still running, waits, and only then drops them; else the queue pauses needs-you. A lease's
-worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence` (factStore.ts, an AsyncLocalStorage
-check run inside every store write) fences everything the queue's work writes, reconciliation included (`MergeQueue`'s
-`holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released runner's worktree while an entry, an
-unfinished advance or an in-flight card's ruleset needs it. Workspace close (`WorkspaceService.closingTasks`), quit and
-project removal release the runners (`releaseQueueRunners`, `forgetProjectQueues`).
+has a job object on Hive's process supervisor (`processSupervisor.ts`: the PowerShell and C# `HiveJobs` host that
+agents' launches use too, extracted from `agentProcesses.ts`; in the app the runner is given agents' host): named
+`Local\HiveQueue-<lease>`, kill-on-close, no breakaway, swept and followed as agents' jobs are (#543, #659, #678), each
+process it follows told (`followed …`) and recorded. Commands start through a detached Node launcher (`queueJobs.ts`)
+that the supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before
+it is told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
+name and their recorded processes still running (followed ones too), waits, and only then drops them; else the queue
+pauses needs-you. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
+(factStore.ts, an AsyncLocalStorage check run inside every store write) fences everything the queue's work writes,
+reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released
+runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close
+(`WorkspaceService.closingTasks`), quit and project removal release the runners (`releaseQueueRunners`,
+`forgetProjectQueues`).
 
 **Layers and modules (planned):**
 

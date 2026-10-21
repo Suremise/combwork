@@ -1,115 +1,30 @@
-// The merge queue runner's process ownership (#1360 round 2): a Windows job object per lease, which owns every process
-// the runner starts for the whole life of its tree (a shell's detached server too), and a launcher that is in the job,
-// and recorded, before the command it runs exists.
+// The merge queue runner's process ownership (#1360): a Windows job object per lease, on Hive's process supervisor
+// (processSupervisor.ts, shared with agents' launches), which owns every process the runner starts for the whole life
+// of its tree (a shell's detached server too), and a launcher that is in the job, and recorded, before the command it
+// runs exists.
 //
-// The job is held by a supervisor (a hidden PowerShell, its C# compiled by Add-Type), a child of Hive: Windows ends it
-// with Hive (Node puts its children in a job that ends them when Hive goes), and the job is made with "kill on close",
-// so once the supervisor's handle goes every process in it ends too, by the operating system's guarantee. Processes
-// can't break away from it (no breakaway allowed). The job is named after the lease (`Local\HiveQueue-<lease>`), so
-// another Hive taking a dead runner's lease over can open it while anything still holds it (a supervisor that outlived
-// its Hive), end what is in it and see it empty.
+// The job is named after the lease (`Local\HiveQueue-<lease>`) and kill on close: the supervisor is a child of Hive,
+// which Windows ends with Hive, and once its handle goes every process in the job ends too, by the operating system's
+// guarantee; nothing in it may break away. What escapes it anyway (a packaged app's process, such as the Store's
+// PowerShell, starts its children outside every job) is adopted into it, or followed by the supervisor (#543, #659,
+// #678), and each followed process is told, for the runner to record as a duty: a followed process isn't in the job,
+// so the job closing doesn't end it. Another Hive taking a dead runner's lease over opens its job by name while
+// anything still holds it (a supervisor that outlived its Hive), ends what is in it and sees it empty.
 //
 // A command starts through the launcher (Node: Hive's own executable as Node, or Node itself in tests), started
-// detached (outside Hive's own job, so its children can't break away with Hive's job's leave) and waiting on its input:
-// it is put in the job and recorded, and only then told to run the command. A launcher whose input closes first (Hive
-// gone, or the record not written) exits without running anything.
+// detached (outside Hive's own job, whose children break away silently) and waiting on its input: it is put in the job
+// and recorded, and only then told to run the command. A launcher whose input closes first (Hive gone, or the record
+// not written) exits without running anything.
 
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { JobHost } from '../processSupervisor'
+import { createLogger } from '../logger'
 
-const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+const log = createLogger('queue')
 
-const SOURCE = String.raw`
-using System;
-using System.Runtime.InteropServices;
-public static class HiveQueueJob {
-  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr CreateJobObjectW(IntPtr a, string name);
-  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr OpenJobObjectW(uint access, bool inherit, string name);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job, int cls, ref ExtLimits info, int len);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int cls, ref Accounting info, int len, IntPtr ret);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr proc);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateJobObject(IntPtr job, uint code);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool CloseHandle(IntPtr h);
-  [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetProcessTimes(IntPtr h, out long created, out long exited, out long kernel, out long user);
-  [StructLayout(LayoutKind.Sequential)] struct Basic { public long a, b; public uint flags; public UIntPtr minWs, maxWs; public uint active; public UIntPtr affinity; public uint prio, sched; }
-  [StructLayout(LayoutKind.Sequential)] struct Io { public ulong a, b, c, d, e, f; }
-  [StructLayout(LayoutKind.Sequential)] struct ExtLimits { public Basic basic; public Io io; public UIntPtr procMem, jobMem, peakProc, peakJob; }
-  [StructLayout(LayoutKind.Sequential)] struct Accounting { public long u, k, pu, pk; public uint faults, total, active, terminated; }
-  const uint KILL_ON_JOB_CLOSE = 0x2000;
-  static IntPtr job = IntPtr.Zero;
-  static long Ms(long ft) { return (ft - 116444736000000000L) / 10000; }
-  /** Makes the job (kill on close, no breakaway): "ready <pid> <start ms>", or why not. */
-  public static string Create(string name) {
-    job = CreateJobObjectW(IntPtr.Zero, name);
-    if (job == IntPtr.Zero) return "error create " + Marshal.GetLastWin32Error();
-    if (Marshal.GetLastWin32Error() == 183) return "error exists";
-    var info = new ExtLimits();
-    info.basic.flags = KILL_ON_JOB_CLOSE;
-    if (!SetInformationJobObject(job, 9, ref info, Marshal.SizeOf(typeof(ExtLimits)))) return "error limits " + Marshal.GetLastWin32Error();
-    var me = System.Diagnostics.Process.GetCurrentProcess();
-    return "ready " + me.Id + " " + new DateTimeOffset(me.StartTime).ToUnixTimeMilliseconds();
-  }
-  static uint Active(IntPtr h) {
-    var a = new Accounting();
-    if (!QueryInformationJobObject(h, 1, ref a, Marshal.SizeOf(typeof(Accounting)), IntPtr.Zero)) return uint.MaxValue;
-    return a.active;
-  }
-  /** Ends every process in a job and waits (15 s at most) until it has none: "ended", or "busy <n>". */
-  static string End(IntPtr h) {
-    TerminateJobObject(h, 1);
-    for (int i = 0; i < 150; i++) {
-      uint n = Active(h);
-      if (n == 0) return "ended";
-      System.Threading.Thread.Sleep(100);
-    }
-    return "busy " + Active(h);
-  }
-  public static string Answer(string line) {
-    var a = line.Split(' ');
-    try {
-      switch (a[0]) {
-        case "assign": {
-          // A launcher, while it is the process that started between the two readings (its pid can't be another's).
-          int pid = int.Parse(a[1]); long after = long.Parse(a[2]), before = long.Parse(a[3]);
-          IntPtr p = OpenProcess(0x0100 | 0x0001 | 0x1000, false, pid);
-          if (p == IntPtr.Zero) return "no open " + Marshal.GetLastWin32Error();
-          try {
-            long c, e, k, u;
-            if (!GetProcessTimes(p, out c, out e, out k, out u)) return "no times";
-            long at = Ms(c);
-            if (at < after - 50 || at > before + 50) return "no other " + at;
-            if (!AssignProcessToJobObject(job, p)) return "no assign " + Marshal.GetLastWin32Error();
-            return "ok " + at;
-          } finally { CloseHandle(p); }
-        }
-        case "end": return End(job);
-        case "active": return "active " + Active(job);
-        case "endjob": {
-          // Another lease's job, by its name: gone (closed, so the system ended what was in it) or ended now.
-          IntPtr h = OpenJobObjectW(0x0008 | 0x0004, false, a[1]);
-          if (h == IntPtr.Zero) return Marshal.GetLastWin32Error() == 2 ? "nojob" : "error open " + Marshal.GetLastWin32Error();
-          try { return End(h); } finally { CloseHandle(h); }
-        }
-        default: return "error unknown";
-      }
-    } catch (Exception x) { return "error " + x.Message.Replace("\n", " "); }
-  }
-}
-`
-
-/**
- * The supervisor's loop: the C# first on its input (a line of base64), then the job's name; one reply per request.
- * Its input closing (Hive gone) ends it, and so the job and all in it.
- */
-const SCRIPT = `
-try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
-$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
-[Console]::Out.WriteLine([HiveQueueJob]::Create([Console]::In.ReadLine()))
-while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveQueueJob]::Answer($line)) }
-`
+/** How long a job's end waits to see it empty. */
+const END_MS = 15_000
 
 /**
  * Tests only (`linger`): a supervisor that outlives its Hive, as one whose Hive's job didn't end it would. A detached
@@ -127,127 +42,79 @@ process.stdout.on('error', () => {})
 p.on('exit', () => end(0))
 `
 
-/** A lease's job name, in this Windows session. */
-export const jobName = (lease: string): string => `Local\\HiveQueue-${lease}`
 
-/** How long the supervisor gets to compile its C# and make the job (antivirus may scan it). */
-const START_MS = 60_000
+/** A host of the queue's own (unit tests, a Hive with no agents' host given): one per process, made on first use. */
+let own: JobHost | null = null
 
-/** A lease's job and the process holding it. */
-export class JobSupervisor {
-  private queue: Promise<unknown> = Promise.resolve()
-  private lines: string[] = []
-  private wake: (() => void) | null = null
-  private exited = false
-  readonly gone: Promise<void>
+/**
+ * The process supervisor a runner uses: the one given (the app passes agents', so one PowerShell serves both), else
+ * the queue's own. `linger` (tests): a new one that outlives this process (RELAY).
+ */
+export function queueHost(opts: { linger?: boolean } = {}): JobHost {
+  if (!opts.linger && own) return own
+  const host = new JobHost({
+    waitMs: () => 60_000,
+    testMode: () => '',
+    log,
+    onJoined: () => undefined,
+    onLost: (why) => log.warn(`the merge queue's process supervisor ended (${why}): its jobs closed, ending what was in them`),
+    onFailed: (f) => log.warn(`the merge queue's process supervisor couldn't start (${f.kind})`),
+    testRequests: true,
+    ...(opts.linger ? { launch: (file: string, args: string[]) => spawn(process.execPath, ['-e', RELAY, file, ...args], { windowsHide: true, stdio: 'pipe', cwd: tmpdir(), env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, detached: true }) as ChildProcessWithoutNullStreams } : {})
+  })
+  if (!opts.linger) own = host
+  return host
+}
 
+/** A lease's job on a supervisor. */
+export class LeaseJob {
   private constructor(
-    private readonly proc: ChildProcessWithoutNullStreams,
-    readonly pid: number,
-    readonly started: number
-  ) {
-    this.gone = new Promise((res) => proc.once('exit', () => res()))
-    void this.gone.then(() => {
-      this.exited = true
-      this.wake?.()
-    })
+    readonly host: JobHost,
+    readonly lease: string
+  ) {}
+
+  /** Makes the lease's job (named, kill on close) on a supervisor; `{ problem }` when it can't (the host can't start, the name taken). */
+  static async open(host: JobHost, lease: string): Promise<LeaseJob | { problem: string }> {
+    const r = await host.request('open', lease)
+    return r === 'ok' ? new LeaseJob(host, lease) : { problem: typeof r === 'string' ? r : 'the process supervisor did not answer' } // i18n-ignore: a reason, logged
   }
 
-  /**
-   * Starts a supervisor with a job of this name. `linger` (tests): one that outlives this process (RELAY). A
-   * supervisor that can't start or make its job (PowerShell refused, the name taken) is `{ problem }`.
-   */
-  static async start(name: string, opts: { linger?: boolean } = {}): Promise<JobSupervisor | { problem: string }> {
-    let p: ChildProcessWithoutNullStreams
-    try {
-      const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(SCRIPT, 'utf16le').toString('base64')]
-      p = opts.linger
-        ? spawn(process.execPath, ['-e', RELAY, POWERSHELL, ...args], { windowsHide: true, stdio: 'pipe', cwd: tmpdir(), env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, detached: true })
-        : spawn(POWERSHELL, args, { windowsHide: true, stdio: 'pipe', cwd: tmpdir() })
-    } catch (e) {
-      return { problem: (e as Error).message }
-    }
-    p.stdin.write(`${Buffer.from(SOURCE, 'utf8').toString('base64')}\n${name}\n`)
-    const reply = await new Promise<string>((res) => {
-      let buf = ''
-      const timer = setTimeout(() => res('error the supervisor did not start in time'), START_MS) // i18n-ignore: a reason, logged
-      const done = (s: string): void => {
-        clearTimeout(timer)
-        p.stdout.removeAllListeners('data')
-        res(s)
-      }
-      p.stdout.on('data', (d) => {
-        buf += String(d)
-        const i = buf.indexOf('\n')
-        if (i >= 0) done(buf.slice(0, i).trim())
-      })
-      p.once('exit', () => done('error the supervisor exited')) // i18n-ignore: a reason, logged
-      p.once('error', (e) => done(`error ${e.message}`))
-    })
-    const m = /^ready (\d+) (\d+)$/.exec(reply)
-    if (!m) {
-      p.kill()
-      return { problem: reply.replace(/^error /, '') }
-    }
-    const s = new JobSupervisor(p, Number(m[1]), Number(m[2]))
-    let buf = ''
-    p.stdout.on('data', (d) => {
-      buf += String(d)
-      for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
-        s.lines.push(buf.slice(0, i).trim())
-        buf = buf.slice(i + 1)
-        s.wake?.()
-      }
-    })
-    if (opts.linger) p.unref()
-    return s
-  }
-
-  get alive(): boolean {
-    return !this.exited
-  }
-
-  /** One request and its reply, in turn; `error gone` once the supervisor has exited. */
-  private ask(line: string): Promise<string> {
-    const run = this.queue.then(async () => {
-      if (this.exited) return 'error gone'
-      this.proc.stdin.write(`${line}\n`)
-      while (!this.lines.length) {
-        if (this.exited) return 'error gone'
-        await new Promise<void>((res) => (this.wake = res))
-        this.wake = null
-      }
-      return this.lines.shift()!
-    })
-    this.queue = run.catch(() => undefined)
-    return run
-  }
-
-  /** Puts a process in the job, only while it is the one that started between the two readings (Unix ms). */
+  /** Puts a waiting launcher in the job, only while it is the process that started between the two readings (Unix ms). */
   async assign(pid: number, after: number, before: number): Promise<boolean> {
-    return (await this.ask(`assign ${pid} ${after} ${before}`)).startsWith('ok ')
+    return (await this.host.request('assign', this.lease, pid, after, before)) === 'ok'
   }
 
-  /** Ends every process in the job and waits until it has none: true once it has none. */
+  /** Ends every process in the job and the ones it follows, and waits until none runs: true once none does. */
   async end(): Promise<boolean> {
-    return (await this.ask('end')) === 'ended'
+    if ((await this.host.request('kill', this.lease)) === null) return false
+    const until = Date.now() + END_MS
+    for (;;) {
+      const empty = await this.host.request('empty', this.lease)
+      if (empty === true) return true
+      if (empty === null || Date.now() > until) return false
+      await new Promise((res) => setTimeout(res, 200))
+    }
   }
 
-  /** Another lease's job: ended and seen empty, or gone (closed: the system ended what was in it). False otherwise. */
-  async endJob(name: string): Promise<boolean> {
-    const r = await this.ask(`endjob ${name}`)
-    return r === 'ended' || r === 'nojob'
-  }
-
-  /** Closes its input (the job closes with it, ending anything left in it) and waits for it to exit. */
+  /** Lets the job go (its handle closed: anything left in it ends, kill on close). */
   async close(): Promise<void> {
-    await this.queue
-    this.proc.stdin.end()
-    const t = setTimeout(() => this.proc.kill(), 10_000)
-    await this.gone
-    clearTimeout(t)
+    await this.host.request('forget', this.lease)
+  }
+
+  /** Tests only: the supervisor follows a process for the job, as it does a packaged app's (agents' Take). */
+  follow(pid: number): Promise<unknown> {
+    return this.host.request('follow', this.lease, pid)
   }
 }
+
+/** Another lease's job, by its name: ended and seen empty, or gone (closed, so the system ended what was in it). */
+export async function endLeaseJob(host: JobHost, lease: string): Promise<boolean> {
+  const r = await host.request('endnamed', lease)
+  return r === 'ended' || r === 'nojob'
+}
+
+/** A FILETIME (the supervisor's start times) in Unix ms. */
+export const fileTimeMs = (created: string): number => Number((BigInt(created) - 116444736000000000n) / 10000n)
 
 /**
  * The launcher (run by Node): waits for its input's first line, then runs the command it was given (HIVE_QUEUE_LAUNCH,

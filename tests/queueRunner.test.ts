@@ -268,6 +268,45 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     }
   })
 
+  it("HR4 r2 #1: a process outside the job that the supervisor follows (as a packaged app's escaped one) is recorded, and a takeover after a crash ends it", async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A', { linger: true })
+      const got = (await a.ask('acquire')) as { lease: string }
+      const f = (await a.ask('follow')) as { followed: boolean; pid: number }
+      expect(f.followed).toBe(true)
+      const outside = await identify(f.pid)
+      // Told, and kept as a duty with its exact start.
+      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).some((p) => p.what === 'followed' && p.pid === f.pid && Math.abs(p.startAfter - outside.started) <= 1)).toBe(true), { timeout: 30_000, interval: 100 })
+      a.proc.kill()
+      await a.exited
+      // Not in the job: ending the job wouldn't end it. Its duty does.
+      expect(await running(outside)).toBe(true)
+      const b = host(w, 'Hive-B')
+      expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
+      expect(await running(outside)).toBe(false)
+      expect(w.store.queueProcs(got.lease)).toEqual([])
+    } finally {
+      await w.close()
+    }
+  })
+
+  it('HR4 r2 #1: a release ends what its job follows too, before it gives its duties up', async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A')
+      const got = (await a.ask('acquire')) as { lease: string }
+      const f = (await a.ask('follow')) as { followed: boolean; pid: number }
+      const outside = await identify(f.pid)
+      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).some((p) => p.what === 'followed')).toBe(true), { timeout: 30_000, interval: 100 })
+      await a.ask('release')
+      expect(await running(outside)).toBe(false)
+      expect(w.store.queueProcs(null, 'main')).toEqual([])
+    } finally {
+      await w.close()
+    }
+  })
+
   it('a release ends a check still running, then gives the lease up for the next Hive (keeping nothing the queue no longer needs)', async () => {
     const w = world()
     try {
@@ -485,17 +524,27 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     let endable = false
     const cfg = { store: w.store, project: w.project, target: 'stuck', root: w.root, profile: 'A', hooks: { endJob: () => endable } }
     const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    // A process its job follows (outside the job, as a packaged app's escaped one): closing the job wouldn't end it.
+    const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+    k.unref()
+    const outside = await identify(k.pid!)
+    expect(await a.runner.followForTests(k.pid!)).toBe(true)
+    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what).sort()).toEqual(['followed', 'supervisor']), { timeout: 30_000, interval: 100 })
     await a.runner.release()
-    // Released, but its job wasn't seen empty: its duties and folder stay, only the lease goes.
+    // Released, but its job wasn't seen empty: the followed process's duty and the folder stay, only the lease goes (and
+    // the supervisor's record: in this Hive, which goes on, it is the supervisor its agents use).
     expect(w.store.queueLease('stuck')).toBeNull()
-    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor'])
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['followed'])
+    expect(await running(outside)).toBe(true)
     const b = (await QueueRunner.acquire({ ...cfg, profile: 'B' })) as { ok: true; runner: QueueRunner; paused?: number }
     expect(b.ok).toBe(true)
-    expect(b.paused).toBe(w.store.queueProcs(a.runner.lease)[0].pid)
+    expect(b.paused).toBe(k.pid)
     expect(w.store.queuePause('stuck')).toMatchObject({ reason: 'needsYou', pid: b.paused })
-    // Once it can end them: settled, the pause it made lifted.
+    expect(await running(outside)).toBe(true)
+    // Once it can end them: settled, the process ended, the pause it made lifted.
     endable = true
     expect(await b.runner.settle()).toBeNull()
+    expect(await running(outside)).toBe(false)
     expect(w.store.queueProcs(a.runner.lease)).toEqual([])
     expect(w.store.queuePause('stuck')).toBeNull()
     await b.runner.release()

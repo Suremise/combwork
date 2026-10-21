@@ -91,7 +91,7 @@ export interface QueueLease {
   renewedAt: string
 }
 
-export type QueueProcKind = 'supervisor' | 'testMerge' | 'install' | 'check'
+export type QueueProcKind = 'supervisor' | 'followed' | 'testMerge' | 'install' | 'check'
 
 /** A process a runner owns (queue_runner_procs): its pid, and the clock readings either side of its start. */
 export interface QueueProc {

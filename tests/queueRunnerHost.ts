@@ -3,6 +3,7 @@
 // one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Hive's log lines go there
 // too). Its seams come from its environment: QR_LINGER (its job's supervisor outlives it), QR_STALL_SETTLE (a takeover
 // that never gets past its first step).
+import { spawn } from 'child_process'
 import { createInterface } from 'readline'
 import { FactStore } from '../src/main/workflow/factStore'
 import { QueueRunner } from '../src/main/workflow/queueRunner'
@@ -13,7 +14,7 @@ let runner: QueueRunner | null = null
 let renew = true
 const REPLY = 'queue-host: '
 
-type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'server' | 'release' }
+type Command = { id: number; op: 'acquire' | 'holds' | 'stall' | 'worktree' | 'sleeper' | 'server' | 'follow' | 'release' }
 
 /** A check (`node -e`) that starts a detached process of its own and prints both pids; `stay`: it runs on, else it exits. */
 const check = (stay: boolean): string =>
@@ -53,6 +54,13 @@ async function run(c: Command): Promise<Record<string, unknown>> {
       const line = await new Promise<string>((res) => child.stdout!.once('data', (d) => res(String(d).trim())))
       const [checkPid, detached] = line.split(' ').map(Number)
       return { launcher: child.pid, check: checkPid, detached }
+    }
+    case 'follow': {
+      // A process outside the job that the supervisor follows, as it does a packaged app's escaped one (the Store's
+      // PowerShell's children): a detached sleeper of this host's.
+      const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true })
+      k.unref()
+      return { followed: await runner!.followForTests(k.pid!), pid: k.pid }
     }
     case 'release':
       await runner?.release()
