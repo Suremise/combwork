@@ -159,6 +159,18 @@ export const HARDWARE_ACCELERATION_OFF = 'hive.disableHardwareAcceleration'
 /** Hive writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
 export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
 
+/** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
+export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
+
+/** The Assistant gets Hive's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
+export const ASSISTANT_START_VIEW = 'hive.assistant.startView'
+
+/** Hive types a prompt as it was written, line breaks and spacing kept (#1286, #966 row 29): read by sendPrompt. */
+export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
+
+/** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
+export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
+
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
@@ -428,6 +440,61 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.workflow.enforce.desc',
       defaultMessage: "Hive keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Hive sees a card's work merged or changed outside Hive. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Hive only records what happens to each card's work, without moving cards or waking agents for it.",
       description: 'What the advanced setting "Workflow rules are enforced" does, and what turning it off does (Settings → Advanced). Version Control is the name of a tab in Project Settings, and Review, Approved and Done are board stages: use them as Hive shows them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
+  // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
+  {
+    id: CTRL_CV_TO_CLI,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.terminal.ctrlCVToCli.title', defaultMessage: 'Ctrl+C and Ctrl+V go to the CLI', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Ctrl+C and Ctrl+V name keys: use the key names your language uses." }),
+    desc: msg({
+      id: 'settings.advanced.hive.terminal.ctrlCVToCli.desc',
+      defaultMessage: "In an agent's pane, Ctrl+C copies the terminal's selection (with nothing selected it goes to the CLI, which stops what it is doing), and Ctrl+V pastes the clipboard's text, or a screenshot as an attachment. Turned on, both keys go to the CLI, as in any other terminal: copy and paste with right-click instead, unless right-click goes to the CLI too (a setting under each CLI).",
+      description: 'What the advanced setting "Ctrl+C and Ctrl+V go to the CLI" does (Settings → Advanced, under Hive). Ctrl+C and Ctrl+V name keys: use the key names your language uses.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: ASSISTANT_START_VIEW,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.assistant.startView.title', defaultMessage: "The Assistant starts with Hive's start view", description: "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts." }),
+    desc: msg({
+      id: 'settings.advanced.hive.assistant.startView.desc',
+      defaultMessage: "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
+      description: 'What the advanced setting "The Assistant starts with Hive\'s start view" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'boolean',
+    default: true,
+    // Read at each start and compaction (assistantStartView), so a running Assistant takes a change at its next one.
+    applies: 'now'
+  },
+  {
+    id: PROMPT_AS_TYPED,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.prompt.asTyped.title', defaultMessage: 'Send prompts as typed', description: "An advanced setting's title (Settings → Advanced), listed under Hive: the prompts Hive itself types into agents' CLIs." }),
+    desc: msg({
+      id: 'settings.advanced.hive.prompt.asTyped.desc',
+      defaultMessage: "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. Other control characters are left out either way: they would press keys.",
+      description: 'What the advanced setting "Send prompts as typed" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs\' names: keep them.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: PROMPT_CLEAR_DRAFT,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.prompt.clearDraft.title', defaultMessage: "Clear the CLI's draft before Hive types", description: "An advanced setting's title (Settings → Advanced), listed under Hive. The draft is text left in the input of an agent's CLI, not sent yet." }),
+    desc: msg({
+      id: 'settings.advanced.hive.prompt.clearDraft.desc',
+      defaultMessage: "Before Hive types a prompt or Compact into an agent's CLI, it presses Ctrl+U, which clears what is in the CLI's input, and it presses it again to take back a prompt it stopped part-way. Turned off, Hive never presses it: text left in the CLI's input stays in front of what Hive types and is sent with it, a prompt stopped part-way stays in the input, and Compact can fail behind a draft. Changing Codex's mode still clears its input first, as its menu needs.",
+      description: 'What the advanced setting "Clear the CLI\'s draft before Hive types" does (Settings → Advanced, under Hive). Ctrl+U names keys: use the key names your language uses. Compact is a command\'s name: use it as Hive shows it.'
     }),
     kind: 'boolean',
     default: true,

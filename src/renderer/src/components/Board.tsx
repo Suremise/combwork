@@ -7,14 +7,15 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
 import { cardLabel, nameWithKey } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
-import { workflowMessage } from '@shared/workflow/texts'
+import { RULE_NAMES, workflowMessage } from '@shared/workflow/texts'
+import { refusalLines, type Refusal, type RefusalFormat } from '@shared/workflow/refusals'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -165,6 +166,76 @@ async function change(n: number, patch: TaskPatch, what?: string): Promise<boole
   }
 }
 
+/** A refusal's sentences in the window's language: names (stages, moves, rules) by their messages (#1264). */
+const IN_WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items) => fmt.list(items, 'unit'), names: true }
+
+const MOVE = {
+  askTitle: msg({ id: 'board.move.askTitle', defaultMessage: 'Move {card} to {column} anyway?', description: "Title of the question before a move that skips some of the card's workflow rules (glossary: rule). {card} is the card's name (its key, such as AM-12, or #12), {column} the board column it is moved to." }),
+  askMessage: msg({ id: 'board.move.askMessage', defaultMessage: '{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}', description: "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives." }),
+  detail: msg({ id: 'board.move.askDetail', defaultMessage: 'Moving it anyway records an override on the card, with your reason.', description: "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
+  reason: msg({ id: 'board.move.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional." }),
+  anyway: msg({ id: 'board.move.anyway', defaultMessage: 'Move Anyway', description: 'The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override).' }),
+  refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Hive couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
+  notMoved: msg({ id: 'board.move.notMoved', defaultMessage: 'Your other changes are saved; the card stays in {column}.', description: "In the card dialog, after Save: the user changed the card's Column, but its move was cancelled or refused (a toast says why); everything else was saved. {column} is the board column it is in." }),
+  stopped: msg({ id: 'board.move.stopped', defaultMessage: '{card} stopped in {column}', description: "A toast's title: a drag went part of the way (the card's work started) and stopped in {column} (a board column), for something no exception to the rules can make true. {card} is the card's name. The toast's text says why and what to do." })
+}
+
+/** A refusal's three sentences, one per line, in the window's language, the card named as the window names it (`name`). */
+const refusalText = (r: Refusal, name: string): string => {
+  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, IN_WINDOW)
+  return [l.message, l.next, ...(l.change ? [l.change] : [])].join('\n')
+}
+
+/**
+ * The question before a move (or a Start) that skips rules (#1275): the rules by name, a reason, Move Anyway. The reason
+ * given (maybe empty), or null when the user cancels.
+ */
+function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): Promise<string | null> {
+  return prompt({
+    title: tr(MOVE.askTitle, { card: name, column: tr(COLUMN_TEXT[column].label) }),
+    message: tr(MOVE.askMessage, { n: rules.length }),
+    list: rules.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
+    listOnly: true,
+    detail: tr(MOVE.detail),
+    fieldLabel: tr(MOVE.reason),
+    confirmLabel: tr(MOVE.anyway)
+  })
+}
+
+/**
+ * Moves a card to a column through its rules (`tasks:move`, #1275, SPEC §16.8.4): a move that skips some asks first
+ * (the rules it skips, a reason, Move Anyway), then records one override; a step no override can make true shows why,
+ * and the card stays where the move stopped. `agent`: the Move to Doing dialog's choice. Whether it reached the column;
+ * the board is read again either way (an optimistic move undone on Cancel or a refusal).
+ */
+export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null } = {}): Promise<boolean> {
+  const name = cardLabelOf(get(), c.number)
+  const where = tr(COLUMN_TEXT[column].label)
+  try {
+    let r = await call('tasks:move', c.number, column, o)
+    if ('ask' in r) {
+      const reason = await askToSkip(name, column, r.ask)
+      if (reason === null) return false
+      r = await call('tasks:move', c.number, column, { ...o, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    }
+    if ('refused' in r) {
+      notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
+      return false
+    }
+    if ('ask' in r) return false
+    if (r.stopped) {
+      notify('warning', tr(MOVE.stopped, { card: name, column: tr(COLUMN_TEXT[r.moved.column].label) }), refusalText(r.stopped, name))
+      return false
+    }
+    return true
+  } catch (e) {
+    notify('error', tr(MOVE_FAILED), errorMessage(e))
+    return false
+  } finally {
+    await loadTasks()
+  }
+}
+
 // Cards being archived from the menu: a second click while one runs is ignored.
 const archiving = new Set<number>()
 
@@ -206,9 +277,9 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
-          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void change(c.number, { column: x.id })) })),
+          ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
           // A failed card still in Review goes back to its reviewer for the next round (#214).
-          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void change(c.number, { column: 'review' }) }] : []),
+          ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void moveCard(c, 'review') }] : []),
           { separator: true }
         ]),
     { label: c.archived ? tr(BRING_BACK) : tr(ARCHIVE), icon: c.archived ? 'discard' : 'archive', disabled: !!readOnly, onClick: () => void archive(c, !c.archived) },
@@ -556,6 +627,13 @@ export function Board({ project, scope = null, query, archived }: { project: str
     dragNow.current = d
     showDrag(d)
   }
+  // The columns the dragged card can be dropped in under its rules (#1275: tasks:columns, asked as the drag starts);
+  // null until known, or when no rule applies: every column. A column its rules lack is no drop target.
+  const dropsNow = useRef<{ n: number; columns: Set<TaskColumn> | null } | null>(null)
+  const droppable = (column: TaskColumn): boolean => {
+    const d = dropsNow.current
+    return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
+  }
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
@@ -577,6 +655,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
     const colEl = at?.closest<HTMLElement>('.board-column')
     const column = colEl?.dataset.column as TaskColumn | undefined
     if (!at || !colEl || !column || !boardRef.current?.contains(colEl)) return
+    if (!droppable(column)) return
     const list = cards.filter((c) => c.column === column)
     const tile = at.closest<HTMLElement>('.task-card')
     let before: number | null
@@ -676,9 +755,11 @@ export function Board({ project, scope = null, query, archived }: { project: str
     if (!card || (card.column === column && d.before === d.n)) return
     // Into Doing from another column: who works on it is asked first, and the card stays put until then (Cancel).
     if (column === 'doing' && card.column !== 'doing') return moveToDoing({ n: card.number, project: card.project, agent: card.agent, before: d.before })
-    // Shown moved at once; the board is read again when the change lands.
+    // Shown moved at once; the board is read again when the change lands (back where it was on Cancel or a refusal).
     set((s) => ({ tasks: s.tasks.map((c) => (c.number === d.n ? { ...c, column } : c)) }))
-    await change(d.n, { column, before: d.before }, tr(MOVE_FAILED))
+    // A move within its column is only a new place: no rule is in it.
+    if (card.column === column) await change(d.n, { column, before: d.before }, tr(MOVE_FAILED))
+    else await moveCard(card, column, { before: d.before })
   }
 
   const folded = new Set(fold.cards ?? [])
@@ -702,13 +783,15 @@ export function Board({ project, scope = null, query, archived }: { project: str
           'data-column': col.id,
           style: colored ? ({ '--col': columnColor(colors, col.id) } as React.CSSProperties) : undefined,
           onDragOver: (e: React.DragEvent) => {
-            if (!dragNow.current) return
+            // A column the card's rules don't have takes no drop (no highlight: the drag shows it can't go there).
+            if (!dragNow.current || !droppable(col.id)) return
             e.preventDefault()
             place(e.clientX, e.clientY)
           },
           onDrop: (e: React.DragEvent) => {
             e.preventDefault()
-            void drop(col.id)
+            if (droppable(col.id)) void drop(col.id)
+            else setDrag(null)
           }
         }
         // Collapsed: a narrow strip with its name and count; a card dropped on it goes to its top.
@@ -761,6 +844,12 @@ export function Board({ project, scope = null, query, archived }: { project: str
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', cardLabel(c))
                     setDrag({ n: c.number, column: c.column, before: c.number })
+                    dropsNow.current = { n: c.number, columns: null }
+                    void call('tasks:columns', c.number)
+                      .then((cols) => {
+                        if (dropsNow.current?.n === c.number) dropsNow.current = { n: c.number, columns: cols ? new Set(cols) : null }
+                      })
+                      .catch(() => undefined)
                   }}
                 />
               ))}
@@ -1614,8 +1703,19 @@ export function TaskDialog() {
       // A card that changes project leaves its agent; one of the new project's agents is given it afterwards.
       const give = patch.project !== undefined && patch.agent ? patch.agent : null
       if (give) delete patch.agent
+      // The column last, through the card's rules (#1275): asked first when the move skips one.
+      const to = patch.column
+      delete patch.column
       if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
       if (give) await call('tasks:update', card.number, { agent: give })
+      if (to !== undefined && !(await moveCard(card, to))) {
+        // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
+        // the dialog's saved state follows, so Save again or Cancel never claims a column it isn't in.
+        const at = get().tasks.find((t) => t.number === card.number)?.column ?? card.column
+        orig.current = { ...fields, column: at }
+        setColumn(at)
+        throw new Error(tr(MOVE.notMoved, { column: tr(COLUMN_TEXT[at].label) }))
+      }
       if (clashed.length) {
         notify(
           'warning',
@@ -2055,10 +2155,20 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
   )
 }
 
-/** Starts a card (the Start and Move to Doing dialogs) and says so, with Show. */
-async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<void> {
-  const r = await call('tasks:start', card.number, target)
+/**
+ * Starts a card (the Start and Move to Doing dialogs) and says so, with Show. A start that skips rules asks first
+ * (#1275), before any agent is added or anything launched: false when the user cancels (nothing done).
+ */
+async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<boolean> {
+  let r = await call('tasks:start', card.number, target)
+  if ('ask' in r) {
+    const reason = await askToSkip(cardLabel(card), 'doing', r.ask)
+    if (reason === null) return false
+    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    if ('ask' in r) return false
+  }
   notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
+  return true
 }
 
 export function TaskStartDialog() {
@@ -2100,9 +2210,13 @@ export function TaskStartDialog() {
 
   const go = async (): Promise<void> => {
     if (!pick.ready) return
-    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here.
-    const r = await action.run('start', () => startCard(card, project, pick.target()))
-    if (!r) return
+    // The dialog stays open (no closing, a spinner) until the agent has the card; a failure shows here. A start the
+    // user cancelled at its question (#1275) leaves it open, nothing done.
+    let started = false
+    const r = await action.run('start', async () => {
+      started = await startCard(card, project, pick.target())
+    })
+    if (!r || !started) return
     close()
     set({ taskOpen: null })
     await loadTasks()
@@ -2150,9 +2264,7 @@ export function moveToDoing(req: DoingRequest): void {
   void (async () => {
     try {
       await req.prepare?.()
-      await call('tasks:update', req.n, { column: 'doing', ...(req.before !== undefined ? { before: req.before } : {}) })
-      await loadTasks()
-      req.done?.()
+      if (await moveCard({ number: req.n, project: req.project }, 'doing', req.before !== undefined ? { before: req.before } : {})) req.done?.()
     } catch (e) {
       notify('error', tr(MOVE_FAILED), errorMessage(e))
       await loadTasks()
@@ -2191,18 +2303,25 @@ export function MoveToDoingDialog() {
 
   const go = async (): Promise<void> => {
     if (!ready) return
+    let moved = true
     const r = await action.run(mode, async () => {
       await req.prepare?.()
       if (mode === 'start') {
-        await startCard(card, project, pick.target())
+        // Cancelled at its question (#1275): nothing done, the card where it was.
+        if (!(await startCard(card, project, pick.target()))) {
+          moved = false
+          return
+        }
         // Start doesn't place the card: where it was dropped, if it still can be (the order only).
         if (req.before !== undefined) await call('tasks:update', card.number, before).catch(() => undefined)
-      } else {
-        await call('tasks:update', card.number, { column: 'doing', agent: mode === 'assign' ? assignee : null, ...before })
+      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before }))) {
+        // Cancelled or refused (its toast says why): the dialog closes, the card where the move left it.
+        moved = false
       }
     })
     if (!r) return
     close()
+    if (!moved) return
     await loadTasks()
     req.done?.()
   }

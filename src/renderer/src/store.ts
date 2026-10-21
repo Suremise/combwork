@@ -122,8 +122,12 @@ export interface PromptRequest {
   validate?: (value: string) => string | null
   /** Items under the message, one per line, with a Copy button (what an MCP server runs, #550). */
   list?: readonly string[]
+  /** The list is to read, not to copy (the rules a move skips, #1275): no Copy button. */
+  listOnly?: boolean
   /** Under the list: what else to know (warnings). */
   detail?: string
+  /** The field's label, above it (and its accessible name): "Reason (optional)". */
+  fieldLabel?: string
   /** A tick box under the field; `set` gets the user's choice before the dialog resolves. */
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */

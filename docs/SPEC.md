@@ -1904,6 +1904,19 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   gate asked again if still unmet); a drag past it returns it there first and then runs the intents of a drag from
   there; a move behind it counts the rules it skips from where the card was, not from Todo. A drag into Merging of a
   card already approved just queues it (nothing skipped).
+- **In the window (#1275):** every move the user makes on the board (a drag, Move to, Review (next round), the Move to
+  Doing dialog with its agent, the card dialog's Column) goes through `tasks:move`; `tasks:update` from the window
+  no longer skips a rule unasked (one that would is refused, naming the rules). A move that asks shows the question
+  (*"Move AM-12 to Done anyway?"*, each rule it skips by its name, **Reason (optional)**, **Move Anyway** / Cancel),
+  then moves with `confirm` and the reason. A window **Start** (the Start dialog, Move to Doing's Assign and start) asks
+  the same before anything is done (`tasks:start` returns `ask` from the runtime's dry move, `startAsks`: no agent
+  added, nothing launched), then starts with the reason kept on its `Override`. Cancel, or a step refused for something no override can make true, puts
+  the card back where it was or where the drag stopped, with the refusal's three sentences in a toast. As a drag
+  starts, the window asks which columns the card's rules have (`tasks:columns`: its ruleset's stages as columns, On
+  Hold always; a reopened Done card's next cycle's; none when no rule applies): a column they don't have takes no
+  drop and isn't highlighted. The **override mark** on a card's tile (an open lock, in the info colour) and a line in
+  its lane segment's hover say who moved it past which rules and why: the card's latest `Override` since its work was
+  last Done (`WorkBadge.override`).
 
 #### 16.8.5 For you
 
@@ -2219,6 +2232,43 @@ picked up in a clean slot, by the builder that knows it, and the next card alway
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
 a returned card gets its own slot and a fresh conversation) is put to Darren as OP-36.
 
+#### 16.11.2a Built [#1270]: Hive owns the lane
+
+- **One record:** a lane is `lanes.ts`'s (#1291), with what Hive keeps of its run beside it (`lane_runs`,
+  `lane_pending`): the ruleset in force when it started (stored as it starts, while rules are enforced), and a queued
+  list. `lanes.ts` is its one writer.
+- **List changes:** `hive_lane start` (or `POST /v1/lanes`) with a changed list for the builder's running lane, while
+  one of its cards is in flight (in Doing, Review or Passed), queues the list (`LaneInfo.queued`; status "list changes
+  after AM-12"; the reply says so). Once no card of the lane is in flight, the queued list applies and the builder gets
+  a message naming the lane's cards now. Between cards a change applies at once. A queued list keeps every card named
+  (none dropped); a queued empty list leaves the lane as it was. Any new list for the builder's running lane is an edit
+  of it, one sharing no card too (never a new lane abandoning it); a card only in a queued list waits for the card in
+  flight. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
+  that moved on meanwhile (reopened) leaves the lane as it was, to be read again.
+- **The lane's ruleset:** a card of a running lane (its list or its queued list) starts under the ruleset stored when
+  the lane started (the recorder's start and the runtime's `rulesetOf`); a Todo card outside a lane under the current
+  one (S19).
+- **One card at a time:** the runtime refuses to start a lane's card while a card before it in the lane isn't Done
+  (`lane.oneAtATime`, a refusal in all 7 locales; no option of its own: `workflow.enforce` off turns it off; the user's
+  own drag isn't refused). `hive_lane next` (`GET /v1/lanes/next`) names the card to start or carry on, or why the lane
+  waits.
+- **The verified end:** a lane ends by itself once every card is Done (the board's column, which follows the fold), with
+  each card's result revision from its `Integrated` fact (none under Not checked, or a card from before 1.0), the last
+  of them its merge commit. The runtime's `endLaneIfDone` action reads the lanes again. An agent's `hive_lane end`
+  ends a lane only when every card is Done (else refused, 409), never abandons one (403: the user's and the
+  Assistant's), and a `mergeCommit` it gives is ignored with a note; one the user, the Assistant or a script gives is
+  kept only where the cards' facts name no merge. A **`lane-ended`** event (once per lane: its
+  project, lane and each card's result) goes to code that follows lanes and to the Agent API's event stream.
+- **Why a lane waits, as data:** each running lane carries `status` (`LaneStatus`: a reason and its card) worked out in
+  main from the board and its cards' facts: blocked (with why), On Hold, waiting for you (a For you request), the round
+  limit, a card passed and not merged (merging: in the queue), a stale pass (submit again), no reviewer on a card in
+  Review, list changes after a card. The first six pause the lane (`state: paused`, `pausedOn` the card). The Progress
+  panel renders it (#1279); lane notices tell a lane paused for a merge (`paused`, a lane event; the others are told as
+  themselves).
+- **With `workflow.enforce` off** a lane is as before 1.0: list changes apply at once, nothing waits for Done, an
+  agent's `end` records its `mergeCommit` unverified, and the only status is a blocked or held card. The verified end
+  and its event still fire when every card is Done.
+
 #### 16.11.3 Starting and ending a lane from the window
 
 [#1117 c "Without the Assistant", #1117 solo] **Start lane…** on the board and in the Progress panel: pick the
@@ -2406,6 +2456,22 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
+
+**Group E's plain switches** (#1286; rows 24, 28, 29): Hive's own handling, the same for every CLI, so each is one row
+under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:
+- `hive.terminal.ctrlCVToCli` (off; at once): on, an agent pane's Ctrl+C and Ctrl+V go to the CLI as xterm sends them
+  (^C, ^V), selection or not; Hive's copy and paste stay on right-click (`shared/terminalInput.ts` `copyPasteKey`).
+- `hive.assistant.startView` (on; at once): off, `assistantStartView` gives none, read at each start and compaction, so
+  a running Assistant takes a change at its next one.
+- `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
+  breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
+  `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
+  on (the Assistant's decision on #1286; a safe Codex newline is #1327). Other control characters stay out either way,
+  so nothing in a prompt can end a paste or press a key (`promptInput`).
+- `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
+  one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
+  a draft.
+Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants) wait for Darren's choice (#1292).
 
 ### 16.16 Other 1.0 rules
 

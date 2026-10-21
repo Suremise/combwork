@@ -14,7 +14,8 @@ const { codex } = await import('../src/main/providers/codex/adapter')
 const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
-const { drawnWaitId } = await import('../src/shared/advanced')
+const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
+const { promptInput } = await import('../src/main/sessions')
 
 describe('a prompt Hive puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
@@ -79,6 +80,80 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     await running(copilot, '\x1b[?2004h')
     await sessions.sendPrompt(p, id, '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it.')
     expect(writes).toEqual(['\x15', '\x1b[200~[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it.\x1b[201~', '\r'])
+  })
+
+  describe("Settings → Advanced's switches for what Hive types (#1286)", () => {
+    /** Runs `fn` with these switches as given (the others as they are). */
+    const withSwitches = async (values: Record<string, boolean>, fn: () => Promise<void>): Promise<void> => {
+      const get = advanced.get.bind(advanced)
+      const spy = vi.spyOn(advanced, 'get').mockImplementation(((key: string, ws?: Record<string, unknown> | null) => (key in values ? values[key] : get(key, ws))) as typeof advanced.get)
+      try {
+        await fn()
+      } finally {
+        spy.mockRestore()
+      }
+    }
+    const written = 'A plan:\r\n  1. one\n\n\t2. two  \x03'
+
+    it('both default to what Hive did before: the draft cleared, the prompt on one line', () => {
+      expect([advanced.get<boolean>(PROMPT_CLEAR_DRAFT), advanced.get<boolean>(PROMPT_AS_TYPED)]).toEqual([true, false])
+    })
+
+    it('as typed, a paste keeps the spacing and line breaks (as the Enter a terminal pastes them with); other control characters stay out', async () => {
+      await running(claudeCode, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
+      expect(writes).toEqual(['\x15', '\x1b[200~A plan:\r  1. one\r\r\t2. two  \x1b[201~', '\r'])
+      writes.length = 0
+      // Nothing in it can end the paste (a new launch: the last line is taken).
+      await running(claudeCode, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, 'a \x1b[201~\x7f b\n'))
+      expect(writes).toEqual(['\x15', '\x1b[200~a [201~ b\r\x1b[201~', '\r'])
+    })
+
+    it('not as typed (the default), the same prompt goes on one line, as before', async () => {
+      await running(claudeCode, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_AS_TYPED]: false }, () => sessions.sendPrompt(p, id, written))
+      expect(writes).toEqual(['\x15', '\x1b[200~A plan: 1. one 2. two \x1b[201~', '\r'])
+    })
+
+    it('as typed into a CLI Hive types into (Codex): each line break or tab a space, the spacing kept', async () => {
+      echo.to = await running(codex, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
+      expect(writes.some((w) => w.includes('\x1b[200~'))).toBe(false)
+      expect(typedText()).toBe('A plan:   1. one   2. two  ')
+    })
+
+    it('promptInput: each case of pasted or typed, as typed or not', () => {
+      expect(promptInput('a\r\nb\tc\x1b', true, true)).toBe('a\rb\tc')
+      expect(promptInput('a\r\nb\tc\x1b', false, true)).toBe('a b c')
+      expect(promptInput('a b\x1b', true, false)).toBe('a b')
+      // Typed and not as typed: as before, the line as it comes (already on one line).
+      expect(promptInput('a b', false, false)).toBe('a b')
+    })
+
+    it("the draft switch off: no Ctrl+U before the prompt, so the CLI's draft stays in front of it", async () => {
+      await running(claudeCode, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_CLEAR_DRAFT]: false }, () => sessions.sendPrompt(p, id, 'hello'))
+      expect(writes).toEqual(['\x1b[200~hello\x1b[201~', '\r'])
+      writes.length = 0
+      await running(claudeCode, '\x1b[?2004h')
+      await withSwitches({ [PROMPT_CLEAR_DRAFT]: true }, () => sessions.sendPrompt(p, id, 'hello'))
+      expect(writes).toEqual(['\x15', '\x1b[200~hello\x1b[201~', '\r'])
+    })
+
+    it('a prompt stopped part-way is taken back with Ctrl+U only while the draft switch is on', async () => {
+      for (const clear of [true, false]) {
+        writes.length = 0
+        await running(claudeCode, '\x1b[?2004h')
+        // The guard passes until the line is typed, then refuses (the agent got busy): Hive stops before Enter.
+        let checks = 0
+        const guard = (): void => {
+          if (++checks > (clear ? 2 : 1)) throw new Error('busy now')
+        }
+        await withSwitches({ [PROMPT_CLEAR_DRAFT]: clear }, () => expect(sessions.sendPrompt(p, id, 'hello', guard)).rejects.toThrow('busy now'))
+        expect(writes, `clear ${clear}`).toEqual(clear ? ['\x15', '\x1b[200~hello\x1b[201~', '\x15'] : ['\x1b[200~hello\x1b[201~'])
+      }
+    })
   })
 
   describe("Codex: Enter once the line is drawn (#600: a busy Codex drops an Enter it reads with the line)", () => {

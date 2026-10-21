@@ -120,6 +120,8 @@ interface HiveMessageValues {
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined
   'tips.copyDiagnostics.title': undefined
+  'tips.ctrlCvToCli.text': undefined
+  'tips.ctrlCvToCli.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined
@@ -196,6 +198,8 @@ interface HiveMessageValues {
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }
   'tips.moreAgents.title': { usual: number }
+  'tips.moveAnyway.text': undefined
+  'tips.moveAnyway.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }

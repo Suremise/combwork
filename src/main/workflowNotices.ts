@@ -50,11 +50,13 @@ const M = {
   blockedNoReason: msg({ id: 'service.workflowNotice.blockedNoReason', defaultMessage: '{card} is blocked', description: "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked." }),
   stalled: msg({ id: 'service.workflowNotice.stalled', defaultMessage: '{card} has stalled', description: "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped." }),
   mergeDue: msg({ id: 'service.workflowNotice.mergeDue', defaultMessage: 'Every card passed review: its merge is due', description: "A line of a lane's notification: all of the lane's cards passed review, so its work is ready to be merged." }),
+  notMerged: msg({ id: 'service.workflowNotice.notMerged', defaultMessage: '{card} passed review: the lane waits for it to be merged', description: "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start." }),
+  merging: msg({ id: 'service.workflowNotice.merging', defaultMessage: '{card} is being merged: the lane waits for it', description: "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) is in the merge queue, so the next card can't start." }),
   mergeStalled: msg({ id: 'service.workflowNotice.mergeStalled', defaultMessage: 'Its merge has stalled', description: "A line of a lane's notification: every card passed review, but nobody has started merging the work for a while (its builder is idle or stopped)." })
 }
 
 /** The events Hive tells the user of, as the Assistant's lane watch does by default (§16.11.4), less what it says itself. */
-const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due']
+const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'paused']
 
 /** How often running lanes are looked at with no change (a stall comes with time), as lane watches are. */
 const TICK_MS = 30_000
@@ -109,6 +111,7 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
     if (e.event === 'failed') return withValues(M.failed, { card })
     if (e.event === 'blocked') return e.detail ? withValues(M.blocked, { card, reason: e.detail }) : withValues(M.blockedNoReason, { card })
     if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
+    if (e.event === 'paused') return withValues(e.detail === 'merging' ? M.merging : M.notMerged, { card })
     return M.mergeDue
   })
   if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines))
