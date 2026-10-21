@@ -1064,7 +1064,12 @@ export async function runOnce<T>(key: string, fn: () => Promise<T>): Promise<T |
 export interface Starting {
   kind: 'start' | 'resume'
   sessionId?: string
+  /** Started without its worktree's setup (Start Without Setup). */
+  skipSetup?: boolean
 }
+
+/** What a start is held under while an agent is added for it (a project without agents, a session no agent can run). */
+export const ADDING_AGENT = ':adding'
 
 const STARTING = msg({ id: 'panes.session.starting', defaultMessage: '{kind, select, resume {Resuming…} other {Starting…}}', description: "A start (other) or Resume (resume) button's label while the agent's session starts, from the click until it runs (it shows a spinner and takes no clicks). Keep it short." })
 
@@ -1111,12 +1116,20 @@ export function useSessionStarting(path: string, sessionId: string | null): Star
   })
 }
 
-/** Any start or resume under way among the project's agents: for its menu items that name no agent. */
-export function projectStarting(path: string): Starting | null {
-  const { starting } = get()
+/** Any start or resume under way in the project (an agent's, or one adding its agent): for its buttons that name no agent. */
+export function useProjectStarting(path: string): Starting | null {
+  return useStore((s) => startingIn(s.starting, path))
+}
+
+function startingIn(starting: Record<string, Starting>, path: string): Starting | null {
   const prefix = `${path.toLowerCase()}#`
   for (const k in starting) if (k.startsWith(prefix)) return starting[k]
   return null
+}
+
+/** Any start or resume under way in the project: for its menu items that name no agent. */
+export function projectStarting(path: string): Starting | null {
+  return startingIn(get().starting, path)
 }
 
 export function notify(level: ToastMessage['level'], title: string, message?: string, actions?: ToastMessage['actions']): void {

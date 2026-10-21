@@ -1345,7 +1345,8 @@ class SessionManager {
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      const usage = await this.usage(projectPath, opts.resumeId).catch(() => null)
+      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
+      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
       times.mark('usage')
       adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
@@ -4542,7 +4543,7 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
-  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId): Promise<SessionUsage | null> {
+  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
@@ -4553,7 +4554,7 @@ class SessionManager {
         // Unchanged since it was read: priced again after a price change, not read.
         return (seen.usage ??= this.priced(seen.raw))
       }
-      const r = await usageHistory.read(projectPath, path, sessionId, provider)
+      const r = await usageHistory.read(projectPath, path, sessionId, provider, o)
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
@@ -4764,7 +4765,8 @@ class SessionManager {
    * since the last sweep) is read from its transcript as before and queued for the history; with no transcript left,
    * its kept usage, until the history has imported it.
    */
-  async usage(projectPath: string, sessionId: string, ctx?: ListContext): Promise<SessionUsage | null> {
+  /** `noWait`: a transcript the worker is busy with (the import ingesting it) isn't waited for: its kept usage, or none (#1177). */
+  async usage(projectPath: string, sessionId: string, ctx?: ListContext, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
     assertSessionId(sessionId)
     const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
     const rec = records.find((s) => s.id === sessionId)
@@ -4788,7 +4790,7 @@ class SessionManager {
     if (!usage) {
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
       if (!p) return rec?.keptUsage ?? null
-      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx))
+      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), o)
       if (usage && rec && !running) void usageHistory.ingest(projectPath, sessionId, { priority: 2, keepState: 'no' }).catch(() => undefined)
     }
     if (usage) usage = withScreenStopsIn(usage, rec?.screenStops)

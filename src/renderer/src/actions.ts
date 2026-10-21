@@ -1,7 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, choose, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, agentProviderOf, choose, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
@@ -449,11 +449,15 @@ function reveal(path: string, agentId: string): void {
 
 export async function newSession(path: string | null = get().selectedProject, agentId?: string, opts: { skipSetup?: boolean } = {}): Promise<void> {
   if (!path) return
-  // A project without agents gets one (the quick add) and starts it.
-  const id = agentId ?? focusedAgentId(project(path)) ?? (await quickAddAgent(path))
-  if (!id) return
-  // Its buttons show it starting from the click until it runs (#1177).
-  await whileStarting(path, id, { kind: 'start' }, () => startNew(path, id, opts))
+  // Its buttons show it starting from the click until it runs (#1177), while a project without agents gets one (the
+  // quick add) too.
+  const what = { kind: 'start' as const, ...(opts.skipSetup ? { skipSetup: true } : {}) }
+  const known = agentId ?? focusedAgentId(project(path))
+  if (known) return void (await whileStarting(path, known, what, () => startNew(path, known, opts)))
+  await whileStarting(path, ADDING_AGENT, what, async () => {
+    const id = await quickAddAgent(path)
+    if (id) await whileStarting(path, id, what, () => startNew(path, id, opts))
+  })
 }
 
 async function startNew(path: string, id: string, opts: { skipSetup?: boolean }): Promise<void> {
@@ -494,13 +498,14 @@ export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cw
 type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'cwd'> & { provider?: ProviderId }
 
 export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
-  // Its buttons show it resuming from the click until it runs (#1177); one with no agent to run it says so at once.
+  // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
+  // under the session itself while one is added for it.
   const target = resumeTarget(project(path), item, agentId)
-  if (!target) return resume(path, item, agentId)
-  await whileStarting(path, target, { kind: 'resume', sessionId: item.id }, () => resume(path, item, agentId))
+  await whileStarting(path, target ?? `${ADDING_AGENT}:${item.id}`, { kind: 'resume', sessionId: item.id }, () => resume(path, item, target, agentId))
 }
 
-async function resume(path: string, item: ResumeItem, agentId?: string): Promise<void> {
+/** Resumes it in its agent; `held` is the agent already shown resuming (another one added for it is shown too). */
+async function resume(path: string, item: ResumeItem, held: string | null, agentId?: string): Promise<void> {
   let p = project(path)
   let target = resumeTarget(p, item, agentId)
   // A session from the project folder, and the project has no agent there: add one of its provider.
@@ -510,6 +515,10 @@ async function resume(path: string, item: ResumeItem, agentId?: string): Promise
     target = await quickAddAgent(path, item.provider)
     if (!target) return
     p = project(path)
+  }
+  if (target && target !== held) {
+    const added = target
+    return void (await whileStarting(path, added, { kind: 'resume', sessionId: item.id }, () => resume(path, item, added, added)))
   }
   if (!target) {
     const inWorktree = item.cwd && p && item.cwd.toLowerCase() !== p.path.toLowerCase()
@@ -556,12 +565,15 @@ async function resume(path: string, item: ResumeItem, agentId?: string): Promise
 
 export async function resumeLast(path: string | null = get().selectedProject, agentId?: string): Promise<void> {
   if (!path) return
-  // A project without agents gets one (the quick add), which resumes the latest session it can.
-  const id = agentId ?? focusedAgentId(project(path)) ?? (await quickAddAgent(path))
-  if (!id) return
-  const a = agentOf(project(path), id)
-  // From the click, while it reads the sessions too (#1177).
-  await whileStarting(path, id, { kind: 'resume', sessionId: a?.resume?.id }, () => resumeLatest(path, id))
+  // From the click, while it reads the sessions too (#1177), and while a project without agents gets one (the quick
+  // add), which resumes the latest session it can.
+  const known = agentId ?? focusedAgentId(project(path))
+  const latest = (id: string): Promise<void | undefined> => whileStarting(path, id, { kind: 'resume', sessionId: agentOf(project(path), id)?.resume?.id }, () => resumeLatest(path, id))
+  if (known) return void (await latest(known))
+  await whileStarting(path, ADDING_AGENT, { kind: 'resume' }, async () => {
+    const id = await quickAddAgent(path)
+    if (id) await latest(id)
+  })
 }
 
 async function resumeLatest(path: string, id: string): Promise<void> {
@@ -578,7 +590,7 @@ async function resumeLatest(path: string, id: string): Promise<void> {
     )
     return
   }
-  await resume(path, last, id)
+  await resume(path, last, id, id)
 }
 
 export async function stopSession(path: string | null = get().selectedProject, agentId?: string): Promise<void> {

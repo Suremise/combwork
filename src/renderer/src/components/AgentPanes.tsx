@@ -1709,6 +1709,9 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   // From the click until the session runs (#1177).
   const starting = useStarting(project.path, a?.id ?? null)
   const startingNew = starting?.kind === 'start'
+  // Retry Setup and Start Without Setup: the one clicked shows it.
+  const settingUp = startingNew && !starting.skipSetup
+  const skippingSetup = startingNew && !!starting.skipSetup
   if (!a) {
     // A single empty pane is a project without agents: its "No agents yet" (SessionEmpty) shows, not covered (#227).
     if (single) return null
@@ -1731,11 +1734,11 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
         </span>
         {setupPending ? (
           <>
-            <button className="btn small act-start solid" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, a.id)}>
-              <Icon name={startingNew ? 'loading' : 'refresh'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(msg({ id: 'panes.body.retrySetup', defaultMessage: 'Retry Setup', description: "Button under a worktree agent's ended session: runs its setup command again, then starts it." }))}
+            <button className="btn small act-start solid" disabled={!!starting} aria-busy={settingUp || undefined} onClick={() => void actions.newSession(project.path, a.id)}>
+              <Icon name={settingUp ? 'loading' : 'refresh'} spin={settingUp} /> {settingUp ? startingLabel(starting) : tr(msg({ id: 'panes.body.retrySetup', defaultMessage: 'Retry Setup', description: "Button under a worktree agent's ended session: runs its setup command again, then starts it." }))}
             </button>
-            <button className="btn small act-start" disabled={!!starting} onClick={() => void actions.newSession(project.path, a.id, { skipSetup: true })}>
-              {tr(msg({ id: 'panes.body.skipSetup', defaultMessage: 'Start Without Setup', description: "Button under a worktree agent's ended session: starts it without its setup command." }))}
+            <button className="btn small act-start" disabled={!!starting} aria-busy={skippingSetup || undefined} onClick={() => void actions.newSession(project.path, a.id, { skipSetup: true })}>
+              {skippingSetup && <Icon name="loading" spin />} {skippingSetup ? startingLabel(starting) : tr(msg({ id: 'panes.body.skipSetup', defaultMessage: 'Start Without Setup', description: "Button under a worktree agent's ended session: starts it without its setup command." }))}
             </button>
           </>
         ) : (

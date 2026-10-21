@@ -1,8 +1,9 @@
 // Start and Resume look busy while a session starts (#1177): with session:start slowed (HIVE_TEST_SLOW_IPC, unpackaged
 // builds only), from the click until the agent runs the button clicked shows a spinner and "Resuming…" or "Starting…",
-// is disabled and aria-busy, and the other ways to start that agent are disabled too; once it runs they are gone. In an
-// agent's pane (its ended bar), the Sessions tab and the Hive Assistant's panel, in both themes (screenshots in the
-// run's folder). The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
+// is disabled and aria-busy, and the other ways to start that agent are disabled too, elsewhere as well (the project
+// header's Resume, the Sessions tab's); once it runs they are gone. In an agent's pane (its ended bar), the Sessions
+// tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Hive Assistant's
+// panel, in both themes (screenshots in the run's folder). The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -55,6 +56,8 @@ const check = (name, ok, extra = '') => {
       await inv('pty:write', lib.ptyKey(proj, id), '\r')
       return !!(await lib.until(async () => (await liveOf(proj, id))?.status === 'finished', HUNG_MS))
     }
+    /** Runs, its start over: nothing busy (a worktree the fake doesn't trust shows its trust question, not ready). */
+    const started = async (proj, id) => !!(await lib.until(async () => !!(await liveOf(proj, id)) && (await page.locator('[aria-busy="true"]').count()) === 0, HUNG_MS + SLOW_MS))
     /** Runs, its start over: the fake ready, nothing busy. */
     const runs = async (proj, id) => !!(await lib.until(async () => (await liveOf(proj, id))?.status === 'ready' && (await page.locator('[aria-busy="true"]').count()) === 0, HUNG_MS + SLOW_MS))
     const stop = async (proj, id) => {
@@ -86,6 +89,13 @@ const check = (name, ok, extra = '') => {
       const others = await bar.locator('button').evaluateAll((bs) => bs.filter((b) => !b.disabled).map((b) => b.textContent.trim() || b.getAttribute('aria-label')))
       check(`${theme}: the ended bar's other buttons are disabled meanwhile`, others.length === 0, JSON.stringify(others))
       await shot(`pane-${theme}`)
+      // Elsewhere too: the project header's Resume, and the Sessions tab's Resume of its session.
+      const headerResume = page.locator('.project-header button.act-resume')
+      check(`${theme}: the project header's Resume is disabled meanwhile`, (await headerResume.count()) === 1 && (await headerResume.isDisabled()))
+      await page.locator('.tabs .tab', { hasText: 'Sessions' }).click()
+      const crossResume = page.locator('.split-main button.act-resume:not(.split-caret)')
+      check(`${theme}: the Sessions tab's Resume of that session is busy meanwhile`, !!(await lib.until(async () => (await crossResume.count()) === 1 && isBusy(await busyOf(crossResume), 'Resuming…'), HUNG_MS)), JSON.stringify(await busyOf(crossResume).catch(() => null)))
+      await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
       check(`${theme}: the agent runs`, await runs(alpha, agent.id))
       check(`${theme}: and nothing says "Resuming…" any more`, (await page.getByText('Resuming…').count()) === 0)
       check(`${theme}: stopped again`, await stop(alpha, agent.id))
@@ -101,6 +111,42 @@ const check = (name, ok, extra = '') => {
       check(`${theme}: the session resumes from the Sessions tab`, await runs(alpha, agent.id))
       check(`${theme}: stopped once more`, await stop(alpha, agent.id))
     }
+
+    // --- A session no agent can run: Resume adds one, busy from the click through the agent's adding to its launch.
+    await inv('agents:remove', alpha, agent.id, { deleteWorktree: false })
+    check('the agent is removed', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.agents.length === 0, HUNG_MS)))
+    await page.locator('.tabs .tab', { hasText: 'Sessions' }).click()
+    const orphanResume = page.locator('.split-main button.act-resume:not(.split-caret)')
+    check('the Sessions tab offers its Resume', !!(await lib.until(async () => (await orphanResume.count()) === 1 && !(await orphanResume.isDisabled()), HUNG_MS)))
+    await slowStart()
+    await orphanResume.click()
+    check('Resume of a session with no agent is busy from the click', !!(await lib.until(async () => isBusy(await busyOf(orphanResume), 'Resuming…'), HUNG_MS)), JSON.stringify(await busyOf(orphanResume).catch(() => null)))
+    const added = await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.agents[0], HUNG_MS)
+    check('an agent is added for it', !!added)
+    check('and Resume stays busy while that agent launches', !!added && isBusy(await busyOf(orphanResume), 'Resuming…'), JSON.stringify(await busyOf(orphanResume).catch(() => null)))
+    await shot('sessions-no-agent')
+    check('the added agent resumes it', !!added && (await runs(alpha, added.id)))
+    if (added) check('and stops', await stop(alpha, added.id))
+
+    // --- Start Without Setup: a worktree agent whose setup failed.
+    await inv('project:updateConfig', alpha, { worktreeSetup: 'exit 1' })
+    const tree = await lib.addAgent(inv, alpha, { name: 'Tree', location: 'new-worktree' })
+    await inv('session:start', alpha, { agentId: tree.id })
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+    await lib.showAgent(page, 'Tree')
+    const setupBar = page.locator('.session-ended', { hasText: 'Setup did not finish' })
+    // By place: their labels change as they work.
+    const retry = setupBar.locator('button').nth(0)
+    const skip = setupBar.locator('button').nth(1)
+    check('a failed setup offers Retry Setup and Start Without Setup', !!(await lib.until(async () => (await retry.textContent().catch(() => ''))?.includes('Retry Setup') && (await skip.textContent().catch(() => ''))?.includes('Start Without Setup'), HUNG_MS)))
+    await slowStart()
+    await skip.click()
+    check('Start Without Setup shows "Starting…", disabled and aria-busy', !!(await lib.until(async () => isBusy(await busyOf(skip), 'Starting…'), HUNG_MS)), JSON.stringify(await busyOf(skip).catch(() => null)))
+    const retryNow = await busyOf(retry)
+    check('and Retry Setup is disabled, not busy', retryNow.disabled && retryNow.busy === null && !retryNow.spin, JSON.stringify(retryNow))
+    await shot('skip-setup')
+    check('the worktree agent starts without its setup', await started(alpha, tree.id))
+    check('and stops', await stop(alpha, tree.id))
 
     // --- The Hive Assistant's panel: Start, then Resume.
     const home = (await inv('workspace:refresh')).assistant.path

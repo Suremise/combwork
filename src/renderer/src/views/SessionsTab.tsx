@@ -11,7 +11,7 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { agentProviderOf, confirm, focusedAgentId, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useSessionStarting, useStore, startingLabel } from '../store'
+import { agentProviderOf, confirm, focusedAgentId, get, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useSessionStarting, useStarting, useStore, startingKey, startingLabel } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { cx, formatDuration, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
 import { useSessions } from './ProjectTabs'
@@ -183,8 +183,9 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   }, [jumpTo, project.path])
 
   const selected = items?.find((i) => i.id === selectedId) ?? null
-  // From the click until it runs (#1177).
+  // From the click until it runs (#1177); the agent that would resume it busy starting something else holds it too.
   const resuming = useSessionStarting(project.path, selected?.id ?? null)
+  const targetStarting = !!useStarting(project.path, selected ? actions.resumeTarget(project, selected) : null)
 
   // Start on the running session, or the most recent conversation (not while an action has closed the view: moving).
   const moving = useRef(false)
@@ -326,7 +327,12 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     if (live) {
       const holder = project.agents.find((a) => a.live?.sessionId === s.id)
       if (holder) entries.push({ label: assistant ? tr(msg({ id: 'sessions.menu.showAssistant', defaultMessage: 'Show the Assistant', description: "Menu item on the Hive Assistant's running conversation: opens its panel." })) : tr(msg({ id: 'sessions.menu.showAgent', defaultMessage: 'Show {agent}', description: "Menu item on a running session: shows the agent running it ({agent}: its name)." }), { agent: holder.name }), icon: 'terminal', onClick: () => (assistant ? setAssistantOpen(true) : revealAgent(project, holder.id)) })
-    } else if (!s.archived) entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block, detail: block ?? undefined, onClick: () => void actions.resumeSession(project.path, s) })
+    } else if (!s.archived) {
+      // Its agent starting already (#1177).
+      const target = actions.resumeTarget(project, s)
+      const busy = target ? get().starting[startingKey(project.path, target)] : undefined
+      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : undefined), onClick: () => void actions.resumeSession(project.path, s) })
+    }
     if (s.source === 'external' && !s.sub) entries.push({ label: tr(ADOPT), icon: 'add', onClick: () => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, s.id)).then(reload) })
     if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
     entries.push({ separator: true })
@@ -605,7 +611,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   const note = removedAgentNote(selected, project.agents, targetAgent)
                   if (agents.length < 2) {
                     const button = (
-                      <button className="btn small act-resume" disabled={!!resuming} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                      <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
                         <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : tr(RESUME)}
                       </button>
                     )
@@ -614,14 +620,14 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   return (
                     <span className="split-btn">
                       <Tooltip content={note ?? (targetName ? tr(RESUME_IN, { agent: targetName }) : tr(msg({ id: 'sessions.resume.addsTip', defaultMessage: 'Resume (adds an agent if none can run it)', description: "Tooltip of Resume when no agent can run the session: Resume adds one." })))}>
-                        <button className="btn small act-resume" disabled={!!resuming} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                        <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
                           <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : targetName ? tr(RESUME_IN, { agent: targetName }) : tr(RESUME)}
                         </button>
                       </Tooltip>
                       <Tooltip content={tr(RESUME_ELSEWHERE)}>
                         <button
                           className="btn small act-resume split-caret"
-                          disabled={!!resuming}
+                          disabled={!!resuming || targetStarting}
                           aria-label={tr(RESUME_ELSEWHERE)}
                           onClick={(e) => {
                             const r = e.currentTarget.getBoundingClientRect()
@@ -630,6 +636,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                               ...agents.map((a) => ({
                                 label: a.name,
                                 icon: a.id === target ? 'debug-continue' : 'person',
+                                // Starting already (#1177).
+                                disabled: !!get().starting[startingKey(project.path, a.id)],
                                 detail: tr(msg({ id: 'sessions.resume.agentDetail', defaultMessage: '{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}', description: 'Under an agent in the Resume in menu: where it works (a worktree and its branch, or the project folder; lower case), and, when it runs, that its current session stops first.' }), { where: a.worktree ? 'worktree' : 'folder', branch: a.worktree?.branch ?? '', running: a.live ? 'yes' : 'no' }),
                                 onClick: () => void actions.resumeSession(project.path, selected, a.id)
                               }))

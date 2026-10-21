@@ -633,7 +633,7 @@ class UsageHistory {
    * resume after a restart reads only what was added since). `projectPath`: the session's host, whose history has that
    * state. Null when it can't be read, or once Hive is quitting.
    */
-  async read(projectPath: string, path: string, sessionId: string, provider: ProviderId): Promise<ReadResult | null> {
+  async read(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean } = {}): Promise<ReadResult | null> {
     if (this.stopped) return null
     let seed: ReadSeed | null = null
     const ws = workspaceFor(projectPath)
@@ -641,7 +641,7 @@ class UsageHistory {
       const scope = await ws.sessionScope(projectPath).catch(() => null)
       if (scope) seed = { file: usageFile(scope.workspace), scope: scope.scope }
     }
-    return this.call<ReadResult | null>({ type: 'read', path, session: sessionId, provider, seed })
+    return this.call<ReadResult | null>({ type: 'read', path, session: sessionId, provider, seed, ...(o.noWait ? { noWait: true } : {}) })
   }
 
   /** Forgets what the worker read in this run (Settings → Sessions → Clear): each transcript is read again when asked for. */
