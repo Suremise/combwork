@@ -5,6 +5,16 @@
   --mono: var(--font-mono);
 }
 
+/* The spacing scale (#1306): padding, gaps and the space between sections come from these, not from whatever margin an
+   element happens to bring. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}
+
 /* ==========================================================================
    Hive — theme tokens. Honey orange replaces VS Code blue as the accent.
    ========================================================================== */
@@ -609,7 +619,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px 4px 6px;
+  padding: var(--space-1) var(--space-2) var(--space-1) 6px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -617,6 +627,22 @@ kbd {
   color: var(--fg);
   cursor: pointer;
   border-top: 1px solid var(--border-subtle);
+}
+/* A section owns the space before the next one (#1306): the same gap above each header that follows content, whatever
+   that content ends with (a hint's margin, a link row, a list); stacked headers (folded sections) stay together. */
+:not(.section-header):has(+ .section-header) {
+  margin-bottom: 0;
+}
+.pane-empty:has(+ .section-header) {
+  padding-bottom: 0;
+}
+:not(.section-header) + .section-header {
+  margin-top: var(--space-3);
+}
+/* A heading inside a list (Performance's Projects, the Board's Stalled), with no fold chevron: its text on the rows'
+   left edge, not left of it. */
+.section-header:not(:has(> .codicon:first-child)) {
+  padding-left: var(--space-4);
 }
 .section-header .section-actions {
   margin-left: auto;
@@ -636,7 +662,7 @@ kbd {
   overflow-x: hidden;
 }
 .pane-empty {
-  padding: 16px 20px;
+  padding: var(--space-4) 20px;
   color: var(--fg-muted);
   line-height: 1.6;
 }
@@ -652,7 +678,7 @@ kbd {
   align-items: center;
   gap: 6px;
   height: 26px;
-  padding: 0 8px 0 16px;
+  padding: 0 var(--space-2) 0 var(--space-4);
   cursor: pointer;
   color: var(--fg);
   position: relative;
@@ -2223,7 +2249,7 @@ h2.section:first-child {
 }
 p.hint {
   color: var(--fg-muted);
-  margin: 4px 0 12px;
+  margin: var(--space-1) 0 var(--space-3);
   line-height: 1.6;
 }
 
@@ -3321,10 +3347,10 @@ p.hint {
 .setting {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
+  gap: var(--space-2) var(--space-6);
   align-items: flex-start;
-  padding: 12px 12px;
-  margin: 0 -12px;
+  padding: var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
   border-radius: 6px;
   max-width: 900px;
 }
@@ -6340,15 +6366,19 @@ body.pane-resizing .monaco-editor {
 .perf-antivirus a {
   cursor: pointer;
 }
+/* Too narrow for the note and every button on one line, the buttons wrap onto the next, right-aligned; the note
+   ("Checked just now") keeps its words whole (#1306: it was squeezed into a cut column at the left edge). */
 .storage-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 .storage-actions > :first-child {
   margin-right: auto;
+  flex-shrink: 0;
 }
 .storage-assistant {
   margin-top: 12px;
