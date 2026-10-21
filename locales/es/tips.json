@@ -168,6 +168,8 @@
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
+  "tips.laneBranchSquash.text": "Tras fusionar con squash la tarjeta de un agente, Hive actualiza su rama antes de su siguiente tarjeta, para que cada revisión muestre solo el trabajo de esa tarjeta. Lo que no puede hacer con seguridad lo pregunta en Para ti; Configuración → Avanzado hace que pregunte siempre.",
+  "tips.laneBranchSquash.title": "La rama de un agente, al día entre tarjetas",
   "tips.laneNotices.text": "Hive te avisa cuando la revisión de un carril no se supera, una tarjeta se bloquea o se estanca, o todas las tarjetas superaron la revisión y toca fusionar, con un aviso por carril. Configuración → Notificaciones decide dónde aparecen.",
   "tips.laneNotices.title": "Entérate de cómo va un carril, sin el Asistente",
   "tips.language.text": "Hive sigue el idioma de presentación de Windows cuando lo tiene. Configuración → General → Idioma elige otro; los idiomas traducidos por IA están marcados, y las mejoras son bienvenidas. A los agentes se les sigue hablando en inglés.",

@@ -168,6 +168,8 @@
   "tips.inboxNotices.title": "Les messages joignent un agent occupé entre deux étapes",
   "tips.keepAwake.text": "Pendant qu’un agent travaille, Hive empêche Windows de se mettre en veille (l’écran peut toujours se verrouiller), et le laisse se mettre en veille une fois les agents terminés. Choisis quand dans Paramètres → Général.",
   "tips.keepAwake.title": "Laisse les agents travailler, le PC reste éveillé",
+  "tips.laneBranchSquash.text": "Après la fusion en squash de la carte d’un agent, Hive met sa branche à jour avant sa carte suivante, pour que chaque revue ne montre que le travail de cette carte. Ce qu’il ne peut pas faire sans risque, il le demande dans Pour toi ; Paramètres → Avancé le fait demander à chaque fois.",
+  "tips.laneBranchSquash.title": "La branche d’un agent à jour entre les cartes",
   "tips.laneNotices.text": "Hive te prévient quand une relecture d’un couloir est refusée, qu’une carte est bloquée ou à l’arrêt, ou que toutes les cartes sont validées et que la fusion peut commencer, avec une notification par couloir. Paramètres → Notifications décide où elles s’affichent.",
   "tips.laneNotices.title": "Suis un couloir, même sans l’Assistant",
   "tips.language.text": "Hive suit la langue d’affichage de Windows quand il l’a. Paramètres → Général → Langue en choisit une autre ; les langues traduites par IA sont signalées, et les améliorations sont les bienvenues. Hive parle toujours aux agents en anglais.",

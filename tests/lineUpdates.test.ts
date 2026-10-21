@@ -133,7 +133,7 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     const main1 = git(repo, 'rev-parse', 'main')
     expect(moved?.data).toMatchObject({ line: 'card', to: main1, why: 'squashContinuation' })
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(main1)
-    expect(lines.lineWaiting(lane)).toBeNull()
+    expect(lines.lineWaiting(w, lane)).toBeNull()
     // Started on the moved line: its base is the LineMoved's `to`; its submission only its own file.
     await approved(w, wt, c2, 'two.txt')
     const s2 = foldCard(facts(w, c2))
@@ -165,19 +165,19 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     // Uncommitted work in the worktree: waits.
     writeFileSync(join(wt, 'scratch.txt'), 'not yet\n')
     await update(w)
-    expect(lines.lineWaiting(lane)).toBe(cards[1])
+    expect(lines.lineWaiting(w, lane)).toBe(cards[1])
     expect(await laneStatus(w, lane)).toEqual({ reason: 'lineUpdate', card: cards[1] })
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(false)
     rmSync(join(wt, 'scratch.txt'))
     // The builder in a turn: waits.
     lines.setAgentBusy(() => true)
     await update(w)
-    expect(lines.lineWaiting(lane)).toBe(cards[1])
+    expect(lines.lineWaiting(w, lane)).toBe(cards[1])
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(false)
     // Idle again: moved.
     lines.setAgentBusy(null)
     await update(w)
-    expect(lines.lineWaiting(lane)).toBeNull()
+    expect(lines.lineWaiting(w, lane)).toBeNull()
     expect(await laneStatus(w, lane)).toBeNull()
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(true)
   })
@@ -252,7 +252,124 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     await update(w)
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(false)
     expect(forYou(w).count).toBe(0)
-    expect(lines.lineWaiting(lane)).toBeNull()
+    expect(lines.lineWaiting(w, lane)).toBeNull()
     expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBeNull()
+  })
+})
+
+// HR2's round 1 finding 1: the move is checked again just before it, and only from the exact state checked; anything
+// that changes during the slow reads (containment, here) leaves the branch as it is, every commit kept.
+describe('the move checked again at its boundary (#1271 round 2)', () => {
+  /** Runs `during` while the updater's containment read is under way (after the safe moment was checked). */
+  const whileChecking = (during: () => Promise<void> | void) => {
+    const contains = GitPlatform.prototype.contains
+    vi.spyOn(GitPlatform.prototype, 'contains').mockImplementation(async function (this: InstanceType<typeof GitPlatform>, target, change) {
+      const r = await contains.call(this, target, change)
+      await during()
+      return r
+    })
+  }
+  /** A lane whose first card was squashed into main: its builder's branch held up. */
+  const squashed = async () => {
+    const env = await workspace()
+    await approved(env.w, env.wt, env.cards[0], 'one.txt')
+    await merged(env.w, env.repo, env.cards[0], 'squash')
+    return { ...env, head: git(env.wt, 'rev-parse', 'HEAD') }
+  }
+  const lineMoved = (w: WS, card: number) => facts(w, card).filter((f) => f.kind === 'LineMoved')
+
+  it('a commit landing meanwhile is kept: nothing moves, and the next look asks about it', async () => {
+    const { w, wt, cards, lane, head } = await squashed()
+    whileChecking(() => void commit(wt, 'late-after-check.txt'))
+    await update(w)
+    expect(lineMoved(w, cards[0])).toEqual([])
+    expect(git(wt, 'log', '-1', '--format=%s')).toBe('late-after-check.txt')
+    expect(git(wt, 'rev-parse', 'HEAD~1')).toBe(head)
+    expect(lines.lineWaiting(w, lane)).toBe(cards[1])
+    vi.restoreAllMocks()
+    await update(w)
+    expect(forYou(w).items.filter((i) => i.card === cards[1]).map((i) => i.text)[0]).toMatch(/late-after-check\.txt/)
+    expect(lineMoved(w, cards[0])).toEqual([])
+  })
+
+  it('the target moving meanwhile: nothing moves; the next look moves to its new head', async () => {
+    const { w, repo, cards } = await squashed()
+    whileChecking(() => void commit(repo, 'main-moved.txt'))
+    await update(w)
+    expect(lineMoved(w, cards[0])).toEqual([])
+    vi.restoreAllMocks()
+    await update(w)
+    expect(lineMoved(w, cards[0]).map((f) => (f.data as { to: string }).to)).toEqual([git(repo, 'rev-parse', 'main')])
+  })
+
+  it('the builder busy, a run going, the switch turned off, the rules turned off or the workspace closed meanwhile: nothing moves', async () => {
+    const service = await import('../src/main/workflow/service')
+    const cases: [string, (env: Awaited<ReturnType<typeof squashed>>) => Promise<void> | void][] = [
+      ['busy', () => lines.setAgentBusy(() => true)],
+      ['a run', () => service.setRunsGoing(() => ['unit tests'])],
+      ['switch off', () => advanced.set(lines.UPDATE_AGENT_BRANCH, false)],
+      ['rules off', () => advanced.set(ENFORCE, false)],
+      ['closed', async (env) => {
+        opened.splice(opened.indexOf(env.w), 1)
+        await disposeWorkspaceService(env.w)
+      }]
+    ]
+    for (const [what, during] of cases) {
+      const env = await squashed()
+      whileChecking(() => during(env))
+      await update(env.w).catch(() => undefined)
+      expect([what, git(env.wt, 'rev-parse', 'HEAD')]).toEqual([what, env.head])
+      if (what !== 'closed') expect([what, lineMoved(env.w, env.cards[0]).length]).toEqual([what, 0])
+      vi.restoreAllMocks()
+      lines.setAgentBusy(null)
+      service.setRunsGoing(null)
+      await advanced.set(lines.UPDATE_AGENT_BRANCH, true)
+      await advanced.set(ENFORCE, true)
+    }
+  })
+
+  it("the platform's move is conditional on the head checked: a branch that moved on since isn't reset", async () => {
+    const { repo, wt, head } = await squashed()
+    const G = await import('../src/main/platform/git')
+    commit(wt, 'after.txt')
+    expect(await G.resetKeep(wt, git(repo, 'rev-parse', 'main'), { line: 'card', head })).toBeNull()
+    expect(git(wt, 'log', '-1', '--format=%s')).toBe('after.txt')
+    expect(await G.resetKeep(wt, git(repo, 'rev-parse', 'main'), { line: 'other', head: git(wt, 'rev-parse', 'HEAD') })).toBeNull()
+  })
+})
+
+// HR2's round 1 finding 2: what waits is each workspace's own.
+describe("each workspace's waiting lanes are its own (#1271 round 2)", () => {
+  it("a pass over another workspace leaves this one's waiting lane as it is; a workspace closed is forgotten", async () => {
+    const a = await workspace()
+    await approved(a.w, a.wt, a.cards[0], 'one.txt')
+    await merged(a.w, a.repo, a.cards[0], 'squash')
+    writeFileSync(join(a.wt, 'scratch.txt'), 'not yet\n')
+    await update(a.w)
+    expect(lines.lineWaiting(a.w, a.lane)).toBe(a.cards[1])
+    const b = await workspace()
+    await update(b.w)
+    expect(lines.lineWaiting(a.w, a.lane)).toBe(a.cards[1])
+    expect(lines.lineWaiting(b.w, a.lane)).toBeNull()
+    opened.splice(opened.indexOf(a.w), 1)
+    await disposeWorkspaceService(a.w)
+    await update(b.w)
+    expect(lines.lineWaiting(a.w, a.lane)).toBeNull()
+  })
+})
+
+// The Assistant's condition for rules off (#1120 point 2: P3's behaviour): 0.9's Merge dialog squash still moves the branch.
+describe("with workflow rules off, 0.9's Merge dialog squash still moves the agent's branch (#1271)", () => {
+  it('a squash with Move branch moves it to the merged branch, as before 1.0', async () => {
+    await advanced.set(ENFORCE, false)
+    const { repo, wt } = await workspace()
+    // Hive's merge commits in the repository as its own identity says (unit tests have no global git config).
+    git(repo, 'config', 'user.name', 'Test')
+    git(repo, 'config', 'user.email', 'test@example.com')
+    commit(wt, 'work.txt')
+    const { mergeWorktree } = await import('../src/main/worktrees')
+    const r = await mergeWorktree(repo, { path: wt, branch: 'card', base: 'main' }, { squash: true, message: 'squash card', moveBranch: true })
+    expect(r).toMatchObject({ ok: true, branchMoved: true })
+    expect(git(wt, 'rev-parse', 'HEAD')).toBe(git(repo, 'rev-parse', 'main'))
   })
 })

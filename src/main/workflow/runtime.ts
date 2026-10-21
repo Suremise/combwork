@@ -1722,14 +1722,19 @@ export class Workflow {
 
   /**
    * Moves the line to the target (§16.19.2 step 3) and records it: a `LineMoved` on the card just Done, before the next
-   * card's `Started` (whose base is its `to`), and the builder told. Git's refusal comes back as its reason, nothing
-   * recorded.
+   * card's `Started` (whose base is its `to`), and the builder told. Only from the state checked (HR2's #1271 round 1):
+   * the line, its head and the target's head read again, the worktree clean and `still()` (the caller's own conditions:
+   * the rules on, the switch or the user's approval, the builder idle with no run, the workspace open) just before, and
+   * the platform's move itself conditional on that head. Git's refusal comes back as its reason; null when anything
+   * changed (nothing moved, nothing recorded: looked at again).
    */
-  async moveLineOn(b: LineBehind): Promise<true | string> {
+  async moveLineOn(b: LineBehind, still: () => boolean): Promise<true | string | null> {
     const s = this.state(b.prev)
     const p = this.platform(this.rulesetOf(b.prev, s).options)
-    if (!p.moveLine) return 'no line to move' // i18n-ignore: a platform with no lines (never asked: lineBehind is Git's)
-    const moved = await p.moveLine(b.folder, b.targetHead)
+    if (!p.moveLine || !p.lineNow) return 'no line to move' // i18n-ignore: a platform with no lines (never asked: lineBehind is Git's)
+    const now = await p.lineNow(b.folder, b.target)
+    if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !still()) return null
+    const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head })
     if (moved !== true) return moved
     const line = b.line ?? b.folder
     await this.write(b.prev, null, 'hive', (w) => {

@@ -337,8 +337,8 @@ export class GitPlatform implements PlatformAdapter {
     return { line, head, targetHead: th, inTarget, dirty }
   }
 
-  moveLine(folder: string, to: string): Promise<true | string> {
-    return G.resetKeep(folder, to)
+  moveLine(folder: string, to: string, expect: { line: string | null; head: string }): Promise<true | string | null> {
+    return G.resetKeep(folder, to, expect)
   }
 
   async commitsBetween(folder: string, from: string, to: string): Promise<Maybe<string[]>> {

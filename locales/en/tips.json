@@ -675,6 +675,14 @@
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
   },
+  "tips.laneBranchSquash.text": {
+    "defaultMessage": "After an agent's card is squash-merged, Hive brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.laneBranchSquash.title": {
+    "defaultMessage": "An agent's branch kept up to date between cards",
+    "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

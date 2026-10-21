@@ -2799,10 +2799,16 @@ you **Decide** on the next card naming the commits after the approved revision; 
 git's reason. Each is asked once for the branch's head (bound to it), so a branch nobody touches isn't asked about twice.
 The move goes through the platform (`lineNow`, `moveLine`: `git reset --keep`), then `LineMoved` on the card just Done
 and a wake to the builder ("<line> is up to date with <target> …: <next> can start"); the next card's start then reads
-its base as `LineMoved.to`. **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
+its base as `LineMoved.to`. **The move is checked again at its boundary** [HR2's round 1]: just before it, the line,
+its head and the target's head are read again (the worktree still clean), and the rules on, the switch (or the user's
+approval), the builder idle with no run and the workspace open checked again; the platform moves only from that exact
+branch and head, and a commit landing between that check and the reset is put back (`ORIG_HEAD`), so no commit is ever
+dropped. Anything changed: nothing moves or is recorded, and the next pass looks again. What waits is each workspace's
+own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
 (`hive.workflow.updateAgentBranch`, default on): off, the user is asked every time, a For you **Approve** on the next
 card (approve: Hive moves it once, by the steps above; decline: the user does it). With workflow rules off, nothing
-moves, nothing is asked and nothing waits (as before 1.0, where the Merge dialog's squash moved the branch itself).
+moves, nothing is asked and nothing waits: P3's behaviour (Darren's decision on #1120, point 2; the Assistant on #1271),
+and the Merge dialog's squash still moves the branch itself, as before 1.0 (tested).
 
 So the contradiction "Hive merges and the agent merges need each card in its own folder" (§16.7.2) is met before P7
 by an agent's worktree, and "Committed is done" still needs the project folder.

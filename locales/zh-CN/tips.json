@@ -168,6 +168,8 @@
   "tips.inboxNotices.title": "消息在步骤之间送达忙碌的智能体",
   "tips.keepAwake.text": "智能体工作时，Hive 会阻止 Windows 进入睡眠（屏幕仍可锁定），等它们完成后再允许睡眠。在“设置”→“常规”中选择何时这样做。",
   "tips.keepAwake.title": "智能体在工作，电脑保持唤醒",
+  "tips.laneBranchSquash.text": "代理的卡片以压缩合并方式合并后，Hive 会在其下一张卡片之前将其分支更新到最新，使每次审查只显示该卡片的工作。无法安全完成的事会在“待你处理”中询问；在“设置”→“高级”中可让它每次都询问。",
+  "tips.laneBranchSquash.title": "卡片之间保持代理的分支为最新",
   "tips.laneNotices.text": "当通道的评审未通过、卡片被阻塞或停滞，或所有卡片均已通过评审、该合并时，Hive 会通知你，每个通道一条通知。在“设置 → 通知”中决定通知显示的位置。",
   "tips.laneNotices.title": "无需助手，也能了解通道进展",
   "tips.language.text": "Hive 会跟随 Windows 的显示语言（如果支持）。“设置”→“常规”→“语言”可以选择其他语言；由 AI 翻译的语言会有标记，欢迎改进。与智能体交流时仍使用英语。",

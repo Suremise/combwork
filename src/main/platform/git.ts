@@ -293,12 +293,21 @@ export async function isolate(repo: string, folder: string, line: string, base: 
 }
 
 /**
- * Moves a worktree's branch to a revision with `git reset --keep` (§16.19.2, #1271): git refuses rather than overwrite a
- * local change. True when moved, else git's reason.
+ * Moves a worktree's branch to a revision with `git reset --keep` (§16.19.2, #1271), only from the exact state checked:
+ * `expect`'s branch checked out at `expect`'s head (else null, nothing moved). Git refuses rather than overwrite a local
+ * change (its reason returned). A commit landing between the check and the reset is never dropped: the reset's
+ * ORIG_HEAD is then not the head checked, and the branch is put back on it (null: it changed meanwhile).
  */
-export async function resetKeep(folder: string, to: string): Promise<true | string> {
+export async function resetKeep(folder: string, to: string, expect: { line: string | null; head: string }): Promise<true | string | null> {
+  const [line, h] = await Promise.all([branch(folder), head(folder)])
+  if (isUnknown(line) || isUnknown(h) || line !== expect.line || h !== expect.head) return null
   const r = await git(folder, ['reset', '--keep', to])
-  return r.ok ? true : (r.err || r.out || 'git reset --keep failed').trim() // i18n-ignore: git's own words, or the command
+  if (!r.ok) return (r.err || r.out || 'git reset --keep failed').trim() // i18n-ignore: git's own words, or the command
+  const orig = await git(folder, ['rev-parse', 'ORIG_HEAD'])
+  if (orig.ok && orig.out.trim() === expect.head) return true
+  // Another commit came first: back onto it, so nothing of it is lost; looked at again.
+  if (orig.ok) await git(folder, ['reset', '--keep', orig.out.trim()])
+  return null
 }
 
 /** Pins a revision by a ref so a deleted line, a force push or garbage collection can't lose it (§16.9.3). */

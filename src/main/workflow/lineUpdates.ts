@@ -35,10 +35,17 @@ export function setAgentBusy(fn: ((project: string, agent: string) => boolean) |
   busy = fn ?? (() => false)
 }
 
-/** The lanes waiting while their builder's branch is brought up to date: lane id → the card that waits. */
-const waiting = new Map<string, number>()
-/** The lane a waiting card is, for lanes.ts's status ("waiting: bringing B1's branch up to date"). */
-export const lineWaiting = (lane: string): number | null => waiting.get(lane) ?? null
+/**
+ * The lanes waiting while their builder's branch is brought up to date, per workspace (its board's path, lower case;
+ * HR2's #1271 round 1): lane id → the card that waits. A workspace closed is forgotten at the next pass.
+ */
+const waiting = new Map<string, Map<string, number>>()
+const keyOf = (ws: WorkspaceService): string | null => ws.path?.toLowerCase() ?? null
+/** The card a workspace's lane waits with, for lanes.ts's status ("waiting: bringing the builder's branch up to date"). */
+export const lineWaiting = (ws: WorkspaceService, lane: string): number | null => {
+  const k = keyOf(ws)
+  return k ? (waiting.get(k)?.get(lane) ?? null) : null
+}
 
 const told = new Set<(ws: WorkspaceService) => void>()
 /** Told when a lane starts or stops waiting here (lanes.ts reads its status again). */
@@ -51,20 +58,28 @@ export function onLineWaitChanged(fn: (ws: WorkspaceService) => void): () => voi
 export async function updateLines(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return
+  const key = path.toLowerCase()
+  // The workspace as the pass began: closed, or its window switched to another, it stops (checked before every move).
+  const life = ws.lifetime
+  const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   const { workflowEnforced, workflowFor } = await import('./service')
+  // Workspaces no longer open: forgotten.
+  const open = new Set(openWorkspaces().map((w) => keyOf(w)))
+  for (const k of [...waiting.keys()]) if (!open.has(k)) waiting.delete(k)
+  const mine = waiting.get(key) ?? new Map<string, number>()
   let moved = false
   const seen = new Set<string>()
   for (const project of await ws.listProjectPaths()) {
-    const wf = workflowEnforced() ? await workflowFor(ws, project).catch(() => null) : null
+    const wf = workflowEnforced() && alive() ? await workflowFor(ws, project).catch(() => null) : null
     if (!wf) continue
     for (const id of wf.store.runningLanes()) {
       seen.add(id)
       try {
-        const r = await laneLine(wf, project, id)
+        const r = await laneLine(wf, project, id, () => alive() && workflowEnforced())
         if (r === null) {
-          if (waiting.delete(id)) moved = true
-        } else if (waiting.get(id) !== r) {
-          waiting.set(id, r)
+          if (mine.delete(id)) moved = true
+        } else if (mine.get(id) !== r) {
+          mine.set(id, r)
           moved = true
         }
       } catch (e) {
@@ -73,12 +88,14 @@ export async function updateLines(ws: WorkspaceService): Promise<void> {
     }
   }
   // Lanes no longer running here (ended, or the rules turned off): not waiting.
-  for (const id of [...waiting.keys()]) if (!seen.has(id) && waiting.delete(id)) moved = true
-  if (moved && ws.path === path) for (const fn of told) fn(ws)
+  for (const id of [...mine.keys()]) if (!seen.has(id) && mine.delete(id)) moved = true
+  if (mine.size) waiting.set(key, mine)
+  else waiting.delete(key)
+  if (moved && alive()) for (const fn of told) fn(ws)
 }
 
 /** A lane's builder's line, between its cards: what was done, and the card that waits meanwhile (null: none waits here). */
-async function laneLine(wf: Workflow, project: string, id: string): Promise<number | null> {
+async function laneLine(wf: Workflow, project: string, id: string, on: () => boolean): Promise<number | null> {
   const l = wf.lane(id)
   if (!l || l.ended) return null
   // The lane's next card: the first not Done, and only before it starts (between cards).
@@ -94,14 +111,15 @@ async function laneLine(wf: Workflow, project: string, id: string): Promise<numb
   const open = s.requests.some((r) => r.gate === LINE_GATE)
   const approved = asked.some((r) => s.approvals.some((a) => a.request === r.request && a.answer === 'approved'))
   if (open) return null
-  if (!advanced.get(UPDATE_AGENT_BRANCH) && !approved) {
+  if (advanced.get(UPDATE_AGENT_BRANCH) !== true && !approved) {
     if (!asked.length) await wf.askAboutLine(b, 'approve', text(FOR_YOU.lineAsk, b))
     return null
   }
   // A question about this head answered other than by an approval: the user has it in hand.
   if (asked.length && !approved) return null
   // 1. A safe moment: the builder idle, with no run going, and its worktree clean.
-  if (busy(project, b.builder) || (wf.cfg.runsOf?.(b.builder) ?? []).length || b.dirty.length) return next.id
+  const safe = (): boolean => !busy(project, b.builder) && !(wf.cfg.runsOf?.(b.builder) ?? []).length
+  if (!safe() || b.dirty.length) return next.id
   // 2. Nothing on the branch that isn't in the target.
   const lost = await wf.lineWorkNotIn(b)
   if (isUnknown(lost)) return next.id
@@ -109,8 +127,11 @@ async function laneLine(wf: Workflow, project: string, id: string): Promise<numb
     await wf.askAboutLine(b, 'decide', text(FOR_YOU.lineWork, b, { commits: lost.join(', ') }))
     return null
   }
-  // 3. Moved, recorded; or git's reason asked about.
-  const r = await wf.moveLineOn(b)
+  // 3. Moved, recorded; or git's reason asked about. Everything checked above is checked again just before the move (the
+  // reads since took time): still on, still allowed, still safe; the line itself (its head, the target's, clean) by
+  // moveLineOn, the move conditional on that head. Anything changed: nothing moves, and the lane waits for the next pass.
+  const r = await wf.moveLineOn(b, () => on() && (advanced.get(UPDATE_AGENT_BRANCH) === true || approved) && safe())
+  if (r === null) return next.id
   if (r === true) {
     log.info(`Moved ${userText(b.line ?? b.folder)} to ${userText(b.target)} after ${b.prev.key}'s squash merge, before ${b.next.key}`)
     return null

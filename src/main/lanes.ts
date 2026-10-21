@@ -387,7 +387,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // The running lanes' cards waiting for the user at their round limit (§16.11.4): from their facts, while the rules
   // are enforced (turned off, nothing pauses a lane for a rule).
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(l.id) : null))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
