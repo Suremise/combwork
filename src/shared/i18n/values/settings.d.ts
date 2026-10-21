@@ -11,6 +11,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.hooks.timeoutSeconds.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
+  'settings.advanced.claude-code.override.mcpIsolation.desc': undefined
+  'settings.advanced.claude-code.override.mcpIsolation.title': undefined
+  'settings.advanced.claude-code.override.preApproveHiveTools.desc': undefined
+  'settings.advanced.claude-code.override.preApproveHiveTools.title': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.desc': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.title': undefined
   'settings.advanced.claude-code.safeguard.note.desc': undefined
@@ -53,6 +57,10 @@ interface HiveMessageValues {
   'settings.advanced.codex.mcp.toolTimeoutSeconds.title': undefined
   'settings.advanced.codex.mouse.rightClickToCli.desc': undefined
   'settings.advanced.codex.mouse.rightClickToCli.title': undefined
+  'settings.advanced.codex.override.mcpIsolation.desc': undefined
+  'settings.advanced.codex.override.mcpIsolation.title': undefined
+  'settings.advanced.codex.override.preApproveHiveTools.desc': undefined
+  'settings.advanced.codex.override.preApproveHiveTools.title': undefined
   'settings.advanced.codex.override.terminalTitle.desc': undefined
   'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
@@ -99,8 +107,14 @@ interface HiveMessageValues {
   'settings.advanced.copilot.mouse.rightClickToCli.title': undefined
   'settings.advanced.copilot.override.allMcpInstructions.desc': undefined
   'settings.advanced.copilot.override.allMcpInstructions.title': undefined
+  'settings.advanced.copilot.override.mcpIsolation.desc': undefined
+  'settings.advanced.copilot.override.mcpIsolation.title': undefined
   'settings.advanced.copilot.override.noAutoUpdate.desc': undefined
   'settings.advanced.copilot.override.noAutoUpdate.title': undefined
+  'settings.advanced.copilot.override.preApproveHiveTools.desc': undefined
+  'settings.advanced.copilot.override.preApproveHiveTools.title': undefined
+  'settings.advanced.copilot.override.stripGitHubTokens.desc': undefined
+  'settings.advanced.copilot.override.stripGitHubTokens.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.signIn.errorMessage.desc': undefined

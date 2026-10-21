@@ -11,6 +11,7 @@ import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
+import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
@@ -244,12 +245,27 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
 
 /**
  * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
- * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.)
+ * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.) The
+ * Assistant's only the ones its Control settings let it use without asking (`trusted`, #1174: Codex 0.163 takes a
+ * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
+ * native server named hive merges into Hive's table key by key, and could turn it off.
  */
-const approval = (name: string): Record<string, unknown> => (name === 'hive' ? { default_tools_approval_mode: 'approve' } : {})
+function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknown> {
+  if (name !== 'hive') return {}
+  if (!hive.preApprove) return { enabled: true }
+  if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
+  return { enabled: true, default_tools_approval_mode: 'approve' }
+}
+
+/** How Hive's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
+export interface HiveServerOptions {
+  preApprove: boolean
+  trusted?: readonly string[]
+}
 
 /** An MCP server definition (Claude Code's JSON format) as a Codex mcp_servers table; null if it can't be passed safely. */
-export function codexMcpServer(name: string, def: McpServerDef): { table: Record<string, unknown> | null; warning?: string } {
+export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
+  const approval = (n: string): Record<string, unknown> => hiveTable(n, hive)
   const ref = (v: unknown): string | null => {
     const m = typeof v === 'string' ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$|^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(v.trim()) : null
     return m ? (m[1] ?? m[2]) : null
@@ -288,6 +304,27 @@ export function codexMcpServer(name: string, def: McpServerDef): { table: Record
   if (Object.keys(env).length) table.env = env
   if (passThrough.length) table.env_vars = passThrough
   return { table }
+}
+
+/**
+ * Keys that keep a native server named hive (the user's own [mcp_servers.hive] in these config files) from hiding Hive's
+ * tools (#1281): Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed), so its tool lists
+ * would still filter Hive's. Hive's server wins: its whole tool list, nothing disabled (and `enabled`, hiveTable). Its
+ * other keys still merge (an env variable, a startup timeout): logged, with the file.
+ */
+export function outrankNativeHive(files: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const file of files) {
+    const servers = readToml(file).mcp_servers
+    const native = servers && typeof servers === 'object' ? (servers as Record<string, unknown>).hive : undefined
+    if (!native || typeof native !== 'object') continue
+    const keys = Object.keys(native as Record<string, unknown>)
+    if (keys.includes('enabled_tools')) out.enabled_tools = [...HIVE_TOOLS]
+    if (keys.includes('disabled_tools')) out.disabled_tools = []
+    const merged = keys.filter((k) => !['command', 'args', 'enabled', 'enabled_tools', 'disabled_tools', 'tool_timeout_sec', 'default_tools_approval_mode'].includes(k))
+    log.warn(`Codex has an MCP server named hive in ${userText(file)}: Hive's own hive server is used instead${merged.length ? `, though Codex still merges its ${merged.join(', ')} into it` : ''}.`)
+  }
+  return out
 }
 
 /** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
@@ -599,18 +636,25 @@ export class CodexAdapter implements ProviderAdapter {
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
     const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
     if (developer) args.push('-c', `developer_instructions=${toToml(developer)}`)
-    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code.
+    const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
-      const { table, warning } = codexMcpServer(name, def)
+      const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
-      if (table) args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
+      if (!table) continue
+      if (name === 'hive') Object.assign(table, outrankNativeHive(files))
+      args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
-    const own = new Set(Object.keys(ctx.mcpServers))
-    const theirs = new Set([...Object.keys(mcpServersIn(join(codexHome(), 'config.toml'))), ...Object.keys(mcpServersIn(join(ctx.cwd, '.codex', 'config.toml')))])
-    for (const name of theirs) {
-      if (own.has(name)) continue
-      if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
-      else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
+    // switch off (#1281), they load beside Hive's (one of the workspace's name still merges into the workspace's).
+    if (launchOverrides(ctx.overrides, CODEX, 'mcpIsolation')) {
+      const own = new Set(Object.keys(ctx.mcpServers))
+      const theirs = new Set(files.flatMap((f) => Object.keys(mcpServersIn(f))))
+      for (const name of theirs) {
+        if (own.has(name)) continue
+        if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
+        else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+      }
     }
     args.push(...ctx.extraArgs)
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.

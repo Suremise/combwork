@@ -151,7 +151,9 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     // The Assistant on Codex: its Hive tools, a read and a change within Control, without being asked.
     const home = (await inv('workspace:refresh')).assistant.path
     lib.trustForCodex(home)
-    await inv('agents:update', home, 'assistant', small)
+    // In Ask (on-request), not its Approve for me, whose reviewer would decide a tool outside its subset itself: here
+    // Codex asks the user, so the subset's tools are seen running unasked and the others asking.
+    await inv('agents:update', home, 'assistant', { ...small, permissionMode: 'ask' })
     const akey = lib.ptyKey(home, 'assistant')
     await lib.cliStep('the Assistant on Codex', { session: akey }, async () => {
       await inv('session:start', home, { agentId: 'assistant' })
@@ -183,6 +185,29 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       check('Assistant: the card is on the board, in demo', card?.project === 'demo', JSON.stringify(record.assistant.cardMade))
       const [, key, no] = CREATED.exec(shown) ?? []
       check('Assistant: the reply named that card, by its key and number', !!card && key === card.key && Number(no) === card.number, JSON.stringify({ key, no, card: card && { key: card.key, number: card.number } }))
+
+      // A Hive tool outside its Control subset (#1174, #1281: Codex pre-approves only the subset, per tool): writing a
+      // shared note asks, as on Claude Code and Copilot. Cancelled here, so nothing is written.
+      if (!done) return
+      const note = path.join(ws, '.hive', 'shared', 'notes', 'mcp-approval-check.md')
+      const notePrompt = 'Write a shared note at notes/mcp-approval-check.md containing the word check, with hive_write_shared_note. Make no other tool calls, then reply DONE.'
+      check('Assistant: the note prompt is taken', (await lib.sendPrompt(inv, akey, notePrompt, { submitted: async () => ['working', 'waiting'].includes((await live(home, 'assistant'))?.status) })) > 0)
+      const asking = await lib.until(async () => {
+        const a = await live(home, 'assistant')
+        if (a?.status === 'waiting') return a
+        return a?.status === 'finished' ? 'finished without asking' : null
+      }, TURN_MS, 500)
+      record.assistant.noteAsk = typeof asking === 'object' && asking ? { status: asking.status, message: asking.statusMessage ?? null } : asking
+      await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant-note.png') })
+      check('Assistant: Codex asks before hive_write_shared_note (outside its Control subset)', typeof asking === 'object' && !!asking && /hive_write_shared_note/.test(asking.statusMessage ?? ''), JSON.stringify(record.assistant.noteAsk))
+      check('…and the note is not written while it asks', !fs.existsSync(note))
+      if (typeof asking === 'object' && asking) {
+        // Cancel the tool call (Esc, as its question says): the turn ends and nothing is written.
+        await inv('pty:write', akey, '\x1b')
+        const ended = await lib.until(async () => ['finished', 'ready'].includes((await live(home, 'assistant'))?.status), TURN_MS, 500)
+        check('…cancelled: the turn ends', !!ended, (await live(home, 'assistant'))?.status)
+        check('…and no note was written', !fs.existsSync(note))
+      }
     })
     await inv('session:stop', home, 'assistant')
     await lib.until(async () => !(await live(home, 'assistant')), 30000, 500)
