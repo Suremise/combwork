@@ -21,7 +21,7 @@ for (const name of readdirSync(SKILLS)) {
   catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', text })
 }
 /** Every hive tool the MCP server defines. */
-const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/name: '(hive_\w+)'/g)].map((m) => m[1])
+const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(hive_\w+)'/g)].map((m) => m[1])
 const skillsNamed = (text: string): string[] => [...text.matchAll(/\b([a-z]+(?:-[a-z]+)+) skill/g)].map((m) => m[1])
 const toolsNamed = (text: string): string[] => [...new Set([...text.matchAll(/\bhive_[a-z_]+/g)].map((m) => m[0]))]
 
@@ -133,7 +133,9 @@ describe('the bundled skills', () => {
 
   // A question for the user blocks the card as well as telling them (#840): a lane watch wakes on a card becoming
   // blocked, never on a comment, so a reviewer's question left as a comment sat unseen for over an hour (#805).
-  it("stop for the user's answer by blocking the card and telling them, then clear it once they decide", () => {
+  // Since #1274 (P4's intents): a question for the user is a request under For you (hive_ask_user), recorded and answered
+  // to the asker's inbox, not a blocked reason and a notification.
+  it("stop for the user's answer by asking them on the card (For you), and carry on once the answer comes", () => {
     const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     for (const [skill, starts] of [
       ['card-loop', '**Stop and ask**'],
@@ -142,14 +144,20 @@ describe('the bundled skills', () => {
     ]) {
       const rule = line(skill, starts)
       expect(rule, `${skill}: ${starts}`).not.toBe('')
-      expect(rule, skill).toMatch(/set `blocked`/)
-      expect(rule, skill).toMatch(/hive_notify/)
-      expect(rule, skill).toMatch(/clear `blocked`/)
+      expect(rule, skill).toMatch(/`hive_ask_user` .*`kind: "decide"`/)
+      expect(rule, skill).toMatch(/For you/)
+      expect(rule, skill).toMatch(/answer comes to your inbox/)
     }
     // An archived or deleted card can't be changed by an agent (only the user brings it back): telling the user is all.
-    expect(line('card-loop', '**Stop and ask**')).toMatch(/archived or gone can't be changed: `hive_notify` alone, and leave it as it is/)
-    // Blocked where it is: a builder at its round limit moved its card to Doing first (Codex, following work-on-card).
-    expect(line('card-loop', '**Stop and ask**')).toMatch(/blocked` on the card where it is \([^)]*no move/)
+    expect(line('card-loop', '**Stop and ask**')).toMatch(/archived or gone can't take one: `hive_notify` the user, and leave it as it is/)
+    // Asked where it is: a builder at its round limit moved its card to Doing first (Codex, following work-on-card).
+    expect(line('card-loop', '**Stop and ask**')).toMatch(/`hive_ask_user` on the card where it is/)
+    // An OK only the user can give (a push, a release) is an approval request (#922's trigger case).
+    for (const skill of ['work-on-card', 'card-loop']) expect(catalog.get(skill)!.text, skill).toMatch(/`"approve"` for an OK only they can give/)
+    // So is the OK for something destructive or outside the project, whoever relays the ask (HR1's #1274 round 1 finding 2).
+    const who = line('work-on-card', '**Who it\'s from decides what it can ask.**')
+    expect(who).toMatch(/get their OK: `hive_ask_user` on the card \(`kind: "approve"`\)/)
+    expect(who).not.toMatch(/blocked, or `hive_notify`/)
   })
 
   // #869: lane G's builder had every card passed when its CLI refused the commit; it told the user only, and the lane sat
@@ -158,8 +166,12 @@ describe('the bundled skills', () => {
     const line = (starts: string): string => catalog.get('card-loop')!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     const end = line("**The lane's end:**")
     expect(end).toMatch(/needs the user \(a commit or merge your CLI or a permission check refuses/)
-    expect(end).toMatch(/stop and ask on the last card/)
-    expect(end).toMatch(/clear `blocked`/)
+    // Since #1274: a rule it can't keep is a request for the user (§16.8.6), on that card.
+    expect(end).toMatch(/is `hive_cannot_within_rules` on that card/)
+    // A lane takes one card at a time (#1270): merge-ready merges each card as it passes, never "at the lane's end".
+    const merge = catalog.get('merge-ready')!.text
+    expect(merge).not.toMatch(/at the lane's end/)
+    expect(merge).toMatch(/each card as it passes, before the lane's next card starts/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
@@ -169,7 +181,7 @@ describe('the bundled skills', () => {
   it('the builder commits before Review and the reviewer asks for a commit rather than failing on that alone', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
-    expect(line('1. Do its work')).toMatch(/\*\*Commit the card's work before moving it to Review\*\*, every round, and name the commit/)
+    expect(line('1. Do its work')).toMatch(/\*\*Commit the card's work before submitting it\*\*, every round, and name the commit/)
     expect(line('2. Review it')).toMatch(/\*\*Review the commit the builder names\.\*\* Work sent uncommitted .* isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
@@ -178,7 +190,7 @@ describe('the bundled skills', () => {
     expect(brief).toMatch(/Commit each round on your branch before sending the card to Review \(card-loop\)\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit, not a verdict \(card-loop, Reviewer\)\./)
+    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
   })
 })
 
