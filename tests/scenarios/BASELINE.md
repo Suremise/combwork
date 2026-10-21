@@ -47,7 +47,7 @@ override and no `Override` fact.
   what the move would skip; asked to put the card back it moved it without an override.
 - **Claude Code**: not run. Its test home is still signed out (`2026-10-21T04-58-14-claude-code`: "Not logged in · Run
   /login" in its status line, the prompt never taken; the harness counted that as 3 failures instead of skipping it for
-  the environment: #1321).
+  the environment: #1321). The trial is #1322, once the test home is signed in.
 
 ## The Assistant's override of a card's workflow rules: fakes, Codex (its default model), fixtures v70, 21 October 2026
 
