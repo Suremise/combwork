@@ -449,6 +449,38 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(existsSync(marker)).toBe(false)
   })
 
+  it('HR4 r2 #2: a failed start gives its lease up: once the store works again, a retry in the same Hive runs', async () => {
+    const cfg = { store: w.store, project: w.project, target: 'retry', root: w.root, profile: 'A' }
+    const add = w.store.addQueueProc.bind(w.store)
+    // Recording its supervisor fails (a full disk, for a moment).
+    w.store.addQueueProc = (p) => {
+      if (p.what === 'supervisor') throw new Error('disk full')
+      add(p)
+    }
+    try {
+      await expect(QueueRunner.acquire(cfg)).rejects.toThrow('disk full')
+    } finally {
+      w.store.addQueueProc = add
+    }
+    expect(w.store.queueLease('retry')).toBeNull()
+    const again = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    expect(again).toMatchObject({ ok: true })
+    await again.runner.release()
+    expect(w.store.queueLease('retry')).toBeNull()
+  })
+
+  it("HR4 r2 #3: a command whose folder is gone fails with its start's own error, nothing left recorded or unhandled; a missing executable fails as a run", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'gone', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    const missing = join(tempDir('qr-gone-'), 'no-such-folder')
+    await expect(a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })).rejects.toThrow(/ENOENT/)
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor'])
+    // The launcher starts and the command can't: its run fails (127), and its launcher's record goes with it.
+    expect(await a.runner.run('check', 'no-such-command-hive-1360', [])).toMatchObject({ ok: false, code: 127 })
+    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['supervisor']), { timeout: 30_000, interval: 100 })
+    await a.runner.release()
+    expect(w.store.queueProcs(null, 'gone')).toEqual([])
+  })
+
   it("a job that can't be seen empty keeps its duties for the next runner, which pauses until it can end them, then runs", async () => {
     let endable = false
     const cfg = { store: w.store, project: w.project, target: 'stuck', root: w.root, profile: 'A', hooks: { endJob: () => endable } }

@@ -171,8 +171,12 @@ export class QueueRunner {
         runner.startRenewal()
         return { ok: true, runner, ...(paused !== null ? { paused } : {}) }
       } catch (e) {
+        // A failed set-up (a write that failed, the lease lost) gives its lease up, by its own token (a successor's is
+        // never touched), once its job is closed: a retry, in this Hive or another, can take it at once. What was
+        // recorded stays, for the next runner's settle.
         runner.stop()
         await runner.sup?.close()
+        await locked(cfg, () => store.dropQueueLease(lease, token)).catch((x) => log.warn(`giving up the merge queue's lease for ${userText(cfg.target)} after a failed start`, x))
         if (!(e instanceof LeaseLost)) throw e
         const h = store.queueLease(cfg.target)
         return { ok: false, heldBy: h ? holderOf(h) : null }
@@ -231,16 +235,30 @@ export class QueueRunner {
     const sup = this.sup
     if (!sup?.alive || this.released) throw new LeaseLost(this.target)
     const { child, after, before } = startLauncher({ command, args, shell: !!opts.shell }, { cwd: opts.cwd as string | undefined, env: opts.env })
+    // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
+    // never left to the process's: the first is the start's error, later ones are logged.
+    let startError: Error | null = null
+    const failed = new Promise<Error>((res) =>
+      child.on('error', (e) => {
+        if (!startError) res((startError = e))
+        else log.warn(`the merge queue's ${what} process`, e)
+      })
+    )
+    for (const s of [child.stdin, child.stdout, child.stderr]) s?.on('error', (e) => log.warn(`the merge queue's ${what} process's pipe`, e))
     const giveUp = (): void => {
-      // Never told to run: ending its input ends it, and it is ended too in case it is slow to see that.
+      // Never told to run: ending its input ends it, and one that started is ended too in case it is slow to see that.
       child.stdin?.end()
-      child.kill()
+      if (child.pid && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill()
+        } catch (e) {
+          log.warn(`ending the merge queue's ${what} launcher`, e)
+        }
+      }
     }
     const pid = child.pid
-    if (!pid) {
-      giveUp()
-      throw new Error(`${command} couldn't be started`) // i18n-ignore: an internal error, logged by the queue's host
-    }
+    // Not started: nothing to record or end; the start's own error (it is told on the next tick).
+    if (!pid) throw startError ?? (await failed)
     try {
       if (!(await sup.assign(pid, after, before))) throw new Error(`${command} couldn't be put in the merge queue's job`) // i18n-ignore: as above
       await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid, startAfter: after, startBefore: before, what }))
