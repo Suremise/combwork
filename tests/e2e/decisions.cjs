@@ -274,8 +274,9 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await page.locator(`[data-column="todo"] .task-card[data-task="${m}"]`).count()) === 1, 5000)
   await open()
   await mDialog.getByLabel('New comment').fill('Second try.')
-  // The move itself fails once (after the comment was posted): Try Again posts nothing again.
-  check('Move to Doing with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:update*1'))
+  // The move itself fails once (after the comment was posted): Try Again posts nothing again. The window's moves go
+  // through tasks:move since #1275 (#1333).
+  check('Move to Doing with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:move*1'))
   check('…with the comment posted once', (await card(m)).comments.filter((c) => c.text === 'Second try.').length === 1 && (await card(m)).decisions.length === decisionsBefore + 1)
 
   // An agent on the card: its next reply flags a decision recorded since it read the card, whatever tool it called.

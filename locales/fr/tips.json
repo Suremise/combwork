@@ -212,6 +212,8 @@
   "tips.myPrices.title": "Tes propres prix pour Claude Code",
   "tips.newCard.text": "Appuie sur {key} pour une nouvelle carte dans le projet où tu es, sans quitter ce que tu fais.",
   "tips.newCard.title": "Noter une carte en vitesse",
+  "tips.noCodeCards.text": "Une décision, un texte ou un essai n’ont rien à committer : coche Sans code dans la fenêtre Nouvelle carte. Son travail est soumis avec un résumé et passe à Terminé sans rien à fusionner.",
+  "tips.noCodeCards.title": "Cartes sans code",
   "tips.off.message": "Elles restent dans Aide → Astuces…, et Paramètres → Général les réactive.",
   "tips.off.title": "Astuces désactivées",
   "tips.overview.text": "La Vue d’ensemble de l’espace de travail montre ce que chaque projet a utilisé, ce qui tourne en ce moment et le tableau, jour par jour. {key}",

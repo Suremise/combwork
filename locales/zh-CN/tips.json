@@ -212,6 +212,8 @@
   "tips.myPrices.title": "为 Claude Code 设置自己的价格",
   "tips.newCard.text": "按 {key} 即可为当前项目新建卡片，无需离开正在做的事。",
   "tips.newCard.title": "随手记一张卡片",
+  "tips.noCodeCards.text": "决定、文稿或试验没有需要提交的内容：在“新建卡片”对话框中勾选“无代码”。其工作附摘要提交，无需合并即可进入“已完成”。",
+  "tips.noCodeCards.title": "无代码卡片",
   "tips.off.message": "“帮助”→“提示…”中仍可查看，“设置”→“常规”可以重新打开。",
   "tips.off.title": "提示已关闭",
   "tips.overview.text": "“工作区概览”按天显示每个项目的用量、当前正在运行的内容和看板。{key}",

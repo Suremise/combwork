@@ -235,6 +235,7 @@
   "workflow.refused.why.userOk": "czeka na zgodę przed scaleniem.",
   "workflow.roundChoice": "{choice, select, carryOn {Kontynuuj} split {Podziel ją} accept {Przyjmij z dalszymi kartami} takeOver {Przejmij ją} other {{choice}}}",
   "workflow.rule.approval.given": "Twoja zgoda przed scaleniem",
+  "workflow.rule.card.kind": "Rodzaj karty ustala się przy jej tworzeniu",
   "workflow.rule.done.contained": "Hive sprawdza scalenie",
   "workflow.rule.integrate.approved": "Praca jest recenzowana przed scaleniem",
   "workflow.rule.integrate.checksPassed": "Sprawdzenia przechodzą na scalonym wyniku",
