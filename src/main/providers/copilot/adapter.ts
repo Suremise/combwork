@@ -15,6 +15,7 @@ import { AGENTS_SKILLS, agentsSkillCopyPath, compareVersions, exportSubtitleText
 import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
 import { launchOverrides } from '../../advancedValues'
+import { overrideId } from '../../../shared/advanced'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
 import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
@@ -108,6 +109,8 @@ export class CopilotAdapter implements ProviderAdapter {
    * taken out of Copilot's own environment instead (home.ts COPILOT_ENV_STRIP): this list applies to every child.
    */
   readonly envToStrip: string[] = []
+  /** Copilot is checked in its sessions' environment (copilotEnv), which these switches change. */
+  readonly locateSettings = [overrideId(COPILOT, 'stripGitHubTokens'), overrideId(COPILOT, 'noAutoUpdate')]
   readonly compactFailure = null
   // SessionStart only comes with the first prompt: its footer ("… · / commands · …") means it is up. Both patterns are
   // advanced settings (#367).
@@ -256,13 +259,18 @@ export class CopilotAdapter implements ProviderAdapter {
     // Hive's guidance is the hive MCP server's instructions: Copilot includes only allowlisted servers' without this.
     if (launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
     // Only the workspace's MCP servers, as for the other CLIs: Copilot's built-in GitHub servers and the user's and the
-    // project's own are turned off for Hive's sessions (never by editing their config).
-    args.push('--disable-builtin-mcps')
-    for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
+    // project's own are turned off for Hive's sessions (never by editing their config). Switched off (#1281), they load
+    // too: the --additional-mcp-config servers win over Copilot's own of the same name (1.0.100), hive included, and are
+    // never disabled by name (--disable-mcp-server <name> would turn Hive's off with the user's).
+    if (launchOverrides(ctx.overrides, COPILOT, 'mcpIsolation')) {
+      args.push('--disable-builtin-mcps')
+      for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
+    }
     // Hive's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
     // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).
     // Copilot's patterns: <server> for all its tools, <server>(<tool>) for one (#468).
-    if (ctx.mcpServers.hive) {
+    // Switched off (#1281), none: Copilot asks per its own mode.
+    if (ctx.mcpServers.hive && launchOverrides(ctx.overrides, COPILOT, 'preApproveHiveTools')) {
       if (ctx.trustedHiveTools) for (const t of ctx.trustedHiveTools) args.push(`--allow-tool=hive(${t})`)
       else args.push('--allow-tool=hive')
     }
@@ -276,7 +284,7 @@ export class CopilotAdapter implements ProviderAdapter {
     // A first task: Copilot starts interactive and runs it (after the folder-trust question, if it asks one).
     if (ctx.initialPrompt) args.push('-i', promptArg(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
-    const env = copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'))
+    const env = copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'), launchOverrides(ctx.overrides, COPILOT, 'stripGitHubTokens'))
     // Hive's hook server is plain http on 127.0.0.1, which Copilot allows for hooks only with this.
     env.COPILOT_HOOK_ALLOW_LOCALHOST = '1'
     if (this.customInstructions(ctx)) {

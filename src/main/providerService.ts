@@ -9,6 +9,7 @@ import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { config } from './config'
+import { advanced } from './advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, toast } from './events'
 import { createLogger } from './logger'
@@ -391,6 +392,15 @@ class ProviderService {
 
 export const providerService = new ProviderService()
 onLanguageChange(() => providerService.relabel())
+
+// A CLI is checked again when an advanced setting its check depends on changes (ProviderAdapter.locateSettings).
+const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.locateSettings ?? []).map((id) => advanced.get(id)))]))
+let lastLocateValues = locateValues()
+advanced.onChange(() => {
+  const now = locateValues()
+  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id)
+  lastLocateValues = now
+})
 
 // Automatic's default provider (#474) follows what this process found.
 setInstalledCheck((id) => {
