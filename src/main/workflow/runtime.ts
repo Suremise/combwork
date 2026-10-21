@@ -441,20 +441,42 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     if (s.stage !== 'todo') return this.notFrom(card, actor, s, 'start')
+    // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
+    // user's own drag is theirs to make.
+    const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
+    if (lane) return this.refuse(card, actor, 'start', lane)
     const g = await this.gatherStart(card, s, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
     await this.cfg.hooks?.beforeWrite?.('start')
     if (await this.revalidate(card, s, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+    let laneMoved = false
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
       if (changed) return changed
+      // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
+      // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
+      // then refused: the boundary passed either way), then the start is checked against it.
+      if (this.enforced() && !opts.drag) {
+        this.applyLaneBoundary(w, this.store.card(card.id))
+        // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
+        // out, or a lane changed meanwhile): else it is gathered again from the top, once, as what it is now.
+        const now = this.store.card(card.id)
+        const r = this.rulesetOf(now, w.state())
+        if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
+          laneMoved = true
+          return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
+        }
+      }
+      const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
+      if (waits) return waits
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
       if (bad) return bad
       this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
       return null
     })
+    if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
     if (out) return this.refuse(card, actor, 'start', out)
     return this.ok(card, 'todo', 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
   }
@@ -1522,6 +1544,58 @@ export class Workflow {
     const next = changeList({ ...l, current }, cards)
     this.saveLane(next)
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
+  }
+
+  /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
+  private laneCardFlying(n: number): boolean {
+    const stage = this.store.card(n).stage
+    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging'
+  }
+
+  /**
+   * A lane's list as a start reads it (#1270; the Assistant's round 4 design, one lane state): the list now, or, once
+   * none of its cards is in flight (the card boundary has passed), the queued list, which `applies` then.
+   */
+  laneNow(l: LaneList): { cards: number[]; applies: boolean } {
+    if (!l.pending?.length || l.cards.some((c) => this.laneCardFlying(c))) return { cards: l.cards, applies: false }
+    return { cards: l.pending, applies: true }
+  }
+
+  /**
+   * The card this one waits for in its running lane, or null (one card at a time, #1270), from the lane's list as a start
+   * reads it (laneNow): a card before it there that isn't Done. A card only in a queued list that hasn't applied (a card
+   * is still in flight) is never eligible: it waits for that card, so no queued card passes an earlier one.
+   */
+  laneWaits(card: CardRecord): CardRecord | null {
+    if (!card.lane) return null
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return null
+    const now = this.laneNow(l)
+    let open: number | undefined
+    if (now.cards.includes(card.id)) open = now.cards.slice(0, now.cards.indexOf(card.id)).find((c) => !this.laneDone(c))
+    else if (l.pending?.includes(card.id)) open = l.cards.find((c) => this.laneCardFlying(c)) ?? l.cards.find((c) => c !== card.id && !this.laneDone(c))
+    return open === undefined ? null : this.store.card(open)
+  }
+
+  /**
+   * Inside a start's write (its board change, #1270): a queued list whose boundary has passed is applied there, before the
+   * start is checked, and the builder is told (a wake, delivered once). lanes.ts's refresh then finds nothing queued.
+   */
+  private applyLaneBoundary(w: Write, card: CardRecord): void {
+    if (!card.lane) return
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return
+    const now = this.laneNow(l)
+    if (!now.applies) return
+    this.saveLane({ ...l, cards: [...now.cards], pending: null })
+    const builder = this.store.laneBuilder(l.id)
+    if (builder) this.wake(w, builder, `Your lane's card list changed, as queued: its cards are now ${now.cards.map((c) => this.store.card(c).key).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: a wake, agent-facing
+  }
+
+  /** A start refused for a card that waits in its lane (laneWaits), or null. */
+  private laneRefusal(card: CardRecord): GuardRefusal | null {
+    const earlier = this.laneWaits(card)
+    return earlier ? { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } } : null
   }
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */

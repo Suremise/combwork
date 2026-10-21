@@ -1305,7 +1305,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     // #869: a merge due with its builder idle and no merge slot claimed (a step it stopped on for the user) is a stall.
     const builder = ws.path ? (sessions.liveFor(join(ws.path, l.project), l.builder.id) ?? null) : null
     const mergeStall = mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
-    out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall })
+    out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status })
   }
   return out
 }

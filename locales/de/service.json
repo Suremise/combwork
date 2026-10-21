@@ -150,6 +150,8 @@
   "service.workflowNotice.lane": "Lane {lane}",
   "service.workflowNotice.mergeDue": "Alle Karten haben das Review bestanden: Der Merge steht an",
   "service.workflowNotice.mergeStalled": "Der Merge ist festgefahren",
+  "service.workflowNotice.merging": "{card} wird gerade gemergt: Die Lane wartet darauf",
+  "service.workflowNotice.notMerged": "{card} hat das Review bestanden: Die Lane wartet auf den Merge",
   "service.workflowNotice.stalled": "{card} ist festgefahren",
   "service.workspace.advancedNotHere": "{setting} kann nicht für einen Arbeitsbereich festgelegt werden.",
   "service.workspace.agentGone": "Diesen Agenten gibt es nicht mehr.",

@@ -1468,7 +1468,7 @@ const laneCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
  * change (started, joined), for the hive MCP server that words it.
  */
 function lanesNamed<T>(r: T): T {
-  const numbersOf = (l: LaneInfo | null | undefined): number[] => (l ? [...l.cards.map((c) => c.number), ...(l.current !== null ? [l.current] : []), ...(l.pausedOn !== null ? [l.pausedOn] : [])] : [])
+  const numbersOf = (l: LaneInfo | null | undefined): number[] => (l ? [...l.cards.map((c) => c.number), ...(l.current !== null ? [l.current] : []), ...(l.pausedOn !== null ? [l.pausedOn] : []), ...(l.queued ?? []), ...(l.status?.card != null ? [l.status.card] : [])] : [])
   const isLane = (v: unknown): v is LaneInfo => !!v && typeof v === 'object' && Array.isArray((v as LaneInfo).cards) && typeof (v as LaneInfo).id === 'string'
   if (Array.isArray(r)) return r.map((l) => (isLane(l) ? { ...l, ...withNames(numbersOf(l)) } : l)) as T
   if (isLane(r)) return { ...r, ...withNames(numbersOf(r)) }
@@ -1517,6 +1517,15 @@ route('GET', '/v1/lanes', async ({ query }) =>
     const a = agentCaller()
     const project = a ? basename(a.projectPath) : query.get('project') ? basename(projectByName(query.get('project')!)) : null
     return lanes.listLanes(ws, { project, all: query.get('all') === 'true' })
+  })
+)
+
+// The next card of the calling agent's running lane (#1270, hive_lane next): to start, to carry on, or why it waits.
+route('GET', '/v1/lanes/next', async () =>
+  laneCall(async () => {
+    const a = agentCaller()
+    if (!a) throw new HttpError(400, "next is a lane agent's: read a lane with GET /v1/lanes/{id}")
+    return lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
   })
 )
 
@@ -1590,7 +1599,9 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     const a = agentCaller()
     const commit = body?.mergeCommit
     if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, 'mergeCommit must be a commit (its hash)')
-    const end = () => lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}) })
+    // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
+    const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' } : {} // i18n-ignore: an agent's reply (English)
+    const end = async () => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}) })), ...ignored })
     if (!assistantCaller()) return end()
     const laneId = /^[\w.-]{1,64}$/.test(id) ? id : null
     return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async () => {

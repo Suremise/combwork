@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
 
 export type RuleId = GuardId | MoveRule
 
@@ -138,6 +138,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.move.needsOverride.message', defaultMessage: 'Moving {card} to {stage} skips: {rules}.', description: 'A move that skips rules: {rules} lists the rule names.' }),
     msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.", description: "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips." }),
     msg({ id: 'workflow.refused.move.needsOverride.change', defaultMessage: 'These rules are set in Version Control, where the user can change them.', description: 'Where the rules a move would skip are changed: the project\'s Version Control tab (a tab name: use it as Hive shows it).' })
+  ),
+  'lane.oneAtATime': r(
+    msg({ id: 'workflow.refused.lane.oneAtATime.message', defaultMessage: "{card} can't start yet: {earlier}, before it in its lane, isn't Done.", description: 'A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12.' }),
+    msg({ id: 'workflow.refused.lane.oneAtATime.next', defaultMessage: 'Finish {earlier} first: once it is Done, the lane goes on to {card}.', description: 'The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12.' }),
+    msg({ id: 'workflow.refused.lane.oneAtATime.change', defaultMessage: 'A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.', description: 'Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Hive shows it).' })
   ),
   'card.plainNumber': r(
     msg({ id: 'workflow.refused.card.plainNumber.message', defaultMessage: 'A plain number is not a card reference.', description: 'A refused intent: the card was named by a bare number.' }),
