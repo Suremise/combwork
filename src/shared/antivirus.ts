@@ -76,6 +76,8 @@ export interface AvPath {
   state: AvPathState
   /** Hive added this exclusion (so Remove may take it away again). */
   addedByHive: boolean
+  /** Defender lists this folder itself, not only a folder holding it (known only when its list is: #1302). */
+  listed?: boolean
   devDrive: AvDevDrive
   /** Why Hive won't offer to exclude it (too broad, or its real location couldn't be established). */
   unsafe?: string
@@ -264,7 +266,7 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
     const checked = drive ? opts.adminCheck?.devDrives?.[drive] : undefined
     const fs = drive ? probe.volumes[drive] : undefined
     const devDrive: AvDevDrive = checked ?? (fs === undefined || fs === null ? 'unknown' : /^refs$/i.test(fs) ? 'refs' : 'no')
-    return { path: f.path, kind: f.kind, state, addedByHive, devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
+    return { path: f.path, kind: f.kind, state, addedByHive, ...(known && listed(f.path, known) ? { listed: true } : {}), devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
   })
   const realTime = scan === 'defender' ? d!.realTime : null
   // A trusted Dev Drive in performance mode is scanned lightly; an untrusted one, or performance mode off, is scanned like any other.
@@ -467,12 +469,14 @@ export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): A
   const now = status.paths.filter((p) => !isOld(p) && kinds(p))
   const base = { scan: status.scan, exclusionsFrom: status.exclusionsFrom, ...(status.adminCheckedAt ? { adminCheckedAt: status.adminCheckedAt } : {}), old, now }
   if (status.scan !== 'defender') return { ...base, remove: [], add: [], theirs: [] }
-  const mine = old.filter((p) => p.addedByHive)
+  // Only an entry for the old folder itself is stale: one for a folder holding it (D:\Development) may cover the new
+  // folder too, and isn't Hive's to remove nor the user's to be told about. With the list hidden, Hive's own count.
+  const mine = old.filter((p) => p.addedByHive && (p.listed || p.state === 'added'))
   const moved = new Set(mine.map((p) => p.kind))
   return {
     ...base,
     remove: mine.map((p) => p.path),
-    add: now.filter((p) => moved.has(p.kind) && !p.unsafe && p.state !== 'excluded').map((p) => p.path),
-    theirs: old.filter((p) => !p.addedByHive && p.state === 'excluded').map((p) => p.path)
+    add: now.filter((p) => moved.has(p.kind) && !p.unsafe && p.state !== 'excluded' && p.state !== 'added').map((p) => p.path),
+    theirs: old.filter((p) => !p.addedByHive && p.listed).map((p) => p.path)
   }
 }

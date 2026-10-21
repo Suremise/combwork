@@ -93,6 +93,7 @@
   "main.move.copied": "{n, plural, other {{owner, select, project {{host}：已将该项目的 {n, number} 个 {provider} 对话和记忆文件复制到新路径对应的文件夹（旧文件夹保留）。} assistant {{host}：已将助手的 {n, number} 个 {provider} 对话和记忆文件复制到新路径对应的文件夹（旧文件夹保留）。} worktree {{host}：已将 {agent} 工作树的 {n, number} 个 {provider} 对话和记忆文件复制到新路径对应的文件夹（旧文件夹保留）。} other {{host}：已将 {of} 的 {n, number} 个 {provider} 对话和记忆文件复制到新路径对应的文件夹（旧文件夹保留）。}}}}",
   "main.move.copyFailed": "{n, plural, other {{owner, select, project {{host}：该项目的 {n, number} 个 {provider} 文件无法复制到 {folder}：{files}。“修复”会再次尝试。} assistant {{host}：助手的 {n, number} 个 {provider} 文件无法复制到 {folder}：{files}。“修复”会再次尝试。} worktree {{host}：{agent} 工作树的 {n, number} 个 {provider} 文件无法复制到 {folder}：{files}。“修复”会再次尝试。} other {{host}：{of} 的 {n, number} 个 {provider} 文件无法复制到 {folder}：{files}。“修复”会再次尝试。}}}}",
   "main.move.copyKept": "{n, plural, other {{owner, select, project {{host}：{folder} 中已有该项目的 {n, number} 个 {provider} 文件，但内容不同，未覆盖：{files}。} assistant {{host}：{folder} 中已有助手的 {n, number} 个 {provider} 文件，但内容不同，未覆盖：{files}。} worktree {{host}：{folder} 中已有 {agent} 工作树的 {n, number} 个 {provider} 文件，但内容不同，未覆盖：{files}。} other {{host}：{folder} 中已有 {of} 的 {n, number} 个 {provider} 文件，但内容不同，未覆盖：{files}。}}}}",
+  "main.move.defenderFailed": "无法将 Hive 的 Defender 排除项移到新文件夹（{why}）。",
   "main.move.gitFailed": "{command} 失败",
   "main.move.lanes": "{n, plural, other {# 条通道}}",
   "main.move.madeNew": "{host}：已在新分支 {branch} 上新建 {agent} 的工作树（原分支已不存在），位置：{path}。",
