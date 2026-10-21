@@ -373,12 +373,12 @@ function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] 
 /** Checked under the board's lock (#1270): the lane's cards are still all Done (gone ones aside), else nothing is saved. */
 const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
   const places = placesOf(ws, l, cards)
-  if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`)
+  if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
 }
 
 /** Checked under the board's lock (#1270): none of the lane's cards is in flight now, else its queued list waits. */
 const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
-  if (placesOf(ws, l, cards).some((c) => c === 'doing' || c === 'review' || c === 'passed')) throw new StaleLane(`lane ${l.id}: a card is in flight again`)
+  if (placesOf(ws, l, cards).some((c) => c === 'doing' || c === 'review' || c === 'passed')) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
 }
 
 /** A lane's card in flight: started, not Done (in Doing, Review or Passed), the first such in the lane's order; null: none. */
