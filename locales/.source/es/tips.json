@@ -136,6 +136,8 @@
   "tips.filesTab.title": "Edit files without leaving Hive",
   "tips.flightRecorder.text": "Turn on a flight recorder trigger in Settings → Advanced (safeguard stops, something unknown from a CLI, a CLI version change, an agent gone silent), and Hive saves the agent's recent developer console events, redacted, the moment it happens, with a notice.",
   "tips.flightRecorder.title": "Catch rare events by themselves",
+  "tips.forYou.text": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
+  "tips.forYou.title": "Answer what waits for you",
   "tips.gitCheck.text": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Git tab need Git for Windows 2.38 or later.",
   "tips.gitCheck.title": "Is git ready for worktrees?",
   "tips.gitInit.text": "A project without git? Its Git tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",

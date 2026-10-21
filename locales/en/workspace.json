@@ -11,6 +11,10 @@
     "defaultMessage": "Documentation",
     "description": "The activity bar (left edge): Hive's documentation."
   },
+  "workspace.activity.forYou": {
+    "defaultMessage": "{n, plural, one {# card waits for you} other {# cards wait for you}}",
+    "description": "Accessible name and tooltip line of the count on the activity bar's Task Board icon: how many cards wait for the user (an approval, a decision, a question: For you). Glossary: For you."
+  },
   "workspace.activity.mcp": {
     "defaultMessage": "MCP Servers",
     "description": "The activity bar (left edge): the workspace's MCP servers."

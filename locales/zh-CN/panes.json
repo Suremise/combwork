@@ -140,6 +140,7 @@
   "panes.session.renameFailed": "无法重命名",
   "panes.session.renameItem": "重命名会话…",
   "panes.session.renameTitle": "重命名会话",
+  "panes.session.starting": "{kind, select, resume {正在恢复…} other {正在启动…}}",
   "panes.tab.failed": "启动失败：{why}",
   "panes.tab.mcp": "MCP 服务器：{servers}",
   "panes.tab.notRunning": "未运行",

@@ -136,6 +136,8 @@
   "tips.filesTab.title": "Edita archivos sin salir de Hive",
   "tips.flightRecorder.text": "Activa un disparador de la caja negra en Configuración → Avanzado (paradas de seguridad, algo desconocido de una CLI, un cambio de versión de la CLI, un agente que se quedó en silencio), y Hive guarda los eventos recientes de la consola de desarrollador del agente, con los datos sensibles ocultos, en el momento en que ocurre, con un aviso.",
   "tips.flightRecorder.title": "Captura los eventos poco frecuentes sin hacer nada",
+  "tips.forYou.text": "Una tarjeta con la etiqueta Para ti te espera: una aprobación, una decisión o una pregunta. El icono del Tablero de tareas las cuenta, y Para ti en el tablero muestra solo esas. Abre la tarjeta para aprobar, rechazar o responder: el agente que espera se entera al instante.",
+  "tips.forYou.title": "Responde lo que te espera",
   "tips.gitCheck.text": "Ayuda → Configuración de agentes… muestra el git que encontró Hive y su versión. Los agentes con worktree, la fusión y la pestaña Git necesitan Git for Windows 2.38 o posterior.",
   "tips.gitCheck.title": "¿Está git listo para los worktrees?",
   "tips.gitInit.text": "¿Un proyecto sin git? Inicializar repositorio…, en su pestaña Git, lo convierte en uno en main, deja .hive fuera, agrega un .gitignore inicial si quieres y hace el primer commit, para que los agentes puedan trabajar en worktrees enseguida.",
