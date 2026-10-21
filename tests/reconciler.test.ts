@@ -26,7 +26,8 @@ const { foldCard } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
 const G = await import('../src/main/platform/git')
 const { advanced } = await import('../src/main/advanced')
-const { ENFORCE } = await import('../src/main/workflow/service')
+const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
+const keys = await import('../src/main/projectKeys')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -193,6 +194,36 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
     expect(kinds(w, one)).not.toContain('CommitAttributed')
     expect(FactStore.forBoard(w, { project: 'p', key: 'p' }).folderCommits(repo)).toMatchObject([{ sha, card: two, how: 'trailer' }])
+  })
+
+  // #1294: the runtime names cards by #1219's keys, a project's own numbers apart from the board's.
+  it("a project's cards by its key and their number there: the runtime's names, cardByKey (an old key, #N, the name form) and a Hive-Card trailer", async () => {
+    const { w, repo } = await workspace({ shared: true })
+    await keys.keyProjects(w)
+    const key = (await keys.projectKeyOf(w, repo))!
+    // A workspace card first, so p's cards' numbers there (1, 2) aren't their numbers on the board.
+    await inWorkspace(w, () => tasks.createTask({ title: 'Workspace', project: '' }, user))
+    const [one, two] = await inWorkspace(w, async () => [(await tasks.createTask({ title: 'One', project: 'p' }, user)).number, (await tasks.createTask({ title: 'Two', project: 'p' }, user)).number])
+    expect(two).not.toBe(2)
+    const wf = (await workflowFor(w, repo))!
+    expect(wf.cfg.projectKey).toBe(key)
+    expect([wf.store.card(one).key, wf.store.card(two).key]).toEqual([`${key}-1`, `${key}-2`])
+    for (const ref of [`${key}-2`, `${key.toLowerCase()}-2`, `#${two}`, `p-${two}`]) expect({ ref, got: wf.store.cardByKey(ref)?.id ?? null }).toEqual({ ref, got: two })
+    expect(wf.store.cardByKey(`${key}-9`)).toBeNull()
+    expect(wf.resolve(`${key}-2`, builder)).toMatchObject({ id: two })
+    // A trailer by key attributes the commit to that card.
+    await inWorkspace(w, () => tasks.updateTask(one, { column: 'doing', agent: 'a1' }, user))
+    await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
+    writeFileSync(join(repo, 'two.txt'), 'two\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: ${key}-2`)
+    const sha = git(repo, 'rev-parse', 'HEAD')
+    await reconcileNow(w, repo)
+    expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
+    expect(kinds(w, one)).not.toContain('CommitAttributed')
+    // The key changed: the runtime names them by the new one at once; the old one still finds them.
+    await keys.changeProjectKey(w, repo, 'ZQX')
+    expect([wf.cfg.projectKey, wf.store.card(two).key, wf.store.cardByKey(`${key}-2`)?.id]).toEqual(['ZQX', 'ZQX-2', two])
   })
 
   it('a head read before the card started again is never written into its new cycle', async () => {
