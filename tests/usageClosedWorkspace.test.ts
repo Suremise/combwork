@@ -8,6 +8,7 @@ import { join, resolve as resolvePath } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { junction } from './pathAliases'
 
 const base = tempDir('hive-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -15,11 +16,11 @@ const base = tempDir('hive-usage-closed-')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const { usageHistory } = await import('../src/main/usageHistory')
-const { boardLock, boardOpen } = await import('../src/main/boardStore')
+const { boardLock, boardOpen, workspaceDb } = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 const { withFileLock } = await import('../src/main/fsutil')
 
-const [wsA, wsB, wsC, wsD, wsE, wsF, wsG] = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta'].map((n) => join(base, n))
+const [wsA, wsB, wsC, wsD, wsE, wsF, wsG, wsH, wsI] = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota'].map((n) => join(base, n))
 let w: ReturnType<typeof createWorkspaceService>
 
 /** Holds a promise until `release()`: the moment a test switches workspaces in. */
@@ -31,7 +32,7 @@ function gate(): { held: Promise<void>; release: () => void } {
 
 describe('the usage history of a workspace that closed', () => {
   beforeAll(async () => {
-    for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF, wsG]) {
+    for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF, wsG, wsH, wsI]) {
       mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
       writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
@@ -202,5 +203,28 @@ describe('the usage history of a workspace that closed', () => {
     g.release()
     await closing
     expect(boardOpen(wsG)).toBe(false)
+  })
+
+  it('a workspace closed by one name is closed by every other: its board is not opened again through a junction, either way round', async () => {
+    // Closed by its real name, asked for through a junction.
+    await w.open(wsH)
+    await w.sessionsFile(join(wsH, 'proj'))
+    const viaH = junction(wsH, join(base, 'theta-alias'))
+    await w.open(wsB)
+    expect(boardOpen(wsH)).toBe(false)
+    expect(() => workspaceDb(viaH)).toThrow('The workspace was closed')
+    expect(boardOpen(viaH) || boardOpen(wsH)).toBe(false)
+    // Opened and closed through a junction, asked for by its real name.
+    const viaI = junction(wsI, join(base, 'iota-alias'))
+    await w.open(viaI)
+    await w.sessionsFile(join(viaI, 'proj'))
+    await w.open(wsB)
+    expect(() => workspaceDb(wsI)).toThrow('The workspace was closed')
+    expect(boardOpen(wsI) || boardOpen(viaI)).toBe(false)
+    // Opened again by the other name: its board opens as it is used.
+    await w.open(wsI)
+    await w.sessionsFile(join(wsI, 'proj'))
+    expect(boardOpen(wsI)).toBe(true)
+    await w.open(wsB)
   })
 })
