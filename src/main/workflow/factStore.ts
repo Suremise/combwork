@@ -370,6 +370,11 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
+  /** Whether a card is archived (a gone card counts as archived: its pins may go). */
+  isArchived(id: number): boolean {
+    return this.conn.read((db) => ((db.prepare('SELECT archived FROM cards WHERE number = ?').get(id) as { archived: number } | undefined)?.archived ?? 1) === 1)
+  }
+
   /** This project's cards (not archived), in number order. */
   cards(): CardRecord[] {
     return this.records('project = ? AND archived = 0', [this.scope.project])
