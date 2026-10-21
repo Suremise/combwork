@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { closeBoard } from './boardStore'
+import { closeBoard, keepBoard } from './boardStore'
 import { closeJournal } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -283,6 +283,8 @@ export class WorkspaceService {
       this.generation++
       this.path = abs
       markOpen(abs)
+      // A save's lease that opened its database as it was closed doesn't close it now it is this window's (#1383).
+      keepBoard(abs)
     })
     admission = admit.catch(() => undefined)
     await admit

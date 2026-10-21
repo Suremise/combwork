@@ -1,7 +1,7 @@
 import { saveTable as saveTypedTable, storeValue, type StoreName } from '../src/main/storeRows'
 import { readTable, saveTable } from '../src/main/storeTables'
 import type { TableStore } from '../src/main/schema/storeCodec'
-import { boardOpen, closeBoard, transientDb, workspaceDb } from '../src/main/boardStore'
+import { leaseDb, workspaceDb } from '../src/main/boardStore'
 import { addDeliveries, readDeliveries } from '../src/main/schema/sessionDeliveryTables'
 
 /** Any store: lanes, watches and metrics are in their typed tables (#1212, storeTables.ts), sessions and deliveries in theirs (#1211). */
@@ -13,12 +13,11 @@ const inTables = (store: AnyStore): store is TableStore => store === 'lanes' || 
  * workspace's (Hive doesn't open a closed workspace's database for itself, #1379) that holds nothing open after.
  */
 function peek<T>(workspacePath: string, read: () => T): T {
-  const wasOpen = boardOpen(workspacePath)
-  transientDb(workspacePath)
+  const lease = leaseDb(workspacePath)
   try {
     return read()
   } finally {
-    if (!wasOpen) closeBoard(workspacePath)
+    lease.release()
   }
 }
 

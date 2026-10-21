@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, inBoardWrite, transientDb, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, inBoardWrite, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { keepAsBackup } from './storeBackup'
@@ -90,14 +90,9 @@ export async function withStoreLock<T>(workspacePath: string, store: StoreName, 
   const path = resolve(workspacePath)
   if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
   await storeTestHooks.beforeSave?.(store, scope)
-  return withFileLock(boardLock(path), async () => {
-    const wasOpen = boardOpen(path)
-    try {
-      return await fn(transientDb(path).writer)
-    } finally {
-      if (!wasOpen) closeBoard(path)
-    }
-  })
+  // Its own lease on the connection (#1383): a workspace closed meanwhile, or opened, neither closes it under `fn` nor is
+  // closed by it.
+  return withFileLock(boardLock(path), () => withLeasedDb(path, (db) => fn(db.writer)))
 }
 
 type Writer = ReturnType<typeof workspaceDb>['writer']
@@ -113,17 +108,13 @@ export async function saveTable(workspacePath: string, store: StoreName, scope: 
   await storeTestHooks.beforeSave?.(store, scope)
   await withFileLock(boardLock(path), async () => {
     guard?.()
-    const wasOpen = boardOpen(path)
-    const db = transientDb(path).writer
-    try {
+    await withLeasedDb(path, ({ writer: db }) =>
       transaction(db, () => {
         write(db)
         for (const [k, v] of Object.entries(meta)) setMeta(db, store, scope, k, v)
         if (storeTestHooks.failSave?.(store, scope)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
       })
-    } finally {
-      if (!wasOpen) closeBoard(path)
-    }
+    )
   })
 }
 
