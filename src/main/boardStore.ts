@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -176,6 +176,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of ACTIONS_DELIVERED_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1237: the board's full-text search, an FTS5 index of the cards' text kept in step by triggers (schema/v1_0.ts).
+    version: 11,
+    name: CARD_SEARCH_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of CARD_SEARCH_STEP.ddl) db.exec(sql)
     }
   }
 ]
@@ -1080,6 +1089,23 @@ export interface CardQuery {
   numbers?: number[]
   agents?: string[]
   reviewers?: string[]
+}
+
+/** An FTS5 query for cards whose searched text contains `words` (one string, spaces and all): a phrase, quotes doubled. */
+export const searchMatch = (words: string): string => `{title description project agent labels} : "${words.replace(/"/g, '""')}"` // i18n-ignore: an FTS5 query
+
+/**
+ * The board's search through its full-text index (#1237, `card_search`): the cards whose title, description, project,
+ * agent's name or labels contain `words` (searchedWords: lower case), as candidates the caller confirms with cardMatches
+ * (the index folds case by Unicode, which can find a few more than `toLowerCase`, never fewer). Null when the index can't
+ * answer: words under three characters (it indexes trigrams), or a board without it (0.9's, waiting for its upgrade).
+ */
+export function searchCards(ws: WorkspaceService, words: string): Set<number> | null {
+  if ([...words].length < 3) return null
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy || b.db.pending) return null
+    return new Set((db.prepare(QUERIES['board.search'].sql).all(searchMatch(words)) as { number: number }[]).map((r) => r.number))
+  })
 }
 
 /** Cards' documents, by number, as the query asks; in number order. */

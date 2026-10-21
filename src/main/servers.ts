@@ -548,7 +548,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 6
+export const API_VERSION = 7
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1961,7 +1961,8 @@ route('GET', '/v1/tasks', async ({ query }) => {
   requireWorkspace()
   const project = query.get('project') ?? undefined
   // A project agent's list is its project's cards; it can't ask for another project's.
-  const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope() })
+  // ?q= (#1237): the board's search, through its full-text index.
+  const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope(), query: query.get('q') ?? undefined })
   const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
   const views = await Promise.all(cards.map((c) => taskView(c, agents)))
   // ?view=short: a row per card, without its description, comments and history.

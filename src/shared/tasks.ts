@@ -379,6 +379,19 @@ export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'desc
   return [c.title, c.description, c.project, c.agentName ?? '', ...c.labels].some((x) => x.toLowerCase().includes(s))
 }
 
+/**
+ * What a search looks for in cards' text (#1237): its words, lower case, as cardMatches compares them; null when it
+ * finds cards another way (a number, `#12`, or a project's key, `AM-12`, `AM-`), when there are no `keys` to tell a key
+ * form from words, or when it is empty. The full-text index answers only for words.
+ */
+export function searchedWords(q: string, keys: readonly { key: string; aliases: readonly string[] }[]): string | null {
+  const s = q.trim().toLowerCase()
+  if (!s || /^#?\d+$/.test(s)) return null
+  const k = /^([a-z]{2,4})-(\d{0,9})$/.exec(s)
+  if (k && (!keys.length || keys.some((x) => x.key === k[1].toUpperCase() || x.aliases.includes(k[1].toUpperCase())))) return null
+  return s
+}
+
 /** Cards in board order: by column, then position. */
 export function sortCards<T extends Pick<TaskCard, 'number' | 'column' | 'order'>>(cards: T[]): T[] {
   const col = (c: T): number => TASK_COLUMNS.findIndex((x) => x.id === c.column)
