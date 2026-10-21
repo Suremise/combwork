@@ -109,6 +109,20 @@ const check = (name, ok, extra = '') => {
     check('…every card of a project by its key alone (WB-)', await finds('WB-', [c1.number, c2.number]), JSON.stringify(await shown()))
     check('…and by number, as before', await finds(`#${h1.number}`, [h1.number]), JSON.stringify(await shown()))
     await search.fill('')
+    // A prompt opened from a box behind it takes the focus (round 3): typed into the search, Ctrl+Alt+N (New Project),
+    // then typed again without a click, the text goes into the dialog's name, the search keeping only its own.
+    await search.click()
+    await page.keyboard.type('before')
+    await page.keyboard.press('Control+Alt+N')
+    const shortcutDialog = page.locator('.dialog', { hasText: 'New Project' })
+    await shortcutDialog.waitFor({ timeout: HUNG_MS })
+    const shortcutName = shortcutDialog.locator('input').first()
+    await lib.until(async () => shortcutName.evaluate((e) => document.activeElement === e), HUNG_MS)
+    await page.keyboard.type('typed')
+    check('a prompt opened from a box behind it takes the focus: what is typed next goes into the dialog', !!(await lib.until(async () => (await shortcutName.inputValue()) === 'typed' && (await search.inputValue()) === 'before', HUNG_MS)), `[name: ${await shortcutName.inputValue()}, search: ${await search.inputValue()}]`)
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await shortcutDialog.count()) === 0, HUNG_MS)
+    await search.fill('')
 
     // --- Project Settings: change the key; the old one is listed and still finds the cards.
     await page.getByRole('button', { name: 'Projects' }).click()

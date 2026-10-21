@@ -56,6 +56,9 @@ export function Dialogs() {
   const [second, setSecond] = useState('')
   const [secondOwn, setSecondOwn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The dialog shown now, for a callback started for one that may have closed since.
+  const shownDialog = useRef(dialog)
+  shownDialog.current = dialog
   const action = useBusy()
   const { setError: setActionError } = action
 
@@ -68,12 +71,18 @@ export function Dialogs() {
       setSecondOwn(false)
       setChecked(dialog.check?.initial ?? false)
       setError(null)
-      // Its box takes the focus as it opens, unless the user is already in a box (#1221: run late, on a busy machine,
-      // the select took what was being typed into the key box into the name box).
+      // Its box takes the focus as it opens, from wherever it was (a search box or a terminal behind the dialog too),
+      // unless the user has already gone into one of this dialog's own boxes (#1221: run late, on a busy machine, the
+      // select took what was being typed into the key box into the name box). Not once this prompt has closed.
+      const opened = dialog
       setTimeout(() => {
+        const box = inputRef.current
+        if (shownDialog.current !== opened || !box?.isConnected) return
         const active = document.activeElement
-        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
-        inputRef.current?.select()
+        const own = box.closest('.dialog')
+        if (own && active !== box && own.contains(active) && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) return
+        if (active === box && box.value !== (opened.initial ?? '')) return
+        box.select()
       }, 30)
     }
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
