@@ -36,6 +36,25 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## The card intents' tools: fakes, Codex (its default model), fixtures v72, 21 October 2026
+
+#1267 gives agents a hive tool per card intent (`hive_start_card`, `hive_put_back`, `hive_start_review`,
+`hive_request_builder`, `hive_verdict`…), +4.9 KB to every session's tool list (27.4 to 32.3 KB a start: baselines
+`hb1-1267-before`, 1.0.0 at d148192c, and `hb1-1267-after`; every other cost unchanged). Two new scenarios, in Pair
+with everyone in the project folder: **intent-put-back** (a builder starts a card and puts it back, saying why) and
+**intent-review-request** (a reviewer starts a review, asks the builder something, and fails it). Each checks the
+card's facts and, for the trials, which tools the model chose.
+- **Fakes** (Claude Code's and Codex's): both pass, 12 of 12 checks (`2026-10-21T06-36-51-fake`, `2026-10-21T06-37-43-fake-codex`).
+- **Codex**, 1 sample each (`2026-10-21T06-38-41-codex`, CLI 0.163.0, $0.16): the skills (unchanged until #1274) still say
+  `hive_update_task`, and the model followed them. The builder read the card and moved it with `hive_update_task`, never
+  started it (no `Started` fact, so no `why` either). The reviewer started its review and failed the card with
+  `hive_update_task`'s `review` (its facts written through that path, the card left in Review as that path does), and
+  chose **`hive_request_builder`** for the question, the one step no older tool covers. 6 of 12 checks pass: the
+  failures are the tool-choice checks and what the older path does differently. The trial to repeat once #1274 points
+  the skills at the intents.
+- **Claude Code**: not run, skipped for the environment (`2026-10-21T06-40-46-claude-code`: its test home is signed
+  out, #1321).
+
 ## The Assistant's override, with its facts and a move that skips nothing: fakes, Codex (its default model), fixtures v71, 21 October 2026
 
 The runs below record fixtures v70: they ran #1319's checks before the version was bumped for them (v71).

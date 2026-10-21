@@ -37,6 +37,12 @@ export const ASSISTANT_AGENT_TOOLS = ['hive_activate_project', 'hive_add_agent',
 export const TASK_TOOLS = ['hive_create_task', 'hive_update_task', 'hive_update_tasks', 'hive_reorder_tasks']
 
 /**
+ * A card's intents (#1267, SPEC §16.8.1), Hive moving the card: every agent has these, the Assistant at the control level
+ * that runs agents. Starting a card oneself is an agent's (the Assistant starts cards on agents: hive_start_task).
+ */
+export const INTENT_TOOLS = ['hive_put_back', 'hive_submit', 'hive_declare_paths', 'hive_start_review', 'hive_verdict', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules', 'hive_request_builder']
+
+/**
  * Lanes (#483): every Assistant lists them (a read, #500: "which lanes are running?" at Look too); starting, joining and
  * ending one need Control agents, which the Agent API checks (assistantChange), and the tool's description says.
  */
@@ -51,8 +57,8 @@ export const ASSISTANT_SETTINGS_TOOLS = ['hive_update_setting']
 /** The Assistant's journal (#1031): offered only while Settings → Assistant → Journal is on (at its start). */
 export const JOURNAL_TOOLS = ['hive_journal_write', 'hive_journal_recall', 'hive_journal_entry', 'hive_journal_update']
 
-/** Tools only project agents have (the Assistant doesn't get them): the merge slot is held by an agent's own launch. */
-export const AGENT_ONLY_TOOLS = ['hive_merge_slot']
+/** Tools only project agents have (the Assistant doesn't get them): the merge slot is held by an agent's own launch; a card is started by the agent that works on it. */
+export const AGENT_ONLY_TOOLS = ['hive_merge_slot', 'hive_start_card']
 
 /** Tools only the Assistant has (project agents don't get them). hive_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
 export const ASSISTANT_ONLY_TOOLS = ['hive_agent_activity', 'hive_list_providers', 'hive_list_settings', 'hive_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
@@ -66,7 +72,7 @@ export function controlAllows(level: AssistantControlLevel | string | undefined,
 
 /** The tools an Assistant with this control level (and Change settings, its journal, on or off) may use without asking. */
 export function assistantTools(level: AssistantControlLevel | string | undefined, changeSettings = false, journal = false): string[] {
-  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
+  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
 }
 
 /** Every tool the hive MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
@@ -76,5 +82,6 @@ export const HIVE_TOOLS: readonly string[] = [
   'hive_create_project', 'hive_activate_project', 'hive_add_agent', 'hive_update_agent', 'hive_start_agent', 'hive_stop_agent', 'hive_prompt_agent',
   'hive_message_agent', 'hive_hand_over', 'hive_list_tasks', 'hive_read_task', 'hive_create_task', 'hive_update_task', 'hive_update_tasks', 'hive_reorder_tasks', 'hive_start_task', 'hive_list_skills', 'hive_wait_for_tasks',
   'hive_list_settings', 'hive_read_setting', 'hive_update_setting', 'hive_merge_slot', 'hive_lane', 'hive_inbox', 'hive_console',
-  'hive_journal_write', 'hive_journal_recall', 'hive_journal_entry', 'hive_journal_update'
+  'hive_journal_write', 'hive_journal_recall', 'hive_journal_entry', 'hive_journal_update',
+  'hive_start_card', ...INTENT_TOOLS
 ]

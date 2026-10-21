@@ -102,6 +102,7 @@
   "service.hiveVcs.exitCode": "código de saída {code}",
   "service.hiveVcs.noRepo": "Nenhum repositório git contém este projeto.",
   "service.hiveVcs.rmFailed": "git rm --cached falhou: {why}",
+  "service.intent.noWorkflow": "#{n} não tem fluxo de trabalho: é um cartão do espaço de trabalho, ou o projeto dele ainda não tem um controle de versão escolhido. Mova-o no quadro.",
   "service.keys.closed": "O espaço de trabalho foi fechado, ou a janela abriu outro, antes de a chave ser alterada: nada mudou.",
   "service.keys.form": "Uma chave do projeto tem de 2 a 4 letras, de A a Z.",
   "service.keys.notice": "Os cartões são nomeados pela chave do seu projeto: {keys}. Mude uma chave em Configurações do projeto; a antiga continua funcionando.",
