@@ -104,7 +104,7 @@ import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
-import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, transcriptAnswered, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
+import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
 import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
@@ -4195,8 +4195,9 @@ class SessionManager {
     // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.
     const ledger = (l.ledger ??= newLedger())
     const ids = hook.ids
-    // The transcript turn it names is heard (#1371), whatever the ledger makes of it: those hooks arrive.
-    if (l.hooksWatch) hookTurn(l.hooksWatch, at, ids.turn, hook.event.kind === 'prompt' ? (hook.event.text ?? null) : null)
+    // The transcript turn it names is heard (#1371), whatever the ledger makes of it and whether or not an alarm stands:
+    // it answers that turn and those placed before it (the one transition, hooksHealth's hookTurn).
+    const answered = !!l.hooksWatch && hookTurn(l.hooksWatch, at, ids.turn, hook.event.kind === 'prompt' ? (hook.event.text ?? null) : null)
     const before = st.status
     // A CLI that wakes when its background tasks end begins that turn itself: while its transcript says one just ended
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
@@ -4219,9 +4220,9 @@ class SessionManager {
     // that is over says nothing of a prompt sent since.
     if (l.hooksWatch) {
       if (took.verdict !== 'stale') turnHeard(l.hooksWatch)
-      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity: the
-      // ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
-      const back = st.hooksMissing?.after === 'transcript' ? transcriptAnswered(l.hooksWatch, ids.turn) : !!st.hooksMissing && took.verdict !== 'stale'
+      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity (above):
+      // the ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
+      const back = st.hooksMissing?.after === 'transcript' ? answered : !!st.hooksMissing && took.verdict !== 'stale'
       if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']

@@ -33,6 +33,8 @@ export const PROMPT_HOOK_WINDOW_MS = 60_000
 /** Hook turn ids kept per launch, and transcript turns waited on: the latest only. */
 const MAX_HEARD = 256
 const MAX_TURNS = 500
+/** Turns order let go of, remembered as forgotten: the latest only. */
+const MAX_FORGOTTEN = 2_000
 
 /** How long the evidence of work must stand, with still no hook, before it counts (at most the bound). */
 export const HOOKS_GRACE_MS = 15_000
@@ -65,8 +67,14 @@ export interface HooksWatch {
    * again, though a later read returns it worked once more (a record of it appended late).
    */
   answered: number
-  /** The transcript turn that showed its hooks missing, while that flag stands. */
+  /** The transcript turn that showed its hooks missing, while that flag stands, and its place (kept: order is bounded). */
   flagged: string | null
+  flaggedSeq: number
+  /**
+   * Turns order let go of that weren't waited on (answered, or never worked): read again (a late record), each is
+   * unknown, never placed anew as a newer turn. The latest only.
+   */
+  forgotten: Set<string>
 }
 
 export const newHooksWatch = (startedAt: number, startHook: boolean, join: 'id' | 'time' | null = null): HooksWatch => ({
@@ -83,7 +91,9 @@ export const newHooksWatch = (startedAt: number, startHook: boolean, join: 'id' 
   order: new Map(),
   seq: 0,
   answered: 0,
-  flagged: null
+  flagged: null,
+  flaggedSeq: 0,
+  forgotten: new Set()
 })
 
 const keep = <T>(set: Set<T> | Map<T, unknown>, max: number): void => {
@@ -97,19 +107,25 @@ export function hookSeen(w: HooksWatch, now: number): void {
 }
 
 /**
- * A hook, as the launch's queue takes it (in the order hooks came, beside the checks), came at `now`: the transcript turn
- * it names is heard (`turn`: its turn id as the ledger reads it; any turn's, a stale one too: it proves that turn's hooks
- * arrive); or with no ids (Copilot), the turn its prompt hook's text is the prompt of (`prompt`), and every turn whose
- * prompt was recorded before the hook came.
+ * A hook, as the launch's queue takes it (in the order hooks came, beside the checks), came at `now`: the one place a hook
+ * answers transcript turns, whatever the ledger makes of it and whether or not a flag stands (`turn`: its turn id as the
+ * ledger reads it; any turn's, a stale one too: it proves that turn's hooks arrive). With ids, a turn the transcript has
+ * placed answers every turn up to its place, the flagged one among them (an older turn's late hook never reaches a newer
+ * one); one it hasn't placed yet is unknown, never newer, and is kept heard for transcriptTurns to answer by once its
+ * record is read. With no ids (Copilot): the turn its prompt hook's text is the prompt of (`prompt`), every turn whose
+ * prompt was recorded before the hook came, and a standing flag. Whether the flag was answered.
  */
-export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt: string | null = null): void {
+export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt: string | null = null): boolean {
+  // Its place as known before it is heard (a pending turn's own, though order has let go of it).
+  const pos = turn ? placeOf(w, turn) : undefined
   if (turn) {
     w.heard.delete(turn)
     w.heard.add(turn)
     keep(w.heard, MAX_HEARD)
     w.unheard.delete(turn)
   }
-  if (w.join !== 'time') return
+  if (w.join === 'id') return pos !== undefined && answeredUpTo(w, pos)
+  if (w.join !== 'time') return false
   const key = prompt ? promptKey(prompt) : null
   if (key) {
     w.prompts.delete(key)
@@ -117,6 +133,7 @@ export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt
     keep(w.prompts, MAX_HEARD)
   }
   for (const [id, u] of w.unheard) if (u.at <= now || (key && u.prompt === key)) w.unheard.delete(id)
+  return w.flagged !== null && answeredUpTo(w, Infinity)
 }
 
 /**
@@ -126,9 +143,32 @@ export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt
 function answeredUpTo(w: HooksWatch, upTo: number): boolean {
   w.answered = Math.max(w.answered, Math.min(upTo, w.seq))
   for (const [id, u] of w.unheard) if (u.seq <= upTo) w.unheard.delete(id)
-  if (w.flagged === null || (w.order.get(w.flagged) ?? 0) > upTo) return false
+  if (w.flagged === null || w.flaggedSeq > upTo) return false
   w.flagged = null
+  w.flaggedSeq = 0
   return true
+}
+
+/**
+ * A turn's place in this reading, while it is known: in order, else (order being bounded) a turn still waited on or
+ * flagged keeps its own. Undefined: unknown (not read, or forgotten), never taken as newer or older.
+ */
+function placeOf(w: HooksWatch, id: string): number | undefined {
+  return w.order.get(id) ?? w.unheard.get(id)?.seq ?? (id === w.flagged ? w.flaggedSeq : undefined)
+}
+
+/**
+ * A turn read for the first time is placed after all before it (or a known one given its place back); order lets go of
+ * the oldest, remembering it forgotten unless its place is kept elsewhere (waited on, or flagged).
+ */
+function place(w: HooksWatch, id: string, at = ++w.seq): void {
+  w.order.set(id, at)
+  while (w.order.size > MAX_TURNS) {
+    const old = w.order.keys().next().value!
+    w.order.delete(old)
+    if (!w.unheard.has(old) && old !== w.flagged) w.forgotten.add(old)
+  }
+  keep(w.forgotten, MAX_FORGOTTEN)
 }
 
 /**
@@ -142,16 +182,20 @@ function answeredUpTo(w: HooksWatch, upTo: number): boolean {
 export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; worked: boolean; prompt?: string }[], now: number, since: number): boolean {
   let heardUpTo = 0
   for (const t of turns) {
+    // A turn order let go of: one still waited on or flagged keeps its place; one forgotten is unknown, and left alone.
     if (!w.order.has(t.id)) {
-      w.order.set(t.id, ++w.seq)
-      keep(w.order, MAX_TURNS)
+      const kept = placeOf(w, t.id)
+      if (kept !== undefined) place(w, t.id, kept)
+      else if (w.forgotten.has(t.id)) continue
+      else place(w, t.id)
     }
-    if (w.join === 'id' && w.heard.has(t.id)) heardUpTo = Math.max(heardUpTo, w.order.get(t.id)!)
-    if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id) || w.order.get(t.id)! <= w.answered) continue
+    const pos = w.order.get(t.id)!
+    if (w.join === 'id' && w.heard.has(t.id)) heardUpTo = Math.max(heardUpTo, pos)
+    if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id) || pos <= w.answered) continue
     const hookAt = t.prompt ? w.prompts.get(t.prompt) : undefined
     const heard = w.join === 'time' ? (w.lastHookAt !== null && w.lastHookAt >= t.at) || (hookAt !== undefined && hookAt >= t.at - PROMPT_HOOK_WINDOW_MS) : w.heard.has(t.id)
     if (heard) continue
-    w.unheard.set(t.id, { foundAt: now, seq: w.order.get(t.id)!, at: t.at, ...(t.prompt ? { prompt: t.prompt } : {}) })
+    w.unheard.set(t.id, { foundAt: now, seq: pos, at: t.at, ...(t.prompt ? { prompt: t.prompt } : {}) })
     keep(w.unheard, MAX_TURNS)
   }
   return heardUpTo > 0 && answeredUpTo(w, heardUpTo)
@@ -165,25 +209,11 @@ export function transcriptReset(w: HooksWatch): boolean {
   const flagged = w.flagged !== null
   w.unheard.clear()
   w.order.clear()
+  w.forgotten.clear()
   w.answered = 0
   w.flagged = null
+  w.flaggedSeq = 0
   return flagged
-}
-
-/**
- * Whether a hook (as the launch's queue takes it) answers the transcript turn that raised the flag: that turn's own id,
- * a newer turn's (one the transcript read after it), or with no ids any hook. An older turn's late hook never does, nor
- * does one whose turn the transcript hasn't shown (unknown: the ledger's current turn may be older than the flagged one,
- * whose hooks are what went missing): that one answers once the transcript shows it after the flagged turn
- * (transcriptTurns). Answered, the turns waited on up to the answering one are let go.
- */
-export function transcriptAnswered(w: HooksWatch, turn: string | null): boolean {
-  const f = w.flagged
-  if (f === null) return false
-  if (w.join === 'time') return answeredUpTo(w, Infinity)
-  if (turn === f) return answeredUpTo(w, w.order.get(f) ?? Infinity)
-  const pos = turn ? w.order.get(turn) : undefined
-  return pos !== undefined && pos > (w.order.get(f) ?? 0) && answeredUpTo(w, pos)
 }
 
 /**
@@ -221,6 +251,7 @@ export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boun
   for (const [id, u] of w.unheard) {
     if (now - u.foundAt < boundMs) continue
     w.flagged = id
+    w.flaggedSeq = u.seq
     return 'transcript'
   }
   const s = w.submit

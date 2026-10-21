@@ -10,7 +10,7 @@ import type { HookIds, LaunchContext } from '../src/main/providers/types'
 import { claudeTranscriptTurns } from '../src/main/providers/claude/turns'
 import { admit, newLedger } from '../src/main/turnLedger'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
-import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptAnswered, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
+import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
 import { promptKey } from '../src/main/providers/turns'
 import { readyFor } from '../src/main/readiness'
 import { agentState } from '../src/shared/agentState'
@@ -278,44 +278,82 @@ describe("a turn its transcript shows (#1371)", () => {
     transcriptTurns(w, [turn('A'), turn('E', 3_000)], 10_000, since)
     hookTurn(w, 10_001, 'A')
     expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    hookTurn(w, 70_002, 'A')
-    expect(transcriptAnswered(w, 'A')).toBe(false)
-    hookTurn(w, 70_003, 'E')
-    expect(transcriptAnswered(w, 'E')).toBe(true)
+    expect(hookTurn(w, 70_002, 'A')).toBe(false)
+    expect(w.flagged).toBe('E')
+    expect(hookTurn(w, 70_003, 'E')).toBe(true)
     expect(w.flagged).toBeNull()
     expect(hooksMissing(w, quiet, 100 * BOUND, BOUND)).toBeNull()
   })
 
-  it("flagged: a newer turn's hook answers it once the transcript shows that turn after the flagged one; an unread id is unknown until then", () => {
-    const later = idWatch()
-    transcriptTurns(later, [turn('E'), turn('F', 3_000, false)], 10_000, since)
-    expect(hooksMissing(later, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    expect(transcriptAnswered(later, 'F')).toBe(true)
-    expect(hooksMissing(later, quiet, 100 * BOUND, BOUND)).toBeNull()
-
-    // A healthy newer turn's hook comes before its transcript is written: nothing yet, then its record answers the flag.
-    const fresh = idWatch()
-    transcriptTurns(fresh, [turn('E')], 10_000, since)
-    expect(hooksMissing(fresh, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    hookTurn(fresh, 80_000, 'N')
-    expect(transcriptAnswered(fresh, 'N')).toBe(false)
-    expect(fresh.flagged).toBe('E')
-    expect(transcriptTurns(fresh, [turn('N', 79_000)], 81_000, since)).toBe(true)
-    expect(fresh.flagged).toBeNull()
-    expect(hooksMissing(fresh, quiet, 100 * BOUND, BOUND)).toBeNull()
-
-    // An unread id the transcript never shows (an older turn's, its prompt before the reading began): it never answers,
-    // however much more of the transcript is read.
+  it('an unread id is unknown: it answers nothing until the transcript places it, however much more is read', () => {
     const older = idWatch()
     transcriptTurns(older, [turn('E', 3_000)], 10_000, since)
     expect(hooksMissing(older, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    hookTurn(older, 80_000, 'A')
-    expect(transcriptAnswered(older, 'A')).toBe(false)
+    expect(hookTurn(older, 80_000, 'A')).toBe(false)
+    expect(older.answered).toBe(0)
     expect(transcriptTurns(older, [turn('E', 3_000)], 81_000, since)).toBe(false)
     expect(older.flagged).toBe('E')
   })
 
-  it("answered stays answered (HR6's recovery case, the real Claude reader): a late record of E after N cleared it never flags E again; a new turn with no hook after that still does", () => {
+  // The invariant (#1371 round 3): an older pending turn E ends only on a hook naming E or a turn placed after it, by
+  // the one transition (hookTurn, or transcriptTurns for a hook that came first), in the order the session calls them:
+  // never a hook replayed. Each order: N's hook before or after N's record, before or after E's alarm; then an older
+  // turn's late hook changes nothing, E's late record isn't waited on, and a new turn with no hook still flags.
+  describe('the arrival orders (hook before or after the record × before or after the alarm)', () => {
+    const orders: { hook: 'before' | 'after'; alarm: 'before' | 'after' }[] = [
+      { hook: 'after', alarm: 'before' },
+      { hook: 'after', alarm: 'after' },
+      { hook: 'before', alarm: 'before' },
+      { hook: 'before', alarm: 'after' }
+    ]
+    for (const o of orders) {
+      it(`N's hook ${o.hook} its record, ${o.alarm} E's alarm: E ends; A's late hook, E's late record and a new unhooked X keep the rules`, () => {
+        const w = idWatch()
+        // A (answered by its own hook), then E: E's hooks never come.
+        transcriptTurns(w, [turn('A', 2_000)], 5_000, since)
+        hookTurn(w, 5_500, 'A')
+        transcriptTurns(w, [turn('E', 3_000)], 10_000, since)
+        const alarmAt = 10_000 + BOUND
+        let cleared = false
+        if (o.alarm === 'after') expect(hooksMissing(w, quiet, alarmAt, BOUND)).toBe('transcript')
+        if (o.hook === 'before') {
+          cleared = hookTurn(w, 10_500, 'N') || cleared
+          expect(w.unheard.has('E')).toBe(true)
+          cleared = transcriptTurns(w, [turn('N', 4_000)], 11_000, since) || cleared
+        } else {
+          cleared = transcriptTurns(w, [turn('N', 4_000)], 11_000, since) || cleared
+          cleared = hookTurn(w, 11_500, 'N') || cleared
+        }
+        // As the session calls hooksBack: only when an alarm stood.
+        expect(cleared).toBe(o.alarm === 'after')
+        expect(w.flagged).toBeNull()
+        expect(w.unheard.has('E')).toBe(false)
+        if (o.alarm === 'before') expect(hooksMissing(w, quiet, alarmAt + 10, BOUND)).toBeNull()
+        // An older turn's late hook: nothing changes, nothing more is answered.
+        const frontier = w.answered
+        expect(hookTurn(w, 200_000, 'A')).toBe(false)
+        expect(w.answered).toBe(frontier)
+        // E's late record: not waited on.
+        transcriptTurns(w, [turn('E', 3_000)], 210_000, since)
+        expect(hooksMissing(w, quiet, 210_000 + 10 * BOUND, BOUND)).toBeNull()
+        // A new turn X, no hook: flagged at its deadline, not before.
+        transcriptTurns(w, [turn('X', 300_000)], 900_000, since)
+        expect(hooksMissing(w, quiet, 900_000 + BOUND - 1, BOUND)).toBeNull()
+        expect(hooksMissing(w, quiet, 900_000 + BOUND, BOUND)).toBe('transcript')
+        expect(w.flagged).toBe('X')
+      })
+    }
+  })
+
+  it("HR6's before-the-alarm probe: E and N read at 10 s, N's hook at 11 s, nothing at 70 s", () => {
+    const w = idWatch()
+    transcriptTurns(w, [turn('E', 3_000), turn('N', 4_000)], 10_000, since)
+    expect(hookTurn(w, 11_000, 'N')).toBe(false)
+    expect(w.answered).toBe(w.order.get('N'))
+    expect(hooksMissing(w, quiet, 70_000, BOUND)).toBeNull()
+  })
+
+  it('answered stays answered (the real Claude reader): a late record of E after N answered it never flags E again; a new turn with no hook after that still does', () => {
     const at = (s: number) => new Date(Date.parse('2026-10-21T18:00:00.000Z') + s * 1000).toISOString()
     const prompt = (id: string, s: number) => JSON.stringify({ type: 'user', uuid: `u-${id}`, parentUuid: null, promptId: id, origin: { kind: 'human' }, timestamp: at(s), message: { role: 'user', content: 'do it' } }) + '\n'
     const reply = (uuid: string, parent: string, s: number) => JSON.stringify({ type: 'assistant', uuid, parentUuid: parent, timestamp: at(s), message: { role: 'assistant', content: [] } }) + '\n'
@@ -323,11 +361,10 @@ describe("a turn its transcript shows (#1371)", () => {
     const memo = {}
     const read = (text: string, now: number) => transcriptTurns(w, claudeTranscriptTurns(text, memo), now, started)
     const w = newHooksWatch(started, false, 'id')
-    // E is worked and no hook names it: flagged after the bound.
     read(prompt('E', 1) + reply('a-E', 'u-E', 2), 10_000)
     expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
     // N's hook, then its records: E is answered by the newer turn.
-    hookTurn(w, 80_000, 'N')
+    expect(hookTurn(w, 80_000, 'N')).toBe(false)
     expect(read(prompt('N', 70) + reply('a-N', 'u-N', 71), 81_000)).toBe(true)
     expect(w.flagged).toBeNull()
     // A record of E appended late (chained to E's reply): the reader returns E worked again, and it isn't waited on.
@@ -342,27 +379,48 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(w.flagged).toBe('X')
   })
 
-  it("answered stays answered for both hook orders and Copilot's any hook, but only up to what was read; a reset lets go of it", () => {
-    // The newer turn's hook after its record (transcriptAnswered): E's late record isn't waited on.
-    const after = idWatch()
-    transcriptTurns(after, [turn('E', 3_000), turn('N', 4_000)], 10_000, since)
-    hookTurn(after, 10_001, 'N')
-    expect(hooksMissing(after, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
-    expect(transcriptAnswered(after, 'N')).toBe(true)
-    transcriptTurns(after, [turn('E', 3_000)], 80_000, since)
-    expect(hooksMissing(after, quiet, 100 * BOUND, BOUND)).toBeNull()
-    // Copilot: any hook answers what was read, never a turn read after it.
+  it("past order's bound: flagged E keeps its place, so its own hook clears only E while a newer unhooked X still flags; a forgotten turn's late record is unknown", () => {
+    const w = idWatch()
+    // An answered turn F, then E (flagged), then X (no hook), then enough turns to push F and E out of order.
+    transcriptTurns(w, [turn('F', 2_000)], 5_000, since)
+    hookTurn(w, 5_500, 'F')
+    transcriptTurns(w, [turn('E', 3_000)], 10_000, since)
+    expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    const eAt = w.flaggedSeq
+    transcriptTurns(w, [turn('X', 4_000)], 80_000, since)
+    transcriptTurns(w, Array.from({ length: 500 }, (_, i) => turn(`old-${i}`, 5_000, false)), 81_000, since)
+    expect(w.order.has('E')).toBe(false)
+    expect(w.order.has('F')).toBe(false)
+    expect(w.forgotten.has('F')).toBe(true)
+    expect(w.forgotten.has('E')).toBe(false)
+    // E's own hook clears E only, at E's own place (never Infinity or 0).
+    expect(hookTurn(w, 90_000, 'E')).toBe(true)
+    expect(w.flagged).toBeNull()
+    expect(w.answered).toBe(eAt)
+    expect(w.unheard.has('X')).toBe(true)
+    expect(hooksMissing(w, quiet, 80_000 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('X')
+    // F's late record: forgotten, so neither placed anew nor an answer to X (though F was heard).
+    expect(transcriptTurns(w, [turn('F', 2_000)], 95_000, since)).toBe(false)
+    expect(w.order.has('F')).toBe(false)
+    expect(w.flagged).toBe('X')
+    // Its hook (forgotten) answers nothing either.
+    expect(hookTurn(w, 96_000, 'F')).toBe(false)
+    expect(w.flagged).toBe('X')
+  })
+
+  it("Copilot's any hook answers what was read, never a turn read after it; a reset lets go of the frontier", () => {
     const copilot = newHooksWatch(since, false, 'time')
     transcriptTurns(copilot, [turn('I1', 10_000)], 11_000, since)
     expect(hooksMissing(copilot, quiet, 11_000 + BOUND, BOUND)).toBe('transcript')
-    expect(transcriptAnswered(copilot, null)).toBe(true)
+    expect(hookTurn(copilot, 80_000, null, null)).toBe(true)
     expect(copilot.answered).toBe(copilot.order.get('I1'))
     transcriptTurns(copilot, [turn('I2', 200_000)], 201_000, since)
     expect(hooksMissing(copilot, quiet, 201_000 + BOUND, BOUND)).toBe('transcript')
     expect(copilot.flagged).toBe('I2')
-    // A reset (another file or conversation) starts the frontier again.
     expect(transcriptReset(copilot)).toBe(true)
     expect(copilot.answered).toBe(0)
+    expect(copilot.flaggedSeq).toBe(0)
   })
 
   it("a newer turn already heard when the transcript shows both: the older turn waited on before it is answered, never flagged", () => {
@@ -383,8 +441,7 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
     const stop = admit(ledger, { kind: 'stop', lastMessage: null }, ids('A'), { now: 2 })
     expect(stop.verdict).toBe('apply')
-    hookTurn(w, 75_000, 'A')
-    expect(transcriptAnswered(w, 'A')).toBe(false)
+    expect(hookTurn(w, 75_000, 'A')).toBe(false)
     expect(w.flagged).toBe('E')
   })
 
@@ -412,7 +469,8 @@ describe("a turn its transcript shows (#1371)", () => {
     transcriptTurns(w, [copilotTurn('I1', 10_000, 'say Deaf turn.')], 11_000, since)
     expect(hooksMissing(w, quiet, 11_000 + BOUND, BOUND)).toBe('transcript')
     // Flagged: any hook clears it (none names a turn).
-    expect(transcriptAnswered(w, null)).toBe(true)
+    hookSeen(w, 72_000)
+    expect(hookTurn(w, 72_000, null, null)).toBe(true)
 
     // Its prompt hook (it runs before Copilot records the prompt), whether read before or after the transcript: heard.
     const before = newHooksWatch(since, false, 'time')
