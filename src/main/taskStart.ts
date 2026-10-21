@@ -218,7 +218,7 @@ async function giveCard(
       await deliverNow(p, { ...nd, conversation: sessions.liveFor(p, agentId)?.sessionId || null }, holds).catch((e: Error) => {
         throw e instanceof NotGiven ? hiveError(msg({ id: 'tasks.start.notGiven', defaultMessage: "{agent} wasn't given #{n}: {why}.", description: "An error: the card #{n} (a number) could not be typed into the terminal of the agent {agent} (its name); {why} says why." }), { agent: agentName, n, why: errorText(e) }, { cause: e }) : e
       })
-    else run = (await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))).launched.runId
+    else run = (await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))).launched?.runId
   } catch (e) {
     await back(before.agent)
       .catch(() => back(null))

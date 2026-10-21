@@ -1059,7 +1059,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     let launched: string | null = null
     if (body?.start || prompt) {
       try {
-        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line })) : await sessions.start(p, { agentId: def.id })).runId
+        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line })) : await sessions.start(p, { agentId: def.id }))?.runId ?? null
         started = ' and started it'
         didStart = true
       } catch (e) {
@@ -1103,7 +1103,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line })) : await sessions.start(p, { agentId, resumeId })
-    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, started: { project: basename(p), agentId, run: st.runId } }
+    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
 
