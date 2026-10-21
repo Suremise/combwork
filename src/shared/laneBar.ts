@@ -200,7 +200,7 @@ export function laneCardState(c: LaneCard): SegmentState {
   if (c.column === 'unrecorded') return 'unrecorded'
   if (c.column === 'done') return 'done'
   if (c.column === 'passed') return 'passed'
-  if (c.blocked || c.column === 'hold') return 'blocked'
+  if (c.blocked || c.roundLimit || c.column === 'hold') return 'blocked'
   if (c.column === 'review') return 'review'
   if (c.column === 'doing') return 'doing'
   return 'todo'

@@ -323,6 +323,8 @@
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
   "tips.viewerTokens.text": "Une application qui montre ce que font tes agents, comme Apiary, n’a besoin que d’un jeton de lecture : Paramètres → Agent API → Jetons de lecture en crée un qui peut tout lire et ne rien modifier, et le révoque ensuite.",
   "tips.viewerTokens.title": "Laisser une autre application observer Hive",
+  "tips.workflowOptions.text": "Paramètres du projet → Flux de travail définit qui relit le travail d’une carte, quelles vérifications passent d’abord et qui le fusionne. Choisis un préréglage ou règle chaque option : un changement s’applique à partir de la prochaine carte qui démarre.",
+  "tips.workflowOptions.title": "Choisis comment les cartes arrivent à Terminé",
   "tips.workspaceMoved.text": "Tu as déplacé le dossier de l’espace de travail, par exemple sur un autre disque ? Ouvre-le depuis son nouvel emplacement et choisis Réparer… dans la bannière : les worktrees des agents, leurs sessions, ainsi que les conversations et la mémoire de Claude Code suivent.",
   "tips.workspaceMoved.title": "Déplacer un espace de travail sans perdre ses agents",
   "tips.worktreeReuse.text": "Tu ajoutes un agent avec un nouveau worktree du même nom qu’un worktree conservé (B4, et le worktree de B4 n’est pas utilisé) ? S’il est fusionné et propre, Hive donne ce dossier à l’agent, mis à jour avec main : ses node_modules y sont déjà.",

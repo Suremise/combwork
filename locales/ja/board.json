@@ -175,6 +175,7 @@
   "board.details.stepsLabel": "ステップ",
   "board.details.stepsLast": "{total, number}ステップ中{done, number}ステップ完了 · 最後：{step}",
   "board.details.summary": "概要",
+  "board.details.testedOn": "テスト対象",
   "board.details.took": "所要時間",
   "board.details.tookSoFar": "{took}経過{expected, select, none {} other { · 目安は約{expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · 目安は約{expected}}}",

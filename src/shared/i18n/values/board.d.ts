@@ -177,6 +177,7 @@ interface HiveMessageValues {
   'board.details.stepsLabel': undefined
   'board.details.stepsLast': { done: number; total: number; step: string | number }
   'board.details.summary': undefined
+  'board.details.testedOn': undefined
   'board.details.took': undefined
   'board.details.tookSoFar': { took: string | number; expected: string }
   'board.details.tookTotal': { took: string | number; expected: string }

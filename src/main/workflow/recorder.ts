@@ -16,14 +16,16 @@ import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
-import type { WorkflowOptions } from '../../shared/workflow/options'
-import { agentActor, foldCard } from '../../shared/workflow/facts'
+import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE } from '../../shared/workflow/facts'
+import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { advanced } from '../advanced'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
 import { createLogger } from '../logger'
 import * as G from '../platform/git'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown, type Maybe } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
+import { resolvedOf } from './rulesets'
 import { FactStore, type Tx } from './factStore'
 
 const log = createLogger('workflow')
@@ -134,11 +136,12 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {} }
   // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
   if (p.why === 'start') {
-    const options = (cfg as { workflow?: { options?: unknown } }).workflow?.options
+    // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
+    const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {
-      const c = options && typeof options === 'object' ? compile(options as WorkflowOptions) : null
+      const c = resolved && !resolved.invalid ? compile(resolved.options) : null
       if (c?.ok) r.ruleset = c.ruleset
-      else r.unknown.ruleset = c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)" // i18n-ignore: a fact's note, in English for agents
+      else r.unknown.ruleset = resolved?.invalid ? `the project's options can't be used (${resolved.invalid})` : c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)" // i18n-ignore: a fact's note, in English for agents
     } catch (e) {
       r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})` // i18n-ignore: a fact's note, in English for agents
     }
@@ -306,6 +309,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     if (!moves) moved = ctx?.byRuntime?.moved ?? null
     let submitted: number | null = null
     let verdict: number | null = null
+    let verdictFailed = false
     if (intoReview && moves) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
@@ -339,6 +343,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const s = facts()
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
       // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
+      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
       verdict = tx.append(n, {
         kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
         actor,
@@ -347,6 +352,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
         data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
       }).seq
     }
+    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     if ((before?.blocked ?? null) !== after.blocked) {
       if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } }) // i18n-ignore: a fact's kind and codes, not text
       else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} }) // i18n-ignore: a fact's kind and codes, not text
@@ -359,6 +365,29 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
     if (inLoop(ws, after)) loopWakes(tx, n, actor, after, { submitted, verdict, moved: moved !== null && (to === 'approved' || to === 'done') ? moved : null, decided }, STAGE_OF[after.column])
   })
+}
+
+/**
+ * Whether workflow rules are enforced (Settings → Advanced: service.ts' ENFORCE, read here without the service, which
+ * reaches back to the board).
+ */
+export const rulesEnforced = (): boolean => advanced.get<boolean>('hive.workflow.enforce')
+
+/**
+ * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the
+ * runtime does (`askAtLimit`), so a loop's verdicts given on the board (before #1268 moves them to the runtime) pause it
+ * too. Only for a card in a running lane, while the rules are enforced.
+ */
+function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string }): void {
+  if (!rulesEnforced()) return
+  const card = tx.card(n)
+  const s = foldCard(tx.facts(n), card.stage)
+  if (!atRoundLimit(s, card.rounds)) return
+  // The card's key as the runtime names it (service.ts: its project's name).
+  const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
+  const text = workflowEnglish(shown)
+  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
+  tx.action(n, 'notify', { text, shown }, asked.seq)
 }
 
 /**

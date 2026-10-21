@@ -5,8 +5,8 @@
 import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
-import { CATEGORY_STAGE, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { workBadge, workView, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
+import { CATEGORY_STAGE, foldCard, ROUND_LIMIT_GATE, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { forYouItems, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 
@@ -48,6 +48,43 @@ export function workBadges(ws: WorkspaceService): WorkBadge[] {
     }
     return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? [])))
   })
+}
+
+/**
+ * What waits for the user (IPC `tasks:forYou`, §16.8.5): every live card's open requests, of one project (its folder
+ * name) or the whole workspace, oldest first, and their count. Read on one snapshot; the window reads it again on
+ * `tasks-changed` (a request or an answer is a board change).
+ */
+export function forYou(ws: WorkspaceService, project?: string | null): ForYouSummary {
+  const items = boardRead(ws, (db) => {
+    if (!hasFacts(db)) return []
+    const cards = db.prepare('SELECT number, col, stage, pre_workflow, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    const facts = new Map<number, Fact[]>()
+    for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
+      const f = factOf(r)
+      facts.set(f.card, [...(facts.get(f.card) ?? []), f])
+    }
+    return cards
+      .filter((r) => project == null || String(r.project ?? '').toLowerCase() === project.toLowerCase())
+      .flatMap((r) => (facts.has(r.number as number) ? forYouItems({ card: r.number as number, project: String(r.project ?? ''), stage: cardOf(r).stage }, facts.get(r.number as number)!) : []))
+  })
+  items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : a.card - b.card))
+  return { items, count: items.length }
+}
+
+/** Of these cards, those waiting for the user at their round limit (§16.11.4): a round-limit request open. */
+export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]): Set<number> {
+  const out = new Set<number>()
+  if (!numbers.length) return out
+  boardRead(ws, (db) => {
+    if (!hasFacts(db)) return
+    const stmt = db.prepare(QUERIES['facts.ofCard'].sql)
+    for (const n of new Set(numbers)) {
+      const facts = (stmt.all(n) as Row[]).map(factOf)
+      if (facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => r.gate === ROUND_LIMIT_GATE)) out.add(n)
+    }
+  })
+  return out
 }
 
 /** A fact as the Agent API's short row gives it (`GET /v1/tasks/:n/facts`). */

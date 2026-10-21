@@ -2591,6 +2591,14 @@
     "defaultMessage": "Warn when a transcript is over",
     "description": "A setting's title (Project Settings → Sessions)."
   },
+  "settings.project.workflow.desc": {
+    "defaultMessage": "Pick a preset, or set each option. Each shows where its value comes from.",
+    "description": "What the setting \"Workflow options\" is, under its title (Project Settings → Workflow)."
+  },
+  "settings.project.workflow.title": {
+    "defaultMessage": "Workflow options",
+    "description": "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own."
+  },
   "settings.project.worktreeCopy.desc": {
     "defaultMessage": "Git-ignored files to copy from the project folder into a new worktree, such as .env files. One pattern per line; empty inherits Settings → Agents & Worktrees → Copy into new worktrees.",
     "description": "What the setting \"Copy into new worktrees\" does, under its title (Project Settings → Agents & Worktrees)."
@@ -2726,6 +2734,14 @@
   "settings.projectSection.storage.label": {
     "defaultMessage": "Storage",
     "description": "A section of Project Settings, in its list on the left."
+  },
+  "settings.projectSection.workflow.desc": {
+    "defaultMessage": "How work moves from Todo to Done in this project: who reviews it, which checks pass first, who merges it and where cards are built. A change applies from the next card.",
+    "description": "Under the heading of the section \"Workflow\" of Project Settings: what it holds."
+  },
+  "settings.projectSection.workflow.label": {
+    "defaultMessage": "Workflow",
+    "description": "A section of Project Settings, in its list on the left (glossary 2.1: workflow)."
   },
   "settings.provider.allowBackgroundSessions.desc": {
     "defaultMessage": "Let {provider}'s agent view move a session into its own background service. Applies to sessions started afterwards.",

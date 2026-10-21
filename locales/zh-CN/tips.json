@@ -323,6 +323,8 @@
   "tips.unusedWorktrees.title": "整理保留的工作树",
   "tips.viewerTokens.text": "显示智能体动态的应用（如 Apiary）只需要一个查看者令牌：“设置”→“Agent API”→“查看者令牌”可以创建一个能读取一切、但不能更改任何内容的令牌，也可以再将其撤销。",
   "tips.viewerTokens.title": "让其他应用查看 Hive",
+  "tips.workflowOptions.text": "“项目设置”→“工作流程”用于设置由谁评审卡片的工作、哪些检查需先通过以及由谁合并。选择一个预设，或逐项设置：更改从下一张开始的卡片起生效。",
+  "tips.workflowOptions.title": "选择卡片如何到达完成",
   "tips.workspaceMoved.text": "把工作区文件夹移动了，比如移到另一个驱动器？从新位置打开它，然后在横幅中选择“修复…”：智能体的工作树、它们的会话，以及 Claude Code 的对话和记忆都会随之迁移。",
   "tips.workspaceMoved.title": "移动工作区而不丢失智能体",
   "tips.worktreeReuse.text": "添加智能体时新建的工作树与你保留的某个工作树同名（例如 B4，而 B4 的工作树没人使用）？如果它已合并且干净，Hive 会把那个文件夹交给该智能体，并更新到 main：它的 node_modules 已经在里面了。",

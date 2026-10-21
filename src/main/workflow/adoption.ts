@@ -24,6 +24,7 @@ import * as G from '../platform/git'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
+import { resolvedOf } from './rulesets'
 import { FactStore } from './factStore'
 import { adoptionInputs, upgradeOptions, writeAdoption, type AdoptionAt, type AdoptionInputs, type InFlight } from './upgrade'
 
@@ -118,7 +119,10 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
       // Where each agent works now, under the board's lock: a card whose agent's folder changed since it was read is read again.
       const now = await ws.projectConfig(folder)
       const store = FactStore.forBoard(ws, { project: name, key: name })
-      const compiled = compile(r.cfg.workflow!.options)
+      // Resolved over the workspace's and Hive's: a project may set only some (#1278).
+      const resolved = resolvedOf(ws, folder, r.platform, r.cfg)
+      if (resolved.invalid) throw new Error(`the options for ${name} can't be used: ${resolved.invalid}`) // i18n-ignore: a mistake in Hive's code, logged
+      const compiled = compile(resolved.options)
       if (!compiled.ok) throw new Error(`the upgrade's options for ${name} contradict each other: ${compiled.contradictions.join(', ')}`) // i18n-ignore: a mistake in Hive's code, logged
       store.saveRuleset(compiled.ruleset)
       for (const x of reads) {

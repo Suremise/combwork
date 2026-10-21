@@ -59,7 +59,7 @@ module.exports = async function run(provider) {
     cliEnv = { CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() }
   } else {
     api = await startFakeCopilotApi({ log: path.join(cliDir, 'api.jsonl') })
-    cliEnv = copilotTestEnv(api, cliDir)
+    cliEnv = copilotTestEnv(api, cliDir, { above: lib.WORK })
   }
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })

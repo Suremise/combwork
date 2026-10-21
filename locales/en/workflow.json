@@ -47,6 +47,274 @@
     "defaultMessage": "{card} waits for your review",
     "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
   },
+  "workflow.forYou.roundLimit": {
+    "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
+    "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
+  },
+  "workflow.forYouKind": {
+    "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
+    "description": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces."
+  },
+  "workflow.form.addCheck": {
+    "defaultMessage": "Add Check",
+    "description": "A button under the checks of “Checks pass before review”."
+  },
+  "workflow.form.agentsSection": {
+    "defaultMessage": "Agents & Worktrees",
+    "description": "A link to the section \"Agents & Worktrees\" of Project Settings: use its name as translated there."
+  },
+  "workflow.form.cantSave": {
+    "defaultMessage": "These options can’t be saved:",
+    "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
+  },
+  "workflow.form.changeLine": {
+    "defaultMessage": "{option}: {from} → {to}",
+    "description": "A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value."
+  },
+  "workflow.form.changesHead": {
+    "defaultMessage": "What changes:",
+    "description": "In the dialog before saving workflow options: above the list of options that change, each with its old and new value."
+  },
+  "workflow.form.checkCommand": {
+    "defaultMessage": "Command",
+    "description": "The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review)."
+  },
+  "workflow.form.checkName": {
+    "defaultMessage": "Name",
+    "description": "The placeholder of a check’s name field (Project Settings → Workflow → Checks pass before review)."
+  },
+  "workflow.form.choose": {
+    "defaultMessage": "Choose a preset…",
+    "description": "The first entry of the preset choice in Project Settings → Workflow, when none was chosen."
+  },
+  "workflow.form.confirmMessage": {
+    "defaultMessage": "The new options apply from the next card that starts.",
+    "description": "The message of the dialog before saving workflow options."
+  },
+  "workflow.form.confirmTitle": {
+    "defaultMessage": "Save Workflow Options",
+    "description": "The title of the dialog before saving workflow options."
+  },
+  "workflow.form.copied": {
+    "defaultMessage": "Workflow options copied",
+    "description": "A notification: the workflow options were copied to the clipboard."
+  },
+  "workflow.form.copy": {
+    "defaultMessage": "Copy as JSON",
+    "description": "The button copying the project’s workflow options as JSON, to paste into another project."
+  },
+  "workflow.form.defaultBranch": {
+    "defaultMessage": "The repository’s default branch",
+    "description": "The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch."
+  },
+  "workflow.form.discard": {
+    "defaultMessage": "Discard Changes",
+    "description": "The button dropping unsaved changes to the workflow options."
+  },
+  "workflow.form.fileLocks": {
+    "defaultMessage": "File locks",
+    "description": "A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7)."
+  },
+  "workflow.form.fileLocksValue": {
+    "defaultMessage": "As set for the project’s agents",
+    "description": "The value of the read-only row \"File locks\" in Project Settings → Workflow: its own setting decides."
+  },
+  "workflow.form.folders": {
+    "defaultMessage": "Folders and files, separated by commas",
+    "description": "The placeholder of the field “What the work is” (folders and files left out)."
+  },
+  "workflow.form.from.global": {
+    "defaultMessage": "From Hive’s settings",
+    "description": "Where a workflow option’s value comes from: Hive’s own default."
+  },
+  "workflow.form.from.platform": {
+    "defaultMessage": "Default",
+    "description": "Where a workflow option’s value comes from: nobody set it (every rule off)."
+  },
+  "workflow.form.from.preset": {
+    "defaultMessage": "From the preset",
+    "description": "Where a workflow option’s value comes from: the preset chosen."
+  },
+  "workflow.form.from.project": {
+    "defaultMessage": "Set for this project",
+    "description": "Where a workflow option’s value comes from: set in this project."
+  },
+  "workflow.form.from.workspace": {
+    "defaultMessage": "From the workspace",
+    "description": "Where a workflow option’s value comes from: the workspace’s default."
+  },
+  "workflow.form.git": {
+    "defaultMessage": "Git",
+    "description": "A version control system’s name (glossary 2.1: keep)."
+  },
+  "workflow.form.identity": {
+    "defaultMessage": "Commits as {name} <{email}>.",
+    "description": "Under “Commits use the project’s identity”: the identity used, from git config."
+  },
+  "workflow.form.identityValue": {
+    "defaultMessage": "On, as {name} <{email}>",
+    "description": "A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use."
+  },
+  "workflow.form.inFlight": {
+    "defaultMessage": "{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}",
+    "description": "In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it."
+  },
+  "workflow.form.inherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value."
+  },
+  "workflow.form.inheritTip": {
+    "defaultMessage": "Use the inherited value: {value}",
+    "description": "The tooltip of the Inherit button of a workflow option. {value} is the value it would have."
+  },
+  "workflow.form.invalid": {
+    "defaultMessage": "These options can’t be used, so every rule is off in this project:",
+    "description": "A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows."
+  },
+  "workflow.form.labels": {
+    "defaultMessage": "Labels, separated by commas",
+    "description": "The placeholder of the labels field of “Your OK before merging”."
+  },
+  "workflow.form.labelsValue": {
+    "defaultMessage": "Cards with these labels: {labels}",
+    "description": "A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels."
+  },
+  "workflow.form.lane": {
+    "defaultMessage": "Builder {builder}: {name}",
+    "description": "A running lane in the dialog before saving workflow options: its builder agent and its name."
+  },
+  "workflow.form.laneUnnamed": {
+    "defaultMessage": "Builder {builder}",
+    "description": "A running lane without a name in the dialog before saving workflow options: its builder agent."
+  },
+  "workflow.form.lanes": {
+    "defaultMessage": "{n, plural, one {This running lane keeps the old rules until it ends:} other {These running lanes keep the old rules until they end:}}",
+    "description": "In the dialog before saving workflow options, above a list of lanes (glossary 2.1: old rules)."
+  },
+  "workflow.form.loadFailed": {
+    "defaultMessage": "Couldn’t read the workflow options: {error}",
+    "description": "An error showing Project Settings → Workflow. {error} says why."
+  },
+  "workflow.form.loops": {
+    "defaultMessage": "Rounds and wait",
+    "description": "A read-only row of Project Settings → Workflow: the card loops’ rounds and wait."
+  },
+  "workflow.form.loopsSection": {
+    "defaultMessage": "Card loops",
+    "description": "A link to the section \"Card loops\" of Project Settings: use its name as translated there."
+  },
+  "workflow.form.loopsValue": {
+    "defaultMessage": "{rounds, plural, one {# round} other {# rounds}}, wait {hours, plural, one {# hour} other {# hours}}",
+    "description": "The value of the read-only row \"Rounds and wait\" of Project Settings → Workflow."
+  },
+  "workflow.form.noChanges": {
+    "defaultMessage": "No option changes: only the preset they started from.",
+    "description": "In the dialog before saving workflow options, when no option’s value changes."
+  },
+  "workflow.form.noChecks": {
+    "defaultMessage": "No checks.",
+    "description": "Under “Checks pass before review” when it has none."
+  },
+  "workflow.form.noIdentity": {
+    "defaultMessage": "No name and email are set in git config yet.",
+    "description": "Under “Commits use the project’s identity” when git has no identity configured."
+  },
+  "workflow.form.none": {
+    "defaultMessage": "None",
+    "description": "The version control of a project without any (glossary 2.1: None)."
+  },
+  "workflow.form.noneValue": {
+    "defaultMessage": "None",
+    "description": "An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders."
+  },
+  "workflow.form.notEnforced": {
+    "defaultMessage": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
+    "description": "A note atop Project Settings → Workflow while the switch \"Workflow rules are enforced\" is off."
+  },
+  "workflow.form.off": {
+    "defaultMessage": "Off",
+    "description": "A workflow option’s value: off."
+  },
+  "workflow.form.on": {
+    "defaultMessage": "On",
+    "description": "A workflow option’s value: on."
+  },
+  "workflow.form.openAdvanced": {
+    "defaultMessage": "Open Advanced",
+    "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
+  },
+  "workflow.form.owned": {
+    "defaultMessage": "Set in {where}.",
+    "description": "Under a read-only row of Project Settings → Workflow (file locks, card loops): where the setting is changed. {where} is a link to it."
+  },
+  "workflow.form.ownedPrefix": {
+    "defaultMessage": "Its own setting decides:",
+    "description": "Before the link to where a read-only row of Project Settings → Workflow is set."
+  },
+  "workflow.form.paste": {
+    "defaultMessage": "Paste JSON…",
+    "description": "The button pasting workflow options copied from another project."
+  },
+  "workflow.form.pasteApply": {
+    "defaultMessage": "Use These Options",
+    "description": "The confirm button of the dialog pasting workflow options."
+  },
+  "workflow.form.pasteBad": {
+    "defaultMessage": "That isn’t workflow options copied from Hive.",
+    "description": "An error pasting workflow options: the text isn’t the JSON Hive copies."
+  },
+  "workflow.form.pasteMessage": {
+    "defaultMessage": "Paste options copied from a project with the same version control. They replace the form’s, to save afterwards.",
+    "description": "The message of the dialog pasting workflow options as JSON."
+  },
+  "workflow.form.pastePlatform": {
+    "defaultMessage": "These options are for another version control.",
+    "description": "An error pasting workflow options: they were copied from a project with another version control."
+  },
+  "workflow.form.pasteTitle": {
+    "defaultMessage": "Paste Workflow Options",
+    "description": "The title of the dialog pasting workflow options as JSON."
+  },
+  "workflow.form.platform": {
+    "defaultMessage": "Version control",
+    "description": "A row of Project Settings → Workflow (glossary 2.1): the project’s version control, detected, shown read-only."
+  },
+  "workflow.form.platformDesc": {
+    "defaultMessage": "Found in the project folder. The options below are this version control’s.",
+    "description": "Under the row \"Version control\" of Project Settings → Workflow."
+  },
+  "workflow.form.preset": {
+    "defaultMessage": "Preset",
+    "description": "A row of Project Settings → Workflow (glossary 2.1: preset): one choice that fills in every option."
+  },
+  "workflow.form.presetDesc": {
+    "defaultMessage": "Fills in every option at once. Changing an option afterwards makes it Custom.",
+    "description": "Under the row \"Preset\" of Project Settings → Workflow. Custom is a preset’s name: as translated there."
+  },
+  "workflow.form.removeCheck": {
+    "defaultMessage": "Remove",
+    "description": "The tooltip of the button removing a check from “Checks pass before review”."
+  },
+  "workflow.form.save": {
+    "defaultMessage": "Save…",
+    "description": "The button saving the workflow options (it shows what changes first)."
+  },
+  "workflow.form.saved": {
+    "defaultMessage": "Workflow options saved",
+    "description": "A notification: the workflow options were saved."
+  },
+  "workflow.form.startedFrom": {
+    "defaultMessage": "Custom, started from {preset}",
+    "description": "Project Settings → Workflow: the options were changed after a preset was chosen. {preset} is its name."
+  },
+  "workflow.form.unavailable": {
+    "defaultMessage": "{preset}: {why}",
+    "description": "A preset that can’t be chosen yet, under the preset choice. {preset} is its name, {why} a whole sentence saying why."
+  },
+  "workflow.form.worktree": {
+    "defaultMessage": "In this version, a card’s own folder is its builder’s worktree.",
+    "description": "Under “Where cards are built” in Project Settings → Workflow."
+  },
   "workflow.move.answer": {
     "defaultMessage": "Answer",
     "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
@@ -90,6 +358,190 @@
   "workflow.move.verdict": {
     "defaultMessage": "Verdict",
     "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
+  },
+  "workflow.notOffered.hiveMerges": {
+    "defaultMessage": "“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.",
+    "description": "Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive."
+  },
+  "workflow.notOffered.later": {
+    "defaultMessage": "Some of these options aren’t available in this version yet: leave them as they are.",
+    "description": "Why workflow options cannot be saved: an option set (merge checks, up to date before merging, slots kept up to date) comes in a later version of Hive."
+  },
+  "workflow.option.commands.desc": {
+    "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
+    "description": "What the workflow setting “Check commands” does."
+  },
+  "workflow.option.commands.title": {
+    "defaultMessage": "Check commands",
+    "description": "A workflow setting: the command each named check runs (the checks of “Checks pass before review”)."
+  },
+  "workflow.option.dependenciesDone.desc": {
+    "defaultMessage": "A card that waits for others can’t start before their work is in.",
+    "description": "What the workflow option “Cards start only when the cards they wait for are merged” does."
+  },
+  "workflow.option.dependenciesDone.none": {
+    "defaultMessage": "Cards start only when the cards they wait for are done",
+    "description": "A workflow option for a project without version control (glossary 2.6, N6)."
+  },
+  "workflow.option.dependenciesDone.title": {
+    "defaultMessage": "Cards start only when the cards they wait for are merged",
+    "description": "A workflow option (glossary 2.6, G14)."
+  },
+  "workflow.option.excluded.desc": {
+    "defaultMessage": "The whole project folder, apart from these folders and files (.hive always).",
+    "description": "What the workflow option “What the work is” does: the folders and files listed are left out of a card’s work."
+  },
+  "workflow.option.excluded.title": {
+    "defaultMessage": "What the work is",
+    "description": "A workflow option for a project without version control (glossary 2.6, N4)."
+  },
+  "workflow.option.finish.desc": {
+    "defaultMessage": "When a card is done: once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "description": "What the workflow option “Who merges” does."
+  },
+  "workflow.option.finish.title": {
+    "defaultMessage": "Who merges",
+    "description": "A workflow option (glossary 2.6, G5)."
+  },
+  "workflow.option.folder.desc": {
+    "defaultMessage": "In its own folder, a card is built in its builder’s worktree, apart from other agents’ work. In the project folder, everyone sees each other’s unfinished changes.",
+    "description": "What the workflow option “Where cards are built” does."
+  },
+  "workflow.option.folder.title": {
+    "defaultMessage": "Where cards are built",
+    "description": "A workflow option (glossary 2.6, G11)."
+  },
+  "workflow.option.identity.desc": {
+    "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
+    "description": "What the workflow option “Commits use the project’s identity” does."
+  },
+  "workflow.option.identity.title": {
+    "defaultMessage": "Commits use the project’s identity",
+    "description": "A workflow option (glossary 2.6, G12)."
+  },
+  "workflow.option.noSelfReview.desc": {
+    "defaultMessage": "Always on while a reviewer agent checks the work.",
+    "description": "What the workflow option “Nobody reviews their own work” does."
+  },
+  "workflow.option.noSelfReview.title": {
+    "defaultMessage": "Nobody reviews their own work",
+    "description": "A workflow option (glossary 2.6, G2 and N2)."
+  },
+  "workflow.option.okBefore.desc": {
+    "defaultMessage": "A card waits for your OK before it is merged: never, only cards with these labels, or every card.",
+    "description": "What the workflow option “Your OK before merging” does."
+  },
+  "workflow.option.okBefore.title": {
+    "defaultMessage": "Your OK before merging",
+    "description": "A workflow option (glossary 2.6, G10)."
+  },
+  "workflow.option.preChecks.desc": {
+    "defaultMessage": "Each check is a named command. A card goes to review only once each one has passed on its work.",
+    "description": "What the workflow option “Checks pass before review” does."
+  },
+  "workflow.option.preChecks.title": {
+    "defaultMessage": "Checks pass before review",
+    "description": "A workflow option (glossary 2.6, G3 and N3): named commands that must pass before a card goes to review."
+  },
+  "workflow.option.review.desc": {
+    "defaultMessage": "A card goes to Review when its builder submits it, and on once it passes. With you as well, it waits for your OK after the reviewer.",
+    "description": "What the workflow option “Work is reviewed before it’s merged” does."
+  },
+  "workflow.option.review.none": {
+    "defaultMessage": "Who checks the work before it’s done",
+    "description": "A workflow option for a project without version control (glossary 2.6, N1)."
+  },
+  "workflow.option.review.title": {
+    "defaultMessage": "Work is reviewed before it’s merged",
+    "description": "A workflow option (glossary 2.6, G1): who reviews a card’s work before it is merged."
+  },
+  "workflow.option.reviewers.desc": {
+    "defaultMessage": "With two, both must pass the same change.",
+    "description": "What the workflow option “Reviewers per card” does."
+  },
+  "workflow.option.reviewers.title": {
+    "defaultMessage": "Reviewers per card",
+    "description": "A workflow option (glossary 2.6, G1b): how many reviewer agents must pass a card."
+  },
+  "workflow.option.sameness.desc": {
+    "defaultMessage": "With the same change, a pass still counts after the work is moved onto newer commits without changing it.",
+    "description": "What the workflow option “A pass survives a clean rebase” does."
+  },
+  "workflow.option.sameness.title": {
+    "defaultMessage": "A pass survives a clean rebase",
+    "description": "A workflow option (glossary 2.6, G4)."
+  },
+  "workflow.option.sharedFolderWarning.desc": {
+    "defaultMessage": "In the project folder, a submit warns when its commit takes in files another agent is editing. It never refuses.",
+    "description": "What the workflow option “Warn when a commit includes another agent’s files” does."
+  },
+  "workflow.option.sharedFolderWarning.title": {
+    "defaultMessage": "Warn when a commit includes another agent’s files",
+    "description": "A workflow option (glossary 2.6, G16)."
+  },
+  "workflow.option.stopOwnRuns.desc": {
+    "defaultMessage": "A card goes to review only once its builder’s own runs and background commands have stopped.",
+    "description": "What the workflow option “Agents stop what they started before review” does."
+  },
+  "workflow.option.stopOwnRuns.title": {
+    "defaultMessage": "Agents stop what they started before review",
+    "description": "A workflow option (glossary 2.6, G13)."
+  },
+  "workflow.option.style.desc": {
+    "defaultMessage": "How a card’s work is merged into the target branch.",
+    "description": "What the workflow option “Merge style” does."
+  },
+  "workflow.option.style.title": {
+    "defaultMessage": "Merge style",
+    "description": "A workflow option (glossary 2.6, G6)."
+  },
+  "workflow.option.target.desc": {
+    "defaultMessage": "The target branch. Left empty, the repository’s default branch.",
+    "description": "What the workflow option “Work merges into” does."
+  },
+  "workflow.option.target.title": {
+    "defaultMessage": "Work merges into",
+    "description": "A workflow option (glossary 2.6, G7): the target branch."
+  },
+  "workflow.preset.custom": {
+    "defaultMessage": "Custom",
+    "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
+  },
+  "workflow.preset.needs.hiveMerges": {
+    "defaultMessage": "Needs Hive to merge cards, which comes in a later version.",
+    "description": "Why a workflow preset can’t be chosen yet."
+  },
+  "workflow.preset.needs.slots": {
+    "defaultMessage": "Needs a folder of its own for every card, which comes in a later version.",
+    "description": "Why a workflow preset can’t be chosen yet."
+  },
+  "workflow.preset.pair": {
+    "defaultMessage": "Pair",
+    "description": "A workflow preset (glossary 2.1): a builder and a reviewer."
+  },
+  "workflow.preset.pairAgent": {
+    "defaultMessage": "Pair (the agent merges)",
+    "description": "A workflow preset (glossary 2.1, Pair): a builder and a reviewer, and the builder merges each card itself."
+  },
+  "workflow.preset.solo": {
+    "defaultMessage": "Solo",
+    "description": "A workflow preset (glossary 2.1): one person, one agent at a time, no reviewer."
+  },
+  "workflow.preset.team": {
+    "defaultMessage": "Team",
+    "description": "A workflow preset (glossary 2.1): several builders and reviewers, stricter checks."
+  },
+  "workflow.presetsNotice.choose": {
+    "defaultMessage": "Choose…",
+    "description": "A button of the one-time presets notice: opens Project Settings → Workflow."
+  },
+  "workflow.presetsNotice.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the one-time presets notice: dismisses it for good."
+  },
+  "workflow.presetsNotice.text": {
+    "defaultMessage": "{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.",
+    "description": "The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
   },
   "workflow.refused.approval.given.change": {
     "defaultMessage": "This rule is set in Version Control → Your OK before merging.",
@@ -171,6 +623,14 @@
     "defaultMessage": "The merge queue brings it up to date itself.",
     "description": "What happens next after the strict up-to-date rule refuses."
   },
+  "workflow.refused.loop.roundLimit.message": {
+    "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
+    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
+  },
+  "workflow.refused.loop.roundLimit.next": {
+    "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
+    "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."
@@ -182,6 +642,18 @@
   "workflow.refused.move.needsOverride.next": {
     "defaultMessage": "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.",
     "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips."
+  },
+  "workflow.refused.move.noStage.change": {
+    "defaultMessage": "A project's steps follow its options in Version Control.",
+    "description": "Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it)."
+  },
+  "workflow.refused.move.noStage.message": {
+    "defaultMessage": "{card} can't go to {stage}: this project's rules have no such step.",
+    "description": "A refused move: the card was moved to a board stage the project's workflow rules don't have (Review with no review, say). {card} is a card key, {stage} a stage name."
+  },
+  "workflow.refused.move.noStage.next": {
+    "defaultMessage": "Move it to one of its steps: {stages}.",
+    "description": "The next step after a move to a stage the rules lack: the stages they have. {stages} lists stage names."
   },
   "workflow.refused.move.notFromHere.message": {
     "defaultMessage": "{card} is in {stage}: {move} isn't possible from there.",
@@ -423,6 +895,10 @@
     "defaultMessage": "it waits for the OK before merging.",
     "description": "The {why} of a refused merge: the user's approval is missing."
   },
+  "workflow.roundChoice": {
+    "defaultMessage": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
+    "description": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces."
+  },
   "workflow.rule.approval.given": {
     "defaultMessage": "Your OK before merging",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
@@ -638,5 +1114,77 @@
   "workflow.unreadable.writes": {
     "defaultMessage": "the files written in {folder}",
     "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": which files changed in a folder. {folder} is a folder path."
+  },
+  "workflow.value.finish.agentMerges": {
+    "defaultMessage": "The agent merges, Hive checks",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.committed": {
+    "defaultMessage": "Committed is done",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.hiveMerges": {
+    "defaultMessage": "Hive merges",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.notChecked": {
+    "defaultMessage": "Not checked",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.folder.project": {
+    "defaultMessage": "Everyone in the project folder",
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11)."
+  },
+  "workflow.value.folder.slots": {
+    "defaultMessage": "Each card in its own folder",
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). In this version the folder is the builder’s worktree."
+  },
+  "workflow.value.okBefore.every": {
+    "defaultMessage": "Every card",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.okBefore.labels": {
+    "defaultMessage": "Cards with these labels",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.okBefore.never": {
+    "defaultMessage": "Never",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.review.agent": {
+    "defaultMessage": "A reviewer agent",
+    "description": "A value of the workflow option for review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.review.agentThenYou": {
+    "defaultMessage": "A reviewer agent, then you",
+    "description": "A value of the workflow option for review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.review.none": {
+    "defaultMessage": "No review",
+    "description": "A value of the workflow option “Work is reviewed before it’s merged” (glossary 2.6, G1)."
+  },
+  "workflow.value.review.noneNone": {
+    "defaultMessage": "No one",
+    "description": "A value of the workflow option “Who checks the work before it’s done”, for a project without version control (glossary 2.6, N1)."
+  },
+  "workflow.value.review.you": {
+    "defaultMessage": "You",
+    "description": "A value of the workflow option for review: you review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.sameness.change": {
+    "defaultMessage": "Same change",
+    "description": "A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4)."
+  },
+  "workflow.value.sameness.exact": {
+    "defaultMessage": "Exact revision only",
+    "description": "A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4)."
+  },
+  "workflow.value.style.merge": {
+    "defaultMessage": "Merge commit",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.value.style.squash": {
+    "defaultMessage": "Squash",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   }
 }

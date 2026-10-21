@@ -5,7 +5,63 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type StageId } from './facts'
+import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type RoundChoice, type StageId } from './facts'
+import type { StoredText } from '../types'
+
+/** A request waiting for the user (For you, §16.8.5), as the window lists it (IPC `tasks:forYou`). */
+export interface ForYouItem {
+  card: number
+  /** The card's project (its folder name; empty: a card about the workspace). */
+  project: string
+  request: string
+  kind: ForYouKind
+  /** What it waits on: a gate (`review`, `okBefore`, `roundLimit`), `ask` (an agent's question), or a rule it couldn't keep. */
+  gate: string
+  /** In English, as agents read it (an agent's question: its own words). */
+  text: string
+  /** Hive's own request's message, for the window in its language (#1264); none for an agent's words. */
+  shown?: StoredText
+  /** When it was asked. */
+  since: string
+  /** The agent who asked; null: Hive. */
+  asker: string | null
+  /** Whom it waits on: the user (a person later, #439). */
+  for: 'user'
+}
+
+/** What waits for the user, in a workspace or one project: each request, oldest first, and their count. */
+export interface ForYouSummary {
+  items: ForYouItem[]
+  count: number
+}
+
+/**
+ * The user's answer to a request (IPC `tasks:answer`): approve or decline it, or answer it with a reply, a decision (a
+ * Decide request: recorded on the card) or, at the round limit, a choice (a carry on with the rounds it adds).
+ */
+export interface ForYouAnswer {
+  outcome: 'approved' | 'declined' | 'answered'
+  reply?: string
+  decision?: string
+  choice?: RoundChoice
+  rounds?: number
+}
+
+/** A card's requests for the user, oldest first: from its facts folded (its open requests). */
+export function forYouItems(card: { card: number; project: string; stage: StageId }, facts: readonly Fact[]): ForYouItem[] {
+  return foldCard(facts, card.stage).requests.map((r) => ({
+    card: card.card,
+    project: card.project,
+    request: r.request,
+    kind: r.kind,
+    gate: r.gate,
+    text: r.text,
+    ...(r.requestText ? { shown: r.requestText } : {}),
+    since: r.at,
+    asker: r.asker ?? null,
+    for: r.for ?? 'user'
+  }))
+}
 
 export interface WorkRevision {
   /** The submission's id (its fact's seq): what verdicts name. */

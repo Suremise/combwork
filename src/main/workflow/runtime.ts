@@ -9,7 +9,7 @@
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
 import { AsyncLocalStorage } from 'async_hooks'
-import { agentOf, approvedByUser, foldCard, openEntry, passingReviewers, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type StageId } from '../../shared/workflow/facts'
+import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -19,6 +19,7 @@ import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/te
 import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
+import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, PlatformAdapter } from '../platform/adapter'
 import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
@@ -26,6 +27,9 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+
+/** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
+export const APPLY_OPTIONS = 'applyOptions'
 
 export interface Moved {
   ok: true
@@ -140,9 +144,18 @@ export function slugOf(title: string): string {
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
 
+/** The user's choice at the round limit, as an agent's wake says it (English). */
+const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
+
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
   readonly written: Fact[] = []
+  /**
+   * The user's answer this write records, as agents read it (#1269): every wake it makes is an answer's (`about:
+   * 'answer'`, delivered with or without a loop), saying the answer first; `woken`, the agents it woke.
+   */
+  answer: string | null = null
+  readonly woken: string[] = []
   /** The card's stage when the write began. */
   readonly was: StageId
   constructor(
@@ -280,12 +293,17 @@ export class Workflow {
   }
 
   /**
-   * The ruleset a card works under (§16.5.4): the one it started with until it's Done; a card in Todo uses its lane's
-   * (the one in force when the lane started), else the current one.
+   * The ruleset a card works under (§16.5.4): the one it started with until it's Done, unless the user applied changed
+   * options to it since (an Override, §16.11.4: the latest one's); a card in Todo uses its lane's (the one in force when
+   * the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
-    if (s.started) {
-      const f = this.store.facts(card.id).find((x) => x.seq === s.cycle)
+    // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
+    // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
+    if (s.started && s.stage !== 'todo') {
+      const facts = this.store.facts(card.id)
+      const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
+      const f = applied ?? facts.find((x) => x.seq === s.cycle)
       if (f?.ruleset) return this.store.ruleset(f.ruleset)
     }
     if (card.lane) {
@@ -619,15 +637,19 @@ export class Workflow {
     return this.platform(r.options).finishInputs(card, s, r.options, revision)
   }
 
-  /** Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, about: { revision?: string; checklist?: string[] } = {}): string {
+  /**
+   * Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. `asker`: the agent whose own question it
+   * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
+   * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
+   */
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[] } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(about.revision ? { revision: about.revision } : {}), ...(about.checklist ? { checklist: about.checklist } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -643,14 +665,43 @@ export class Workflow {
     const o = r.options
     if (w.current === 'review' && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
       this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: w.card.key }))
-    } else if (w.current === 'approved' && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
+    } else if (w.current === 'approved' && this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
       this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
     }
   }
 
-  /** Wakes an agent: a durable action delivered once (§16.4.5). */
-  wake(w: Write, agent: string | null | undefined, why: string): void {
-    if (agent && agent !== 'user') w.action('wake', { agent, why })
+  /**
+   * At the round limit (§16.11.4): Hive asks the user (Decide: carry on, split, accept with follow-ups, take it over), and
+   * the card's lane pauses until they answer. Only for a card in a running lane (its rounds: the Card loops settings it
+   * started with) and while the rules are enforced (Settings → Advanced).
+   */
+  askAtLimit(w: Write): void {
+    const s = w.state()
+    if (!this.enforced() || !atRoundLimit(s, w.card.rounds)) return
+    // Not bound to the submission: a new one can't retire it, only the user's answer (HR3's #1269 round 1 finding 1).
+    this.askUser(w, 'decide', ROUND_LIMIT_GATE, workflowText(FOR_YOU.roundLimit, { card: w.card.key, rounds: s.rounds }), { unbound: true })
+  }
+
+  /**
+   * Refuses an agent's or the Assistant's submission or forward move while the card waits for the user at its round
+   * limit (§16.11.4): only the user's answer resumes its loop. The user's own moves go on.
+   */
+  private atLimit(card: CardRecord, s: CardState, actor: Actor): GuardRefusal | null {
+    if (actor === 'user' || !this.enforced() || !s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)) return null
+    return { rule: 'loop.roundLimit', values: { card: card.key } } as GuardRefusal
+  }
+
+  /**
+   * Wakes an agent: a durable action delivered once (§16.4.5). `about: 'answer'`: the user's answer, which reaches the
+   * agent whether or not the card has a reviewer (loopWakes.ts).
+   */
+  wake(w: Write, agent: string | null | undefined, why: string, about?: 'answer'): void {
+    if (!agent || agent === 'user') return
+    // In the user's answer's write (finish's wakes too): an answer's wake, the answer first (HR3's #1269 round 2).
+    const answer = about ?? (w.answer !== null ? 'answer' : undefined)
+    const said = w.answer !== null && !why.startsWith(w.answer) ? `${w.answer}. ${why}` : why
+    w.action('wake', { agent, why: said, ...(answer ? { about: answer } : {}) })
+    w.woken.push(agent)
   }
 
   /** The reviewer to wake: the card's (a lane's), else the pool. */
@@ -692,7 +743,8 @@ export class Workflow {
       }
       return
     }
-    const needOk = okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')
+    // G10 asks only while the rules are enforced (Settings → Advanced): off, the card goes on as if it were never set.
+    const needOk = this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')
     switch (o.finish) {
       case 'hiveMerges':
         if (needOk) {
@@ -735,6 +787,8 @@ export class Workflow {
     let card = card0
     let s = this.state(card)
     if (!s.started) return this.notFrom(card, actor, s, 'submit')
+    const limit = this.atLimit(card, s, actor)
+    if (limit) return this.refuse(card, actor, 'submit', limit)
     const r = this.rulesetOf(card, s)
     const o = r.options
     const agent = agentOf(actor)
@@ -910,6 +964,7 @@ export class Workflow {
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing
+        this.askAtLimit(w)
         return null
       }
       if (moved && !moved.same) {
@@ -932,8 +987,14 @@ export class Workflow {
     return this.ok(card, 'review', this.state(card).stage)
   }
 
-  /** The user answers a request (§16.8.5): an approval satisfies its gate; a decline is a round. Never a decision. */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', note?: string): Promise<Reply> {
+  /**
+   * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
+   * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
+   * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. Never a decision (the
+   * board records those). The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
+   * at the round limit the builder and the reviewer, whose lane paused for it.
+   */
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -943,23 +1004,37 @@ export class Workflow {
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
     const from = s.stage
+    const { note, choice } = opts
+    // What the answer may be follows its request (HR3's #1269 round 1 finding 2): checked before anything is written.
+    if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
+    const rounds = choice === 'carryOn' ? opts.rounds : undefined
     await this.cfg.hooks?.beforeWrite?.('answer')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, note))
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
     const out = await this.write(card, r, 'user', (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
       const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
       if (changed) return changed
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
-      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
-      if (answer === 'declined') {
-        w.move('active', 'user')
-        this.wake(w, builder, `${card.key}: the user declined it`) // i18n-ignore: a wake, agent-facing
+      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${req.text}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      w.answer = said
+      if (req.gate === ROUND_LIMIT_GATE) {
+        this.wake(w, builder, said, 'answer')
+        // Its lane's reviewer, which paused with it.
+        if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
         return null
       }
-      if (answer !== 'approved' || req.kind !== 'approve') {
-        this.wake(w, builder, `${card.key}: the user answered`) // i18n-ignore: a wake, agent-facing
+      if (req.gate !== 'review' && req.gate !== 'okBefore') {
+        // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.
+        this.wake(w, req.asker ?? builder, said, 'answer')
+        return null
+      }
+      if (answer === 'declined') {
+        w.move('active', 'user')
+        this.wake(w, builder, said, 'answer')
+        this.askAtLimit(w)
         return null
       }
       // The gate is evaluated before anything moves on: passes and approvals at the current generation, not stale.
@@ -967,10 +1042,12 @@ export class Workflow {
       const missing = notApproved(now, r, card.labels)
       if (req.gate === 'review') {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
-      } else if (req.gate === 'okBefore' && !missing && st.stage === 'approved') {
+      } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
         else this.wake(w, builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
       }
+      // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
+      if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
     if (out) return this.refuse(card, 'user', 'answer', out)
@@ -1021,7 +1098,7 @@ export class Workflow {
     const s = this.state(card)
     let request = ''
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
-      request = this.askUser(w, args.kind, 'ask', args.text, { ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}) })
+      request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}) })
     })
     return this.ok(card, s.stage, s.stage, { request })
   }
@@ -1034,7 +1111,7 @@ export class Workflow {
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
       const request = `${card.key}/r${s.lastSeq + 1}`
       w.fact('CannotWithinRules', { rule: args.rule, why: args.why, request })
-      w.fact('ApprovalRequested', { request, kind: 'decide', gate: args.rule, text: args.why })
+      w.fact('ApprovalRequested', { request, kind: 'decide', gate: args.rule, text: args.why, for: 'user', ...(agentOf(actor) ? { asker: agentOf(actor)! } : {}) })
       w.action('notify', { text: args.why })
     })
     return this.ok(card, s.stage, s.stage)
@@ -1135,9 +1212,14 @@ export class Workflow {
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
-    const r = this.rulesetOf(card, s)
+    // The Assistant's move on, while the card waits for the user at its round limit: only the user's answer resumes it.
+    const limit = ORDER.indexOf(to) > ORDER.indexOf(from === 'hold' ? 'active' : from) ? this.atLimit(card, s, by) : null
+    if (limit) return this.refuse(card, by, 'move', limit)
+    // A Done card dragged on is reopened: its next cycle's rules (as from Todo), not its last's.
+    const reopened = from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo')
+    const r = this.rulesetOf(card, reopened ? { ...s, stage: 'todo' } : s)
     // Never into a stage the card's ruleset doesn't have (no review: no Review; no merge step: no Approved or Merging).
-    if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: to, moves: r.stages.map((x) => x.id).join(', ') } })
+    if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
     if (to === 'hold') {
       const out = await this.write(card, r, by, (w) => {
@@ -1172,6 +1254,9 @@ export class Workflow {
         return this.ok(card, from, this.state(card).stage)
       }
     }
+    // Reopening a Done card past Todo (§16.7.4): no rule skipped by the reopening; back to Todo and a drag from there, a
+    // new cycle (its start), in one write.
+    if (from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo') && to !== 'done') return this.dragForward(card, from, to, by, opts, 'todo')
     // A forward drag into Active, Review, Approved or Merging stands for intents, and runs them in order (Start, then
     // submit, then the review skipped): never a bare move that leaves a card with no start, nothing to review or no
     // queue entry. Each step that skips nothing just happens; one that would skip a rule asks first (§16.8.4).
@@ -1202,15 +1287,16 @@ export class Workflow {
    * skipped), and the rules they would skip, together, are the question (the user's, nothing written), the refusal (the
    * Assistant's without a reason: only its `Refused`) or one `Override` naming them all. A step refused for what no
    * override makes true (nothing to submit, a fact that couldn't be read) refuses the drag, nothing written. The write
-   * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: back from On Hold to where the card
-   * was, first, in the same write.
+   * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
+   * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
   private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
-    const r = this.rulesetOf(card, s0)
+    // The rules of where the drag counts from (a reopened card's: its next cycle's).
+    const r = this.rulesetOf(card, s)
     const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder) : null
     if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
     const s1 = gs ? this.predicted(card, s, gs) : s
@@ -1417,8 +1503,8 @@ export class Workflow {
   }
 
   /** Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends. */
-  startLane(id: string, cards: number[], reviewer?: string): LaneList {
-    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer)
+  startLane(id: string, cards: number[], reviewer?: string, rounds?: number): LaneList {
+    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer, rounds)
   }
 
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */

@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
 
 export type RuleId = GuardId | MoveRule
 
@@ -125,6 +125,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.move.notFromHere.message', defaultMessage: "{card} is in {stage}: {move} isn't possible from there.", description: 'A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent.' }),
     msg({ id: 'workflow.refused.move.notFromHere.next', defaultMessage: 'From {stage}, use: {moves}.', description: 'The next step: the intents possible from the stage. {moves} lists them.' })
   ),
+  'move.noStage': r(
+    msg({ id: 'workflow.refused.move.noStage.message', defaultMessage: "{card} can't go to {stage}: this project's rules have no such step.", description: 'A refused move: the card was moved to a board stage the project\'s workflow rules don\'t have (Review with no review, say). {card} is a card key, {stage} a stage name.' }),
+    msg({ id: 'workflow.refused.move.noStage.next', defaultMessage: 'Move it to one of its steps: {stages}.', description: 'The next step after a move to a stage the rules lack: the stages they have. {stages} lists stage names.' }),
+    msg({ id: 'workflow.refused.move.noStage.change', defaultMessage: "A project's steps follow its options in Version Control.", description: 'Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it).' })
+  ),
   'move.useIntent': r(
     msg({ id: 'workflow.refused.move.useIntent.message', defaultMessage: "Agents don't move cards between columns.", description: 'A refused column move by an agent: agents act by intent.' }),
     msg({ id: 'workflow.refused.move.useIntent.next', defaultMessage: 'Use the {intent} intent instead.', description: 'The next step after a refused column move: {intent} is the intent to use.' })
@@ -141,6 +146,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),
     msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Agent Setup or the folder, then try again.', description: 'The next step when Hive could not read what a rule needs.' })
+  ),
+  'loop.roundLimit': r(
+    msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),
+    msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: 'The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.', description: "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card." })
   ),
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
@@ -218,6 +227,8 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
     if (typeof vals.stage === 'string') vals.stage = f.one(STAGE_NAME, { stage: vals.stage })
     for (const k of ['move', 'intent', 'rule'] as const) if (typeof vals[k] === 'string') vals[k] = name(vals[k] as string)
     for (const k of ['moves', 'rules'] as const) if (vals[k] !== undefined) vals[k] = names(vals[k])
+    // A list of stages (`move.noStage`'s), each by its stage name.
+    if (vals.stages !== undefined) vals.stages = f.list(String(vals.stages).split(', ').filter(Boolean).map((x) => f.one(STAGE_NAME, { stage: x })))
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })

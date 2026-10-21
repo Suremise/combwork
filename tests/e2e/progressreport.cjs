@@ -13,6 +13,8 @@ const userData = path.join(lib.WORK, 'progressreport-profile')
 const ws = path.join(lib.WORK, 'progressreport-ws')
 const claudeHome = path.join(lib.WORK, 'progressreport-claude-home')
 const alpha = path.join(ws, 'alpha')
+// A checkout of alpha at an older commit (#1273), beside the workspace so it isn't one of its projects.
+const older = path.join(lib.WORK, 'progressreport-older')
 const PORT = Number(lib.port(47913))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -21,7 +23,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, claudeHome, older]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
@@ -186,6 +188,7 @@ const check = (name, ok, extra = '') => {
   const details = cardRow.locator('.progress-details')
   const detailsText = async () => (await details.textContent().catch(() => '')) ?? ''
   check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card${card.key}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
+  check("…and no Tested on: it was tested on the card's revision (#1273)", !(await detailsText()).includes('Tested on'), await detailsText())
   for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-card-${theme}.png`)
   await cardRow.locator('.progress-run-card').click()
   // The dialog has the card's title in its title box.
@@ -193,6 +196,24 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Escape')
   const end3 = await forCard()
   check('…and it passes', end3?.code === 0, JSON.stringify(end3))
+
+  // A run for the card in another checkout (#1273, as a reviewer's): the card's revision, and what it was tested on, the
+  // commit checked out there, shown in its details as Tested on.
+  gitIn('worktree', 'add', '-q', '--detach', older, 'HEAD~1')
+  const olderHead = gitIn('rev-parse', 'HEAD~1')
+  known = (await runs()).map((r) => r.id)
+  const elsewhere = await startShell(builder.id, `cd /d "${older}" && hive-progress --card "#${card.number}" --title "Tested elsewhere" -- node -e "setTimeout(() => process.exit(0), 6000)"`)
+  const live4 = await newRun(known, (r) => r.title === 'Tested elsewhere')
+  check("a run in another checkout: the card's revision, tested on that checkout's head", live4?.card === card.number && live4?.revision === head && live4?.testedCheckout === olderHead, JSON.stringify(live4))
+  const elsewhereRow = panel.locator(`.progress-run[data-run="${live4?.id}"]`)
+  await elsewhereRow.locator('.progress-title').click()
+  const elsewhereText = async () => (await elsewhereRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
+  check('…and its details show Tested on with the whole commit, after the Revision', !!(await until(async () => /Revision[0-9a-f]{40}Tested on[0-9a-f]{40}/.test(await elsewhereText()) && (await elsewhereText()).includes(`Revision${head}Tested on${olderHead}`), HUNG_MS)), await elsewhereText())
+  for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-tested-on-${theme}.png`)
+  const end4 = await elsewhere()
+  check('…and it passes', end4?.code === 0, JSON.stringify(end4))
+  await elsewhereRow.locator('.progress-title').click()
+  gitIn('worktree', 'remove', '--force', older)
 
   // A revision that isn't what's checked out is refused before the command runs; a check runs the project's command.
   const refused = await shell(builder.id, `hive-progress --card "#${card.number}" --revision HEAD~1 -- node -e "require('fs').writeFileSync('refused-ran.txt', 'x')"`)

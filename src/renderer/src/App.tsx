@@ -1,3 +1,4 @@
+import { PresetsNotice } from './components/WorkflowOptions'
 import { fmt, msg, tr } from '@shared/i18n'
 import { useAntivirusOffer } from './components/Antivirus'
 import { useEffect, useRef } from 'react'
@@ -443,6 +444,7 @@ export function App() {
           <ProvidersBanner />
           <MovedBanner />
           <BoardUpgradeBanner />
+          <PresetsNotice />
           {workspace && <ProjectView visible={activity === 'projects'} />}
           {main && (
             <div className="tab-body">

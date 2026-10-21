@@ -661,7 +661,7 @@
   },
   "board.details.revision": {
     "defaultMessage": "Revision",
-    "description": "A label in a run's details (Progress panel): the commit it ran on follows (a commit id)."
+    "description": "A label in a run's details (Progress panel): the card's revision follows, the version of the card's work the run was for: a commit id, or for a project with no platform a hash of the card's files' content (not a commit)."
   },
   "board.details.run": {
     "defaultMessage": "Run",
@@ -702,6 +702,10 @@
   "board.details.summary": {
     "defaultMessage": "Summary",
     "description": "A label in a run's details copied as text (Copy details, Progress panel): the summary its reporter gave follows."
+  },
+  "board.details.testedOn": {
+    "defaultMessage": "Tested on",
+    "description": "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)."
   },
   "board.details.took": {
     "defaultMessage": "Took",

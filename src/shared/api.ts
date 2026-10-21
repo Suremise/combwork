@@ -98,6 +98,9 @@ import type {
   Transcript,
   TranscriptSearchResult,
   TranscriptTool,
+  WorkflowChange,
+  WorkflowCheck,
+  WorkflowForm,
   WorkspaceInfo
 } from './types'
 import type { MetricsQuery, MetricsReport } from './metrics'
@@ -114,7 +117,7 @@ import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
-import type { WorkBadge, WorkView } from './workflow/workView'
+import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -264,7 +267,18 @@ export interface HiveRequests {
   'project:setKey': (projectPath: string, key: string) => string
   /** The names moved cards keep in the projects they left (`HI-1` → its card's number), #1221. */
   'project:movedCardNames': () => Record<string, number>
+  /** Any of a project's settings but its workflow options, which change only through `workflow:setOptions` (refused here). */
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
+  /** The project's workflow options as Project Settings → Workflow shows them (#1278): its own, what they inherit, the presets. */
+  'workflow:form': (projectPath: string) => WorkflowForm
+  /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
+  'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
+  /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
+  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
+  'workflow:presetsNotice': () => { path: string; name: string }[] | null
+  /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
+  'workflow:presetsNoticeSaid': () => void
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */
@@ -325,6 +339,10 @@ export interface HiveRequests {
   'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string }) => TaskMoveResult
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
   'tasks:facts': (n: number) => Fact[]
+  /** What waits for the user (For you, #1269, SPEC §16.8.5): every live card's open requests, of one project (its folder name) or the workspace, oldest first, and their count. */
+  'tasks:forYou': (project?: string | null) => ForYouSummary
+  /** The user answers a card's request (For you): only the user. Refused when it was answered or retired meanwhile. */
+  'tasks:answer': (n: number, request: string, answer: ForYouAnswer) => TaskCard
   'tasks:comment': (n: number, text: string) => TaskCard
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
   'tasks:editDecision': (n: number, id: string, text: string | null) => TaskCard
