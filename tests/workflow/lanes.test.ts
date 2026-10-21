@@ -74,7 +74,7 @@ describe('the upgrade', () => {
     const opts = upgradeOptions('git', { reviewers: true, worktrees: false })
     expect(opts).toMatchObject({ review: 'agent', finish: 'notChecked', folder: 'project', preChecks: [] })
     const e = (env = setup(opts))
-    const [doing, review, passed] = ['Doing', 'Review', 'Passed'].map((t) => e.wf.createCard({ title: t, reviewer: 'R1' }))
+    const [doing, review, passed] = ['Doing', 'Review', 'Passed'].map((t) => e.wf.createCard({ title: t }))
     commit(e.project, { 'r.txt': 'review work\n' }, 'review work')
     await adopt(e.wf, doing, 'doing', { agent: 'B1', target: 'main' })
     await adopt(e.wf, review, 'review', { agent: 'B2', target: 'main' })

@@ -18,7 +18,7 @@ import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusa
 import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
-import { changeList, newLane, nextCard, type LaneList } from '../../shared/workflow/laneList'
+import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import type { FinishInputs, PlatformAdapter } from '../platform/adapter'
 import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
@@ -201,8 +201,8 @@ export class Workflow {
 
   // --- Cards, rulesets, folders.
 
-  createCard(input: { title: string; kind?: CardKind; labels?: string[]; blockedBy?: number[]; target?: string; paths?: string[]; reviewer?: string }): CardRecord {
-    return this.store.createCard({ title: input.title, kind: input.kind ?? 'code', labels: input.labels ?? [], blockedBy: input.blockedBy ?? [], ...(input.target ? { target: input.target } : {}), ...(input.paths ? { paths: input.paths } : {}), ...(input.reviewer ? { reviewer: input.reviewer } : {}) })
+  createCard(input: { title: string; kind?: CardKind; labels?: string[]; blockedBy?: number[]; target?: string; paths?: string[] }): CardRecord {
+    return this.store.createCard({ title: input.title, kind: input.kind ?? 'code', labels: input.labels ?? [], blockedBy: input.blockedBy ?? [], ...(input.target ? { target: input.target } : {}), ...(input.paths ? { paths: input.paths } : {}) })
   }
 
   /** A card by reference (`AM-12`, `#12`) or id; a plain number from an agent is refused (§16.12). */
@@ -237,7 +237,7 @@ export class Workflow {
     }
     if (card.lane) {
       const lane = this.lane(card.lane)
-      if (lane && !lane.ended) return this.store.ruleset(lane.ruleset)
+      if (lane && !lane.ended && lane.ruleset) return this.store.ruleset(lane.ruleset)
     }
     // Not stored here (a read): a write naming it stores it in its own transaction (write()).
     return this.currentRuleset(false)
@@ -1238,21 +1238,17 @@ export class Workflow {
     this.store.saveLane(l)
   }
 
-  /** Starts a lane: its cards use the ruleset in force now until it ends. */
+  /** Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends. */
   startLane(id: string, cards: number[], reviewer?: string): LaneList {
-    const r = this.currentRuleset()
-    const l = newLane(id, cards, r.id)
-    for (const c of cards) this.store.updateCard(c, { lane: id, ...(reviewer ? { reviewer } : {}) })
-    this.saveLane(l)
-    return l
+    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer)
   }
 
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */
   changeLane(id: string, cards: number[]): { lane: LaneList; queuedAfter: string | null } {
     const l = this.lane(id)!
     const current = l.current !== null && !this.laneDone(l.current) ? l.current : null
+    // A card queued is in the lane already (its queued list): it uses the lane's ruleset.
     const next = changeList({ ...l, current }, cards)
-    for (const c of cards) this.store.updateCard(c, { lane: id })
     this.saveLane(next)
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
   }

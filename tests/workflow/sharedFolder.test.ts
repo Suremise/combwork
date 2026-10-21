@@ -38,8 +38,8 @@ describe('workflow scenarios, several agents in one folder', () => {
 
   it('S29: Pair in the project folder (line = target): interleaved commits with trailers never move a card to Done; each change is its own; reviewed, then Done; a commit with no trailer refuses submit', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
-    const a = e.wf.createCard({ title: 'A', reviewer: 'R1' })
-    const b = e.wf.createCard({ title: 'B', reviewer: 'R1' })
+    const a = e.wf.createCard({ title: 'A' })
+    const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))
     moved(await e.wf.start(b.key, B2))
     const a1 = commit(e.project, { 'a1.txt': 'a\n' }, 'a1', { trailer: a.key })
@@ -58,7 +58,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     moved(await e.wf.verdict(a.key, R1, { pass: true, comment: 'ok' }))
     expect(e.wf.state(a)).toMatchObject({ stage: 'done', integrated: { method: 'committed' } })
     // B commits with no trailer while A... (A is done: B is the only unfinished card, so it's B's). Start a third card.
-    const c = e.wf.createCard({ title: 'C', reviewer: 'R1' })
+    const c = e.wf.createCard({ title: 'C' })
     moved(await e.wf.start(c.key, B3))
     commit(e.project, { 'b3.txt': 'no trailer\n' }, 'b3')
     const r = refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer')
@@ -105,8 +105,8 @@ describe('workflow scenarios, several agents in one folder', () => {
 
   it('S58: shared folder: A submits its own newest commit; B\'s change excludes A\'s; A\'s run while B edits is uncounted, the isolated run counts; an untrailered commit is listed for the user', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: ['lint'], mergeChecks: [], commands: { lint: 'npm run lint' }, target: '' }))
-    const a = e.wf.createCard({ title: 'A', reviewer: 'R1' })
-    const b = e.wf.createCard({ title: 'B', reviewer: 'R1' })
+    const a = e.wf.createCard({ title: 'A' })
+    const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))
     moved(await e.wf.start(b.key, B2))
     const a1 = commit(e.project, { 'a.txt': 'a\n' }, 'a', { trailer: a.key })
