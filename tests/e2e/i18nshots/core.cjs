@@ -89,9 +89,10 @@ async function openCards(ctx) {
   // First "Remove Four?": its action button is the solid (or danger, or primary) one, whatever its words.
   const confirm = await shown(ctx, page.locator('.dialog').last().locator('button.solid, button.danger, button.primary').last(), 'the remove dialog')
   await confirm.click()
-  // Then the open cards, listed by number.
+  // Then the open cards, listed by their label: the project's key where it has one ("AL-1"), else the number (#1318).
+  const label = cards[0].key || `#${cards[0].number}`
   const ask = page.locator('.dialog').last()
-  if (!(await lib.until(async () => (await ask.innerText().catch(() => '')).includes(`#${cards[0].number}`), ctx.hungMs))) throw new Error(`the open-cards dialog did not show (dialogs: ${JSON.stringify(await page.locator('.dialog').count())})`)
+  if (!(await lib.until(async () => (await ask.innerText().catch(() => '')).includes(label), ctx.hungMs))) throw new Error(`the open-cards dialog did not show ${label} (dialogs: ${await page.locator('.dialog').count()}; the last says: ${JSON.stringify((await ask.innerText().catch(() => '')).slice(0, 160))})`)
   return ask
 }
 
