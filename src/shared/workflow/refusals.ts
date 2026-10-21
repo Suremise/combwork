@@ -223,6 +223,8 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
     if (typeof vals.stage === 'string') vals.stage = f.one(STAGE_NAME, { stage: vals.stage })
     for (const k of ['move', 'intent', 'rule'] as const) if (typeof vals[k] === 'string') vals[k] = name(vals[k] as string)
     for (const k of ['moves', 'rules'] as const) if (vals[k] !== undefined) vals[k] = names(vals[k])
+    // A list of stages (`move.noStage`'s), each by its stage name.
+    if (vals.stages !== undefined) vals.stages = f.list(String(vals.stages).split(', ').filter(Boolean).map((x) => f.one(STAGE_NAME, { stage: x })))
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })

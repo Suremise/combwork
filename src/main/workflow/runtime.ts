@@ -284,7 +284,9 @@ export class Workflow {
    * (the one in force when the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
-    if (s.started) {
+    // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
+    // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
+    if (s.started && s.stage !== 'todo') {
       const f = this.store.facts(card.id).find((x) => x.seq === s.cycle)
       if (f?.ruleset) return this.store.ruleset(f.ruleset)
     }
@@ -1134,7 +1136,9 @@ export class Workflow {
     const s = this.state(card)
     const from = s.stage
     if (to === from) return this.ok(card, from, to)
-    const r = this.rulesetOf(card, s)
+    // A Done card dragged on is reopened: its next cycle's rules (as from Todo), not its last's.
+    const reopened = from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo')
+    const r = this.rulesetOf(card, reopened ? { ...s, stage: 'todo' } : s)
     // Never into a stage the card's ruleset doesn't have (no review: no Review; no merge step: no Approved or Merging).
     if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
@@ -1212,7 +1216,8 @@ export class Workflow {
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
-    const r = this.rulesetOf(card, s0)
+    // The rules of where the drag counts from (a reopened card's: its next cycle's).
+    const r = this.rulesetOf(card, s)
     const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder) : null
     if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
     const s1 = gs ? this.predicted(card, s, gs) : s

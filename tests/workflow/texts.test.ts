@@ -98,6 +98,16 @@ describe('the workflow text in every locale', () => {
     expect(refusalLines('move.needsOverride', SAMPLE, WINDOW).message).toContain(tr(RULE_NAMES['submit.checksPassed']))
   })
 
+  it("names a refusal's stages by their stage names in every locale, as they are to agents (HR2's #1290 round 1)", async () => {
+    expect(refusal('move.noStage', SAMPLE).next).toBe('Move it to one of its steps: todo, active, done.')
+    for (const code of ['en', ...LOCALES]) {
+      if (code !== 'en') setLanguage(code, await loadCatalogue(code), code)
+      const next = refusalLines('move.noStage', SAMPLE, WINDOW).next
+      for (const stage of ['todo', 'active', 'done']) expect(next, `${code} ${stage}`).toContain(tr(STAGE_NAME, { stage }))
+      if (code !== 'en') expect(next, code).not.toMatch(/\btodo\b|\bactive\b/)
+    }
+  })
+
   it('names every guard, move and stage for the window', () => {
     for (const id of Object.keys(GUARDS)) expect(RULE_NAMES[id], id).toBeDefined()
     for (const stage of ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']) expect(tr(STAGE_NAME, { stage })).not.toBe(stage)

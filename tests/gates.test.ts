@@ -462,6 +462,28 @@ describe('drags run the intents they stand for (#1290)', () => {
     expect(await move(w, card, 'todo')).toMatchObject({ moved: { column: 'todo' } })
   })
 
+  it("a reopened card's new cycle starts under the rules now, not its last cycle's: directly, and through Todo (HR2's #1290 round 1)", async () => {
+    for (const via of [false, true]) {
+      const { w, repo, wt } = await workspace(null)
+      const card = await create(w)
+      await update(w, card, { column: 'doing', agent: 'a1' })
+      await move(w, card, 'done')
+      const old = facts(w, card).find((f) => f.kind === 'Started')!.ruleset
+      // Review by an agent turned on since.
+      writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: PAIR } }))
+      if (via) expect(await move(w, card, 'todo')).toMatchObject({ moved: { column: 'todo' } })
+      expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
+      const started = facts(w, card).filter((f) => f.kind === 'Started')
+      expect(started).toHaveLength(2)
+      expect(started[1].ruleset).not.toBe(old)
+      // Review is a step of its rules now: the card goes there (with work to submit).
+      writeFileSync(join(wt, 'b.txt'), 'b\n')
+      git(wt, 'add', '-A')
+      git(wt, 'commit', '-qm', 'b')
+      expect(await move(w, card, 'review')).toMatchObject({ moved: { column: 'review' } })
+    }
+  })
+
   it("a stage the card's rules don't have is refused, saying why; the board's other moves keep today's move until the window asks (#1275)", async () => {
     const { w } = await workspace(null)
     const card = await create(w)
