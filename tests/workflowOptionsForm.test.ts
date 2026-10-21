@@ -167,7 +167,7 @@ describe('the next card starts under the saved options (#1278, S19)', () => {
     const before = await inWorkspace(w, () => tasks.createTask({ title: 'Before', project: 'p', agent: 'b1', column: 'doing' }, user))
     const after = await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
     const wf = (await workflowFor(w, repo))!
-    const startedRuleset = (n: number): string | undefined => wf.store.facts(n).find((f) => f.kind === 'Started')?.ruleset
+    const startedRuleset = (card: number): string | undefined => wf.store.facts(card).find((f) => f.kind === 'Started')?.ruleset
     const old = await vi.waitFor(() => startedRuleset(before.number) ?? Promise.reject(new Error('not started yet')), { timeout: HUNG_MS })
     // Only some options set: the rest inherit (the workspace's squash among them).
     const { target: _t, style: _s, ...own } = allOff('git')
