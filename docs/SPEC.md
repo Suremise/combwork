@@ -1332,18 +1332,27 @@ side effects touch git, processes and other agents), so they are tied by **durab
   notification carries the action id and isn't shown twice). An action that can't tell (a notification already shown
   before a crash) may repeat at most once, never more. **Built** (#1266): a wake's delivery carries the action's id
   (`deliveries.action`, unique), which is the record that it was made: the worker runs a delivering action until it is
-  marked, and every run after the first finds its delivery. A notice, which leaves nothing to find once shown, is
-  **repeatable**: one Hive at a time runs it, holding its **lease** (`lease_owner`, `lease_until`: taken by a conditional
-  update only one writer wins, while it is free, has passed, or is this Hive's own); its dispatch is counted
-  (`attempts`) under the lease just before it is shown, and a dispatch not followed by its mark is **uncertain**. The
-  action stays pending until marked, so a crash or a close before it was shown never loses it (it runs again once its
-  lease has passed), one after it repeats it at most once (never past two uncertain dispatches), and two Hives never
-  show it at once. A kind with no handler yet is marked done by the one run that finds it pending.
+  marked, and every run after the first finds its delivery.
+  **Notices: the guarantee is the durable record, not the toast** (the Assistant's call on #1266, 21 Oct). A notice's
+  record is durable before anything is shown: its action (`notify`, `laneNotice`, written with the facts or the lane's
+  marks, and pending until marked), and its source, which the window always shows after any crash (the card's For you
+  request, its Work section; the lane in the Progress panel, the blocked or failed card on the board). The banner or
+  Windows notification itself is **best effort**: attempted after the record commits, repeated at most once more after
+  a run that ended uncertainly, never claimed to be exactly once. A notice is **repeatable**: one claim at a time runs
+  it, holding its **lease** (`lease_owner`, a token unique to the claim, and `lease_until`: taken by a conditional update
+  only one writer wins, renewed while its handler runs); its dispatch is counted (`attempts`) under that token while the
+  lease holds, and the toast is shown at once after that commits (a dispatch not followed by its mark is
+  **uncertain**). A dispatch refused (its lease expired or taken, the workspace gone) shows nothing and leaves the
+  action pending, retried: an action is done only once its dispatch was attempted under a valid lease (or it had
+  nothing to show), and its completion is fenced by the token. Two claims never show it at once, and it is never
+  dispatched past two uncertain dispatches. A kind with no handler yet is marked done by the one run that finds it
+  pending.
   `card_actions.delivered` (#1215's stand-in) is gone (the 1.0 group's step 9). A host's deliveries are saved by
   **compare-and-set**: a save writes only the deliveries its change made or changed, each from the row as this Hive
   last read or wrote it; another Hive's receipt, ack or cancel since makes it read the rows again and plan the change
   again on them (never written over), its rows are never deleted, and a new delivery whose id it took takes the next
-  free one.
+  free one. A delivery's record and the row it checks against come from one read (one SELECT, in one read
+  transaction with the values beside them), on loading and on every read again.
 - **The target advance** is the one step that can't be repeated blindly. The queue writes `IntegrationStarted`
   (expected target revision, result revision) and commits it, **then** advances the target, **then** writes
   `Integrated`. After a restart, an entry with `IntegrationStarted` and no outcome is reconciled from the platform,
@@ -2143,9 +2152,10 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   passed (its merge due) and the merge stalled: one notice per lane at a time, a banner or a Windows notification as
   **Settings → Notifications** says, with the Assistant on or off. What was told of each lane is kept with the board
   (`lane_notice_lanes`, `lane_notice_cards`): one board change moves it on and writes the lane's notice as a durable
-  `laneNotice` action, only when what the look read (the newest change to a card and a lane, and the marks' writes) is
-  still the board's under its lock, else it looks again, so marks never move back to an older look, a restart tells
-  what it hadn't yet and two Hives tell each event once; a lane running when
+  `laneNotice` action, only when the board's revision (`board_rev`, moved on by every write to a card or a lane, by
+  trigger: never a clock) and the marks' writes are as the look read them, under its lock, else it looks again, so
+  marks never move back to an older look, a restart tells what it hadn't yet and two Hives tell each event once (the
+  toast best effort, as §16.4.5 says; the lane itself always shows in the Progress panel); a lane running when
   Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
   runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
   (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's

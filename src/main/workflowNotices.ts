@@ -28,8 +28,10 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * events found together are one notice, per lane. Like the loop's wakes, none for a project whose Project Settings →
  * Card loops → Wake reviewers and builders is off (`loopWakes`).
  *
- * Both are durable actions (`notify`, `laneNotice`), repeatable (actionWorker.ts): never lost to a crash or a close
- * before they were shown, repeated at most once. A lane's events are found by comparing it with what was last told of
+ * Both are durable actions (`notify`, `laneNotice`), repeatable (actionWorker.ts), and what they tell always shows in the
+ * window too (the card's request, the lane in the Progress panel): that record is the guarantee, and the banner or
+ * Windows notification is best effort (shown once its dispatch is counted under a lease that holds; never done without
+ * it when that lease expired; repeated at most once after a run that ended uncertainly; SPEC §16.4.5). A lane's events are found by comparing it with what was last told of
  * it, kept with the board (`lane_notice_lanes`, `lane_notice_cards`): in one board change, the marks move on and each
  * lane's notice is written as an action, so a restart tells what it hadn't yet, and two Hives on one workspace tell each
  * event once (the second finds the marks moved on). A lane running when Hive first followed lanes on the board (its
@@ -82,8 +84,8 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
   const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
   const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [text] : []
-  // Counted just before it is shown (its lease still this Hive's): uncertain until the action is marked.
-  if (await ctx.dispatch()) tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body)
+  // Shown once its dispatch is counted under a lease that holds (uncertain until the action is marked).
+  await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body))
 }
 
 /** A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why. */
@@ -107,7 +109,7 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
     if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
     return M.mergeDue
   })
-  if (lines.length && (await ctx.dispatch())) tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines)
+  if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines))
 }
 
 // --- What lane notices last told, with the board.
@@ -141,14 +143,12 @@ const metaOf = (db: DatabaseSync, key: string): string | null => (db.prepare('SE
 const SEQ = 'lane_notices_seq'
 
 /**
- * What a look reads, as of now (#1266 round 2): the newest change to a card and to a lane (their `updated_at`: every
- * change to either moves it on) and the marks' writes. The same stamp at the write as at the read: nothing a look reads
- * changed between (a session's stall aside, which no write marks).
+ * What a look reads, as of now (#1266 round 3): the board's revision (`board_rev`, moved on in the same transaction as
+ * every write to a card, a lane or a lane's cards, by trigger: never a clock) and the marks' writes. The same stamp at
+ * the write as at the read: nothing a look reads changed between (a session's stall aside, which no write marks).
  */
 function stampOf(db: DatabaseSync): string {
-  const card = (db.prepare('SELECT max(updated_at) AS u FROM cards').get() as { u: string | null }).u // i18n-ignore: SQL
-  const lane = (db.prepare('SELECT max(updated_at) AS u FROM lanes').get() as { u: string | null }).u // i18n-ignore: SQL
-  return `${card ?? ''}|${lane ?? ''}|${metaOf(db, SEQ) ?? '0'}`
+  return `${metaOf(db, 'board_rev') ?? '0'}|${metaOf(db, SEQ) ?? '0'}`
 }
 
 /** How many times a look is made again, at most, while the board keeps changing under it (the next change or tick looks then). */

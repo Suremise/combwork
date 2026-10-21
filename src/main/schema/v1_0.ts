@@ -538,7 +538,19 @@ export const ACTIONS_DELIVERED_STEP: SchemaStep = {
       failed  TEXT    NOT NULL,
       passed  TEXT    NOT NULL,
       PRIMARY KEY (lane, card)
-    ) STRICT, WITHOUT ROWID`
+    ) STRICT, WITHOUT ROWID`,
+    // The board's revision (board_meta `board_rev`): moved on by every write to a card or a lane, in that write's own
+    // transaction, never by the clock. What lane notices read is current while it hasn't moved (workflowNotices.ts).
+    "INSERT OR IGNORE INTO board_meta (key, value) VALUES ('board_rev', '0')",
+    `CREATE TRIGGER board_rev_cards_insert AFTER INSERT ON cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_cards_update AFTER UPDATE ON cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_cards_delete AFTER DELETE ON cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lanes_insert AFTER INSERT ON lanes BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lanes_update AFTER UPDATE ON lanes BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lanes_delete AFTER DELETE ON lanes BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lane_cards_insert AFTER INSERT ON lane_cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lane_cards_update AFTER UPDATE ON lane_cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`,
+    `CREATE TRIGGER board_rev_lane_cards_delete AFTER DELETE ON lane_cards BEGIN UPDATE board_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'board_rev'; END`
   ]
 }
 

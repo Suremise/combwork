@@ -233,6 +233,15 @@ export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
   for (const id of had.keys()) if (!ids.has(id)) del.run(host, id)
 }
 
+/**
+ * A host's deliveries and each one's row as its text, from one read of the rows (#1266 round 3): a record and the base a
+ * compare-and-set save checks it against are always the same row's, never two reads another writer committed between.
+ */
+export function readDeliveriesWithBases(db: Db, host: string): { records: Rec[]; bases: Map<string, string> } {
+  const rows = db.prepare('SELECT * FROM deliveries WHERE host = ? ORDER BY seq, id').all(host) as Rec[] // i18n-ignore: SQL
+  return { records: rows.map(deliveryFromRow), bases: new Map(rows.map((r) => [r.id as string, rowText(r as Row)])) }
+}
+
 /** A host's deliveries' rows as they are committed, each as its text (what a compare-and-set save checks against). */
 export function deliveryBases(db: Db, host: string): Map<string, string> {
   return new Map((db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[]).map((r) => [r.id as string, rowText(r)])) // i18n-ignore: SQL

@@ -569,8 +569,7 @@ describe('writers at once (#1266 round 3)', () => {
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     const fn: Parameters<typeof worker.onAction>[1] = async (_a, _w, ctx) => {
-      if (!(await ctx.dispatch())) return
-      ran++
+      if (!(await ctx.dispatch(() => ran++))) return
       await held
     }
     worker.onAction('probeNotice', fn, 'repeatable')
@@ -636,6 +635,151 @@ describe('writers at once (#1266 round 3)', () => {
       await notices.checkLanesNow(w)
       await settled()
       expect(st.notices).toHaveLength(1)
+    } finally {
+      release()
+      await older
+      spy.mockRestore()
+      notices.noticeTestHooks.hold = false
+    }
+  })
+})
+
+// HR1's round 3 probes (#1266): the boundaries of the same three invariants, each a regression test.
+describe('boundaries (#1266 round 4)', () => {
+  it('a lease that expired before its dispatch shows nothing and leaves the action pending, never done; it runs again and shows it', async () => {
+    const { w, ws } = await open()
+    const c = await newCard(w)
+    await settled()
+    let shown = 0
+    let expire = true
+    worker.onAction(
+      'probeExpired',
+      async (a, _w, ctx) => {
+        // The handler took longer than its lease (suspended, slow IO): it has expired by its dispatch.
+        if (expire) store.workspaceDb(ws).writer.prepare('UPDATE card_actions SET lease_until = ? WHERE id = ?').run(new Date(Date.now() - 1).toISOString(), a.id)
+        await ctx.dispatch(() => shown++)
+      },
+      'repeatable'
+    )
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    const id = own.tx((tx) => tx.action(c, 'probeExpired', {}, null))
+    own.close()
+    await worker.runActions(w)
+    expect(shown).toBe(0)
+    expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts, lease_owner FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending', attempts: 0, lease_owner: null })
+    // Its next run (a retry, or the next change) shows it, once.
+    expire = false
+    await vi.waitFor(async () => {
+      await worker.runActions(w)
+      expect(shown).toBe(1)
+    }, HANG)
+    expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 1 })
+  })
+
+  it('a lease is renewed while its handler runs: a handler slower than the lease still dispatches, and no other claim takes it meanwhile', async () => {
+    const { w, ws } = await open()
+    const c = await newCard(w)
+    await settled()
+    worker.setLeaseMsForTests(300)
+    let shown = 0
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let entered = false
+    worker.onAction(
+      'probeSlow',
+      async (_a, _w, ctx) => {
+        entered = true
+        await held
+        await ctx.dispatch(() => shown++)
+      },
+      'repeatable'
+    )
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    const id = own.tx((tx) => tx.action(c, 'probeSlow', {}, null))
+    own.close()
+    const leaseOf = () => ({ ...(store.workspaceDb(ws).reader.prepare('SELECT lease_owner, lease_until FROM card_actions WHERE id = ?').get(id) as { lease_owner: string; lease_until: string }) })
+    try {
+      const run = worker.runActions(w)
+      await vi.waitFor(() => expect(entered).toBe(true), HANG)
+      const first = leaseOf()
+      // Renewed past its first expiry while the handler waits.
+      await vi.waitFor(() => expect(Date.parse(leaseOf().lease_until)).toBeGreaterThan(Date.parse(first.lease_until) + 300), HANG)
+      expect(leaseOf().lease_owner).toBe(first.lease_owner)
+      release()
+      await run
+      expect(shown).toBe(1)
+      expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 1 })
+    } finally {
+      release()
+      worker.setLeaseMsForTests(null)
+    }
+  })
+
+  it("a delivery's record and the base a save checks it against are one read's: another Hive's receipt just after the read is kept", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    await inReview(w)
+    await settled()
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received right after the read' })
+    await deliveries.forgetDeliveriesForTests()
+    const tables = await import('../src/main/schema/sessionDeliveryTables')
+    const real = tables.readDeliveriesWithBases
+    let injected = false
+    const spy = vi.spyOn(tables, 'readDeliveriesWithBases').mockImplementationOnce((db, host) => {
+      const read = real(db, host)
+      // Another Hive receives it the moment after this one read the rows.
+      const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite')
+      const outside = new DatabaseSync(store.boardFile(ws))
+      try {
+        outside.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(new Date().toISOString(), own.id)
+      } finally {
+        outside.close()
+      }
+      injected = true
+      return read
+    })
+    try {
+      await deliveries.load(alpha)
+      expect(injected).toBe(true)
+      expect(await deliveries.cancelDeliveries(alpha, 'b1', 'a test')).toBe(0)
+      expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(own.id) as { state: string }).state).toBe('received')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it("an unrelated card's future timestamp can't hide a lane card's change: the board's revision isn't a clock", async () => {
+    const { w, ws, alpha } = await open()
+    notices.noticeTestHooks.hold = true
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    const other = await newCard(w)
+    await settled()
+    await notices.checkLanesNow(w)
+    await settled()
+    // A stored time after the clock (the machine's clock corrected backwards, say).
+    store.workspaceDb(ws).writer.prepare('UPDATE cards SET updated_at = ? WHERE number = ?').run('2099-01-01T00:00:00.000Z', other)
+    let captured = false
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const real = watches.lanesNowIn
+    const spy = vi.spyOn(watches, 'lanesNowIn').mockImplementationOnce(async (...args) => {
+      const snapshot = await real(...args)
+      captured = true
+      await held
+      return snapshot
+    })
+    let older: Promise<void> | undefined
+    try {
+      older = notices.checkLanesNow(w)
+      await vi.waitFor(() => expect(captured).toBe(true), HANG)
+      await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Read the board as it is' }, b1))
+      release()
+      await older
+      await settled()
+      // The look read again: the card's mark is blocked, and it was told.
+      expect((store.workspaceDb(ws).reader.prepare('SELECT blocked FROM lane_notice_cards WHERE card = ?').get(c) as { blocked: number }).blocked).toBe(1)
+      expect(JSON.stringify(st.notices)).toContain('Read the board as it is')
     } finally {
       release()
       await older

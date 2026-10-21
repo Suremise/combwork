@@ -35,7 +35,7 @@ import { onHiveEvent } from './events'
 import { readCapped, readJson, renameRetrying } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
-import { addDeliveriesFile, countDeliveries, deliveryBases, readDeliveries as readDeliveryRows, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -406,10 +406,20 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
   } else {
     // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
     await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(host), DELIVERIES_TABLE)
+    // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
+    // record and its base are the same row's, never two reads another Hive committed between.
     const db = workspaceDb(place.workspace).reader
-    raw = readDeliveryRows(db, place.scope)
-    base = deliveryBases(db, place.scope)
-    value = (key) => storeValue(db, 'deliveries', place.scope, key)
+    const values = new Map<string, string | null>()
+    db.exec('BEGIN')
+    try {
+      const read = readDeliveriesWithBases(db, place.scope)
+      raw = read.records
+      base = read.bases
+      for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', place.scope, key))
+    } finally {
+      db.exec('COMMIT')
+    }
+    value = (key) => values.get(key) ?? null
   }
   const kept = value('invalid')
   const savedNext = value('next') !== null ? (JSON.parse(value('next')!) as unknown) : undefined

@@ -588,15 +588,18 @@ pending. Each action runs in one of two ways (#1266), as its handler registered 
 **delivered** (`wake`, loopWakes.ts; `wakeOnDecision`, decisionWakes.ts), checked still pending in a board change of
 its own, then its handler runs, whose delivery carries the action's id (`deliveries.action`, unique: `actionDelivered`
 finds one made, in memory or in hive.db, another Hive's too), then it is marked done (failed when the handler throws;
-never tried again); **repeatable** (`notify` and `laneNotice`, workflowNotices.ts), leased by one process
-(`lease_owner`, its id per Hive, and `lease_until`, 2 min: `take`, a conditional update; one another Hive holds is
-left and tried again when its lease passes, and the commit listener starts a run only for what this process could take,
-so no run starts runs for nothing), its handler calling `dispatch()` just before its effect (`attempts`, counted under
-the lease: an uncertain dispatch), done after two; or **claimed** (every kind with
+never tried again); **repeatable** (`notify` and `laneNotice`, workflowNotices.ts), leased by one claim
+(`lease_owner`, a token per claim, `<process>/<uuid>`, and `lease_until`, 2 min: `take`, a conditional update; renewed
+while the handler runs; one another claim holds is left and tried again when its lease passes), its handler giving its
+effect to `dispatch(effect)` (`attempts`, counted under the token while the lease holds, then the effect at once: an
+uncertain dispatch), completion fenced by the token, a refused dispatch left pending and taken again after a second
+(`cooling`), done after two uncertain dispatches; the commit listener starts a run only for what this process could
+take, so no run starts runs for nothing; or **claimed** (every kind with
 no handler, marked done as the no-op it is: `prepareReviewCopy`, `releaseSlot`, `enqueue`, `pin`, `prepareSlot`,
 `endLaneIfDone` until P5 and P7). deliveries.ts saves a host's deliveries by compare-and-set (`saveDeliveryChanges`):
-only what the transaction changed, each from its row as the store last read or wrote it (`Store.base`); a row another
-Hive changed since fails the save (`StaleDeliveries`), and the transaction reads the rows again and plans again on them. The recorder
+only what the transaction changed, each from its row as the store last read or wrote it (`Store.base`, read with the
+record in one SELECT and one read transaction: `readDeliveriesWithBases`); a row another Hive changed since fails the
+save (`StaleDeliveries`), and the transaction reads the rows again and plans again on them. The recorder
 writes the loop's handoffs as `wake` and `wakeOnDecision` actions with the facts (`loopWakes` in recorder.ts), for a
 card in a loop only; `tasks.ts` has no handoff path of its own (`onLoopEvent` is gone). A
 run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
@@ -620,8 +623,9 @@ backup; a newer file opens read-only.
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer: built, #1266), loop wakes (`loopWakes.ts`, fed by
 the facts' `wake` actions instead of `onLoopEvent`: built, #1266), Hive's own notices of the work (`workflowNotices.ts`:
 the `notify` and `laneNotice` actions; what lanes were told in `lane_notice_lanes` and `lane_notice_cards`, moved on
-in the board change that writes the notice, only while the look's stamp (the newest card and lane `updated_at`, and
-board_meta `lane_notices_seq`) is unchanged under the lock, else it looks again, #1266), the Progress runs (`ProgressRun` gains `card` and
+in the board change that writes the notice, only while the look's stamp (board_meta `board_rev`, moved on by triggers
+on `cards`, `lanes` and `lane_cards`, and `lane_notices_seq`) is unchanged under the lock, else it looks again, #1266),
+the Progress runs (`ProgressRun` gains `card` and
 `revision`).
 
 **Risks the builders own** (SPEC §16 and the note's section 12): `sessions.ts`, `servers.ts` and `tasks.ts` are large;
