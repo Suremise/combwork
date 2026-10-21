@@ -2411,11 +2411,13 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:
 - `hive.terminal.ctrlCVToCli` (off; at once): on, an agent pane's Ctrl+C and Ctrl+V go to the CLI as xterm sends them
   (^C, ^V), selection or not; Hive's copy and paste stay on right-click (`shared/terminalInput.ts` `copyPasteKey`).
-- `hive.assistant.startView` (on): off, `assistantStartView` gives none, at the Assistant's start and after compaction.
+- `hive.assistant.startView` (on; at once): off, `assistantStartView` gives none, read at each start and compaction, so
+  a running Assistant takes a change at its next one.
 - `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
   breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
-  `bracketedPaste`, a slash command) each line break or tab becomes a space. Other control characters stay out either
-  way, so nothing in a prompt can end a paste or press a key (`promptInput`).
+  `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
+  on (the Assistant's decision on #1286; a safe Codex newline is #1327). Other control characters stay out either way,
+  so nothing in a prompt can end a paste or press a key (`promptInput`).
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.
