@@ -134,9 +134,9 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     try {
       const c = options && typeof options === 'object' ? compile(options as WorkflowOptions) : null
       if (c?.ok) r.ruleset = c.ruleset
-      else r.unknown.ruleset = c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)"
+      else r.unknown.ruleset = c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)" // i18n-ignore: a fact's note, in English for agents
     } catch (e) {
-      r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})`
+      r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})` // i18n-ignore: a fact's note, in English for agents
     }
   }
   // None (no version control): no line, head or base yet (P5 adds its manifests).
@@ -155,7 +155,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     const targetHead = r.target ? take('base', await G.lineHead(folder, r.target)) : null
     r.base = r.head && targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null
     // Not read: why (its head or target couldn't be read, or there is no target to start from).
-    if (!r.base && !r.unknown.base) r.unknown.base = r.unknown.head ?? r.unknown.target ?? 'no target to start from'
+    if (!r.base && !r.unknown.base) r.unknown.base = r.unknown.head ?? r.unknown.target ?? 'no target to start from' // i18n-ignore: a fact's note, in English for agents
     return r
   }
   // A submission: from where its work started (its Started), else the merge base with the target now.
@@ -169,7 +169,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     r.files = take('files', await G.filesChanged(folder, r.base, r.head)) ?? []
     r.key = take('key', await G.candidateKey(folder, r.base, r.head))
   } else {
-    r.unknown.files ??= 'no base or head to compare'
+    r.unknown.files ??= 'no base or head to compare' // i18n-ignore: a fact's note, in English for agents
   }
   return r
 }
@@ -238,7 +238,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
   const record = store.card(n)
   // The stage before this change: its cache, else its column's (the row is already saved with the new column); a new
   // card's starts in Todo (HR4's round 1 finding 6: its first move is recorded like any other).
-  const cached = boardRead(ws, (db) => (db.prepare('SELECT stage FROM cards WHERE number = ?').get(n) as { stage: StageId | null } | undefined)?.stage ?? null)
+  const cached = boardRead(ws, (db) => (db.prepare('SELECT stage FROM cards WHERE number = ?').get(n) as { stage: StageId | null } | undefined)?.stage ?? null) // i18n-ignore: SQL
   const was: StageId = before ? (cached ?? STAGE_OF[before.column]) : 'todo'
   const earlier = foldCard(store.facts(n), was)
   const to = STAGE_OF[after.column]
@@ -258,7 +258,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
   store.tx((tx) => {
     let generation = earlier.generation
     const decision = (d: { id: string; text: string }, removed = false): void =>
-      void tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } })
+      void tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     // The ruleset the card's cycle works under (its Started's, or an adopted card's Adopted: #1249), on each fact of it.
     const ruleset = (): { ruleset?: string } => {
       const id = tx.facts(n).findLast((f) => f.kind === 'Started' || f.kind === 'Adopted')?.ruleset
@@ -274,7 +274,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const mine = reads && reads.agent === after.agent ? reads : null
       if (mine?.ruleset) tx.saveRuleset(mine.ruleset)
       tx.append(n, {
-        kind: 'Started',
+        kind: 'Started', // i18n-ignore: a fact's kind and codes, not text
         actor,
         source: 'recorded',
         ...(mine?.ruleset ? { ruleset: mine.ruleset.id } : {}),
@@ -290,7 +290,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       })
     }
     if (was !== to && moves) {
-      tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } })
+      tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }) // i18n-ignore: a fact's kind and codes, not text
       tx.setStage(n, to)
     }
     if (intoReview && moves) {
@@ -315,7 +315,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
                 ...unknownOf(mine, ['revision', 'base', 'files', 'key'])
               }
             })()
-      tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data })
+      tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data }) // i18n-ignore: a fact's kind and codes, not text
     }
     if (moves && after.review && (!before?.review || before.review.agent !== after.review.agent)) {
       const s = facts()
@@ -327,7 +327,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
       // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
       tx.append(n, {
-        kind: 'Verdict',
+        kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
         actor,
         source: 'recorded',
         ...ruleset(),
@@ -335,8 +335,8 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       })
     }
     if ((before?.blocked ?? null) !== after.blocked) {
-      if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } })
-      else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} })
+      if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } }) // i18n-ignore: a fact's kind and codes, not text
+      else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} }) // i18n-ignore: a fact's kind and codes, not text
     }
     // Each change of its decisions, a new generation each (HR4's round 1 finding 3): added, its words changed, removed.
     // Compared with what it had (a card starting from before 1.0: as just recorded above, once).
@@ -356,7 +356,7 @@ function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
 
 /** The fields of a fact that couldn't be read, and why (as `platform.unknown`); none when the reads weren't made at all, named so. */
 function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<string, unknown> } {
-  if (!r) return { platform: { unknown: Object.fromEntries(fields.map((f) => [f, 'not read before the change'])) } }
+  if (!r) return { platform: { unknown: Object.fromEntries(fields.map((f) => [f, 'not read before the change'])) } } // i18n-ignore: a fact's note, in English for agents
   const map: Record<string, string> = {}
   for (const f of fields) {
     const from = f === 'revision' ? 'head' : f
@@ -382,7 +382,7 @@ export async function recordDecisionsReceived(ws: WorkspaceService, agentId: str
       ws,
       async () => {
         if (!alive()) return
-        const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined)
+        const card = boardRead(ws, (db) => db.prepare('SELECT project, pre_workflow FROM cards WHERE number = ?').get(n) as { project: string; pre_workflow: number } | undefined) // i18n-ignore: SQL
         if (!card || card.pre_workflow || (project !== undefined && card.project.toLowerCase() !== project.toLowerCase())) return
         const store = FactStore.forBoard(ws, { project: card.project, key: '' })
         if ((foldCard(store.facts(n)).received[agentId] ?? 0) >= generation) return

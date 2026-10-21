@@ -17,7 +17,8 @@ import { slugOf, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
-import { isUnknown, type Containment, type Maybe } from './types'
+import { UNREADABLE } from '../../shared/workflow/texts'
+import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -29,7 +30,7 @@ function statLine(p: string): string {
   }
 }
 
-const unknownRefusal = (card: CardRecord, what: string, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what, rule } })
+const unknownRefusal = (card: CardRecord, what: Unknown, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } })
 
 /** What `prime` reads once per intent for the evidence: the card's folder, and the tracked files it covers. */
 interface Primed {
@@ -63,10 +64,11 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(line)) return line
       if (isUnknown(head)) return head
       if (isUnknown(th)) return th
-      if (!head || !th) return { unknown: true, what: `the heads of ${own.path} and ${target}` }
+      if (!head) return unknown(UNREADABLE.head, { where: own.path })
+      if (!th) return unknown(UNREADABLE.head, { where: target })
       const base = await G.mergeBase(own.path, head, th)
       if (isUnknown(base)) return base
-      if (!base) return { unknown: true, what: `the merge base of ${line ?? own.path} with ${target}` }
+      if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
       return { folder: own.path, line, base, target, existing: true }
     }
     if (o.folder === 'slots' && this.wf.cfg.agentFolder) {
@@ -78,7 +80,7 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(target)) return target
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
-      if (!base) return { unknown: true, what: `the head of ${target}` }
+      if (!base) return unknown(UNREADABLE.head, { where: target })
       const slug = slugOf(card.title)
       const line = `hive/${this.wf.cfg.projectKey}/${card.key}${slug ? `-${slug}` : ''}`
       return { folder: join(this.wf.cfg.slots, card.key), line, base, target }
@@ -209,13 +211,13 @@ export class GitPlatform implements PlatformAdapter {
     let commits: string[] | undefined
     if (this.wf.ownLine(s)) {
       const h = await G.head(folder)
-      if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h.what, 'submit') }
+      if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
       if (args.revision && args.revision !== h) return { ok: false, refusal: { rule: 'check.revisionMismatch', values: { revision: args.revision.slice(0, 7) } } }
       revision = h
       // The change's base: the merge base with the target at this moment, fixed with the submission.
       const th = await G.lineHead(this.project, s.started!.target ?? '')
       const mb = !isUnknown(th) && th ? await G.mergeBase(this.project, th, h) : th
-      if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, 'the merge base with the target', 'submit') }
+      if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb
     } else {
       // A shared folder: the card's change is its own attributed commits (§16.3.2).
@@ -229,7 +231,7 @@ export class GitPlatform implements PlatformAdapter {
     let key: string | null = null
     if (revision && base) {
       const c = commits && commits.length ? await this.ownChange(base, commits) : await G.change(this.project, base, revision)
-      if (isUnknown(c)) return { ok: false, refusal: unknownRefusal(card, c.what, 'submit') }
+      if (isUnknown(c)) return { ok: false, refusal: unknownRefusal(card, c, 'submit') }
       files = c.files
       key = c.key
     }
@@ -331,7 +333,7 @@ export class GitPlatform implements PlatformAdapter {
     const folder = run.isolated ?? this.wf.folderOf(s)
     const rev = await this.revisionNow(card, s)
     const h = await G.head(folder)
-    if (isUnknown(rev) || !rev || isUnknown(h)) return unknownRefusal(card, `the revision in ${folder}`, 'submit.checksPassed')
+    if (isUnknown(rev) || !rev || isUnknown(h)) return unknownRefusal(card, unknown(UNREADABLE.revisionIn, { folder }), 'submit.checksPassed')
     if (run.revision && run.revision !== h) return { rule: 'check.revisionMismatch', values: { revision: run.revision.slice(0, 7) } }
     const ls = await git(folder, ['ls-files', '-z'])
     const files = ls.out.split('\0').filter(Boolean)

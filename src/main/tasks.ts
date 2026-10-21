@@ -1085,7 +1085,7 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
   // Interim (#1290, #1275): the user's moves don't ask yet, so a move that skips a rule records its Override.
   const r = await moveThroughRules(g, n, patch, actor, opts, true)
   if ('refused' in r) throw new WorkflowRefusedError(r.refused)
-  if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: `#${n}`, stage: g.to, rules: r.ask.join(', ') }, 'the user'))
+  if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: `#${n}`, stage: g.to, rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
   return r.moved
 }
 
