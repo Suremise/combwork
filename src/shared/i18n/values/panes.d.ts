@@ -142,6 +142,7 @@ interface HiveMessageValues {
   'panes.session.renameFailed': undefined
   'panes.session.renameItem': undefined
   'panes.session.renameTitle': undefined
+  'panes.session.starting': { kind: string }
   'panes.tab.failed': { why: string | number }
   'panes.tab.mcp': { servers: string | number }
   'panes.tab.notRunning': undefined

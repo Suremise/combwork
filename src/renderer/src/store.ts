@@ -13,7 +13,7 @@ import { projectAgentStates, type AgentState } from '@shared/agentState'
 import { tileOrder, tilePageOf, tilePageShown, tilesOnPage } from '@shared/tiles'
 import { agentProvider, providersInUse, providerWarnings, setInstalledCheck } from '@shared/providers'
 import { setDateStyle } from '@shared/dates'
-import { language as shownLanguage, onLanguageChange } from '@shared/i18n'
+import { language as shownLanguage, msg, onLanguageChange, tr } from '@shared/i18n'
 import { chooseFocus, deferredFocus } from './deferredFocus'
 import type { ProjectTab } from '@shared/projectTabs'
 import type { GitSection } from '@shared/gitRepo'
@@ -351,6 +351,8 @@ interface State {
   paneSaid: { text: string; n: number } | null
   /** Actions without a dialog that are running (runOnce): their buttons show a spinner and ignore clicks. */
   running: Record<string, true>
+  /** Agents whose session is starting or resuming ("<path>#<agent>", startingKey), from the click until it runs or fails: their buttons show it (#1177). */
+  starting: Record<string, Starting>
   /** Per project and agent page ("<path>#<page>"): the agent last focused there, focused again on going back. */
   pageFocus: Record<string, string>
   /** Per project, in the Tiles view (#976): the agent its focus view shows (none: the grid of tiles). */
@@ -523,6 +525,7 @@ export const useStore = create<State>(() => ({
   agentDrag: null,
   paneSaid: null,
   running: {},
+  starting: {},
   pageFocus: {},
   tileFocus: {},
   tilePage: {},
@@ -1057,6 +1060,65 @@ export async function runOnce<T>(key: string, fn: () => Promise<T>): Promise<T |
     })
   }
 }
+/** A start or resume under way for an agent (#1177): which, and the session it resumes. */
+export interface Starting {
+  kind: 'start' | 'resume'
+  sessionId?: string
+}
+
+const STARTING = msg({ id: 'panes.session.starting', defaultMessage: '{kind, select, resume {Resuming…} other {Starting…}}', description: "A start (other) or Resume (resume) button's label while the agent's session starts, from the click until it runs (it shows a spinner and takes no clicks). Keep it short." })
+
+/** The label a start or resume button shows while its agent starts (#1177). */
+export function startingLabel(st: Starting): string {
+  return tr(STARTING, { kind: st.kind })
+}
+
+export function startingKey(path: string, agentId: string): string {
+  return `${path.toLowerCase()}#${agentId}`
+}
+
+/**
+ * Runs an agent's start or resume, marked as starting until it ends (the call that starts it answers once the
+ * session runs, or fails), so every button that starts it shows that it's working and ignores clicks: a second
+ * start of an agent already starting is ignored.
+ */
+export async function whileStarting<T>(path: string, agentId: string, what: Starting, fn: () => Promise<T>): Promise<T | undefined> {
+  const key = startingKey(path, agentId)
+  if (get().starting[key]) return undefined
+  set((s) => ({ starting: { ...s.starting, [key]: what } }))
+  try {
+    return await fn()
+  } finally {
+    set((s) => {
+      const { [key]: _, ...rest } = s.starting
+      return { starting: rest }
+    })
+  }
+}
+
+/** The agent's start or resume under way (none for no agent). */
+export function useStarting(path: string, agentId: string | null): Starting | null {
+  return useStore((s) => (agentId ? (s.starting[startingKey(path, agentId)] ?? null) : null))
+}
+
+/** The resume of this session under way, by whichever of the project's agents (the Sessions tab's buttons). */
+export function useSessionStarting(path: string, sessionId: string | null): Starting | null {
+  return useStore((s) => {
+    if (!sessionId) return null
+    const prefix = `${path.toLowerCase()}#`
+    for (const k in s.starting) if (k.startsWith(prefix) && s.starting[k].sessionId === sessionId) return s.starting[k]
+    return null
+  })
+}
+
+/** Any start or resume under way among the project's agents: for its menu items that name no agent. */
+export function projectStarting(path: string): Starting | null {
+  const { starting } = get()
+  const prefix = `${path.toLowerCase()}#`
+  for (const k in starting) if (k.startsWith(prefix)) return starting[k]
+  return null
+}
+
 export function notify(level: ToastMessage['level'], title: string, message?: string, actions?: ToastMessage['actions']): void {
   pushToast({ id: `local-${++toastSeq}-${Date.now()}`, level, title, message, actions, timestamp: new Date().toISOString() })
 }

@@ -21,6 +21,9 @@ import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 
 const log = createLogger('usage')
 
+/** What the worker answers at once, not after its jobs (usageWorker.ts): one slow to answer is worth a log line. */
+const QUERIES: ReadonlySet<Body['type']> = new Set(['sessions', 'cards', 'timelines', 'ids', 'meta', 'read'])
+
 /**
  * The usage history's side in main (#1106): the usage worker (usageWorker.ts) and the work it is given. Main keeps the
  * queue, one job in the worker at a time, most urgent first: a session about to be deleted (its use recorded before its
@@ -235,10 +238,21 @@ class UsageHistory {
 
   private post(send: (m: WorkerRequest) => void, body: Body): Promise<unknown> {
     const id = this.next++
-    return new Promise((resolve, reject) => {
+    const sent = performance.now()
+    const answer = new Promise((resolve, reject) => {
       this.calls.set(id, { resolve, reject })
       send({ ...body, id } as WorkerRequest)
     })
+    // A query the worker answers at once, not after its jobs, that took over a second says so (#1177).
+    if (QUERIES.has(body.type))
+      void answer.then(
+        () => {
+          const ms = performance.now() - sent
+          if (ms > 1000) log.info(`the usage worker took ${(ms / 1000).toFixed(1)} s to answer a ${body.type} query`)
+        },
+        () => undefined
+      )
+    return answer
   }
 
   // -------------------------------------------------------------------------

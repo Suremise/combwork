@@ -1,4 +1,5 @@
 import { randomUUID, randomBytes } from 'crypto'
+import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
@@ -1219,12 +1220,16 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve() }
     this.starting.set(id, pending)
-    const run = this.startReserved(projectPath, agentId, id, opts)
+    // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
+    const times = new StepTimes()
+    const run = this.startReserved(projectPath, agentId, id, opts, times)
     pending.done = run.catch(() => undefined)
     try {
       return await run
     } finally {
       this.starting.delete(id)
+      const slow = times.slowLine()
+      if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
   }
 
@@ -1279,8 +1284,9 @@ class SessionManager {
     if (this.starting.get(id)?.cancelled) throw hiveError(M.stoppedBeforeStart)
   }
 
-  private async startReserved(projectPath: string, agentId: string, id: string, opts: { resumeId?: string; name?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }): Promise<LiveSessionState> {
+  private async startReserved(projectPath: string, agentId: string, id: string, opts: { resumeId?: string; name?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }, times: StepTimes): Promise<LiveSessionState> {
     const { agent, cfg, count } = await this.agentDef(projectPath, agentId)
+    times.mark('agentDef')
     this.assertStarting(id)
     if (this.live.has(id))
       throw count > 1
@@ -1290,19 +1296,23 @@ class SessionManager {
     if (holder) throw hiveError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
     const assistant = workspace.isAssistantHome(projectPath)
     const existing = opts.resumeId ? (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === opts.resumeId) : undefined
+    times.mark('sessionsFile')
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
     // nor a change of the agent's own re-points one. A new conversation following Automatic waits until Hive knows what
     // is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
+    times.mark('resumeProvider')
     this.assertStarting(id)
     if (!recorded && !agent.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
     this.assertStarting(id)
     const providerId = recorded ?? agentLaunchSettings(agent, cfg, config.settings).provider
     // At start, Hive may still be looking for that CLI.
     await providerService.settle(providerId)
+    times.mark('providerSettle')
     // The PATH a new process gets now, with what was installed since Hive started (#821).
     await refreshPathBeforeStart()
+    times.mark('refreshPath')
     this.assertStarting(id)
     const adapter = providerAdapter(providerId)
     const name = adapter.descriptor.name
@@ -1311,6 +1321,7 @@ class SessionManager {
     const info = providerService.info(providerId)
     if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Agent Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
     await workspace.ensureProject(projectPath)
+    times.mark('ensureProject')
     // The Assistant works in the workspace folder, where it can read every project.
     const cwd = assistant ? workspaceOf(projectPath).path! : (agent.worktree?.path ?? projectPath)
     if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd })
@@ -1318,6 +1329,7 @@ class SessionManager {
     if (existing?.archived) throw hiveError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
     // A sub-session (a Codex guardian review, say) is not a conversation: never resumed (#239).
     const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.listSessions(cwd).catch(() => [])).find((e) => e.id === opts.resumeId)?.sub) : undefined
+    times.mark('recordSub')
     if (sub) throw hiveError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
     this.assertStarting(id)
     // By real paths (#455): the worktree's stored path may have changed form (an 8.3 short name, a junction) since.
@@ -1328,11 +1340,13 @@ class SessionManager {
     const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? randomUUID() : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
+    times.mark('assistantInstructions')
     // A /rename in the CLI since the session was last named in Hive is the newer name: Hive takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
       const usage = await this.usage(projectPath, opts.resumeId).catch(() => null)
+      times.mark('usage')
       adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
@@ -1392,7 +1406,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId })
+      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -1457,7 +1471,7 @@ class SessionManager {
   }
 
   /** Starts the agent's CLI for an agent whose live entry already exists. */
-  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }): Promise<void> {
+  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times?: StepTimes): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -1486,6 +1500,7 @@ class SessionManager {
       // A session restarted before anything was typed has no transcript: start it fresh under the same id
       // where the provider allows choosing it, else as a new session.
       resume = !!(await adapter.transcriptPath(cwd, sessionId, recorded))
+      times?.mark('transcript')
       if (!resume) {
         log.info(`No transcript for ${sessionId}; starting it fresh instead of resuming`)
         if (!adapter.descriptor.capabilities.fixedSessionId) state.sessionId = ''
@@ -1493,6 +1508,7 @@ class SessionManager {
     }
 
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
+    times?.mark('effective')
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
@@ -1513,6 +1529,9 @@ class SessionManager {
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
     // This launch's own hook token (#345): in its environment for HTTP hooks, in a file outside the project for hook commands.
     const hookAuth = await newHookToken(state.runId)
+    times?.mark('tokens')
+    const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    times?.mark('guidance')
     const ctx = {
       projectPath,
       agentId: agent.id,
@@ -1534,7 +1553,7 @@ class SessionManager {
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
-      guidance: await this.hiveGuidance(projectPath).catch(() => ''),
+      guidance,
       instructions: assistantText?.text,
       overrides: overridesNow(adapter.id),
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
@@ -1554,13 +1573,18 @@ class SessionManager {
       }), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
+    times?.mark('prepareLaunch')
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
+    times?.mark('skillSizes')
     if (workspace.isAssistantHome(projectPath)) await this.onAssistantLaunch(projectPath)
+    times?.mark('assistantLaunch')
     // Through its gate when its processes can be tracked (#507), else directly, untracked, as said once.
     const tracked = await this.trackingReady()
+    times?.mark('trackingReady')
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
+    times?.mark('folderSteady')
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)

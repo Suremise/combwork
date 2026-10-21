@@ -11,7 +11,7 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { agentProviderOf, confirm, focusedAgentId, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, focusedAgentId, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useSessionStarting, useStore, startingLabel } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { cx, formatDuration, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
 import { useSessions } from './ProjectTabs'
@@ -183,6 +183,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   }, [jumpTo, project.path])
 
   const selected = items?.find((i) => i.id === selectedId) ?? null
+  // From the click until it runs (#1177).
+  const resuming = useSessionStarting(project.path, selected?.id ?? null)
 
   // Start on the running session, or the most recent conversation (not while an action has closed the view: moving).
   const moving = useRef(false)
@@ -603,8 +605,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   const note = removedAgentNote(selected, project.agents, targetAgent)
                   if (agents.length < 2) {
                     const button = (
-                      <button className="btn small act-resume" onClick={() => void actions.resumeSession(project.path, selected)}>
-                        <Icon name="debug-continue" /> {tr(RESUME)}
+                      <button className="btn small act-resume" disabled={!!resuming} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                        <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : tr(RESUME)}
                       </button>
                     )
                     return note ? <Tooltip content={note}>{button}</Tooltip> : button
@@ -612,13 +614,14 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   return (
                     <span className="split-btn">
                       <Tooltip content={note ?? (targetName ? tr(RESUME_IN, { agent: targetName }) : tr(msg({ id: 'sessions.resume.addsTip', defaultMessage: 'Resume (adds an agent if none can run it)', description: "Tooltip of Resume when no agent can run the session: Resume adds one." })))}>
-                        <button className="btn small act-resume" onClick={() => void actions.resumeSession(project.path, selected)}>
-                          <Icon name="debug-continue" /> {targetName ? tr(RESUME_IN, { agent: targetName }) : tr(RESUME)}
+                        <button className="btn small act-resume" disabled={!!resuming} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                          <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : targetName ? tr(RESUME_IN, { agent: targetName }) : tr(RESUME)}
                         </button>
                       </Tooltip>
                       <Tooltip content={tr(RESUME_ELSEWHERE)}>
                         <button
                           className="btn small act-resume split-caret"
+                          disabled={!!resuming}
                           aria-label={tr(RESUME_ELSEWHERE)}
                           onClick={(e) => {
                             const r = e.currentTarget.getBoundingClientRect()

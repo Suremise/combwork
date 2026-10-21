@@ -17,7 +17,7 @@ import { paneColumnsFor, projectSessionView, tileStripRoom } from '@shared/defau
 import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
-import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useStore, type ProjectTab } from '../store'
+import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
 import { carriesFiles, cx, formatKeybinding } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { GitTab } from './GitTab'
@@ -285,6 +285,10 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const ended = epoch !== undefined
   // Its workspace's 1.0 upgrade waits (#1230): no session can start.
   const startBlocked = useStartBlocked()
+  // From the click until the session runs (#1177).
+  const starting = useStarting(project.path, focused?.id ?? null)
+  const resuming = starting?.kind === 'resume'
+  const startingNew = starting?.kind === 'start'
   // An ended session keeps its terminal; the pane shows the Resume bar over it.
   if (ended) return null
   const many = project.agents.length > 1
@@ -294,11 +298,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
-            <Icon name="debug-continue" /> {tr(M.resume)}
+          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
+            <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
-          <button className="btn act-start" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
-            <Icon name="add" /> {tr(M.newSession)}
+          <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+            <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)}
           </button>
         </>
       ) : (
@@ -320,8 +324,8 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
             </p>
           )}
           <div className="btns">
-            <button className="btn act-start solid" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
-              <Icon name="add" /> {tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
+            <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+              <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
             </button>
             {focused ? <ResumeButton project={project} a={focused} className={RESUME_TINT} label={tr(M.resumeLast)} /> : <AddAgentButton project={project} className="tint-amber" />}
             <button className="btn subtle" onClick={() => setProjectTab(project.path, 'sessions')}>
