@@ -493,6 +493,30 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
       expect(await launched()).toBe('Mine first.\n\nHive guidance')
       // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, Codex's own apply untouched.
       expect(await launched({ guidance: '' })).toBeNull()
+
+      // A profile the agent's Extra arguments select (HR4's round 2): Codex ranks it above the user's own config and
+      // below a trusted project's (0.163.0, e2e codexownhooks), which its app server can't select: Hive reads it.
+      writeFileSync(join(home, 'mine.config.toml'), 'developer_instructions = "PROFILE-ONLY"\n')
+      writeFileSync(said, 'USER-ONLY')
+      for (const form of [['--profile', 'mine'], ['-p', 'mine'], ['--profile=mine']]) expect(await launched({ extraArgs: form }), form.join(' ')).toBe('PROFILE-ONLY\n\nHive guidance')
+      // The last one wins, as Codex takes it; none selected, the user's.
+      expect(await launched({ extraArgs: ['-p', 'other', '--profile', 'mine'] })).toBe('PROFILE-ONLY\n\nHive guidance')
+      expect(await launched()).toBe('USER-ONLY\n\nHive guidance')
+      // A trusted project's (Codex says it came from the project) outranks the profile.
+      writeFileSync(said, 'PROJECT-TRUSTED')
+      writeFileSync(join(home, 'fake-developer-origin.txt'), 'project')
+      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('PROJECT-TRUSTED\n\nHive guidance')
+      rmSync(join(home, 'fake-developer-origin.txt'))
+      // A profile that sets none: what Codex said.
+      writeFileSync(said, 'USER-ONLY')
+      writeFileSync(join(home, 'mine.config.toml'), 'model = "gpt-x"\n')
+      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('USER-ONLY\n\nHive guidance')
+      // Codex can't say: the profile's, then the user's own config.toml's.
+      writeFileSync(join(home, 'mine.config.toml'), 'developer_instructions = "PROFILE-ONLY"\n')
+      writeFileSync(said, '!fail')
+      expect(await launched({ extraArgs: ['--profile', 'mine'] })).toBe('PROFILE-ONLY\n\nHive guidance')
+      // With guidance off, nothing of Hive's, so nothing passed: the profile's own apply as Codex takes them.
+      expect(await launched({ guidance: '', extraArgs: ['--profile', 'mine'] })).toBeNull()
     } finally {
       process.env.CODEX_HOME = homeBefore
       rmSync(home, { recursive: true, force: true })

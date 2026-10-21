@@ -213,15 +213,37 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
 }
 
 /**
- * The developer_instructions Codex itself would give a session in `cwd` (#1285): its app server's config/read, the
- * config layers as Codex takes them (the user's, a profile, and a project's only while Codex trusts that project).
- * '' when none sets them; null when Codex couldn't be asked.
+ * The developer_instructions Codex itself would give a session in `cwd` started with `args` (#1285): its app server's
+ * config/read, the config layers as Codex takes them (a project's only while Codex trusts that project). Its app server
+ * can't select a profile (Codex 0.163.0 refuses --profile there and a `profile` key), so a profile the session's
+ * arguments select is read here, where Codex ranks it: above the user's own config, below a trusted project's
+ * (`debug prompt-input`, 0.163.0). '' when none sets them; null when Codex couldn't be asked.
  */
-async function developerInstructionsFromCodex(executable: string, cwd: string, env?: NodeJS.ProcessEnv): Promise<string | null> {
+async function developerInstructionsFromCodex(executable: string, cwd: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
   const result = await askAppServer(executable, [], cwd, 'config/read', { cwd }, env)
   if (!result || typeof result.config !== 'object' || !result.config) return null
   const v = result.config.developer_instructions
-  return typeof v === 'string' ? v.trim() : ''
+  const given = typeof v === 'string' ? v.trim() : ''
+  // Where Codex took them from: the user's own config (or none, or one below it) is what a selected profile outranks.
+  const from = result.origins?.developer_instructions?.name?.type
+  return given && from && from !== 'user' && from !== 'system' ? given : (profileDeveloperInstructions(args) ?? given)
+}
+
+/** The Codex profile `args` select (`--profile <name>`, `-p <name>`, `--profile=<name>`; the last wins, as Codex takes it), or null. */
+export function selectedProfile(args: readonly string[]): string | null {
+  let name: string | null = null
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--profile' || args[i] === '-p') && i + 1 < args.length) name = args[++i]
+    else if (args[i].startsWith('--profile=')) name = args[i].slice('--profile='.length)
+  }
+  return name && /^[\w.-]+$/.test(name) ? name : null
+}
+
+/** A selected profile's own developer_instructions (CODEX_HOME's `<name>.config.toml`), or null when it sets none. */
+function profileDeveloperInstructions(args: readonly string[]): string | null {
+  const name = selectedProfile(args)
+  const v = name ? readToml(join(codexHome(), `${name}.config.toml`)).developer_instructions : undefined
+  return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
 /** One request to Codex's app server (started for it, in `cwd`, with `args`): its result, or null on an error or after 20 s. */
@@ -386,13 +408,13 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
 }
 
 /**
- * The developer_instructions in the user's own Codex config (CODEX_HOME's config.toml), or '': what Hive keeps when
- * Codex couldn't say which apply (developerInstructionsFromCodex). Never a project's: Codex takes those only from a
- * project it trusts, which only Codex can tell.
+ * The developer_instructions in the user's own Codex config, or '': what Hive keeps when Codex couldn't say which apply
+ * (developerInstructionsFromCodex). A profile `args` select first (it outranks CODEX_HOME's config.toml), then that
+ * file. Never a project's: Codex takes those only from a project it trusts, which only Codex can tell.
  */
-export function userDeveloperInstructions(): string {
+export function userDeveloperInstructions(args: readonly string[] = []): string {
   const v = readToml(join(codexHome(), 'config.toml')).developer_instructions
-  return typeof v === 'string' ? v.trim() : ''
+  return profileDeveloperInstructions(args) ?? (typeof v === 'string' ? v.trim() : '')
 }
 
 /** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
@@ -661,7 +683,7 @@ export class CodexAdapter implements ProviderAdapter {
     // The developer_instructions Codex would give this session (its layers, a project's only if trusted), for Hive's
     // guidance to follow (#1285): asked only when Hive has some to add.
     if ([ctx.guidance, ctx.instructions].some((t) => t && t.trim())) {
-      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, ctx.env)
+      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, ctx.extraArgs, ctx.env)
       if (theirs === null) log.warn("Codex couldn't say which developer_instructions apply; Hive keeps only those in your own config.toml")
       else this.developerByRun.set(ctx.runId, theirs)
     }
@@ -717,7 +739,7 @@ export class CodexAdapter implements ProviderAdapter {
     // their place (#1285, #966 row 13): as Codex said in prepareLaunch, else the user's own; Hive never writes their
     // config. With none of Hive's, Codex's own apply untouched.
     const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
-    const given = this.developerByRun.get(ctx.runId) ?? userDeveloperInstructions()
+    const given = this.developerByRun.get(ctx.runId) ?? userDeveloperInstructions(ctx.extraArgs)
     this.developerByRun.delete(ctx.runId)
     if (developer) args.push('-c', `developer_instructions=${toToml([given, developer].filter(Boolean).join('\n\n'))}`)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }

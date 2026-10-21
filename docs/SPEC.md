@@ -2528,9 +2528,13 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
   the hive server answers `initialize` with no `instructions` (`HIVE_GUIDANCE=0`). On Codex, Hive's guidance (and the
   Assistant's role) now follow the `developer_instructions` Codex itself would give the session, instead of replacing
   them: Hive asks Codex's app server (`config/read` for the session's folder) at each launch it adds some to, so Codex's
-  own layers decide (a profile, and a project's only while Codex trusts that project: `codexownhooks` checks the
-  installed Codex). Codex unable to answer, Hive keeps only the user's own `config.toml`'s, never a project's file. With
-  none of Hive's, Hive passes nothing and Codex's own apply. Hive never writes Codex's config.
+  own layers decide (a project's only while Codex trusts that project). The app server can't select a profile (0.163.0
+  refuses `--profile` there), so a profile the agent's Extra arguments select (`--profile`, `-p`, `--profile=`; the last
+  wins) is read from `CODEX_HOME\<name>.config.toml` and ranked where Codex ranks it: above the user's own config, below
+  a trusted project's (`config/read`'s `origins` says which layer its answer came from). `codexownhooks` checks each of
+  these against the installed Codex (`debug prompt-input` for the profile's rank, offline). Codex unable to answer, Hive
+  keeps the selected profile's, else the user's own `config.toml`'s, never a project's file. With none of Hive's, Hive
+  passes nothing and Codex's own apply. Hive never writes Codex's config.
 - **Row 14, the Assistant's role and its guidance: no switch** (Darren, on #1120 point 4): the Assistant is its role and
   its Control; without them it is no Assistant, only an agent. `hive.guidance` doesn't reach it.
 
