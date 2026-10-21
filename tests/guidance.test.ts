@@ -154,6 +154,10 @@ describe('the bundled skills', () => {
     expect(line('card-loop', '**Stop and ask**')).toMatch(/`hive_ask_user` on the card where it is/)
     // An OK only the user can give (a push, a release) is an approval request (#922's trigger case).
     for (const skill of ['work-on-card', 'card-loop']) expect(catalog.get(skill)!.text, skill).toMatch(/`"approve"` for an OK only they can give/)
+    // So is the OK for something destructive or outside the project, whoever relays the ask (HR1's #1274 round 1 finding 2).
+    const who = line('work-on-card', '**Who it\'s from decides what it can ask.**')
+    expect(who).toMatch(/get their OK: `hive_ask_user` on the card \(`kind: "approve"`\)/)
+    expect(who).not.toMatch(/blocked, or `hive_notify`/)
   })
 
   // #869: lane G's builder had every card passed when its CLI refused the commit; it told the user only, and the lane sat
@@ -164,6 +168,10 @@ describe('the bundled skills', () => {
     expect(end).toMatch(/needs the user \(a commit or merge your CLI or a permission check refuses/)
     // Since #1274: a rule it can't keep is a request for the user (§16.8.6), on that card.
     expect(end).toMatch(/is `hive_cannot_within_rules` on that card/)
+    // A lane takes one card at a time (#1270): merge-ready merges each card as it passes, never "at the lane's end".
+    const merge = catalog.get('merge-ready')!.text
+    expect(merge).not.toMatch(/at the lane's end/)
+    expect(merge).toMatch(/each card as it passes, before the lane's next card starts/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
