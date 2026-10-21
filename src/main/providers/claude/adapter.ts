@@ -23,6 +23,7 @@ import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { advanced } from '../../advanced'
+import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
@@ -393,13 +394,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     else args.push('--session-id', ctx.sessionId)
     if (ctx.name) args.push('--name', runsThroughCmd(executable) ? ctx.name.replace(/["%^&|<>!]/g, ' ').replace(/\s+/g, ' ').trim() : ctx.name)
     args.push('--plugin-dir', join(dir, 'plugin'))
-    args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'), '--strict-mcp-config')
+    // Only the workspace's servers; switched off (#1281), Claude Code's own load too, and the --mcp-config ones still win
+    // over its own of the same name, hive included (2.1.305: the user's and the project's are never started).
+    args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'))
+    if (launchOverrides(ctx.overrides, CLAUDE_CODE, 'mcpIsolation')) args.push('--strict-mcp-config')
     args.push('--settings', join(ctx.privateDir, 'settings.json'))
     if (ctx.instructions) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
     // A resumed conversation gets this launch's instructions (the Assistant's current mode), not the ones it started with:
-    // a newer Claude Code would keep sending those. Not where the user's own arguments choose.
-    if (ctx.instructions && ctx.resume && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
-    if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
+    // a newer Claude Code would keep sending those. Not where the user's own arguments choose, nor with the switch off (#1167).
+    if (ctx.instructions && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
+    if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveHiveTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)

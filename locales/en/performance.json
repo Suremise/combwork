@@ -104,8 +104,8 @@
     "description": "What could not be read on the Performance page: shown in \"Could not load {what}: {error}\"."
   },
   "performance.cards.open": {
-    "defaultMessage": "Open #{number}",
-    "description": "Name, for screen readers, of a row of the Performance page's Cards table: opens that card. {number} is the card's number (keep the #)."
+    "defaultMessage": "Open {number}",
+    "description": "Name, for screen readers, of a row of the Performance page's Cards table: opens that card. {number} is the card’s name: its key, such as AM-12, or #12 for a card with none (keep the #)."
   },
   "performance.cards.project": {
     "defaultMessage": "Project",

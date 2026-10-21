@@ -25,7 +25,7 @@
   "performance.cards.heading": "Karty",
   "performance.cards.lastHeld": "Ostatnio w pracy",
   "performance.cards.loadTarget": "kosztu kart",
-  "performance.cards.open": "Otwórz #{number}",
+  "performance.cards.open": "Otwórz {number}",
   "performance.cards.project": "Projekt",
   "performance.cards.reviewer": "Recenzent",
   "performance.cards.rounds": "Rundy",

@@ -244,6 +244,7 @@
   "shell.palette.command": "{category}: {command}",
   "shell.palette.goToProject": "Go to Project: {project}",
   "shell.palette.noMatch": "No matching commands",
+  "shell.palette.openCard": "Open Card: {card} {title}",
   "shell.palette.placeholder": "Type a command or project name",
   "shell.palette.projectsPlaceholder": "Go to project",
   "shell.providers.choose": "Choose providers",

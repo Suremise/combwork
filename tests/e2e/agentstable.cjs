@@ -70,7 +70,14 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   check('four agents start', !!(await until(ready, 45000)))
 
   // The board: B1 on a card with a long title, B3 (not running) on another, R1 watching B1's for Review; solo's agent on one.
-  const make = async (title, agent, project = 'alpha') => (await inv('tasks:create', { title, project, column: 'doing', agent })).number
+  // Each card's name as the window gives it (#1221): its key. What a watch waits for keeps its #N (the watch's own words).
+  const keyOf = new Map()
+  const K = (n) => keyOf.get(n) ?? `#${n}`
+  const make = async (title, agent, project = 'alpha') => {
+    const c = await inv('tasks:create', { title, project, column: 'doing', agent })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
   const c1 = await make(LONG, a.B1.id)
   const c3 = await make('Lane C docs', a.B3.id)
   const cs = await make('Solo card', one.id, 'solo')
@@ -148,11 +155,11 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const t12 = await hoverTable(tile)
   check('12 agents: a table with Agent, State, Card and Waiting for', JSON.stringify(t12?.head) === JSON.stringify(['Agent', 'State', 'Card', 'Waiting for']), JSON.stringify(t12?.head))
   check('12 agents: a row each, a builder beside its reviewer (the lanes newest first, as in the Progress panel), then the rest', t12?.rows.map((r) => r.name).join(',') === 'B2,R2,B1,R1,B3,B4,B5,B6,R3,R4,R5,R6', t12?.rows.map((r) => r.name).join(','))
-  check('working, with its card', row(t12, 'B1')[1] === 'Working…' && row(t12, 'B1')[2].startsWith(`#${c1} Coordinator`), JSON.stringify(row(t12, 'B1')))
+  check('working, with its card', row(t12, 'B1')[1] === 'Working…' && row(t12, 'B1')[2].startsWith(`${K(c1)} Coordinator`), JSON.stringify(row(t12, 'B1')))
   check('waiting on a background task', row(t12, 'B2')[1] === 'Waiting on 1 background task', JSON.stringify(row(t12, 'B2')))
   check('watching: what it waits for', row(t12, 'R1')[1] === 'Watching' && row(t12, 'R1')[3] === `#${c1} → Review`, JSON.stringify(row(t12, 'R1')))
   check('idle, with no card', row(t12, 'R2')[1] === 'Ready' && row(t12, 'R2')[2] === '—', JSON.stringify(row(t12, 'R2')))
-  check('not running, on a card', row(t12, 'B3')[1] === 'Not running' && row(t12, 'B3')[2] === `#${c3} Lane C docs`, JSON.stringify(row(t12, 'B3')))
+  check('not running, on a card', row(t12, 'B3')[1] === 'Not running' && row(t12, 'B3')[2] === `${K(c3)} Lane C docs`, JSON.stringify(row(t12, 'B3')))
   check('each row has its status dot', ['working', 'background', 'watching', 'ready', 'stopped'].every((s, i) => t12?.rows.find((r) => r.name === ['B1', 'B2', 'R1', 'R2', 'B3'][i])?.dot.includes(s)), JSON.stringify(t12?.rows.slice(0, 5).map((r) => r.dot)))
   check('a long card title is cut to one line', JSON.stringify(t12?.cut) === '["B1"]', JSON.stringify(t12?.cut))
   check('the tooltip never scrolls, every column fits, it stays in the window', fits(t12), fitText(t12))
@@ -175,7 +182,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
 
   // --- One agent (solo, its agent on a card, not running): one row, no Waiting for column.
   const t1 = await hoverTable(page.locator('.rail-project[aria-label^="solo"]'))
-  check('1 agent: one row, no Waiting for', t1?.rows.length === 1 && row(t1, 'Solo')[2] === `#${cs} Solo card` && !t1.head.includes('Waiting for'), JSON.stringify(t1))
+  check('1 agent: one row, no Waiting for', t1?.rows.length === 1 && row(t1, 'Solo')[2] === `${K(cs)} Solo card` && !t1.head.includes('Waiting for'), JSON.stringify(t1))
   check('1 agent: fits, never scrolls', fits(t1), fitText(t1))
   await shoot('rail-1')
   // …and without a card: still its table and its description.
@@ -219,10 +226,10 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const bar = await hoverTable(running)
   check("the status bar's running sessions show a table: Agent, Project, State, Card, Waiting for", JSON.stringify(bar?.head) === JSON.stringify(['Agent', 'Project', 'State', 'Card', 'Waiting for']), JSON.stringify(bar?.head))
   check('…of the four running agents, each with its project', JSON.stringify(bar?.rows.map((r) => r.name).sort()) === JSON.stringify(['B1', 'B2', 'R1', 'R2']) && bar.rows.every((r) => r.cells[1] === 'alpha'), JSON.stringify(bar?.rows))
-  check('…B1 on its card, R1 waiting for it', row(bar, 'B1')[3].startsWith(`#${c1} `) && row(bar, 'R1')[4] === `#${c1} → Review`, JSON.stringify([row(bar, 'B1'), row(bar, 'R1')]))
+  check('…B1 on its card, R1 waiting for it', row(bar, 'B1')[3].startsWith(`${K(c1)} `) && row(bar, 'R1')[4] === `#${c1} → Review`, JSON.stringify([row(bar, 'B1'), row(bar, 'R1')]))
   check('…the counts above it', /4 running session\(s\): 1 working, 1 waiting on background tasks/.test(await page.locator('.tip.agents-tip strong').first().innerText()))
   check('…every column inside the tooltip', fits(bar), fitText(bar))
-  check('…and the item is described by its agents, a line each', new RegExp(`• B1 — in alpha · Working… · card #${c1} `).test((await running.getAttribute('aria-description')) ?? '') && new RegExp(`• R1 — in alpha · Watching · waiting for #${c1} → Review`).test((await running.getAttribute('aria-description')) ?? ''), await running.getAttribute('aria-description'))
+  check('…and the item is described by its agents, a line each', new RegExp(`• B1 — in alpha · Working… · card ${K(c1)} `).test((await running.getAttribute('aria-description')) ?? '') && new RegExp(`• R1 — in alpha · Watching · waiting for #${c1} → Review`).test((await running.getAttribute('aria-description')) ?? ''), await running.getAttribute('aria-description'))
   await shoot('statusbar-running')
 
   // --- Narrow and zoomed, with a long agent name: every column still fits, the long cells cut with an ellipsis.

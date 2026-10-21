@@ -60,6 +60,11 @@ export interface LaunchContext {
   guidance: string
   /** More instructions for this launch, over the provider's own (the Hive Assistant's role and mode). */
   instructions?: string
+  /**
+   * The provider's override switches (#1167) as read once for this launch (overridesNow), so prepareLaunch and
+   * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
+   */
+  overrides?: Readonly<Record<string, boolean>>
   /** Tools of the hive MCP server this launch may use without asking, for providers that can pre-approve tools. */
   trustedHiveTools?: string[]
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
@@ -296,6 +301,11 @@ export interface ProviderAdapter {
   configHome?(): string
   /** What still keeps agents from running, given what locate() found. */
   readiness(info: AgentInstallInfo): ReadinessIssue[]
+  /**
+   * Advanced settings (ids) that change what locate() finds (#1281: the environment its sign-in is checked in): a change
+   * of one checks the CLI again, so the account shown is the one its sessions get.
+   */
+  readonly locateSettings?: readonly string[]
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
   /** The CLI's own default model from its settings, if set. */
@@ -320,9 +330,10 @@ export interface ProviderAdapter {
   normalizeHook(body: Record<string, any>): NormalizedHook
   /**
    * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
-   * this version of the CLI. Null (or absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
+   * this version of the CLI, and the launch (its override switches: a title Hive didn't set isn't read). Null (or
+   * absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
    */
-  titleAttention?(version: string | null): ((title: string) => boolean) | null
+  titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
    * The reply that puts Hive's fixed notice text before the model at this hook (#650: the CLI's own event name, as the

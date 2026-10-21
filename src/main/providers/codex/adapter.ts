@@ -11,9 +11,11 @@ import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
+import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
+import { hiveError } from '../../hiveError'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
@@ -26,6 +28,7 @@ import { parseCodexModels } from './models'
 import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
+import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('codex')
 
@@ -243,12 +246,27 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
 
 /**
  * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
- * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.)
+ * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.) The
+ * Assistant's only the ones its Control settings let it use without asking (`trusted`, #1174: Codex 0.163 takes a
+ * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
+ * native server named hive merges into Hive's table key by key, and could turn it off.
  */
-const approval = (name: string): Record<string, unknown> => (name === 'hive' ? { default_tools_approval_mode: 'approve' } : {})
+function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknown> {
+  if (name !== 'hive') return {}
+  if (!hive.preApprove) return { enabled: true }
+  if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
+  return { enabled: true, default_tools_approval_mode: 'approve' }
+}
+
+/** How Hive's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
+export interface HiveServerOptions {
+  preApprove: boolean
+  trusted?: readonly string[]
+}
 
 /** An MCP server definition (Claude Code's JSON format) as a Codex mcp_servers table; null if it can't be passed safely. */
-export function codexMcpServer(name: string, def: McpServerDef): { table: Record<string, unknown> | null; warning?: string } {
+export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
+  const approval = (n: string): Record<string, unknown> => hiveTable(n, hive)
   const ref = (v: unknown): string | null => {
     const m = typeof v === 'string' ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$|^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(v.trim()) : null
     return m ? (m[1] ?? m[2]) : null
@@ -287,6 +305,68 @@ export function codexMcpServer(name: string, def: McpServerDef): { table: Record
   if (Object.keys(env).length) table.env = env
   if (passThrough.length) table.env_vars = passThrough
   return { table }
+}
+
+/** A native hive server's keys for an HTTP server, which can't be taken out of Hive's stdio one (Codex refuses the mix). */
+const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
+
+/** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
+const NATIVE_HIVE = msg({
+  id: 'providers.codex.nativeHive',
+  defaultMessage: 'Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.',
+  description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
+})
+
+/**
+ * Hive's own hive server over a native one of that name (the user's own [mcp_servers.hive] in these config files, #1281):
+ * Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
+ * another transport can't take a key out), so Hive's table gives every key the native one sets Hive's value, and Hive's
+ * server wins whatever the isolation switch says:
+ * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, hiveTable);
+ * - their approval: the server default and each native per-tool mode as this launch approves them (`approved`: every
+ *   tool, the Assistant's trusted ones, or none), "auto" (Codex's own policy) for the rest;
+ * - how it starts: the session's folder for its `cwd`, Hive's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
+ *   own default), not `required`, and the native
+ *   `env` and `env_vars` emptied (an environment variable Hive doesn't set is set empty: Codex can't remove one).
+ * An HTTP one (`url` and its kin, HTTP_KEYS) can't be taken out of a stdio server: the launch is refused with what to do
+ * (NATIVE_HIVE; Codex itself would refuse to start).
+ */
+export function outrankNativeHive(files: string[], table: Record<string, unknown>, approved: 'all' | readonly string[], cwd: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const mode = (tool: string): string => (approved === 'all' || approved.includes(tool) ? 'approve' : 'auto')
+  for (const file of files) {
+    const servers = readToml(file).mcp_servers
+    const native = servers && typeof servers === 'object' ? (servers as Record<string, unknown>).hive : undefined
+    if (!native || typeof native !== 'object') continue
+    const n = native as Record<string, unknown>
+    const http = Object.keys(n).filter((k) => HTTP_KEYS.includes(k))
+    if (http.length) {
+      log.warn(`Codex has an HTTP MCP server named hive in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Hive's own.`)
+      throw hiveError(NATIVE_HIVE, { file })
+    }
+    if ('enabled_tools' in n) out.enabled_tools = [...HIVE_TOOLS]
+    if ('disabled_tools' in n) out.disabled_tools = []
+    if ('default_tools_approval_mode' in n && !('default_tools_approval_mode' in table)) out.default_tools_approval_mode = approved === 'all' ? 'approve' : 'auto'
+    const tools = n.tools && typeof n.tools === 'object' ? Object.keys(n.tools as Record<string, unknown>) : []
+    if (tools.length) {
+      const own = (table.tools ?? {}) as Record<string, unknown>
+      const merged = { ...((out.tools ?? {}) as Record<string, unknown>) }
+      for (const t of tools) if (!(t in own)) merged[t] = { approval_mode: mode(t) }
+      out.tools = { ...own, ...merged }
+    }
+    if ('cwd' in n && !('cwd' in table)) out.cwd = cwd
+    // Settings → Advanced (default Codex's own documented 10 s), over the native one's.
+    const startup = advanced.number('codex.mcp.startupTimeoutSeconds')
+    if ('startup_timeout_sec' in n) out.startup_timeout_sec = startup
+    if ('startup_timeout_ms' in n) out.startup_timeout_ms = startup * 1000
+    if ('required' in n) out.required = false
+    const env = n.env && typeof n.env === 'object' ? Object.keys(n.env as Record<string, unknown>) : []
+    const ownEnv = (table.env ?? {}) as Record<string, string>
+    if (env.some((k) => !(k in ownEnv))) out.env = { ...((out.env ?? {}) as Record<string, string>), ...Object.fromEntries(env.filter((k) => !(k in ownEnv)).map((k) => [k, ''])), ...ownEnv }
+    if ('env_vars' in n && !('env_vars' in table)) out.env_vars = []
+    log.warn(`Codex has an MCP server named hive in ${userText(file)}: Hive's own hive server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
+  }
+  return out
 }
 
 /** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
@@ -591,24 +671,32 @@ export class CodexAdapter implements ProviderAdapter {
     args.push('--no-daemon')
     args.push(...hookOverrides(ctx.hookUrl, ctx.hookAuthFile, this.hashesByRun.get(ctx.runId)))
     this.hashesByRun.delete(ctx.runId)
-    args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
+    // Switched off (#1167), the user's own [tui].terminal_title applies, and titleAttention reads nothing from it.
+    if (launchOverrides(ctx.overrides, CODEX, 'terminalTitle')) args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
     const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
     if (developer) args.push('-c', `developer_instructions=${toToml(developer)}`)
-    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code.
+    const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
-      const { table, warning } = codexMcpServer(name, def)
+      const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
-      if (table) args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
+      if (!table) continue
+      if (name === 'hive') Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
+      args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
-    const own = new Set(Object.keys(ctx.mcpServers))
-    const theirs = new Set([...Object.keys(mcpServersIn(join(codexHome(), 'config.toml'))), ...Object.keys(mcpServersIn(join(ctx.cwd, '.codex', 'config.toml')))])
-    for (const name of theirs) {
-      if (own.has(name)) continue
-      if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
-      else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
+    // switch off (#1281), they load beside Hive's (one of the workspace's name still merges into the workspace's).
+    if (launchOverrides(ctx.overrides, CODEX, 'mcpIsolation')) {
+      const own = new Set(Object.keys(ctx.mcpServers))
+      const theirs = new Set(files.flatMap((f) => Object.keys(mcpServersIn(f))))
+      for (const name of theirs) {
+        if (own.has(name)) continue
+        if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
+        else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+      }
     }
     args.push(...ctx.extraArgs)
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.
@@ -721,10 +809,10 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Codex titles its terminal "[ ! ] Action Required | <project>" (blinking with "[ . ]") exactly while a person
    * must act (an approval prompt, a question), and not while its auto-reviewer decides. Older versions than the one
-   * Hive was tested with go by the hooks.
+   * Hive was tested with go by the hooks, as do sessions whose title Hive leaves to the user's config (#1167).
    */
-  titleAttention(version: string | null): ((title: string) => boolean) | null {
-    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0) return null
+  titleAttention(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null {
+    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0 || !launchOverrides(ctx?.overrides, CODEX, 'terminalTitle')) return null
     return (title) => /^\[ [!.] \] Action Required\b/.test(title)
   }
 

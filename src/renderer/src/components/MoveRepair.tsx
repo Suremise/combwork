@@ -3,7 +3,7 @@ import type { MoveCards, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveWorkt
 import { providerName } from '@shared/providers'
 import { moveHasWork } from '@shared/movePaths'
 import { call } from '../api'
-import { set, useStore } from '../store'
+import { cardLabelOf, get, set, useStore } from '../store'
 import { BusyButton, Icon, IconButton, Modal, useBusy } from './ui'
 import { cx } from '../util'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -280,7 +280,7 @@ export function MoveRepairDialog() {
                 <h4>{tr(M.board)}</h4>
                 <ul>
                   {plan.cards!.map((m) => (
-                    <li key={m.from}>{rich(M.give, { what: savedUnder(m), from: m.from, to: m.to, hasCards: m.cards.length ? 'yes' : 'no', cards: fmt.list(m.cards.map((n) => `#${n}`), 'unit') })}</li>
+                    <li key={m.from}>{rich(M.give, { what: savedUnder(m), from: m.from, to: m.to, hasCards: m.cards.length ? 'yes' : 'no', cards: fmt.list(m.cards.map((n) => cardLabelOf(get(), n)), 'unit') })}</li>
                   ))}
                 </ul>
               </section>

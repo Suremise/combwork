@@ -75,7 +75,10 @@ const forceClose = async (app) => {
     const alphaAgent = await startIn(inv, path.join(ws, 'alpha'))
     await startIn(inv, path.join(ws, 'beta'))
     // alpha's agent works on a card: the dialog's table says which (#572).
-    const card = (await inv('tasks:create', { title: 'Quit table', project: 'alpha', column: 'doing', agent: alphaAgent.id })).number
+    const made = await inv('tasks:create', { title: 'Quit table', project: 'alpha', column: 'doing', agent: alphaAgent.id })
+    const card = made.number
+    // The card by key (#1221).
+    const cardName = made.key ?? `#${card}`
     // Its sessions up and idle, so quitting finds them running.
     await untilReady(inv, 2)
     await page.evaluate(() => window.hive.invoke('app:quit')) // same entry point as the tray's Quit Hive
@@ -90,10 +93,10 @@ const forceClose = async (app) => {
     const alphaRow = table.locator('tr.quit-row', { hasText: 'alpha' })
     const cells = await alphaRow.locator('td').allInnerTexts()
     check('dialog: the agents are a table: Agent, Project, State, Card', JSON.stringify(heads) === JSON.stringify(['Agent', 'Project', 'State', 'Card']))
-    check(`dialog: a row is the agent, its project, its state and its card (#${card})`, cells.length === 4 && cells[0].trim() === alphaAgent.name && cells[1].trim() === 'alpha' && cells[3].trim() === `#${card} Quit table`)
+    check(`dialog: a row is the agent, its project, its state and its card (#${card})`, cells.length === 4 && cells[0].trim() === alphaAgent.name && cells[1].trim() === 'alpha' && cells[3].trim() === `${cardName} Quit table`)
     // For screen readers, the same as plain text (the table hidden from them): each agent, its project, state and card.
     const plain = await page.locator('.dialog .quit-agents .visually-hidden').innerText()
-    check('dialog: its plain text says each agent with its project, state and card, the table hidden from screen readers', plain.includes(`• ${alphaAgent.name} — in alpha · Ready · card #${card} Quit table`) && (await page.locator('.dialog .quit-agents [aria-hidden="true"] table.agents-table').count()) === 1)
+    check('dialog: its plain text says each agent with its project, state and card, the table hidden from screen readers', plain.includes(`• ${alphaAgent.name} — in alpha · Ready · card ${cardName} Quit table`) && (await page.locator('.dialog .quit-agents [aria-hidden="true"] table.agents-table').count()) === 1)
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await becomes(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)

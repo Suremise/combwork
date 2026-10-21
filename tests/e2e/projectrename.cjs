@@ -141,7 +141,8 @@ const oldCard = (n, proj, agent) =>
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
   const table = page.locator('.archived-cards')
   await table.waitFor({ timeout: 10000 })
-  const rowOf = (n) => table.locator('tbody tr', { has: page.locator('.task-number', { hasText: new RegExp(`^#${n}$`) }) })
+  // A row by its card's number (its cell shows the card's key, #1221).
+  const rowOf = (n) => table.locator('tbody tr', { has: page.locator(`.task-number[data-task="${n}"]`) })
   check('Archived shows the renamed project’s card under its new name, with its agent', !!(await lib.until(async () => {
     const t = await rowOf(old.number).innerText().catch(() => '')
     return /gamma/.test(t) && /Builder/.test(t) && !/removed/.test(t)

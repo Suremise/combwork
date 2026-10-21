@@ -12,6 +12,7 @@ import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { agentProviderOf, confirm, focusedAgentId, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useStore } from '../store'
+import { cardLabel } from '@shared/projectKeys'
 import { cx, formatDuration, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
 import { useSessions } from './ProjectTabs'
 import { useScopedLoad } from '../scopedLoad'
@@ -1478,7 +1479,7 @@ function CardsLine({ icon, label, cards }: { icon: string; label: string; cards:
       <Icon name={icon} /> {label}{' '}
       {cards.map((c, i) => {
         const card = tasks.find((t) => t.number === c.number)
-        const text = `#${c.number} ${card?.title ?? c.title}`
+        const text = `${card ? cardLabel(card) : `#${c.number}`} ${card?.title ?? c.title}`
         return (
           <span key={c.number}>
             {i > 0 && ', '}

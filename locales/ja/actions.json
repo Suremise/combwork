@@ -73,6 +73,8 @@
   "actions.project.deactivateFailed": "プロジェクトを非アクティブにできませんでした",
   "actions.project.deactivateMessage": "{n, plural, other {{project}で#個のエージェントが実行中です。}}",
   "actions.project.deactivateTitle": "{n, plural, other {エージェントを停止して非アクティブにしますか？}}",
+  "actions.project.key": "キー",
+  "actions.project.keyHint": "カードは {first}、{second} のように呼ばれます。キーはあとでプロジェクト設定で変更できます。",
   "actions.project.nameChars": "名前に{chars}は使えません",
   "actions.project.nameDot": "名前を「.」で始めることはできません",
   "actions.project.nameEmpty": "名前を入力してください",

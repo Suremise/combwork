@@ -97,6 +97,10 @@ interface HiveMessageValues {
   'tips.cardReadFirst.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
+  'tips.cardWork.text': undefined
+  'tips.cardWork.title': undefined
+  'tips.cliOverrides.text': undefined
+  'tips.cliOverrides.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
   'tips.commandName': { command: string | number }
@@ -236,6 +240,8 @@ interface HiveMessageValues {
   'tips.progressRecentFold.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
+  'tips.projectKeys.text': undefined
+  'tips.projectKeys.title': undefined
   'tips.projectTabs.text': undefined
   'tips.projectTabs.title': undefined
   'tips.projectTabsKeys.text': undefined

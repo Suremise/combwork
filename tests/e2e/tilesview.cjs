@@ -352,14 +352,17 @@ const check = (name, ok, extra = '') => {
     const chipInfo = (name) => chipOf(name).evaluate((el) => ({ text: el.textContent, column: el.dataset.column, col: el.style.getPropertyValue('--col'), blocked: !!el.dataset.blocked, review: !!el.dataset.review, label: el.getAttribute('aria-label') })).catch(() => null)
     const chips = { [LONG]: [doingCard, 'doing', '#3b82f6'], C: [passedCard, 'passed', '#14b8a6'], A: [reviewCard, 'review', '#a371f7'], D: [reviewCard, 'review', '#a371f7'] }
     check('the strip: a chip on each row with a card', !!(await lib.until(async () => (await page.locator('.tile-strip-chip .card-chip').count()) === 5, HUNG_MS)), String(await page.locator('.tile-strip-chip .card-chip').count()))
+    // Each card by key (#1221).
+    const L = {}
+    for (const n of [doingCard, passedCard, reviewCard, blockedCard]) L[n] = await lib.cardLabel(inv, n)
     for (const [name, [n, column, col]] of Object.entries(chips)) {
       const c = await chipInfo(name)
-      check(`…${name.length > 2 ? 'the long-named builder' : name}: #${n}, in its column's colour (${column})`, c?.text === `#${n}` && c.column === column && c.col === col, JSON.stringify(c))
+      check(`…${name.length > 2 ? 'the long-named builder' : name}: ${L[n]}, in its column's colour (${column})`, c?.text === L[n] && c.column === column && c.col === col, JSON.stringify(c))
     }
     check("…A's is the reviewer's chip (the eye)", (await chipInfo('A'))?.review && (await row('A').locator('.tile-strip-chip .codicon-eye').count()) === 1)
     const blocked = await chipInfo('E')
-    check("…E's blocked card: red, and said so", blocked?.blocked && blocked.col === 'var(--error)' && blocked.label === `Card #${blockedCard}, Doing, blocked`, JSON.stringify(blocked))
-    check("…C's accessible name: the card and its column", (await chipInfo('C'))?.label === `Card #${passedCard}, Passed`, (await chipInfo('C'))?.label)
+    check("…E's blocked card: red, and said so", blocked?.blocked && blocked.col === 'var(--error)' && blocked.label === `Card ${L[blockedCard]}, Doing, blocked`, JSON.stringify(blocked))
+    check("…C's accessible name: the card and its column", (await chipInfo('C'))?.label === `Card ${L[passedCard]}, Passed`, (await chipInfo('C'))?.label)
     check('…no card, no chip (F)', (await row('F').locator('.card-chip').count()) === 0)
     check("…A's status drops the number its chip shows: Waiting → Passed", (await row('A').locator('.tile-strip-status').innerText()) === 'Waiting → Passed', await row('A').locator('.tile-strip-status').innerText())
     // The layout: the long name cut before its chip, never under it; the chips' right edges in a column.

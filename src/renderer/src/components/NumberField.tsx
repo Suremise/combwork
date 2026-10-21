@@ -15,6 +15,7 @@ export function NumberField({
   off,
   inherit,
   label,
+  unit,
   onCommit
 }: {
   value: number | null
@@ -25,6 +26,8 @@ export function NumberField({
   /** Placeholder for an empty box, which saves null (inherit). Without it, a blank box keeps the saved value. */
   inherit?: string
   label?: string
+  /** The number's unit, shown after the box ("s"). */
+  unit?: string
   onCommit: (value: number | null) => Promise<unknown> | void
 }) {
   const shown = (v: number | null): string => (v === null ? '' : String(v))
@@ -110,6 +113,7 @@ export function NumberField({
             }
           }}
         />
+        {unit && <span className="muted number-field-unit">{unit}</span>}
         {off && (
           <label className="flex muted number-field-off">
             <input type="checkbox" className="checkbox" checked={isOff} onChange={(e) => save(e.target.checked ? 0 : (lastOn.current ?? off.restore))} /> {off.label}

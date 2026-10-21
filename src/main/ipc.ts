@@ -40,7 +40,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, cardHeads, exportBoard, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -48,7 +48,7 @@ import * as mcp from './mcp'
 import * as notes from './notes'
 import * as removal from './projectRemoval'
 import * as tasks from './tasks'
-import { changeProjectKey, keyProjects, sayKeysOnce } from './projectKeys'
+import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
@@ -595,7 +595,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return r.filePaths[0]
     },
 
-    'project:create': (name) => workspace.createProject(name),
+    'project:create': (name, key) => createProjectWithKey(workspace, name, key),
     'project:removalInfo': (p) => removal.removalInfo(p),
     'project:remove': (p, how) => {
       if (!['hide', 'remove', 'delete'].includes(how)) throw hiveError(M.removeHow, { how: String(how) }, { kind: 'invalid' })
@@ -695,6 +695,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       })
     },
     'project:setKey': (p, key) => changeProjectKey(workspace, workspace.assertProject(p), key),
+    'project:movedCardNames': () => movedNames(workspace),
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       return workspace.updateProjectConfig(workspace.assertProject(p), patch)

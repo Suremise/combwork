@@ -48,6 +48,20 @@ describe("a card's work view (#1223)", () => {
     expect(currentRevision(v)).toBe('rev2222bbbb')
   })
 
+  it('what couldn’t be read, and why, when the work started and when it was submitted: kept, never read as none (#1224 round 1)', () => {
+    seq = 0
+    const facts = [
+      fact('Started', start({ line: null, base: null, platform: { unknown: { line: 'cannot read repository HEAD', base: 'cannot read repository HEAD' } } }), 'agent:B1'),
+      fact('Submitted', submit(null as unknown as string, 1, { revision: null, head: null, files: [], platform: { unknown: { revision: 'cannot read repository HEAD', files: 'cannot read repository diff' } } }), 'agent:B1'),
+      fact('Submitted', submit('rev3333cccc', 2), 'agent:B1')
+    ]
+    const v = workView(card, facts)
+    expect(v.unknown).toEqual({ line: 'cannot read repository HEAD', base: 'cannot read repository HEAD' })
+    expect(v.revisions.map((r) => r.unknown)).toEqual([{ revision: 'cannot read repository HEAD', files: 'cannot read repository diff' }, {}])
+    // A later submission read in full keeps the earlier one's record as it was.
+    expect(v.revisions[0]).toMatchObject({ revision: null, files: [] })
+  })
+
   it('verdicts tied to their submission, revision and round; only the latest submission at this generation counts', () => {
     const { facts, s1, s2 } = reviewed()
     const v = workView(card, facts)

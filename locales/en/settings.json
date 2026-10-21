@@ -31,6 +31,38 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
+    "defaultMessage": "Right-click in a Claude Code pane is Hive's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Hive passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
+    "description": "What the advanced setting \"Pass right-click to Claude Code\" is for (Settings → Advanced, under Claude Code). Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
+  "settings.advanced.claude-code.mouse.rightClickToCli.title": {
+    "defaultMessage": "Pass right-click to Claude Code",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.override.mcpIsolation.desc": {
+    "defaultMessage": "Hive starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Hive (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Hive's own hive among them, win over yours of the same name.",
+    "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.claude-code.override.mcpIsolation.title": {
+    "defaultMessage": "Only the workspace's MCP servers",
+    "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name."
+  },
+  "settings.advanced.claude-code.override.preApproveHiveTools.desc": {
+    "defaultMessage": "When the Hive Assistant runs on Claude Code, Hive passes --allowedTools with the Hive tools its Control settings let it use without asking, so Claude Code doesn't ask before them. Turned off, Claude Code asks before each Hive tool as its own permission mode says. Control still decides what the Assistant may do either way. Agents' Hive tools are never pre-approved on Claude Code.",
+    "description": "What the advanced setting \"Pre-approve the Assistant's Hive tools\" does (Settings → Advanced, under Claude Code). --allowedTools is a command-line option: keep it. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.claude-code.override.preApproveHiveTools.title": {
+    "defaultMessage": "Pre-approve the Assistant's Hive tools",
+    "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default."
+  },
+  "settings.advanced.claude-code.override.promptSnapshotOff.desc": {
+    "defaultMessage": "When the Hive Assistant's conversation resumes, Hive starts Claude Code with --system-prompt-snapshot off, so the Assistant follows its role and Control settings as they are now. Turned off, Hive leaves the flag out and Claude Code keeps sending the instructions it recorded when the conversation began, until it compacts: a change to the Assistant's settings may not reach it until then. --system-prompt-snapshot in Extra arguments wins either way.",
+    "description": "What the advanced setting \"Resume the Assistant with its current instructions\" does (Settings → Advanced, under Claude Code). --system-prompt-snapshot off is a command-line option and its value: keep them. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.claude-code.override.promptSnapshotOff.title": {
+    "defaultMessage": "Resume the Assistant with its current instructions",
+    "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default."
+  },
   "settings.advanced.claude-code.safeguard.note.desc": {
     "defaultMessage": "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Hive misses such stops: no shield on the agent's pane, and Performance doesn't count them.",
     "description": "What the advanced setting \"Safeguard stop: transcript note\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -175,6 +207,14 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
+    "defaultMessage": "How long Codex waits for Hive's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Hive gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Hive's tools.",
+    "description": "What the advanced setting \"hive tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
+    "defaultMessage": "hive tools: startup timeout in Codex",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex lets one of Hive's tools run (its tool_timeout_sec for the hive server). Hive's waits stay a minute under it.",
     "description": "What the advanced setting \"hive tools: timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -182,6 +222,38 @@
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": {
     "defaultMessage": "hive tools: timeout in Codex",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.mouse.rightClickToCli.desc": {
+    "defaultMessage": "Right-click in a Codex pane is Hive's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Hive passes right-clicks to Codex instead, which tracks the mouse itself.",
+    "description": "What the advanced setting \"Pass right-click to Codex\" is for (Settings → Advanced, under Codex). Shift+drag names a key and a mouse action: use the key names your language uses."
+  },
+  "settings.advanced.codex.mouse.rightClickToCli.title": {
+    "defaultMessage": "Pass right-click to Codex",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.override.mcpIsolation.desc": {
+    "defaultMessage": "Hive's Codex sessions get the MCP servers the workspace gives them, and Hive turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Hive. Hive's own hive server always wins over one of yours with that name.",
+    "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.codex.override.mcpIsolation.title": {
+    "defaultMessage": "Only the workspace's MCP servers",
+    "description": "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name."
+  },
+  "settings.advanced.codex.override.preApproveHiveTools.desc": {
+    "defaultMessage": "Hive gives Codex its hive server with its tools approved (for the Hive Assistant, only those its Control settings let it use without asking), so Codex doesn't ask before them in any mode. Turned off, Codex asks before them as its own approval policy says. What an agent or the Assistant may do with them is still decided by Hive.",
+    "description": "What the advanced setting \"Pre-approve Hive's tools\" does (Settings → Advanced, under Codex). hive is the name of Hive's MCP server. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.codex.override.preApproveHiveTools.title": {
+    "defaultMessage": "Pre-approve Hive's tools",
+    "description": "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default."
+  },
+  "settings.advanced.codex.override.terminalTitle.desc": {
+    "defaultMessage": "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Hive tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Agent Setup keeps Hive's title, which it waits on.",
+    "description": "What the advanced setting \"Set Codex's terminal title\" does (Settings → Advanced, under Codex). Terminal title items is another setting's title: use it as Settings shows it. tui.terminal_title is a config key and \"Action Required\" is Codex's own text: keep them. Agent Setup is a dialog's name."
+  },
+  "settings.advanced.codex.override.terminalTitle.title": {
+    "defaultMessage": "Set Codex's terminal title",
+    "description": "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default."
   },
   "settings.advanced.codex.prompt.drawnSeconds.desc": {
     "defaultMessage": "How long Hive waits for Codex to show a line Hive typed (a message's notice, a wake) in its prompt before pressing Enter. Codex drops an Enter that it reads together with the line while it is busy, so Hive presses Enter once the line shows; if it doesn't show in time, Hive presses Enter anyway, and presses it again 10 seconds later if the line wasn't sent.",
@@ -350,6 +422,46 @@
   "settings.advanced.copilot.mouse.rightClickToCli.title": {
     "defaultMessage": "Pass right-click to Copilot",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.copilot.override.allMcpInstructions.desc": {
+    "defaultMessage": "Hive starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the hive server's instructions (Hive's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Hive gives its guidance as custom instructions instead.",
+    "description": "What the advanced setting \"Include every MCP server's instructions\" does (Settings → Advanced, under GitHub Copilot). --allow-all-mcp-server-instructions is a command-line option: keep it. hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.copilot.override.allMcpInstructions.title": {
+    "defaultMessage": "Include every MCP server's instructions",
+    "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name."
+  },
+  "settings.advanced.copilot.override.mcpIsolation.desc": {
+    "defaultMessage": "Hive starts Copilot with --disable-builtin-mcps, and --disable-mcp-server for each server in your own Copilot config and the project's, so its sessions get only the MCP servers the workspace gives them. Turned off, those and Copilot's built-in GitHub servers load beside them, as they would outside Hive. The workspace's servers, Hive's own hive among them, win over yours of the same name.",
+    "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under GitHub Copilot). --disable-builtin-mcps and --disable-mcp-server are command-line options: keep them. hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.copilot.override.mcpIsolation.title": {
+    "defaultMessage": "Only the workspace's MCP servers",
+    "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name."
+  },
+  "settings.advanced.copilot.override.noAutoUpdate.desc": {
+    "defaultMessage": "Hive starts Copilot with --no-auto-update and COPILOT_AUTO_UPDATE=false (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Agent Setup updates it when you choose. Turned off, Hive sets neither and Copilot updates itself as it would outside Hive (your own COPILOT_AUTO_UPDATE still applies).",
+    "description": "What the advanced setting \"Don't let Copilot update itself\" does (Settings → Advanced, under GitHub Copilot). --no-auto-update is a command-line option and COPILOT_AUTO_UPDATE=false an environment variable: keep them. Update is a button's name and Agent Setup a dialog's."
+  },
+  "settings.advanced.copilot.override.noAutoUpdate.title": {
+    "defaultMessage": "Don't let Copilot update itself",
+    "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default."
+  },
+  "settings.advanced.copilot.override.preApproveHiveTools.desc": {
+    "defaultMessage": "Hive starts Copilot with --allow-tool for Hive's tools (for the Hive Assistant, only those its Control settings let it use without asking), so Copilot doesn't ask before them in any mode. Turned off, Copilot asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Hive.",
+    "description": "What the advanced setting \"Pre-approve Hive's tools\" does (Settings → Advanced, under GitHub Copilot). --allow-tool is a command-line option: keep it. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.copilot.override.preApproveHiveTools.title": {
+    "defaultMessage": "Pre-approve Hive's tools",
+    "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default."
+  },
+  "settings.advanced.copilot.override.stripGitHubTokens.desc": {
+    "defaultMessage": "Hive leaves GH_TOKEN and GITHUB_TOKEN, which other tools set, out of Copilot's environment, so a token left there never signs Copilot agents in to another account; COPILOT_GITHUB_TOKEN, set for Copilot, is kept. Turned off, Copilot gets them and signs in with them before its own login, as it would outside Hive, and Agent Setup shows that sign-in.",
+    "description": "What the advanced setting \"Keep GH_TOKEN and GITHUB_TOKEN from Copilot\" does (Settings → Advanced, under GitHub Copilot). GH_TOKEN, GITHUB_TOKEN and COPILOT_GITHUB_TOKEN are environment variables: keep them. Agent Setup is a dialog's name."
+  },
+  "settings.advanced.copilot.override.stripGitHubTokens.title": {
+    "defaultMessage": "Keep GH_TOKEN and GITHUB_TOKEN from Copilot",
+    "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them."
   },
   "settings.advanced.copilot.ready.footer.desc": {
     "defaultMessage": "Copilot only says it has started with the first prompt, so Hive takes its footer on screen to mean it is ready.",
@@ -698,6 +810,26 @@
   "settings.advanced.unit.seconds": {
     "defaultMessage": "{n, number} s",
     "description": "An advanced setting's value in seconds, short: \"300 s\". {n} is the number."
+  },
+  "settings.advanced.unitLabel.agents": {
+    "defaultMessage": "agents",
+    "description": "Beside the box of an advanced setting that is a number of agents (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.captures": {
+    "defaultMessage": "captures",
+    "description": "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.lanes": {
+    "defaultMessage": "lanes",
+    "description": "Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.minutes": {
+    "defaultMessage": "min",
+    "description": "Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in \"10 min\"."
+  },
+  "settings.advanced.unitLabel.seconds": {
+    "defaultMessage": "s",
+    "description": "Beside the box of an advanced setting given in seconds (Settings → Advanced): the unit, short, as in \"300 s\"."
   },
   "settings.advanced.values.desc": {
     "defaultMessage": "Details Hive relies on that a CLI update can break (the text of its prompts, the fields it sends), and timeouts and limits for power users. Change one only when something doesn't work, or Hive's notes on a CLI update say to.",
@@ -2366,6 +2498,14 @@
   "settings.project.fileLocks.title": {
     "defaultMessage": "File locks",
     "description": "A setting's title (Project Settings → Agents & Worktrees)."
+  },
+  "settings.project.key.desc": {
+    "defaultMessage": "The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.",
+    "description": "What the setting \"Project key\" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project's own key, such as WB-12."
+  },
+  "settings.project.key.title": {
+    "defaultMessage": "Project key",
+    "description": "A setting's title (Project Settings → Agents & Worktrees): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)."
   },
   "settings.project.keybindings.desc": {
     "defaultMessage": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.",
