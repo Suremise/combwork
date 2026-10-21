@@ -101,6 +101,7 @@
   "tasks.history.movedBottom": "Movido para o fim de {column, select, hold {Em espera} todo {A fazer} doing {Fazendo} review {Revisão} passed {Aprovado} done {Concluído} other {{column}}}",
   "tasks.history.movedTop": "Movido para o topo de {column, select, hold {Em espera} todo {A fazer} doing {Fazendo} review {Revisão} passed {Aprovado} done {Concluído} other {{column}}}",
   "tasks.history.noDependencies": "Não depende mais de outros cartões",
+  "tasks.history.notified": "Avisou você: {event, select, failed {a revisão foi reprovada} blocked {está bloqueado} stalled {está travado} mergeDue {todos os cartões da raia {lane} tiveram revisão bem-sucedida: hora do merge} mergeStalled {o merge da raia {lane} está travado} other {precisa de você}}",
   "tasks.history.placed": "Colocado em {place, selectordinal, one {#º} two {#º} few {#º} other {#º}} lugar em {column, select, hold {Em espera} todo {A fazer} doing {Fazendo} review {Revisão} passed {Aprovado} done {Concluído} other {{column}}}",
   "tasks.history.renamed": "Renomeado para “{title}”",
   "tasks.history.repaired": "Projeto: {from} → {to} (renomeado ou movido)",

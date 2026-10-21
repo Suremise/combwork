@@ -24,7 +24,7 @@
 // so a closed board is never opened again for it nor another workspace's written.
 
 import { randomUUID } from 'crypto'
-import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardCommitted } from '../boardStore'
+import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, dbGeneration, onBoardCommitted } from '../boardStore'
 import { createLogger } from '../logger'
 import type { WorkspaceService } from '../workspace'
 import type { DatabaseSync } from 'node:sqlite'
@@ -51,8 +51,14 @@ const MAX_TRIES = 2
 let LEASE_MS = 2 * 60_000
 /** This process's part of its claims' tokens (`<process>/<uuid>`): a claim of an ended run here is taken again at once. */
 const PROCESS = randomUUID()
-/** Repeatable actions a run of this process is on now, with their claims' tokens: never taken again here meanwhile. */
-const handling = new Map<number, string>()
+/**
+ * Repeatable actions a run of this process is on now, with their claims' tokens: never taken again here meanwhile. Keyed
+ * by actionKey: an action's id is its workspace database's own (each numbers from 1), so two open workspaces' actions
+ * with one id are two actions (HR1's #1266 round 4).
+ */
+const handling = new Map<string, string>()
+/** An action of a workspace's database, as this process's maps key it: the board's file, its generation, the id. */
+const actionKey = (ws: WorkspaceService, id: number): string => `${ws.path ? boardFile(ws.path).toLowerCase() : ''}#${ws.path ? dbGeneration(ws.path) : 0}#${id}`
 /** For tests: the lease's length (null: two minutes), to test its renewal and expiry without waiting minutes. */
 export function setLeaseMsForTests(ms: number | null): void {
   LEASE_MS = ms ?? 2 * 60_000
@@ -61,12 +67,12 @@ const ours = (token: string | null): boolean => !!token && token.startsWith(`${P
 /** How long a repeatable action whose dispatch was refused waits before it is taken again here (no run spins on it). */
 const RETRY_MS = 1000
 /** Refused repeatable actions, until when they wait (a few at most: each one leaves it once its time has passed). */
-const cooling = new Map<number, number>()
-const coolingNow = (id: number): number | null => {
-  const until = cooling.get(id)
+const cooling = new Map<string, number>()
+const coolingNow = (key: string): number | null => {
+  const until = cooling.get(key)
   if (until === undefined) return null
   if (until > Date.now()) return until
-  cooling.delete(id)
+  cooling.delete(key)
   return null
 }
 
@@ -219,7 +225,8 @@ async function runOnce(at: RunOf, a: ActionRow, fn: ActionHandler, once: ActionO
  */
 async function runLeased(at: RunOf, a: ActionRow, fn: ActionHandler, token: string): Promise<void> {
   const { ws } = at
-  handling.set(a.id, token)
+  const key = actionKey(ws, a.id)
+  handling.set(key, token)
   const renew = (): Promise<unknown> => change(at, () => boardWriteOp(ws, (db) => db.prepare("UPDATE card_actions SET lease_until = ? WHERE id = ? AND state = 'pending' AND lease_owner = ? AND lease_until > ?").run(new Date(Date.now() + LEASE_MS).toISOString(), a.id, token, new Date().toISOString()))) // i18n-ignore: SQL
   const renewing = setInterval(() => void renew().catch((e) => log.warn(`renewing the lease of action ${a.id}`, e)), Math.max(10, Math.floor(LEASE_MS / 3)))
   renewing.unref?.()
@@ -242,7 +249,7 @@ async function runLeased(at: RunOf, a: ActionRow, fn: ActionHandler, token: stri
     log.warn(`action ${a.id} (${a.kind}) of #${a.card} failed`, e)
   } finally {
     clearInterval(renewing)
-    handling.delete(a.id)
+    handling.delete(key)
   }
   // Fenced by the token: a claim whose lease another has taken since marks nothing. Refused: released, pending, run again.
   await change(at, () =>
@@ -254,7 +261,7 @@ async function runLeased(at: RunOf, a: ActionRow, fn: ActionHandler, token: stri
   )
   // Taken again here only after a pause, by its own timer: its release's commit starts no run that would refuse it again.
   if (refused && !failed) {
-    cooling.set(a.id, Date.now() + RETRY_MS)
+    cooling.set(key, Date.now() + RETRY_MS)
     if (at.alive()) retryAt(ws, Date.now() + RETRY_MS)
   }
 }
@@ -283,7 +290,8 @@ function take(db: DatabaseSync, ws: WorkspaceService, id: number, once: ActionOn
  * of this process (one another claim holds is tried again when its lease passes).
  */
 function free(db: DatabaseSync, ws: WorkspaceService, id: number): boolean {
-  if (handling.has(id) || coolingNow(id) !== null) return false
+  const key = actionKey(ws, id)
+  if (handling.has(key) || coolingNow(key) !== null) return false
   const row = db.prepare('SELECT lease_owner, lease_until FROM card_actions WHERE id = ?').get(id) as { lease_owner: string | null; lease_until: string | null } | undefined // i18n-ignore: SQL
   const until = row?.lease_until ? Date.parse(row.lease_until) : 0
   if (row?.lease_owner && !ours(row.lease_owner) && until > Date.now()) {
@@ -314,9 +322,9 @@ function retryAt(ws: WorkspaceService, at: number): void {
  * another Hive's lease holds (its retry is timed), nor one a run here is on. So a run's own board changes (a mark, a
  * dispatch) never start another run for nothing.
  */
-function takeable(db: DatabaseSync): boolean {
+function takeable(db: DatabaseSync, ws: WorkspaceService): boolean {
   const rows = db.prepare("SELECT id, lease_owner FROM card_actions WHERE state = 'pending' AND (lease_owner IS NULL OR lease_owner LIKE ? OR lease_until <= ?)").all(`${PROCESS}/%`, new Date().toISOString()) as { id: number }[] // i18n-ignore: SQL
-  return rows.some((r) => !handling.has(r.id) && coolingNow(r.id) === null)
+  return rows.some((r) => !handling.has(actionKey(ws, r.id)) && coolingNow(actionKey(ws, r.id)) === null)
 }
 
 /** After a change commits: its actions, if it wrote any this process could take. */
@@ -324,7 +332,7 @@ onBoardCommitted((ws) => {
   if (!ws.path) return
   let pending = false
   try {
-    pending = boardRead(ws, (db) => takeable(db))
+    pending = boardRead(ws, (db) => takeable(db, ws))
   } catch {
     // A board without the facts step's tables (not upgraded): no actions.
     return

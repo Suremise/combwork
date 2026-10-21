@@ -1337,11 +1337,11 @@ side effects touch git, processes and other agents), so they are tied by **durab
   before a crash) may repeat at most once, never more. **Built** (#1266): a wake's delivery carries the action's id
   (`deliveries.action`, unique), which is the record that it was made: the worker runs a delivering action until it is
   marked, and every run after the first finds its delivery.
-  **Notices: the guarantee is the durable record, not the toast** (the Assistant's call on #1266, 21 Oct). A notice's
-  record is durable before anything is shown: its action (`notify`, `laneNotice`, written with the facts or the lane's
-  marks, and pending until marked), and its source, which the window always shows after any crash (the card's For you
-  request, its Work section; the lane in the Progress panel, the blocked or failed card on the board). The banner or
-  Windows notification itself is **best effort**: attempted after the record commits, repeated at most once more after
+  **Notices: the guarantee is the durable record, not the toast** (the Assistant's calls on #1266, 21 Oct). Each
+  notice is a **line in its card's history** (*Notified you: its review failed*, translated; a lane's own events on the
+  lane's current card), written by Hive **in the same transaction as its action** (`notify` in the runtime's change,
+  `laneNotice` in the lane notices' change), so after any crash the user can still read it on the card, whatever became
+  of what it told. The banner or Windows notification itself is **best effort**: attempted after the record commits, repeated at most once more after
   a run that ended uncertainly, never claimed to be exactly once. A notice is **repeatable**: one claim at a time runs
   it, holding its **lease** (`lease_owner`, a token unique to the claim, and `lease_until`: taken by a conditional update
   only one writer wins, renewed while its handler runs); its dispatch is counted (`attempts`) under that token while the
@@ -2160,7 +2160,7 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   they commit; another Hive's by SQLite's `data_version`; a replaced or restored file by its generation: never a clock)
   and the marks' writes are as the look read them, under its lock, else it looks again, so
   marks never move back to an older look, a restart tells what it hadn't yet and two Hives tell each event once (the
-  toast best effort, as §16.4.5 says; the lane itself always shows in the Progress panel); a lane running when
+  toast best effort, as §16.4.5 says; each notice a line in its card's history, the lane's own on its current card); a lane running when
   Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
   runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
   (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's

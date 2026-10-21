@@ -13,7 +13,8 @@ import { listLanes } from './lanes'
 import { createLogger } from './logger'
 import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
-import { allTasks, getTask } from './tasks'
+import { HISTORY, storedText } from '../shared/taskHistory'
+import { allTasks, getTask, noteOnCard } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction, type ActionHandler } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
@@ -187,10 +188,11 @@ async function look(ws: WorkspaceService): Promise<boolean> {
   if (!alive()) return true
   const written = await boardWrite(
     ws,
-    async () =>
-      boardWriteOp(ws, (db) => {
+    async () => {
+      const planned = boardWriteOp(ws, (db): Note[] | false => {
         // Written since the read (another look, a change, another Hive): the read is stale, and nothing is written.
         if (stampOf(ws, db) !== told.stamp) return false
+        const notes: Note[] = []
         const since = metaOf(db, SINCE) ?? told.since
         db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
         // As the marks are now: what another Hive told since this one read them isn't told again.
@@ -206,22 +208,66 @@ async function look(ws: WorkspaceService): Promise<boolean> {
             writeMark(db, now.id, now.mark)
           }
           if (!hit || !lane || quiet.has(lane.project.toLowerCase())) continue
+          const exists = (n: number): boolean => !!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n) // i18n-ignore: SQL
+          // The lane's current card (its first not yet merged, else its last): where a lane's own event is noted.
+          const laneCards = now.cards.map((c) => c.number).filter(exists)
+          const current = laneCards.find((n) => now.mark.cards[n]?.c !== 'done') ?? laneCards.at(-1)
           // On a card of the lane still on the board (the action's card), the first it names.
-          const cards = [...hit.parts.flatMap((p) => (p.n !== null ? [p.n] : [])), ...now.cards.map((c) => c.number)]
-          const on = cards.find((n) => !!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n)) // i18n-ignore: SQL
+          const on = [...hit.parts.flatMap((p) => (p.n !== null ? [p.n] : [])), ...laneCards].find(exists)
           if (on === undefined) continue
           const events: Told[] = hit.parts.map((p) => ({ event: p.event, card: p.n, ...(p.detail ? { detail: p.detail } : {}) }))
           db.prepare("INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, 'laneNotice', ?, NULL)").run(on, JSON.stringify({ lane: hit.label, events })) // i18n-ignore: SQL
+          for (const e of events) {
+            const card = e.card !== null && exists(e.card) ? e.card : current
+            if (card !== undefined) notes.push({ card, event: noteEvent(e), lane: hit.label })
+          }
         }
         // Lanes no longer running (ended, abandoned, gone) are followed no more.
         for (const id of Object.keys(marks)) if (!running.has(id)) writeMark(db, id, null)
         db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)").run(SEQ) // i18n-ignore: SQL
-        return true
-      }),
+        return notes
+      })
+      if (planned === false) return false
+      // The durable notice (SPEC §16.4.5): each event a line in its card's history, in this same change.
+      for (const n of planned) await noteOnCard(n.card, storedText(HISTORY.notified, { event: n.event, lane: n.lane }), ws)
+      return true
+    },
     { alive }
   )
   // Its workspace closed or switched meanwhile: nothing more to look at.
   return written !== false
+}
+
+/** A notice's line in a card's history (HISTORY.notified): which event, and the lane's label. */
+interface Note {
+  card: number
+  event: 'failed' | 'blocked' | 'stalled' | 'mergeDue' | 'mergeStalled' | 'request'
+  lane: string
+}
+function noteEvent(e: Told): Note['event'] {
+  if (e.event === 'failed' || e.event === 'blocked') return e.event
+  if (e.event === 'stalled') return e.card === null ? 'mergeStalled' : 'stalled'
+  return 'mergeDue'
+}
+
+/**
+ * The durable notice of the runtime's requests for the user (#1266, SPEC §16.4.5): a line in each card's history for
+ * each `notify` action written after `after` (an action id), in the board change that wrote them (service.ts' `locked`,
+ * which calls this before the change commits).
+ */
+export async function noteRequestsSince(ws: WorkspaceService, after: number): Promise<void> {
+  const rows = boardRead(ws, (db) => db.prepare("SELECT card FROM card_actions WHERE kind = 'notify' AND id > ? ORDER BY id").all(after) as { card: number }[]) // i18n-ignore: SQL
+  for (const r of rows) await noteOnCard(r.card, storedText(HISTORY.notified, { event: 'request', lane: '' }), ws)
+}
+
+/** The newest action's id now (0: none), for noteRequestsSince. */
+export const lastActionId = (ws: WorkspaceService): number => {
+  try {
+    return (boardRead(ws, (db) => db.prepare('SELECT max(id) AS id FROM card_actions').get()) as { id: number | null }).id ?? 0 // i18n-ignore: SQL
+  } catch {
+    // A board without the facts' tables: none.
+    return 0
+  }
 }
 
 /** For tests: `hold` keeps the lanes from being looked at on a change or the tick (a restart before the look, say). */

@@ -788,3 +788,148 @@ describe('boundaries (#1266 round 4)', () => {
     }
   })
 })
+
+// HR1's round 4 (#1266): two workspaces' actions with one id are two actions; and the durable notice, a translated
+// line in its card's history, written with the action.
+describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
+  /** A repeatable action of a kind, written as another Hive's change would (pending). */
+  const add = (ws: string, c: number, kind: string, payload: Record<string, unknown> = {}): number => {
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    try {
+      return own.tx((tx) => tx.action(c, kind, payload, null))
+    } finally {
+      own.close()
+    }
+  }
+  /** A card's history lines that are notices (HISTORY.notified), as their values. */
+  const notesOn = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c, w))).history.filter((h) => h.whatText?.id === 'tasks.history.notified').map((h) => h.whatText!.values)
+
+  it('equal action ids in two open workspaces: one held in the first never holds up the second', async () => {
+    const first = await open()
+    const second = await open()
+    const one = await newCard(first.w)
+    const two = await newCard(second.w)
+    await settled()
+    let entered = false
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const ran: string[] = []
+    worker.onAction(
+      'probeTwoWorkspaces',
+      async (_a, w, ctx) => {
+        if (w === first.w) {
+          entered = true
+          await held
+        }
+        await ctx.dispatch(() => ran.push(w.path!))
+      },
+      'repeatable'
+    )
+    expect(add(first.ws, one, 'probeTwoWorkspaces')).toBe(add(second.ws, two, 'probeTwoWorkspaces'))
+    const run = worker.runActions(first.w)
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true), HANG)
+      await worker.runActions(second.w)
+      expect(ran).toEqual([second.ws])
+    } finally {
+      release()
+      await run
+    }
+    expect(ran).toEqual([second.ws, first.ws])
+  })
+
+  it("one workspace's refused dispatch doesn't make the other's action with its id wait", async () => {
+    const first = await open()
+    const second = await open()
+    const one = await newCard(first.w)
+    const two = await newCard(second.w)
+    await settled()
+    const ran: string[] = []
+    worker.onAction(
+      'probeCooling',
+      async (a, w, ctx) => {
+        // The first's lease expires before its dispatch: refused, and it waits a moment before it is taken again.
+        if (w === first.w) store.workspaceDb(first.ws).writer.prepare('UPDATE card_actions SET lease_until = ? WHERE id = ?').run(new Date(Date.now() - 1).toISOString(), a.id)
+        await ctx.dispatch(() => ran.push(w.path!))
+      },
+      'repeatable'
+    )
+    expect(add(first.ws, one, 'probeCooling')).toBe(add(second.ws, two, 'probeCooling'))
+    await worker.runActions(first.w)
+    expect(ran).toEqual([])
+    await worker.runActions(second.w)
+    expect(ran).toEqual([second.ws])
+  })
+
+  it("a lane notice is a line in its card's history, written with it: kept after a restart, its event long resolved", async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await settled()
+    await notices.checkLanesNow(w)
+    await settled()
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
+    await vi.waitFor(async () => {
+      await notices.checkLanesNow(w)
+      await worker.actionsSettled()
+      expect(await notesOn(w, c)).toEqual([{ event: 'failed', lane: 'B1 / R1' }])
+    }, HANG)
+    // In the card's history in the user's language, said by Hive.
+    const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
+    expect(line).toMatchObject({ by: 'Hive', what: 'Notified you: its review failed' })
+    // The failure resolved since (fixed, passed), and Hive restarted: the notice is still on the card, once.
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'PASSED' }))
+    await settled()
+    await disposeWorkspaceService(w)
+    const again = createWorkspaceService()
+    await again.open(ws)
+    opened.push(again)
+    expect((await notesOn(again, c)).filter((v) => v?.event === 'failed')).toHaveLength(1)
+    expect(st.notices.length).toBeGreaterThan(0)
+  })
+
+  it('an uncertain dispatch (a crash after it was counted) shows the toast once more at most, its history line once', async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await settled()
+    await notices.checkLanesNow(w)
+    await settled()
+    notices.noticeTestHooks.hold = true
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which greeting?' }, b1))
+      await notices.checkLanesNow(w)
+      await settled()
+    } finally {
+      notices.noticeTestHooks.hold = false
+    }
+    const shown = st.notices.length
+    expect(shown).toBe(1)
+    // Its dispatch counted, then Hive ended before its mark: pending again, one try left.
+    const id = (store.workspaceDb(ws).reader.prepare("SELECT max(id) AS id FROM card_actions WHERE kind = 'laneNotice'").get() as { id: number }).id
+    store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET state = 'pending', attempts = 1, lease_owner = NULL, lease_until = NULL WHERE id = ?").run(id)
+    await worker.runActions(w)
+    await worker.runActions(w)
+    expect(st.notices).toHaveLength(2)
+    expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 2 })
+    expect(await notesOn(w, c)).toEqual([{ event: 'blocked', lane: 'B1 / R1' }])
+  })
+
+  it("a request the runtime writes for the user is noted on its card in the same change (a history line before any toast)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await newCard(w)
+    await settled()
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const wf = (await workflowFor(w, alpha))!
+    expect(wf).toBeTruthy()
+    const before = st.notices.length
+    const reply = await wf.askTheUser(c, 'user', { kind: 'decide', text: 'Which greeting?' })
+    expect(reply).toMatchObject({ ok: true })
+    await settled()
+    expect(await notesOn(w, c)).toEqual([{ event: 'request', lane: '' }])
+    expect(st.notices.length).toBe(before + 1)
+  })
+})

@@ -133,6 +133,19 @@ const check = (name, ok, extra = '') => {
     })
     await inv('tasks:update', a, { blocked: '' })
 
+    // The durable notice (#1266): each notice is a line in its card's history, there to read whatever became of the
+    // notification. The card whose review failed says so, in its dialog's History.
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    await page.locator(`.task-card[data-task="${a}"]`).click()
+    const dialog = page.locator('.dialog', { hasText: `(#${a})` })
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByText(/History \(\d+\)/).first().click()
+    const noted = dialog.locator('.task-history', { hasText: 'Notified you: its review failed' })
+    check("the card's history keeps the notice: \"Notified you: its review failed\"", !!(await until(async () => (await noted.count()) > 0, HUNG_MS)), await dialog.locator('.task-history').innerText().catch(() => ''))
+    await dialog.locator('.task-history').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-3-history.png') })
+    await page.keyboard.press('Escape')
+
     // Notifications off (Settings → Notifications): nothing more is told.
     await inv('settings:update', { notifications: { desktopNotifications: false } })
     const told = notices().length
