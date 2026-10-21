@@ -680,6 +680,8 @@ From 1.0 a project has workflow rules (its version control's options): for examp
 
 The Hive Assistant moves cards the same way, but a move of its that skips a rule is refused unless you asked for it and it gives the reason, which is recorded on the card. Agents can't make an exception.
 
+Moving a **Done** card back to Doing (or further) reopens it: its work starts again as a new round of the card, with what was done before kept in its Work section. On Hold keeps a card as it was, and moving it back where it was carries on from there.
+
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
 
 ### Exporting the board
