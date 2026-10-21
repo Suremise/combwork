@@ -575,8 +575,46 @@ export const ACTIONS_DELIVERED_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * A card's text as the search reads it (#1237): its row in `card_search`, from its title, description, project, agent's
+ * name and labels. `x` is the card's number (an expression).
+ */
+const searchRow = (x: string): string => `INSERT INTO card_search (rowid, title, description, project, agent, labels)
+      SELECT number, title, description, project, coalesce(agent_name, ''),
+        coalesce((SELECT group_concat(label, char(10)) FROM card_labels WHERE card = number), '')
+      FROM cards WHERE number = ${x}`
+/** A trigger's body that writes card `x`'s search row again (or only removes it, for a card gone). */
+const reindex = (x: string): string => `DELETE FROM card_search WHERE rowid = ${x}; ${searchRow(x)};`
+
+/**
+ * Full-text search over cards (#1237): `card_search`, an FTS5 index of each card's text, kept in step with the card tables
+ * by triggers, so every write path (a card saved, a project renamed, a card deleted with its rows) keeps it. Contentless
+ * (the text is only in the card tables; rowid is the card's number), and by the trigram tokenizer: the board's search
+ * finds what a card's text *contains*, any three characters or more, case-insensitively, as the in-memory search does
+ * (shorter queries are too short for it and are matched in memory). Comments aren't in it, as the board's search doesn't
+ * read them: on a live board (1,284 cards) they would make it 38 MB rather than 8, and each comment would write its
+ * card's row again. Searching comments, if wanted, is a later step (perhaps a word index, which is far smaller).
+ */
+export const CARD_SEARCH_STEP: SchemaStep = {
+  name: 'card search',
+  ddl: [
+    `CREATE VIRTUAL TABLE card_search USING fts5(title, description, project, agent, labels, tokenize = 'trigram', content = '', contentless_delete = 1)`,
+    // The cards there already (the upgrade's), before the triggers keep it.
+    searchRow('number').replace(' WHERE number = number', ''),
+    `CREATE TRIGGER card_search_ai AFTER INSERT ON cards BEGIN ${reindex('NEW.number')} END`,
+    // Only when the searched text changed: a card's save writes its whole row (#1210), whatever changed.
+    `CREATE TRIGGER card_search_au AFTER UPDATE OF title, description, project, agent_name ON cards
+      WHEN OLD.title IS NOT NEW.title OR OLD.description IS NOT NEW.description OR OLD.project IS NOT NEW.project OR OLD.agent_name IS NOT NEW.agent_name
+      BEGIN ${reindex('NEW.number')} END`,
+    'CREATE TRIGGER card_search_ad AFTER DELETE ON cards BEGIN DELETE FROM card_search WHERE rowid = OLD.number; END',
+    `CREATE TRIGGER card_search_lai AFTER INSERT ON card_labels BEGIN ${reindex('NEW.card')} END`,
+    `CREATE TRIGGER card_search_lau AFTER UPDATE ON card_labels BEGIN ${reindex('OLD.card')} ${reindex('NEW.card')} END`,
+    `CREATE TRIGGER card_search_lad AFTER DELETE ON card_labels BEGIN ${reindex('OLD.card')} END`,
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -594,6 +632,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'board.byAgent': { sql: 'SELECT number FROM cards WHERE agent IN (SELECT value FROM json_each(?))', args: ['["a1"]'], index: 'cards_agent' },
   'board.byReviewer': { sql: 'SELECT number FROM cards WHERE review_agent IN (SELECT value FROM json_each(?))', args: ['["a1"]'], index: 'cards_reviewer' },
   'board.byProject': { sql: 'SELECT number FROM cards WHERE project_id = ? AND archived = 0', args: ['p1'], index: 'cards_project' },
+  // The board's search (#1237): cards whose searched text holds the words, through the full-text index (FTS5's MATCH on its
+  // table column, the 6th: `0:M5`).
+  'board.search': { sql: 'SELECT rowid AS number FROM card_search WHERE card_search MATCH ?', args: ['{title description project agent labels} : "release"'], index: '0:M5' },
   'board.column': { sql: 'SELECT number FROM cards WHERE archived = 0 AND col = ? ORDER BY ord', args: ['todo'], index: 'cards_place' },
   'board.archivedCounts': { sql: 'SELECT project, count(*) FROM cards WHERE archived = 1 GROUP BY project', args: [], index: 'cards_archived_project' },
   'board.updatedSince': { sql: 'SELECT number FROM cards WHERE updated_at > ?', args: ['2026-10-01'], index: 'cards_updated' },

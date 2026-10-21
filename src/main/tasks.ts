@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { englishText, forAgents, withValues, type Text } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
-import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, sortCards } from '../shared/tasks'
+import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
 import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
@@ -22,7 +22,7 @@ import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type Stag
 import type { ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -298,16 +298,24 @@ export async function boardPlaces(ws: WorkspaceService): Promise<CardPlace[]> {
 }
 
 /** Cards on the board, filtered; with `scope`, only that project's (asking for another project is refused). */
-export async function listTasks(opts: { project?: string; column?: TaskColumn; archived?: boolean; scope?: string | null } = {}): Promise<TaskCard[]> {
+export async function listTasks(opts: { project?: string; column?: TaskColumn; archived?: boolean; scope?: string | null; query?: string } = {}): Promise<TaskCard[]> {
   const scope = opts.scope ?? null
   if (scope !== null && opts.project !== undefined && opts.project.toLowerCase() !== scope.toLowerCase()) {
     throw new TaskPermissionError(withValues(msg({ id: 'tasks.error.ownCardsOnly', defaultMessage: "You can see only your project's cards ({project}).", description: "An error: an agent asked for another project's cards; it sees only its own project's ({project}, its folder name)." }), { project: scope }))
   }
-  return (await allTasks(workspace, { archived: opts.archived ?? false })).filter(
+  // The board's search (#1237): words through the full-text index, so only the cards it finds are read; the rest (a
+  // number, a key, words too short for the index) as the board matches them. Either way cardMatches has the last word.
+  const query = opts.query?.trim() ?? ''
+  const keys = query ? keysForSearch(workspace) : []
+  const moved = query ? movedNames(workspace) : {}
+  const words = query ? searchedWords(query, keys) : null
+  const found = words === null ? null : searchCards(workspace, words)
+  return (await allTasks(workspace, { archived: opts.archived ?? false, ...(found ? { numbers: [...found] } : {}) })).filter(
     (c) =>
       (opts.project === undefined || c.project.toLowerCase() === opts.project.toLowerCase()) &&
       (!opts.column || c.column === opts.column) &&
-      inScope(c, scope)
+      inScope(c, scope) &&
+      (!query || cardMatches(c, query, keys, moved))
   )
 }
 
