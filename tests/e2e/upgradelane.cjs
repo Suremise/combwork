@@ -158,7 +158,10 @@ function driver(app, page) {
     const wakesBefore = jsonl('fake-wakes.jsonl').length
     check('no loop wake was left over from 0.9', wakesBefore === 0, String(wakesBefore))
     script('Reviewer', [n1, n2, n3].map((n) => `boardreview ${n} start then boardreview ${n} passed passed`))
-    script('Builder', [`boardmove ${n2} review then boardcomment ${n2}`, `boardmove ${n3} doing then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
+    // Its moves are now the cards' intents (#1268): a move to Review submits the card, so the builder commits its work
+    // first, with the card's trailer (everyone works in the project folder), as an agent would.
+    const work = (n) => `shell: echo card ${n}>card${n}.txt && git add -A && git -c user.email=b@t -c user.name=Builder commit -qm "card ${n}" --trailer "Hive-Card: alpha-${n}"`
+    script('Builder', [`${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
     const sessions = await dev.inv('session:list', alpha)
     const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id
     check("the 0.9 sessions are there, one per agent", !!sessionOf(builder.id) && !!sessionOf(reviewer.id), JSON.stringify(sessions.map((x) => [x.agentId, x.id])))
