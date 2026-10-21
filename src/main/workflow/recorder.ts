@@ -16,7 +16,7 @@ import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
-import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE } from '../../shared/workflow/facts'
+import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import { advanced } from '../advanced'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
@@ -269,7 +269,9 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
   const cached = boardRead(ws, (db) => (db.prepare('SELECT stage FROM cards WHERE number = ?').get(n) as { stage: StageId | null } | undefined)?.stage ?? null) // i18n-ignore: SQL
   const was: StageId = before ? (cached ?? STAGE_OF[before.column]) : 'todo'
   const earlier = foldCard(store.facts(n), was)
-  const to = STAGE_OF[after.column]
+  // Where the change puts it: its column's stage, unless the column is still its stage's own (a card in Merging is in
+  // Passed, whose stage is Approved: a change that leaves it there isn't a move back, #1348).
+  const to = STAGE_CATEGORY[was] === after.column ? was : STAGE_OF[after.column]
   const history = added(before?.history ?? [], after.history)
   const returned = history.some((h) => h.whatText?.id === HISTORY.returned.id)
   // A new work cycle only for a real start (HR4's round 1 finding 1): none yet, or one that ended Done (reopened). A

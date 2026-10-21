@@ -168,6 +168,15 @@ export function withWriteFence<T>(check: () => void, fn: () => Promise<T>): Prom
   return fences.run(check, fn)
 }
 
+/**
+ * Runs `fn` outside any write fence: work that starts its own course (the actions worker's run, a queue host's run)
+ * even when a fenced write set it going (its commit's listeners run in the writer's async context), so a fence never
+ * reaches work that isn't the fenced queue's own (#1348).
+ */
+export function withoutWriteFence<T>(fn: () => T): T {
+  return fences.exit(fn)
+}
+
 /** A connection whose writes check the fence of the work making them, inside each write. */
 const fenced = (c: Conn): Conn => ({
   read: (fn) => c.read(fn),

@@ -420,7 +420,7 @@ export class GitPlatform implements PlatformAdapter {
       return true
     }
     if (kind === 'pin') {
-      await G.pin(this.project, String(payload.ref), String(payload.revision))
+      if (!(await G.pin(this.project, String(payload.ref), String(payload.revision)))) throw new Error(`pinning ${String(payload.revision)} failed`) // i18n-ignore: an action's failure, recorded on the action
       return true
     }
     return false

@@ -15,6 +15,7 @@ import { basename, join } from 'path'
 import { app } from 'electron'
 import { boardRead, boardWrite } from '../boardStore'
 import { onHiveEvent } from '../events'
+import { exitBy } from '../exitLog'
 import { git } from '../git'
 import { createLogger, userText } from '../logger'
 import { processSupervisor } from '../agentProcesses'
@@ -22,7 +23,8 @@ import { advanced } from '../advanced'
 import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
-import { MergeQueue, type QueueConfig, type QueueOutcome } from './mergeQueue'
+import { withoutWriteFence } from './factStore'
+import { MergeQueue, type QueueConfig } from './mergeQueue'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
 import { workflowEnforced, workflowFor } from './service'
@@ -51,9 +53,6 @@ const hosts = new Map<string, Host>()
 const hostKey = (wsPath: string, projectPath: string, target: string): string => `${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}\n${target}`
 const alive = (h: Host): boolean => !h.life.aborted && h.ws.lifetime === h.life && h.ws.path === h.wsPath
 
-/** For tests: what each host's runs came to, in order (QueueOutcome), and seams. */
-export const queueHostTestHooks: { outcomes: QueueOutcome[] | null; config: ((cfg: QueueConfig) => QueueConfig) | null } = { outcomes: null, config: null }
-
 /**
  * Runs a target's queue (once more, if it is running now: what was asked meanwhile is looked at again). Resolves when
  * this run ends. Never throws: a failure is logged, and the entries stay for the next run.
@@ -71,11 +70,14 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
     return h.running
   }
   const host = h
-  host.running = runHost(host)
+  // Its own course, outside any write fence of whatever started it (an action run a queue's write set going).
+  host.running = withoutWriteFence(() => runHost(host))
     .catch((e) => log.warn(`running the merge queue for ${userText(target)} in ${userText(basename(projectPath))}`, e))
     .finally(() => {
       host.running = null
       if (!alive(host)) hosts.delete(key)
+      // Asked again after its loop had ended (while it released its runner): run once more.
+      else if (host.again) void kickQueue(ws, projectPath, target)
     })
   return host.running
 }
@@ -123,7 +125,6 @@ async function runHost(h: Host): Promise<void> {
         return
       }
       const outcomes = await q.drain(h.target)
-      queueHostTestHooks.outcomes?.push(...outcomes)
       for (const o of outcomes) if (o.outcome !== 'paused') await dropQueuePin(h.projectPath, o.card)
       await prunePins(wf, h.projectPath)
     } while (h.again && alive(h))
@@ -144,16 +145,19 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     enforced: () => workflowEnforced(),
     pauseCheckedOut: true,
     runCheck: checks.runCheck,
-    install: checks.install
+    install: checks.install,
+    // Test copies (unpackaged): HIVE_TEST_QUEUE_CRASH=afterAdvance ends Hive at once once the target has moved, before
+    // `Integrated` is written (S33c: the next start's recovery observes it); no quit handler runs, nothing is released.
+    ...(!app.isPackaged && process.env.HIVE_TEST_QUEUE_CRASH === 'afterAdvance' ? { hooks: { afterAdvance: () => (exitBy('app.exit', 'a test crash after the merge queue advanced', () => app.exit(1)), new Promise<void>(() => undefined)) } } : {})
   }
-  return queueHostTestHooks.config ? queueHostTestHooks.config(cfg) : cfg
+  return cfg
 }
 
 /** Rules off: a target with open entries is paused `rulesOff` (its first entry's card named), unless paused already. */
 async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Promise<void> {
   const first = q.entries(target)[0]
   if (!first || q.paused(target)) return
-  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key }))
+  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key })) // i18n-ignore: a pause reason's code, not text
 }
 
 /** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
@@ -165,7 +169,7 @@ async function dropQueuePin(projectPath: string, cardKey: string): Promise<void>
  * The submissions' pins (`refs/hive/cards/<key>/<n>`, §16.9.3) of the project's cards that are archived, or gone:
  * removed. A pin keeps what was reviewed until its card is archived.
  */
-async function prunePins(wf: Workflow, projectPath: string): Promise<void> {
+export async function prunePins(wf: Workflow, projectPath: string): Promise<void> {
   const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/hive/cards/'])
   if (!r.ok) return
   const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/hive\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
@@ -203,7 +207,7 @@ async function startOpen(ws: WorkspaceService, resumeRulesOff = false): Promise<
 
 /** The project of a card on a workspace's board, by its board name: its folder, or null. */
 function projectOfCard(ws: WorkspaceService, card: number): string | null {
-  const name = boardRead(ws, (db) => (db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string } | undefined)?.project)
+  const name = boardRead(ws, (db) => (db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string } | undefined)?.project) // i18n-ignore: SQL
   if (!name) return null
   return ws.info()?.projects.find((p) => p.name.toLowerCase() === name.toLowerCase())?.path ?? null
 }
@@ -211,7 +215,8 @@ function projectOfCard(ws: WorkspaceService, card: number): string | null {
 let stopHosts: (() => void) | null = null
 
 /**
- * Starts the app's merge queue (index.ts, once): `enqueue` runs a target's host; `releaseSlot` is marked done (P7's
+ * Starts the app's merge queue (index.ts, once): `enqueue` runs a target's host; `pin` pins a submission's revision
+ * (the runtime wrote it, nothing in the app ran it before the queue); `releaseSlot` is marked done (P7's
  * slots; agents' worktrees carry on meanwhile); a workspace opening starts its hosts with open entries; the rules
  * coming back on lift `rulesOff` pauses; a workspace closing waits for its hosts' runs to end.
  */
@@ -223,6 +228,12 @@ export function startQueueHosts(): void {
     if (project && target) void kickQueue(ws, project, target)
   })
   onAction('releaseSlot', () => undefined)
+  // A submission's pin (§16.9.3): what was reviewed is kept until its card is archived (prunePins).
+  onAction('pin', async (a, ws) => {
+    const project = projectOfCard(ws, a.card)
+    const wf = project ? await workflowFor(ws, project) : null
+    if (wf) await wf.platformOf(wf.store.card(a.card)).perform('pin', a.payload)
+  })
   const seen = new WeakSet<AbortSignal>()
   const off = onHiveEvent((e) => {
     if (e.type !== 'workspace-changed') return
