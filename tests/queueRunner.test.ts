@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore } from '../src/main/workflow/factStore'
-import { queueHost, startLauncher } from '../src/main/workflow/queueJobs'
+import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
 import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
@@ -292,6 +292,32 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(w.store.queueProcs(got.lease)).toEqual([])
       // Cleared, and sealed: a folder in its place, so the outlived supervisor can't write there any more.
       expect(statSync(join(w.root, '.queue-journals', `${got.lease}.followed`)).isDirectory()).toBe(true)
+    } finally {
+      await w.close()
+    }
+  })
+
+  it("HR4 r5: a known writer whose journal record was torn (its last digits and newline lost) keeps its duty: the next runner pauses rather than forget it", async () => {
+    const w = world()
+    try {
+      const a = host(w, 'Hive-A', { linger: true })
+      const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
+      await identify(got.supervisor)
+      const f = (await a.ask('follow')) as { followed: boolean; pid: number }
+      expect(f.followed).toBe(true)
+      const outside = await identify(f.pid)
+      a.proc.kill()
+      await a.exited
+      // A torn final append, as HR4's probe made it: still digits, but cut short.
+      const file = join(w.root, '.queue-journals', `${got.lease}.followed`)
+      writeFileSync(file, readFileSync(file, 'utf8').slice(0, -3))
+      const b = host(w, 'Hive-B')
+      const took = (await b.ask('acquire')) as { ok: boolean; paused: number | null }
+      expect(took.ok).toBe(true)
+      expect(took.paused).not.toBeNull()
+      expect(w.store.queuePause('main')).toMatchObject({ reason: 'needsYou' })
+      expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['job'])
+      expect(await running(outside)).toBe(true)
     } finally {
       await w.close()
     }
@@ -583,6 +609,13 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queueProcs(null, 'stuck')).toEqual([])
   })
 
+  /** Puts a journal's whole text back, where the takeover moved it aside when it sealed it (the parts named `<lease>.sealed-…`). */
+  const putBack = (file: string, text: string): void => {
+    const folder = join(file, '..')
+    const stem = basename(file).replace(/\.followed$/, '')
+    for (const n of readdirSync(folder).filter((x) => x.startsWith(`${stem}.sealed-`) && statSync(join(folder, x)).isFile())) writeFileSync(join(folder, n), text)
+  }
+
   it.each([
     ['a journal part that can\'t be read (a moved-aside part that is a folder)', (file: string) => {
       const part = `${file.replace(/\.followed$/, '')}.sealed-0-unreadable`
@@ -590,17 +623,23 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
       return () => rmSync(part, { recursive: true })
     }],
     ['a damaged journal (a line that isn\'t a process)', (file: string) => {
-      writeFileSync(file, `${readFileSync(file, 'utf8')}12x:34\n`)
-      // The takeover sealed it before it read it: the damaged line is in the part moved aside.
-      return () => {
-        const folder = join(file, '..')
-        const stem = basename(file).replace(/\.followed$/, '')
-        for (const n of readdirSync(folder).filter((x) => x.startsWith(`${stem}.sealed-`))) writeFileSync(join(folder, n), readFileSync(join(folder, n), 'utf8').replace('12x:34\n', ''))
-      }
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, `${text}12x:34\n`)
+      return () => putBack(file, text)
+    }],
+    ['a record cut short (a torn append: its last digits and its newline lost)', (file: string) => {
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, text.slice(0, -3))
+      return () => putBack(file, text)
+    }],
+    ['a record cut at its first field (a torn append: "pid:")', (file: string) => {
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, text.slice(0, text.indexOf(':') + 1))
+      return () => putBack(file, text)
     }]
 ])("HR4 r4 #1: %s is never taken for empty: the next runner pauses and keeps the duty, and settles once it reads", async (what, damage) => {
     let endable = false
-    const target = what.startsWith('a damaged') ? 'damaged' : 'unreadable'
+    const target = `unknown-${what.slice(2, 14).replace(/\W/g, '')}`
     const cfg = { store: w.store, project: w.project, target, root: w.root, profile: 'A', hooks: { endJob: () => endable } }
     const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
     const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
@@ -771,5 +810,35 @@ describe('the folder kept while in-flight rules need it (#1360 item 5)', () => {
     } finally {
       e.close()
     }
+  })
+})
+
+describe("a journal's records (#1360, HR4's round 5)", () => {
+  const rec = (pid: bigint, created: bigint): string => `${pid}:${created}:${(pid + created) % 1000003n}\n`
+  const created = 134370814265697467n
+
+  it('reads whole records, as the supervisor writes them', () => {
+    expect(parseJournal(rec(56692n, created) + rec(1n, created + 1n))).toEqual([
+      { pid: 56692, started: fileTimeMs(String(created)) },
+      { pid: 1, started: fileTimeMs(String(created + 1n)) }
+    ])
+    expect(parseJournal('')).toEqual([])
+    // Windows' line endings too.
+    expect(parseJournal(rec(56692n, created).replace('\n', '\r\n'))).toHaveLength(1)
+  })
+
+  it.each([
+    ['a timestamp cut before its newline', rec(56692n, created).slice(0, -6)],
+    ['a record cut at the pid', '56692:'],
+    ['a record cut at the timestamp, its newline kept', `56692:${String(created).slice(0, -2)}\n`],
+    ['digits lost from the middle, the check now wrong', `56692:${String(created).slice(0, -2)}:${(56692n + created) % 1000003n}\n`],
+    ['pid 0', rec(0n, created)],
+    ['a pid past 32 bits', rec(0x100000000n, created)],
+    ['a start before 1970', rec(56692n, 1n)],
+    ['a start a year from now', rec(56692n, BigInt(Date.now() + 365 * 86_400_000) * 10000n + 116444736000000000n)],
+    ['an old two-field record', `56692:${created}\n`],
+    ['a whole record after a torn one', '56692:13437\n' + rec(1n, created)]
+  ])('%s is never a record', (_what, text) => {
+    expect(parseJournal(text)).toMatchObject({ why: expect.any(String) })
   })
 })

@@ -182,14 +182,40 @@ export async function journalOf(root: string, lease: string, dir?: string): Prom
     } catch (e) {
       return { state: 'unknown', why: (e as Error).message }
     }
-    for (const line of text.split(/\r?\n/)) {
-      if (!line.trim()) continue
-      const m = /^(\d+):(\d+)$/.exec(line.trim())
-      if (!m) return { state: 'unknown', why: `a line that isn't a process: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
-      entries.push({ pid: Number(m[1]), started: fileTimeMs(m[2]) })
-    }
+    const records = parseJournal(text)
+    if ('why' in records) return { state: 'unknown', why: records.why }
+    entries.push(...records)
   }
   return { state: 'read', entries, sealed }
+}
+
+/** FILETIME bounds of a process the journal may name: started after 1970 began, and no later than a day from now. */
+const FILETIME_1970 = 116444736000000000n
+const filetimeNow = (): bigint => BigInt(Date.now() + 86_400_000) * 10000n + FILETIME_1970
+
+/**
+ * A journal's text as whole records (HiveJobs.Journal writes each as "pid:created:check\n"), or why it isn't one
+ * (HR4's round 5 finding): every record must end with its newline (an unterminated tail is a torn append), have all
+ * three fields, a pid Windows could give (1 to 2^32 - 1), a start (FILETIME) between 1970 and a day from now, and the
+ * check the supervisor wrote ((pid + created) mod 1000003), so a record cut short or damaged is never read as another,
+ * plausible one.
+ */
+export function parseJournal(text: string): Journalled[] | { why: string } {
+  if (text && !text.endsWith('\n')) return { why: 'its last record is cut short' } // i18n-ignore: a reason, logged
+  const out: Journalled[] = []
+  for (const raw of text.split('\n')) {
+    const line = raw.replace(/\r$/, '')
+    if (!line) continue
+    const m = /^(\d{1,10}):(\d{1,20}):(\d{1,7})$/.exec(line)
+    if (!m) return { why: `a record that isn't one: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
+    const pid = BigInt(m[1])
+    const created = BigInt(m[2])
+    if (pid < 1n || pid > 0xffffffffn) return { why: `a pid out of range: ${m[1]}` } // i18n-ignore: a reason, logged
+    if (created <= FILETIME_1970 || created > filetimeNow()) return { why: `a start time out of range: ${m[2]}` } // i18n-ignore: a reason, logged
+    if ((pid + created) % 1000003n !== BigInt(m[3])) return { why: `a record whose check doesn't match: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
+    out.push({ pid: Number(pid), started: fileTimeMs(m[2]) })
+  }
+  return out
 }
 
 /**

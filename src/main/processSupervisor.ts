@@ -136,7 +136,7 @@ public static class HiveJobs {
     if (w != null) try { foreach (var n in notes) w.WriteLine(n); w.Flush(); } catch { }
   }
   /**
-   * Before a kill-on-close job follows a process: its identity ("pid:created") written to the job's journal and flushed
+   * Before a kill-on-close job follows a process: its identity ("pid:created:check") written to the job's journal and flushed
    * through to the disk, so it outlives a crash of this host or of Hive. False when it couldn't be (no journal, a write
    * that failed): the caller ends the process at once instead (fail closed).
    */
@@ -145,7 +145,9 @@ public static class HiveJobs {
     if (!closing.TryGetValue(id, out path) || string.IsNullOrEmpty(path)) return false;
     try {
       using (var f = new System.IO.FileStream(path, System.IO.FileMode.Append, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite, 4096, System.IO.FileOptions.WriteThrough)) {
-        byte[] b = Encoding.ASCII.GetBytes(pid + ":" + created + "\n");
+        // "pid:created:check", newline-terminated: check = (pid + created) mod 1000003, so a record cut short or damaged
+        // (a torn append) is told from a whole one (queueJobs.ts journalOf).
+        byte[] b = Encoding.ASCII.GetBytes(pid + ":" + created + ":" + ((pid + created) % 1000003) + "\n");
         f.Write(b, 0, b.Length);
         f.Flush(true);
       }
