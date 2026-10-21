@@ -27,6 +27,7 @@ import { startupReplay } from './startupReplay'
 import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { AssistantMain } from './components/AssistantView'
+import { loadAssistantChanges } from './assistantUndo'
 import { agentOnScreen, applyLeftovers, applyLiveState, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
@@ -219,6 +220,8 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'assistant-activity':
       set((s) => ({ assistantActions: [...s.assistantActions, e.action].slice(-200) }))
+      // What it changed is kept for undo as it is made (#1283): the panel's list follows.
+      void loadAssistantChanges()
       break
     case 'language-changed':
       // i18n.ts has switched the text; the language setting's notes read the rest.

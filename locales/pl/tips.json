@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "Asystent kieruje Twoim zespołem",
   "tips.assistantToldWaiting.text": "Gdy Asystent obserwuje tory, agent, który pokazuje pytanie o uprawnienia lub o coś Cię pyta, wybudza go, a Asystent mówi Ci, który to agent, jaka karta i o co pyta. Nigdy nie odpowiada za Ciebie. Może też obserwować kartę wydania poza torami.",
   "tips.assistantToldWaiting.title": "Asystent powie, gdy agent Cię potrzebuje",
+  "tips.assistantUndo.text": "Wykonane przez Asystenta pokazuje jego zmiany według Twoich wiadomości. Cofnij przy zmianie przywraca ją, a Cofnij przy wiadomości przywraca wszystkie jej zmiany; to, co Ty lub agent zmieniliście od tego czasu, zostaje.",
+  "tips.assistantUndo.title": "Cofanie zmian Asystenta",
   "tips.assistantWaits.text": "Poproś Asystenta, żeby dał Ci znać, gdy agent skończy kompilację lub testy: czeka, nie sprawdzając co chwilę, a Hive wybudza go, gdy agent skończy, będzie Cię potrzebował lub się zatrzyma.",
   "tips.assistantWaits.title": "Niech Asystent powie, gdy agent skończy",
   "tips.attachFiles.text": "Upuść PDF, log lub dowolny plik na terminal agenta: Hive zachowuje kopię z sesją i wkleja jego ścieżkę. Etykieta pokazuje, co załączono, i mówi, kiedy CLI agenta nie czyta samo tego rodzaju plików, więc agent otwiera plik po ścieżce.",

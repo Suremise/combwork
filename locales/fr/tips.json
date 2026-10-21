@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "L’Assistant dirige ton équipe",
   "tips.assistantToldWaiting.text": "Pendant que l’Assistant surveille les couloirs, un agent qui affiche une demande d’autorisation ou te pose une question le réveille, et il te dit quel agent, sa carte et ce qu’il demande. Il ne répond jamais à ta place. Sa surveillance peut aussi suivre une carte de version hors des couloirs.",
   "tips.assistantToldWaiting.title": "L’Assistant te prévient quand un agent a besoin de toi",
+  "tips.assistantUndo.text": "Fait par l’Assistant liste ses modifications par message de votre part. Annuler sur une modification la défait, et Annuler sur un message les défait toutes ; ce que vous ou un agent avez modifié depuis est conservé.",
+  "tips.assistantUndo.title": "Annuler les modifications de l’Assistant",
   "tips.assistantWaits.text": "Demande à l’Assistant de te prévenir quand un agent finit un build ou une série de tests : il attend sans vérifier tout seul, et Hive le réveille quand l’agent termine, a besoin de toi ou s’arrête.",
   "tips.assistantWaits.title": "L’Assistant te prévient quand un agent a fini",
   "tips.attachFiles.text": "Dépose un PDF, un journal ou n’importe quel fichier sur le terminal d’un agent : Hive en garde une copie avec la session et colle son chemin. Une puce montre ce qui est joint, et indique quand la CLI de l’agent ne lit pas elle-même ce type de fichier, pour que l’agent l’ouvre par son chemin.",

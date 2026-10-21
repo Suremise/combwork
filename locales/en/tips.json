@@ -207,6 +207,14 @@
     "defaultMessage": "The Assistant tells you when an agent needs you",
     "description": "A tip's title."
   },
+  "tips.assistantUndo.text": {
+    "defaultMessage": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: undo, changed since."
+  },
+  "tips.assistantUndo.title": {
+    "defaultMessage": "Undo the Assistant's changes",
+    "description": "A tip's title (glossary: undo)."
+  },
   "tips.assistantWaits.text": {
     "defaultMessage": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Hive wakes it when the agent finishes, needs you or stops.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

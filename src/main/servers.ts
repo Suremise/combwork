@@ -9,7 +9,7 @@ import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarn
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
-import { publicReason, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
+import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
 import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
@@ -543,18 +543,18 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
  * here, so undo can stop it.
  */
 const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
-  'prompt-agent': "A prompt that was sent can't be taken back.",
-  'message-agent': "A message that was sent can't be taken back.",
-  'comment-task': "A comment stays: undo doesn't take back what was said.",
-  'hand-over': "A hand-over can't be undone: the work went to the other agent.",
-  'create-project': 'A project it made stays: remove it from Hive if it isn\'t wanted.',
-  'activate-project': "A project it opened stays open: close it if it isn't wanted.",
-  'deactivate-project': 'A project it closed stays closed: open it again if it is wanted.',
-  'add-agent': "An agent it added stays: remove it in the project's agents if it isn't wanted.",
-  'stop-agent': "An agent it stopped isn't started again by undo: start it if it should run.",
-  'reorder-tasks': "The cards' order isn't put back.",
-  'cancel-messages': "Messages it withdrew aren't sent again.",
-  'lane-end': 'A lane that ended stays ended: start it again if it should go on.'
+  'prompt-agent': UNDO_FINAL.prompt,
+  'message-agent': UNDO_FINAL.message,
+  'comment-task': UNDO_FINAL.comment,
+  'hand-over': UNDO_FINAL.handOver,
+  'create-project': UNDO_FINAL.projectMade,
+  'activate-project': UNDO_FINAL.projectOpened,
+  'deactivate-project': UNDO_FINAL.projectClosed,
+  'add-agent': UNDO_FINAL.agentAdded,
+  'stop-agent': UNDO_FINAL.agentStopped,
+  'reorder-tasks': UNDO_FINAL.cardsOrder,
+  'cancel-messages': UNDO_FINAL.withdrawn,
+  'lane-end': UNDO_FINAL.laneEnded
 }
 
 /**
@@ -568,7 +568,7 @@ interface UndoNotes {
 }
 
 /** Said of a change that changed nothing undo puts back, when its kind has no words of its own. */
-const NOTHING_TO_UNDO = 'It changed nothing undo puts back.'
+const NOTHING_TO_UNDO = UNDO_FINAL.nothing
 
 /**
  * What the change running here leaves for undo once done (#1282 round 3): an agent it started (the launch the start
@@ -2522,16 +2522,16 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
  * is undone as any card field; this is said beside it, so nothing of it is left out.
  */
 const INTENT_STAYS: Partial<Record<CardIntent['kind'], string>> = {
-  start: "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
-  putBack: "Its reason stays as a comment.",
-  submit: "Its submission stays in the card's work.",
-  declarePaths: 'The paths it declared stay with the card.',
-  startReview: "The review it started stays in the card's work.",
-  verdict: "Its verdict stays in the card's work, and its round with it.",
-  reportMerge: "The merge it reported stays in the card's work.",
-  ask: 'Its question stays under For you: answer or dismiss it there.',
-  cannot: 'Its request stays under For you: answer or dismiss it there.',
-  request: "Its request to the builder stays as a comment."
+  start: UNDO_FINAL.start,
+  putBack: UNDO_FINAL.putBack,
+  submit: UNDO_FINAL.submit,
+  declarePaths: UNDO_FINAL.declarePaths,
+  startReview: UNDO_FINAL.startReview,
+  verdict: UNDO_FINAL.verdict,
+  reportMerge: UNDO_FINAL.reportMerge,
+  ask: UNDO_FINAL.ask,
+  cannot: UNDO_FINAL.cannot,
+  request: UNDO_FINAL.request
 }
 
 /** A body's text field, trimmed; required ones refused when missing or empty. */

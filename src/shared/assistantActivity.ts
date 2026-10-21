@@ -100,3 +100,52 @@ export function activityFields(a: Partial<ActivityTarget>): Partial<ActivityTarg
     ...(isSetting(a.settingId) ? { settingId: a.settingId } : {})
   }
 }
+
+/**
+ * Why a change of the Assistant's can't be undone, or what of it stays (#1282, SPEC §16.14): each reason's code and its
+ * English, as the undo tool and the Agent API say it. The window says it in its language from the code (#1283), so a
+ * change keeps the English it was recorded with and the window reads its codes back with finalWhys.
+ */
+export const UNDO_FINAL = {
+  prompt: "A prompt that was sent can't be taken back.",
+  message: "A message that was sent can't be taken back.",
+  comment: "A comment stays: undo doesn't take back what was said.",
+  handOver: "A hand-over can't be undone: the work went to the other agent.",
+  projectMade: "A project it made stays: remove it from Hive if it isn't wanted.",
+  projectOpened: "A project it opened stays open: close it if it isn't wanted.",
+  projectClosed: 'A project it closed stays closed: open it again if it is wanted.',
+  agentAdded: "An agent it added stays: remove it in the project's agents if it isn't wanted.",
+  agentStopped: "An agent it stopped isn't started again by undo: start it if it should run.",
+  cardsOrder: "The cards' order isn't put back.",
+  withdrawn: "Messages it withdrew aren't sent again.",
+  laneEnded: 'A lane that ended stays ended: start it again if it should go on.',
+  decision: 'A decision it recorded stays: only the user changes or removes decisions.',
+  cardPlace: "The card's place in its column isn't put back.",
+  context: 'The doc sections to read first stay as set.',
+  nothing: 'It changed nothing undo puts back.',
+  start: "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
+  putBack: 'Its reason stays as a comment.',
+  submit: "Its submission stays in the card's work.",
+  declarePaths: 'The paths it declared stay with the card.',
+  startReview: "The review it started stays in the card's work.",
+  verdict: "Its verdict stays in the card's work, and its round with it.",
+  reportMerge: "The merge it reported stays in the card's work.",
+  ask: 'Its question stays under For you: answer or dismiss it there.',
+  cannot: 'Its request stays under For you: answer or dismiss it there.',
+  request: 'Its request to the builder stays as a comment.'
+} as const
+
+/** A reason a change of the Assistant's, or part of it, can't be undone (UNDO_FINAL's codes). */
+export type UndoFinalWhy = keyof typeof UNDO_FINAL
+
+/**
+ * The reasons a change's recorded why gives (its sentences, joined), in their order: the codes the window words them by.
+ */
+export function finalWhys(text: string): UndoFinalWhy[] {
+  const found: { at: number; why: UndoFinalWhy }[] = []
+  for (const [why, english] of Object.entries(UNDO_FINAL) as [UndoFinalWhy, string][]) {
+    const at = text.indexOf(english)
+    if (at >= 0) found.push({ at, why })
+  }
+  return found.sort((a, b) => a.at - b.at).map((f) => f.why)
+}

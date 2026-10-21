@@ -653,8 +653,26 @@ export const ASSISTANT_CHANGES_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * What undo did with each field of a change it processed (#1283, SPEC §16.14): put back (`undone`), or left as it was
+ * because someone changed it since, it is gone or its lane ended. Written when the change is marked undone, so the panel
+ * says Undone, Partly undone or Kept, with why, whoever undid it and after a restart. A failure isn't one: the change
+ * stays to be tried again.
+ */
+export const UNDO_OUTCOMES_STEP: SchemaStep = {
+  name: 'undo outcomes',
+  ddl: [
+    `CREATE TABLE assistant_change_outcomes (
+      change  TEXT NOT NULL REFERENCES assistant_changes (id) ON DELETE CASCADE,
+      field   TEXT NOT NULL,
+      outcome TEXT NOT NULL CHECK (outcome IN ('undone', 'changed', 'gone', 'ended')),
+      PRIMARY KEY (change, field)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -670,6 +688,7 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'undo.group': { sql: 'SELECT * FROM assistant_changes WHERE grp = ? AND grp_at >= ? ORDER BY at DESC', args: ['g1', '2026-10-01'], index: 'assistant_changes_grp' },
   'undo.kept': { sql: 'SELECT * FROM assistant_changes WHERE grp_at >= ? ORDER BY grp_at DESC', args: ['2026-10-01'], index: 'assistant_changes_grp_at' },
   'undo.values': { sql: 'SELECT field, side, ord, path, type, text, num FROM assistant_change_values WHERE change = ? ORDER BY field, side, ord', args: ['c1'], index: 'PRIMARY KEY' },
+  'undo.outcomes': { sql: 'SELECT field, outcome FROM assistant_change_outcomes WHERE change = ? ORDER BY field', args: ['c1'], index: 'PRIMARY KEY' },
   // boardStore.ts: cards and their children.
   'board.card': { sql: 'SELECT * FROM cards WHERE number = ?', args: [1], index: 'INTEGER PRIMARY KEY' },
   'board.live': { sql: 'SELECT number FROM cards WHERE archived = ? ORDER BY number', args: [0], index: ['cards_place', 'cards_archived_project'] },

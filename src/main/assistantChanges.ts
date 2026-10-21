@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomUUID } from 'crypto'
-import type { ActivityKind } from '../shared/assistantActivity'
+import { UNDO_FINAL, type ActivityKind } from '../shared/assistantActivity'
 import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, TaskCard } from '../shared/types'
 import type { LaneRecord } from '../shared/lanes'
 import { currentTurn, type AssistantTurn } from './assistantControl'
@@ -109,10 +109,11 @@ export const sameValue = (a: unknown, b: unknown): boolean => stable(a) === stab
 function finalsOf(before: TaskCard | null, after: TaskCard): string[] {
   if (!before) return []
   const out: string[] = []
-  if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push('A decision it recorded stays: only the user changes or removes decisions.') // i18n-ignore: why, in the Assistant's tool replies (English); the window words it from the kind
-  if (after.comments.length > before.comments.length) out.push("A comment stays: undo doesn't take back what was said.") // i18n-ignore: as above
-  if (after.order !== before.order && after.column === before.column) out.push("The card's place in its column isn't put back.") // i18n-ignore: as above
-  if (!sameValue(after.context ?? [], before.context ?? [])) out.push('The doc sections to read first stay as set.') // i18n-ignore: as above
+  // Why, in the Assistant's tool replies (English); the window words it from its code (finalWhys, #1283).
+  if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push(UNDO_FINAL.decision)
+  if (after.comments.length > before.comments.length) out.push(UNDO_FINAL.comment)
+  if (after.order !== before.order && after.column === before.column) out.push(UNDO_FINAL.cardPlace)
+  if (!sameValue(after.context ?? [], before.context ?? [])) out.push(UNDO_FINAL.context)
   return out
 }
 
@@ -310,6 +311,9 @@ interface ChangeRecordRow {
   undone_at: string | null
 }
 
+/** What undo did with a change's fields once it was marked undone: put back, or left as they are, and why (#1283). */
+export type UndoOutcome = NonNullable<AssistantChangeRow['outcome']>
+
 /**
  * The changes recorded within KEEP_DAYS: one by id, a group's (the user's message), or all of them; newest first. With
  * their fields' values.
@@ -325,6 +329,7 @@ export function recordedChanges(ws: WorkspaceService, sel: { change?: string; gr
           : db.prepare('SELECT * FROM assistant_changes WHERE grp_at >= ? ORDER BY grp_at DESC, at DESC, rowid DESC').all(since) // i18n-ignore: SQL
     ) as unknown as ChangeRecordRow[]
     const valuesOf = db.prepare('SELECT field, side, ord, path, type, text, num FROM assistant_change_values WHERE change = ? ORDER BY field, side, ord') // i18n-ignore: SQL
+    const outcomesOf = db.prepare('SELECT field, outcome FROM assistant_change_outcomes WHERE change = ? ORDER BY field') // i18n-ignore: SQL
     return rows.map((r) => {
       const byField = new Map<string, { old: ValueRow[]; new: ValueRow[] }>()
       for (const v of valuesOf.all(r.id) as unknown as (ValueRow & { field: string; side: 'old' | 'new' })[]) {
@@ -333,6 +338,9 @@ export function recordedChanges(ws: WorkspaceService, sel: { change?: string; gr
         byField.set(v.field, f)
       }
       const values = [...byField].map(([field, v]) => ({ field, old: valueOf(v.old), new: valueOf(v.new) }))
+      // What undo did with its fields, once marked (none for one marked before outcomes were kept: it reads as undone).
+      const outcomes = r.undone_at !== null ? (outcomesOf.all(r.id) as unknown as { field: string; outcome: 'undone' | 'changed' | 'gone' | 'ended' }[]) : []
+      const outcome: UndoOutcome | null = outcomes.length ? { undone: outcomes.filter((o) => o.outcome === 'undone').map((o) => o.field), skipped: outcomes.flatMap((o) => (o.outcome === 'undone' ? [] : [{ field: o.field, why: o.outcome }])) } : null
       return {
         id: r.id,
         group: r.grp,
@@ -346,6 +354,7 @@ export function recordedChanges(ws: WorkspaceService, sel: { change?: string; gr
         ...(r.target !== null ? { target: r.target } : {}),
         ...(r.final !== null ? { final: r.final } : {}),
         ...(r.undone_at !== null ? { undoneAt: r.undone_at } : {}),
+        ...(outcome ? { outcome } : {}),
         // The fields it set; its implicit snapshot (a card's review, checked by undo) isn't one.
         fields: values.map((f) => f.field).filter((f) => f !== REVIEW),
         values
@@ -366,13 +375,18 @@ export function changeGroups(ws: WorkspaceService, now = Date.now()): AssistantC
   return [...groups.values()]
 }
 
-/** Marks changes undone (as far as they could be: what was skipped stays as it was), so they aren't undone again. */
-export async function markUndone(ws: WorkspaceService, ids: readonly string[], at = new Date().toISOString()): Promise<void> {
-  if (!ids.length) return
+/**
+ * Marks a change undone (as far as it could be: what was skipped stays as it was), so it isn't undone again, with what
+ * undo did with each of its fields (#1283: the panel's Undone, Partly undone or Kept, and why). Marked once: a change
+ * marked before keeps its outcome.
+ */
+export async function markUndone(ws: WorkspaceService, id: string, outcome: UndoOutcome, at = new Date().toISOString()): Promise<void> {
   await boardWrite(ws, async () =>
     boardWriteOp(ws, (db) => {
-      const mark = db.prepare('UPDATE assistant_changes SET undone_at = ? WHERE id = ? AND undone_at IS NULL') // i18n-ignore: SQL
-      for (const id of ids) mark.run(at, id)
+      if (!Number(db.prepare('UPDATE assistant_changes SET undone_at = ? WHERE id = ? AND undone_at IS NULL').run(at, id).changes)) return // i18n-ignore: SQL
+      const put = db.prepare('INSERT INTO assistant_change_outcomes (change, field, outcome) VALUES (?, ?, ?) ON CONFLICT DO NOTHING') // i18n-ignore: SQL
+      for (const field of outcome.undone) put.run(id, field, 'undone')
+      for (const s of outcome.skipped) put.run(id, s.field, s.why)
     })
   )
 }

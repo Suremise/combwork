@@ -116,7 +116,9 @@ export function allows(need: AssistantControl): boolean {
 export function record(workspacePath: string, act: ActivityTarget, text: string, error?: string, more: { setting?: AssistantSettingChange; revertOf?: string; brief?: string; reason?: string } = {}): AssistantAction {
   const s = stateOf(workspacePath)
   const reason = error ? (more.reason ?? publicReason(undefined)) : undefined
-  const action: AssistantAction = { id: randomUUID(), at: new Date().toISOString(), text, ok: !error, ...(error ? { error } : {}), ...more, ...(reason ? { reason } : {}), ...activityFields(act) }
+  // The user's message it came from (#1283): the panel lists it with that message's changes.
+  const turn = currentTurn(workspacePath)
+  const action: AssistantAction = { id: randomUUID(), at: new Date().toISOString(), text, ok: !error, ...(error ? { error } : {}), ...more, ...(reason ? { reason } : {}), ...activityFields(act), group: turn.id, groupAt: turn.at }
   s.actions.push(action)
   if (s.actions.length > MAX_LISTED) s.actions.splice(0, s.actions.length - MAX_LISTED)
   log.info(`${userText(workspacePath)}: ${userText(text)}${error ? ` (refused: ${userText(error)})` : ''}`)
