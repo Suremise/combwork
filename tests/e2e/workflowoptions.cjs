@@ -64,6 +64,11 @@ function board(sql, ...args) {
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
+    /** Saves in the open dialog and waits for it to close: it reloads the form as it ends, so the next step edits the form as saved. */
+    const saveAndClose = async () => {
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+      await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    }
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
 
     // A board made by 1.0 has no notice; one upgraded from 0.9 (cards from before it) has, once.
@@ -136,12 +141,12 @@ function board(sql, ...args) {
     await row('style').getByRole('button', { name: 'Inherit' }).waitFor({ timeout: HUNG_MS })
     await section.getByRole('button', { name: 'Save…' }).click()
     await dialog.waitFor({ timeout: HUNG_MS })
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await saveAndClose()
     check('saved with the merge style set', !!(await lib.until(async () => projectJson().workflow?.options.style === 'squash', HUNG_MS)))
     await row('style').getByRole('button', { name: 'Inherit' }).click()
     await section.getByRole('button', { name: 'Save…' }).click()
     await dialog.waitFor({ timeout: HUNG_MS })
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await saveAndClose()
     check('an option inherited again is left out of project.json', !!(await lib.until(async () => !('style' in projectJson().workflow.options) && projectJson().workflow.options.finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow.options))
 
     // --- Typed as a person types (HR6's round 1: fill() hid both): Your OK before merging shows the policy chosen, and
@@ -161,7 +166,7 @@ function board(sql, ...args) {
     check('a check’s command typed with spaces keeps them', (await newCheck.locator('input').nth(1).inputValue()) === 'npm run test -- --silent', await newCheck.locator('input').nth(1).inputValue())
     await section.getByRole('button', { name: 'Save…' }).click()
     await dialog.waitFor({ timeout: HUNG_MS })
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await saveAndClose()
     const saved = () => projectJson().workflow?.options ?? {}
     check('saved: the labels policy and the check with its command', !!(await lib.until(async () => saved().okBefore?.mode === 'labels' && saved().commands?.['unit tests'] === 'npm run test -- --silent', HUNG_MS)), JSON.stringify(saved()))
     check('…the labels as a list', JSON.stringify(saved().okBefore?.labels) === JSON.stringify(['ui', 'release']) && saved().preChecks?.includes('unit tests'))
@@ -214,6 +219,11 @@ function board(sql, ...args) {
     await speak(base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
+    // What the window showed then, for whoever reads the failure.
+    await app
+      .firstWindow()
+      .then((p) => p.screenshot({ path: path.join(lib.WORK, 'workflowoptions-failed.png') }))
+      .catch(() => {})
   } finally {
     await app.close().catch(() => {})
   }
