@@ -8,11 +8,13 @@ import type { Ruleset } from './compile'
 import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState } from './facts'
 import { reviewByYou, reviewerAgent } from './options'
 import type { GuardId } from './pieces'
-import type { RuleId } from './refusals'
+import type { RefusalValues, RuleId } from './refusals'
+import type { StoredText } from '../types'
 
 export interface UnknownAnswer {
   unknown: true
   what: string
+  whatText?: StoredText
 }
 type Ans<T> = T | UnknownAnswer
 const isUnknownAnswer = (v: unknown): v is UnknownAnswer => !!v && typeof v === 'object' && (v as UnknownAnswer).unknown === true
@@ -48,7 +50,7 @@ export interface GuardInputs {
 
 export interface GuardRefusal {
   rule: RuleId
-  values: Record<string, string | number>
+  values: RefusalValues
 }
 
 const short = (r: string | null | undefined): string => (r ? r.slice(0, 7) : '—')
@@ -79,7 +81,7 @@ export function notApproved(s: CardState, r: Ruleset, labels: string[]): { missi
 
 type Guard = (i: GuardInputs) => GuardRefusal | null
 
-const unknownRefusal = (i: GuardInputs, id: GuardId, a: UnknownAnswer): GuardRefusal => ({ rule: 'platform.unknown', values: { card: i.card.key, what: a.what, rule: id } })
+const unknownRefusal = (i: GuardInputs, id: GuardId, a: UnknownAnswer): GuardRefusal => ({ rule: 'platform.unknown', values: { card: i.card.key, what: a.whatText ?? a.what, rule: id } })
 
 /** Each guard. A guard refuses only from what it was given: inputs a move didn't gather hold (the move doesn't need them). */
 export const GUARD_FNS: Record<GuardId, Guard> = {

@@ -27,16 +27,80 @@
     "defaultMessage": "“Nobody reviews their own work” can't be off while a reviewer agent checks the work.",
     "description": "Why workflow options in the Version Control tab cannot be saved: the no-self-review option was turned off while a reviewer agent is required."
   },
+  "workflow.forYou.decidedAfterMerge": {
+    "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
+    "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.newDecision": {
+    "defaultMessage": "{card} has a new decision: your review again?",
+    "description": "A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.okBefore": {
+    "defaultMessage": "{card} is approved: OK to merge?",
+    "description": "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.passedReview": {
+    "defaultMessage": "{card} passed review: your OK?",
+    "description": "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.review": {
+    "defaultMessage": "{card} waits for your review",
+    "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
+  },
+  "workflow.move.answer": {
+    "defaultMessage": "Answer",
+    "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
+  },
+  "workflow.move.declarePaths": {
+    "defaultMessage": "Set the card's paths",
+    "description": "A move on a card, named in a refused move: saying which files are its work (a project without version control)."
+  },
+  "workflow.move.move": {
+    "defaultMessage": "Move",
+    "description": "A move on a card, named in a refused move: dragging it to another column."
+  },
+  "workflow.move.putBack": {
+    "defaultMessage": "Put back",
+    "description": "A move on a card, named in a refused move: putting a started card back in Todo."
+  },
+  "workflow.move.removeFromQueue": {
+    "defaultMessage": "Remove from queue",
+    "description": "A move on a card, named in a refused move: the user taking it out of the merge queue."
+  },
+  "workflow.move.reportMerge": {
+    "defaultMessage": "Report the merge",
+    "description": "A move on a card, named in a refused move: the agent saying it merged the work."
+  },
+  "workflow.move.retryMerge": {
+    "defaultMessage": "Retry merge",
+    "description": "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card."
+  },
+  "workflow.move.start": {
+    "defaultMessage": "Start",
+    "description": "A move on a card, named in a refused move (\"… isn't possible from there\"): starting work on it."
+  },
+  "workflow.move.startReview": {
+    "defaultMessage": "Start review",
+    "description": "A move on a card, named in a refused move: a reviewer beginning a review."
+  },
+  "workflow.move.submit": {
+    "defaultMessage": "Submit for review",
+    "description": "A move on a card, named in a refused move: sending its work to Review."
+  },
+  "workflow.move.verdict": {
+    "defaultMessage": "Verdict",
+    "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
+  },
   "workflow.refused.approval.given.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Your OK before merging.",
+    "defaultMessage": "This rule is set in Version Control → Your OK before merging.",
     "description": "Where the rule that waits for the user's OK is changed."
   },
   "workflow.refused.approval.given.message": {
-    "defaultMessage": "{card} waits for your OK.",
-    "description": "A refused move: the user has to approve the card first."
+    "defaultMessage": "{card} waits for the OK before merging.",
+    "description": "A refused move: the user has to approve the card first (glossary 2.3: approval; Version Control → Your OK before merging)."
   },
   "workflow.refused.approval.given.next": {
-    "defaultMessage": "Approve it on the card or in For you.",
+    "defaultMessage": "Wait for the OK, given on the card or in For you.",
     "description": "The next step after a move refused for want of the user’s approval."
   },
   "workflow.refused.card.plainNumber.message": {
@@ -56,7 +120,7 @@
     "description": "The next step after a check run named the wrong revision."
   },
   "workflow.refused.done.contained.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Who merges.",
+    "defaultMessage": "This rule is set in Version Control → Who merges.",
     "description": "Where the rule that checks a merge is changed."
   },
   "workflow.refused.done.contained.message": {
@@ -84,7 +148,7 @@
     "description": "The next step after a merge refused for want of approval."
   },
   "workflow.refused.integrate.checksPassed.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Checks pass on the merged result.",
+    "defaultMessage": "This rule is set in Version Control → Checks pass on the merged result.",
     "description": "Where the merge checks are changed."
   },
   "workflow.refused.integrate.checksPassed.message": {
@@ -96,7 +160,7 @@
     "description": "The next step after failed merge checks."
   },
   "workflow.refused.integrate.upToDate.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Work is up to date before it merges.",
+    "defaultMessage": "This rule is set in Version Control → Work is up to date before it merges.",
     "description": "Where the strict rule is changed."
   },
   "workflow.refused.integrate.upToDate.message": {
@@ -123,6 +187,10 @@
     "defaultMessage": "From {stage}, use: {moves}.",
     "description": "The next step: the intents possible from the stage. {moves} lists them."
   },
+  "workflow.refused.move.notFromHere.nextNone": {
+    "defaultMessage": "Nothing waits to be done there now.",
+    "description": "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)."
+  },
   "workflow.refused.move.useIntent.message": {
     "defaultMessage": "Agents don't move cards between columns.",
     "description": "A refused column move by an agent: agents act by intent."
@@ -140,8 +208,8 @@
     "description": "The next step when Hive could not read what a rule needs."
   },
   "workflow.refused.requeue.allowed.change": {
-    "defaultMessage": "The user can retry the merge once from the queue.",
-    "description": "Who can override a refused requeue: the user, with Retry merge."
+    "defaultMessage": "Retry merge on the merge queue retries it once.",
+    "description": "Who can override a refused requeue: the user, with Retry merge on the merge queue (glossary 2.5: merge queue)."
   },
   "workflow.refused.requeue.allowed.message": {
     "defaultMessage": "{card} at {revision} can't go back into the merge queue unchanged: {why}",
@@ -168,8 +236,8 @@
     "description": "The next step when there is nothing to review."
   },
   "workflow.refused.review.notAuthor.change": {
-    "defaultMessage": "Only the user can override this rule, on the card.",
-    "description": "Who can override the no-self-review rule."
+    "defaultMessage": "Only Move anyway, on the card, skips this rule.",
+    "description": "Who can override the no-self-review rule: only the user, moving the card anyway (glossary 2.4: override, Move anyway)."
   },
   "workflow.refused.review.notAuthor.message": {
     "defaultMessage": "You worked on {card}, so you can't review it.",
@@ -180,7 +248,7 @@
     "description": "The next step after a refused self-review."
   },
   "workflow.refused.start.dependenciesIntegrated.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Cards start only when the cards they wait for are merged.",
+    "defaultMessage": "This rule is set in Version Control → Cards start only when the cards they wait for are merged.",
     "description": "Where the rule that refused starting a card before the cards it waits for are done is changed."
   },
   "workflow.refused.start.dependenciesIntegrated.message": {
@@ -192,7 +260,7 @@
     "description": "The next step after a refused start: {waitsFor} is the card key it waits for."
   },
   "workflow.refused.start.notBlocked.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Cards start only when the cards they wait for are done.",
+    "defaultMessage": "This rule is set in Version Control → Cards start only when the cards they wait for are done.",
     "description": "Where the rule that refused starting a blocked card is changed."
   },
   "workflow.refused.start.notBlocked.message": {
@@ -200,11 +268,11 @@
     "description": "A refused start of a card. {card} is a card key like AM-12; {reason} is why the card is blocked, in the words given."
   },
   "workflow.refused.start.notBlocked.next": {
-    "defaultMessage": "Ask the user to unblock it, or work on another card.",
+    "defaultMessage": "Wait for it to be unblocked, or work on another card.",
     "description": "The next step after a refused start of a blocked card."
   },
   "workflow.refused.start.slotAvailable.change": {
-    "defaultMessage": "The user can change this in Version Control → Where cards are built.",
+    "defaultMessage": "This is set in Version Control → Where cards are built.",
     "description": "Where the rule that refused starting for want of a slot is changed."
   },
   "workflow.refused.start.slotAvailable.message": {
@@ -216,7 +284,7 @@
     "description": "The next step after a refused start for want of a slot."
   },
   "workflow.refused.submit.checksPassed.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Checks pass before review.",
+    "defaultMessage": "This rule is set in Version Control → Checks pass before review.",
     "description": "Where the rule that refused a submit for a missing check is changed."
   },
   "workflow.refused.submit.checksPassed.message": {
@@ -256,7 +324,7 @@
     "description": "The next step after submitting an empty change."
   },
   "workflow.refused.submit.identity.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Commits use the project's identity.",
+    "defaultMessage": "This rule is set in Version Control → Commits use the project's identity.",
     "description": "Where the identity rule is changed."
   },
   "workflow.refused.submit.identity.message": {
@@ -276,7 +344,7 @@
     "description": "The next step after a refused duplicate submission."
   },
   "workflow.refused.submit.ownRunsStopped.change": {
-    "defaultMessage": "The user can change this rule in Version Control → Agents stop what they started before review.",
+    "defaultMessage": "This rule is set in Version Control → Agents stop what they started before review.",
     "description": "Where the rule about stopping runs before review is changed."
   },
   "workflow.refused.submit.ownRunsStopped.message": {
@@ -348,7 +416,223 @@
     "description": "The {why} of a refused merge or requeue: the revision's pass no longer holds."
   },
   "workflow.refused.why.userOk": {
-    "defaultMessage": "the user hasn't approved it.",
+    "defaultMessage": "it waits for the OK before merging.",
     "description": "The {why} of a refused merge: the user's approval is missing."
+  },
+  "workflow.rule.approval.given": {
+    "defaultMessage": "Your OK before merging",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
+  },
+  "workflow.rule.done.contained": {
+    "defaultMessage": "Hive checks the merge",
+    "description": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5)."
+  },
+  "workflow.rule.integrate.approved": {
+    "defaultMessage": "Work is reviewed before it's merged",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G1)."
+  },
+  "workflow.rule.integrate.checksPassed": {
+    "defaultMessage": "Checks pass on the merged result",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G9)."
+  },
+  "workflow.rule.integrate.upToDate": {
+    "defaultMessage": "Work is up to date before it merges",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G8, without the branch name)."
+  },
+  "workflow.rule.requeue.allowed": {
+    "defaultMessage": "Unchanged work is queued again only after a failure outside it",
+    "description": "A rule of the workflow, named where a move skips or can't check it: work goes back into the merge queue unchanged only after a merge failed for a reason outside the work (a network error, a timeout)."
+  },
+  "workflow.rule.review.decisionsReceived": {
+    "defaultMessage": "The reviewer has read every decision",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.5: reviewer)."
+  },
+  "workflow.rule.review.notAuthor": {
+    "defaultMessage": "Nobody reviews their own work",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N2, G2)."
+  },
+  "workflow.rule.start.dependenciesIntegrated": {
+    "defaultMessage": "Cards start only when the cards they wait for are done",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N6, G14)."
+  },
+  "workflow.rule.start.notBlocked": {
+    "defaultMessage": "Blocked cards don't start",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.start.slotAvailable": {
+    "defaultMessage": "Each card in its own folder",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G11 values): a card starts only when a folder is free."
+  },
+  "workflow.rule.submit.checksPassed": {
+    "defaultMessage": "Checks pass before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N3, G3)."
+  },
+  "workflow.rule.submit.clean": {
+    "defaultMessage": "Work is committed before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.submit.decisionsReceived": {
+    "defaultMessage": "The builder has read every decision",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder)."
+  },
+  "workflow.rule.submit.identity": {
+    "defaultMessage": "Commits use the project's identity",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G12)."
+  },
+  "workflow.rule.submit.notDuplicate": {
+    "defaultMessage": "Work is submitted once",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the same revision isn't submitted twice."
+  },
+  "workflow.rule.submit.ownRunsStopped": {
+    "defaultMessage": "Agents stop what they started before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G13)."
+  },
+  "workflow.rule.submit.ready": {
+    "defaultMessage": "Work has no unresolved conflicts",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.submit.trailer": {
+    "defaultMessage": "Commits name their card",
+    "description": "A rule of the workflow, named where a move skips or can't check it: in a shared folder, each commit names its card."
+  },
+  "workflow.rule.verdict.currentSubmission": {
+    "defaultMessage": "A verdict is on the latest submission",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.3: verdict)."
+  },
+  "workflow.rule.verdict.reviewing": {
+    "defaultMessage": "A verdict follows a review",
+    "description": "A rule of the workflow, named where a move skips or can't check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict)."
+  },
+  "workflow.stage": {
+    "defaultMessage": "{stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} done {Done} other {{stage}}}",
+    "description": "A stage of the board, named in a refusal (glossary 2.2: On Hold, Todo, Active, Review, Approved, Merging, Done): translate each as the glossary does."
+  },
+  "workflow.unreadable.branch": {
+    "defaultMessage": "the branch checked out in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+  },
+  "workflow.unreadable.branchedOff": {
+    "defaultMessage": "where {a} and {b} branched off",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit two lines of work have in common. {a} and {b} are commit ids or branch names."
+  },
+  "workflow.unreadable.branchedOffTarget": {
+    "defaultMessage": "where the work branched off its target",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit the card's work and the branch it merges into have in common."
+  },
+  "workflow.unreadable.cardPathsFiles": {
+    "defaultMessage": "the card's paths: they hold over {n, plural, one {# file} other {# files}}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names hold too many files. {n} is the limit."
+  },
+  "workflow.unreadable.cardPathsSize": {
+    "defaultMessage": "the card's paths: they hold over {n, number} GB",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names are too large. {n} is a size in gigabytes (GB, of 1024 MB): write the unit as your language does."
+  },
+  "workflow.unreadable.change": {
+    "defaultMessage": "the change from {from} to {to}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: change). {from} and {to} are short commit ids."
+  },
+  "workflow.unreadable.changeFingerprint": {
+    "defaultMessage": "the change's fingerprint",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": what tells a change apart from others (glossary 2.3: change)."
+  },
+  "workflow.unreadable.commitsOf": {
+    "defaultMessage": "the commits of {range}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {range} is a Git range of commits, like a1b2c3d..e4f5a6b."
+  },
+  "workflow.unreadable.commitsOn": {
+    "defaultMessage": "the commits on {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {target} is a branch name."
+  },
+  "workflow.unreadable.commitsSince": {
+    "defaultMessage": "the commits of {revision} since {base}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {base} are short commit ids."
+  },
+  "workflow.unreadable.contains": {
+    "defaultMessage": "whether {revision} is in {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {target} are short commit ids."
+  },
+  "workflow.unreadable.defaultBranch": {
+    "defaultMessage": "the default branch of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch work merges into by default. {folder} is a folder path."
+  },
+  "workflow.unreadable.deliverables": {
+    "defaultMessage": "the work in {project}: it has over {n, plural, one {# file} other {# files}}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a project without version control has too many files to read its work. {project} is a project name, {n} the limit."
+  },
+  "workflow.unreadable.files": {
+    "defaultMessage": "the files of {revision}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files as they are at a revision. {revision} is a commit id or name."
+  },
+  "workflow.unreadable.filesChanged": {
+    "defaultMessage": "the files changed from {from} to {to}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {from} and {to} are short commit ids."
+  },
+  "workflow.unreadable.folderFor": {
+    "defaultMessage": "a folder for {branch}",
+    "description": "What Hive couldn't make, the object of \"Hive couldn't read …\": a working folder (a Git worktree) for a branch. {branch} is its name."
+  },
+  "workflow.unreadable.gitFolder": {
+    "defaultMessage": "the Git folder of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the repository's .git folder. {folder} is a folder path."
+  },
+  "workflow.unreadable.head": {
+    "defaultMessage": "the latest commit in {where}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit checked out in a folder, or at the tip of a branch. {where} is a folder path or a branch name."
+  },
+  "workflow.unreadable.history": {
+    "defaultMessage": "the history of {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commits of a branch. {target} is a branch name."
+  },
+  "workflow.unreadable.holdsChange": {
+    "defaultMessage": "whether {where} holds the change",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether the card's change is already in a commit or branch (glossary 2.3: change). {where} is a short commit id or a branch name."
+  },
+  "workflow.unreadable.ignored": {
+    "defaultMessage": "what Git ignores in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files Git is told to leave out. {folder} is a folder path."
+  },
+  "workflow.unreadable.line": {
+    "defaultMessage": "the branch {branch}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a Git branch. {branch} is its name."
+  },
+  "workflow.unreadable.pathOutside": {
+    "defaultMessage": "the path {path}, which is outside the project",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a card's path that isn't in its project. {path} is the path."
+  },
+  "workflow.unreadable.replay": {
+    "defaultMessage": "{revision} applied onto {onto}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
+  },
+  "workflow.unreadable.replayedFiles": {
+    "defaultMessage": "the files of the change applied again",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
+  },
+  "workflow.unreadable.revision": {
+    "defaultMessage": "the revision {revision}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: revision). {revision} is a commit id or name."
+  },
+  "workflow.unreadable.revisionIn": {
+    "defaultMessage": "the revision in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the revision checked out in a folder (glossary 2.3: revision). {folder} is a folder path."
+  },
+  "workflow.unreadable.state": {
+    "defaultMessage": "the state of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether a merge or rebase is going on in the folder. {folder} is a folder path."
+  },
+  "workflow.unreadable.target": {
+    "defaultMessage": "the target branch {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch the work merges into. {target} is its name."
+  },
+  "workflow.unreadable.uncommitted": {
+    "defaultMessage": "the uncommitted changes in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+  },
+  "workflow.unreadable.worktrees": {
+    "defaultMessage": "the worktrees of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the Git worktrees of a repository. {folder} is its folder path."
+  },
+  "workflow.unreadable.writes": {
+    "defaultMessage": "the files written in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": which files changed in a folder. {folder} is a folder path."
   }
 }

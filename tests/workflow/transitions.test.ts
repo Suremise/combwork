@@ -39,7 +39,7 @@ describe('intents only where the compiled table has them', () => {
     await passed(e, card.key)
     expect(e.wf.state(card).stage).toBe('approved')
     const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'move.notFromHere')
-    expect(r.next).toBe('From approved, use: .')
+    expect(r.next).toBe('Nothing waits to be done there now.')
     refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'move.notFromHere')
     expect(e.wf.state(card)).toMatchObject({ stage: 'approved', integrated: null })
   })
