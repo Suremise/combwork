@@ -162,8 +162,11 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the header has a fold button, with its shortcut', (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)', await fold.getAttribute('aria-label'))
   await inv('settings:setKeybinding', 'assistant.toggle', 'Mod+Alt+J')
   check('…the shortcut as rebound', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+J)'), await fold.getAttribute('aria-label'))
+  // null removes the shortcut (the tooltip names none); undefined resets it to Hive's (setKeybinding).
   await inv('settings:setKeybinding', 'assistant.toggle', null)
-  await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)')
+  check('…none once it is removed', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel'), await fold.getAttribute('aria-label'))
+  await inv('settings:setKeybinding', 'assistant.toggle', undefined)
+  check('…and Ctrl+Alt+I again once it is reset', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)'), await fold.getAttribute('aria-label'))
   const runBefore = (await inv('session:live')).find((s) => s.agentId === 'assistant')?.runId
   await fold.click()
   check('clicking it folds the panel to its strip', await becomes(async () => (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail').count()) === 1))
