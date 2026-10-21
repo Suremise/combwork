@@ -478,8 +478,9 @@ real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EX
 | cards in tables (#1209) | `cards`: number (the permanent global `#N`), title, description, project, project_id, agent, agent_name, review_agent/_name/_since, col (the category, today's column), stage (the cached stage, null before a 1.0 move), ord, blocked, archived, archived_for, archived_batch, context_problems, pre_workflow, created/updated, extra, layout (place, project, archived by project, agent, reviewer, updated). `card_labels` (by label), `card_links` (blockedBy and links; by target), `card_context`, `card_comments`, `card_history` (by time), `card_decisions`, `card_holds` | `boardStore.ts` (rows), `tasks.ts` (rules) |
 | sessions and deliveries in tables (#1211; built, v6: `schema/sessionDeliveryTables.ts` moves `store_rows`' rows in and drops `store_rows`) | `sessions` per host (by agent), `session_cards` (by card), `sessions_deleted`, `sessions_deleted_usage`; `deliveries` per host (by agent, state, source and ref, card and round; the 7-day expiry by `received` and `ended`; unique `action`) | `sessionStore.ts`, `deliveries.ts` |
 | lanes, watches and metrics in tables (#1212) | `lanes` (by builder, reviewer, state and end), `lane_cards` (by card), `lane_frozen`; `watches` (one per folder and agent; by limit, by fired delivery), `watch_cards` (by card); `metrics_buckets` (by start), `metrics_series` (a row per series: part '' for the workspace or a project's name, family, key) | `lanes.ts`, `watches.ts`, `metrics.ts` |
-| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card; `delivered`, transitional, below), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files` | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
+| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card; `delivered`, transitional, below), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `paths_declared`; `lane`, `lane_reviewer` until the lane record step) and `card_paths` (declared and pre-fill; by path); `workflow_queue_pauses`, `workflow_queue_pause_files` (`workflow_lanes`, `workflow_lane_cards` until the lane record step) | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
 | project keys (#1219) | `project_keys` (current and old keys, one current per project), `project_counters`, `cards.project_number` (unique per project), `card_aliases` ((old project, number) → card, for a card moved since) | `schema/keysStep.ts` (every query; `putCard` numbers a card as it is saved), `projectKeys.ts` (keys given at open, changed, notice, references), `shared/projectKeys.ts` (rules; `cardLabel`, a card as the window names it), `renderer/src/projectKeys.ts` (the window's keys and references; the keys read with the board, `project:keys`) |
+| one lane record (#1291, v9: `schema/laneRecordStep.ts` moves the runtime's lanes in, each whole: joined to lanes.ts's lane of its id only when that is the same lane (project, cards and state alike), else a lane of its own under a free id; then drops `workflow_lanes`, `workflow_lane_cards` and `cards.lane`/`lane_reviewer`) | `lane_runs` (a lane's ruleset, the card in flight, whether a list change is queued; no foreign key, below), `lane_pending` (the queued list; by card) | `workflow/factStore.ts` (the runtime's part of a lane), `lanes.ts` (the rest) |
 
 `board_meta` and `archive_batches` (an undo record of a bulk archive, read whole) stay as they are; the stores' few
 values (`imported`, `next`, `invalid`, `observed`…) move from `store_meta` to `board_meta` as `<store>.<key>` (lanes,
@@ -526,12 +527,19 @@ column) is read from its documents as before. Tests and the e2e helpers read and
 facts step, v7: #1208's facts tables and what the runtime keeps beside them, Darren's rule of 20 Oct applied by the
 Assistant: typed tables, never JSON values). A `CardRecord` is the board's card: its number (`id`), its key
 (`<project key>-<number>` until #1219's keys), title, labels and `blockedBy` from the card's rows, and the runtime's
-columns of the row outside the card's JSON document (`stage`, `kind`, `target`, `lane`, `lane_reviewer`,
-`pre_workflow`, and `card_paths` for None's declared paths and pre-fill), so `tasks.ts`' saves of the document keep
-them and the Agent API's card is unchanged. `stage` empty (a card no 1.0 rule has moved) reads as its column's stage;
-`setStage` writes the stage and the column, its category (§16.4.3). The runtime's lanes and a target's queue pause are
-tables of their own per project (`workflow_lanes`, `workflow_queue_pauses`) until P4 and P7 make them `lanes.ts`' and
-the queue's; scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
+columns of the row outside the card's JSON document (`stage`, `kind`, `target`, `pre_workflow`, and `card_paths` for
+None's declared paths and pre-fill), so `tasks.ts`' saves of the document keep them and the Agent API's card is
+unchanged; its `lane` and `reviewer` are its lane's (below). `stage` empty (a card no 1.0 rule has moved) reads as its column's stage;
+`setStage` writes the stage and the column, its category (§16.4.3). **One lane record (#1291):** the runtime's lanes
+are `lanes.ts`' (`lanes`, `lane_cards`: the lane's agents, state and list), with what only the runtime keeps beside them,
+keyed by the lane's id: `lane_runs` (the ruleset in force when it started the lane, the card in flight, a list change
+queued) and `lane_pending` (that queued list). A card's lane is the newest running lane of its project with it in its
+list or its queued one, and its reviewer that lane's. The runtime ends a lane as `lanes.ts` does (state `ended`); its
+`startLane` takes `lanes.ts`' lane of that id, or makes one by Hive (`tests/workflow`; #1270 wires the app's). `lanes.ts`
+writes a changed lane again whole (deleted and inserted), so `lane_runs` and `lane_pending` have no foreign key and go
+when the lane leaves the table (`storeCodec.ts` `onRemove`); and since the runtime writes lane rows too, a lanes save
+compares with the table, never its own last save (`shared`). A target's queue pause is a table of its own per project
+(`workflow_queue_pauses`) until P7 makes it the queue's; scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
 `workflow:<project>:<key>`. A store reaches the database one of two ways (HR4's #1215 round 1: a connection's open
 transaction is no sign it is the caller's). **On the board** (`FactStore.forBoard(ws)`): its writes go through the
 board's own guard (`boardWriteOp`, writeOp's): only inside the caller's change of that board, in that change's async

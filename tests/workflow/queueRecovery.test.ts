@@ -22,7 +22,7 @@ afterEach(() => {
 const team = () => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
 
 async function queued(e: Env, title: string, file: string) {
-  const card = e.wf.createCard({ title, reviewer: 'R1' })
+  const card = e.wf.createCard({ title })
   const s = await e.wf.start(card.key, B1)
   moved(s)
   commit(s.data!.folder as string, { [file]: `${title}\n` }, title)

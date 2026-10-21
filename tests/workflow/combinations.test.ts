@@ -59,7 +59,7 @@ describe('S36: every combination', () => {
     const e = envs[c.platform]!
     const i = ++n
     Object.assign(e.options, optionsOf(c))
-    const card = e.wf.createCard({ title: `Combination ${i}`, kind: c.kind, reviewer: 'R1', ...(c.platform === 'none' ? { paths: [`c${i}.md`] } : {}) })
+    const card = e.wf.createCard({ title: `Combination ${i}`, kind: c.kind, ...(c.platform === 'none' ? { paths: [`c${i}.md`] } : {}) })
     const refusals: string[] = []
     const tryIt = async (r: unknown) => {
       if (isRefusal(r)) {
