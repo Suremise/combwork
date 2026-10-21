@@ -483,7 +483,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await inv('tasks:update', n2, { column: 'review' })
   const row4 = section.locator(`.progress-lane[data-lane="${l4}"]`)
   const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
-  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()), HUNG_MS)) && !/\breview\b/.test(await seg4()) && /\breview\b/.test((await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''), await seg4())
+  // Both rows waited for: B1's shows the move once lanes-changed reaches it, which may come after B5's (#1270 round 3).
+  const seg1 = async () => (await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
+  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()) && /\breview\b/.test(await seg1()), HUNG_MS)) && !/\breview\b/.test(await seg4()), JSON.stringify([await seg4(), await seg1()]))
   check('…its count unknown, and no current card', /–\/2/.test(await row4.locator('.progress-lane-top').innerText()) && (await row4.locator('.progress-lane-current').count()) === 0, await row4.locator('.progress-lane-top').innerText())
   await row4.locator(`.lane-seg[data-card="${n2}"]`).hover()
   check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Hive kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
