@@ -940,8 +940,12 @@
     "description": "Tooltip of an agent's permission mode badge: whose mode it is (the running session's, or new sessions'), the mode ({mode}), why the CLI's own screen names it differently ({note}; none: leave that branch empty), the shortcut that opens the menu ({key}; none: empty), and whether Shift+Tab switches it in the terminal. Shift+Tab is a key: keep it."
   },
   "agents.permission.cliOwnNoSwitch": {
-    "defaultMessage": "Hive can't switch this session's mode: it started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.",
-    "description": "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): why no mode switches live."
+    "defaultMessage": "It started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.",
+    "description": "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does."
+  },
+  "agents.permission.cliOwnNoSwitchTitle": {
+    "defaultMessage": "Hive can't switch this session's mode",
+    "description": "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short."
   },
   "agents.permission.current": {
     "defaultMessage": "Current mode",

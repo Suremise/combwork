@@ -104,7 +104,7 @@ const check = (name, ok, extra = '') => {
     check("…and its badge says CLI's own", !!(await lib.until(async () => /CLI's own/.test(await badge.innerText()), HUNG_MS)), await badge.innerText())
 
     await badge.click()
-    check("the running agent's menu says why no mode switches live", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Hive can't switch this session's mode: it started in the CLI's own setting/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
+    check("the running agent's menu says why no mode switches live", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Hive can't switch this session's mode\s*It started in the CLI's own setting/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
     const modes = (await items.allInnerTexts()).filter((t) => /^(Manual|Accept edits|Plan|Auto)\b/.test(t))
     check('…and every mode there restarts the session', modes.length === 4 && modes.every((t) => /Restarts the session/.test(t)), JSON.stringify(modes))
     await shots('running-menu')

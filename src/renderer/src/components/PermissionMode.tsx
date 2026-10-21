@@ -93,7 +93,17 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings): M
     const cliOwn = !!modeOption(provider, cur)?.cliOwn
     return [
       { header: true, label: many ? tr(msg({ id: 'agents.permission.menuAgent', defaultMessage: 'Permission mode — {agent}', description: "The permission mode menu's heading, for one of several agents ({agent}: its name)." }), { agent: a.name }) : tr(msg({ id: 'agents.permission.menu', defaultMessage: 'Permission mode', description: "The permission mode menu's heading." })) },
-      ...(cliOwn ? [{ label: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "Hive can't switch this session's mode: it started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): why no mode switches live." })), icon: 'info', disabled: true }] : []),
+      // A short line and its why under it, which wraps (the menu's details), so the menu keeps its width.
+      ...(cliOwn
+        ? [
+            {
+              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Hive can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
+              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
+              icon: 'info',
+              disabled: true
+            }
+          ]
+        : []),
       ...(asking ? [{ label: tr(msg({ id: 'agents.permission.answerFirst', defaultMessage: 'The agent is asking you something: answer it first', description: 'In the permission mode menu, while the agent waits for an answer: its mode can be switched once it is answered.' })), icon: 'warning', disabled: true }] : []),
       ...modes.map((m): MenuEntry => {
         const liveOk = canSwitchModeLive(desc, m.value, cur, null)

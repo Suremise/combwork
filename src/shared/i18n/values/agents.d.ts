@@ -237,6 +237,7 @@ interface HiveMessageValues {
   'agents.permission.answerFirst': undefined
   'agents.permission.badgeTip': { live: string; mode: string | number; note: string; key: string; cycles: string; plan: string }
   'agents.permission.cliOwnNoSwitch': undefined
+  'agents.permission.cliOwnNoSwitchTitle': undefined
   'agents.permission.current': undefined
   'agents.permission.dangerConfirm': { mode: string | number }
   'agents.permission.dangerDetail': { provider: string | number }
