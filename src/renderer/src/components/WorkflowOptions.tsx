@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { CONTRADICTIONS, FORM_OPTIONS, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
@@ -274,12 +274,17 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       case 'folder':
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'target':
-        return <input className="input" value={effective.target} placeholder={tr(T.defaultBranch)} onChange={(e) => set('target', e.target.value.trim())} />
+        return <DraftText value={effective.target} placeholder={tr(T.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
       case 'okBefore':
         return (
           <div className="workflow-stack">
-            {select('okBefore', [['never', tr(V.okBefore.never)], ['labels', tr(V.okBefore.labels)], ['every', tr(V.okBefore.every)]].map(([v, l]) => [v, l] as [string, string]), (s) => ({ mode: s as OkBefore['mode'], labels: effective.okBefore.labels }))}
-            {effective.okBefore.mode === 'labels' && <input className="input" value={effective.okBefore.labels.join(', ')} placeholder={tr(T.labels)} onChange={(e) => set('okBefore', { mode: 'labels', labels: list(e.target.value) })} />}
+            {/* Bound to its mode: the option itself is an object (HR6's round 1). */}
+            <select className="select" value={effective.okBefore.mode} onChange={(e) => set('okBefore', { mode: e.target.value as OkBefore['mode'], labels: effective.okBefore.labels })}>
+              <option value="never">{tr(V.okBefore.never)}</option>
+              <option value="labels">{tr(V.okBefore.labels)}</option>
+              <option value="every">{tr(V.okBefore.every)}</option>
+            </select>
+            {effective.okBefore.mode === 'labels' && <DraftText value={effective.okBefore.labels.join(', ')} placeholder={tr(T.labels)} onCommit={(v) => set('okBefore', { mode: 'labels', labels: list(v) })} />}
           </div>
         )
       case 'identity':
@@ -293,7 +298,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       case 'preChecks':
         return <ChecksEditor names={effective.preChecks} commands={effective.commands} onChange={(names, commands) => setDraft({ ...draft, options: { ...draft.options, preChecks: names, commands } })} />
       case 'excluded':
-        return <input className="input" value={effective.excluded.join(', ')} placeholder={tr(T.folders)} onChange={(e) => set('excluded', list(e.target.value))} />
+        return <DraftText value={effective.excluded.join(', ')} placeholder={tr(T.folders)} onCommit={(v) => set('excluded', list(v))} />
       default:
         return null
     }
@@ -402,31 +407,59 @@ function ReadOnlyRow({ title, value, where, open }: { title: string; value: stri
   )
 }
 
+/**
+ * A text field typed freely (spaces, commas) and taken when it loses focus or on Enter: tidied then, never per keystroke
+ * (HR6's round 1). A value changed from outside (a preset, a paste, Discard Changes) replaces what it shows.
+ */
+function DraftText({ value, placeholder, onCommit, className = 'input' }: { value: string; placeholder: string; onCommit: (v: string) => void; className?: string }) {
+  const [text, setText] = useState(value)
+  useEffect(() => setText(value), [value])
+  return <input className={className} value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)} onBlur={() => text !== value && onCommit(text)} onKeyDown={(e) => e.key === 'Enter' && onCommit(text)} />
+}
+
+type CheckRow = { name: string; command: string }
+
 /** The checks before review: each a name and its command (§16.13: a run counts as the check only as that command). */
 function ChecksEditor({ names, commands, onChange }: { names: string[]; commands: Record<string, string>; onChange: (names: string[], commands: Record<string, string>) => void }) {
-  const rows = names.map((n) => ({ name: n, command: commands[n] ?? '' }))
-  const emit = (next: { name: string; command: string }[]): void => {
-    const kept = next.filter((r) => r.name.trim() || r.command.trim())
-    onChange(
-      kept.map((r) => r.name.trim()),
-      Object.fromEntries(kept.filter((r) => r.name.trim() && r.command.trim()).map((r) => [r.name.trim(), r.command.trim()]))
-    )
+  const given = JSON.stringify([names, commands])
+  const [rows, setRows] = useState<CheckRow[]>(() => names.map((n) => ({ name: n, command: commands[n] ?? '' })))
+  // What it last gave back: the props coming back as that keep the rows as typed; anything else (a preset, a paste,
+  // Discard Changes) replaces them.
+  const sent = useRef(given)
+  useEffect(() => {
+    if (given === sent.current) return
+    sent.current = given
+    const [n, c] = JSON.parse(given) as [string[], Record<string, string>]
+    setRows(n.map((x) => ({ name: x, command: c[x] ?? '' })))
+  }, [given])
+  // Typed freely and taken as the field loses focus, tidied then (HR6's round 1: never trimmed per keystroke).
+  const commit = (next: CheckRow[]): void => {
+    const kept = next.map((r) => ({ name: r.name.trim(), command: r.command.trim() })).filter((r) => r.name || r.command)
+    const n = kept.map((r) => r.name)
+    const c = Object.fromEntries(kept.filter((r) => r.name && r.command).map((r) => [r.name, r.command]))
+    sent.current = JSON.stringify([n, c])
+    onChange(n, c)
+  }
+  const edit = (i: number, part: keyof CheckRow, v: string): void => setRows(rows.map((x, j) => (j === i ? { ...x, [part]: v } : x)))
+  const change = (next: CheckRow[]): void => {
+    setRows(next)
+    commit(next)
   }
   return (
     <div className="workflow-stack workflow-checks">
       {!rows.length && <div className="s-desc">{tr(T.noChecks)}</div>}
       {rows.map((r, i) => (
         <div className="workflow-check" key={i}>
-          <input className="input" value={r.name} placeholder={tr(T.checkName)} onChange={(e) => emit(rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-          <input className="input mono" value={r.command} placeholder={tr(T.checkCommand)} onChange={(e) => emit(rows.map((x, j) => (j === i ? { ...x, command: e.target.value } : x)))} />
+          <input className="input" value={r.name} placeholder={tr(T.checkName)} onChange={(e) => edit(i, 'name', e.target.value)} onBlur={() => commit(rows)} />
+          <input className="input mono" value={r.command} placeholder={tr(T.checkCommand)} onChange={(e) => edit(i, 'command', e.target.value)} onBlur={() => commit(rows)} />
           <Tooltip content={tr(T.removeCheck)}>
-            <button className="btn subtle small" aria-label={tr(T.removeCheck)} onClick={() => emit(rows.filter((_x, j) => j !== i))}>
+            <button className="btn subtle small" aria-label={tr(T.removeCheck)} onClick={() => change(rows.filter((_x, j) => j !== i))}>
               <Icon name="close" />
             </button>
           </Tooltip>
         </div>
       ))}
-      <button className="btn subtle small" onClick={() => onChange([...names, `check${names.length + 1}`], commands)}>
+      <button className="btn subtle small" onClick={() => change([...rows, { name: `check${rows.length + 1}`, command: '' }])}>
         {tr(T.addCheck)}
       </button>
     </div>

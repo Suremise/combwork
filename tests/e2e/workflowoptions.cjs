@@ -142,6 +142,32 @@ function board(sql, ...args) {
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     check('an option inherited again is left out of project.json', !!(await lib.until(async () => !('style' in projectJson().workflow.options) && projectJson().workflow.options.finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow.options))
 
+    // --- Typed as a person types (HR6's round 1: fill() hid both): Your OK before merging shows the policy chosen, and
+    // a check's command keeps its spaces; both saved and shown again when the section is opened again.
+    const okSelect = row('okBefore').locator('select')
+    await okSelect.selectOption('every')
+    check('Your OK before merging shows Every card once chosen', (await okSelect.inputValue()) === 'every')
+    await okSelect.selectOption('labels')
+    check('…and Cards with these labels, with its labels field', (await okSelect.inputValue()) === 'labels' && (await row('okBefore').locator('input').count()) === 1)
+    await row('okBefore').locator('input').pressSequentially('ui, release')
+    check('…its labels typed with a comma and a space, kept as typed', (await row('okBefore').locator('input').inputValue()) === 'ui, release')
+    await row('preChecks').getByRole('button', { name: 'Add Check' }).click()
+    const newCheck = row('preChecks').locator('.workflow-check').last()
+    await newCheck.locator('input').first().fill('')
+    await newCheck.locator('input').first().pressSequentially('unit tests')
+    await newCheck.locator('input').nth(1).pressSequentially('npm run test -- --silent')
+    check('a check’s command typed with spaces keeps them', (await newCheck.locator('input').nth(1).inputValue()) === 'npm run test -- --silent', await newCheck.locator('input').nth(1).inputValue())
+    await section.getByRole('button', { name: 'Save…' }).click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    const saved = () => projectJson().workflow?.options ?? {}
+    check('saved: the labels policy and the check with its command', !!(await lib.until(async () => saved().okBefore?.mode === 'labels' && saved().commands?.['unit tests'] === 'npm run test -- --silent', HUNG_MS)), JSON.stringify(saved()))
+    check('…the labels as a list', JSON.stringify(saved().okBefore?.labels) === JSON.stringify(['ui', 'release']) && saved().preChecks?.includes('unit tests'))
+    await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
+    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    await section.waitFor({ timeout: HUNG_MS })
+    check('opened again: the policy shows Cards with these labels, its labels and the check’s command', !!(await lib.until(async () => (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release' && (await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))).includes('npm run test -- --silent'), HUNG_MS)))
+
     // --- Copy as JSON and Paste JSON… (the clipboard stubbed: never the real one).
     await page.evaluate(() => {
       window.__copied = null
