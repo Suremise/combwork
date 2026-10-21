@@ -251,6 +251,8 @@ export interface LineBehind extends LineNow {
   builder: string
   folder: string
   target: string
+  /** A move begun (its `LineMoving`) with no `LineMoved` after it, and the line not back where it was (HR2's round 3). */
+  unfinished?: { from: string; to: string }
 }
 
 class DragUndone extends Error {
@@ -1711,8 +1713,15 @@ export class Workflow {
     const p = this.platform(this.rulesetOf(prev, ps).options)
     if (!p.lineNow) return null
     const now = await p.lineNow(own.path, target)
-    if (isUnknown(now) || now.inTarget) return null
-    return { next: card, prev, builder, folder: own.path, target, ...now }
+    if (isUnknown(now)) return null
+    // A move begun and not recorded as done (it failed part way, or Hive stopped during it): held until it is settled,
+    // unless the line is back where it began.
+    const facts = this.store.facts(prev.id)
+    const moving = facts.findLast((f) => f.kind === 'LineMoving')
+    const begun = moving && !facts.some((f) => f.kind === 'LineMoved' && f.seq > moving.seq) ? (moving.data as FactData['LineMoving']) : null
+    const unfinished = begun && now.head !== begun.from ? { from: begun.from, to: begun.to } : undefined
+    if (now.inTarget && !unfinished) return null
+    return { next: card, prev, builder, folder: own.path, target, ...now, ...(unfinished ? { unfinished } : {}) }
   }
 
   /**
@@ -1755,15 +1764,17 @@ export class Workflow {
       const ok = (): boolean => this.state(b.next).stage === 'todo' && still()
       const now = await p.lineNow(b.folder, b.target)
       if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !ok()) return null
+      const line = b.line ?? b.folder
+      // Begun, durably, before anything moves (HR2's round 3): a move that doesn't finish (it fails part way and can't be
+      // put back, or Hive stops) holds the next card until it is settled.
+      await this.write(b.prev, null, 'hive', (w) => {
+        w.fact('LineMoving', { line, from: b.head, to: b.targetHead }) // i18n-ignore: a fact's kind and codes, not text
+        return null
+      })
       const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head, target: b.target }, ok)
       if (moved !== true) return moved
-      const line = b.line ?? b.folder
       try {
-        await this.write(b.prev, null, 'hive', (w) => {
-          w.fact('LineMoved', { line, from: b.head, to: b.targetHead, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
-          this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
-          return null
-        })
+        await this.lineMovedRecord(b, b.head, b.targetHead)
       } catch (e) {
         // Not recorded (the workspace closed, the board failing): the branch put back where it was, as conditionally.
         await p.moveLine(b.folder, b.head, { line: b.line, head: b.targetHead }, () => true)
@@ -1773,6 +1784,16 @@ export class Workflow {
     } finally {
       lineMoving.delete(key)
     }
+  }
+
+  /** Records a line's move as done (`LineMoved` on the card just Done) and tells its builder the next card can start. */
+  async lineMovedRecord(b: LineBehind, from: string, to: string): Promise<void> {
+    const line = b.line ?? b.folder
+    await this.write(b.prev, null, 'hive', (w) => {
+      w.fact('LineMoved', { line, from, to, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
+      this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
+      return null
+    })
   }
 
   /** A card as `lineMoving` keys it: its project's folder, resolved, and its number (any runtime of that project sees it). */

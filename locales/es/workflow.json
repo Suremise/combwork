@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "La tarjeta {card} recibió una decisión después de fusionarse: ¿necesita un seguimiento?",
   "workflow.forYou.lineAsk": "{line} todavía tiene el trabajo de {card}, fusionado con squash en {target}: aprueba y Hive actualiza la rama una vez, o rechaza y hazlo tú antes de que empiece {next}.",
   "workflow.forYou.lineRefused": "Git no actualizó {line} con {target}: {reason}. {next} empieza cuando la rama esté actualizada.",
+  "workflow.forYou.lineUnfinished": "El movimiento de {line} a {to} que hizo Hive no terminó y no se pudo deshacer. Lleva la rama a {target}, con sus archivos e índice limpios, o devuélvela adonde estaba: {next} empieza cuando quede resuelto.",
   "workflow.forYou.lineWork": "{line} tiene trabajo que no está en {target}: {commits}. Decide qué pasa con él: {next} empieza cuando la rama esté actualizada.",
   "workflow.forYou.newDecision": "La tarjeta {card} tiene una decisión nueva: ¿la revisas otra vez?",
   "workflow.forYou.okBefore": "La tarjeta {card} está aprobada: ¿das tu aprobación para fusionarla?",

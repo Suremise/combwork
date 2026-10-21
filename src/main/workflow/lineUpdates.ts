@@ -110,6 +110,16 @@ async function laneLine(wf: Workflow, project: string, id: string, on: () => boo
   const asked = Object.values(s.made).filter((r) => r.gate === LINE_GATE && r.revision === b.head)
   const open = s.requests.some((r) => r.gate === LINE_GATE)
   const approved = asked.some((r) => s.approvals.some((a) => a.request === r.request && a.answer === 'approved'))
+  // A move begun that didn't finish (HR2's round 3): done after all once the line is at its target, clean (recorded
+  // now); else asked of the user once, the next card held meanwhile.
+  if (b.unfinished) {
+    if (b.head === b.unfinished.to && !b.dirty.length) {
+      await wf.lineMovedRecord(b, b.unfinished.from, b.unfinished.to)
+      return null
+    }
+    if (!asked.length && !open) await wf.askAboutLine(b, 'decide', text(FOR_YOU.lineUnfinished, b, { to: b.unfinished.to.slice(0, 7) }))
+    return null
+  }
   if (open) return null
   if (advanced.get(UPDATE_AGENT_BRANCH) !== true && !approved) {
     if (!asked.length) await wf.askAboutLine(b, 'approve', text(FOR_YOU.lineAsk, b))
@@ -130,6 +140,8 @@ async function laneLine(wf: Workflow, project: string, id: string, on: () => boo
   // 3. Moved, recorded; or git's reason asked about. Everything checked above is checked again just before the move (the
   // reads since took time): still on, still allowed, still safe; the line itself (its head, the target's, clean) by
   // moveLineOn, the move conditional on that head. Anything changed: nothing moves, and the lane waits for the next pass.
+  // A move that failed part way and couldn't be put back throws (LineMoveBroken): its LineMoving holds the next card, and
+  // the next pass settles it (above).
   const r = await wf.moveLineOn(b, () => on() && (advanced.get(UPDATE_AGENT_BRANCH) === true || approved) && safe())
   if (r === null) return next.id
   if (r === true) {

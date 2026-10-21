@@ -5,11 +5,28 @@
 // in the target, and git's refusal, are asked of the user (For you); with the switch off the user is asked every time;
 // with workflow rules off nothing moves. A merge commit needs nothing. On a real board (a temp hive.db) and temp repos.
 import { execFileSync } from 'child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+
+// The index's renames, refusable (HR2's round 3): `times` renames onto `to` refused with EPERM, as Windows can.
+const renameFault = vi.hoisted(() => ({ to: '', times: 0 }))
+vi.mock('original-fs', async () => {
+  const real = await vi.importActual<typeof import('fs')>('fs')
+  const norm = (v: unknown): string => String(v).replaceAll('\\', '/').toLowerCase()
+  return {
+    ...real,
+    renameSync: (from: Parameters<typeof real.renameSync>[0], to: Parameters<typeof real.renameSync>[1]) => {
+      if (renameFault.times > 0 && renameFault.to && norm(to) === norm(renameFault.to)) {
+        renameFault.times--
+        throw Object.assign(new Error('EPERM: rename refused'), { code: 'EPERM' })
+      }
+      return real.renameSync(from, to)
+    }
+  }
+})
 
 const base = tempDir('hive-lines-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -478,5 +495,92 @@ describe("with workflow rules off, 0.9's Merge dialog squash still moves the age
     const r = await mergeWorktree(repo, { path: wt, branch: 'card', base: 'main' }, { squash: true, message: 'squash card', moveBranch: true })
     expect(r).toMatchObject({ ok: true, branchMoved: true })
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(git(repo, 'rev-parse', 'main'))
+  })
+})
+
+// HR2's round 3: a failure after the move's first change is put back, conditionally, or the next card is held until
+// what was left is settled. The index renames refused as Windows can (EPERM), by an original-fs stand-in.
+describe('a move failing after its first change (#1271 round 4)', () => {
+  afterEach(() => {
+    renameFault.to = ''
+    renameFault.times = 0
+    gitTestHooks.started = undefined
+  })
+  /** Refuses the next `times` renames onto `<index><suffix>` (the lock: '.lock'; the index itself: ''). */
+  const refuseRename = (wt: string, suffix: '' | '.lock', times: number) => {
+    renameFault.to = `${git(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')}${suffix}`
+    renameFault.times = times
+  }
+  const squashed = async () => {
+    const env = await workspace()
+    await approved(env.w, env.wt, env.cards[0], 'one.txt')
+    await merged(env.w, env.repo, env.cards[0], 'squash')
+    // A file on main only, so a stale index would show it deleted (HR2's round 3 repro).
+    commit(env.repo, 'target-only.txt')
+    return { ...env, head: git(env.wt, 'rev-parse', 'HEAD') }
+  }
+  const kindsOf = (w: WS, card: number) => facts(w, card).map((f) => f.kind)
+  const consistent = (wt: string, at: string) => {
+    expect(git(wt, 'rev-parse', 'HEAD')).toBe(at)
+    expect(git(wt, 'status', '--porcelain')).toBe('')
+    const index = git(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')
+    expect([existsSync(`${index}.lock`), existsSync(`${index}.hive-line`)]).toEqual([false, false])
+  }
+
+  it("the new index can't be staged in the lock: the files are put back, nothing moved, the user told, the next card held", async () => {
+    const { w, wt, cards, head } = await squashed()
+    refuseRename(wt, '.lock', 1)
+    await update(w)
+    expect(renameFault.times).toBe(0)
+    consistent(wt, head)
+    expect(kindsOf(w, cards[0])).not.toContain('LineMoved')
+    expect(forYou(w).items.filter((i) => i.card === cards[1]).map((i) => i.text)[0]).toMatch(/^Git wouldn't bring card up to date with main: .*refused/)
+    expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBe('lane.lineBehind')
+  })
+
+  it("the index can't be published after the branch moved: the branch is swapped back and the files with it, nothing lost", async () => {
+    const { w, wt, cards, head } = await squashed()
+    refuseRename(wt, '', 100)
+    await update(w)
+    consistent(wt, head)
+    expect(kindsOf(w, cards[0])).not.toContain('LineMoved')
+    expect(forYou(w).items.filter((i) => i.card === cards[1])).toHaveLength(1)
+    expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBe('lane.lineBehind')
+  })
+
+  it('a rename refused a moment, as Windows can: tried again, and the move completes', async () => {
+    const { w, wt, repo, cards } = await squashed()
+    refuseRename(wt, '', 2)
+    await update(w)
+    consistent(wt, git(repo, 'rev-parse', 'main'))
+    expect(kindsOf(w, cards[0])).toContain('LineMoved')
+  })
+
+  it("not put back (the branch moved on meanwhile): its LineMoving holds the next card, the user is asked once; settled by hand, it is recorded and the card starts", async () => {
+    const { w, wt, repo, cards, head } = await squashed()
+    refuseRename(wt, '', 100)
+    // The branch moved elsewhere just as Hive swaps it back: the swap back fails.
+    let other = ''
+    gitTestHooks.started = (_cwd, args) => {
+      if (args[0] !== 'update-ref' || !args.includes(head) || other) return
+      other = git(wt, 'commit-tree', `${head}^{tree}`, '-p', head, '-m', 'elsewhere')
+      git(wt, 'update-ref', 'refs/heads/card', other)
+    }
+    await update(w)
+    gitTestHooks.started = undefined
+    renameFault.times = 0
+    expect(kindsOf(w, cards[0])).toContain('LineMoving')
+    expect(kindsOf(w, cards[0])).not.toContain('LineMoved')
+    expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBe('lane.lineBehind')
+    await update(w)
+    expect(forYou(w).items.filter((i) => i.card === cards[1]).map((i) => i.text)[0]).toMatch(/didn't finish/)
+    await update(w)
+    expect(forYou(w).items.filter((i) => i.card === cards[1])).toHaveLength(1)
+    // The user settles it: the line at main, clean. The next pass records the move done; the card starts.
+    git(wt, 'reset', '-q', '--hard', 'main')
+    await update(w)
+    expect(kindsOf(w, cards[0])).toContain('LineMoved')
+    expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBeNull()
+    expect(foldCard(facts(w, cards[1])).started?.base).toBe(git(repo, 'rev-parse', 'main'))
   })
 })

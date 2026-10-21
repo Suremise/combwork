@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "{card} was decided after it merged: does it need a follow-up?",
   "workflow.forYou.lineAsk": "{line} still has {card}'s work, squashed into {target}: approve and Hive brings the branch up to date once, or decline and do it yourself before {next} starts.",
   "workflow.forYou.lineRefused": "Git wouldn't bring {line} up to date with {target}: {reason}. {next} starts once the branch is up to date.",
+  "workflow.forYou.lineUnfinished": "Hive's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
   "workflow.forYou.lineWork": "{line} has work that isn't in {target}: {commits}. Decide what happens to it: {next} starts once the branch is up to date.",
   "workflow.forYou.newDecision": "{card} has a new decision: your review again?",
   "workflow.forYou.okBefore": "{card} is approved: OK to merge?",

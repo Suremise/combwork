@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "{card}：マージ後に決定事項が記録されました。フォローアップが必要ですか？",
   "workflow.forYou.lineAsk": "{line} には、{target} にスカッシュでマージされた {card} の作業がまだ残っています: 承認すると Hive がブランチを一度だけ最新にします。拒否した場合は、{next} の開始前にご自分で行ってください。",
   "workflow.forYou.lineRefused": "Git は {line} を {target} に合わせて最新にできませんでした: {reason}。ブランチが最新になると {next} が開始します。",
+  "workflow.forYou.lineUnfinished": "Hive による {line} の {to} への移動は完了せず、元に戻せませんでした。ファイルとインデックスをクリーンにしてブランチを {target} に合わせるか、元の位置に戻してください。解決すると {next} が開始します。",
   "workflow.forYou.lineWork": "{line} には {target} にない作業があります: {commits}。その扱いを決めてください。ブランチが最新になると {next} が開始します。",
   "workflow.forYou.newDecision": "{card}：新しい決定事項があります。もう一度レビューしますか？",
   "workflow.forYou.okBefore": "{card}は承認済みです。マージしてよいですか？",

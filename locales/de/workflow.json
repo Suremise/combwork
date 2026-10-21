@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "Zu {card} gab es nach dem Merge eine Entscheidung: Ist eine Nacharbeit nötig?",
   "workflow.forYou.lineAsk": "{line} enthält noch die Arbeit von {card}, per Squash in {target} gemergt: Stimme zu, und Hive bringt den Branch einmal auf den neuesten Stand, oder lehne ab und erledige es selbst, bevor {next} startet.",
   "workflow.forYou.lineRefused": "Git hat {line} nicht auf den Stand von {target} gebracht: {reason}. {next} startet, sobald der Branch auf dem neuesten Stand ist.",
+  "workflow.forYou.lineUnfinished": "Hives Versetzen von {line} auf {to} wurde nicht abgeschlossen und konnte nicht rückgängig gemacht werden. Bring den Branch auf {target}, mit sauberen Dateien und sauberem Index, oder zurück, wo er war: {next} startet, sobald das geklärt ist.",
   "workflow.forYou.lineWork": "{line} enthält Arbeit, die nicht in {target} ist: {commits}. Entscheide, was damit geschieht: {next} startet, sobald der Branch auf dem neuesten Stand ist.",
   "workflow.forYou.newDecision": "{card} hat eine neue Entscheidung: Reviewst du noch einmal?",
   "workflow.forYou.okBefore": "{card} ist genehmigt: Stimmst du dem Merge zu?",

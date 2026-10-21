@@ -2809,8 +2809,13 @@ index (`read-tree -m -u`, which won't overwrite a local change), then moves the 
 head (`update-ref <to> <head>`, compare and swap; else the files go back and nothing moves). Never a reset of a branch
 that may have moved on. Anything changed: nothing moves or is recorded, and the next pass looks again. While the move
 runs, the next card is reserved: its start is refused (`lane.lineBehind`, also inside its own write) until the
-`LineMoved` is saved, and a `LineMoved` that can't be saved has the move undone the same way. What waits is each
-workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
+`LineMoved` is saved, and a `LineMoved` that can't be saved has the move undone the same way. **A failure after the
+move's first change** [HR2's round 3] is put back conditionally: the new index is staged in the held lock and published
+only once the branch has moved (a refused rename tried a few times); unpublished, the branch is swapped back (only if
+still where the move put it) and the files restored from that index. A `LineMoving` fact is written before the move: one
+with no `LineMoved` after it while the line isn't back where it began (a move that couldn't be put back, or Hive
+stopping during it) holds the next card; the next pass records the `LineMoved` once the line is at its target and clean,
+else asks the user once. What waits is each workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
 (`hive.workflow.updateAgentBranch`, default on): off, the user is asked every time, a For you **Approve** on the next
 card (approve: Hive moves it once, by the steps above; decline: the user does it). With workflow rules off, nothing
 moves, nothing is asked and nothing waits: P3's behaviour (Darren's decision on #1120, point 2; the Assistant on #1271),

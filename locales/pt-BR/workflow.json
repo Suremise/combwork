@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "O cartão {card} recebeu uma decisão depois do merge: ele precisa de uma continuação?",
   "workflow.forYou.lineAsk": "{line} ainda tem o trabalho de {card}, mesclado com squash em {target}: aprove e o Hive atualiza o branch uma vez, ou recuse e faça você mesmo antes de {next} começar.",
   "workflow.forYou.lineRefused": "O Git não atualizou {line} com {target}: {reason}. {next} começa quando o branch estiver atualizado.",
+  "workflow.forYou.lineUnfinished": "A movimentação de {line} para {to} feita pelo Hive não terminou e não pôde ser desfeita. Leve o branch para {target}, com arquivos e índice limpos, ou de volta para onde estava: {next} começa quando isso estiver resolvido.",
   "workflow.forYou.lineWork": "{line} tem trabalho que não está em {target}: {commits}. Decida o que acontece com ele: {next} começa quando o branch estiver atualizado.",
   "workflow.forYou.newDecision": "O cartão {card} tem uma nova decisão: você revisa de novo?",
   "workflow.forYou.okBefore": "O cartão {card} está aprovado: pode fazer o merge?",

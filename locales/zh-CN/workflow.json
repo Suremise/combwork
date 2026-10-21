@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "{card} 合并后又做出了决定：需要后续跟进吗？",
   "workflow.forYou.lineAsk": "{line} 上仍有 {card} 的工作，已以压缩合并方式合并到 {target}：批准则由 Hive 将分支更新一次，拒绝则请在 {next} 开始前自己处理。",
   "workflow.forYou.lineRefused": "Git 未能将 {line} 更新到 {target}：{reason}。分支更新后 {next} 才会开始。",
+  "workflow.forYou.lineUnfinished": "Hive 将 {line} 移到 {to} 的操作未完成，且无法撤销。请将分支移到 {target}（文件和索引保持干净），或恢复到原来的位置：处理好后 {next} 才会开始。",
   "workflow.forYou.lineWork": "{line} 上有不在 {target} 中的工作：{commits}。请决定如何处理：分支更新后 {next} 才会开始。",
   "workflow.forYou.newDecision": "{card} 有新的决定：需要你再次评审吗？",
   "workflow.forYou.okBefore": "{card} 已批准：可以合并吗？",

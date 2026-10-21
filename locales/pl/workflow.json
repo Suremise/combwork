@@ -9,6 +9,7 @@
   "workflow.forYou.decidedAfterMerge": "Decyzja na karcie {card} zapadła po scaleniu: czy potrzebna jest dalsza praca?",
   "workflow.forYou.lineAsk": "Gałąź {line} nadal zawiera pracę karty {card}, scaloną jako squash do {target}: zatwierdź, a Hive raz zaktualizuje gałąź, albo odrzuć i zrób to sam przed startem karty {next}.",
   "workflow.forYou.lineRefused": "Git nie zaktualizował gałęzi {line} do {target}: {reason}. Karta {next} wystartuje, gdy gałąź będzie aktualna.",
+  "workflow.forYou.lineUnfinished": "Przesunięcie gałęzi {line} do {to} przez Hive nie zakończyło się i nie dało się go cofnąć. Ustaw gałąź na {target} z czystymi plikami i indeksem albo przywróć ją tam, gdzie była: karta {next} wystartuje, gdy to zostanie rozwiązane.",
   "workflow.forYou.lineWork": "Gałąź {line} zawiera pracę, której nie ma w {target}: {commits}. Zdecyduj, co się z nią stanie: karta {next} wystartuje, gdy gałąź będzie aktualna.",
   "workflow.forYou.newDecision": "Karta {card} ma nową decyzję: zrecenzujesz ją ponownie?",
   "workflow.forYou.okBefore": "Karta {card} jest zatwierdzona: zgadzasz się na scalenie?",
