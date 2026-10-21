@@ -872,8 +872,49 @@ marked.use({
   }
 })
 
-export function Markdown({ source, className, onLink }: { source: string; className?: string; onLink?: (href: string) => boolean }) {
-  const html = DOMPurify.sanitize(marked.parse(source, { async: false }) as string)
+/** Card references Markdown links to their cards (#1221): where each is in a text, the card it names, and opening one. */
+export interface MarkdownCards {
+  find: (text: string) => { start: number; end: number; number: number }[]
+  title: (n: number) => string | null
+  open: (n: number) => void
+}
+
+/**
+ * Wraps the card references in rendered Markdown's text in links (`hive-card:N`), never inside a link, code or a code
+ * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
+ */
+function linkCards(html: string, cards: MarkdownCards): string {
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  const texts: Text[] = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) if (!(n.parentElement?.closest('a, code, pre'))) texts.push(n as Text)
+  for (const t of texts) {
+    const text = t.data
+    const found = cards.find(text)
+    if (!found.length) continue
+    const frag = doc.createDocumentFragment()
+    let at = 0
+    for (const m of found) {
+      frag.append(text.slice(at, m.start))
+      const a = doc.createElement('a')
+      a.setAttribute('href', `hive-card:${m.number}`)
+      a.className = 'card-ref'
+      const title = cards.title(m.number)
+      if (title) a.setAttribute('title', title)
+      a.textContent = text.slice(m.start, m.end)
+      frag.append(a)
+      at = m.end
+    }
+    frag.append(text.slice(at))
+    t.replaceWith(frag)
+  }
+  return doc.body.innerHTML
+}
+
+/** Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments. */
+export function Markdown({ source, className, onLink, cards }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards }) {
+  const clean = DOMPurify.sanitize(marked.parse(source, { async: false }) as string)
+  const html = cards ? linkCards(clean, cards) : clean
   return (
     <div
       className={cx('markdown', className)}
@@ -882,6 +923,8 @@ export function Markdown({ source, className, onLink }: { source: string; classN
         if (!a) return
         const href = a.getAttribute('href') ?? ''
         e.preventDefault()
+        const card = /^hive-card:(\d+)$/.exec(href)
+        if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
         if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })

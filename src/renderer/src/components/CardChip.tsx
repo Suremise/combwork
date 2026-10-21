@@ -3,7 +3,8 @@ import { msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, TaskCard, TaskColumn } from '@shared/types'
 import { agentDoingCards, agentReviewCards, agentRowCards, columnColor, columnName } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
-import { isAssistantPath, set, useStore } from '../store'
+import { cardLabelOf, isAssistantPath, set, useStore } from '../store'
+import { cardLabel } from '@shared/projectKeys'
 import { cx } from '../util'
 import { Icon, Tooltip } from './ui'
 
@@ -32,6 +33,8 @@ export function cardText(cards: TaskCard[]): string {
 export function TaskChip({ number, column, title, short, more = 0, label, blocked, onOpen }: { number: number; column: TaskColumn | null; title?: string; short?: boolean; more?: number; label?: string; blocked?: boolean; onOpen?: () => void }) {
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
+  // Its name as the window gives it (#1221): its key, else #n.
+  const name = useStore((s) => cardLabelOf(s, number))
   const review = column === 'review'
   const open = (): void => (onOpen ? onOpen() : set({ taskOpen: number }))
   // Blocked, the board's red whatever the column colours (a blocked card is red in any column, #1021).
@@ -46,7 +49,7 @@ export function TaskChip({ number, column, title, short, more = 0, label, blocke
       data-review={review || undefined}
       role="button"
       tabIndex={0}
-      aria-label={label ?? tr(msg({ id: 'board.chip.open', defaultMessage: 'Open card #{card}', description: "A card chip's accessible name (on an agent's pane or row): opens the card. {card} is its number." }), { card: number })}
+      aria-label={label ?? tr(msg({ id: 'board.chip.open', defaultMessage: 'Open card {card}', description: "A card chip's accessible name (on an agent's pane or row): opens the card. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name })}
       onClick={(e) => {
         e.stopPropagation()
         open()
@@ -60,7 +63,7 @@ export function TaskChip({ number, column, title, short, more = 0, label, blocke
       onMouseDown={(e) => e.stopPropagation()}
     >
       <Icon name={review ? 'eye' : 'project'} />
-      <span className="card-chip-number">#{number}</span>
+      <span className="card-chip-number">{name}</span>
       {!short && title && <span className="card-chip-title">{title}</span>}
       {more > 0 && <span className="card-chip-more">+{more}</span>}
     </span>
@@ -82,11 +85,11 @@ export function CardChip({ project, a, short, tip = true }: { project: ProjectIn
   const chip = <TaskChip number={first.number} column={review ? 'review' : 'doing'} title={first.title} short={short} more={more.length} />
   if (!tip) return chip
   // Each card's decisions counted (#357): what the user decided about it, read in the card.
-  const line = (c: TaskCard): string => tr(msg({ id: 'board.chip.card', defaultMessage: '#{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its number, title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." }), { card: c.number, title: c.title, decisions: c.decisions?.length ?? 0 })
+  const line = (c: TaskCard): string => tr(msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." }), { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
   const lines = [
     ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Doing):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Doing is the board column." })), ...doing.map(line)] : []),
     ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(line)] : []),
-    tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open #{card}.', description: "The last line of the hover of an agent's card chip. {card} is the card's number." }), { card: first.number })
+    tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(first) })
   ]
   return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{lines.join('\n')}</span>}>{chip}</Tooltip>
 }
@@ -110,9 +113,9 @@ export function RowCardChip({ cards, space }: { cards: RowCard[]; space?: boolea
   const { card } = cards[0]
   if (space) return <TaskChip number={card.number} column={card.column} blocked={!!card.blocked} short />
   const column = columnName(card.column, tr)
-  const label = tr(msg({ id: 'panes.tiles.chipLabel', defaultMessage: 'Card #{card}, {column}{blocked, select, yes {, blocked} other {}}', description: "Accessible name of the card chip on an agent's row in the focus view's strip: the card's number ({card}), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")." }), { card: card.number, column, blocked: card.blocked ? 'yes' : 'no' })
-  const line = ({ card: c, reviewing }: RowCard): string => tr(msg({ id: 'panes.tiles.chipLine', defaultMessage: '#{card} {title} ({role, select, reviewing {reviewing, } other {}}{column}{blocked, select, yes {, blocked} other {}})', description: "A card in the hover of the card chip on an agent's row in the focus view's strip: its number ({card}), title (the user's own words), whether the agent reviews it (reviewing: add \"reviewing, \"), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")." }), { card: c.number, title: c.title, role: reviewing ? 'reviewing' : 'works', column: columnName(c.column, tr), blocked: c.blocked ? 'yes' : 'no' })
-  const tip = [...cards.map(line), tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open #{card}.', description: "The last line of the hover of an agent's card chip. {card} is the card's number." }), { card: card.number })].join('\n')
+  const label = tr(msg({ id: 'panes.tiles.chipLabel', defaultMessage: 'Card {card}, {column}{blocked, select, yes {, blocked} other {}}', description: "Accessible name of the card chip on an agent's row in the focus view's strip: the card’s name ({card}: its key, such as AM-12, or #12 for a card with none), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")." }), { card: cardLabel(card), column, blocked: card.blocked ? 'yes' : 'no' })
+  const line = ({ card: c, reviewing }: RowCard): string => tr(msg({ id: 'panes.tiles.chipLine', defaultMessage: '{card} {title} ({role, select, reviewing {reviewing, } other {}}{column}{blocked, select, yes {, blocked} other {}})', description: "A card in the hover of the card chip on an agent's row in the focus view's strip: its name ({card}: its key, such as AM-12, or #12 for a card with none), title (the user's own words), whether the agent reviews it (reviewing: add \"reviewing, \"), the board column it is in ({column}) and whether it is blocked (yes: add \", blocked\")." }), { card: cardLabel(c), title: c.title, role: reviewing ? 'reviewing' : 'works', column: columnName(c.column, tr), blocked: c.blocked ? 'yes' : 'no' })
+  const tip = [...cards.map(line), tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(card) })].join('\n')
   return (
     <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>} focus>
       <TaskChip number={card.number} column={card.column} blocked={!!card.blocked} short label={label} />

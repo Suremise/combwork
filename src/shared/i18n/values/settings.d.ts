@@ -9,6 +9,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.desc': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
+  'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
+  'settings.advanced.claude-code.override.promptSnapshotOff.desc': undefined
+  'settings.advanced.claude-code.override.promptSnapshotOff.title': undefined
   'settings.advanced.claude-code.safeguard.note.desc': undefined
   'settings.advanced.claude-code.safeguard.note.title': undefined
   'settings.advanced.claude-code.safeguard.prompt.desc': undefined
@@ -47,6 +51,10 @@ interface HiveMessageValues {
   'settings.advanced.codex.hooks.timeoutSeconds.title': undefined
   'settings.advanced.codex.mcp.toolTimeoutSeconds.desc': undefined
   'settings.advanced.codex.mcp.toolTimeoutSeconds.title': undefined
+  'settings.advanced.codex.mouse.rightClickToCli.desc': undefined
+  'settings.advanced.codex.mouse.rightClickToCli.title': undefined
+  'settings.advanced.codex.override.terminalTitle.desc': undefined
+  'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
   'settings.advanced.codex.prompt.drawnSeconds.title': undefined
   'settings.advanced.codex.queue.hint.desc': undefined
@@ -89,6 +97,10 @@ interface HiveMessageValues {
   'settings.advanced.copilot.hooks.timeoutSeconds.title': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.desc': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.title': undefined
+  'settings.advanced.copilot.override.allMcpInstructions.desc': undefined
+  'settings.advanced.copilot.override.allMcpInstructions.title': undefined
+  'settings.advanced.copilot.override.noAutoUpdate.desc': undefined
+  'settings.advanced.copilot.override.noAutoUpdate.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.signIn.errorMessage.desc': undefined
@@ -593,6 +605,8 @@ interface HiveMessageValues {
   'settings.project.fileLocks.desc': undefined
   'settings.project.fileLocks.tip': undefined
   'settings.project.fileLocks.title': undefined
+  'settings.project.key.desc': { example: string | number }
+  'settings.project.key.title': undefined
   'settings.project.keybindings.desc': undefined
   'settings.project.keybindings.title': undefined
   'settings.project.loopRounds.desc': undefined

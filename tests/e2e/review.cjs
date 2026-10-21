@@ -123,7 +123,7 @@ function mcp(config, msgs) {
   await page.locator('.tab', { hasText: 'Session' }).first().click()
   // On each agent's pane header (#975: its strip tab had it).
   const chip = (name) => lib.paneHeader(page, name).locator('.card-chip')
-  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', 5000)) && (await chip('Reviewer').innerText()).includes(`#${n}`))
+  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', 5000)) && (await chip('Reviewer').innerText()).includes(await lib.cardLabel(inv, n)))
   check("the coder's doesn't (it isn't working on it)", (await chip('Coder').count()) === 0)
 
   // --- A second reviewer is refused, naming the first.

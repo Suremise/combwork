@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { useMemo, type ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
 import type { StartFailure } from '@shared/startFailure'
+import { cardLabel } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
@@ -127,6 +128,11 @@ export interface PromptRequest {
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */
   select?: { label: string; options: { label: string; value: string }[]; initial: string; set: (value: string) => void }
+  /**
+   * A second box under the field (a new project's key, #1221): it follows the field (`follow`) until the user types in
+   * it, is checked as it changes (`validate`: why it can't be, or null), and `set` gets it before the dialog resolves.
+   */
+  second?: { label: string; hint?: (second: string) => string; follow: (value: string) => string; validate: (second: string) => string | null; set: (second: string) => void }
   resolve: (value: string | null) => void
 }
 
@@ -368,6 +374,10 @@ interface State {
   tasks: TaskCard[]
   /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
   boardState: BoardState | null
+  /** Each project's key and its old keys (#1221), read with the board (a key change is a board change). */
+  projectKeys: ProjectKeys[]
+  /** The names moved cards keep in the projects they left (`HI-1` → card), read with the board too (#1221). */
+  movedCardNames: Record<string, number>
   /**
    * The Performance view's filters (activity bar: the workspace, a project filter) and each project's Performance tab's
    * (fixed to that project), kept while you move around.
@@ -524,6 +534,8 @@ export const useStore = create<State>(() => ({
 
   tasks: [],
   boardState: null,
+  projectKeys: [],
+  movedCardNames: {},
   perfWorkspace: DEFAULT_PERF_FILTERS,
   perfProjects: {},
   overviewPeriod: 'week',
@@ -1124,13 +1136,28 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [], boardState: null })
+  if (!ws) return set({ tasks: [], boardState: null, projectKeys: [], movedCardNames: {} })
   try {
-    const [tasks, boardState] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state')])
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState })
+    const [tasks, boardState, projectKeys, movedCardNames] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames')])
+    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys, movedCardNames })
   } catch {
     // The workspace closed meanwhile.
   }
+}
+
+/** A project's key and its old keys, as the board has them (#1221). */
+export type ProjectKeys = { projectPath: string; key: string; aliases: string[] }
+
+/** A project's key (null before it has one). */
+export const projectKeyOf = (s: Pick<State, 'projectKeys'>, projectPath: string | null | undefined): string | null => (projectPath ? (s.projectKeys.find((k) => k.projectPath.toLowerCase() === projectPath.toLowerCase())?.key ?? null) : null)
+
+/**
+ * A card named by its number as the window names it (#1221): its key when the board has the card, else `#12`. For a
+ * card in hand, cardLabel(card).
+ */
+export const cardLabelOf = (s: Pick<State, 'tasks'>, n: number): string => {
+  const c = s.tasks.find((t) => t.number === n)
+  return c ? cardLabel(c) : `#${n}`
 }
 
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */

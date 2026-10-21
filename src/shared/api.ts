@@ -255,12 +255,14 @@ export interface HiveRequests {
   /** Locate…: a folder picker for an agent's worktree that wasn't found; the folder, or null when cancelled. */
   'workspace:moveLocate': (projectPath: string, agentId: string) => string | null
 
-  'project:create': (name: string) => WorkspaceInfo | null
+  'project:create': (name: string, key?: string | null) => WorkspaceInfo | null
   'project:setActive': (projectPath: string, active: boolean) => WorkspaceInfo | null
   /** Each project's key and old keys (#1219, #704), by its folder (projects with no id yet have none). */
   'project:keys': () => { projectPath: string; key: string; aliases: string[] }[]
   /** Makes a key the project's (Project Settings), its old one kept as an alias; refused, saying why. Returns the key as kept. */
   'project:setKey': (projectPath: string, key: string) => string
+  /** The names moved cards keep in the projects they left (`HI-1` → its card's number), #1221. */
+  'project:movedCardNames': () => Record<string, number>
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo

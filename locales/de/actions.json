@@ -73,6 +73,8 @@
   "actions.project.deactivateFailed": "Projekt konnte nicht deaktiviert werden",
   "actions.project.deactivateMessage": "{n, plural, one {{project} hat eine laufende Sitzung.} other {In {project} laufen # Agenten.}}",
   "actions.project.deactivateTitle": "{n, plural, one {Sitzung stoppen und deaktivieren?} other {Agenten stoppen und deaktivieren?}}",
+  "actions.project.key": "Schlüssel",
+  "actions.project.keyHint": "Seine Karten heißen {first}, {second} usw. Den Schlüssel kannst du später in den Projekteinstellungen ändern.",
   "actions.project.nameChars": "Namen dürfen {chars} nicht enthalten",
   "actions.project.nameDot": "Namen dürfen nicht mit „.“ beginnen",
   "actions.project.nameEmpty": "Gib einen Namen ein",

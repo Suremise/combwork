@@ -168,6 +168,16 @@ interface HiveMessageValues {
   'project.header.stopAllTip': { count: number }
   'project.header.stopMany': { count: string | number }
   'project.header.workingOn': undefined
+  'project.key.aliases': { keys: string | number }
+  'project.key.change': undefined
+  'project.key.changed': { key: string | number; old: string | number }
+  'project.key.failed': undefined
+  'project.key.form': undefined
+  'project.key.label': undefined
+  'project.key.none': undefined
+  'project.key.prefix': { key: string | number; other: string | number }
+  'project.key.taken': { key: string | number }
+  'project.key.willAlias': { key: string | number; old: string | number }
   'project.limit.heading': { plan: string; when: string | number }
   'project.limit.none': { provider: string | number }
   'project.limit.resets': { when: string | number }

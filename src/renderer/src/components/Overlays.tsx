@@ -16,6 +16,8 @@ import { testedNote, testedSummary } from '@shared/testedClis'
 import { APP_NAME } from '@shared/appName'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
+import { cardLabel } from '@shared/projectKeys'
+import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
@@ -50,7 +52,13 @@ export function Dialogs() {
   const [error, setError] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const [picked, setPicked] = useState('')
+  // The prompt's second box (a new project's key) and whether the user has typed in it.
+  const [second, setSecond] = useState('')
+  const [secondOwn, setSecondOwn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The dialog shown now, for a callback started for one that may have closed since.
+  const shownDialog = useRef(dialog)
+  shownDialog.current = dialog
   const action = useBusy()
   const { setError: setActionError } = action
 
@@ -59,9 +67,23 @@ export function Dialogs() {
     if (dialog?.kind === 'confirm') setChecked(dialog.check?.initial ?? false)
     if (dialog?.kind === 'prompt') {
       setValue(dialog.initial ?? '')
+      setSecond(dialog.second?.follow(dialog.initial ?? '') ?? '')
+      setSecondOwn(false)
       setChecked(dialog.check?.initial ?? false)
       setError(null)
-      setTimeout(() => inputRef.current?.select(), 30)
+      // Its box takes the focus as it opens, from wherever it was (a search box or a terminal behind the dialog too),
+      // unless the user has already gone into one of this dialog's own boxes (#1221: run late, on a busy machine, the
+      // select took what was being typed into the key box into the name box). Not once this prompt has closed.
+      const opened = dialog
+      setTimeout(() => {
+        const box = inputRef.current
+        if (shownDialog.current !== opened || !box?.isConnected) return
+        const active = document.activeElement
+        const own = box.closest('.dialog')
+        if (own && active !== box && own.contains(active) && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) return
+        if (active === box && box.value !== (opened.initial ?? '')) return
+        box.select()
+      }, 30)
     }
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
   }, [dialog, setActionError])
@@ -75,6 +97,7 @@ export function Dialogs() {
     } else if (dialog.kind === 'prompt') {
       dialog.check?.set(checked)
       if (typeof result === 'string') dialog.select?.set(picked)
+      if (typeof result === 'string') dialog.second?.set(second)
       dialog.resolve(typeof result === 'string' ? result : null)
     }
   }
@@ -155,9 +178,11 @@ export function Dialogs() {
     )
   }
 
+  const secondError = dialog.second ? dialog.second.validate(second) : null
   const submit = (): void => {
     const err = dialog.validate?.(value) ?? null
     if (err) return setError(err)
+    if (secondError) return
     close(value)
   }
   return (
@@ -169,7 +194,7 @@ export function Dialogs() {
           <button className="btn subtle" onClick={() => close(null)}>
             {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
           </button>
-          <button className="btn primary" onClick={submit}>
+          <button className="btn primary" onClick={submit} disabled={!!secondError}>
             {dialog.confirmLabel ?? tr(msg({ id: 'shell.dialog.ok', defaultMessage: 'OK', description: "A dialog's button that agrees, when the dialog gives it no other name." }))}
           </button>
         </>
@@ -187,10 +212,29 @@ export function Dialogs() {
         onChange={(e) => {
           setValue(e.target.value)
           setError(null)
+          if (dialog.second && !secondOwn) setSecond(dialog.second.follow(e.target.value))
         }}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
       />
       {error && <div className="field-error">{error}</div>}
+      {dialog.second && (
+        <label className="dialog-select">
+          {dialog.second.label}
+          <input
+            className={cx('input', secondError && 'invalid')}
+            value={second}
+            aria-label={dialog.second.label}
+            aria-invalid={!!secondError}
+            spellCheck={false}
+            onChange={(e) => {
+              setSecond(e.target.value.toUpperCase())
+              setSecondOwn(true)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+          />
+        </label>
+      )}
+      {dialog.second && (secondError ? <div className="field-error">{secondError}</div> : dialog.second.hint?.(second) && <div className="field-hint">{dialog.second.hint(second)}</div>)}
       {dialog.select && <DialogSelect select={dialog.select} picked={picked} setPicked={setPicked} />}
       {dialog.check && (
         <label className="flex" style={{ marginTop: 10 }}>
@@ -240,6 +284,9 @@ export function DialogList({ items }: { items: readonly string[] }) {
   )
 }
 
+/** What the palette takes for a card's name (#1221): a key with or without its number (AM-12, AM-), or #1061. */
+const CARD_QUERY = /^(#\d{1,9}|[A-Za-z]{2,4}-\d{0,9})$/
+
 function score(text: string, q: string): number {
   if (!q) return 1
   const t = text.toLowerCase()
@@ -258,6 +305,9 @@ export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen)
   const mode = useStore((s) => s.paletteMode)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  const tasks = useStore((s) => s.tasks)
+  const keys = useStore((s) => s.projectKeys)
+  const moved = useStore((s) => s.movedCardNames)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
   useStore(() => commands.map((c) => (c.checked ? (c.checked() ? '1' : '0') : '')).join(''))
@@ -287,14 +337,29 @@ export function CommandPalette() {
       icon: 'folder',
       checked: undefined as (() => boolean) | undefined
     }))
-    return [...projectItems, ...cmdItems]
-      .map((i) => ({ ...i, s: score(i.label, q) }))
+    // Cards by name (#1221): typed as a card reference (AM-12, am-12, AM- for all of that project's, #1061), the cards it
+    // finds come first, those on the board before archived ones; choosing one opens it.
+    const ref = mode !== 'projects' && CARD_QUERY.test(q.trim())
+    const cardItems = ref
+      ? [...tasks.filter((c) => !c.archived), ...tasks.filter((c) => c.archived)]
+          .filter((c) => cardMatches(c, q, keys, moved))
+          .map((c) => ({
+            id: `card:${c.number}`,
+            command: undefined as string | undefined,
+            label: tr(msg({ id: 'shell.palette.openCard', defaultMessage: 'Open Card: {card} {title}', description: 'A card in the command palette, found by its name: choosing it opens the card. {card} is its name (its key, such as AM-12, or #12 for a card with none), {title} its title (the user’s own words).' }), { card: cardLabel(c), title: c.title }),
+            keybinding: undefined as string | undefined,
+            run: () => set({ taskOpen: c.number }),
+            icon: 'project',
+            checked: undefined as (() => boolean) | undefined
+          }))
+      : []
+    return [...cardItems.map((i) => ({ ...i, s: 1000 })), ...[...projectItems, ...cmdItems].map((i) => ({ ...i, s: score(i.label, q) }))]
       .filter((i) => i.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })

@@ -181,11 +181,11 @@ const check = (name, ok, extra = '') => {
   check("a run names the agent's card in Doing and the folder's head by default", live3?.card === card.number && live3?.revision === head && live3?.testedCheckout === head && live3?.folder?.toLowerCase() === alpha.toLowerCase(), JSON.stringify(live3))
   const cardRow = panel.locator(`.progress-run[data-run="${live3?.id}"]`)
   const forText = async () => (await cardRow.locator('.progress-run-for').textContent().catch(() => '')) ?? ''
-  check('…and its row shows "#N · a3f2c1d" under the agent', !!(await until(async () => (await forText()).replace(/\s+/g, ' ').trim() === `#${card.number} · ${head.slice(0, 7)}`, 10000)), await forText())
+  check('…and its row shows "AM-12 · a3f2c1d" under the agent (the card by key, #1221)', !!(await until(async () => (await forText()).replace(/\s+/g, ' ').trim() === `${card.key} · ${head.slice(0, 7)}`, 10000)), await forText())
   await cardRow.locator('.progress-title').click()
   const details = cardRow.locator('.progress-details')
   const detailsText = async () => (await details.textContent().catch(() => '')) ?? ''
-  check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card#${card.number}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
+  check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card${card.key}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
   for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-card-${theme}.png`)
   await cardRow.locator('.progress-run-card').click()
   // The dialog has the card's title in its title box.

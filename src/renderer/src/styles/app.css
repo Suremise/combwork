@@ -890,6 +890,15 @@ kbd {
   font-weight: 600;
   color: var(--fg-strong);
 }
+/* A 3- or 4-letter key (#1221) fits the tile without widening the rail. */
+.rail-initials-3 {
+  font-size: 10.5px;
+  letter-spacing: -0.2px;
+}
+.rail-initials-4 {
+  font-size: 9px;
+  letter-spacing: -0.4px;
+}
 .rail-project .dot {
   position: absolute;
   right: -2px;
@@ -2767,6 +2776,12 @@ p.hint {
 }
 .field-error {
   color: var(--error);
+  font-size: 12px;
+  margin-top: 6px;
+}
+/* What a field means, under it (a new project's key, #1221): where an error would be. */
+.field-hint {
+  color: var(--fg-muted);
   font-size: 12px;
   margin-top: 6px;
 }

@@ -26,6 +26,8 @@ const keysStep = await import('../src/main/schema/keysStep')
 const { openDb } = await import('../src/main/db')
 const { staleWhy } = await import('../src/main/deliveries')
 
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 15000
 const user = { kind: 'user' } as const
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
@@ -120,6 +122,84 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.key ?? `#${c.number}`).sort()).toEqual(['#4', 'AM-1', 'HI-1', 'HI-2'])
     // Keys and numbers resolve, any case; a key nobody has, nothing.
     for (const [ref, want] of [['HI-2', made[2].number], ['hi-2', made[2].number], ['AM-1', made[1].number], [`#${made[3].number}`, made[3].number], [made[0].number, made[0].number], ['HI-9', null], ['ZZ-1', null]] as [string | number, number | null][]) expect({ ref, got: keys.cardOfRef(w, ref) }).toEqual({ ref, got: want })
+    await close(w)
+  })
+
+  it('New Project…: the key chosen, refused before the folder is made when it can’t be one, or the suggestion (#1221)', async () => {
+    const ws = workspace(['hive'])
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    await keys.createProjectWithKey(w, 'web-app', 'wb')
+    expect(await keyOf(w, 'web-app')).toBe('WB')
+    for (const [name, key, why] of [['taken', 'HI', /another project’s key/], ['prefix', 'HIV', /begin alike/], ['form', 'H1', /2 to 4 letters/]] as const) {
+      await expect(keys.createProjectWithKey(w, name, key)).rejects.toThrow(why)
+      expect(existsSync(join(ws, name))).toBe(false)
+    }
+    await keys.createProjectWithKey(w, 'amberlight', null)
+    expect(await keyOf(w, 'amberlight')).toBe('AM')
+    await close(w)
+  })
+
+  it('a key chosen for a project being made is reserved: a key change or another new project meanwhile is refused it (round 1, finding 2)', async () => {
+    const ws = workspace(['hive'])
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    // web-app's folder is made only when the test says so.
+    const make = w.createProject.bind(w)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    w.createProject = async (name: string) => {
+      await held
+      return make(name)
+    }
+    const creating = keys.createProjectWithKey(w, 'web-app', 'ZZ')
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.createProjectWithKey(w, 'other', 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZA')).rejects.toThrow(/begin alike/)
+    expect(existsSync(join(ws, 'other'))).toBe(false)
+    release()
+    await creating
+    expect([await keyOf(w, 'web-app'), await keyOf(w, 'hive')]).toEqual(['ZZ', 'HI'])
+    w.createProject = make
+    // The reservation ends once it is made: the key is web-app's now.
+    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await close(w)
+  })
+
+  it('a reservation is its workspace’s own: another workspace changes a key to it, or makes a project with it, meanwhile (round 2, finding 1)', async () => {
+    const [wsA, wsB, wsC] = [workspace(['hive']), workspace(['hive']), workspace(['hive'])]
+    const [a, b, c] = [await open(wsA), await open(wsB), await open(wsC)]
+    for (const w of [a, b, c]) await keys.keyProjects(w)
+    const make = a.createProject.bind(a)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    a.createProject = async (name: string) => {
+      await held
+      return make(name)
+    }
+    const creating = keys.createProjectWithKey(a, 'web-app', 'ZZ')
+    // B's and C's keys are their own: ZZ is free there, for a new project and for a key change.
+    await keys.createProjectWithKey(b, 'other', 'ZZ')
+    await keys.changeProjectKey(c, join(wsC, 'hive'), 'ZZ')
+    expect([await keyOf(b, 'other'), await keyOf(c, 'hive')]).toEqual(['ZZ', 'ZZ'])
+    // …and in A, the reservation still holds.
+    await expect(keys.changeProjectKey(a, join(wsA, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    release()
+    await creating
+    expect([await keyOf(a, 'web-app'), await keyOf(a, 'hive')]).toEqual(['ZZ', 'HI'])
+    a.createProject = make
+    for (const w of [a, b, c]) await close(w)
+  })
+
+  it("a moved card's names in the project it left, for the window: under each key that project holds or held (round 1, finding 1)", async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
+    await inWorkspace(w, () => tasks.updateTask(h.number, { project: 'amberlight' }, user))
+    expect(store.movedNames(w)).toEqual({ 'HI-1': h.number })
+    await keys.changeProjectKey(w, join(ws, 'hive'), 'HX')
+    expect(store.movedNames(w)).toEqual({ 'HI-1': h.number, 'HX-1': h.number })
     await close(w)
   })
 
@@ -310,7 +390,7 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
     // Said once, quietly.
     expect(store.keysNoticeDue(w)).toBe(true)
     keys.sayKeysOnce(w)
-    await expect.poll(() => store.keysNoticeDue(w)).toBe(false)
+    await expect.poll(() => store.keysNoticeDue(w), { timeout: HUNG_MS }).toBe(false)
     await close(w)
   })
 })

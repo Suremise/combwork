@@ -126,11 +126,13 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   // --- Performance's Cards table.
   await page.locator('.activitybar button[aria-label="Performance"]').click()
   const cards = page.locator('.performance-page:visible .table-wrap .table:has(th .th-sort:text-is("Rounds"))')
-  const cardRow = cards.locator('tbody tr', { hasText: `#${n} Cost per card` })
+  // The cards by key (#1221).
+  const [nName, mName] = [await lib.cardLabel(inv, n), await lib.cardLabel(inv, m)]
+  const cardRow = cards.locator('tbody tr', { hasText: `${nName} Cost per card` })
   check('Performance lists the card', !!(await until(async () => (await cardRow.count()) === 1, HUNG_MS)))
   check('…with its cost and rounds', /≈ \$\d/.test(plain(await cardRow.innerText())) && /\b1\b/.test(await cardRow.innerText()), await cardRow.innerText())
-  const unknownRow = cards.locator('tbody tr', { hasText: `#${m} Nobody ran` })
-  check('…and the unknown one as Unknown, sorted last', /Unknown/.test(await unknownRow.innerText().catch(() => '')) && (await cards.locator('tbody tr').last().innerText()).includes(`#${m}`))
+  const unknownRow = cards.locator('tbody tr', { hasText: `${mName} Nobody ran` })
+  check('…and the unknown one as Unknown, sorted last', /Unknown/.test(await unknownRow.innerText().catch(() => '')) && (await cards.locator('tbody tr').last().innerText()).includes(mName))
   await page.screenshot({ path: path.join(shots, 'performance.png') })
   await cardRow.click()
   // Its title is in a field (innerText leaves it out): the card's own cost line says it is this one.

@@ -149,6 +149,8 @@ export interface AdvancedDef {
   /** Who takes a change: at once, sessions started afterwards, or Hive when it next starts (Settings offers a restart). */
   applies: 'now' | 'sessions' | 'restart'
   samples?: AdvancedSample[]
+  /** An off switch for one of Hive's overrides of the CLI's own behaviour (overrideId). */
+  override?: boolean
 }
 
 /** Hive draws without the graphics card (#676): read from advanced.json before the app is ready (main/gpu.ts). */
@@ -162,6 +164,14 @@ export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
  */
 export const rightClickToCliId = (provider: string): string => `${provider}.mouse.rightClickToCli`
+
+/**
+ * The off switch for one of Hive's overrides of a CLI's own behaviour (#966, #1167; Darren's principle on #737: every
+ * one has a switch): `<provider>.override.<what>`, a boolean marked `override`, on by default (what Hive does today).
+ * Off, Hive leaves that part to the CLI and the user's own config, which Hive never writes either way. Its description
+ * says what Hive loses without the override, and its samples show the CLI documenting the flag or variable Hive sets.
+ */
+export const overrideId = (provider: ProviderId, what: string): string => `${provider}.override.${what}`
 
 /**
  * How long Hive waits for a provider's CLI to draw a line it typed before pressing Enter anyway (#600):
@@ -945,6 +955,100 @@ const SOURCES: readonly AdvancedSource[] = [
     default: false,
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/mouse-copilot-1.0.95.json`, version: '1.0.95', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Copilot turning on mouse tracking as Hive starts it (without --no-mouse), which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // The same for Claude Code and Codex (#1167). Codex tracks the mouse since 0.163; Claude Code (2.1.305) doesn't at its
+  // prompt, so a right-click passed to it does nothing there, but Hive's copy/paste can still be turned off.
+  {
+    id: rightClickToCliId('claude-code'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.mouse.rightClickToCli.desc',
+      defaultMessage: "Right-click in a Claude Code pane is Hive's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Hive passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
+      description: 'What the advanced setting "Pass right-click to Claude Code" is for (Settings → Advanced, under Claude Code). Ctrl+C and Ctrl+V name keys: use the key names your language uses.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/mouse-claude-2.1.305.json`, version: '2.1.305', text: '"mouseTracking": "none"', shows: 'Claude Code turning on no mouse tracking at its prompt, so a passed right-click reaches nothing there' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: rightClickToCliId('codex'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({
+      id: 'settings.advanced.codex.mouse.rightClickToCli.desc',
+      defaultMessage: "Right-click in a Codex pane is Hive's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Hive passes right-clicks to Codex instead, which tracks the mouse itself.",
+      description: 'What the advanced setting "Pass right-click to Codex" is for (Settings → Advanced, under Codex). Shift+drag names a key and a mouse action: use the key names your language uses.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/mouse-codex-0.163.0.json`, version: '0.163.0', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Codex turning on mouse tracking as Hive starts it, which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // Off switches for Hive's overrides of the CLIs' own behaviour (#966, #1167): on is what Hive does today.
+  {
+    id: overrideId('claude-code', 'promptSnapshotOff'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.override.promptSnapshotOff.title', defaultMessage: 'Resume the Assistant with its current instructions', description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.override.promptSnapshotOff.desc',
+      defaultMessage: "When the Hive Assistant's conversation resumes, Hive starts Claude Code with --system-prompt-snapshot off, so the Assistant follows its role and Control settings as they are now. Turned off, Hive leaves the flag out and Claude Code keeps sending the instructions it recorded when the conversation began, until it compacts: a change to the Assistant's settings may not reach it until then. --system-prompt-snapshot in Extra arguments wins either way.",
+      description: 'What the advanced setting "Resume the Assistant with its current instructions" does (Settings → Advanced, under Claude Code). --system-prompt-snapshot off is a command-line option and its value: keep them. Control is the name of the Assistant\'s settings page.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--system-prompt-snapshot <on|off>', shows: "Claude Code's help for the flag Hive passes on the Assistant's resumes" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('codex', 'terminalTitle'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.override.terminalTitle.title', defaultMessage: "Set Codex's terminal title", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.codex.override.terminalTitle.desc',
+      defaultMessage: "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Hive tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Agent Setup keeps Hive's title, which it waits on.",
+      description: 'What the advanced setting "Set Codex\'s terminal title" does (Settings → Advanced, under Codex). Terminal title items is another setting\'s title: use it as Settings shows it. tui.terminal_title is a config key and "Action Required" is Codex\'s own text: keep them. Agent Setup is a dialog\'s name.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Hive gave it" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('copilot', 'noAutoUpdate'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.override.noAutoUpdate.title', defaultMessage: "Don't let Copilot update itself", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.copilot.override.noAutoUpdate.desc',
+      defaultMessage: "Hive starts Copilot with --no-auto-update and COPILOT_AUTO_UPDATE=false (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Agent Setup updates it when you choose. Turned off, Hive sets neither and Copilot updates itself as it would outside Hive (your own COPILOT_AUTO_UPDATE still applies).",
+      description: 'What the advanced setting "Don\'t let Copilot update itself" does (Settings → Advanced, under GitHub Copilot). --no-auto-update is a command-line option and COPILOT_AUTO_UPDATE=false an environment variable: keep them. Update is a button\'s name and Agent Setup a dialog\'s.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--no-auto-update', shows: "Copilot's help for the flag Hive passes" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '`COPILOT_AUTO_UPDATE`: set to "false"', shows: "Copilot's help for the variable Hive sets" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: overrideId('copilot', 'allMcpInstructions'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.override.allMcpInstructions.title', defaultMessage: "Include every MCP server's instructions", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    desc: msg({
+      id: 'settings.advanced.copilot.override.allMcpInstructions.desc',
+      defaultMessage: "Hive starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the hive server's instructions (Hive's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Hive gives its guidance as custom instructions instead.",
+      description: 'What the advanced setting "Include every MCP server\'s instructions" does (Settings → Advanced, under GitHub Copilot). --allow-all-mcp-server-instructions is a command-line option: keep it. hive is the name of Hive\'s MCP server.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--allow-all-mcp-server-instructions', shows: "Copilot's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.hooks.knownEvents',
