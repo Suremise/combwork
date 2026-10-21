@@ -1,4 +1,4 @@
-import { execFile } from 'child_process'
+import { execFile, type ChildProcess } from 'child_process'
 import { resolve, sep } from 'path'
 import { lstat, readFile, readlink } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
@@ -39,6 +39,8 @@ export const GIT_PREFIX = ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=f
 export interface GitRunOptions {
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /** Told of git's process as it starts, before git can write anything (the merge queue's runner records it: #1360). */
+  onSpawn?: (child: ChildProcess) => void
 }
 
 /** A seam for unit tests: told of each git command as it starts (#732 counts a template plan's and load's). */
@@ -58,6 +60,7 @@ export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, i
       else if (!err || typeof errCode === 'number') noteGitRan()
       res({ out: buf.toString('utf8'), ok: !err, buf, err: ((stderr as unknown as Buffer) ?? Buffer.alloc(0)).toString('utf8').trim(), code, ...(missing ? { missing } : {}), ...((err as { killed?: boolean } | null)?.killed && opts.timeout ? { timedOut: true } : {}) })
     })
+    opts.onSpawn?.(child)
     // What the command reads (update-ref --stdin's transaction).
     if (input !== undefined) child.stdin?.end(input)
   })

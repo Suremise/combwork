@@ -15,6 +15,7 @@ import { checkProject } from './branchWatch'
 import { branchPlace, mergeInProject, reserveForRemoval } from './projectAgents'
 import { workspace, workspaceOf } from './workspace'
 import * as wt from './worktrees'
+import { FactStore } from './workflow/factStore'
 
 const log = createLogger('worktrees')
 
@@ -40,6 +41,35 @@ async function unsafe(projectPath: string, path: string): Promise<string | null>
   return null
 }
 
+/**
+ * The merge queue's folders a running runner holds now (#1360): never offered, whoever's Hive runs it. A folder of a
+ * runner whose process has gone (it crashed), or kept for the next one, is an unused worktree like any other.
+ */
+function queueFoldersInUse(projectPath: string): Set<string> {
+  try {
+    const store = FactStore.forBoard(workspaceOf(projectPath), { project: basename(projectPath), key: basename(projectPath) })
+    const out = new Set<string>()
+    for (const f of store.queueFolders()) {
+      const holder = f.lease ? store.queueLease(f.target) : null
+      if (holder && holder.lease === f.lease && running(holder.pid)) out.add(key(f.folder))
+    }
+    return out
+  } catch {
+    // A board still 0.9's (no queue tables), or none open: no queue runs.
+    return new Set()
+  }
+}
+
+/** Whether a process with this id runs (a quick look: a pid given again keeps a folder hidden, never shows a used one). */
+const running = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
 /** The worktrees git lists for the project that no agent works in, as they are now (no check yet). */
 async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ listed: { path: string; branch: string | null }[]; problem?: string }> {
   const all = await (reads ? reads.worktrees() : wt.listWorktrees(projectPath))
@@ -47,7 +77,7 @@ async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ 
     const problem = gitProblem()
     return problem ? { listed: [], problem } : { listed: [] }
   }
-  const used = new Set(projectAgents(await workspace.projectConfig(projectPath)).flatMap((a) => (a.worktree ? [key(a.worktree.path)] : [])))
+  const used = new Set([...projectAgents(await workspace.projectConfig(projectPath)).flatMap((a) => (a.worktree ? [key(a.worktree.path)] : [])), ...queueFoldersInUse(projectPath)])
   const listed: { path: string; branch: string | null }[] = []
   for (const w of all) {
     if (key(w.path) === key(projectPath) || used.has(key(w.path)) || !existsSync(w.path)) continue

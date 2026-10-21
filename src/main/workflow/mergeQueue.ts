@@ -18,6 +18,7 @@ import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { CardRecord } from './factStore'
+import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import type { Workflow, Write } from './runtime'
 
@@ -39,6 +40,11 @@ export interface QueueConfig {
   manifests?: string[]
   /** An agent builds in this folder (holds file locks there, or has a run going in it). */
   folderBusy?: (folder: string) => boolean
+  /**
+   * Whether this queue's runner still holds its target's lease (#1360, QueueRunner.holds): checked inside each write
+   * the queue makes (its facts, a pause), which is refused whole once it doesn't, and the queue stops. Left out, always.
+   */
+  holds?: () => boolean
   /** Test seams: crash injection and races between the queue's steps. */
   hooks?: {
     afterTest?: (entry: string) => void | Promise<void>
@@ -63,6 +69,12 @@ export const MAX_RETESTS = 3
 
 const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
 
+/** A runner that lost its lease stops at once: no outcome (another Hive's runner carries on). */
+const lostIsNull = (e: unknown): null => {
+  if (e instanceof LeaseLost) return null
+  throw e
+}
+
 export class MergeQueue {
   /** Entries a restart's recovery found should run again from the test merge. */
   private rerun = new Set<string>()
@@ -84,9 +96,19 @@ export class MergeQueue {
     this.wf.store.setQueuePause(target, null)
   }
 
-  private pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): QueueOutcome {
-    this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) })
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): Promise<QueueOutcome> {
+    await this.wf.locked(() =>
+      this.wf.store.quiet(() => {
+        this.fence(target)
+        this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) })
+      })
+    )
     return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
+  }
+
+  /** Throws LeaseLost once the runner doesn't hold the target's lease (inside a write: it is refused whole). */
+  private fence(target: string): void {
+    if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
   }
 
   /** The queue's entries for a target, in the order they were requested: open, or recovered to run again. */
@@ -106,7 +128,7 @@ export class MergeQueue {
   async drain(target: string): Promise<QueueOutcome[]> {
     const out: QueueOutcome[] = []
     for (let i = 0; i < 50; i++) {
-      const o = await this.runOnce(target)
+      const o = await this.runOnce(target).catch(lostIsNull)
       if (!o) break
       out.push(o)
       if (o.outcome === 'paused') break
@@ -119,12 +141,16 @@ export class MergeQueue {
     if (this.paused(target)) return null
     const next = this.entries(target)[0]
     if (!next) return null
-    return this.process(next.card, next.entry)
+    return this.process(next.card, next.entry).catch(lostIsNull)
   }
 
-  private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
+  /** A write of the queue's for a card, fenced: refused whole (LeaseLost) once its runner doesn't hold the target. */
+  private async write<T>(card: CardRecord, fn: (w: Write) => T, target?: string): Promise<T> {
     const s = this.wf.state(card)
-    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', fn)
+    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', (w) => {
+      this.fence(target ?? s.entries.at(-1)?.target ?? '')
+      return fn(w)
+    })
   }
 
   /**
@@ -443,14 +469,14 @@ export class MergeQueue {
         const u = await git(this.project, ['update-ref', `refs/heads/${e.target}`, result, expected])
         if (u.ok) await done()
         else {
-          this.pause(e.target, card, e, 'needsYou', files)
+          await this.pause(e.target, card, e, 'needsYou', files)
           out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
         }
       } else if (phase === 'rollback' && (await at(expected))) {
         this.rerun.add(e.id)
         out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
       } else {
-        this.pause(e.target, card, e, 'needsYou', files)
+        await this.pause(e.target, card, e, 'needsYou', files)
         out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
       }
     }

@@ -258,6 +258,17 @@ moved head and sameness, containment, reconcile, a check's bracket, check copies
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
 
+**The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
+takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
+holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only, never a
+takeover). Its processes go through `spawn` and `git` (recorded in `queue_runner_procs` in the same write that checks the
+lease); a takeover ends a dead runner's still running (as trees, by pid and start), then makes its own worktree
+(`queue_worktrees`, one per lease) and removes the old one. `holds()` is checked inside each write the queue makes
+(`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`, undoing the write, and the queue stops). `queueFolderNeeded`
+keeps a released runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it.
+Workspace close (`WorkspaceService.closingTasks`), quit and project removal release the runners (`releaseQueueRunners`,
+`forgetProjectQueues`).
+
 **Layers and modules (planned):**
 
 | Layer | Shared (pure, unit-tested) | Main |
@@ -266,7 +277,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
-| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
+| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
 | Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
