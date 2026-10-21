@@ -268,6 +268,52 @@ describe('decisions wake the loop (#1266, S5; #587)', () => {
   })
 })
 
+describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
+  it("decisions on two Review cards for one busy builder: its line tells both (the second's wake carries the first's card on)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const first = await inReview(w)
+    const second = await inReview(w)
+    await settled()
+    await inWorkspace(w, () => tasks.updateTask(first, { decision: 'First card decision' }, user))
+    await settled()
+    await inWorkspace(w, () => tasks.updateTask(second, { decision: 'Second card decision' }, user))
+    await settled()
+    st.status.set('b1', 'ready')
+    await typedUntil(st, 1)
+    await settled()
+    const said = st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join(' ')
+    expect(said).toContain(`#${first} has 1 new decision`)
+    expect(said).toContain(`#${second} has 1 new decision`)
+  })
+
+  it("another Hive's delivery, saved after this one read its own, outlives this one's next save", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    await inReview(w)
+    await settled()
+    const mine = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'old local' })
+    const db = store.workspaceDb(ws).writer
+    const row = db.prepare('SELECT * FROM deliveries WHERE id = ?').get(mine.id) as Record<string, unknown>
+    // Another Hive's, with the id this one would give next, and an action's.
+    const next = `m${mine.seq + 1}`
+    const theirs = { ...row, id: next, seq: mine.seq + 1, body: 'another Hive wake', action: 99999 }
+    const { DatabaseSync } = await import('node:sqlite')
+    const outside = new DatabaseSync(store.boardFile(ws))
+    try {
+      outside.prepare(`INSERT INTO deliveries (${Object.keys(theirs).join(', ')}) VALUES (${Object.keys(theirs).map(() => '?').join(', ')})`).run(...(Object.values(theirs) as never[]))
+    } finally {
+      outside.close()
+    }
+    const later = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'later local' })
+    // Theirs is kept as they saved it; this one's new delivery took the next free id instead of theirs.
+    expect({ ...(db.prepare('SELECT id, body FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ id: next, body: 'another Hive wake' })
+    expect(later.id).not.toBe(next)
+    expect({ ...(db.prepare('SELECT body FROM deliveries WHERE host = (SELECT host FROM deliveries WHERE action = 99999) AND id = ?').get(later.id) as object) }).toEqual({ body: 'later local' })
+    expect(deliveries.deliveryNow(alpha, later.id)?.body).toBe('later local')
+  })
+})
+
 describe('off switches (#1266)', () => {
   it("the project's loop wakes off: no arrival, request or decision wakes anyone", async () => {
     const { w, ws, alpha } = await open({ loopWakes: false })
@@ -298,58 +344,163 @@ describe('off switches (#1266)', () => {
 })
 
 describe('notices (#1266, §16.11.4)', () => {
-  it('a notify action is claimed: shown once, however often the actions run', async () => {
+  /** A notice action written as another Hive's change would (pending), with `attempts` tries already counted. */
+  const noticeAction = (ws: string, card: number, kind: string, payload: Record<string, unknown>, attempts = 0): number => {
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    try {
+      const id = own.tx((tx) => tx.action(card, kind, payload, null))
+      store.workspaceDb(ws).writer.prepare('UPDATE card_actions SET attempts = ? WHERE id = ?').run(attempts, id)
+      return id
+    } finally {
+      own.close()
+    }
+  }
+  const stateOf = (ws: string, id: number) => ({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as { state: string; attempts: number }) })
+  /** What the notices told so far, as one text (their titles and lines). */
+  const toldText = (st: { notices: unknown[] }) => JSON.stringify(st.notices)
+
+  it('a notify action is shown once, however often the actions run at once', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha)
     const c = await newCard(w)
-    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
-    own.tx((tx) => tx.action(c, 'notify', { text: 'alpha-1 waits for your review' }, null))
-    own.close()
+    const id = noticeAction(ws, c, 'notify', { text: 'alpha-1 waits for your review' })
     await Promise.all([worker.runActions(w), worker.runActions(w)])
     await worker.runActions(w)
     expect(st.notices).toHaveLength(1)
-    expect(JSON.stringify(st.notices[0])).toContain('waits for your review')
+    expect(toldText(st)).toContain('waits for your review')
+    expect(stateOf(ws, id)).toEqual({ state: 'done', attempts: 1 })
+  })
+
+  it('a notice is never lost to a crash between its try and its mark: tried once more on reopen, and never a third time', async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    // Its try counted, then Hive ended (or the workspace closed) before it was marked, perhaps before it was shown.
+    const once = noticeAction(ws, c, 'notify', { text: 'tried once' }, 1)
+    // Tried twice already: it may have been shown twice; never a third time.
+    const twice = noticeAction(ws, c, 'notify', { text: 'tried twice' }, 2)
+    await worker.runActions(w)
+    expect(st.notices).toHaveLength(1)
+    expect(toldText(st)).toContain('tried once')
+    expect(stateOf(ws, once)).toEqual({ state: 'done', attempts: 2 })
+    expect(stateOf(ws, twice)).toEqual({ state: 'done', attempts: 2 })
   })
 
   it("a notify action with Hive's own message (#1264) shows it in the language shown, its English kept beside it", async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha)
     const c = await newCard(w)
-    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
-    own.tx((tx) => tx.action(c, 'notify', { text: 'AL-9 is approved: OK to merge?', shown: { id: 'workflow.forYou.okBefore', values: { card: 'AL-9' } } }, null))
-    own.close()
+    noticeAction(ws, c, 'notify', { text: 'AL-9 is approved: OK to merge?', shown: { id: 'workflow.forYou.okBefore', values: { card: 'AL-9' } } })
     await worker.runActions(w)
     expect(st.notices).toHaveLength(1)
     expect(JSON.stringify(st.notices[0].body)).toContain('"shown":"AL-9 is approved: OK to merge?"')
     expect(JSON.stringify(st.notices[0].body)).toContain('"english":"AL-9 is approved: OK to merge?"')
   })
 
-  it("a lane's failed review, a card blocked and its merge due are told, one notice per lane at a time; a lane already running starts from now", async () => {
+  it("a lane's failed review, a card blocked and its merge due are told; a lane already running starts from now; nothing new tells nothing", async () => {
     const { w, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
     const c = await inReview(w)
-    // Hive begins following: the lane, already running, from now.
-    notices.forgetLaneNotices()
     await notices.checkLanesNow(w)
-    st.notices.length = 0
+    await settled()
+    // Already running when Hive began following it: nothing of before is told.
+    expect(st.notices).toEqual([])
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
     await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Waiting for the API key' }, b1))
+    await vi.waitFor(async () => {
+      await notices.checkLanesNow(w)
+      await worker.actionsSettled()
+      expect(toldText(st)).toContain('Waiting for the API key')
+    }, HANG)
+    expect(toldText(st)).toContain('B1 / R1')
+    expect(toldText(st)).toContain('failed review')
+    const told = st.notices.length
+    // Each event once: looking again tells nothing.
     await notices.checkLanesNow(w)
-    expect(st.notices).toHaveLength(1)
-    const told = JSON.stringify(st.notices[0])
-    expect(told).toContain('B1 / R1')
-    expect(told).toContain('failed review')
-    expect(told).toContain('Waiting for the API key')
-    // Nothing new: nothing told.
-    await notices.checkLanesNow(w)
-    expect(st.notices).toHaveLength(1)
+    await settled()
+    expect(st.notices).toHaveLength(told)
     // Its merge due: every card passed.
     await inWorkspace(w, () => tasks.updateTask(c, { blocked: '' }, b1))
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'PASSED' }))
+    await vi.waitFor(async () => {
+      await notices.checkLanesNow(w)
+      await worker.actionsSettled()
+      expect(JSON.stringify(st.notices.slice(told))).toContain('its merge is due')
+    }, HANG)
+  })
+
+  it('an event before a restart is told after it: what lanes were told is kept with the board, not in memory', async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
     await notices.checkLanesNow(w)
-    expect(st.notices).toHaveLength(2)
-    expect(JSON.stringify(st.notices[1])).toContain('its merge is due')
+    await settled()
+    // The failure commits, and Hive stops before it looked at the lanes again.
+    notices.noticeTestHooks.hold = true
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
+      await settled()
+      expect(st.notices).toEqual([])
+      await disposeWorkspaceService(w)
+    } finally {
+      notices.noticeTestHooks.hold = false
+    }
+    const again = createWorkspaceService()
+    await again.open(ws)
+    opened.push(again)
+    await notices.checkLanesNow(again)
+    await vi.waitFor(async () => {
+      await worker.runActions(again)
+      expect(toldText(st)).toContain('failed review')
+    }, HANG)
+    expect(st.notices).toHaveLength(1)
+  })
+
+  it('two followers of one board (two Hives) tell an event once', async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await notices.checkLanesNow(w)
+    await settled()
+    notices.noticeTestHooks.hold = true
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which greeting?' }, b1))
+      // Two looks at once, each reading the marks before either writes (as two Hives would; Hive opens a workspace once
+      // per process): the second's board change finds the marks the first moved on.
+      await Promise.all([notices.checkLanesNow(w), notices.checkLanesNow(w)])
+    } finally {
+      notices.noticeTestHooks.hold = false
+    }
+    await settled()
+    const written = store.workspaceDb(ws).reader.prepare("SELECT count(*) AS n FROM card_actions WHERE kind = 'laneNotice'").get() as { n: number }
+    expect(written.n).toBe(1)
+    expect(st.notices).toHaveLength(1)
+  })
+
+  it("the project's loop wakes off: no lane notice and no request notice", async () => {
+    const { w, ws, alpha } = await open({ loopWakes: false })
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await notices.checkLanesNow(w)
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
+    await notices.checkLanesNow(w)
+    noticeAction(ws, c, 'notify', { text: 'needs you' })
+    await worker.runActions(w)
+    await settled()
+    expect(st.notices).toEqual([])
+    // Its lane's marks still moved on: turned on again, what happened while off isn't told then.
+    expect((store.workspaceDb(ws).reader.prepare('SELECT failed FROM lane_notice_cards WHERE card = ?').get(c) as { failed: string }).failed).not.toBe('')
+  })
+
+  it('workflow rules not enforced: notices still come (they are no gate)', async () => {
+    await advanced.set(ENFORCE, false)
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    noticeAction(ws, c, 'notify', { text: 'needs you, rules off' })
+    await worker.runActions(w)
+    expect(toldText(st)).toContain('needs you, rules off')
   })
 })

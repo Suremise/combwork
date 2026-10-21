@@ -1,14 +1,18 @@
 import { join } from 'path'
+import type { DatabaseSync } from 'node:sqlite'
 import { shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { laneHits, newLaneBase, type LaneHit, type LaneMark } from '../shared/laneWatch'
+import { laneHits, newLaneBase, type LaneCardMark, type LaneEvent, type LaneMark } from '../shared/laneWatch'
 import { cardLabel } from '../shared/projectKeys'
+import type { TaskColumn } from '../shared/types'
 import { workflowLine } from '../shared/workflow/texts'
+import { boardRead, boardReadOnly, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { createLogger } from './logger'
-import { sessions } from './sessions'
 import { listLanes } from './lanes'
+import { createLogger } from './logger'
+import { wakesOn } from './loopWakes'
+import { sessions } from './sessions'
 import { allTasks, getTask } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction } from './workflow/actionWorker'
@@ -20,13 +24,16 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * the user (the runtime's `notify` action: For you, a "couldn't within the rules"), and what the Assistant's lane watch
  * reports of each running lane (a failed review, a card blocked or stalled, every card passed so the merge is due, the
  * merge stalled). Each is a notice, a banner in the window the user is using or a Windows notification, as the user's
- * notification settings say (Settings → Notifications: their off switch); a quiet test copy records it to
- * HIVE_TEST_NOTIFY_LOG. A lane's events found together are one notice, per lane.
+ * notification settings say (Settings → Notifications); a quiet test copy records it to HIVE_TEST_NOTIFY_LOG. A lane's
+ * events found together are one notice, per lane. Like the loop's wakes, none for a project whose Project Settings →
+ * Card loops → Wake reviewers and builders is off (`loopWakes`).
  *
- * A notice makes no delivery, so a `notify` action is claimed (marked done before it is shown: at most once, never twice).
- * Lane notices follow every running lane of each open workspace from what the board and lanes are now, by marks of
- * their own kept in memory (as a lane watch's): a lane already running when Hive started is followed from then, so a
- * restart never tells again what was told before it.
+ * Both are durable actions (`notify`, `laneNotice`), repeatable (actionWorker.ts): never lost to a crash or a close
+ * before they were shown, repeated at most once. A lane's events are found by comparing it with what was last told of
+ * it, kept with the board (`lane_notice_lanes`, `lane_notice_cards`): in one board change, the marks move on and each
+ * lane's notice is written as an action, so a restart tells what it hadn't yet, and two Hives on one workspace tell each
+ * event once (the second finds the marks moved on). A lane running when Hive first followed lanes on the board (its
+ * `since`) starts from then; one started later is told from its start.
  */
 
 const log = createLogger('workflow')
@@ -43,14 +50,26 @@ const M = {
 }
 
 /** The events Hive tells the user of, as the Assistant's lane watch does by default (§16.11.4), less what it says itself. */
-const EVENTS = ['failed', 'blocked', 'stalled', 'merge-due'] as const
+const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due']
 
 /** How often running lanes are looked at with no change (a stall comes with time), as lane watches are. */
 const TICK_MS = 30_000
 
+/** board_meta's key for when Hive first followed this board's lanes (ISO): lanes running then start from then. */
+const SINCE = 'lane_notices_since'
+
 /** A notice about a project's work, as the user's notification settings say. */
 function tell(projectPath: string, title: Text, lines: TextPart[]): void {
   sessions.notice(projectPath, title, lines.length === 1 ? lines[0] : { lines })
+}
+
+/** A card's project folder and the card, while it is on the board and its project lets loops wake (and tell) anyone. */
+async function cardIn(ws: WorkspaceService, n: number): Promise<{ projectPath: string; card: Awaited<ReturnType<typeof getTask>> } | null> {
+  if (!ws.path) return null
+  const card = await getTask(n, ws).catch(() => null)
+  if (!card?.project || card.archived) return null
+  const projectPath = join(ws.path, card.project)
+  return (await wakesOn(ws, projectPath)) ? { projectPath, card } : null
 }
 
 /**
@@ -58,76 +77,137 @@ function tell(projectPath: string, title: Text, lines: TextPart[]): void {
  * message (`shown`, #1264: Hive's own requests), else as written (an agent's own words), and in English for the Agent API.
  */
 async function notifyFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
-  if (!ws.path) return
-  const card = await getTask(a.card, ws).catch(() => null)
-  if (!card?.project || card.archived) return
-  const projectPath = join(ws.path, card.project)
+  const at = await cardIn(ws, a.card)
+  if (!at) return
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
   const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
   const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [text] : []
-  tell(projectPath, withValues(M.forYou, { card: cardLabel(card) }), body)
+  tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body)
 }
 
-/** A lane's events as the notice's lines, each card named as the window names it (`labels`: by number, #1221). */
-function linesOf(hit: LaneHit, labels: Map<number, string>): TextPart[] {
-  return hit.parts.map((p) => {
-    const card = p.n !== null ? (labels.get(p.n) ?? `#${p.n}`) : ''
-    switch (p.event) {
-      case 'failed':
-        return withValues(M.failed, { card })
-      case 'blocked':
-        return p.detail ? withValues(M.blocked, { card, reason: p.detail }) : withValues(M.blockedNoReason, { card })
-      case 'stalled':
-        return p.n === null ? M.mergeStalled : withValues(M.stalled, { card })
-      default:
-        return M.mergeDue
-    }
+/** A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why. */
+interface Told {
+  event: LaneEvent
+  card: number | null
+  detail?: string
+}
+
+/** A `laneNotice` action: a lane's events, one notice, each card named as the window names it (#1221). */
+async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
+  const at = await cardIn(ws, a.card)
+  if (!at || !ws.path) return
+  const events = (Array.isArray(a.payload.events) ? a.payload.events : []) as Told[]
+  const numbers = events.flatMap((e) => (typeof e.card === 'number' ? [e.card] : []))
+  const labels = new Map(numbers.length ? (await allTasks(ws, { numbers })).map((c) => [c.number, cardLabel(c)]) : [])
+  const lines = events.map((e): TextPart => {
+    const card = e.card !== null ? (labels.get(e.card) ?? `#${e.card}`) : ''
+    if (e.event === 'failed') return withValues(M.failed, { card })
+    if (e.event === 'blocked') return e.detail ? withValues(M.blocked, { card, reason: e.detail }) : withValues(M.blockedNoReason, { card })
+    if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
+    return M.mergeDue
   })
+  if (lines.length) tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines)
 }
 
-/** Per workspace (by path): when Hive began following its lanes, and each lane as last told. */
-const follows = new Map<string, { since: string; marks: Record<string, LaneMark> }>()
+// --- What lane notices last told, with the board.
 
-/** Looks at a workspace's running lanes now: each one's events since it was last looked at, one notice per lane. */
+type MarkRow = { lane: string; state: string; merge_due: number; merge_stalled: number }
+type CardRow = { lane: string; card: number; col: string; blocked: number; stalled: number; failed: string; passed: string }
+
+/** Each lane as its notices last told it. */
+function readMarks(db: DatabaseSync): Record<string, LaneMark> {
+  const out: Record<string, LaneMark> = {}
+  for (const r of db.prepare('SELECT lane, state, merge_due, merge_stalled FROM lane_notice_lanes').all() as MarkRow[]) out[r.lane] = { state: r.state as LaneMark['state'], mergeDue: r.merge_due === 1, ...(r.merge_stalled ? { ms: true } : {}), cards: {} } // i18n-ignore: SQL
+  for (const c of db.prepare('SELECT lane, card, col, blocked, stalled, failed, passed FROM lane_notice_cards').all() as CardRow[]) { // i18n-ignore: SQL
+    const m = out[c.lane]
+    if (m) m.cards[c.card] = { c: c.col as TaskColumn | 'gone', b: c.blocked === 1, s: c.stalled === 1, f: c.failed, p: c.passed } satisfies LaneCardMark
+  }
+  return out
+}
+
+/** Keeps a lane's mark as told (replacing what was), or drops it (null: a lane no longer followed). */
+function writeMark(db: DatabaseSync, lane: string, m: LaneMark | null): void {
+  db.prepare('DELETE FROM lane_notice_lanes WHERE lane = ?').run(lane) // i18n-ignore: SQL
+  if (!m) return
+  db.prepare('INSERT INTO lane_notice_lanes (lane, state, merge_due, merge_stalled) VALUES (?, ?, ?, ?)').run(lane, m.state, m.mergeDue ? 1 : 0, m.ms ? 1 : 0) // i18n-ignore: SQL
+  const ins = db.prepare('INSERT INTO lane_notice_cards (lane, card, col, blocked, stalled, failed, passed) VALUES (?, ?, ?, ?, ?, ?, ?)') // i18n-ignore: SQL
+  for (const [n, c] of Object.entries(m.cards)) ins.run(lane, Number(n), c.c, c.b ? 1 : 0, c.s ? 1 : 0, c.f, c.p)
+}
+
+const metaOf = (db: DatabaseSync, key: string): string | null => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null // i18n-ignore: SQL
+
+/**
+ * Looks at a workspace's running lanes now: each one's events since it was last told, as a `laneNotice` action (one per
+ * lane), and its mark moved on, in one board change against the marks as they are then (another Hive's included).
+ */
 async function check(ws: WorkspaceService): Promise<void> {
   const path = ws.path
-  if (!path) return
-  const key = path.toLowerCase()
-  const f = follows.get(key) ?? { since: new Date().toISOString(), marks: {} }
-  follows.set(key, f)
-  const lanes = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l]))
-  const nows = await lanesNowIn(ws, f.marks, f.since)
-  // Closed, or another workspace opened in its window, meanwhile: nothing told for it.
-  if (ws.path !== path || !openWorkspaces().includes(ws)) return
-  const marks: Record<string, LaneMark> = {}
-  for (const now of nows) {
-    const lane = lanes.get(now.id)
-    // A lane first seen: one started since Hive began following starts empty (what it came with is told), else from now.
-    const base = f.marks[now.id] ?? (lane && Date.parse(lane.startedAt) > Date.parse(f.since) ? newLaneBase(now, f.since) : null)
-    marks[now.id] = now.mark
-    const hit = laneHits(base, now, EVENTS, f.since)
-    if (!hit || !lane) continue
-    const numbers = hit.parts.flatMap((p) => (p.n !== null ? [p.n] : []))
-    const labels = new Map(numbers.length ? (await allTasks(ws, { numbers })).map((c) => [c.number, cardLabel(c)]) : [])
-    tell(join(path, lane.project), withValues(M.lane, { lane: hit.label }), linesOf(hit, labels))
+  if (!path || boardReadOnly(ws)) return
+  const life = ws.lifetime
+  const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path && openWorkspaces().includes(ws)
+  let told: { marks: Record<string, LaneMark>; since: string }
+  try {
+    told = boardRead(ws, (db) => ({ marks: readMarks(db), since: metaOf(db, SINCE) ?? new Date().toISOString() }))
+  } catch {
+    // A board without the lane notices' tables (not upgraded): nothing to follow.
+    return
   }
-  // Only running lanes are followed on: one ended, abandoned or gone is dropped.
-  f.marks = Object.fromEntries(Object.entries(marks).filter(([, m]) => m.state === 'active' || m.state === 'paused'))
+  const lanes = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l]))
+  const nows = await lanesNowIn(ws, told.marks, told.since)
+  // Whose loops tell anyone: a project with loop wakes off gets no notices, its lanes' marks still moving on.
+  const quiet = new Set<string>()
+  for (const p of new Set([...lanes.values()].map((l) => l.project))) if (!(await wakesOn(ws, join(path, p)))) quiet.add(p.toLowerCase())
+  if (!alive()) return
+  await boardWrite(
+    ws,
+    async () =>
+      boardWriteOp(ws, (db) => {
+        const since = metaOf(db, SINCE) ?? told.since
+        db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
+        // As the marks are now: what another Hive told since this one read them isn't told again.
+        const marks = readMarks(db)
+        const running = new Set<string>()
+        for (const now of nows) {
+          const lane = lanes.get(now.id)
+          // A lane first seen: one started since Hive began following starts empty (what it came with is told), else from now.
+          const base = marks[now.id] ?? (lane && Date.parse(lane.startedAt) > Date.parse(since) ? newLaneBase(now, since) : null)
+          const hit = laneHits(base, now, EVENTS, since)
+          if (now.mark.state === 'active' || now.mark.state === 'paused') {
+            running.add(now.id)
+            writeMark(db, now.id, now.mark)
+          }
+          if (!hit || !lane || quiet.has(lane.project.toLowerCase())) continue
+          // On a card of the lane still on the board (the action's card), the first it names.
+          const cards = [...hit.parts.flatMap((p) => (p.n !== null ? [p.n] : [])), ...now.cards.map((c) => c.number)]
+          const on = cards.find((n) => !!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n)) // i18n-ignore: SQL
+          if (on === undefined) continue
+          const events: Told[] = hit.parts.map((p) => ({ event: p.event, card: p.n, ...(p.detail ? { detail: p.detail } : {}) }))
+          db.prepare("INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, 'laneNotice', ?, NULL)").run(on, JSON.stringify({ lane: hit.label, events })) // i18n-ignore: SQL
+        }
+        // Lanes no longer running (ended, abandoned, gone) are followed no more.
+        for (const id of Object.keys(marks)) if (!running.has(id)) writeMark(db, id, null)
+      }),
+    { alive }
+  )
 }
+
+/** For tests: `hold` keeps the lanes from being looked at on a change or the tick (a restart before the look, say). */
+export const noticeTestHooks: { hold: boolean } = { hold: false }
 
 /** A workspace's lanes looked at soon: one look at a time, a change during it looked at again after. */
 function checkSoon(ws: WorkspaceService): void {
-  if (!ws.path) return
+  if (!ws.path || noticeTestHooks.hold) return
   void coalesced(`lane-notices:${ws.path.toLowerCase()}`, () => check(ws)).catch((e) => log.warn('lane notices', e))
 }
 
 let started = false
-/** Wires Hive's own notices of the work (once, at start): the `notify` action, and lanes followed on every change and tick. */
+/** Wires Hive's own notices of the work (once, at start): its actions, and lanes looked at on every change and tick. */
 export function initWorkflowNotices(): void {
   if (started) return
   started = true
-  // A notice makes no delivery: claimed (marked done before it is shown), so at most once.
-  onAction('notify', notifyFromAction, 'claimed')
+  // A notice leaves nothing to find once shown: repeatable (never lost, repeated at most once).
+  onAction('notify', notifyFromAction, 'repeatable')
+  onAction('laneNotice', laneNoticeFromAction, 'repeatable')
   onHiveEvent((e) => {
     if (e.type !== 'tasks-changed' && e.type !== 'lanes-changed') return
     const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
@@ -138,6 +218,5 @@ export function initWorkflowNotices(): void {
   }, TICK_MS).unref?.()
 }
 
-/** For tests: looks at a workspace's lanes now (what a change or the tick does), and forgets what was followed. */
+/** For tests: looks at a workspace's lanes now (what a change or the tick does). */
 export const checkLanesNow = (ws: WorkspaceService): Promise<void> => check(ws)
-export const forgetLaneNotices = (): void => follows.clear()

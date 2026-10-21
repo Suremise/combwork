@@ -113,6 +113,26 @@ const check = (name, ok, extra = '') => {
     const dueNotice = () => notices().find((n) => n.body.includes('its merge is due'))
     check('every card passed: a notice that its merge is due', !!(await until(async () => !!dueNotice(), HUNG_MS)), JSON.stringify(notices()))
 
+    // With Hive focused (stubbed: a test window never takes the OS focus), a lane's notice is a banner in the window, as
+    // the user's notification settings say: before and after, for the screenshots.
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.isFocused = () => true
+      w.emit('focus')
+    })
+    await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-1-before.png') })
+    await inv('tasks:update', a, { blocked: 'Release notes first?' })
+    const banner = page.locator('.notice-banner', { hasText: 'Lane Builder / Reviewer (greetings)' })
+    check('with Hive focused, a lane notice is a banner in the window', !!(await until(async () => (await banner.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.notice-banner').allInnerTexts()))
+    check('…naming the card by its key and why it is blocked', (await banner.first().innerText()).includes(`${keyA} is blocked: Release notes first?`), await banner.first().innerText())
+    await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-2-banner.png') })
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.isFocused = () => false
+      w.emit('blur')
+    })
+    await inv('tasks:update', a, { blocked: '' })
+
     // Notifications off (Settings → Notifications): nothing more is told.
     await inv('settings:update', { notifications: { desktopNotifications: false } })
     const told = notices().length

@@ -157,8 +157,8 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => moveKeys(db)
   },
   {
-    // #1266: an action's delivery is recorded by its row in `deliveries` (the action's id, unique), and a notice is claimed
-    // instead; `card_actions.delivered` (#1215's stand-in) goes.
+    // #1266: an action's delivery is recorded by its row in `deliveries` (the action's id, unique), and a notice counts its
+    // tries instead; `card_actions.delivered` (#1215's stand-in) goes. And what lane notices have told (workflowNotices.ts).
     version: 9,
     name: ACTIONS_DELIVERED_STEP.name,
     group: UPGRADE_GROUP_ID,

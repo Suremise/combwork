@@ -484,8 +484,19 @@ async function save(store: Store, d: Draft): Promise<void> {
     if (store.gen !== dbGeneration(store.place.workspace)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
   }
   // Their table's rows that changed (#1211), the next id and the entries kept aside beside them, in one transaction.
+  // Only what this store read and kept is its own to delete (#1266): another Hive's rows saved since are left as they are,
+  // and a new delivery whose id that Hive took meanwhile takes the next free one (made here, before it is published).
   const records = d.records as unknown as Record<string, unknown>[]
-  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => writeDeliveries(db, store.place.scope, records), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  const known = new Set(store.records.map((r) => r.id))
+  let renamed = new Map<string, { id: string; seq: number }>()
+  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => void (renamed = writeDeliveries(db, store.place.scope, records, known)), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  for (const r of d.records) {
+    const to = renamed.get(r.id)
+    if (!to) continue
+    // The same record (what the transaction returns is it): its id is the one saved.
+    Object.assign(r, to)
+    d.next = Math.max(d.next, to.seq + 1)
+  }
 }
 
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */

@@ -478,7 +478,7 @@ real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EX
 | cards in tables (#1209) | `cards`: number (the permanent global `#N`), title, description, project, project_id, agent, agent_name, review_agent/_name/_since, col (the category, today's column), stage (the cached stage, null before a 1.0 move), ord, blocked, archived, archived_for, archived_batch, context_problems, pre_workflow, created/updated, extra, layout (place, project, archived by project, agent, reviewer, updated). `card_labels` (by label), `card_links` (blockedBy and links; by target), `card_context`, `card_comments`, `card_history` (by time), `card_decisions`, `card_holds` | `boardStore.ts` (rows), `tasks.ts` (rules) |
 | sessions and deliveries in tables (#1211; built, v6: `schema/sessionDeliveryTables.ts` moves `store_rows`' rows in and drops `store_rows`) | `sessions` per host (by agent), `session_cards` (by card), `sessions_deleted`, `sessions_deleted_usage`; `deliveries` per host (by agent, state, source and ref, card and round; the 7-day expiry by `received` and `ended`; unique `action`) | `sessionStore.ts`, `deliveries.ts` |
 | lanes, watches and metrics in tables (#1212) | `lanes` (by builder, reviewer, state and end), `lane_cards` (by card), `lane_frozen`; `watches` (one per folder and agent; by limit, by fired delivery), `watch_cards` (by card); `metrics_buckets` (by start), `metrics_series` (a row per series: part '' for the workspace or a project's name, family, key) | `lanes.ts`, `watches.ts`, `metrics.ts` |
-| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files` | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
+| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files`; `lane_notice_lanes`, `lane_notice_cards` (what lane notices told of each running lane, #1266) | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts`, `workflowNotices.ts` |
 | project keys (#1219) | `project_keys` (current and old keys, one current per project), `project_counters`, `cards.project_number` (unique per project), `card_aliases` ((old project, number) → card, for a card moved since) | `schema/keysStep.ts` (every query; `putCard` numbers a card as it is saved), `projectKeys.ts` (keys given at open, changed, notice, references), `shared/projectKeys.ts` (rules; `cardLabel`, a card as the window names it), `renderer/src/projectKeys.ts` (the window's keys and references; the keys read with the board, `project:keys`) |
 
 `board_meta` and `archive_batches` (an undo record of a bulk archive, read whole) stay as they are; the stores' few
@@ -588,9 +588,11 @@ pending. Each action runs in one of two ways (#1266), as its handler registered 
 **delivered** (`wake`, loopWakes.ts; `wakeOnDecision`, decisionWakes.ts), checked still pending in a board change of
 its own, then its handler runs, whose delivery carries the action's id (`deliveries.action`, unique: `actionDelivered`
 finds one made, in memory or in hive.db, another Hive's too), then it is marked done (failed when the handler throws;
-never tried again); or **claimed** (`notify`, workflowNotices.ts, and every kind with no handler, marked done as the
-no-op it is: `prepareReviewCopy`, `releaseSlot`, `enqueue`, `pin`, `prepareSlot`, `endLaneIfDone` until P5 and P7),
-marked done by a conditional update before its handler runs, so only the run that claimed it runs it. The recorder
+never tried again); **repeatable** (`notify` and `laneNotice`, workflowNotices.ts), its try counted (`attempts`,
+moved on by a conditional update) before its handler runs, at most twice, then marked; or **claimed** (every kind with
+no handler, marked done as the no-op it is: `prepareReviewCopy`, `releaseSlot`, `enqueue`, `pin`, `prepareSlot`,
+`endLaneIfDone` until P5 and P7). deliveries.ts saves a host's rows against what another Hive saved since it read them
+(`writeDeliveries`' `known`: only its own rows are deleted, a taken id is renumbered). The recorder
 writes the loop's handoffs as `wake` and `wakeOnDecision` actions with the facts (`loopWakes` in recorder.ts), for a
 card in a loop only; `tasks.ts` has no handoff path of its own (`onLoopEvent` is gone). A
 run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
@@ -613,7 +615,8 @@ backup; a newer file opens read-only.
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer: built, #1266), loop wakes (`loopWakes.ts`, fed by
 the facts' `wake` actions instead of `onLoopEvent`: built, #1266), Hive's own notices of the work (`workflowNotices.ts`:
-the `notify` action and lane notices, #1266), the Progress runs (`ProgressRun` gains `card` and
+the `notify` and `laneNotice` actions; what lanes were told in `lane_notice_lanes` and `lane_notice_cards`, moved on
+in the board change that writes the notice, #1266), the Progress runs (`ProgressRun` gains `card` and
 `revision`).
 
 **Risks the builders own** (SPEC §16 and the note's section 12): `sessions.ts`, `servers.ts` and `tasks.ts` are large;

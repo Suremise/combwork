@@ -1,14 +1,16 @@
 // The durable actions' worker (SPEC §16.4.5, #1215): an action is written in the same transaction as the facts that cause
 // it, so nothing outside happens for a change that rolled back; once a change commits, this runs the workspace's pending
-// actions in the order written, and at start (a workspace opened) any a crash left pending. Each runs at most once in
-// effect, however often it is run (a crash between its effect and its mark, two runs at once, another Hive's), in one of
-// two ways (#1266):
+// actions in the order written, and at start (a workspace opened) any a crash left pending. However often an action is
+// run (a crash between its effect and its mark, a close, two runs at once, another Hive's), its effect is kept to once
+// in one of three ways (#1266, SPEC §16.4.5):
 // - **Delivered**: a handler that makes a delivery gives it the action's id, and the delivery's row (unique per action,
 //   `deliveries.action`) is the record that it was made. The handler runs again until the action is marked, and finds
-//   that row each time after the first: one delivery.
-// - **Claimed**: every other kind (a notice, a kind with no handler) is marked done before its effect runs, by a
-//   conditional update, so only the run that moved it from pending runs it: at most once (a notice lost to a crash
-//   isn't shown twice).
+//   that row each time after the first: one delivery, never lost.
+// - **Repeatable**: an effect that leaves nothing to find (a notice shown) is tried at most twice, each try counted
+//   (`attempts`) by the run that moves the count on, before it runs: never lost to a crash or a close before it was
+//   shown (the action stays pending until marked), and repeated at most once when one after it was shown kept its mark.
+// - **Claimed**: a kind with no effect here (no handler: the queue's and slots' steps until P5 and P7) is marked done by
+//   a conditional update, by the one run that finds it pending.
 //
 // A run belongs to the workspace as it was when it began (HR4's #1215 round 1): once that workspace closes, or its window
 // opens another, the run stops, checked after every wait and inside each board change, before the board is touched,
@@ -26,9 +28,12 @@ export type ActionHandler = (action: ActionRow, ws: WorkspaceService) => Promise
 
 /**
  * How an action of a kind is kept to once (the top): `delivered`, its handler's delivery carries the action's id and a
- * run finds it made; `claimed`, it is marked done before it runs.
+ * run finds it made; `repeatable`, tried at most twice, never lost; `claimed`, marked done before it runs.
  */
-export type ActionOnce = 'delivered' | 'claimed'
+export type ActionOnce = 'delivered' | 'repeatable' | 'claimed'
+
+/** How many times a repeatable action is tried at most: once, and once more after a crash that may have come after it. */
+const MAX_TRIES = 2
 
 const handlers = new Map<string, { fn: ActionHandler; once: ActionOnce }>()
 
@@ -134,15 +139,23 @@ async function drain(at: RunOf): Promise<void> {
   for (const a of pending) {
     if (!at.alive()) return
     const handler = handlers.get(a.kind)
-    const claimed = !handler || handler.once === 'claimed'
+    const once: ActionOnce = handler?.once ?? 'claimed'
+    const claimed = once === 'claimed'
     // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile. A claimed one is
-    // marked done here, by the run that finds it pending: only that run goes on with it.
+    // marked done here, by the run that finds it pending; a repeatable one's try is counted here, by the run that moves
+    // the count on (one tried twice already is done: never a third time); only that run goes on with it.
     const mine = await change(at, () =>
-      boardWriteOp(ws, (db) =>
-        claimed
-          ? Number(db.prepare("UPDATE card_actions SET state = 'done', attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(a.id).changes) > 0 // i18n-ignore: SQL
-          : !!db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) // i18n-ignore: SQL
-      )
+      boardWriteOp(ws, (db) => {
+        if (claimed) return Number(db.prepare("UPDATE card_actions SET state = 'done', attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(a.id).changes) > 0 // i18n-ignore: SQL
+        const now = db.prepare("SELECT attempts FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) as { attempts: number } | undefined // i18n-ignore: SQL
+        if (!now) return false
+        if (once === 'delivered') return true
+        if (now.attempts >= MAX_TRIES) {
+          db.prepare("UPDATE card_actions SET state = 'done' WHERE id = ? AND state = 'pending'").run(a.id) // i18n-ignore: SQL
+          return false
+        }
+        return Number(db.prepare("UPDATE card_actions SET attempts = attempts + 1 WHERE id = ? AND state = 'pending' AND attempts = ?").run(a.id, now.attempts).changes) > 0 // i18n-ignore: SQL
+      })
     )
     // Closed or switched while the claim committed (a listener of that commit may close it): no handler runs for it.
     if (!at.alive()) return
@@ -154,13 +167,14 @@ async function drain(at: RunOf): Promise<void> {
       failed = true
       log.warn(`action ${a.id} (${a.kind}) of #${a.card} failed`, e)
     }
-    // Closed or switched while the handler ran: a delivered one's mark waits for the next run there, which finds its
-    // delivery made and makes none. A claimed one is already done (a failure is still recorded, when it can be).
+    // Closed or switched while the handler ran: its mark waits for the next run there, which finds a delivered one's
+    // delivery made, and tries a repeatable one once more at most. A claimed one is already done (a failure is still
+    // recorded, when it can be).
     await change(at, () =>
       boardWriteOp(ws, (db) =>
         claimed
           ? failed && db.prepare("UPDATE card_actions SET state = 'failed' WHERE id = ? AND state = 'done'").run(a.id) // i18n-ignore: SQL
-          : db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(failed ? 'failed' : 'done', a.id) // i18n-ignore: SQL
+          : db.prepare(`UPDATE card_actions SET state = ?${once === 'delivered' ? ', attempts = attempts + 1' : ''} WHERE id = ? AND state = 'pending'`).run(failed ? 'failed' : 'done', a.id) // i18n-ignore: SQL
       )
     )
   }

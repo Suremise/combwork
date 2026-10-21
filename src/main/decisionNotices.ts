@@ -101,10 +101,10 @@ export async function newDecisions(ws: WorkspaceService, agent: { projectPath: s
 
 /**
  * newDecisions, each card with when its newest such decision was made (ms): for a line that tells them (#401). `told`:
- * per card, what an earlier line already told (the latest decision time it covered): only later ones count. `loop`: the
- * card a decision wake is for (#1266), whose builder and reviewer hear of it in Review and Passed too (baseline).
+ * per card, what an earlier line already told (the latest decision time it covered): only later ones count. `loop`: the cards
+ * decision wakes are for (#1266), whose builders and reviewers hear of them in Review and Passed too (baseline).
  */
-export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>, loop?: number): Promise<Map<number, { count: number; latest: number; generation: number }>> {
+export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>, loop?: ReadonlySet<number>): Promise<Map<number, { count: number; latest: number; generation: number }>> {
   const out = new Map<number, { count: number; latest: number; generation: number }>()
   if (!ws.path) return out
   const project = basename(agent.projectPath).toLowerCase()
@@ -113,7 +113,7 @@ export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath:
   const { cards, generations } = await board(ws)
   for (const c of cards) {
     if (!c.decisions?.length || c.project.toLowerCase() !== project) continue
-    const base = baseline(c, agent.agentId, self, seen?.get(c.number), c.number === loop)
+    const base = baseline(c, agent.agentId, self, seen?.get(c.number), !!loop?.has(c.number))
     if (base === null) continue
     const since = Math.max(base, told?.get(c.number) ?? 0)
     const fresh = c.decisions.filter((d) => t(d.editedAt) > since || (d.recordedBy !== self && t(d.at) > since))

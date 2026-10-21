@@ -120,8 +120,8 @@ registerSource('decision', {
     // What the line is worked out from: the board and the agent's reads as they are now.
     const gen = genOf(ws)
     const reads = cardReadsBy(agent)
-    // A decision wake's line (#1266) also tells its card where only its loop makes it the agent's (`loop`).
-    const loop = typeof r.meta?.loop === 'number' ? r.meta.loop : undefined
+    // A decision wake's line (#1266) also tells its cards where only their loop makes them the agent's (`loop`).
+    const loop = loopOf(r)
     const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop))
     if (!cards.size) return { cancel: 'nothing new to tell' }
     // This version: its line, and what its receipt tells (saved with it), and what its holds compares with.
@@ -129,7 +129,7 @@ registerSource('decision', {
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
     // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop !== undefined ? { loop } : {}) } }
+    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop.size ? { loop: [...loop].join(',') } : {}) } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
@@ -216,10 +216,13 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
     async () => {
       const self = await boardSelf(ws, projectPath, to.id)
       if (!self) return
-      const cards = fitting(await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), a.card))
+      // One line per agent, telling every card a decision wake waiting for it was for, this one's too: the one waiting is
+      // replaced (cancelled, its action done) by this one, which carries its cards on.
+      const loop = new Set([a.card, ...fromSource(projectPath, 'decision').filter((r) => r.agentId === to.id && r.action !== undefined && isWaiting(r)).flatMap((r) => [...loopOf(r)])])
+      const cards = fitting(await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop))
       if (!cards.size) return
       try {
-        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: a.card }, action: a.id })
+        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })
       } catch (e) {
         // Another Hive made it meanwhile (the unique row refused this one's): delivered.
         if (!actionDelivered(projectPath, a.id)) throw e
@@ -229,6 +232,12 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
     },
     scopeOfHost(projectPath)
   )
+}
+
+/** The cards a decision wake's line is for (`meta.loop`, comma-separated), none for another decision line. */
+function loopOf(r: { meta?: Record<string, string | number | boolean> }): Set<number> {
+  const v = r.meta?.loop
+  return new Set((typeof v === 'number' ? [v] : typeof v === 'string' ? v.split(',').map(Number) : []).filter((n) => Number.isInteger(n) && n > 0))
 }
 
 /** Every running project agent of a workspace that may be told. */

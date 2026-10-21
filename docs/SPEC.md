@@ -1314,9 +1314,13 @@ side effects touch git, processes and other agents), so they are tied by **durab
   notification carries the action id and isn't shown twice). An action that can't tell (a notification already shown
   before a crash) may repeat at most once, never more. **Built** (#1266): a wake's delivery carries the action's id
   (`deliveries.action`, unique), which is the record that it was made: the worker runs a delivering action until it is
-  marked, and every run after the first finds its delivery. An action that makes no delivery (a notice, a kind with no
-  handler yet) is **claimed**: marked done before it runs, by a conditional update, so it runs at most once (a notice
-  lost to a crash isn't shown again). `card_actions.delivered` (#1215's stand-in) is gone (the 1.0 group's step 9).
+  marked, and every run after the first finds its delivery. A notice, which leaves nothing to find once shown, is
+  **repeatable**: each try is counted (`attempts`) by the run that moves the count on, before it runs, and the action
+  stays pending until marked, so a crash or a close before it was shown never loses it, and one after it was shown
+  repeats it at most once (never a third try). A kind with no handler yet is marked done by the one run that finds it
+  pending. `card_actions.delivered` (#1215's stand-in) is gone (the 1.0 group's step 9). A host's deliveries are saved
+  against the rows another Hive saved since this one read them: those are never deleted or overwritten, and a new
+  delivery whose id that Hive took takes the next free one.
 - **The target advance** is the one step that can't be repeated blindly. The queue writes `IntegrationStarted`
   (expected target revision, result revision) and commits it, **then** advances the target, **then** writes
   `Integrated`. After a restart, an entry with `IntegrationStarted` and no outcome is reconciled from the platform,
@@ -2112,11 +2116,15 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
 - **Following to the end** without the Assistant: the Progress panel and notifications cover what the Assistant's lane
   watch does today (failed review, blocked, stalled, merge due, paused with why). **Notifications built** (#1266,
   `workflowNotices.ts`): Hive follows every running lane of each open workspace as a lane watch does (on each board or
-  lane change and every 30 s, by marks of its own in memory: a lane running when Hive started is followed from then),
-  and tells the user of a failed review, a card blocked (with why) or stalled, every card passed (its merge due) and
-  the merge stalled: one notice per lane at a time, a banner or a Windows notification as **Settings → Notifications**
-  says (their off switch), with the Assistant on or off. A card's request for the user (For you) is a notice too, the
-  runtime's `notify` action. A paused lane's reason comes with #1270's data.
+  lane change and every 30 s), and tells the user of a failed review, a card blocked (with why) or stalled, every card
+  passed (its merge due) and the merge stalled: one notice per lane at a time, a banner or a Windows notification as
+  **Settings → Notifications** says, with the Assistant on or off. What was told of each lane is kept with the board
+  (`lane_notice_lanes`, `lane_notice_cards`): one board change moves it on and writes the lane's notice as a durable
+  `laneNotice` action, so a restart tells what it hadn't yet and two Hives tell each event once; a lane running when
+  Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
+  runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
+  (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's
+  data.
 - **Paused reasons** (P4): "waiting for you (approval: ui)", "waiting: AM-11 not merged", "waiting: AM-11 merging",
   "stale: submit again", "waiting for a reviewer", "waiting for a slot", "waiting for a check copy", "<target> in use", "list changes after
   AM-12" [#1120 c, #1123 c].

@@ -213,12 +213,27 @@ export const countDeliveries = (db: Db, host: string): number => (db.prepare('SE
 /**
  * Writes a host's deliveries as `records` has them, only the rows that changed. One not of Hive's form, or two with one
  * id, throw (deliveries.ts writes only what readDelivery reads back: a mistake; nothing is written).
+ *
+ * `known` (#1266): the ids the writer read and kept since (its published records). Another writer's rows (another Hive
+ * on the workspace, which saved after this one read) are neither deleted nor overwritten: only a known row that
+ * `records` no longer has goes, and a new record whose id another writer took meanwhile is given the next free one
+ * (returned, old id → new id and seq, for the writer to follow). Left out, every row of the host is known.
  */
-export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
-  const had = new Map((db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[]).map((r) => [r.id as string, rowText(r)])) // i18n-ignore: SQL
+export function writeDeliveries(db: Db, host: string, records: Rec[], known?: ReadonlySet<string>): Map<string, { id: string; seq: number }> {
+  const rows = db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[] // i18n-ignore: SQL
+  const had = new Map(rows.map((r) => [r.id as string, rowText(r)]))
   const ids = new Set<string>()
+  const renamed = new Map<string, { id: string; seq: number }>()
+  let top = Math.max(0, ...rows.map((r) => Number(r.seq) || 0), ...records.map((d) => Number(d.seq) || 0))
   const del = db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?') // i18n-ignore: SQL
-  for (const d of records) {
+  for (const rec of records) {
+    let d = rec
+    // New here, and its id another writer's since: the next free one.
+    if (known && !known.has(d.id as string) && had.has(d.id as string)) {
+      top++
+      renamed.set(d.id as string, { id: `m${top}`, seq: top })
+      d = { ...d, id: `m${top}`, seq: top }
+    }
     const r = deliveryToRow(host, d)
     if (!r) throw new Error(`a delivery without the fields Hive keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
     const id = r.id as string
@@ -230,7 +245,8 @@ export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
     // Changed: set in place, every column (those it doesn't fill null).
     else if (was !== rowText(withAllColumns(db, r))) update(db, 'deliveries', withAllColumns(db, r))
   }
-  for (const id of had.keys()) if (!ids.has(id)) del.run(host, id)
+  for (const id of had.keys()) if (!ids.has(id) && (!known || known.has(id))) del.run(host, id)
+  return renamed
 }
 
 /** A row with every column of `deliveries`, those it doesn't give null (as SELECT * reads it back). */

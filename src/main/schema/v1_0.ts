@@ -507,12 +507,35 @@ const KEYS: SchemaStep = {
 
 /**
  * #1266 (P4): an action's delivery is recorded by the delivery itself, its row in `deliveries` with the action's id
- * (unique), so the transitional `card_actions.delivered` (#1215) goes. A notice, which makes no delivery, is claimed
- * instead: marked done before it runs (actionWorker.ts).
+ * (unique), so the transitional `card_actions.delivered` (#1215) goes; a notice, which makes no delivery, counts its
+ * tries instead (`attempts`, actionWorker.ts). And what Hive has told the user of each running lane (its lane notices,
+ * workflowNotices.ts, §16.11.4): each lane as last told and its cards, so a restart tells what it hadn't yet, and two
+ * Hives on one workspace tell each event once.
  */
 export const ACTIONS_DELIVERED_STEP: SchemaStep = {
-  name: 'actions delivered by deliveries',
-  ddl: ['DROP INDEX card_actions_delivered', 'ALTER TABLE card_actions DROP COLUMN delivered']
+  name: 'actions delivered by deliveries, lane notices',
+  ddl: [
+    'DROP INDEX card_actions_delivered',
+    'ALTER TABLE card_actions DROP COLUMN delivered',
+    // A lane as its notices last told it (laneWatch.ts' LaneMark): its state, whether its merge was due, and stalled.
+    `CREATE TABLE lane_notice_lanes (
+      lane          TEXT    PRIMARY KEY,
+      state         TEXT    NOT NULL,
+      merge_due     INTEGER NOT NULL CHECK (merge_due IN (0, 1)),
+      merge_stalled INTEGER NOT NULL CHECK (merge_stalled IN (0, 1))
+    ) STRICT, WITHOUT ROWID`,
+    // Its cards as last told (LaneCardMark): the column, blocked and stalled, its latest failed and passed verdicts' times.
+    `CREATE TABLE lane_notice_cards (
+      lane    TEXT    NOT NULL REFERENCES lane_notice_lanes (lane) ON DELETE CASCADE,
+      card    INTEGER NOT NULL,
+      col     TEXT    NOT NULL,
+      blocked INTEGER NOT NULL CHECK (blocked IN (0, 1)),
+      stalled INTEGER NOT NULL CHECK (stalled IN (0, 1)),
+      failed  TEXT    NOT NULL,
+      passed  TEXT    NOT NULL,
+      PRIMARY KEY (lane, card)
+    ) STRICT, WITHOUT ROWID`
+  ]
 }
 
 /** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
