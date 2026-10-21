@@ -2118,6 +2118,46 @@ the Git view's actions (ยง8) take it too. It is held **only for the advance** (ย
 they write only the queue's worktree and `refs/hive/queue/*`, and the advance's expected value catches anything that
 moved meanwhile. A paused entry holds no lock. One queue per target still runs one entry at a time.
 
+**The runner** [Built #1360]: exactly one Hive runs a target's queue, across every Hive on the workspace (the dev and
+the installed one share its hive.db, S50). It holds the target's **lease** (a row in hive.db: the holder's profile,
+pid and process start time, when it was taken and last renewed). Another Hive takes the lease over **only once the
+holder process is gone** (its pid gone, or given to a process that started at another time), never because its
+renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>".
+
+Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
+check's detached server too: nothing may break away from it), held by Hive's process supervisor (the one agents'
+launches use), which ends with its Hive; closing the job ends everything in it. What escapes a job anyway (a packaged
+app's process, such as the Store's PowerShell, starts its children outside every job) is adopted into it or followed,
+as for agents; a process it follows is first written to the lease's journal (a file the supervisor flushes to disk),
+and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
+job and recorded in hive.db.
+
+**A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
+naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
+serve a living Hive's other targets and agents), is empty or gone; its journal is sealed (closed to writers for good:
+a supervisor that outlived its Hive can't write down anything more, and ends what it can't write down instead), then
+read, and could be; every process its records and its journal name is gone (ended by pid and start time, never by
+name); and its folder is removed, in that order, its duty dropped only after all of them. What a runner owns stays
+recorded as a duty of the target until then, however many runners crash in between; a journal that can't be read, or
+isn't whole, is never taken for empty; a folder that can't be removed pauses the queue naming it, until a later try
+removes it. A clean release (closing a
+workspace, quitting) ends and confirms its own job first, and leaves as duties what it couldn't confirm.
+
+Each fact the queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its
+lease stops at once, writing nothing. Each lease has **its own worktree** (`queue-<hash of project and target>-<lease>`,
+in the project's Hive worktrees folder): a takeover makes a new one, never an earlier runner's. A target's worktree is
+kept while the queue needs it (an open entry, an unfinished advance, an in-flight card whose ruleset says Hive merges
+into that target, a run in it) and removed when nothing does, or with its project. Unused Worktrees never lists a
+living runner's worktree.
+
+**Accepted (a limitation, not a guarantee):** a process that escapes a job and that the supervisor hasn't yet seen
+(about a second, or until the next process of the job ends) has no identity anywhere if Hive crashes in that moment,
+so a takeover can't end it, and it may go on doing whatever its command does. Worktrees share the repository and its
+refs, and a command can use any path: such a process isn't confined to the old lease's folder, needn't take Hive's
+repository lock, and could move a ref, the target's included. What Hive itself does stays safe: the takeover removes
+the old folder or pauses naming it, the queue's facts and pauses are fenced by the lease, and Hive's own advance is a
+compare-and-swap against the head it tested, so it never builds on a target that moved under it unseen.
+
 **Pins** [HB3's round 1 finding 11]: every submitted revision is pinned by a ref, `refs/hive/cards/<key>/<n>` (the
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose
 what was reviewed or approved. Ref paths compare keys case-insensitively (NTFS).
