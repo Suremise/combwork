@@ -83,6 +83,7 @@
   "session.mergeSlot.waitingNext": "Waiting for the merge slot ({agent} is next to merge)",
   "session.mergeSlot.waitingNextCards": "Waiting for the merge slot ({agent} is next to merge {cards})",
   "session.mode.asking": "The agent is asking you something. Answer it first, then switch the mode.",
+  "session.mode.assistantCliOwn": "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.",
   "session.mode.ended": "The session ended before Hive could switch it to {mode}.",
   "session.mode.endedUnconfirmed": "The session ended before {provider} confirmed switching to {mode}.",
   "session.mode.notFound": "Hive couldn't find {what}, so it didn't switch to {mode}. Check its terminal, or switch there.",

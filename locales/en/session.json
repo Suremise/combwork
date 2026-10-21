@@ -319,6 +319,10 @@
     "defaultMessage": "The agent is asking you something. Answer it first, then switch the mode.",
     "description": "Switching an agent's permission mode is refused: it waits for the user's answer."
   },
+  "session.mode.assistantCliOwn": {
+    "defaultMessage": "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.",
+    "description": "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting."
+  },
   "session.mode.ended": {
     "defaultMessage": "The session ended before Hive could switch it to {mode}.",
     "description": "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name."

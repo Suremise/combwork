@@ -5,6 +5,7 @@ import { mkdir, open, readdir, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
+import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
@@ -407,7 +408,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)
-    if (ctx.permissionMode) args.push('--permission-mode', ctx.permissionMode)
+    // The CLI's own setting (#1284): no flag, so Claude Code's own settings (defaultMode) decide.
+    if (ctx.permissionMode && !isCliOwnMode(ctx.permissionMode)) args.push('--permission-mode', ctx.permissionMode)
     args.push(...withoutSettingsArgs(ctx.extraArgs))
     // Claude Code takes a first message as its last argument and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))

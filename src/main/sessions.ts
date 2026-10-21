@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'crypto'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -17,7 +17,8 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { agentLaunchSettings, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { isCliOwnMode } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
@@ -117,6 +118,7 @@ const log = createLogger('sessions')
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
+  assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
@@ -1096,14 +1098,16 @@ class SessionManager {
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
     // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
+    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers; with its switch on
+    // (#1284, #966 row 7), the workspace's servers too: those on in the workspace, as it works across every project.
+    const assistantServers = assistant && advanced.get<boolean>(ASSISTANT_OTHER_MCP)
     const mcpServers: Record<string, McpServerDef> = {}
     for (const m of await reads.servers()) {
-      if (serverOnIn(m, pc.mcp) && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
+      const on = assistant ? assistantServers && !!m.globallyEnabled : serverOnIn(m, pc.mcp)
+      if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
     if (hive) mcpServers.hive = hive
-    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers.
-    if (assistant) for (const k of Object.keys(mcpServers)) if (k !== 'hive') delete mcpServers[k]
 
     const l = agentLaunchSettings(forAgent, pc, s)
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
@@ -1513,7 +1517,7 @@ class SessionManager {
         : hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in Project Settings or Settings → {provider}.', description: "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)." }), { problem: argsProblem, provider: adapter.descriptor.name })
     l.configuredMode = eff.permissionMode
     let mode = eff.permissionMode
-    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings)) mode = l.modeOverride
+    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings) && !(workspace.isAssistantHome(projectPath) && isCliOwnMode(l.modeOverride))) mode = l.modeOverride
     l.launchMode = mode
     state.permissionMode = mode ?? undefined
     // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
@@ -2032,9 +2036,18 @@ class SessionManager {
     if (mode && (mode !== l.state.permissionMode || mode !== l.state.modeObserved)) {
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'footer mode', provider: l.state.provider, raw: { footer: mode }, made: { permissionMode: mode, was: l.state.permissionMode }, safe: { raw: { footer: true }, made: { permissionMode: true, was: true } }, summary: `terminal footer: mode ${mode}` }))
-      l.state.permissionMode = l.state.modeObserved = mode
+      this.observeMode(l, mode)
       this.emitState(l.state)
     }
+  }
+
+  /**
+   * The mode the CLI showed (its footer, a hook, its transcript): the session's mode from now, except in one launched in
+   * the CLI's own setting (#1284), which keeps saying so: only recorded as seen.
+   */
+  private observeMode(l: LiveSession, mode: PermissionMode): void {
+    l.state.modeObserved = mode
+    if (!isCliOwnMode(l.launchMode)) l.state.permissionMode = mode
   }
 
   /**
@@ -2051,9 +2064,11 @@ class SessionManager {
     const p = st.provider
     const name = l.adapter.descriptor.name
     if (st.permissionMode === mode) return { ok: true }
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw hiveError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
     const how = l.adapter.descriptor.capabilities.liveModeSwitch
-    if (how === 'none' || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
+    // Never to or from the CLI's own setting (#1284): Hive doesn't know where such a session started.
+    if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
     if (st.status === 'waiting') throw hiveError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }))
@@ -2626,6 +2641,7 @@ class SessionManager {
   /** Stops the agent and resumes the same conversation in another permission mode. */
   async restartInMode(projectPath: string, agentId: string, mode: PermissionMode): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
@@ -3635,7 +3651,7 @@ class SessionManager {
     // The CLI's report is kept; it is shown unless the user chose their prices (#436), and then it isn't an estimate.
     if (d.costUsd != null) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !usesOwnPrices(st.provider, config.settings)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode ?? st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
@@ -4008,7 +4024,7 @@ class SessionManager {
       }
     }
     if (hook.mode && (hook.mode !== st.permissionMode || hook.mode !== st.modeObserved)) {
-      st.permissionMode = st.modeObserved = hook.mode
+      this.observeMode(l, hook.mode)
       this.emitState(st)
     }
     // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.

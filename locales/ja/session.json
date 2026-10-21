@@ -79,6 +79,7 @@
   "session.mergeSlot.waitingNext": "マージ枠を待機中（次は{agent}がマージ）",
   "session.mergeSlot.waitingNextCards": "マージ枠を待機中（次は{agent}が{cards}をマージ）",
   "session.mode.asking": "エージェントが質問しています。先に回答してから、モードを切り替えてください。",
+  "session.mode.assistantCliOwn": "アシスタントはCLI自身の設定を使えません。アシスタントの「操作範囲」の設定は、実行中のモードがわかっていることを前提にしています。CLIのモードを1つ選んでください。",
   "session.mode.ended": "Hiveが{mode}に切り替える前にセッションが終了しました。",
   "session.mode.endedUnconfirmed": "{provider}が{mode}への切り替えを確認する前にセッションが終了しました。",
   "session.mode.notFound": "Hiveは{what}を見つけられなかったため、{mode}に切り替えませんでした。ターミナルを確認するか、そこで切り替えてください。",
