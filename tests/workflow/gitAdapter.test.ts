@@ -196,16 +196,22 @@ describe('Git adapter', () => {
     const twice = async () => [await G.isAncestor(repo, base, rev), await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev), await G.mergeBase(repo, base, rev), await G.lineHead(repo, 'one'), await G.lineHead(repo, 'one')]
     const outside = await counted(twice)
     expect(ancestors(outside.ran)).toBe(2)
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'one')
     let leaked: (() => Promise<unknown>) | null = null
     const inside = await counted(() =>
       G.gitStep(async () => {
         leaked = () => G.isAncestor(repo, base, rev)
-        // A worktree of the project asks about the same commits: the same answer.
-        return [...(await twice()), await G.gitStep(() => G.isAncestor(join(repo, 'src'), base, rev))]
+        // A linked worktree of the project asks about the same commits (in a step inside the step): the same answer.
+        return [...(await twice()), await G.gitStep(() => G.isAncestor(wt, base, rev))]
       })
     )
     expect(inside.value).toEqual([...outside.value, true])
     expect(ancestors(inside.ran)).toBe(1)
+    // A subfolder, whose repository its own `.git` doesn't say: asked each time.
+    const sub = await counted(() => G.gitStep(async () => [await G.isAncestor(join(repo, 'src'), base, rev), await G.isAncestor(join(repo, 'src'), base, rev)]))
+    expect(sub.value).toEqual([true, true])
+    expect(ancestors(sub.ran)).toBe(2)
     expect(inside.ran.filter((c) => c === `merge-base ${base} ${rev}`)).toHaveLength(1)
     expect(inside.ran.filter((c) => c.startsWith('rev-parse --verify'))).toHaveLength(2)
     // Something the step set off, asking once it has ended: asked again.
@@ -217,6 +223,23 @@ describe('Git adapter', () => {
     const unknowns = await counted(() => G.gitStep(async () => [await G.isAncestor(repo, missing, rev), await G.isAncestor(repo, missing, rev)]))
     expect(unknowns.value.every((v) => isUnknown(v))).toBe(true)
     expect(ancestors(unknowns.ran)).toBe(2)
+  })
+
+  it("a step's answers are its repository's: another repository, without those commits, is asked and answers unknown (HR2's #1376 round 1)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
+    // Another repository with the same base commit (a clone of main) but not the card's.
+    const other = join(repo, '..', 'other')
+    execFileSync('git', ['clone', '-q', '--no-local', '--single-branch', '-b', 'main', repo, other])
+    expect(isUnknown(await G.isAncestor(other, base, rev))).toBe(true)
+    const answers = await G.gitStep(async () => {
+      const here = [await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev)]
+      // A step inside the step (another workspace's work it set off), on the other repository: its own answers.
+      const there = await G.gitStep(async () => [await G.isAncestor(other, base, rev), await G.mergeBase(other, base, rev)])
+      return { here, there }
+    })
+    expect(answers.here).toEqual([true, base])
+    expect(answers.there.every((v) => isUnknown(v))).toBe(true)
   })
 
   it('dirty lists tracked and untracked changes and a merge under way, only the paths asked for', async () => {

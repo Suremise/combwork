@@ -316,7 +316,8 @@ clean when they read, dirty again), so the new fingerprint is never adopted for 
 from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
 an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
 and each lane's look in a branch-update pass, is one `gitStep` (`platform/git.ts`, #1376): what it asks about fixed
-commits (an ancestor, a merge base, by full ids) is asked of git once in it; nothing about refs, HEAD or files is
+commits (an ancestor, a merge base, by full ids) is asked of git once in it per repository (its common git dir, read
+from `.git`: a project and its worktrees share answers, another repository never); nothing about refs, HEAD or files is
 kept, so every read of state (a regather's, the move's own at its boundary) asks git again. The Assistant
 suggested letting git answer (#1206 round 1) after HR5 found that reading the index in Hive (an earlier round) got
 attributes, v4 paths and required extensions wrong. **The practical guarantee:** git, the files and SQLite can't be

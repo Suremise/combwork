@@ -49,14 +49,17 @@ export function gitStep<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * `ask()` once per step for commits `ids` (full ids only), unknown answers asked again; outside a step, always asked.
- * Keyed by the commits alone: a project's worktrees share its objects (a line is read in the worktree, its containment
- * in the project), and a repository without them answers unknown, never kept.
+ * `ask()` once per step for commits `ids` (full ids only) in `repo`'s repository, unknown answers asked again; outside
+ * a step, always asked. Keyed by the repository's common git dir (HR2's round 1): a project and its worktrees share
+ * answers (a line is read in the worktree, its containment in the project), another repository never. A folder whose
+ * repository can't be told from its `.git` (a subfolder) is always asked.
  */
-function onceInStep<T>(what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
+function onceInStep<T>(repo: string, what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
   const step = stepNow.getStore()
   if (!step || step.done || !ids.every((id) => SHA.test(id))) return ask()
-  const key = [what, ...ids].join('\0')
+  const common = commonDirSync(repo)
+  if (!common) return ask()
+  const key = [common.toLowerCase(), what, ...ids].join('\0')
   const had = step.answers.get(key) as Promise<Maybe<T>> | undefined
   if (had) return had
   const p = ask().then((v) => {
@@ -86,6 +89,20 @@ export function gitDirSync(folder: string): string | null {
     return m ? resolvePath(folder, m[1].trim()) : null
   } catch {
     return null
+  }
+}
+
+/**
+ * A folder's repository's common git dir, read from its `.git` (a linked worktree's git dir names it in `commondir`)
+ * with no git process; null where `gitDirSync` can't say.
+ */
+function commonDirSync(folder: string): string | null {
+  const own = gitDirSync(folder)
+  if (!own) return null
+  try {
+    return resolvePath(own, readFileSync(join(own, 'commondir'), 'utf8').trim())
+  } catch {
+    return own
   }
 }
 
@@ -160,7 +177,7 @@ export async function defaultBranch(repo: string): Promise<Maybe<string>> {
 }
 
 export function isAncestor(repo: string, a: string, b: string): Promise<Maybe<boolean>> {
-  return onceInStep('is-ancestor', [a, b], async () => {
+  return onceInStep(repo, 'is-ancestor', [a, b], async () => {
     const r = await git(repo, ['merge-base', '--is-ancestor', a, b])
     if (r.ok) return true
     if (r.code === 1) return false
@@ -169,7 +186,7 @@ export function isAncestor(repo: string, a: string, b: string): Promise<Maybe<bo
 }
 
 export function mergeBase(repo: string, a: string, b: string): Promise<Maybe<string | null>> {
-  return onceInStep('merge-base', [a, b], async () => {
+  return onceInStep(repo, 'merge-base', [a, b], async () => {
     const r = await git(repo, ['merge-base', a, b])
     if (r.ok) return r.out.trim()
     if (r.code === 1 && !r.err) return null
