@@ -2558,8 +2558,12 @@ built on the fact log and the Assistant's activity list:
 - **Undo of a message** asks first ("Undo 61 changes? Changes made since by you or an agent are kept.", and how many
   can't be undone), runs in the dialog, then says under its heading what it did: undone n, each change kept with why
   (its fields changed since, gone, the lane ended, failed) and each that can't be undone with why. A change's own Undo
-  runs at once; its row then says Undone, Partly undone or Kept (why in its tooltip) for this window's session; a failure
-  keeps Undo offered.
+  runs at once. A failure keeps Undo offered, with why.
+- **What undo did is kept with the change** (round 2: `assistant_change_outcomes`, a 1.0 group step, v13): when a change is
+  marked undone, each of its fields is recorded as put back or kept (changed since, gone, the lane ended), whoever undid it
+  (the window or the Assistant's `hive_undo`). The row says Undone (struck through, with when), Partly undone or Kept,
+  why in its tooltip, after a reload or restart too (`AssistantChangeRow.outcome`). A change marked before outcomes were
+  kept reads as undone; a failure isn't marked, so it has none.
 - **The Assistant** undoes its own with `hive_undo` (`GET /v1/assistant/changes`, `POST /v1/assistant/undo`, Control
   agents, its activity kind `undo`). Its control level and launch are checked again at each write: turned down or ended
   partway through, the undo stops there. It undoes a Hive setting only while Change settings is on.

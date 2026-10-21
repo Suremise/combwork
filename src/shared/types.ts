@@ -341,6 +341,11 @@ export interface AssistantChangeRow {
   /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
   finalWhy?: UndoFinalWhy[]
   undoneAt?: string
+  /**
+   * Once undone, what undo did with its fields (#1283): those put back, and those left as they were, with why (someone
+   * changed it since, it is gone, the lane ended). Absent for a change undone before outcomes were kept.
+   */
+  outcome?: { undone: string[]; skipped: { field: string; why: 'changed' | 'gone' | 'ended' }[] }
 }
 
 /** The Assistant's changes for one message of the user's (#1282): when it was sent, and its changes, newest first. */

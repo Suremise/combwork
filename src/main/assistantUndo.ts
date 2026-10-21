@@ -86,7 +86,7 @@ export async function undoChanges(ws: WorkspaceService, sel: { change?: string; 
         }
         out.push({ ...head, ...r })
         // Done for good (each field undone, or skipped as changed, gone or ended): marked; a failure stays to try again.
-        if (!r.skipped.some((s) => s.why === 'failed')) await markUndone(ws, [c.id])
+        if (!r.skipped.some((s) => s.why === 'failed')) await markUndone(ws, c.id, { undone: r.undone, skipped: r.skipped.flatMap((s) => (s.why === 'failed' ? [] : [{ field: s.field, why: s.why }])) })
       }
     }
     return out

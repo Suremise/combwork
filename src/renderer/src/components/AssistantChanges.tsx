@@ -91,7 +91,7 @@ const whyText = (whys: readonly UndoFinalWhy[] | undefined, english: string | un
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Why undo kept each part of a change as it is: the fields changed since, gone, the lane ended, or failed. */
-function skippedText(r: AssistantUndoResult): string {
+function skippedText(r: Pick<AssistantUndoResult, 'skipped'>): string {
   const changed = r.skipped.filter((s) => s.why === 'changed').map((s) => s.field)
   const out = [
     ...(changed.length ? [tr(M.changed, { fields: fieldsText(changed) })] : []),
@@ -165,11 +165,12 @@ function MessageGroupView({ g, open, toggle, changeText }: { g: MessageGroup; op
     // A card's change by its card; another by the Assistant's line for it while this window has it ("Changed Settings → …:
     // 20 → 50"), else as it was recorded.
     const text = c.kind === 'card' || c.card !== undefined ? changeText(c) : (lineOf(g, c)?.text ?? changeText(c))
-    const r = undone[c.id]
-    const failed = r?.skipped.some((s) => s.why === 'failed')
-    const kept = r && !r.already && r.skipped.length ? skippedText(r) : ''
-    const status = c.kind === 'final' ? 'final' : c.undoneAt ? (r && !r.already && !r.undone.length && r.skipped.length ? 'kept' : kept ? 'partly' : 'undone') : null
-    const why = c.kind === 'final' ? whyText(c.finalWhy, c.final) : kept
+    // Once undone, what undo did, as kept with the change whoever undid it (#1283 round 2): Undone, Partly undone (some
+    // of it put back) or Kept (none of it), with why. One not undone yet may have failed here: Undo stays offered, and why.
+    const o = c.undoneAt ? c.outcome : undefined
+    const failed = !c.undoneAt ? undone[c.id]?.skipped.filter((x) => x.why === 'failed') : undefined
+    const status = c.kind === 'final' ? 'final' : c.undoneAt ? (o?.skipped.length ? (o.undone.length ? 'partly' : 'kept') : 'undone') : null
+    const why = c.kind === 'final' ? whyText(c.finalWhy, c.final) : o?.skipped.length ? skippedText(o) : failed?.length ? skippedText({ skipped: failed }) : ''
     // Its tooltip: the whole line, when, what of it changed (beside a line that doesn't say), and why it was kept or can't be undone.
     const tip = [text, formatDateTime(c.at), ...(c.fields.length && c.kind !== 'card' ? [fieldsText(c.fields)] : []), ...(why ? [why] : [])]
     return (
@@ -184,7 +185,7 @@ function MessageGroupView({ g, open, toggle, changeText }: { g: MessageGroup; op
               className="btn small subtle assistant-undo"
               disabled={!!running[`undo:${c.id}`]}
               aria-label={tr(M.undoChange, { change: text })}
-              title={failed ? why : undefined}
+              title={failed?.length ? why : undefined}
               onClick={(e) => {
                 e.stopPropagation()
                 undoOne(c)

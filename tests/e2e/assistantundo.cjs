@@ -2,9 +2,10 @@
 // user's message they came from ("Your message at 08:14: 70 changes · Undo"), the newest open and the others folded,
 // each change on its row with Undo. S24 in the window: 70 relabels in one message, the user edits one card since, Undo
 // on the message asks first, then says what it did (69 undone, 1 kept with why), the card the user edited keeping their
-// labels. Undo on a single change puts it back and strikes the row through with when; a comment says it can't be
-// undone, and why; the Assistant's own undo (hive_undo) is listed in the same list. Screenshots in both themes and in
-// Polish. The Assistant runs the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
+// labels. What undo did is kept with each change (#1283 round 2): after a reload the card the user edited still says
+// Kept, never Undone. Undo on a single change puts it back and strikes the row through with when; a comment says it
+// can't be undone, and why; the Assistant's own undo (hive_undo) is listed in the same list, and a change of it the user
+// partly changed since says Partly undone, after a reload too. Screenshots in both themes and in Polish. The Assistant runs the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -101,6 +102,19 @@ const check = (name, ok, extra = '') => {
     check('…every other card without the label, the edited one with the user’s', after.filter((c) => c.labels?.includes('triage')).length === 0 && JSON.stringify((await card(edited)).labels) === '["mine"]', JSON.stringify((await card(edited)).labels))
     check('…its rows struck through, Undo no longer offered', !!(await lib.until(async () => (await groups.first().locator('.assistant-action.undone').count()) >= 2 && (await groups.first().locator('.assistant-undo, .assistant-undo-group').count()) === 0, HUNG_MS)))
     await shots('result')
+    // After a reload (what the window kept is gone): the card the user edited says Kept, the others Undone.
+    const reload = async () => {
+      await page.reload()
+      await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, HUNG_MS)
+      await lib.until(async () => (await groups.count()) >= 1, HUNG_MS)
+    }
+    await reload()
+    await groups.first().getByRole('button', { name: /Show all 7\d/ }).click()
+    const keptRow = groups.first().locator('.assistant-action[data-status="kept"]')
+    check('after a reload: the edited card’s change still says Kept, not Undone; the rest Undone', !!(await lib.until(async () => (await keptRow.count()) === 1 && /Card 5/.test(await keptRow.innerText()) && /Kept/.test(await keptRow.innerText()) && (await groups.first().locator('.assistant-action[data-status="undone"]').count()) === 69, HUNG_MS)), await keptRow.innerText().catch(() => ''))
+    const keptTip = await lib.hoverTip(page, keptRow, (t) => /labels changed since/.test(t), HUNG_MS)
+    check('…its tooltip says why: labels changed since', /labels changed since/.test(keptTip), keptTip)
+    await page.mouse.move(5, 5)
 
     // --- One change at a time: a title and a comment in the next message.
     const [one, two] = [numbers[0], numbers[1]]
@@ -115,13 +129,18 @@ const check = (name, ok, extra = '') => {
     check('…its row struck through, “Undone just now”, no Undo', !!(await lib.until(async () => (await groups.first().locator('.assistant-action.undone').count()) === 1 && /Undone just now/.test(await groups.first().locator('.assistant-action.undone').innerText()) && (await groups.first().locator('.assistant-action.undone .assistant-undo').count()) === 0, HUNG_MS)), await groups.first().innerText().catch(() => ''))
     await shots('single')
 
-    // --- The Assistant's own undo, in the same list.
-    check('a third message: it blocks a card', await say(`hive hive_update_task {"number":${numbers[2]},"blocked":"Waiting on a decision"}`))
+    // --- The Assistant's own undo, in the same list: a change the user partly changed since says Partly undone.
+    check('a third message: it blocks a card and renames it', await say(`hive hive_update_task {"number":${numbers[2]},"blocked":"Waiting on a decision","title":"Renamed again"}`))
+    await inv('tasks:update', numbers[2], { title: 'My own title' })
     check('…then undoes it with its own tool', await say('hive hive_undo {"group":"latest"}'))
     check('…its undo listed with its message (the newest, open)', !!(await lib.until(async () => (await groups.count()) === 4 && (await groups.first().locator('.assistant-action', { hasText: 'Undid 1 of 1 change of its own' }).count()) === 1, HUNG_MS)) && !(await card(numbers[2]))?.blocked, await panel().locator('.assistant-actions').innerText().catch(() => ''))
     // The message before it, opened: the change it undid, struck through.
     await head(1).click()
-    check('…the change it undid struck through, in its own message', !!(await lib.until(async () => (await groups.nth(1).locator('.assistant-action.undone', { hasText: 'blocked' }).count()) === 1, HUNG_MS)), await groups.nth(1).innerText().catch(() => ''))
+    const partlyRow = groups.nth(1).locator('.assistant-action[data-status="partly"]')
+    check('…the change it undid says Partly undone in its own message (the block put back, the title the user’s)', !!(await lib.until(async () => (await partlyRow.count()) === 1 && /Partly undone/.test(await partlyRow.innerText()), HUNG_MS)) && !(await card(numbers[2]))?.blocked && (await card(numbers[2]))?.title === 'My own title', await groups.nth(1).innerText().catch(() => ''))
+    await reload()
+    await head(1).click()
+    check('…and after a reload', !!(await lib.until(async () => (await partlyRow.count()) === 1, HUNG_MS)), await groups.nth(1).innerText().catch(() => ''))
 
     // --- In Polish (as main sends a change of language, with Polish's own catalogue).
     const base = (await inv('app:info')).language

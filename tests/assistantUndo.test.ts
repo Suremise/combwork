@@ -239,6 +239,49 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect((await card(c.number)).title).toBe('Restart')
   })
 
+  it('what undo did is kept with each change, whoever undid it, across a restart: put back, kept as changed since, or partly (#1283)', async () => {
+    const [whole, kept, partly] = [await make('Outcome whole'), await make('Outcome kept'), await make('Outcome partly')]
+    const group = newMessage()
+    for (const c of [whole, kept, partly]) await asAssistant('change it', () => tasks.updateTask(c.number, { title: `${c.title} (Assistant)`, labels: ['assistant'] }, assistant))
+    // The user changes all of one, and part of another, since.
+    await run(() => tasks.updateTask(kept.number, { title: 'Mine', labels: ['mine'] }, user))
+    await run(() => tasks.updateTask(partly.number, { labels: ['mine'] }, user))
+    // The Assistant undoes them with its own tool's path (not the window's): the outcome is the change's, not the window's.
+    await undoChanges(w, { group }, 'assistant')
+    const outcomeOf = (n: number) => groupOf(group)!.changes.find((c) => c.card === n)
+    const expectOutcomes = (): void => {
+      expect(outcomeOf(whole.number)).toMatchObject({ outcome: { undone: ['labels', 'title'], skipped: [] } })
+      expect(outcomeOf(kept.number)).toMatchObject({ outcome: { undone: [], skipped: [{ field: 'labels', why: 'changed' }, { field: 'title', why: 'changed' }] } })
+      expect(outcomeOf(partly.number)).toMatchObject({ outcome: { undone: ['title'], skipped: [{ field: 'labels', why: 'changed' }] } })
+      for (const c of [whole, kept, partly]) expect(outcomeOf(c.number)?.undoneAt).toBeTruthy()
+    }
+    expectOutcomes()
+    // Undone again: nothing more done, and what the first undo did stays as it was.
+    expect((await userUndo(w, { group })).every((r) => r.already)).toBe(true)
+    expectOutcomes()
+    await disposeWorkspaceService(w)
+    store.closeAllBoards()
+    w = createWorkspaceService()
+    await w.open(wsPath)
+    expectOutcomes()
+  })
+
+  it("a change that failed isn't marked: no outcome, and Undo is offered again", async () => {
+    const c = await make('Outcome failed')
+    const group = newMessage()
+    await asAssistant('change it', () => tasks.updateTask(c.number, { title: 'Failing' }, assistant))
+    const spy = vi.spyOn(tasks, 'updateTask').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toMatchObject([{ field: 'title', why: 'failed' }])
+    } finally {
+      spy.mockRestore()
+    }
+    const row = groupOf(group)!.changes[0]
+    expect(row.undoneAt).toBeUndefined()
+    expect(row.outcome).toBeUndefined()
+  })
+
   it("a value of any shape comes back as it was written (a setting's table, a list, nothing)", () => {
     for (const v of [null, true, 0, -2.5, '', 'x', [], [1, 'a', null], {}, { a: { b: [1, { c: 'd' }] }, 'e.f': false }]) expect(changes.valueOf(changes.rowsOf(v))).toEqual(v)
   })
