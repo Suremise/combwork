@@ -8,7 +8,7 @@ import type { AgentInfo, LiveSessionState, ProjectInfo, TaskCard } from './types
  * word, a question, a stall, a card blocked on the user); it detects nothing of its own.
  * - waiting: waiting for you (a permission prompt, a question, a sign-in, a card blocked on you): a diamond;
  * - stalled: nothing will move it on (its CLI failed, or failed to start, its turn has been silent with its state
- *   unknown, or it left the cards it loops on unwatched): a square;
+ *   unknown, its hooks aren't arriving, or it left the cards it loops on unwatched): a square;
  * - working: a turn, its start, a compaction or background tasks running: a pulsing dot;
  * - idle: ready, finished, watching cards, stopped or no session: a ring.
  */
@@ -27,14 +27,14 @@ export interface AgentStateExtras {
   failedToStart?: boolean
 }
 
-type StateFields = Pick<LiveSessionState, 'status' | 'question' | 'turn' | 'notWatching'>
+type StateFields = Pick<LiveSessionState, 'status' | 'question' | 'turn' | 'notWatching'> & Partial<Pick<LiveSessionState, 'hooksMissing'>>
 
 /** The state an agent's mark shows; no session at all is idle. */
 export function agentState(live: StateFields | null | undefined, extras: AgentStateExtras = {}): AgentState {
   if (asksYou(live) || extras.blocked) return 'waiting'
   if (extras.stalled || (extras.failedToStart && !live)) return 'stalled'
   if (!live) return 'idle'
-  if (live.status === 'error' || live.turn?.state === 'unknown' || (live.notWatching?.length ?? 0) > 0) return 'stalled'
+  if (live.status === 'error' || live.turn?.state === 'unknown' || live.hooksMissing || (live.notWatching?.length ?? 0) > 0) return 'stalled'
   if (live.status === 'working' || live.status === 'starting' || live.status === 'background') return 'working'
   return 'idle'
 }

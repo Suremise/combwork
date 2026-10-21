@@ -88,8 +88,8 @@
     "description": "A tip's title."
   },
   "tips.assistantBatch.text": {
-    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own. The step counts as one of its {changes, plural, one {# change} other {# changes}} for a message, so it never stops part-way through them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100), {changes} how many changes the Assistant may make for one message (30)."
+    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."
   },
   "tips.assistantBatch.title": {
     "defaultMessage": "Many cards in one step",
@@ -666,6 +666,14 @@
   "tips.hiveSkills.title": {
     "defaultMessage": "Skills for working with Hive",
     "description": "A tip's title."
+  },
+  "tips.hooksMissing.text": {
+    "defaultMessage": "If a CLI update or a policy stops an agent’s hooks reaching Hive, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Hive can tell.",
+    "description": "A tip. Hooks: the calls an agent's coding agent makes to Hive as it works. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.hooksMissing.title": {
+    "defaultMessage": "When an agent’s hooks stop arriving",
+    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
   },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",

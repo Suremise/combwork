@@ -429,7 +429,7 @@
   "board.lanes.usualOrderDetail": "Działające tory od najnowszych, wstrzymane po nich",
   "board.lanes.usualOrderSaid": "Przywrócono zwykłą kolejność torów",
   "board.lanes.waitingForYou": "{n, plural, one {# czeka na Ciebie} few {# czekają na Ciebie} many {# czeka na Ciebie} other {# czeka na Ciebie}}",
-  "board.lanes.waits": "{reason, select, blocked {{card} jest zablokowana} hold {{card} jest wstrzymana} you {czeka na Ciebie ({ask, select, approve {zgoda} decide {decyzja} test {test} signIn {logowanie} other {odpowiedź}}): {card}} roundLimit {czeka na Ciebie: {card} osiągnęła limit rund} notMerged {czeka: {card} nie jest scalona} merging {czeka: {card} jest scalana} stale {nieaktualna: {card} trzeba zgłosić ponownie} reviewer {czeka na recenzenta dla {card}} other {zmiany listy po {card}}}",
+  "board.lanes.waits": "{reason, select, blocked {{card} jest zablokowana} hold {{card} jest wstrzymana} you {czeka na Ciebie ({ask, select, approve {zgoda} decide {decyzja} test {test} signIn {logowanie} other {odpowiedź}}): {card}} roundLimit {czeka na Ciebie: {card} osiągnęła limit rund} notMerged {czeka: {card} nie jest scalona} merging {czeka: {card} jest scalana} stale {nieaktualna: {card} trzeba zgłosić ponownie} reviewer {czeka na recenzenta dla {card}} lineUpdate {czeka: gałąź wykonawcy jest aktualizowana przed {card}} hooks {wstrzymany: hooki agenta {agent} nie docierają} other {zmiany listy po {card}}}",
   "board.links.archivedTitle": "{card} {title} · Zarchiwizowana (z kolumny {column}) · Ctrl+kliknięcie otwiera",
   "board.links.title": "{card} {title} · {column} · Ctrl+kliknięcie otwiera",
   "board.menu.delete": "Usuń…",

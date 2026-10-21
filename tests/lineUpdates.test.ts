@@ -463,6 +463,24 @@ describe('the move checked again at its boundary (#1271 round 2)', () => {
 })
 
 // HR2's round 1 finding 2: what waits is each workspace's own.
+// #1287's p4lane: a pass set off from inside another card's intent (a board event its write fires) ran its writes in that
+// intent's context, whose hook wrote the intent's card from the moved card's write: card 3 Done, never started.
+describe("a pass inside another card's intent (#1287)", () => {
+  it("writes only its own cards: the intent's card keeps its column and stage", async () => {
+    const { w, repo, wt, cards } = await workspace()
+    await approved(w, wt, cards[0], 'one.txt')
+    await merged(w, repo, cards[0], 'squash')
+    const wf = (await service.workflowFor(w, repo))!
+    // The next card's (refused) start, and the pass run from inside it.
+    // (Its hook as a start's: the card given to its builder with its first write.)
+    await inWorkspace(w, () => tasks.runIntent(wf, cards[1], builder, async () => update(w), (_w, first) => (first ? { patch: { agent: 'a1' } } : {})))
+    expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(true)
+    const c2 = await inWorkspace(w, () => tasks.getTask(cards[1], w))
+    expect([c2.column, foldCard(facts(w, cards[1])).stage]).toEqual(['todo', 'todo'])
+    expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBeNull()
+  })
+})
+
 describe("each workspace's waiting lanes are its own (#1271 round 2)", () => {
   it("a pass over another workspace leaves this one's waiting lane as it is; a workspace closed is forgotten", async () => {
     const a = await workspace()

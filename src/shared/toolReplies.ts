@@ -546,7 +546,7 @@ export function settingText(d: SettingDetail): string {
 /** hive_update_setting's reply: what changed, old → new, and when it applies. */
 export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string }): string {
   if (c.changed === false || (c.changed === undefined && c.old === c.new)) return `${c.path}${c.project ? ` (${c.project})` : ''} was already ${c.new}: nothing changed.`
-  return `Changed ${c.path}${c.project ? ` in ${c.project}` : ''} (${c.id}): ${c.old} → ${c.new}. ${c.restart ? `It applies ${c.restart}.` : 'It applies now.'} The user can revert it in your panel's list.`
+  return `Changed ${c.path}${c.project ? ` in ${c.project}` : ''} (${c.id}): ${c.old} → ${c.new}. ${c.restart ? `It applies ${c.restart}.` : 'It applies now.'} The user can undo it in your panel's list.`
 }
 
 // The Assistant's journal (#1031): a recall is a line an entry; an entry in full on request.

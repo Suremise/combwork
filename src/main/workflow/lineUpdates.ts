@@ -14,6 +14,7 @@
 // Each question is asked once for the branch's head (bound to it), so a branch nobody touches is never asked about twice.
 // Looked at after board changes and when an agent goes idle (its session's status), per open workspace, one pass at a time.
 
+import { AsyncResource } from 'async_hooks'
 import { advanced } from '../advanced'
 import { onHiveEvent } from '../events'
 import { createLogger, userText } from '../logger'
@@ -163,14 +164,22 @@ async function laneLine(wf: Workflow, project: string, id: string, on: () => boo
 const text = (m: (typeof FOR_YOU)[keyof typeof FOR_YOU], b: LineBehind, more: Record<string, string> = {}) => workflowText(m, { line: b.line ?? b.folder, card: b.prev.key, next: b.next.key, target: b.target, ...more })
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
+/**
+ * Where passes are scheduled from: made as this module loads, with no caller's async context (#1287). A pass scheduled
+ * from inside a change (a board event an intent's write fires) would otherwise carry that change's context into its
+ * own writes: the intent's `alongside` hook ran in them, writing that card's 0.9 fields from another card's stage.
+ */
+const root = new AsyncResource('lineUpdates')
 /** A pass soon (once things settle), one at a time per workspace. */
 function soon(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()
   if (!k || timers.has(k)) return
-  const t = setTimeout(() => {
-    timers.delete(k)
-    void coalesced(`lines:${k}`, () => updateLines(ws).catch((e) => log.warn('bringing builders\' branches up to date', e)))
-  }, 1000)
+  const t = root.runInAsyncScope(() =>
+    setTimeout(() => {
+      timers.delete(k)
+      void coalesced(`lines:${k}`, () => updateLines(ws).catch((e) => log.warn('bringing builders\' branches up to date', e)))
+    }, 1000)
+  )
   t.unref?.()
   timers.set(k, t)
 }
