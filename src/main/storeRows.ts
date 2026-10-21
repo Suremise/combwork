@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, inBoardWrite, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, boardOpen, closeBoard, inBoardWrite, transientDb, upgradeWaiting, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { keepAsBackup } from './storeBackup'
@@ -93,7 +93,7 @@ export async function withStoreLock<T>(workspacePath: string, store: StoreName, 
   return withFileLock(boardLock(path), async () => {
     const wasOpen = boardOpen(path)
     try {
-      return await fn(workspaceDb(path).writer)
+      return await fn(transientDb(path).writer)
     } finally {
       if (!wasOpen) closeBoard(path)
     }
@@ -114,7 +114,7 @@ export async function saveTable(workspacePath: string, store: StoreName, scope: 
   await withFileLock(boardLock(path), async () => {
     guard?.()
     const wasOpen = boardOpen(path)
-    const db = workspaceDb(path).writer
+    const db = transientDb(path).writer
     try {
       transaction(db, () => {
         write(db)

@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, dbGeneration, inBoardWrite, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, boardOpen, closeBoard, dbGeneration, inBoardWrite, noteLanesSaved, onDbReplaced, transientDb, upgradeWaiting, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -113,7 +113,8 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
 
 /** saveTable's transaction. */
 function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, keep: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
-  const db = workspaceDb(path).writer
+  // saveTable closes it again when it wasn't open (#1379: not fenced).
+  const db = transientDb(path).writer
   const def = TABLE_DEFS[store]
   const gen = dbGeneration(path)
   const keys = entryKeys(store, docs)

@@ -19,6 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
+import { inOpening, setOpenCheck } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -1220,8 +1221,14 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {
-  return context.run(w, fn)
+  // Also the work of the workspace's opening now (#1379): once that closes, it can't open the closed one's databases again.
+  return context.run(w, () => inOpening(w.path ? { path: w.path, signal: w.lifetime } : null, fn))
 }
+
+setOpenCheck((path) => {
+  const k = resolve(path).toLowerCase()
+  return [...services].some((w) => !!w.path && resolve(w.path).toLowerCase() === k)
+})
 
 /** The workspace set for the current work by inWorkspace (a window's request, an API request), if any. */
 export function contextWorkspace(): WorkspaceService | undefined {

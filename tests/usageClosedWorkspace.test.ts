@@ -4,7 +4,7 @@
 // backups' retention; and a transcript read that takes its saved state from the closed workspace's usage.db closes it
 // again after.
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, resolve as resolvePath } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -13,13 +13,14 @@ const base = tempDir('hive-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 
-const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { usageHistory } = await import('../src/main/usageHistory')
-const { boardOpen } = await import('../src/main/boardStore')
+const { boardLock, boardOpen } = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 const { usageFile } = await import('../src/main/usageDb')
+const { withFileLock } = await import('../src/main/fsutil')
 
-const [wsA, wsB, wsC, wsD] = ['alpha', 'beta', 'gamma', 'delta'].map((n) => join(base, n))
+const [wsA, wsB, wsC, wsD, wsE, wsF] = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'].map((n) => join(base, n))
 let w: ReturnType<typeof createWorkspaceService>
 
 /** Holds a promise until `release()`: the moment a test switches workspaces in. */
@@ -31,7 +32,7 @@ function gate(): { held: Promise<void>; release: () => void } {
 
 describe('the usage history of a workspace that closed', () => {
   beforeAll(async () => {
-    for (const ws of [wsA, wsB, wsC, wsD]) {
+    for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF]) {
       mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
       writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
@@ -120,6 +121,60 @@ describe('the usage history of a workspace that closed', () => {
       spy.mockRestore()
       inner.closeInProcess = closeAll
       closeAll?.()
+    }
+  })
+
+  it("a host's first read, waiting for the board's lock as the window switches away, doesn't open the closed board again", async () => {
+    await w.open(wsE)
+    const host = join(wsE, 'proj')
+    // The board's lock held: the read's move of the host's records into the database waits for it.
+    const g = gate()
+    let locked!: () => void
+    const holding = new Promise<void>((resolve) => (locked = resolve))
+    const lock = withFileLock(boardLock(resolvePath(wsE)), async () => {
+      locked()
+      await g.held
+    })
+    await holding
+    const reading = inWorkspace(w, () => w.sessionsFile(host)).then(
+      () => 'read',
+      (e: Error) => e.message
+    )
+    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(true), { timeout: 20000 })
+    const switching = w.open(wsB)
+    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(false), { timeout: 20000 })
+    g.release()
+    await lock
+    await switching
+    expect(await reading).toBe('The workspace was closed')
+    expect(boardOpen(wsE)).toBe(false)
+  })
+
+  it("a session's ingest, finding its transcript as the window switches away, doesn't open the closed board again", async () => {
+    const id = '00000000-0000-4000-9000-000000000002'
+    const at = new Date().toISOString()
+    writeFileSync(join(wsF, 'proj', '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', agentId: 'c1', name: 'a session', createdAt: at, lastActiveAt: at }] }))
+    await w.open(wsF)
+    const host = join(wsF, 'proj')
+    const g = gate()
+    const find = sessions.anyTranscript.bind(sessions)
+    const spy = vi.spyOn(sessions, 'anyTranscript').mockImplementationOnce(async (p, s) => {
+      await g.held
+      return find(p, s)
+    })
+    const providers = vi.spyOn(sessions, 'providerTranscript')
+    try {
+      const ingesting = inWorkspace(w, () => usageHistory.ingest(host, id, { priority: 1, keepState: 'no' })).catch(() => null)
+      await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: 20000 })
+      await w.open(wsB)
+      expect(boardOpen(wsF)).toBe(false)
+      g.release()
+      await ingesting
+      expect(providers).toHaveBeenCalled()
+      expect(boardOpen(wsF)).toBe(false)
+    } finally {
+      spy.mockRestore()
+      providers.mockRestore()
     }
   })
 })
