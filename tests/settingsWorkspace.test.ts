@@ -36,6 +36,9 @@ describe('Settings → Workspace → Card loops (#412)', async () => {
     await w.open(path)
     await inWorkspace(w, async () => {
       expect(settingRows({ query: 'card loop' }).find((r) => r.id === 'workspace.loopRounds')).toMatchObject({ value: '10' })
+      // A row's gist (#1312): the first sentence, cut at a word within 60 characters.
+      for (const r of settingRows({ query: 'compact' })) expect(r.desc.length <= 60 && !/[\s,;:]…$/.test(r.desc)).toBe(true)
+      expect(settingRows({ query: 'compact' }).find((r) => r.id === 'sessions.transcriptWarnMB')?.desc).toBe("Size, in MB, at which a running conversation's transcript…")
       const changed = await applySetting(entryOf('workspace.loopRounds'), 7, null)
       expect([changed.old, changed.new]).toEqual([10, 7])
       await applySetting(entryOf('workspace.loopWaitHours'), '3', null)
