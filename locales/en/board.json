@@ -719,6 +719,10 @@
     "defaultMessage": "Summary",
     "description": "A label in a run's details copied as text (Copy details, Progress panel): the summary its reporter gave follows."
   },
+  "board.details.temporary": {
+    "defaultMessage": "Temporary",
+    "description": "A label in a run's details (Progress panel), on one of the merge queue's failed checks: why the failure counts as temporary (the environment's, not the work's) follows."
+  },
   "board.details.testedOn": {
     "defaultMessage": "Tested on",
     "description": "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)."
@@ -734,6 +738,10 @@
   "board.details.tookTotal": {
     "defaultMessage": "{took}{expected, select, none {} other { · expected about {expected}}}",
     "description": "How long a finished run took, in its details (Progress panel): {took} (\"4 min\"), then about how long runs like it take ({expected}, a duration, or none when unknown: keep that branch empty)."
+  },
+  "board.details.transient": {
+    "defaultMessage": "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the merge queue tries the same revision again, at most twice.",
+    "description": "A run's details in the Progress panel: why a failed merge check counts as temporary, picked by {cause} (keep each branch's key as it is); {code} is the network error code found in its output (ENOTFOUND, ECONNRESET…: keep it as it is). Code 75 is a number: keep it."
   },
   "board.details.waitingSince": {
     "defaultMessage": "Waiting since {since}: {waiting}",

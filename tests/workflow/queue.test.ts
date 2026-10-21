@@ -183,6 +183,20 @@ describe('the merge queue', () => {
     expect((await r2.queue().drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
   })
 
+  it("#1362: a transient check's IntegrationFailed records why, as codes (its cause and the network code); a red one's says nothing of it", async () => {
+    const e = team()
+    const { card } = await queued(e)
+    await e.queue({ runCheck: async () => ({ ok: false, transient: true, cause: { cause: 'network', code: 'ENOTFOUND' }, output: 'npm error code ENOTFOUND' }) }).drain('main')
+    const failed = () => e.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').map((f) => f.data)
+    expect(failed().at(-1)).toMatchObject({ reason: 'checks', transient: true, cause: 'network', code: 'ENOTFOUND' })
+    moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
+    await e.queue({ runCheck: async () => ({ ok: false, output: '1 test failed' }) }).drain('main')
+    const red = failed().at(-1)!
+    expect(red).toMatchObject({ reason: 'checks', transient: false })
+    expect(red).not.toHaveProperty('cause')
+    expect(red).not.toHaveProperty('code')
+  })
+
   it('S33: restarts — a removed entry never merges; a wake is delivered once; an advance before Integrated is reconciled, never merged twice', async () => {
     const e = team({}, { autoRun: false })
     sh(e.project, 'checkout', '-q', '--detach')

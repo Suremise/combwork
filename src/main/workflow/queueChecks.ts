@@ -32,7 +32,7 @@ import { endTree, resolveCommand, shellSpec } from '../progressReporters/wrapper
 import { snapshot } from './checks'
 import type { CheckContext, CheckResult } from './mergeQueue'
 import type { ProgressCaller, ProgressStore } from '../progress'
-import type { CheckWhyNot, RunCheck } from '../../shared/types'
+import type { CheckWhyNot, RunCheck, TransientFailure } from '../../shared/types'
 
 /** Starts a process (the app's recording spawn, #1360; a test's plain one). */
 export type Spawn = (file: string, args: string[], opts: SpawnOptions) => ChildProcess
@@ -45,7 +45,8 @@ export interface QueueRuns {
    * `installAsWritten`: an install run as written, with no clean form (its details say so).
    */
   start(run: { title: string; command: string; card: number; revision: string; folder: string; noInstall?: boolean; titleFromCommand?: boolean; installAsWritten?: boolean }): string | null
-  finish(id: string, end: { ok: boolean; exitCode: number | null; logPath: string | null }): void
+  /** `transient`: why a failure counts as temporary (its details say so). */
+  finish(id: string, end: { ok: boolean; exitCode: number | null; logPath: string | null; transient?: TransientFailure }): void
   /** How it counted as a check of the card's result revision (its `CheckRan`). */
   counts(id: string, c: RunCheck): void
 }
@@ -70,7 +71,7 @@ export function progressRuns(store: ProgressStore, on: () => boolean, workspaceP
     },
     finish: (id, end) => {
       try {
-        store.finish(caller(), id, { ok: end.ok, ...(end.exitCode !== null ? { exitCode: end.exitCode } : {}), ...(end.logPath ? { logPath: end.logPath } : {}) })
+        store.finish(caller(), id, { ok: end.ok, ...(end.exitCode !== null ? { exitCode: end.exitCode } : {}), ...(end.logPath ? { logPath: end.logPath } : {}), ...(end.transient ? { transient: end.transient } : {}) })
       } catch {
         // forgotten meanwhile (the panel turned off, the workspace closed)
       }
@@ -90,6 +91,8 @@ export interface QueueChecksDeps {
   timeoutMs: () => number
   /** The project's worktree setup command (Project Settings → Agents & Worktrees), as it is now. */
   setupCommand: () => string | Promise<string>
+  /** The network error codes that make a failed check transient in its last lines (Settings → Advanced, #1362); none: only the sure causes. */
+  networkCodes?: () => RegExp | null
   platform?: NodeJS.Platform
   /** The log's file calls (a test's, to fail them). */
   logIo?: LogIo
@@ -123,6 +126,8 @@ export function checkEnv(base: Record<string, string | undefined>): Record<strin
 export interface CheckEnd {
   /** It couldn't be started (the shell or the folder missing). */
   spawnError?: boolean
+  /** Its program wasn't found before it was started (Windows: programFound). */
+  notFound?: boolean
   /** Ended by its time limit. */
   timedOut?: boolean
   exitCode: number | null
@@ -133,19 +138,37 @@ export interface CheckEnd {
 /** Windows' STATUS_CONTROL_C_EXIT, unsigned and signed: a process ended by an interrupt. */
 const INTERRUPTED = new Set([0xc000013a, -1073741510])
 
+/** The exit code a check gives to say "a temporary failure, try again" (EX_TEMPFAIL, #1362). */
+export const TEMPFAIL = 75
+/** How much of a failed check's output its network error codes are looked for in: its last lines. */
+export const TAIL_LINES = 40
+
 /**
- * Whether a failed check is the environment's failure (transient: the same revision may go back into the queue) or the
- * work's (red: it needs a new revision): transient when it couldn't start (a spawn error, or the shell's "no such
- * command", 9009 on Windows and 127 elsewhere), was ended by its time limit, or was killed from outside (a signal, or
- * Windows' interrupt status). A process another program ends with TerminateProcess exits with the code that program
- * gave, which can't be told from the check's own: it counts as red. #1362 adds what it decides here.
+ * Why a failed check is the environment's failure (transient: the same revision may go back into the queue) rather
+ * than the work's (red: it needs a new revision), or null when it is the work's. Transient when it couldn't start (a
+ * spawn error, or the shell's "no such command", 9009 on Windows and 127 elsewhere), was ended by its time limit, was
+ * killed from outside (a signal, or Windows' interrupt status), exited 75 (the project's own script saying so, #1362),
+ * or has a network error code (`network`: Settings → Advanced, Node's and npm's own) in its last 40 lines (#1362,
+ * Darren's decision on #1121): never guessed from anything else. A process another program ends with TerminateProcess
+ * exits with the code that program gave, which can't be told from the check's own: it counts as red.
  */
-export function classifyCheckFailure(e: CheckEnd, platform: NodeJS.Platform = process.platform): 'transient' | 'red' {
-  if (e.spawnError || e.timedOut) return 'transient'
-  if (e.signal !== null) return 'transient'
-  if (e.exitCode !== null && INTERRUPTED.has(e.exitCode)) return 'transient'
-  if (e.exitCode === (platform === 'win32' ? 9009 : 127)) return 'transient'
-  return 'red'
+export function transientCause(e: CheckEnd, platform: NodeJS.Platform = process.platform, network: RegExp | null = null): TransientFailure | null {
+  if (e.spawnError) return { cause: e.notFound ? 'notFound' : 'spawn' }
+  if (e.timedOut) return { cause: 'timeout' }
+  if (e.signal !== null || (e.exitCode !== null && INTERRUPTED.has(e.exitCode))) return { cause: 'killed' }
+  if (e.exitCode === (platform === 'win32' ? 9009 : 127)) return { cause: 'notFound' }
+  if (e.exitCode === TEMPFAIL) return { cause: 'exit75' }
+  if (network) {
+    const tail = e.output.replace(/\s+$/, '').split(/\r?\n/).slice(-TAIL_LINES).join('\n')
+    const found = new RegExp(network.source, network.flags.replace('g', '')).exec(tail)
+    if (found) return { cause: 'network', code: found[0].slice(0, 64) }
+  }
+  return null
+}
+
+/** Whether a failed check is the environment's failure ('transient') or the work's ('red'): transientCause's verdict. */
+export function classifyCheckFailure(e: CheckEnd, platform: NodeJS.Platform = process.platform, network: RegExp | null = null): 'transient' | 'red' {
+  return transientCause(e, platform, network) ? 'transient' : 'red'
 }
 
 /** cmd.exe's own commands, which no file on PATH runs. */
@@ -398,6 +421,14 @@ export async function bracketEnd(folder: string, revision: string, start: QueueB
 export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>; install: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }> } {
   const spawn = deps.spawn ?? nodeSpawn
   const platform = deps.platform ?? process.platform
+  // A pattern that can't be read (an Advanced value gone bad) leaves only the sure causes.
+  const network = (): RegExp | null => {
+    try {
+      return deps.networkCodes?.() ?? null
+    } catch {
+      return null
+    }
+  }
   const io = deps.logIo ?? FILE_IO
 
   /** Runs a command to its end or its time limit, its output into the log; never throws. */
@@ -426,7 +457,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         const env = checkEnv(deps.env())
         if (!programFound(command, env, folder, platform)) {
           log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
-          return done({ spawnError: true, exitCode: null, signal: null })
+          return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
         }
         const sh = shellSpec(command, env, platform)
         child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -461,6 +492,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
     const log = new BoundedLog(logPath, io)
     let end: CheckEnd = { spawnError: true, exitCode: null, signal: null, output: '' }
     let output = ''
+    let cause: TransientFailure | null = null
     try {
       try {
         opts.before?.()
@@ -468,19 +500,19 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         // What the command needs first failed (node_modules couldn't be removed): the machine's failure, not the work's.
         log.write(Buffer.from(`${e instanceof Error ? e.message : String(e)}\n`))
         end = { spawnError: true, exitCode: null, signal: null, output: '' }
-        return { ok: false, transient: true, output: '', command, run: id ?? randomUUID() }
+        return { ok: false, transient: true, cause: { cause: 'spawn' }, output: '', command, run: id ?? randomUUID() }
       }
       end = await exec(command, folder, log)
     } finally {
       output = log.close()
       const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
-      if (id) deps.runs?.finish(id, { ok, exitCode: end.exitCode, logPath: log.usable ? logPath : null })
+      cause = ok ? null : transientCause({ ...end, output }, platform, network())
+      if (id) deps.runs?.finish(id, { ok, exitCode: end.exitCode, logPath: log.usable ? logPath : null, ...(cause ? { transient: cause } : {}) })
     }
     const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
-    const transient = !ok && classifyCheckFailure({ ...end, output }, platform) === 'transient'
     return {
       ok,
-      ...(transient ? { transient: true } : {}),
+      ...(cause ? { transient: true, cause } : {}),
       output,
       command,
       run: id ?? randomUUID(),
