@@ -766,7 +766,7 @@ const tools: Tool[] = [
   {
     name: 'hive_update_setting',
     description:
-      "Change one of Hive's settings to value, as Settings would: only when the user asked or agreed. project: the project, for a project's setting (null inherits Hive's). Refused for [read-only] settings (permission modes, the Agent API, what Hive runs, your own Control): tell the user where to change those. It shows in your panel's list with old → new, where the user can revert it. Replies with old → new and when it applies.",
+      "Change one of Hive's settings to value, as Settings would: only when the user asked or agreed. project: the project, for a project's setting (null inherits Hive's). Refused for [read-only] settings (permission modes, the Agent API, what Hive runs, your own Control): tell the user where to change those. It shows in your panel's list with old → new, where the user can undo it. Replies with old → new and when it applies.",
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: 'What hive_read_setting says it takes (a table is an object or a list).' }, project: { type: 'string' } },

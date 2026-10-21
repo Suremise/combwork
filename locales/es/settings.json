@@ -337,7 +337,7 @@
   "settings.appearance.uiFontSize.tip": "Ver → Acercar y Alejar escalan todo, incluida la terminal.",
   "settings.appearance.uiFontSize.title": "Tamaño de fuente de la interfaz",
   "settings.assistant.changeSettings.desc": "Permitir que el Asistente cambie la configuración de Hive cuando se lo pidas, en todos los espacios de trabajo. Diga lo que diga esta opción, puede leerla y explicarla.",
-  "settings.assistant.changeSettings.tip": "Primero sugiere un cambio y solo lo hace cuando aceptas. Cada cambio aparece en su panel con el valor anterior y el nuevo y un botón Revertir. Nunca puede cambiar su propio Control, los modos de permisos, la Agent API ni lo que Hive ejecuta (rutas de las CLI, argumentos adicionales, comandos de preparación): te dice dónde cambiarlos. Un Asistente en ejecución aplica un cambio después de reiniciarse.",
+  "settings.assistant.changeSettings.tip": "Primero sugiere un cambio y solo lo hace cuando aceptas. Cada cambio aparece en su panel con el valor anterior y el nuevo y un botón Deshacer. Nunca puede cambiar su propio Control, los modos de permisos, la Agent API ni lo que Hive ejecuta (rutas de las CLI, argumentos adicionales, comandos de preparación): te dice dónde cambiarlos. Un Asistente en ejecución aplica un cambio después de reiniciarse.",
   "settings.assistant.changeSettings.title": "Cambiar la configuración",
   "settings.assistant.compactSuggestTokens.desc": "Tamaño del contexto, en tokens, a partir del cual el botón Compactar del Asistente y el recuento de contexto de su pie se ponen naranjas. Nunca: no se ponen nunca.",
   "settings.assistant.compactSuggestTokens.off": "Nunca",

@@ -337,7 +337,7 @@
   "settings.appearance.uiFontSize.tip": "View → Zoom In and Zoom Out scale everything, including the terminal.",
   "settings.appearance.uiFontSize.title": "Interface font size",
   "settings.assistant.changeSettings.desc": "Let the Assistant change Hive's settings when you ask it to, in every workspace. Whatever this says, it can read and explain them.",
-  "settings.assistant.changeSettings.tip": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and a Revert button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
+  "settings.assistant.changeSettings.tip": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and an Undo button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
   "settings.assistant.changeSettings.title": "Change settings",
   "settings.assistant.compactSuggestTokens.desc": "Context size, in tokens, at which the Assistant's Compact button and the context count in its footer turn orange. Never: they never do.",
   "settings.assistant.compactSuggestTokens.off": "Never",

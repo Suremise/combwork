@@ -337,7 +337,7 @@
   "settings.appearance.uiFontSize.tip": "Exibir → Ampliar e Reduzir mudam a escala de tudo, inclusive do terminal.",
   "settings.appearance.uiFontSize.title": "Tamanho da fonte da interface",
   "settings.assistant.changeSettings.desc": "Deixar o Assistente alterar as configurações do Hive quando você pedir, em todos os espaços de trabalho. Seja qual for este valor, ele pode lê-las e explicá-las.",
-  "settings.assistant.changeSettings.tip": "Ele sugere uma configuração primeiro e só altera quando você concorda. Cada alteração aparece no painel dele com o valor antigo e o novo e um botão Reverter. Ele nunca pode alterar o próprio Controle, os modos de permissão, a Agent API ou o que o Hive executa (caminhos das CLIs, argumentos extras, comandos de preparação): ele diz onde alterar isso. Um Assistente em execução recebe a alteração depois de reiniciar.",
+  "settings.assistant.changeSettings.tip": "Ele sugere uma configuração primeiro e só altera quando você concorda. Cada alteração aparece no painel dele com o valor antigo e o novo e um botão Desfazer. Ele nunca pode alterar o próprio Controle, os modos de permissão, a Agent API ou o que o Hive executa (caminhos das CLIs, argumentos extras, comandos de preparação): ele diz onde alterar isso. Um Assistente em execução recebe a alteração depois de reiniciar.",
   "settings.assistant.changeSettings.title": "Alterar configurações",
   "settings.assistant.compactSuggestTokens.desc": "Tamanho do contexto, em tokens, a partir do qual o botão Compactar do Assistente e a contagem de contexto no rodapé ficam laranja. Nunca: eles nunca ficam.",
   "settings.assistant.compactSuggestTokens.off": "Nunca",

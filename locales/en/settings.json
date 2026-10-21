@@ -1352,7 +1352,7 @@
     "description": "What the setting \"Change settings\" does, under its title (Settings → Assistant)."
   },
   "settings.assistant.changeSettings.tip": {
-    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and a Revert button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
+    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and an Undo button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
     "description": "The info tip of the setting \"Change settings\" (Settings → Assistant): more on what it does and when it applies."
   },
   "settings.assistant.changeSettings.title": {
