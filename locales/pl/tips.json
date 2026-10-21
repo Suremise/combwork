@@ -204,7 +204,7 @@
   "tips.myPrices.title": "Twoje własne ceny dla Claude Code",
   "tips.newCard.text": "Naciśnij {key}, żeby dodać nową kartę dla bieżącego projektu bez przerywania tego, co robisz.",
   "tips.newCard.title": "Zanotuj kartę",
-  "tips.noCodeCards.text": "Decyzja, tekst lub test nie mają nic do commitowania: zaznacz Bez kodu w oknie Nowa karta. Jej praca jest zgłaszana z podsumowaniem i trafia do Gotowe bez scalania.",
+  "tips.noCodeCards.text": "Decyzja, tekst lub próba nie mają nic do commitowania: zaznacz Bez kodu w oknie Nowa karta. Jej praca jest zgłaszana z podsumowaniem i trafia do Gotowe bez scalania.",
   "tips.noCodeCards.title": "Karty bez kodu",
   "tips.off.message": "Nadal są w Pomoc → Wskazówki…, a w Ustawienia → Ogólne włączysz je z powrotem.",
   "tips.off.title": "Wskazówki są wyłączone",

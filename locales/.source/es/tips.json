@@ -204,7 +204,7 @@
   "tips.myPrices.title": "Your own prices for Claude Code",
   "tips.newCard.text": "Press {key} for a new card for the project you are in, without leaving what you are doing.",
   "tips.newCard.title": "Jot down a card",
-  "tips.noCodeCards.text": "A decision, a write-up or a test has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+  "tips.noCodeCards.text": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
   "tips.noCodeCards.title": "Cards with no code",
   "tips.off.message": "Help → Tips… still has them, and Settings → General turns them back on.",
   "tips.off.title": "Tips are off",

@@ -917,7 +917,7 @@
   },
   "workflow.rule.card.kind": {
     "defaultMessage": "A card's kind is set when it is made",
-    "description": "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a test) from when it is made; changing it later is an exception the user makes (glossary: override)."
+    "description": "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a trial) from when it is made; changing it later is an exception the user makes (glossary: override)."
   },
   "workflow.rule.done.contained": {
     "defaultMessage": "Hive checks the merge",

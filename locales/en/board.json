@@ -1337,26 +1337,26 @@
   },
   "board.kind.field": {
     "defaultMessage": "Kind",
-    "description": "A field label in the card dialog: the card's kind, code (work in commits) or no code (a decision, a write-up, a test). Glossary: no-code card."
+    "description": "A field label in the card dialog: the card's kind, code (work in commits) or no code (a decision, a write-up, a trial). Glossary: no-code card."
   },
   "board.kind.keep": {
     "defaultMessage": "Keep as Code",
     "description": "A button on the banner of a card an agent proposed as no code: keeps it code (work in commits)."
   },
   "board.kind.newChoice": {
-    "defaultMessage": "No code (a decision, a write-up, a test…)",
+    "defaultMessage": "No code (a decision, a write-up, a trial…)",
     "description": "A tick box in the New Card dialog: the card's work has no commits; it is submitted with a summary. Glossary: no-code card."
   },
   "board.kind.noCode": {
     "defaultMessage": "No code",
-    "description": "A card's kind (a mark on its tile, and in its dialog): work with no commits, such as a decision, a write-up or a test; it is submitted with a summary. Glossary: no-code card."
+    "description": "A card's kind (a mark on its tile, and in its dialog): work with no commits, such as a decision, a write-up or a trial; it is submitted with a summary. Glossary: no-code card."
   },
   "board.kind.noCodeTip": {
-    "defaultMessage": "No code: its work is a decision, a write-up or a test, submitted with a summary and no commits.",
+    "defaultMessage": "No code: its work is a decision, a write-up or a trial, submitted with a summary and no commits.",
     "description": "Tooltip and accessible name of a card's No code mark (on its tile). Glossary: no-code card."
   },
   "board.kind.proposal": {
-    "defaultMessage": "No code? The agent that made this card proposes it: its work has no commits (a decision, a write-up, a test).",
+    "defaultMessage": "No code? The agent that made this card proposes it: its work has no commits (a decision, a write-up, a trial).",
     "description": "A banner in a card's dialog: the agent that made the card proposed it as no code, and the user is to confirm it or keep it as code. Glossary: no-code card."
   },
   "board.kind.proposedTip": {

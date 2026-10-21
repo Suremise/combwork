@@ -204,7 +204,7 @@
   "tips.myPrices.title": "Seus próprios preços para o Claude Code",
   "tips.newCard.text": "Pressione {key} para criar um cartão no projeto em que você está, sem sair do que está fazendo.",
   "tips.newCard.title": "Anote um cartão",
-  "tips.noCodeCards.text": "Uma decisão, um texto ou um teste não têm nada para commitar: marque Sem código na janela Novo cartão. O trabalho é enviado com um resumo e vai para Concluído sem nada para mesclar.",
+  "tips.noCodeCards.text": "Uma decisão, um texto ou um experimento não têm nada para commitar: marque Sem código na janela Novo cartão. O trabalho é enviado com um resumo e vai para Concluído sem nada para mesclar.",
   "tips.noCodeCards.title": "Cartões sem código",
   "tips.off.message": "Ajuda → Dicas… continua com elas, e Configurações → Geral as reativa.",
   "tips.off.title": "Dicas desativadas",

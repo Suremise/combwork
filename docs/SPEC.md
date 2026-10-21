@@ -1772,7 +1772,7 @@ queue. With review they finish when the review (and approval, if any) passes; wi
 Changing the kind later is the user's, recorded as an override.
 
 **Built (#1277).** The kind is the card's `kind` column. The user (the New Card dialog's **No code (a decision, a
-write-up, a test…)**) and the Assistant (`kind` on `POST /v1/tasks` and `hive_create_task`) make a no-code card at
+write-up, a trial…)**) and the Assistant (`kind` on `POST /v1/tasks` and `hive_create_task`) make a no-code card at
 once; a project agent's `kind: "no-code"` is only **proposed** (OP-7: a `KindProposed` fact, the card stays code): its
 tile marks it ("No code?") and its dialog asks **Confirm No Code** / **Keep as Code** (the Assistant: `confirmKind` on
 `PATCH /v1/tasks/{n}` and `hive_update_task`), answered by a `KindDecided` fact. Changed later, the user's change asks

@@ -625,7 +625,7 @@ const tools: Tool[] = [
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
         context: contextArg,
-        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a test), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a test); the user confirms it. Default code.' }
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' }
       },
       required: ['title']
     },

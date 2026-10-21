@@ -33,7 +33,7 @@
   },
   "tasks.error.badKind": {
     "defaultMessage": "A card is code or no-code, not {kind}.",
-    "description": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a test). Keep code and no-code as they are (they are values)."
+    "description": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a trial). Keep code and no-code as they are (they are values)."
   },
   "tasks.error.batchGone": {
     "defaultMessage": "That batch is no longer kept: unarchive its cards from Archived.",
@@ -385,7 +385,7 @@
   },
   "tasks.history.kind": {
     "defaultMessage": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
-    "description": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a test: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence."
+    "description": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a trial: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence."
   },
   "tasks.history.labels": {
     "defaultMessage": "Labels: {labels}",

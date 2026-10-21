@@ -820,7 +820,7 @@
     "description": "A tip's title."
   },
   "tips.noCodeCards.text": {
-    "defaultMessage": "A decision, a write-up or a test has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+    "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
   },
   "tips.noCodeCards.title": {

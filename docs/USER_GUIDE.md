@@ -688,7 +688,7 @@ Turn every rule off at once with **Settings → Advanced → Workflow rules are 
 
 ### No-code cards
 
-Some cards have no code to write: a decision, a write-up, a test to try. Make one with **No code (a decision, a write-up, a test…)** in the New Card dialog: its tile and its dialog say **No code**, and when its work is done it is submitted with a summary instead of commits, reviewed if your project reviews work, and goes to Done with nothing to merge. An agent that adds a card can only propose it as no code: the card shows **No code?** and its dialog asks you to **Confirm No Code** or **Keep as Code**. To change a card's kind after it was made, use **Make It Code…** or **Make It No Code…** beside its **Kind** in the dialog: as it is an exception to its rules, Hive asks first and records it on the card with your reason. The Hive Assistant changes a kind only with your reason; agents never change it.
+Some cards have no code to write: a decision, a write-up, a trial. Make one with **No code (a decision, a write-up, a trial…)** in the New Card dialog: its tile and its dialog say **No code**, and when its work is done it is submitted with a summary instead of commits, reviewed if your project reviews work, and goes to Done with nothing to merge. An agent that adds a card can only propose it as no code: the card shows **No code?** and its dialog asks you to **Confirm No Code** or **Keep as Code**. To change a card's kind after it was made, use **Make It Code…** or **Make It No Code…** beside its **Kind** in the dialog: as it is an exception to its rules, Hive asks first and records it on the card with your reason. The Hive Assistant changes a kind only with your reason; agents never change it.
 
 ### For you
 

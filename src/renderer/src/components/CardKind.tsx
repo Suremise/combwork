@@ -9,23 +9,23 @@ import { loadTasks, notify, prompt, useLanguage } from '../store'
 import { BusyButton, Icon, Tooltip, useBusy } from './ui'
 
 // A card's kind in the window (#1277, SPEC §16.7.3): code (the default: work in commits) or no code (a decision, a
-// write-up, a test: no commits, submitted with a summary). Set when the card is made; a project agent only proposes no
+// write-up, a trial: no commits, submitted with a summary). Set when the card is made; a project agent only proposes no
 // code, and the user (or the Assistant) confirms it; changing it later is the user's exception to the rules, asked first.
 
 const M = {
-  noCode: msg({ id: 'board.kind.noCode', defaultMessage: 'No code', description: "A card's kind (a mark on its tile, and in its dialog): work with no commits, such as a decision, a write-up or a test; it is submitted with a summary. Glossary: no-code card." }),
+  noCode: msg({ id: 'board.kind.noCode', defaultMessage: 'No code', description: "A card's kind (a mark on its tile, and in its dialog): work with no commits, such as a decision, a write-up or a trial; it is submitted with a summary. Glossary: no-code card." }),
   code: msg({ id: 'board.kind.code', defaultMessage: 'Code', description: "A card's kind in its dialog: work in commits (the default). Glossary: no-code card." }),
-  noCodeTip: msg({ id: 'board.kind.noCodeTip', defaultMessage: 'No code: its work is a decision, a write-up or a test, submitted with a summary and no commits.', description: "Tooltip and accessible name of a card's No code mark (on its tile). Glossary: no-code card." }),
+  noCodeTip: msg({ id: 'board.kind.noCodeTip', defaultMessage: 'No code: its work is a decision, a write-up or a trial, submitted with a summary and no commits.', description: "Tooltip and accessible name of a card's No code mark (on its tile). Glossary: no-code card." }),
   proposedTip: msg({ id: 'board.kind.proposedTip', defaultMessage: 'No code? Proposed by the agent that made it: open the card to confirm it.', description: "Tooltip and accessible name of a card's mark when an agent proposed it as no code (no commits) and nobody has answered yet. Glossary: no-code card." }),
-  field: msg({ id: 'board.kind.field', defaultMessage: 'Kind', description: "A field label in the card dialog: the card's kind, code (work in commits) or no code (a decision, a write-up, a test). Glossary: no-code card." }),
-  newChoice: msg({ id: 'board.kind.newChoice', defaultMessage: 'No code (a decision, a write-up, a test…)', description: "A tick box in the New Card dialog: the card's work has no commits; it is submitted with a summary. Glossary: no-code card." }),
+  field: msg({ id: 'board.kind.field', defaultMessage: 'Kind', description: "A field label in the card dialog: the card's kind, code (work in commits) or no code (a decision, a write-up, a trial). Glossary: no-code card." }),
+  newChoice: msg({ id: 'board.kind.newChoice', defaultMessage: 'No code (a decision, a write-up, a trial…)', description: "A tick box in the New Card dialog: the card's work has no commits; it is submitted with a summary. Glossary: no-code card." }),
   change: msg({ id: 'board.kind.change', defaultMessage: '{kind, select, code {Make It No Code…} other {Make It Code…}}', description: "A button beside a card's kind in its dialog: changes it to the other kind, asking first (…): an exception to the card's rules. Select keys: the kind it is now." }),
   askTitle: msg({ id: 'board.kind.askTitle', defaultMessage: '{kind, select, code {Make {card} code?} other {Make {card} no code?}}', description: "Title of the question before a card's kind is changed after it was made. {kind} is the kind it would get (select keys), {card} the card's name." }),
   askMessage: msg({ id: 'board.kind.askMessage', defaultMessage: 'This skips a rule of its project:', description: "The question before a card's kind is changed after it was made: the rule it skips is listed below (its name)." }),
   askDetail: msg({ id: 'board.kind.askDetail', defaultMessage: 'Changing it anyway records an override on the card, with your reason.', description: "Under the rule a kind change skips, in the question before it: the change is recorded on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
   reason: msg({ id: 'board.kind.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a card's kind is changed: why the user makes the exception. Optional." }),
   anyway: msg({ id: 'board.kind.anyway', defaultMessage: 'Change Anyway', description: "The button of the question before a card's kind is changed: makes the change, recorded as an override (glossary: override)." }),
-  proposal: msg({ id: 'board.kind.proposal', defaultMessage: 'No code? The agent that made this card proposes it: its work has no commits (a decision, a write-up, a test).', description: "A banner in a card's dialog: the agent that made the card proposed it as no code, and the user is to confirm it or keep it as code. Glossary: no-code card." }),
+  proposal: msg({ id: 'board.kind.proposal', defaultMessage: 'No code? The agent that made this card proposes it: its work has no commits (a decision, a write-up, a trial).', description: "A banner in a card's dialog: the agent that made the card proposed it as no code, and the user is to confirm it or keep it as code. Glossary: no-code card." }),
   confirm: msg({ id: 'board.kind.confirm', defaultMessage: 'Confirm No Code', description: "A button on the banner of a card an agent proposed as no code: makes it no code." }),
   keep: msg({ id: 'board.kind.keep', defaultMessage: 'Keep as Code', description: "A button on the banner of a card an agent proposed as no code: keeps it code (work in commits)." }),
   working: msg({ id: 'board.kind.working', defaultMessage: 'Saving…', description: "A button while the card's kind is being saved." }),
