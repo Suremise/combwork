@@ -2,7 +2,8 @@
 // the fake Claude Code, which sends no hook or status line while fake-nohooks-<agent> is in its home, with Hive's bound
 // (Settings → Advanced, Hooks missing: wait) at 3 s:
 // - a healthy agent's long silent think (10 s, over three bounds) and an idle one never show it (no false alarms);
-// - its hooks turned off mid-session, its next prompt's work with no hook turns its pane to "Status unknown: no hooks
+// - its hooks turned off mid-session, its next prompt's work (held on screen until the test ends it) with no hook turns
+//   its pane to "Status unknown: no hooks
 //   from Claude Code" (a stalled mark) with the project's banner saying why and what to do, a Notifications entry
 //   once, nothing typed into it (the Agent API says why), and its lane paused: "paused: Builder's hooks aren't arriving";
 // - an agent started with its hooks off shows it from its start; a Codex agent (the fake, whose first hook comes with its
@@ -109,14 +110,22 @@ const hooksOff = (agent, off) => {
     check('no false alarm: a long silent think after its prompt hook, nor an idle agent, ever shows its hooks missing', ever.size === 0 && !(await live(reviewer))?.hooksMissing, JSON.stringify([...ever]))
     clearInterval(sampler)
 
-    // --- Builder's hooks stop mid-session: its next prompt, with no hook, shows it. A quick turn (1 s), over and idle at
-    // its prompt before Hive's first look (every 5 s): its records' request timed after the prompt shows it worked,
-    // though the conversation had requests before (its history never counts).
+    // --- Builder's hooks stop mid-session: its next prompt, with no hook while its screen shows it working, shows it. The
+    // turn holds until the test ends it (holduntil), so Hive's look sees it working whenever it comes: a condition, not
+    // a turn's length.
     hooksOff('Builder', true)
     const runBefore = (await live(builder))?.runId
-    check('a quick prompt with its hooks off', (await say(builder, 'work 1')) > 0)
-    check('it is over and idle at its prompt on screen', !!(await until(async () => /Worked for/.test(lib.plainText(await raw(builder))), HUNG_MS)))
+    const mark = (await raw(builder)).length
+    check('a prompt with its hooks off, held at work on screen', (await say(builder, 'holduntil hh-go')) > 0 && /esc to interrupt/.test(lib.plainText((await raw(builder)).slice(mark))))
     const gone = await until(async () => (await live(builder))?.hooksMissing, HUNG_MS)
+    // A late hook of a turn that is over (a tool's end of the earlier turn) says nothing of this prompt: it stays missing.
+    const lh = lib.launchHook(userData, gone ? (await live(builder)).runId : '')
+    const stale = lh && (await fetch(lh.url, { method: 'POST', headers: { Authorization: `Bearer ${lh.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'PostToolUse', session_id: (await live(builder)).sessionId, cwd: alpha, tool_name: 'Read', tool_use_id: 'toolu_old', tool_input: {}, prompt_id: 'old-turn' }) }).then((r) => r.ok, () => false))
+    const journaled = await until(() => fs.existsSync(path.join(userData, 'logs', 'hooks.log')) && fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8').split('\n').some((x) => x.includes(`run=${runBefore} `) && /PostToolUse .*stale/.test(x)), HUNG_MS)
+    check("a late hook of a turn that is over (the ledger's stale) leaves its hooks missing", !!stale && !!journaled && !!(await live(builder))?.hooksMissing, JSON.stringify({ stale, journaled, missing: (await live(builder))?.hooksMissing }))
+    // Its turn ends once that is seen: this prompt's own end, after the mark.
+    fs.writeFileSync(path.join(claudeHome, 'hh-go'), '')
+    check('this turn ends on screen', !!(await until(async () => /Worked for/.test(lib.plainText((await raw(builder)).slice(mark))), HUNG_MS)))
     check('its hooks are missing, shown after the prompt', gone?.after === 'prompt', JSON.stringify(gone))
     const header = page.locator('.pane-header-bar', { hasText: 'Builder' }).first()
     check('its pane says its status is unknown', !!(await until(async () => (await header.locator('.pane-status.hooks-missing').count()) === 1 && /Status unknown: no hooks from Claude Code/.test(await header.locator('.pane-status.hooks-missing').innerText()), HUNG_MS)))
@@ -159,10 +168,10 @@ const hooksOff = (agent, off) => {
     // task is watched from its start, though it is still starting then.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex', permissionMode: 'full-access' })
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cx'), '')
-    // What it does with the card it is started on: 12 s of work, its Working line on screen.
-    fs.writeFileSync(path.join(codexHome, 'fake-wakes-Cx.txt'), 'work 12\n')
+    // What it does with the card it is started on: work held until the test types "g", its Working line on screen.
+    fs.writeFileSync(path.join(codexHome, 'fake-wakes-Cx.txt'), 'hold\n')
     // Started on a card (Start on Card, as from the board), whose title is the fake's step: 12 s of work.
-    const cxCard = await inv('tasks:create', { title: 'work 12', project: 'alpha', column: 'todo' })
+    const cxCard = await inv('tasks:create', { title: 'Hold on', project: 'alpha', column: 'todo' })
     const startedCx = await inv('tasks:start', cxCard.number, { kind: 'agent', agentId: cx.id })
     check('the Codex agent starts on its card', startedCx?.agentId === cx.id, JSON.stringify(startedCx))
     const deafCx = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)

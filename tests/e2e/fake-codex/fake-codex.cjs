@@ -33,7 +33,7 @@
 // - Ctrl+C twice ends it with SessionEnd.
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
-//   FAKE_CODEX_VERSION 0.162.1 or later, "work N" draws Codex's Working line while it works.
+//   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -341,8 +341,6 @@ async function scripted(step) {
   const call = parseHiveStep(step)
   if (call) await hiveCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
-  // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while it works (#1336: what Hive's screen reading looks for).
-  if (pause && /^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (${pause[1]}s • esc to interrupt)\r\n`)
   if (pause) await sleep(Number(pause[1]) * 1000)
   // "checkpoint": a command of its own, whose PostToolUse reply may carry Hive's notice (#650).
   const check = /\bcheckpoint\b/i.test(step)
@@ -391,6 +389,8 @@ async function runPrompt(text) {
     if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, at: new Date().toISOString() }) + '\n')
     if (rows.length) text = work ? read : nextScripted() || ''
   }
+  // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Hive's screen reading looks for).
+  if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (0s • esc to interrupt)\r\n`)
   let questions = 0
   let scriptedSteps = false
   // "latetool": a command whose PostToolUse reaches Hive only after the turn's Stop (#648).
