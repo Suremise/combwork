@@ -4,7 +4,7 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { createInterface } from 'readline'
@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore } from '../src/main/workflow/factStore'
-import { startLauncher } from '../src/main/workflow/queueJobs'
+import { queueHost, startLauncher } from '../src/main/workflow/queueJobs'
 import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
@@ -580,6 +580,115 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queuePause('stuck')).toBeNull()
     await b.runner.release()
     expect(w.store.queueProcs(null, 'stuck')).toEqual([])
+  })
+
+  it.each([
+    ['a journal that can\'t be read (a folder where it should be)', (file: string) => {
+      renameSync(file, `${file}.saved`)
+      mkdirSync(file)
+      return () => {
+        rmSync(file, { recursive: true })
+        renameSync(`${file}.saved`, file)
+      }
+    }],
+    ['a damaged journal (a line that isn\'t a process)', (file: string) => {
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, `${text}12x:34\n`)
+      return () => writeFileSync(file, text)
+    }]
+  ])("HR4 r4 #1: %s is never taken for empty: the next runner pauses and keeps the duty, and settles once it reads", async (_what, damage) => {
+    let endable = false
+    const target = `unread-${damage.length}${_what.length}`
+    const cfg = { store: w.store, project: w.project, target, root: w.root, profile: 'A', hooks: { endJob: () => endable } }
+    const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+    k.unref()
+    const outside = await identify(k.pid!)
+    expect(await a.runner.followForTests(k.pid!)).toBe(true)
+    await a.runner.release()
+    const file = join(w.root, '.queue-journals', `${a.runner.lease}.followed`)
+    const repair = damage(file)
+    endable = true
+    const b = (await QueueRunner.acquire({ ...cfg, profile: 'B' })) as { ok: true; runner: QueueRunner; paused?: number }
+    expect(b.ok).toBe(true)
+    expect(b.paused).toBeDefined()
+    expect(w.store.queuePause(target)).toMatchObject({ reason: 'needsYou' })
+    expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
+    expect(await running(outside)).toBe(true)
+    // Readable again: settled, the process it names ended, the pause lifted.
+    repair()
+    expect(await b.runner.settle()).toBeNull()
+    expect(await running(outside)).toBe(false)
+    expect(w.store.queueProcs(a.runner.lease)).toEqual([])
+    expect(w.store.queuePause(target)).toBeNull()
+    await b.runner.release()
+  })
+
+  it('HR4 r4 #2: a process an outlived supervisor writes down while a takeover settles (after its read) is ended too, before the takeover runs', async () => {
+    // A's supervisor is its own (it outlives A, the seam); A's holder looks dead to B (as after a crash).
+    const aHost = queueHost({ linger: true })
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'late', root: w.root, profile: 'A', host: aHost, probe: probeWith(new Set(), { pid: 1001, started: 5 }) })) as { ok: true; runner: QueueRunner }
+    await identify(a.runner.supervisorPid!)
+    const sleeper = (): ChildProcess => {
+      const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+      k.unref()
+      return k
+    }
+    const first = sleeper()
+    const one = await identify(first.pid!)
+    expect(await a.runner.followForTests(first.pid!)).toBe(true)
+    const second = sleeper()
+    const two = await identify(second.pid!)
+    let late = false
+    const bProbe: ProcessProbe = { ...windowsProbe, self: async () => ({ pid: 2002, started: 7 }), alive: async (pid) => pid !== 1001 }
+    const b = (await QueueRunner.acquire({
+      store: w.store,
+      project: w.project,
+      target: 'late',
+      root: w.root,
+      profile: 'B',
+      probe: bProbe,
+      hooks: {
+        // Once B has read A's journal, A's lingering supervisor finds and writes down another process.
+        afterJournalRead: async () => {
+          if (late) return
+          late = true
+          expect(await a.runner.followForTests(second.pid!)).toBe(true)
+        }
+      }
+    })) as { ok: true; runner: QueueRunner; paused?: number }
+    expect(late).toBe(true)
+    expect(b).toMatchObject({ ok: true })
+    expect(b.paused).toBeUndefined()
+    expect(await running(one)).toBe(false)
+    expect(await running(two)).toBe(false)
+    expect(existsSync(join(w.root, '.queue-journals', `${a.runner.lease}.followed`))).toBe(false)
+    await b.runner.release()
+  })
+
+  it("an earlier runner's folder that can't be removed (a process nobody recorded still in it: the window SPEC accepts) pauses the queue naming it, until it can be", async () => {
+    const cfg = { store: w.store, project: w.project, target: 'held', root: w.root, profile: 'A' }
+    const a = (await QueueRunner.acquire(cfg)) as { ok: true; runner: QueueRunner }
+    expect(await a.runner.git(w.project, ['worktree', 'add', '--detach', a.runner.folder(), 'HEAD'])).toMatchObject({ ok: true })
+    // Something no record or journal names works in it (an escaped process the supervisor never saw).
+    const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd: a.runner.folder(), stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+    k.unref()
+    const stray = await identify(k.pid!)
+    await a.runner.release()
+    // Released (its job empty), but its folder stays, and so does the folder's record.
+    expect(existsSync(a.runner.folder())).toBe(true)
+    expect(w.store.queueFolders('held').map((f) => f.folder)).toContain(a.runner.folder())
+    const b = (await QueueRunner.acquire({ ...cfg, profile: 'B' })) as { ok: true; runner: QueueRunner; paused?: number }
+    expect(b).toMatchObject({ ok: true, paused: 0 })
+    expect(w.store.queuePause('held')).toMatchObject({ reason: 'needsYou', files: [a.runner.folder()] })
+    // Once nothing has it open: removed, the pause lifted.
+    await windowsProbe.end([stray])
+    await ends(stray)
+    expect(await b.runner.settle()).toBeNull()
+    expect(existsSync(a.runner.folder())).toBe(false)
+    expect(w.store.queuePause('held')).toBeNull()
+    expect(w.store.queueFolders('held').map((f) => f.folder)).not.toContain(a.runner.folder())
+    await b.runner.release()
   })
 
   it("HR4 r3 #1: a process the supervisor can't journal is never followed: it is ended at once, and the queue pauses", async () => {

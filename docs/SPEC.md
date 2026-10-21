@@ -2115,25 +2115,37 @@ moved meanwhile. A paused entry holds no lock. One queue per target still runs o
 the installed one share its hive.db, S50). It holds the target's **lease** (a row in hive.db: the holder's profile,
 pid and process start time, when it was taken and last renewed). Another Hive takes the lease over **only once the
 holder process is gone** (its pid gone, or given to a process that started at another time), never because its
-renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>". Each lease has a
-**Windows job object** that owns every process the runner starts for the life of its whole tree (a check's detached
-server too: nothing may break away from it), held by Hive's process supervisor (the one agents' launches use), which
-ends with its Hive; closing the job ends everything in it. What escapes a job anyway (a packaged app's process, such
-as the Store's PowerShell, starts its children outside every job) is adopted into it or followed, as for agents; a
-process it follows is first written to the lease's journal (a file the supervisor flushes to disk), and one it can't
-write down is ended at once and the queue pauses (needs you). A command starts only once it is in the job and recorded
-in hive.db. What a runner owns stays
-recorded as a duty of the target until it is seen gone: the next runner to take the lease ends the earlier runners'
-jobs (by name, never the supervisor holding them, which may serve a living Hive's other targets and agents) and the
-processes their records and journals name that still run (by pid and start time, never by name), and waits for them before it runs,
-however many runners crashed in between; one it can't end pauses the queue (needs you, with its pid). Each fact the
-queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its lease stops at
-once, writing nothing. Each lease has **its own worktree** (`queue-<hash of project and target>-<lease>`, in the
-project's Hive worktrees folder): a takeover makes a new one and removes an earlier runner's once its duties are done.
-A target's worktree is kept while the queue needs it (an open entry, an unfinished advance, an in-flight card whose
-ruleset says Hive merges into that target, a run in it) and removed when nothing does, or with its project. Closing a
-workspace or quitting ends the runner's job and gives up its lease. Unused Worktrees never lists a living runner's
-worktree.
+renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>".
+
+Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
+check's detached server too: nothing may break away from it), held by Hive's process supervisor (the one agents'
+launches use), which ends with its Hive; closing the job ends everything in it. What escapes a job anyway (a packaged
+app's process, such as the Store's PowerShell, starts its children outside every job) is adopted into it or followed,
+as for agents; a process it follows is first written to the lease's journal (a file the supervisor flushes to disk),
+and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
+job and recorded in hive.db.
+
+**A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
+naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
+serve a living Hive's other targets and agents), is empty or gone; every process its records and its journal name is
+gone (ended by pid and start time, never by name, the journal read again after each ending until nothing new appears);
+its journal could be read; and its folder is removed. What a runner owns stays recorded as a duty of the target until
+then, however many runners crash in between; a journal that can't be read, or isn't whole, is never taken for empty;
+a folder that can't be removed pauses the queue naming it, until a later try removes it. A clean release (closing a
+workspace, quitting) ends and confirms its own job first, and leaves as duties what it couldn't confirm.
+
+Each fact the queue writes, reconciliation's included, checks the lease in the same write, so a runner that lost its
+lease stops at once, writing nothing. Each lease has **its own worktree** (`queue-<hash of project and target>-<lease>`,
+in the project's Hive worktrees folder): a takeover makes a new one, never an earlier runner's. A target's worktree is
+kept while the queue needs it (an open entry, an unfinished advance, an in-flight card whose ruleset says Hive merges
+into that target, a run in it) and removed when nothing does, or with its project. Unused Worktrees never lists a
+living runner's worktree.
+
+**Accepted:** a process that escapes a job and that the supervisor hasn't yet seen (about a second, or until the next
+process of the job ends) has no identity anywhere if Hive crashes in that moment, so a takeover can't end it. It can
+only have been working in the old lease's folder, which the takeover removes, or pauses the queue naming; it can't
+write the queue's facts or pauses (they are fenced by the lease); and it can't advance the target past the queue, whose
+advance is a compare-and-swap against the head it tested.
 
 **Pins** [HB3's round 1 finding 11]: every submitted revision is pinned by a ref, `refs/hive/cards/<key>/<n>` (the
 submission's number), until the card is archived, so a deleted line, a force push or garbage collection can't lose

@@ -136,18 +136,32 @@ export async function journalPath(root: string, lease: string, dir?: string): Pr
 
 const JOURNALS = '.queue-journals'
 
-/** The processes a lease's journal names, by id and start (Unix ms); none when it has none (or no journal). */
-export async function journalOf(root: string, lease: string, dir?: string): Promise<{ pid: number; started: number }[]> {
+/** A process a journal names: its id and start (Unix ms). */
+export type Journalled = { pid: number; started: number }
+
+/**
+ * What a lease's journal says: `absent` (none was written: nothing was followed), `read` (every line a process), or
+ * `unknown` (it couldn't be read, or a line isn't one: damaged or cut short). Unknown is never taken for empty: what it
+ * may name can't be ruled out, so its duty stays and the queue pauses (HR4's round 4 finding 1).
+ */
+export type JournalState = { state: 'absent' } | { state: 'read'; entries: Journalled[] } | { state: 'unknown'; why: string }
+
+/** A lease's journal, as it is now (JournalState). */
+export async function journalOf(root: string, lease: string, dir?: string): Promise<JournalState> {
   let text: string
   try {
     text = await readFile(join(dir ?? join(root, JOURNALS), `${lease}.followed`), 'utf8')
-  } catch {
-    return []
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? { state: 'absent' } : { state: 'unknown', why: (e as Error).message }
   }
-  return text
-    .split(/\r?\n/)
-    .map((l) => /^(\d+):(\d+)$/.exec(l.trim()))
-    .flatMap((m) => (m ? [{ pid: Number(m[1]), started: fileTimeMs(m[2]) }] : []))
+  const entries: Journalled[] = []
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue
+    const m = /^(\d+):(\d+)$/.exec(line.trim())
+    if (!m) return { state: 'unknown', why: `a line that isn't a process: ${line.slice(0, 40)}` } // i18n-ignore: a reason, logged
+    entries.push({ pid: Number(m[1]), started: fileTimeMs(m[2]) })
+  }
+  return { state: 'read', entries }
 }
 
 /** Removes a lease's journal, once what it names is seen gone. */

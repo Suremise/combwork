@@ -28,7 +28,7 @@ import { git, GIT_PREFIX } from '../git'
 import { createLogger, userText } from '../logger'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
-import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, startLauncher } from './queueJobs'
+import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
@@ -38,6 +38,8 @@ const log = createLogger('queue')
 export const RENEW_MS = 30_000
 /** How long a takeover waits for the processes it ended to be gone. */
 const END_WAIT_MS = 15_000
+/** How many times a takeover reads the earlier runners' journals again, as long as each read finds something new. */
+const SETTLE_PASSES = 5
 /** A recorded launcher's start may be this far outside the clock readings around it (clock resolution). */
 const START_SLACK_MS = 50
 
@@ -71,9 +73,10 @@ export interface RunnerConfig {
    * Test seams. `renew`: false skips a renewal (a Hive stalled for as long as a test wants). `lingeringJob`: the
    * supervisor outlives this process (a Hive whose helper survived it). `beforeSettle`: runs as a takeover begins on a
    * dead runner's duties. `endJob`: false makes ending a job fail (a job that won't empty). `journalDir`: where the
-   * jobs' journals go (a folder that can't be written, for a journal that fails).
+   * jobs' journals go (a folder that can't be written, for a journal that fails). `afterJournalRead`: runs as a takeover
+   * has read the earlier runners' journals, before it ends what they name (a late entry written meanwhile).
    */
-  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; endJob?: () => boolean; journalDir?: string }
+  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; afterJournalRead?: () => Promise<void>; endJob?: () => boolean; journalDir?: string }
 }
 
 /** Who holds a target's lease, as the panel shows it. */
@@ -356,6 +359,7 @@ export class QueueRunner {
     // Its own, by token: a lease taken over meanwhile (its pid looked gone to another Hive) keeps its successor's row and
     // folders, and the successor settles what was recorded.
     if (!store.holdsQueueLease(this.lease, this.token)) return
+    // A folder it couldn't remove keeps its record (its lease's): the next runner's settle tries again, else pauses naming it.
     if (ended && !keep) await this.removeFolder(this.dir)
     await locked(this.cfg, () =>
       store.quiet(() => {
@@ -363,7 +367,6 @@ export class QueueRunner {
         if (ended) {
           for (const p of store.queueProcs(this.lease)) store.dropQueueProc(this.lease, p.pid)
           if (keep) store.setQueueFolder({ folder: this.dir, target: this.target, lease: null })
-          else store.dropQueueFolder(this.dir)
         }
         store.dropQueueLease(this.lease, this.token)
       })
@@ -376,19 +379,22 @@ export class QueueRunner {
    * ended what was in it), else kept for the next runner's settle.
    */
   async forgetFailedJob(): Promise<void> {
-    if ((await journalOf(this.cfg.root, this.lease, this.cfg.hooks?.journalDir)).length) return
+    // Only a journal known to name nothing: one that names anything, or can't be read, keeps the duty.
+    const j = await journalOf(this.cfg.root, this.lease, this.cfg.hooks?.journalDir)
+    if (j.state === 'unknown' || (j.state === 'read' && j.entries.length)) return
     await locked(this.cfg, () => {
       for (const p of this.cfg.store.queueProcs(this.lease)) this.cfg.store.dropQueueProc(this.lease, p.pid)
     })
     await clearJournal(this.cfg.root, this.lease, this.cfg.hooks?.journalDir)
   }
 
-  /** Whether none of the processes a lease's journal names still runs (by pid and start); false when that can't be told. */
+  /** Whether none of the processes a lease's journal names still runs (by pid and start); false when that can't be told (a journal that can't be read too). */
   private async journalGone(lease: string): Promise<boolean> {
-    const named = await journalOf(this.cfg.root, lease, this.cfg.hooks?.journalDir)
-    if (!named.length) return true
+    const j = await journalOf(this.cfg.root, lease, this.cfg.hooks?.journalDir)
+    if (j.state === 'unknown') return false
+    if (j.state === 'absent' || !j.entries.length) return true
     const list = await this.probe.list()
-    return !!list && !named.some((n) => list.some((p) => p.pid === n.pid && Math.abs(p.started - n.started) <= 1))
+    return !!list && !j.entries.some((n) => list.some((p) => p.pid === n.pid && Math.abs(p.started - n.started) <= 1))
   }
 
   /** Stops renewing and holding (no write): what release and a lost lease share. */
@@ -428,33 +434,52 @@ export class QueueRunner {
     if (duties.length) {
       await this.cfg.hooks?.beforeSettle?.()
       const leases = [...new Set(duties.map((d) => d.lease))]
-      // What they recorded: their launchers, and each process their journals name (what their jobs followed, outside them).
-      const journals = (await Promise.all(leases.map((l) => journalOf(this.cfg.root, l, this.cfg.hooks?.journalDir)))).flat()
-      const named: QueueProc[] = [...duties.filter((d) => d.what !== 'job'), ...journals.map((j) => ({ lease: '', target: this.target, pid: j.pid, startAfter: j.started, startBefore: j.started, what: 'check' as const }))]
+      const launchers = duties.filter((d) => d.what !== 'job')
       // Their jobs first, by name, never by the supervisor holding them (it may be a living Hive's, serving its other
       // targets and its agents): ended and seen empty, or gone (closed, so the system ended what was in them).
       for (const lease of leases) {
         const ok = this.cfg.hooks?.endJob?.() !== false && (await endLeaseJob(this.host!, lease))
-        if (!ok) return this.pauseFor(named[0]?.pid ?? 0)
+        if (!ok) {
+          // Named for the user: a process it recorded, if any can be read.
+          const read = await this.journalsOf(leases)
+          return this.pauseFor(launchers[0]?.pid ?? ('entries' in read ? read.entries[0]?.pid : undefined) ?? 0)
+        }
       }
-      // Then what they recorded that still runs, as trees.
-      if (named.length) {
+      // Then what they recorded and still runs: their launchers' trees, and each process their journals name (what their
+      // jobs followed, outside them). Read once their jobs are ended, and again after ending what they name, until a read
+      // finds nothing new: a supervisor that outlived its Hive may still write down what it finds meanwhile (HR4's round
+      // 4 finding 2). A journal that can't be read, or that keeps growing, pauses the queue and keeps the duties.
+      const ended = new Set<string>()
+      for (let pass = 0; ; pass++) {
+        const read = await this.journalsOf(leases)
+        if ('unknown' in read) return this.pauseFor(launchers[0]?.pid ?? 0)
+        const fresh = read.entries.filter((j) => !ended.has(`${j.pid}:${j.started}`))
+        const named: QueueProc[] = [...(pass === 0 ? launchers : []), ...fresh.map((j) => ({ lease: '', target: this.target, pid: j.pid, startAfter: j.started, startBefore: j.started, what: 'check' as const }))]
+        if (!named.length) break
+        if (pass >= SETTLE_PASSES) return this.pauseFor(named[0].pid)
+        for (const j of fresh) ended.add(`${j.pid}:${j.started}`)
+        await this.cfg.hooks?.afterJournalRead?.()
         const list = await this.probe.list()
         if (!list) return this.pauseFor(named[0].pid)
         const roots = named.flatMap((d) => list.filter((p) => matches(p, d)))
-        if (roots.length) {
-          log.info(`Ending ${roots.length} process(es) an earlier merge queue runner left running`)
-          const tree = uniq(roots.flatMap((root) => treeOf(list, root)))
-          await this.probe.end(tree)
-          const still = await gone(this.probe, tree)
-          if (still === null) return this.pauseFor(roots[0].pid)
-          if (still.length) return this.pauseFor(still[0].pid)
-        }
+        if (!roots.length) continue
+        log.info(`Ending ${roots.length} process(es) an earlier merge queue runner left running`)
+        const tree = uniq(roots.flatMap((root) => treeOf(list, root)))
+        await this.probe.end(tree)
+        const still = await gone(this.probe, tree)
+        if (still === null) return this.pauseFor(roots[0].pid)
+        if (still.length) return this.pauseFor(still[0].pid)
       }
       await this.change(() => {
         for (const d of duties) store.dropQueueProc(d.lease, d.pid)
       })
       for (const lease of leases) await clearJournal(this.cfg.root, lease, this.cfg.hooks?.journalDir)
+    }
+    // Then their folders, where whatever they ran worked (and whatever escaped before the supervisor saw it, if Hive
+    // crashed in that moment, the window SPEC accepts): each removed, or the queue paused naming it, its record kept.
+    for (const f of store.queueFolders(this.target)) {
+      if (f.lease === null || f.lease === this.lease || store.queueProcs(f.lease).length) continue
+      if (!(await this.removeFolder(f.folder))) return this.pauseFor(0, f.folder)
     }
     // A pause this settling made before, now settled.
     const p = store.queuePause(this.target)
@@ -462,31 +487,45 @@ export class QueueRunner {
     return null
   }
 
+  /** The leases' journals, together: every process they name, or unknown when any can't be read. */
+  private async journalsOf(leases: string[]): Promise<{ entries: Journalled[] } | { unknown: string }> {
+    const entries: Journalled[] = []
+    for (const lease of leases) {
+      const j = await journalOf(this.cfg.root, lease, this.cfg.hooks?.journalDir)
+      if (j.state === 'unknown') {
+        log.warn(`The merge queue's journal for an earlier runner of ${userText(this.target)} can't be read (${userText(j.why)}): the queue is paused`)
+        return { unknown: j.why }
+      }
+      if (j.state === 'read') entries.push(...j.entries)
+    }
+    return { entries }
+  }
+
   /**
    * The queue paused (needs you), naming a process that couldn't be ended (0: a job that couldn't be seen empty, no one
    * process named), or one its job ended because it couldn't record it.
    */
-  private async pauseFor(pid: number): Promise<number> {
-    log.warn(`The merge queue for ${userText(this.target)} is paused: process ${pid || 'in an earlier job'} couldn't be ended or recorded`)
-    await this.change(() => this.cfg.store.setQueuePause(this.target, { reason: 'needsYou', card: '', ...(pid ? { pid } : {}) })) // i18n-ignore: a pause reason's code, not text
+  private async pauseFor(pid: number, folder?: string): Promise<number> {
+    if (folder) log.warn(`The merge queue for ${userText(this.target)} is paused: an earlier runner's folder ${userText(folder)} couldn't be removed (something still has it open)`)
+    else log.warn(`The merge queue for ${userText(this.target)} is paused: process ${pid || 'in an earlier job'} couldn't be ended or recorded`)
+    await this.change(() => this.cfg.store.setQueuePause(this.target, { reason: 'needsYou', card: '', ...(pid ? { pid } : {}), ...(folder ? { files: [folder] } : {}) })) // i18n-ignore: a pause reason's code, not text
     return pid
   }
 
   /**
-   * The target's folders as this runner starts (the target's lease is its own now): one kept by a runner that released
-   * cleanly becomes its own (warm); one of an earlier lease is removed once that lease's duties are done (else kept, the
-   * queue paused); then its own recorded.
+   * The target's folders as this runner starts (the target's lease is its own now, and settle has removed the earlier
+   * leases' it could): one kept by a runner that released cleanly becomes its own (warm), another kept one is removed;
+   * then its own recorded.
    */
   private async settleFolders(): Promise<void> {
     const store = this.cfg.store
     let mine: string | null = null
     for (const f of store.queueFolders(this.target)) {
-      if (f.lease === this.lease) continue
-      if (f.lease === null && !mine && existsSync(f.folder)) {
+      if (f.lease !== null) continue
+      if (!mine && existsSync(f.folder)) {
         mine = f.folder
         continue
       }
-      if (f.lease && store.queueProcs(f.lease).length) continue
       await this.removeFolder(f.folder)
     }
     if (mine) this.dir = mine
@@ -495,19 +534,25 @@ export class QueueRunner {
 
   /**
    * Removes one of the queue's folders and its record: only a folder named as the queue names them, directly in the
-   * project's worktrees folder (git's worktree removal, then what is left of it), never anything else.
+   * project's worktrees folder (git's worktree removal, then what is left of it), never anything else. Whether it has
+   * gone (a folder that isn't the queue's is never removed, and its record is left).
    */
-  private async removeFolder(folder: string): Promise<void> {
+  private async removeFolder(folder: string): Promise<boolean> {
+    // Gone already (removed by hand, or recorded where the workspace was before it moved): only its record goes.
+    if (!existsSync(folder)) {
+      await locked(this.cfg, () => this.cfg.store.dropQueueFolder(folder))
+      return true
+    }
     if (!isQueueFolder(this.cfg.root, folder)) {
       log.warn(`Not removing ${userText(folder)}: it isn't one of the merge queue's folders`)
-      return
+      return false
     }
-    if (existsSync(folder)) {
-      const r = await git(this.project, ['worktree', 'remove', '--force', folder])
-      if (!r.ok && existsSync(folder)) await removePath(folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(folder)}`, e))
-    }
+    const r = await git(this.project, ['worktree', 'remove', '--force', folder])
+    if (!r.ok && existsSync(folder)) await removePath(folder).catch((e) => log.warn(`removing the merge queue's folder ${userText(folder)}`, e))
     await git(this.project, ['worktree', 'prune'])
-    if (!existsSync(folder)) await locked(this.cfg, () => this.cfg.store.dropQueueFolder(folder))
+    if (existsSync(folder)) return false
+    await locked(this.cfg, () => this.cfg.store.dropQueueFolder(folder))
+    return true
   }
 }
 
