@@ -10,6 +10,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/sessions.ts` | Launch/stop/resume per agent (any provider), normalised hooks → status, file locks (PreToolUse), transcript backups, usage and cost, Continue with… |
 | `src/shared/assistant.ts`, `assistantTools.ts`, `src/main/modes.ts`, `assistantControl.ts`, `assistantChanges.ts`, `assistantUndo.ts` (#1282: its changes kept and undone), `src/renderer/src/components/Assistant.tsx`, `AssistantView.tsx`, `Modes.tsx` | The Hive Assistant (one per workspace, a session host at `.hive/assistant` whose settings are overlaid from Settings → Assistant) and its modes (Coordinator, Planner, QA triager; files in `.hive/modes`, shipped in `resources/modes`; called personas until 0.9.3, #1084) |
 | `src/main/projectAgents.ts`, `src/main/worktrees.ts` | A project's agents (`agentLimit()`: 12 by default, 24 at most, #562; a page holds as many as the layout has panes): add/update/remove/merge; git worktree operations |
+| `src/main/repoLock.ts`, `repoLockCore.ts` | The repository lock (#1347, SPEC §16.9.3): one row in `hive-merge.lock` (SQLite) in the repository's common git dir, across Hives; a dead holder (pid gone or reused) taken over by compare and swap, a live one never; taken by merges, the Git view's folder actions and the line updater's move. The core has no Electron imports, so tests run it in plain Node children |
 | `src/shared/providers.ts`, `claude.ts`, `codex.ts`, `copilot.ts` | Provider descriptors (names, modes, models, capabilities) and settings resolution helpers |
 | `src/shared/models.ts`, `src/main/providers/*/models.ts` | Models and capabilities from the CLIs (Claude Code's initialize, codex debug models, Copilot's ACP session), with the editable fallbacks: what the pickers, the footer and the Agent API offer |
 | `src/main/providers/` | `ProviderAdapter` interface, registry, `claude/`, `codex/` and `copilot/` adapters (launch, hooks, transcripts, usage, conversation parsers) |
@@ -249,9 +250,9 @@ where it stands in for later work: the store (P3 puts the tables in hive.db, wri
   sessions), `board_meta`, `archive_batches`; migrations in `BOARD_MIGRATIONS` (`boardStore.ts:34`), versioned and
   backed up by `db.ts`.
 - Lanes (`lanes.ts`) are bookkeeping; `mergeCommit` is the agent's text. Merge slots (`mergeSlots.ts`) are in-memory,
-  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts:430`) auto-commits and doesn't
-  return the merge commit; squash detection is `alreadyMerged` (`:417`). The Git view's actions fence the folder
-  (`folderFence.ts`, `gitRepo.ts:343`) and take a `.git/hive-merge` lock.
+  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts`) refuses a dirty worktree,
+  takes a target and returns the merge commit (#1347); squash detection is `alreadyMerged`. The Git view's actions fence
+  the folder (`folderFence.ts`, `gitRepo.ts`) and take the repository lock (`repoLock.ts`, #1347).
 
 **The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
 (`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a

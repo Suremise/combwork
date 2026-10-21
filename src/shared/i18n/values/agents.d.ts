@@ -178,7 +178,6 @@ interface HiveMessageValues {
   'agents.merge.uncommitted': { n: number }
   'agents.mergeDialog.cantRead': undefined
   'agents.mergeDialog.close': undefined
-  'agents.mergeDialog.commitsFirst': { branch: string | number }
   'agents.mergeDialog.conflict': undefined
   'agents.mergeDialog.conflictFiles': { branch: string | number; into: string | number }
   'agents.mergeDialog.conflictHelp': undefined
@@ -186,7 +185,7 @@ interface HiveMessageValues {
   'agents.mergeDialog.copy': undefined
   'agents.mergeDialog.mergeNote': undefined
   'agents.mergeDialog.mergeNoteUnused': undefined
-  'agents.mergeDialog.merges': { parts: string; commits: number; changes: number; branch: string | number; into: string | number }
+  'agents.mergeDialog.mergesCommits': { commits: number; branch: string | number; into: string | number }
   'agents.mergeDialog.message': undefined
   'agents.mergeDialog.move': { branch: string | number; known: string; into: string | number }
   'agents.mergeDialog.moveNote': { agent: string | number }
@@ -195,6 +194,7 @@ interface HiveMessageValues {
   'agents.mergeDialog.noInto': undefined
   'agents.mergeDialog.noMoveNote': undefined
   'agents.mergeDialog.nothing': { branch: string | number; into: string | number }
+  'agents.mergeDialog.onlyUncommitted': { branch: string | number }
   'agents.mergeDialog.otherBase': { agent: string | number; base: string | number; into: string | number }
   'agents.mergeDialog.reading': { branch: string | number }
   'agents.mergeDialog.remove': undefined
@@ -206,6 +206,7 @@ interface HiveMessageValues {
   'agents.mergeDialog.squashNoteUnused': undefined
   'agents.mergeDialog.title': { agent: string | number }
   'agents.mergeDialog.titleUnused': { branch: string | number }
+  'agents.mergeDialog.uncommitted': { files: number }
   'agents.merged.failed': undefined
   'agents.merged.kept': { branch: string | number }
   'agents.merged.moved': { branch: string | number; folder: string; into: string | number; agent: string | number }

@@ -166,6 +166,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
   'settings.advanced.hive.mcp.replySeconds.title': undefined
+  'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
+  'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
   'settings.advanced.hive.prompt.asTyped.desc': undefined

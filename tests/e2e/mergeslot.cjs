@@ -168,6 +168,9 @@ const check = (name, ok, extra = '') => {
   // --- The Merge dialog follows the slot: open while it is free, it waits once an agent claims it, until it is free again.
   const wes = await lib.addAgent(inv, alpha, { name: 'Wes', location: 'new-worktree' })
   fs.writeFileSync(path.join(wes.worktree.path, 'b.txt'), 'b' + String.fromCharCode(10))
+  // Committed: only committed work is merged (#1347), so uncommitted files alone would keep Merge off.
+  lib.git(wes.worktree.path, ['add', '-A'])
+  lib.git(wes.worktree.path, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'b'])
   await idle(alpha, bob.id)
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
   await lib.agentMenu(page, 'Wes')
