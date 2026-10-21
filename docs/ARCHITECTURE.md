@@ -49,6 +49,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 │ providerService.ts  each provider's install info, setup tasks                │
 │ ptyHost.ts      node-pty processes, output buffers                           │
 │ agentProcesses.ts  each launch's process tree (a job object), leftovers      │
+│ processSupervisor.ts  the job host (C#) agents and the merge queue share     │
 │ launchGate.ts   holds a terminal's command until its job is made             │
 │ servers.ts      hook server (random port) + Agent API (configured port)      │
 │ skills.ts mcp.ts notes.ts git.ts files.ts   feature services                 │
@@ -258,6 +259,28 @@ moved head and sameness, containment, reconcile, a check's bracket, check copies
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
 
+**The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
+takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
+holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease
+has a job object on Hive's process supervisor (`processSupervisor.ts`: the PowerShell and C# `HiveJobs` host that
+agents' launches use too, extracted from `agentProcesses.ts`; in the app the runner is given agents' host): named
+`Local\HiveQueue-<lease>`, kill-on-close, no breakaway, swept and followed as agents' jobs are (#543, #659, #678); the
+supervisor writes each process it follows to the lease's journal (`<worktrees>/.queue-journals/<lease>.followed`,
+flushed through) before following it, and ends one it can't write (`unowned …`, the runner pauses). A lease's duty is
+its job (`what = 'job'`), never the supervisor process. Commands start through a detached Node launcher (`queueJobs.ts`)
+that the supervisor puts in the job, and that is recorded (`queue_runner_procs`, in a write that checks the lease), before
+it is told to run the command. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
+name, seals their journals (`sealJournal`: the file moved aside, a folder in its place, so an outlived supervisor can't
+append), reads them once, ends the processes their records and journals name still running, waits, removes their
+folders, and only then drops their duties and clears the journals (the seals stay); anything it can't rule out (a
+journal it can't read, a process or folder that won't go) pauses the queue needs-you, naming it, and leaves all of it
+for the next try. A lease's worktree (`queue_worktrees`) is removed once its duties are done. `withWriteFence`
+(factStore.ts, an AsyncLocalStorage check run inside every store write) fences everything the queue's work writes,
+reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`). `queueFolderNeeded` keeps a released
+runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close
+(`WorkspaceService.closingTasks`), quit and project removal release the runners (`releaseQueueRunners`,
+`forgetProjectQueues`).
+
 **Layers and modules (planned):**
 
 | Layer | Shared (pure, unit-tested) | Main |
@@ -266,7 +289,7 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 | Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
-| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
+| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
 | Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
