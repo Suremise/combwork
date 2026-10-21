@@ -176,6 +176,8 @@
   "settings.advanced.hive.prompt.rawCardStart.title": "カードの開始をそのままの言葉で",
   "settings.advanced.hive.queue.checkMinutes.desc": "マージキューがマージ前のチェックやインストールを終了させるまでに実行を許す時間です。こうして終了したチェックは作業ではなく環境の失敗として扱われ、カードはそのように示されて戻り、ビルダーは同じリビジョンをキューに戻せます。プロジェクトのチェックが実際にもっと時間がかかる場合は値を上げてください。長すぎると、止まったチェックがその間キューを止めます。",
   "settings.advanced.hive.queue.checkMinutes.title": "マージキュー：マージ前のチェックの最長実行時間",
+  "settings.advanced.hive.queue.signSeconds.desc": "リポジトリがコミットに署名する設定のとき、マージキューがフックを含めてマージコミットを待つ時間です。これを過ぎると、署名プログラムがパスフレーズを待っているとみなします。そのときはコミットを終了し、ターゲットには何も変更せず、「署名があなたを待っています」としてキューを一時停止します。署名やリポジトリのコミットフックが実際にもっと時間がかかる場合は値を上げてください。長すぎると、あなたを待つ署名プログラムがその間キューを止めます。",
+  "settings.advanced.hive.queue.signSeconds.title": "マージキュー：署名付きマージコミットの最長時間",
   "settings.advanced.hive.recorder.afterSeconds.desc": "トリガーの後、キャプチャを保存するまで待つ時間です。これにより、その後に起きたこと（CLIが次に何をしたか）もキャプチャに含まれます。",
   "settings.advanced.hive.recorder.afterSeconds.title": "フライトレコーダー：トリガー後の待ち時間",
   "settings.advanced.hive.recorder.keep.desc": "Hiveがconsole-recordingsフォルダーに残すキャプチャの数です。超えると古いものから削除されます。開発者コンソールで自分で作成した記録は削除されません。",

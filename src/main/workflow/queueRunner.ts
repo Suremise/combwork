@@ -26,6 +26,7 @@ import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { git, GIT_PREFIX } from '../git'
 import { createLogger, userText } from '../logger'
+import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, sealJournal, startLauncher, type Journalled } from './queueJobs'
@@ -96,6 +97,8 @@ export interface RunResult {
   code: number
   out: string
   err: string
+  /** Ended at its bound (`run`'s timeoutMs): its whole tree. */
+  timedOut?: boolean
 }
 
 /** A queue's folder name: collision-safe for targets alike (`a/b`, `a-b`) and per lease, so a takeover never reuses one. */
@@ -350,23 +353,42 @@ export class QueueRunner {
     child.stdin!.end()
   }
 
-  /** Runs a command (spawn) to its end: its output and exit code. */
-  async run(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<RunResult> {
-    const child = await this.spawn(what, command, args, opts)
+  /**
+   * Runs a command (spawn) to its end: its output and exit code. `timeoutMs`: once it has run that long its whole tree
+   * is ended (#1350: a signer waiting for a passphrase), and the result says it timed out.
+   */
+  async run(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
+    const { timeoutMs, ...spawnOpts } = opts
+    const child = await this.spawn(what, command, args, spawnOpts)
     const out: Buffer[] = []
     const err: Buffer[] = []
     child.stdout?.on('data', (d: Buffer) => out.push(d))
     child.stderr?.on('data', (d: Buffer) => err.push(d))
+    let timedOut = false
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          timedOut = true
+          endTree(child)
+        }, timeoutMs)
+      : undefined
     const code = await new Promise<number>((res) => {
       child.once('close', (c) => res(c ?? 1))
       child.once('error', () => res(-1))
+      // Ended at its bound: a descendant that got away may hold the output open, so its exit is enough.
+      child.once('exit', (c) => {
+        if (timedOut) setImmediate(() => res(c ?? 1))
+      })
     })
-    return { ok: code === 0, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim() }
+    clearTimeout(timer)
+    return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}) }
   }
 
-  /** git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX), through `run`. */
-  git(cwd: string, args: string[], what: Exclude<QueueProcKind, 'job'> = 'testMerge'): Promise<RunResult> {
-    return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd })
+  /**
+   * git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX), through
+   * `run`; `opts` its environment and bound (the queue's merge commits, #1350).
+   */
+  git(cwd: string, args: string[], what: Exclude<QueueProcKind, 'job'> = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
+    return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd, ...opts })
   }
 
   /**

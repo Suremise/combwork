@@ -170,6 +170,9 @@ export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
 export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
 
+/** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
+export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
+
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
@@ -528,6 +531,24 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // How long the merge queue's own commit may take when the repository signs its commits (#1350, SPEC §16.9.1 step 4):
+  // past it, the signer is taken to be waiting for a passphrase, ended, and the queue pauses.
+  {
+    id: QUEUE_SIGN_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.signSeconds.title', defaultMessage: 'Merge queue: longest a signed merge commit takes', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds (\"60 s\"). The merge commit is the commit Hive's merge queue makes when it merges a card; signed means the repository is set to sign commits (GPG or SSH)." }),
+    desc: msg({
+      id: 'settings.advanced.hive.queue.signSeconds.desc',
+      defaultMessage: 'When a repository signs its commits, how long the merge queue waits for its merge commit, hooks included, before it takes the signer to be waiting for a passphrase. It then ends the commit, changes nothing in the target and pauses the queue with “signing waits for you”. Raise it when signing or the repository’s commit hooks really take longer; too long, and a signer waiting for you holds the queue up that long.',
+      description: 'What the advanced setting "Merge queue: longest a signed merge commit takes" does, and what goes wrong when it is wrong (Settings → Advanced). “signing waits for you” is how the queue’s pause reads.'
+    }),
+    kind: 'number',
+    default: 60,
+    min: 5,
+    max: 3600,
+    unit: 's',
     applies: 'now'
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own

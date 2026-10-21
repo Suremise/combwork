@@ -2050,6 +2050,26 @@ submissions' pins once it is archived.
      output (`IntegrationFailed`, reason `hook`);
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
+   **Built [#1350]:**
+   - **Identity:** G12's when on, else the repository's own (`git config user.name` / `user.email`: local, then
+     global), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
+     window says to set a commit identity for this repository (`git config user.name` / `user.email`).
+   - **Hooks:** they run (no `--no-verify`). A merge stopped by `pre-merge-commit` or `commit-msg` (git's "Not
+     committing merge") returns the card with the output (`IntegrationFailed`, reason `hook`). So does a squash's
+     `git commit` that exits 1 with no `fatal:` of git's while a `pre-commit`, `prepare-commit-msg` or `commit-msg`
+     hook is there. Any other failure of git (an index lock, a broken repository, a worktree it couldn't check out)
+     pauses `needsYou` with git's message, never a return.
+   - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,
+     `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
+     queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
+     Settings → Advanced, `hive.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
+     ended, and the entry pauses `signingWaits`, "signing waits for you". So does a signer whose message says it needs
+     a passphrase, a pinentry or a terminal. A signing error pauses `signing` with git's message.
+   - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
+     `reset --hard`, `clean`), and nothing in the target changes.
+   - **The pause:** keeps git's message in its own words (`workflow_queue_pauses.message`, the 1.0 group's 15th
+     step). Only a conflict, a hook or red checks return a card; every other cause is a pause.
+   - Resuming after fixing the cause is #1353's; signing without a prompt stays #1185.
 5. **Merge checks** (G9) run on that worktree as runs attributed to "Hive (merge queue)", named for the card and the
    result revision (§16.13). The worktree is the queue's own and no one else writes in it, so the checks run on
    exactly the result. **Dependencies from scratch** [HB3's round 1 finding 12]: when the result's package manifests or

@@ -8,10 +8,12 @@
 // signing pauses are P5's. The merge checks (#1349) run as Hive's own runs (queueChecks.ts), each bracketed here: green
 // only when it exited 0 and its `CheckRan` counted for exactly the test merge's revision.
 
+import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
 import { existsSync, readFileSync } from 'original-fs'
-import { join } from 'path'
-import { git } from '../git'
+import { join, resolve } from 'path'
+import { git, GIT_PREFIX } from '../git'
+import { endTree } from '../progressReporters/wrapper'
 import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -71,7 +73,12 @@ export interface QueueConfig {
    * Runs git for the queue (its test merges, the advance, the pins): the runner's recording one in the app (#1360,
    * QueueRunner.git: its processes in the lease's job, recorded before they run); left out, Hive's own git().
    */
-  git?: (cwd: string, args: string[]) => Promise<{ ok: boolean; out: string; err: string; code: number }>
+  git?: (cwd: string, args: string[], opts?: QueueGitOptions) => Promise<QueueGitResult>
+  /**
+   * The longest Hive's merge commit runs when the repository signs its commits (#1350, Advanced
+   * `hive.queue.signSeconds`): a signer still waiting then (for a passphrase) is ended and the entry pauses. 60 s left out.
+   */
+  signTimeoutMs?: number
   /**
    * Runs the advance under the repository's lock across processes (#1347, withRepoLock), its `IntegrationStarted` and
    * the ref's compare-and-swap together; left out, as it is.
@@ -97,15 +104,95 @@ export interface QueueConfig {
   }
 }
 
+/** How the queue runs a git command that may run the repository's hooks or sign (#1350): its environment and bound. */
+export interface QueueGitOptions {
+  env?: NodeJS.ProcessEnv
+  /** Ends the command's whole tree (git, its hooks, its signer) once it has run this long. */
+  timeoutMs?: number
+}
+
+export interface QueueGitResult {
+  ok: boolean
+  out: string
+  err: string
+  code: number
+  /** Ended at its bound (QueueGitOptions.timeoutMs). */
+  timedOut?: boolean
+}
+
 export type QueueOutcome =
   | { card: string; entry: string; outcome: 'integrated'; result: string; retests: number }
   | { card: string; entry: string; outcome: 'returned'; reason: FactData['IntegrationFailed']['reason']; transient: boolean }
-  | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[] }
+  | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[]; message?: string }
   | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
 
-/** `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says why). */
-export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff'
+/**
+ * `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says
+ * why). `signingWaits`: signing Hive's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
+ * (git's message in the pause). `identity`: no commit identity for the repository (its folder in the pause).
+ */
+export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing'
+
+/** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
+const SIGN_TIMEOUT_MS = 60_000
+
+/** git's messages (and a signer's) that say signing would wait for someone: a passphrase, a pinentry, a terminal. */
+const SIGN_WAITS = /passphrase|pinentry|inappropriate ioctl|cannot open \/dev\/tty|no tty|tty.*not available/i
+
+/** git's messages that say signing the commit failed (gpg's, ssh-keygen's, or git's own around them). */
+const SIGN_FAILED = /gpg failed to sign|failed to sign|signing failed|couldn't load public key|ssh-keygen|failed to write commit object/i
+
+/** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit. */
+const MERGE_HOOK_STOPPED = /^Not committing merge;/m
+
+/**
+ * The environment of Hive's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
+ * asks for a passphrase, and a credential manager stays non-interactive; a pinentry window is ended by the bound.
+ */
+function commitEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
+}
+
+/**
+ * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
+ * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
+ * the app runs it through the runner's recorded spawn).
+ */
+function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
+  return new Promise((res) => {
+    const out: Buffer[] = []
+    const err: Buffer[] = []
+    let timedOut = false
+    let child: ChildProcess
+    try {
+      child = spawn('git', [...GIT_PREFIX, ...args], { cwd, env: opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (e) {
+      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1 })
+    }
+    const timer = opts.timeoutMs
+      ? setTimeout(() => {
+          timedOut = true
+          endTree(child)
+        }, opts.timeoutMs)
+      : undefined
+    child.stdout?.on('data', (d: Buffer) => out.push(d))
+    child.stderr?.on('data', (d: Buffer) => err.push(d))
+    let settled = false
+    const done = (code: number): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}) })
+    }
+    child.once('error', (e) => {
+      err.push(Buffer.from(e.message))
+      done(-1)
+    })
+    // `exit`, not `close`: a descendant that got away may hold the output open.
+    child.once('exit', (c) => setImmediate(() => done(c ?? 1)))
+  })
+}
 
 /**
  * How many times an entry is tested again for a target that moved (§16.9.1 step 6), or for checks that passed without
@@ -134,21 +221,23 @@ export class MergeQueue {
     return this.wf.cfg.project
   }
 
-  private git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string; err: string; code: number }> {
-    return (this.cfg.git ?? git)(cwd, args)
+  private git(cwd: string, args: string[], opts?: QueueGitOptions): Promise<QueueGitResult> {
+    return this.cfg.git ? this.cfg.git(cwd, args, opts) : opts ? gitTree(cwd, args, opts) : git(cwd, args)
   }
 
-  paused(target: string): { reason: PauseReason; card: string; files?: string[] } | null {
-    return this.wf.store.queuePause(target) as { reason: PauseReason; card: string; files?: string[] } | null
+  paused(target: string): { reason: PauseReason; card: string; files?: string[]; message?: string } | null {
+    return this.wf.store.queuePause(target) as { reason: PauseReason; card: string; files?: string[]; message?: string } | null
   }
 
   resume(target: string): void {
     this.wf.store.setQueuePause(target, null)
   }
 
-  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): Promise<QueueOutcome> {
-    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) }))
-    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
+  /** Pauses the target's queue at this entry: its reason, the files or folder it names, git's message (bounded). */
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string): Promise<QueueOutcome> {
+    const m = message?.trim().slice(0, 4000) || undefined
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }))
+    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }
   }
 
   /**
@@ -252,7 +341,7 @@ export class MergeQueue {
 
       // The test merge, in the queue's own worktree, at the expected revision.
       const test = await this.testMerge(card, s, revision, expected)
-      if ('pause' in test) return this.pause(target, card, entry, test.pause)
+      if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
       if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
       const result = test.result
       await this.cfg.hooks?.afterTest?.(entry.id)
@@ -322,16 +411,22 @@ export class MergeQueue {
     return this.wf.cfg.options().identity ?? (await G.identity(this.project))
   }
 
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason }> {
+  /**
+   * The test merge (§16.9.1 step 4), committed as Hive's commits are (#1350): with the project's identity (else paused
+   * `identity`, naming the folder), the repository's hooks run (one that fails returns the card), signed as the
+   * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
+   * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
+   */
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity()
-    if (!id) return { pause: 'identity' }
+    if (!id) return { pause: 'identity', files: [this.project] }
     const f = this.cfg.folder
     if (!existsSync(f)) {
       const add = await this.git(this.project, ['worktree', 'add', '--detach', f, expected])
-      if (!add.ok) return { pause: 'needsYou' }
+      if (!add.ok) return { pause: 'needsYou', message: add.err }
     } else {
       const co = await this.git(f, ['checkout', '--detach', '-f', expected])
-      if (!co.ok) return { pause: 'needsYou' }
+      if (!co.ok) return { pause: 'needsYou', message: co.err }
       await this.git(f, ['clean', '-fdq'])
     }
     const r = this.wf.rulesetOf(card, s)
@@ -340,26 +435,61 @@ export class MergeQueue {
     const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
-    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision])
-    if (!m.ok) {
-      const u = await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = u.out.split(/\r?\n/).filter(Boolean)
+    // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
+    // is ended with the rest of the commit's tree.
+    const signs = (await this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign'])).out.trim() === 'true'
+    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
+    const clean = async (): Promise<void> => {
       await this.git(f, ['merge', '--abort'])
       await this.git(f, ['reset', '--hard', '-q', expected])
+      await this.git(f, ['clean', '-fdq'])
+    }
+    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    if (!m.ok) {
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+      const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
+      await clean()
       if (files.length) return { fail: 'conflict', files, log: m.out + m.err }
-      return { fail: 'hook', log: m.out + m.err }
+      return this.commitFailed(m, squash ? 'squash' : 'merge', signs, f)
     }
     if (squash) {
-      const c = await this.git(f, [...who, 'commit', '-q', '-m', message])
+      const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
       if (!c.ok) {
-        await this.git(f, ['reset', '--hard', '-q', expected])
-        return { fail: 'hook', log: c.out + c.err }
+        const why = await this.commitFailed(c, 'commit', signs, f)
+        await clean()
+        return why
       }
     }
     const h = await G.head(f)
     if (isUnknown(h)) return { pause: 'needsYou' }
     await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, h])
     return { result: h }
+  }
+
+  /**
+   * Why Hive's merge commit (`merge`), squash (`squash`, the merge step that makes no commit) or its commit (`commit`)
+   * failed, from git's exit and message (#1350): a signer that waited (ended at the bound, or saying it needs a
+   * passphrase) or failed pauses; a hook that stopped the commit returns the card with its output; anything else (an
+   * index lock, a broken repository) pauses `needsYou` with git's message, never a return.
+   */
+  private async commitFailed(r: QueueGitResult, step: 'merge' | 'squash' | 'commit', signs: boolean, folder: string): Promise<{ fail: 'hook'; log: string } | { pause: PauseReason; message?: string }> {
+    const log = [r.out.trim(), r.err.trim()].filter(Boolean).join('\n')
+    if (r.timedOut) return { pause: signs ? 'signingWaits' : 'needsYou', message: log }
+    if (signs && step !== 'squash' && SIGN_WAITS.test(log)) return { pause: 'signingWaits', message: log }
+    if (signs && step !== 'squash' && SIGN_FAILED.test(log)) return { pause: 'signing', message: log }
+    if (step === 'merge' && MERGE_HOOK_STOPPED.test(log)) return { fail: 'hook', log }
+    // `git commit` says nothing of its own when a hook stops it (the hook's output only): a hook that would run, and no
+    // `fatal:` from git.
+    if (step === 'commit' && r.code === 1 && !/^fatal:/m.test(log) && (await this.commitHooks(folder))) return { fail: 'hook', log }
+    return { pause: 'needsYou', message: log }
+  }
+
+  /** Whether a hook that runs on `git commit` (pre-commit, prepare-commit-msg, commit-msg) is there, wherever the repository keeps its hooks. */
+  private async commitHooks(folder: string): Promise<boolean> {
+    const p = await this.git(folder, ['rev-parse', '--git-path', 'hooks'])
+    if (!p.ok || !p.out.trim()) return false
+    const dir = resolve(folder, p.out.trim())
+    return ['pre-commit', 'prepare-commit-msg', 'commit-msg'].some((h) => existsSync(join(dir, h)))
   }
 
   /**
