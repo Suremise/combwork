@@ -262,13 +262,16 @@ export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
 /** Why a value can't be set yet: its piece comes in a later version (§16.19.1). */
 export const NOT_OFFERED = {
   hiveMerges: msg({ id: 'workflow.notOffered.hiveMerges', defaultMessage: '“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.', description: 'Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive.' }),
-  later: msg({ id: 'workflow.notOffered.later', defaultMessage: 'Some of these options aren’t available in this version yet: leave them as they are.', description: 'Why workflow options cannot be saved: an option set (merge checks, up to date before merging, slots kept up to date) comes in a later version of Hive.' })
+  later: msg({ id: 'workflow.notOffered.later', defaultMessage: 'Some of these options aren’t available in this version yet: leave them as they are.', description: 'Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive.' })
 } satisfies Record<string, Msg>
 
-/** The values a project sets that this version doesn't offer yet (§16.19.1), by why. */
+/**
+ * The values a project sets that this version doesn't offer yet (§16.19.1), by why. Hive merges and merge checks are
+ * offered since P5's queue (#1348; the presets and form rows that offer them are #1355's); `hiveMerges` stays as a
+ * reason for an older build's refusal.
+ */
 export function notOffered(own: Partial<WorkflowOptions>): (keyof typeof NOT_OFFERED)[] {
   const out: (keyof typeof NOT_OFFERED)[] = []
-  if (own.finish === 'hiveMerges') out.push('hiveMerges')
-  if (own.strict === true || (own.mergeChecks?.length ?? 0) > 0 || own.slotsUpToDate === true) out.push('later')
+  if (own.strict === true || own.slotsUpToDate === true) out.push('later')
   return out
 }

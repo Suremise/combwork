@@ -13,7 +13,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { tempDir } from './tempDir'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { gitTestHooks } from '../src/main/git'
-import { FactStore } from '../src/main/workflow/factStore'
+import { FactStore, withoutWriteFence, withWriteFence } from '../src/main/workflow/factStore'
 import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
 import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
@@ -454,6 +454,32 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
       expect(e.store.queueLease('main')).toMatchObject({ profile: 'B', lease: b!.lease })
       await runner.release()
       await b!.release()
+    } finally {
+      e.close()
+    }
+  })
+
+  it("#1348: work a fenced write sets going on its own course (withoutWriteFence) is never refused by that fence", async () => {
+    const e = team()
+    try {
+      let later: Promise<void> | null = null
+      await withWriteFence(
+        () => {
+          throw new LeaseLost('main')
+        },
+        async () => {
+          // Inside the fence a write is refused…
+          expect(() => e.store.setMeta('fenced', '1')).toThrow(LeaseLost)
+          // …and work started from here on its own course (as the actions worker's run) writes freely, even later.
+          later = withoutWriteFence(async () => {
+            await new Promise((r) => setImmediate(r))
+            e.store.setMeta('free', '1')
+          })
+        }
+      )
+      await later
+      expect(e.store.meta('free')).toBe('1')
+      expect(e.store.meta('fenced')).toBeNull()
     } finally {
       e.close()
     }
