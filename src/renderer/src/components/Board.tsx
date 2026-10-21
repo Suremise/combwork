@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AgentInfo, ArchiveBatch, BoardFold, ProjectInfo, ProviderId, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
-import { agentRuntime } from '@shared/runtime'
+import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, taskOverview, type BoardFoldChange } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -378,7 +378,8 @@ function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]
       >
         {live && <span className={cx('dot', agent.live ? status : 'stopped')} />}
         <span className="task-agent-name">{name}</span>
-        {live && <span className="faint">{agent.live ? STATUS_TEXT[status] : tr(NOT_RUNNING)}</span>}
+        {/* Its hooks not arriving (#1336): its status word would be a guess. */}
+        {live && <span className="faint">{agent.live ? (hooksMissingText(agent.live, tr) ?? STATUS_TEXT[status]) : tr(NOT_RUNNING)}</span>}
       </span>
     </Tooltip>
   )

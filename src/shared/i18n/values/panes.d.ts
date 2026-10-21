@@ -124,6 +124,8 @@ interface HiveMessageValues {
   'panes.resume.recache': { tokens: string | number }
   'panes.resume.sessionsTab': undefined
   'panes.resume.tip': { session: string | number; when: string | number }
+  'panes.runtime.hooksMissing': { provider: string | number }
+  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; after: string }
   'panes.runtime.needsInput': undefined
   'panes.runtime.signin': undefined
   'panes.runtime.silent': { known: string; minutes: number }

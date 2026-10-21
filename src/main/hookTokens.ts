@@ -75,6 +75,9 @@ export function refusedHookNote(runId: string | null): string | null {
   return `Refused a hook call for run ${runId}: ${tokens.has(runId!) ? "its token didn't match the launch's" : 'that launch has ended'}`
 }
 
+/** Whether a hook call of the running launch `runId` was refused (#1336: why its hooks don't reach Hive). */
+export const hooksRefused = (runId: string): boolean => tokens.has(runId) && refusedTold.has(runId)
+
 /** The launch `runId` ended: its token stops working and its private folder goes. */
 export function endHookToken(runId: string): void {
   tokens.delete(runId)

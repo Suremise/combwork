@@ -122,6 +122,8 @@
   "panes.resume.recache": "pamięć podręczna wygasła, ~{tokens} do ponownego wczytania",
   "panes.resume.sessionsTab": "Zakładka Sesje…",
   "panes.resume.tip": "Wznów „{session}”, ostatnio aktywna {when}",
+  "panes.runtime.hooksMissing": "Stan nieznany: brak hooków z {provider}",
+  "panes.runtime.hooksMissingNote": "Hive nie otrzymuje hooków z {provider}, więc stan agenta może być błędny. {why, select, refused {Hive odrzucił jego hooki: nie miały tokenu tej sesji.} off {{where} wyłącza hooki (disableAllHooks).} newer {Ten {provider} jest nowszy niż wersja, z którą testowano Hive, a aktualizacja mogła zmienić jego hooki.} other {{after, select, start {Żaden nie przyszedł od jego uruchomienia.} other {Żaden nie przyszedł po prompcie, nad którym zaczął pracować.}}}} Dopóki hooki nie zaczną docierać, Hive nic do niego nie wpisuje. Uruchom sesję ponownie; jeśli to się powtórzy, zaktualizuj Hive albo sprawdź, czy ustawienia {provider} nie wyłączają hooków.",
   "panes.runtime.needsInput": "Czeka na Ciebie",
   "panes.runtime.signin": "Wymaga logowania",
   "panes.runtime.silent": "Cisza {known, select, yes {{minutes, number}} other {?}} min · stan nieznany",

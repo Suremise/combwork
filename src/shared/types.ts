@@ -1510,6 +1510,16 @@ export interface InboxSummary {
   overdue: number
 }
 
+/** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Hive can tell. */
+export interface HooksMissing {
+  since: string
+  /** start: no hook since its start; prompt: none after a prompt its CLI took. */
+  after: 'start' | 'prompt'
+  why?: 'refused' | 'off' | 'newer'
+  /** off: the settings that turn them off, as the CLI's adapter names them. */
+  offIn?: string
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -1593,6 +1603,13 @@ export interface LiveSessionState {
    * Shown in its pane until the CLI takes it or the user types there; nothing more is typed into it meanwhile.
    */
   untakenLine?: { since: string; text: string }
+  /**
+   * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
+   * then), or none after a prompt its CLI went to work on (its screen or its records show it). Hive's status for it may be
+   * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Hive can tell: Hive
+   * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Hive was tested with.
+   */
+  hooksMissing?: HooksMissing
   /**
    * Its deliveries (#647: messages left for it, main/deliveries.ts) not received yet, and how many are overdue; shown in
    * its pane ("✉ 2 unread"), where the user can cancel those waiting. Absent when there are none.
@@ -2657,9 +2674,10 @@ export interface LaneInfo {
 /**
  * Why a lane waits (#1270): its card blocked or On Hold, a request for you (For you), the round limit reached, a card
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
- * Review, or a list change queued after the card in flight. The first four and the merge pause the lane.
+ * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
+ * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks'
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -2684,6 +2702,8 @@ export interface LaneStatus {
   blocked?: string
   /** you: what the user is asked for (the open request's kind, #1279). */
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
+  /** hooks: the agent whose hooks aren't arriving, by name. */
+  agent?: string
 }
 
 /** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */

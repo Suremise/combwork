@@ -115,6 +115,7 @@ export const SUITES = [
   { name: 'handovernotice' },
   { name: 'hivetools' },
   { name: 'hivevcs' },
+  { name: 'hookshealth' },
   { name: 'hwaccel' },
   { name: 'i18nlive' },
   { name: 'i18nreport' },
