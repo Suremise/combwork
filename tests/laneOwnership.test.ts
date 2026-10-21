@@ -208,6 +208,62 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(ended.length).toBe(before + 1)
   })
 
+  it('a list sharing no card, mid-card, edits the running lane: queued, never a new lane abandoning it (HR6 round 1, finding 1)', async () => {
+    const [a, b] = [await make('Disjoint a'), await make('Disjoint b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    await move(a, 'doing')
+    const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b], by: 'B1 (alpha)' })
+    expect([r.did, r.lane.id, r.lane.state, r.lane.queued, r.replaced ?? null]).toEqual(['updated', l.id, 'active', [b], null])
+    // The card in flight stays the lane's until it is Done; then the list without it applies.
+    expect(r.lane.cards.map((c) => c.number)).toEqual([a])
+    await move(a, 'done')
+    await vi.waitFor(async () => expect((await lane(l.id)).cards.map((c) => c.number)).toEqual([b]), { timeout: HUNG_MS })
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it("a card queued in front can't start before the card in flight is Done (HR6 round 1, finding 2)", async () => {
+    const [a, b] = [await make('Front a'), await make('Front b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    await move(a, 'doing')
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b, a], by: 'B1 (alpha)' })).lane.queued).toEqual([b, a])
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${b}`, agentActor('b1')))).toMatchObject({ refused: true, rule: 'lane.oneAtATime', values: { earlier: `alpha-${a}` } })
+    await move(a, 'done')
+    await vi.waitFor(async () => expect((await lane(l.id)).cards.map((c) => c.number)).toEqual([b, a]), { timeout: HUNG_MS })
+    expect(await store.boardWrite(w, async () => wf.start(`#${b}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('a card reopened between the read and the save: the lane goes on, no end and no event (HR6 round 1, finding 3)', async () => {
+    const a = await make('Reopen a')
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    await move(a, 'doing')
+    const before = ended.length
+    // The refresh reads a Done; at its next wait (the project's agents' names) the card is reopened.
+    const real = w.projectConfig.bind(w)
+    let reopened = false
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
+      // Only the lanes' read of names, once it has read the card Done (its stack names it): the move's own reads pass.
+      if (!reopened && (new Error().stack ?? '').includes('namesOf')) {
+        reopened = true
+        await move(a, 'todo')
+      }
+      return real(p)
+    })
+    try {
+      await run(() => tasks.updateTask(a, { column: 'done' }, user))
+      await lanes.refresh(w)
+      await vi.waitFor(() => expect(reopened).toBe(true), { timeout: HUNG_MS })
+      await lanes.refresh(w)
+    } finally {
+      spy.mockRestore()
+    }
+    const now = await lane(l.id)
+    expect([now.state, now.cards[0].column]).toEqual(['active', 'todo'])
+    expect(ended.length).toBe(before)
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
   it("with rules off an agent ends a lane as before: its merge commit as given, unverified", async () => {
     await advanced.set(ENFORCE, false)
     const a = await make('Off a')

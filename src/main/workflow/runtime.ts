@@ -433,8 +433,8 @@ export class Workflow {
     if (s.stage !== 'todo') return this.notFrom(card, actor, s, 'start')
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
     // user's own drag is theirs to make.
-    const earlier = this.enforced() && !opts.drag ? this.laneWaits(card) : null
-    if (earlier) return this.refuse(card, actor, 'start', { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } })
+    const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
+    if (lane) return this.refuse(card, actor, 'start', lane)
     const g = await this.gatherStart(card, s, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
@@ -443,6 +443,9 @@ export class Workflow {
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, s, 'start') ?? this.evidenceChanged(w, g.o, g.before)
       if (changed) return changed
+      // Checked again where the start is written (HR6's #1270 round 1): the lane may have moved on during the gather.
+      const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
+      if (waits) return waits
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
       if (bad) return bad
@@ -1448,15 +1451,24 @@ export class Workflow {
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
   }
 
-  /** The first card before this one in its running lane (its list, or the queued one it is in) that isn't Done, or null. */
+  /**
+   * The card this one waits for in its running lane, or null (one card at a time, #1270): a card before it in the lane's
+   * list that isn't Done; for a card only in a queued list (not applied yet), the first card of the lane's list now that
+   * isn't Done (the queue applies once none is in flight: HR6's round 1, a card queued in front can't start early).
+   */
   laneWaits(card: CardRecord): CardRecord | null {
     if (!card.lane) return null
     const l = this.lane(card.lane)
     if (!l || l.ended) return null
-    const list = l.cards.includes(card.id) ? l.cards : (l.pending ?? [])
-    const before = list.slice(0, Math.max(0, list.indexOf(card.id)))
-    const open = before.find((c) => !this.laneDone(c))
+    const before = l.cards.includes(card.id) ? l.cards.slice(0, l.cards.indexOf(card.id)) : l.cards
+    const open = before.find((c) => c !== card.id && !this.laneDone(c))
     return open === undefined ? null : this.store.card(open)
+  }
+
+  /** A start refused for a card that waits in its lane (laneWaits), or null. */
+  private laneRefusal(card: CardRecord): GuardRefusal | null {
+    const earlier = this.laneWaits(card)
+    return earlier ? { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } } : null
   }
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */

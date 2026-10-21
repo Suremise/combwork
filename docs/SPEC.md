@@ -2186,7 +2186,10 @@ a returned card gets its own slot and a fresh conversation) is put to Darren as 
   one of its cards is in flight (in Doing, Review or Passed), queues the list (`LaneInfo.queued`; status "list changes
   after AM-12"; the reply says so). Once no card of the lane is in flight, the queued list applies and the builder gets
   a message naming the lane's cards now. Between cards a change applies at once. A queued list keeps every card named
-  (none dropped); a queued empty list leaves the lane as it was.
+  (none dropped); a queued empty list leaves the lane as it was. Any new list for the builder's running lane is an edit
+  of it, one sharing no card too (never a new lane abandoning it); a card only in a queued list waits for the card in
+  flight. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
+  that moved on meanwhile (reopened) leaves the lane as it was, to be read again.
 - **The lane's ruleset:** a card of a running lane (its list or its queued list) starts under the ruleset stored when
   the lane started (the recorder's start and the runtime's `rulesetOf`); a Todo card outside a lane under the current
   one (S19).

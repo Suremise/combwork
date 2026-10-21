@@ -11,7 +11,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
-import { boardWrite, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou } from '../shared/workflow/facts'
@@ -158,7 +158,7 @@ export function onLanesWritten(fn: () => void): () => void {
   return () => writtenListeners.delete(fn)
 }
 
-async function write(ws: WorkspaceService, lanes: LaneRecord[]): Promise<void> {
+async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void): Promise<void> {
   const ids = await ws.projectIds()
   const stamped = keptLanes(lanes, Date.now()).map((l) => {
     const saved = savedProjectName(l.project)
@@ -171,6 +171,8 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[]): Promise<void> {
   const path = ws.path!
   await saveTable(path, 'lanes', stamped, {}, () => {
     if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
+    // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.
+    check?.()
   })
   for (const fn of writtenListeners) fn()
 }
@@ -237,12 +239,13 @@ export async function legacyLanes(ws: WorkspaceService): Promise<{ name: string;
 }
 
 /** Changes a workspace's lanes under its lock: fn changes the list it is given (or throws), and says whether it did. */
-async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[]) => T | Promise<T>): Promise<T> {
+async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[]) => T | Promise<T>): Promise<T> {
   if (!ws.path) throw new LaneError(409, M.noWorkspace)
   const result = await withFileLock(fileOf(ws), async () => {
     const lanes = await read(ws)
-    const r = await fn(lanes)
-    await write(ws, lanes)
+    const checks: (() => void)[] = []
+    const r = await fn(lanes, checks)
+    await write(ws, lanes, () => checks.forEach((c) => c()))
     return r
   })
   changed(ws)
@@ -353,6 +356,29 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const names = await namesOf(ws, lanes)
   const facts = await factsOf(ws, lanes)
   return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id)))
+}
+
+/** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
+class StaleLane extends Error {}
+
+/** Where a lane's cards are now, as the board has committed them: a card archived, gone or in another project is gone. */
+function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] = l.cards): string[] {
+  const places = cardPlacesNow(ws, cards)
+  return cards.map((n) => {
+    const c = places.get(n)
+    return !c || c.archived || !same(c.project, l.project) ? 'gone' : c.column
+  })
+}
+
+/** Checked under the board's lock (#1270): the lane's cards are still all Done (gone ones aside), else nothing is saved. */
+const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
+  const places = placesOf(ws, l, cards)
+  if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`)
+}
+
+/** Checked under the board's lock (#1270): none of the lane's cards is in flight now, else its queued list waits. */
+const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
+  if (placesOf(ws, l, cards).some((c) => c === 'doing' || c === 'review' || c === 'passed')) throw new StaleLane(`lane ${l.id}: a card is in flight again`)
 }
 
 /** A lane's card in flight: started, not Done (in Doing, Review or Passed), the first such in the lane's order; null: none. */
@@ -474,7 +500,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const r = await mutate(ws, async (lanes) => {
     const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     const t = now()
-    if (was && was.cards.some((n) => s.cards.includes(n))) {
+    // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
+    // in flight is never left behind; with them off, a list sharing no card is another loop, as before 1.0.
+    if (was && (was.cards.some((n) => s.cards.includes(n)) || on)) {
       // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
       const flying = on && !sameList(was.cards, s.cards) ? inFlight((await views(ws, [was]))[0]) : null
@@ -566,7 +594,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
   let ended = false
   const on = await enforced()
   const verified: EndedLane[] = []
-  const rec = await mutate(ws, async (lanes) => {
+  const rec = await mutate(ws, async (lanes, checks) => {
     const l = lanes.find((x) => x.id === id && (!o.project || same(x.project, o.project)))
     if (!l) throw new LaneError(404, withValues(M.unknown, { id }))
     if (o.agent && l.builder.id !== o.agent && l.reviewer?.id !== o.agent) throw new LaneError(403, "Only a lane's builder or reviewer ends it (or the user, or the Assistant)") // i18n-ignore: hive_lane's refusal, which only a project agent gets
@@ -578,7 +606,10 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
       if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => `The lane ends by itself once all its cards are Done: ${v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone').map((c) => cardRef(c.number)).join(', ')} not yet`)) // i18n-ignore: hive_lane's refusal, which only a project agent gets
       // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
       const given = on && o.agent ? null : (o.mergeCommit ?? null)
-      if (!o.abandoned && allDone(v.cards)) endVerified(ws, l, v.cards, on, verified, given)
+      if (!o.abandoned && allDone(v.cards)) {
+        checks.push(stillAllDone(ws, l, [...l.cards]))
+        endVerified(ws, l, v.cards, on, verified, given)
+      }
       else close(l, o.abandoned ? 'abandoned' : 'ended', v.cards, given)
       ended = true
     } else if ((!on || !o.agent) && o.mergeCommit && !l.mergeCommit) {
@@ -586,6 +617,9 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
       ended = true
     }
     return l
+  }).catch((e) => {
+    // Its cards moved on between the read and the save (a card reopened): nothing was saved.
+    throw e instanceof StaleLane ? new LaneError(409, 'Its cards moved on meanwhile: read the lane again') : e // i18n-ignore: hive_lane's refusal (agents)
   })
   log.info(`Lane ${id} ${rec.state}`)
   if (ended) laneFact(ws, rec)
@@ -677,18 +711,29 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
     const boundary = live.filter((l, i) => l.pending && inFlight(vs[i]) === null)
     if (boundary.length) {
       const applied: LaneRecord[] = []
-      await withFileLock(fileOf(ws), async () => {
-        const kept = await read(ws)
-        for (const l of kept) {
-          if (!running(l) || !l.pending || !boundary.some((b) => b.id === l.id)) continue
-          // A lane keeps at least a card (lanes.ts keeps none without): a change to none leaves it as it was.
-          if (l.pending.length) l.cards = l.pending
-          delete l.pending
-          l.updatedAt = now()
-          applied.push(l)
-        }
-        await write(ws, kept)
-      })
+      const checks: (() => void)[] = []
+      try {
+        await withFileLock(fileOf(ws), async () => {
+          const kept = await read(ws)
+          for (const l of kept) {
+            const was = boundary.find((b) => b.id === l.id)
+            // As the decision read it: the same list, still queued (another change meanwhile is looked at afresh).
+            if (!running(l) || !l.pending || !was || !sameList(l.cards, was.cards) || !sameList(l.pending, was.pending ?? [])) continue
+            checks.push(stillBetweenCards(ws, l, [...l.cards]))
+            // A lane keeps at least a card (lanes.ts keeps none without): a change to none leaves it as it was.
+            if (l.pending.length) l.cards = l.pending
+            delete l.pending
+            l.updatedAt = now()
+            applied.push(l)
+          }
+          await write(ws, kept, () => checks.forEach((c) => c()))
+        })
+      } catch (e) {
+        if (!(e instanceof StaleLane)) throw e
+        log.info(`a lane's queued list waits: ${e.message}`)
+        changed(ws)
+        return
+      }
       for (const l of applied) {
         log.info(`Lane ${l.id}: its queued list change applied`)
         await tellListChanged(ws, l)
@@ -706,18 +751,33 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
       const cardsNow = new Map(live.map((l, i) => [l.id, vs[i].cards]))
       const on = await enforced()
       const ended: EndedLane[] = []
-      await withFileLock(fileOf(ws), async () => {
-        const kept = await read(ws)
-        for (const l of kept) {
-          if (!running(l)) continue
-          // Every card Done (#1270): the lane ends by itself, its results from the cards' facts.
-          if (done.some((d) => d.id === l.id)) endVerified(ws, l, cardsNow.get(l.id), on, ended)
-          else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', cardsNow.get(l.id))
-          else continue
-          laneFact(ws, l)
-        }
-        await write(ws, kept)
-      })
+      const closed: LaneRecord[] = []
+      const checks: (() => void)[] = []
+      try {
+        await withFileLock(fileOf(ws), async () => {
+          const kept = await read(ws)
+          for (const l of kept) {
+            if (!running(l)) continue
+            const decided = done.find((d) => d.id === l.id)
+            // Every card Done (#1270): the lane ends by itself, its results from the cards' facts, if its list is the
+            // one the decision read and its cards are still all Done as it saves (else nothing is saved, and it is read
+            // again: HR6's #1270 round 1, a card reopened meanwhile).
+            if (decided && sameList(l.cards, decided.cards)) {
+              checks.push(stillAllDone(ws, l, [...l.cards]))
+              endVerified(ws, l, cardsNow.get(l.id), on, ended)
+            } else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', cardsNow.get(l.id))
+            else continue
+            closed.push(l)
+          }
+          await write(ws, kept, () => checks.forEach((c) => c()))
+        })
+      } catch (e) {
+        if (!(e instanceof StaleLane)) throw e
+        log.info(`a lane's end waits: ${e.message}`)
+        changed(ws)
+        return
+      }
+      for (const l of closed) laneFact(ws, l)
       tellEnded(ws, ended)
       if (ws.path && same(ws.path, path)) return refresh(ws)
       return

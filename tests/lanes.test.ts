@@ -229,6 +229,8 @@ describe('the lanes service', () => {
   }
 
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [c1, c2, c3] = [await make('One'), await make('Two'), await make('Three')]
     const a = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], rounds: 10, waitMinutes: 360, name: 'first', by: 'B1 (alpha)' })
     expect(a.did).toBe('started')
@@ -250,6 +252,8 @@ describe('the lanes service', () => {
   })
 
   it("a lane started without rounds or wait takes the project's settings, else the workspace's; given ones win (#412)", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [c1, c2, c3] = [await make('L1'), await make('L2'), await make('L3')]
     const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
     expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
@@ -281,6 +285,8 @@ describe('the lanes service', () => {
   })
 
   it("a builder's next loop, its last lane's cards passed but not merged: that lane ends (not abandoned), whoever registers first", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [p1, p2, n1, n2, m1] = [await make('P1'), await make('P2'), await make('N1'), await make('N2'), await make('M1')]
     const passed = async (...ns: number[]) => {
       for (const n of ns) await run(() => tasks.updateTask(n, { column: 'passed' }, user))
