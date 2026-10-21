@@ -108,7 +108,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -116,9 +116,14 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) })))
   // Its next card waiting while its builder's branch is brought up to date (§16.19.2, `line`: the main side's), when
   // nothing more pressing says why.
-  const status = running(rec) ? (laneStatus(rec, list, current, waiting, facts ?? null) ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
-  const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   const named = (a: LaneAgent): LaneAgent => ({ id: a.id, name: names?.get(a.id) ?? a.name })
+  const found = running(rec) ? laneStatus(rec, list, current, waiting, facts ?? null) : null
+  // Its builder's or reviewer's hooks not arriving (#1336, `hooksOut`: the main side's, by agent id) pauses it: nothing
+  // is typed into that agent. Only what already waits for the user says more.
+  const deaf = running(rec) && !unrecorded ? [rec.builder, rec.reviewer].find((a): a is LaneAgent => !!a && !!hooksOut?.has(a.id)) : undefined
+  const hooks = deaf && !(found && USERS.has(found.reason)) ? { reason: 'hooks' as const, card: current, agent: named(deaf).name } : null
+  const status = running(rec) ? (hooks ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
+  const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   return {
     id: rec.id,
     project: rec.project,
@@ -152,7 +157,9 @@ export interface LaneCardFacts {
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
-const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging'])
+const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging', 'hooks'])
+/** The reasons that already wait for the user: they say more than an agent's hooks not arriving (#1336). */
+const USERS: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit'])
 
 /**
  * Why a running lane waits (#1270, SPEC §16.11.4), most pressing first: its card blocked or On Hold (with no other being
@@ -207,6 +214,8 @@ export function laneStatusText(s: LaneStatus): string {
       return `waiting: bringing the builder's branch up to date before ${card}`
     case 'listChanges':
       return `list changes after ${card}`
+    case 'hooks':
+      return `paused: ${s.agent ?? 'an agent'}'s hooks aren't arriving`
   }
 }
 

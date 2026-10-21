@@ -104,6 +104,7 @@
   "session.newConversation.pending": "O agente acabou de receber um prompt que a CLI ainda não aceitou.",
   "session.notice.finished": "{agent} terminou",
   "session.notice.finishedBody": "O agente terminou o trabalho.",
+  "session.notice.hooksMissingTitle": "O Hive não está recebendo os hooks de {agent}",
   "session.notice.longConversation": "{agent}: conversa longa",
   "session.notice.needsInput": "{agent} precisa da sua resposta",
   "session.notice.notWatching": "{agent} não está observando {cards}",

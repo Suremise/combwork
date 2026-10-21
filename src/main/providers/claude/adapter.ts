@@ -430,6 +430,18 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return autoCompactOf(ctx.extraArgs, env, settingsScopes(ctx.cwd, env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs), models)
   }
 
+  /**
+   * The settings that turn Claude Code's hooks off (#1336): the first scope, highest first, that sets disableAllHooks,
+   * if it sets it on; or managed settings allowing only their own hooks (allowManagedHooksOnly), which Hive's aren't.
+   */
+  hooksOffIn(ctx: LaunchContext): string | null {
+    const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    const obj = (j: unknown): Record<string, unknown> | null => (j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null)
+    if (obj(scopes[0]?.json)?.allowManagedHooksOnly === true) return scopes[0].label
+    const deciding = scopes.find((s) => typeof obj(s.json)?.disableAllHooks === 'boolean')
+    return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
+  }
+
   backgroundTasks(appended: string): BackgroundTaskEvent[] {
     return claudeBackgroundTasks(appended)
   }
