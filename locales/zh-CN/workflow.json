@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "没有检查。",
   "workflow.form.noIdentity": "git config 中尚未设置姓名和邮箱。",
   "workflow.form.none": "无",
+  "workflow.form.noneValue": "无",
   "workflow.form.notEnforced": "未强制执行工作流程规则（“设置”→“高级”）。这些选项会保存，并在重新强制执行规则后生效。",
   "workflow.form.off": "关",
   "workflow.form.on": "开",

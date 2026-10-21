@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "Aucune vérification.",
   "workflow.form.noIdentity": "Aucun nom ni adresse e-mail n’est encore défini dans la configuration Git.",
   "workflow.form.none": "Aucune",
+  "workflow.form.noneValue": "Aucun",
   "workflow.form.notEnforced": "Les règles du flux de travail ne sont pas appliquées (Paramètres → Avancé). Ces options sont enregistrées et s’appliqueront dès que les règles seront de nouveau appliquées.",
   "workflow.form.off": "Désactivé",
   "workflow.form.on": "Activé",

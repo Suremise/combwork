@@ -44,6 +44,7 @@ const T = {
   checkCommand: msg({ id: 'workflow.form.checkCommand', defaultMessage: 'Command', description: 'The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review).' }),
   addCheck: msg({ id: 'workflow.form.addCheck', defaultMessage: 'Add Check', description: 'A button under the checks of “Checks pass before review”.' }),
   removeCheck: msg({ id: 'workflow.form.removeCheck', defaultMessage: 'Remove', description: 'The tooltip of the button removing a check from “Checks pass before review”.' }),
+  noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
   worktree: msg({ id: 'workflow.form.worktree', defaultMessage: 'In this version, a card’s own folder is its builder’s worktree.', description: 'Under “Where cards are built” in Project Settings → Workflow.' }),
@@ -238,8 +239,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     if (key === 'okBefore') return tr(VALUE_TEXT.okBefore[(v as OkBefore).mode])
     if (key === 'identity') return tr(v ? T.on : T.off)
     if (key === 'reviewers') return fmt.number(v as number)
-    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noChecks) // i18n-ignore: a check's name and command, shown as they are
-    if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noChecks)
+    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
+    if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
     if (key === 'target') return (v as string) || tr(T.defaultBranch)
     return String(v)
   }

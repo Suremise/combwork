@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "チェックはありません。",
   "workflow.form.noIdentity": "git configにまだ名前とメールアドレスが設定されていません。",
   "workflow.form.none": "なし",
+  "workflow.form.noneValue": "なし",
   "workflow.form.notEnforced": "ワークフローのルールは適用されていません（「設定」→「詳細」）。これらのオプションは保存され、ルールが再び適用されると有効になります。",
   "workflow.form.off": "オフ",
   "workflow.form.on": "オン",

@@ -53,6 +53,7 @@ interface HiveMessageValues {
   'workflow.form.noChecks': undefined
   'workflow.form.noIdentity': undefined
   'workflow.form.none': undefined
+  'workflow.form.noneValue': undefined
   'workflow.form.notEnforced': undefined
   'workflow.form.off': undefined
   'workflow.form.on': undefined

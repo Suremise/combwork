@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "Keine Checks.",
   "workflow.form.noIdentity": "In der Git-Konfiguration sind noch kein Name und keine E-Mail-Adresse festgelegt.",
   "workflow.form.none": "Keine",
+  "workflow.form.noneValue": "Keine",
   "workflow.form.notEnforced": "Workflow-Regeln werden nicht durchgesetzt (Einstellungen → Erweitert). Diese Optionen werden gespeichert und gelten, sobald die Regeln wieder durchgesetzt werden.",
   "workflow.form.off": "Aus",
   "workflow.form.on": "An",

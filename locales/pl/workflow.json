@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "Brak sprawdzeń.",
   "workflow.form.noIdentity": "W git config nie ustawiono jeszcze nazwy ani adresu e-mail.",
   "workflow.form.none": "Brak",
+  "workflow.form.noneValue": "Brak",
   "workflow.form.notEnforced": "Reguły przepływu pracy nie są egzekwowane (Ustawienia → Zaawansowane). Te opcje są zapisane i zaczną obowiązywać, gdy reguły znów będą egzekwowane.",
   "workflow.form.off": "Wyłączone",
   "workflow.form.on": "Włączone",

@@ -51,6 +51,7 @@
   "workflow.form.noChecks": "No checks.",
   "workflow.form.noIdentity": "No name and email are set in git config yet.",
   "workflow.form.none": "None",
+  "workflow.form.noneValue": "None",
   "workflow.form.notEnforced": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
   "workflow.form.off": "Off",
   "workflow.form.on": "On",

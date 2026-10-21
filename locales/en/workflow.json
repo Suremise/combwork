@@ -207,6 +207,10 @@
     "defaultMessage": "None",
     "description": "The version control of a project without any (glossary 2.1: None)."
   },
+  "workflow.form.noneValue": {
+    "defaultMessage": "None",
+    "description": "An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders."
+  },
   "workflow.form.notEnforced": {
     "defaultMessage": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
     "description": "A note atop Project Settings → Workflow while the switch \"Workflow rules are enforced\" is off."
