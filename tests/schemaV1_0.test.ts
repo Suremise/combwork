@@ -56,7 +56,7 @@ describe('the 1.0 schema', () => {
     const db = schemaDb()
     const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name)
     for (const t of ['cards', 'card_labels', 'card_links', 'card_context', 'card_comments', 'card_history', 'card_decisions', 'card_holds', 'sessions', 'session_cards', 'sessions_deleted', 'sessions_deleted_usage', 'deliveries', 'lanes', 'lane_cards', 'lane_frozen', 'watches', 'watch_cards', 'metrics_buckets', 'metrics_series', 'card_facts', 'card_actions', 'rulesets', 'folder_commits', 'project_keys', 'project_counters', 'card_aliases']) expect(tables).toContain(t)
-    expect(V1_0_STEPS.map((s) => s.name)).toEqual(['cards in tables', 'sessions and deliveries in tables', 'lanes, watches and metrics in tables', 'facts', 'project keys'])
+    expect(V1_0_STEPS.map((s) => s.name)).toEqual(['cards in tables', 'sessions and deliveries in tables', 'lanes, watches and metrics in tables', 'facts', 'project keys', 'actions delivered by deliveries'])
     db.close()
   })
 

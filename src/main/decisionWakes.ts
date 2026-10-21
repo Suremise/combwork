@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { basename } from 'path'
+import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { LiveSessionState } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
@@ -9,8 +9,11 @@ import { onHiveEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { noteOnCard } from './tasks'
-import { createDelivery, fromSource, offerNow, registerSource } from './deliveries'
+import { getTask, noteOnCard } from './tasks'
+import { actionDelivered, createDelivery, fromSource, offerNow, registerSource } from './deliveries'
+import { cardReviewer, wakesOn } from './loopWakes'
+import { onAction } from './workflow/actionWorker'
+import type { ActionRow } from './workflow/factStore'
 import { isWaiting } from '../shared/deliveries'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
@@ -117,14 +120,16 @@ registerSource('decision', {
     // What the line is worked out from: the board and the agent's reads as they are now.
     const gen = genOf(ws)
     const reads = cardReadsBy(agent)
-    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId))))
+    // A decision wake's line (#1266) also tells its card where only its loop makes it the agent's (`loop`).
+    const loop = typeof r.meta?.loop === 'number' ? r.meta.loop : undefined
+    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop))
     if (!cards.size) return { cancel: 'nothing new to tell' }
     // This version: its line, and what its receipt tells (saved with it), and what its holds compares with.
     const v = ++versions
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
     // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(',') } }
+    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop !== undefined ? { loop } : {}) } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
@@ -173,7 +178,9 @@ async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: str
   try {
     // A line offered and not read yet (#650: its doorbell rang) is made again from the board when the agent reads it, so
     // it tells these decisions too: not a second line beside it.
-    if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && r.state === 'offered')) return
+    // A decision wake's line waiting (#1266, made by an action) is made again from the board when it is offered, with its
+    // loop's card: not replaced by this one, which would lose that card.
+    if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && (r.state === 'offered' || (r.action !== undefined && isWaiting(r))))) return
     const self = await boardSelf(ws, projectPath, agentId)
     if (!self) return
     const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(key)))
@@ -184,6 +191,44 @@ async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: str
   } finally {
     telling.delete(key)
   }
+}
+
+/**
+ * A `wakeOnDecision` action (#1266, S5; #587's gap): a decision recorded on a card in a loop wakes its builder (`to:
+ * builder`, the card's agent) and, while the card is in Review or Passed, its reviewer (`to: reviewer`: the lane's, else
+ * the last), whether or not they are waiting for the user: a watching agent too, which a decision line never reached
+ * before. The line is the decision line, made with the action's id (made once), and made again from the board when it
+ * is offered, as every decision line is. Not to whoever recorded it, not where the project turned loop wakes off, and
+ * only when the decisions are new to that agent.
+ */
+async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise<void> {
+  if (!from.path) return
+  const card = await getTask(a.card, from).catch(() => null)
+  if (!card?.project || card.archived) return
+  const projectPath = join(from.path, card.project)
+  const ws = workspaceFor(projectPath)
+  if (!ws?.isProjectPath(projectPath) || !openWorkspaces().includes(ws) || !(await wakesOn(ws, projectPath))) return
+  if (actionDelivered(projectPath, a.id)) return
+  const to = a.payload.to === 'reviewer' ? await cardReviewer(ws, projectPath, card) : card.agent ? { id: card.agent, name: '' } : null
+  if (!to || a.payload.by === `agent:${to.id}`) return
+  await withCardNames(
+    ws,
+    async () => {
+      const self = await boardSelf(ws, projectPath, to.id)
+      if (!self) return
+      const cards = fitting(await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), a.card))
+      if (!cards.size) return
+      try {
+        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: a.card }, action: a.id })
+      } catch (e) {
+        // Another Hive made it meanwhile (the unique row refused this one's): delivered.
+        if (!actionDelivered(projectPath, a.id)) throw e
+        return
+      }
+      await offerNow(projectPath, to.id)
+    },
+    scopeOfHost(projectPath)
+  )
 }
 
 /** Every running project agent of a workspace that may be told. */
@@ -211,6 +256,8 @@ let started = false
 export function initDecisionWakes(): void {
   if (started) return
   started = true
+  // Its delivery carries the action's id: run until marked, made once.
+  onAction('wakeOnDecision', (a, ws) => decisionFromAction(a, ws), 'delivered')
   onHiveEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())

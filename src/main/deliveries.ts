@@ -673,6 +673,30 @@ export interface NewDelivery {
   again?: string
   /** Offered by a launch about to start (launchWith only). */
   launching?: true
+  /**
+   * The durable action making it (SPEC §16.4.5): one delivery per action. One this action already made is returned as it
+   * is; one of the same source and ref still waiting is cancelled as replaced, never rewritten (it keeps its own action).
+   */
+  action?: number
+}
+
+/**
+ * Whether a durable action has made its delivery (SPEC §16.4.5): one of a host's loaded here, or a row of its workspace's
+ * database with the action's id (another Hive's, or one from before a restart). That row (unique per action) is the
+ * record that it was delivered: an action run again finds it and makes nothing.
+ */
+export function actionDelivered(host: string, action: number): boolean {
+  const ws = workspaceFor(host)
+  if (!ws?.path) return false
+  // Action ids are a workspace database's own: only its hosts' deliveries count.
+  const mine = (s: Store): boolean => s.place.workspace.toLowerCase() === resolve(ws.path!).toLowerCase()
+  if ([...stores.values()].some((s) => mine(s) && s.records.some((r) => r.action === action))) return true
+  try {
+    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // i18n-ignore: SQL
+  } catch {
+    // A board waiting for its upgrade has no deliveries table: none made.
+    return false
+  }
 }
 
 /** How many of an agent's deliveries of a kind wait to be offered. */
@@ -694,7 +718,15 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
     if (why) throw new Error(`Not sent: ${why}.`)
-    const had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
+    // An action's delivery already made (two runs of it at once here): that one.
+    const made = nd.action ? d.records.find((x) => x.action === nd.action) : undefined
+    if (made) return made
+    let had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
+    // An action's own delivery: the one waiting is replaced by a new one (each action keeps its own row).
+    if (had && nd.action && nd.replace) {
+      set(store, d, had, 'cancelled', 'replaced by a newer one')
+      had = undefined
+    }
     if (had) {
       if (!nd.replace) return had
       const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
@@ -722,6 +754,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
       ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
       ...(nd.forRun ? { forRun: nd.forRun } : {}),
       ...(nd.again ? { again: nd.again } : {}),
+      ...(nd.action ? { action: nd.action } : {}),
       // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
       ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
     }

@@ -11,7 +11,7 @@ import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, numberCard } from './schema/keysStep'
-import { CARDS_STEP, FACTS_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -155,6 +155,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: KEYS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => moveKeys(db)
+  },
+  {
+    // #1266: an action's delivery is recorded by its row in `deliveries` (the action's id, unique), and a notice is claimed
+    // instead; `card_actions.delivered` (#1215's stand-in) goes.
+    version: 9,
+    name: ACTIONS_DELIVERED_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of ACTIONS_DELIVERED_STEP.ddl) db.exec(sql)
+    }
   }
 ]
 

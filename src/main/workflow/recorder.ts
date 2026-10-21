@@ -24,7 +24,7 @@ import * as G from '../platform/git'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown, type Maybe } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
-import { FactStore } from './factStore'
+import { FactStore, type Tx } from './factStore'
 
 const log = createLogger('workflow')
 
@@ -244,8 +244,11 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
   const reads = ctx?.reads.get(n) ?? (before ? undefined : ctx?.reads.get(NEW_CARD))
   store.tx((tx) => {
     let generation = earlier.generation
-    const decision = (d: { id: string; text: string }, removed = false): void =>
-      void tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } })
+    // The decisions this change records: what wakes the loop's agents (#1266), once each change.
+    let decided: number | null = null
+    const decision = (d: { id: string; text: string }, removed = false): void => {
+      decided = tx.append(n, { kind: 'Decision', actor, source: 'recorded', ...ruleset(), data: { decision: d.id, generation: ++generation, text: d.text, ...(removed ? { removed: true } : {}) } }).seq
+    }
     // The ruleset the card's cycle works under (its Started's, or an adopted card's Adopted: #1249), on each fact of it.
     const ruleset = (): { ruleset?: string } => {
       const id = tx.facts(n).findLast((f) => f.kind === 'Started' || f.kind === 'Adopted')?.ruleset
@@ -276,10 +279,13 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
         }
       })
     }
+    let moved: number | null = null
     if (was !== to) {
-      tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } })
+      moved = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }).seq
       tx.setStage(n, to)
     }
+    let submitted: number | null = null
+    let verdict: number | null = null
     if (intoReview) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
@@ -302,7 +308,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
                 ...unknownOf(mine, ['revision', 'base', 'files', 'key'])
               }
             })()
-      tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data })
+      submitted = tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data }).seq
     }
     if (after.review && (!before?.review || before.review.agent !== after.review.agent)) {
       const s = facts()
@@ -313,13 +319,13 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const s = facts()
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
       // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
-      tx.append(n, {
+      verdict = tx.append(n, {
         kind: 'Verdict',
         actor,
         source: 'recorded',
         ...ruleset(),
         data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
-      })
+      }).seq
     }
     if ((before?.blocked ?? null) !== after.blocked) {
       if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } })
@@ -331,7 +337,38 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     const now = new Map((after.decisions ?? []).map((d) => [d.id, d.text]))
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
+    if (inLoop(ws, after)) loopWakes(tx, n, actor, after, { submitted, verdict, moved: moved !== null && (to === 'approved' || to === 'done') ? moved : null, decided }, STAGE_OF[after.column])
   })
+}
+
+/**
+ * Whether a card is in a loop, so its handoffs wake anyone (loopWakes.ts: only a card with a reviewer, so a solo user
+ * never sees one): a running lane with a reviewer has it, or an agent has reviewed it. Read in the change, so a change
+ * with no loop writes no actions.
+ */
+function inLoop(ws: WorkspaceService, card: TaskCard): boolean {
+  if (card.history.some((h) => h.what === 'Started reviewing')) return true
+  return boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' AND l.reviewer_id IS NOT NULL LIMIT 1").get(card.number)) // i18n-ignore: SQL
+}
+
+/**
+ * The loop's handoffs a change makes (#1266, SPEC §16.4.5): durable actions written with the facts that cause them, run
+ * by the actions worker once the change commits (loopWakes.ts, decisionWakes.ts). An arrival in Review wakes the card's
+ * reviewer; a verdict, or a move into Passed or Done not made by a verdict, its builder; a decision its builder, and its
+ * reviewer too while the card is in Review or Passed (#587, S5): one action per agent woken, each carrying who made the
+ * change (never woken by its own) and the history entry the handoff left.
+ */
+function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted: number | null; verdict: number | null; moved: number | null; decided: number | null }, stage: StageId): void {
+  const last = after.history.at(-1)
+  const since = last ? { at: last.at, ...(last.id ? { id: last.id } : {}) } : null
+  const common = { by, ...(since ? { since } : {}) }
+  if (f.verdict !== null) tx.action(n, 'wake', { agent: 'builder', about: 'verdict', ...common }, f.verdict)
+  else if (f.submitted !== null) tx.action(n, 'wake', { agent: 'reviewers', about: 'review', ...common }, f.submitted)
+  else if (f.moved !== null) tx.action(n, 'wake', { agent: 'builder', about: stage === 'done' ? 'done' : 'approved', ...common }, f.moved)
+  if (f.decided !== null) {
+    tx.action(n, 'wakeOnDecision', { to: 'builder', by }, f.decided)
+    if (stage === 'review' || stage === 'approved') tx.action(n, 'wakeOnDecision', { to: 'reviewer', by }, f.decided)
+  }
 }
 
 /** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Hive's derived. */

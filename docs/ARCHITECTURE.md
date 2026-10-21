@@ -25,7 +25,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/db.ts`, `src/main/boardStore.ts`, `src/main/presence.ts` | Hive's SQLite layer (`node:sqlite`: connections, settings, migrations, a group of steps run as one: #1207), and the board's database (`.hive/hive.db`): its one write path (`boardWrite`, a transaction told once), the move in from the cards' files, export (#1017), the 1.0 upgrade (asked first, `upgradeBoard`, `restoreBoardBackup`), and the workspace presence marker (`.hive/open`) |
 | `src/main/schema/` | hive.db's 1.0 tables (`v1_0.ts`, #1208) and the cards in them (#1209): `cardRows.ts`, a card's document as rows and back byte for byte (the card JSON contract), and `cardsStep.ts`, the 1.0 group's step that moves 0.9's cards into the tables |
 | `src/main/workflow/recorder.ts` | Facts from today's moves (#1216): `saveCard` hands it each card change, as it was and as it is, inside the change; the platform's reads are made before the change by tasks.ts' public entry points (`gatherReads`) and handed in through the change's context (`recording`) |
-| `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each delivered once |
+| `src/main/workflow/factStore.ts`, `src/main/workflow/actionWorker.ts` | The fact log in hive.db (#1215): a project's facts, actions, rulesets, lanes and queue pauses, written in the caller's `boardWrite`; the actions worker, which runs pending actions after each change commits and at a workspace's open, each once (delivered, or claimed) |
 | `src/main/workflow/adoption.ts`, `src/main/workflow/upgrade.ts` | The 1.0 upgrade's adoption (#1218): each project's options as it works today, cards from before 1.0 marked, cards in flight adopted from what their folder shows (`adoptionInputs` outside the board's lock, `writeAdoption` inside); in the background after the upgrade and at each open until it has run once |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
@@ -478,7 +478,7 @@ real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EX
 | cards in tables (#1209) | `cards`: number (the permanent global `#N`), title, description, project, project_id, agent, agent_name, review_agent/_name/_since, col (the category, today's column), stage (the cached stage, null before a 1.0 move), ord, blocked, archived, archived_for, archived_batch, context_problems, pre_workflow, created/updated, extra, layout (place, project, archived by project, agent, reviewer, updated). `card_labels` (by label), `card_links` (blockedBy and links; by target), `card_context`, `card_comments`, `card_history` (by time), `card_decisions`, `card_holds` | `boardStore.ts` (rows), `tasks.ts` (rules) |
 | sessions and deliveries in tables (#1211; built, v6: `schema/sessionDeliveryTables.ts` moves `store_rows`' rows in and drops `store_rows`) | `sessions` per host (by agent), `session_cards` (by card), `sessions_deleted`, `sessions_deleted_usage`; `deliveries` per host (by agent, state, source and ref, card and round; the 7-day expiry by `received` and `ended`; unique `action`) | `sessionStore.ts`, `deliveries.ts` |
 | lanes, watches and metrics in tables (#1212) | `lanes` (by builder, reviewer, state and end), `lane_cards` (by card), `lane_frozen`; `watches` (one per folder and agent; by limit, by fired delivery), `watch_cards` (by card); `metrics_buckets` (by start), `metrics_series` (a row per series: part '' for the workspace or a project's name, family, key) | `lanes.ts`, `watches.ts`, `metrics.ts` |
-| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card; `delivered`, transitional, below), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files` | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
+| facts (#1215) | `card_facts` (unique (card, seq); unique (card, kind, dedupe) for observed facts; by kind, in the order written), `card_actions` (ids never reused, as deliveries outlive them; pending, by card), `rulesets`, `folder_commits` (a folder's commits in the order seen); the runtime's columns of a card (`kind`, `target`, `lane`, `lane_reviewer`, `paths_declared`) and `card_paths` (declared and pre-fill; by path); `workflow_lanes`, `workflow_lane_cards`, `workflow_queue_pauses`, `workflow_queue_pause_files` | `workflow/factStore.ts` inside `boardWrite`, `workflow/actionWorker.ts` |
 | project keys (#1219) | `project_keys` (current and old keys, one current per project), `project_counters`, `cards.project_number` (unique per project), `card_aliases` ((old project, number) → card, for a card moved since) | `schema/keysStep.ts` (every query; `putCard` numbers a card as it is saved), `projectKeys.ts` (keys given at open, changed, notice, references), `shared/projectKeys.ts` (rules) |
 
 `board_meta` and `archive_batches` (an undo record of a bulk archive, read whole) stay as they are; the stores' few
@@ -584,10 +584,15 @@ on. The window reads a card's facts with
 **The actions worker** (`workflow/actionWorker.ts`, SPEC §16.4.5): `boardStore.onBoardCommitted` tells it of every
 change that commits, and it runs the workspace's pending actions (one run at a time per workspace; one asked for
 meanwhile runs after) in id order; the workspace's open (`WorkspaceService.onOpened`) runs those a crash or a close left
-pending. For each action, in a board change of its own, its delivery is recorded once (`card_actions.delivered`, by a
-conditional update: an action delivered already, by another run or before a crash, isn't run again), then its handler
-runs (`onAction(kind, fn)`), then it is marked done (failed when the handler throws; never tried again). P3 registers
-no handler: nothing wakes, notifies or merges yet, and an action without one is marked done as the no-op it is. A
+pending. Each action runs in one of two ways (#1266), as its handler registered (`onAction(kind, fn, once)`):
+**delivered** (`wake`, loopWakes.ts; `wakeOnDecision`, decisionWakes.ts), checked still pending in a board change of
+its own, then its handler runs, whose delivery carries the action's id (`deliveries.action`, unique: `actionDelivered`
+finds one made, in memory or in hive.db, another Hive's too), then it is marked done (failed when the handler throws;
+never tried again); or **claimed** (`notify`, workflowNotices.ts, and every kind with no handler, marked done as the
+no-op it is: `prepareReviewCopy`, `releaseSlot`, `enqueue`, `pin`, `prepareSlot`, `endLaneIfDone` until P5 and P7),
+marked done by a conditional update before its handler runs, so only the run that claimed it runs it. The recorder
+writes the loop's handoffs as `wake` and `wakeOnDecision` actions with the facts (`loopWakes` in recorder.ts), for a
+card in a loop only; `tasks.ts` has no handoff path of its own (`onLoopEvent` is gone). A
 run belongs to the workspace as it was when it began (its lifetime and path): once that workspace closes or its window
 opens another, the run stops, checked after every wait and inside each board change before the board is touched
 (`boardWrite`'s `alive`), and between an action's claim and its handler (a listener of the claim's commit may close
@@ -595,7 +600,10 @@ it), so it never opens a closed board again nor writes another workspace's (whos
 and no handler runs for a workspace that has gone. A run asked for while one goes on joins it with its own workspace
 (HR4's #1215 round 2): when the run's workspace has gone, the newest that asked and is still open takes over what is
 left, so a window still open on the board never loses its request to one that switched away.
-**`delivered` is transitional:** #1211's typed `deliveries` (unique `action`) replace it when P4 wires wakes (#1120).
+**`delivered` is gone** (#1266, the 1.0 group's step 9): a wake's delivery carries the action's id in #1211's typed
+`deliveries` (unique `action`), and a notice is claimed instead. The runtime's own executor (`Workflow.runActions`, for
+`tests/workflow` only: `autoRun` is off in the app) records what it delivered as `deliveries` rows of a host of its own
+(`runtime:<project>`), on the same index.
 
 Observed facts name the observed fact they follow (`prev`) and (card, kind, prev) is unique, so two Hives observing one
 workspace write each transition once, while a later repeat of the same values is still recorded; a writer that loses
@@ -603,8 +611,9 @@ the race re-reads the platform and writes only what is true now, after the winne
 backup; a newer file opens read-only.
 
 **What stays where it is:** file locks (`sessions.ts` `preToolUse`), the folder fence, decision wakes
-(`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer), loop wakes (`loopWakes.ts`, fed by
-the runtime's `Moved` and `Verdict` facts instead of `onLoopEvent`), the Progress runs (`ProgressRun` gains `card` and
+(`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer: built, #1266), loop wakes (`loopWakes.ts`, fed by
+the facts' `wake` actions instead of `onLoopEvent`: built, #1266), Hive's own notices of the work (`workflowNotices.ts`:
+the `notify` action and lane notices, #1266), the Progress runs (`ProgressRun` gains `card` and
 `revision`).
 
 **Risks the builders own** (SPEC §16 and the note's section 12): `sessions.ts`, `servers.ts` and `tasks.ts` are large;

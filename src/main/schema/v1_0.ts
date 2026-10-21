@@ -505,8 +505,18 @@ const KEYS: SchemaStep = {
   ]
 }
 
-/** P3's steps, in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS]
+/**
+ * #1266 (P4): an action's delivery is recorded by the delivery itself, its row in `deliveries` with the action's id
+ * (unique), so the transitional `card_actions.delivered` (#1215) goes. A notice, which makes no delivery, is claimed
+ * instead: marked done before it runs (actionWorker.ts).
+ */
+export const ACTIONS_DELIVERED_STEP: SchemaStep = {
+  name: 'actions delivered by deliveries',
+  ddl: ['DROP INDEX card_actions_delivered', 'ALTER TABLE card_actions DROP COLUMN delivered']
+}
+
+/** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, ACTIONS_DELIVERED_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -581,7 +591,6 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'workflowLanes.of': { sql: 'SELECT * FROM workflow_lanes WHERE project = ? AND id = ?', args: ['p', 'L'], index: 'PRIMARY KEY' },
   'workflowLanes.cards': { sql: 'SELECT list, card FROM workflow_lane_cards WHERE project = ? AND lane = ? ORDER BY list, ord', args: ['p', 'L'], index: 'PRIMARY KEY' },
   'queuePauses.of': { sql: 'SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
-  'actions.delivered': { sql: 'SELECT id, delivered FROM card_actions WHERE delivered IS NOT NULL ORDER BY id', args: [], index: 'card_actions_delivered' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },

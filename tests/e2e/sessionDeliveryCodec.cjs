@@ -65,7 +65,8 @@ const DELIVERY = [
   { key: 'ref', col: 'ref', kind: 'text' },
   { key: 'meta', col: 'meta', kind: 'json' },
   { key: 'need', col: 'need', kind: 'text' },
-  { key: 'forRun', col: 'for_run', kind: 'text' }
+  { key: 'forRun', col: 'for_run', kind: 'text' },
+  { key: 'action', col: 'action', kind: 'int' }
 ]
 
 const wellFormed = (s) => s.isWellFormed()

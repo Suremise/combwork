@@ -120,6 +120,7 @@ export const SUITES = [
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },
+  { name: 'lanenotices' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
   { name: 'leftovers' },

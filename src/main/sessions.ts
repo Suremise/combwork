@@ -4438,6 +4438,14 @@ class SessionManager {
     this.deliver(projectPath, title, body, kind, agentId, apiTitle)
   }
 
+  /**
+   * A notice about a project's work that no one agent gives (#1266: a card's request for the user, a lane's events), told
+   * as every notice is (notify): a banner in the window the user is using or a Windows notification, as the settings say.
+   */
+  notice(projectPath: string, title: Text, body: TextPart): void {
+    this.notify(projectPath, title, body, 'notice')
+  }
+
   /** Where a notice about this project goes now: the settings, and the Hive window the user is using (noticeRoute). */
   private route(projectPath: string, kind: 'finished' | 'waiting' | 'notice'): NoticeRoute {
     return noticeRoute(config.settings.notifications, kind, this.focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })

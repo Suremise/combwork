@@ -253,7 +253,8 @@ const DELIVERY: Field[] = [
   { key: 'ref', col: 'ref', kind: 'text' },
   { key: 'meta', col: 'meta', kind: 'json' },
   { key: 'need', col: 'need', kind: 'text' },
-  { key: 'forRun', col: 'for_run', kind: 'text' }
+  { key: 'forRun', col: 'for_run', kind: 'text' },
+  { key: 'action', col: 'action', kind: 'int' }
 ]
 
 /** A delivery as its row in `deliveries`, or null when it isn't of Hive's form. */

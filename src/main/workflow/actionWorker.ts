@@ -1,9 +1,14 @@
 // The durable actions' worker (SPEC §16.4.5, #1215): an action is written in the same transaction as the facts that cause
 // it, so nothing outside happens for a change that rolled back; once a change commits, this runs the workspace's pending
-// actions in the order written, and at start (a workspace opened) any a crash left pending. Each action's delivery is
-// recorded once before its effect runs (`card_actions.delivered`), so an action run twice (a crash between its effect
-// and its mark, two runs at once) delivers once. P3 has no effects yet: nothing wakes, notifies or merges; the kinds
-// P4 on adds register a handler here. A kind with none is marked done, its delivery recorded, as the no-op it is in P3.
+// actions in the order written, and at start (a workspace opened) any a crash left pending. Each runs at most once in
+// effect, however often it is run (a crash between its effect and its mark, two runs at once, another Hive's), in one of
+// two ways (#1266):
+// - **Delivered**: a handler that makes a delivery gives it the action's id, and the delivery's row (unique per action,
+//   `deliveries.action`) is the record that it was made. The handler runs again until the action is marked, and finds
+//   that row each time after the first: one delivery.
+// - **Claimed**: every other kind (a notice, a kind with no handler) is marked done before its effect runs, by a
+//   conditional update, so only the run that moved it from pending runs it: at most once (a notice lost to a crash
+//   isn't shown twice).
 //
 // A run belongs to the workspace as it was when it began (HR4's #1215 round 1): once that workspace closes, or its window
 // opens another, the run stops, checked after every wait and inside each board change, before the board is touched,
@@ -12,18 +17,24 @@
 import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardCommitted } from '../boardStore'
 import { createLogger } from '../logger'
 import type { WorkspaceService } from '../workspace'
-import { deliverOnce, pendingActionsOf, type ActionRow } from './factStore'
+import { pendingActionsOf, type ActionRow } from './factStore'
 
 const log = createLogger('workflow')
 
-/** What an action of a kind does, once its delivery is recorded. Throwing marks it failed (it isn't tried again). */
+/** What an action of a kind does. Throwing marks it failed (it isn't tried again). */
 export type ActionHandler = (action: ActionRow, ws: WorkspaceService) => Promise<void> | void
 
-const handlers = new Map<string, ActionHandler>()
+/**
+ * How an action of a kind is kept to once (the top): `delivered`, its handler's delivery carries the action's id and a
+ * run finds it made; `claimed`, it is marked done before it runs.
+ */
+export type ActionOnce = 'delivered' | 'claimed'
 
-/** Registers what an action kind does (P4 on: wakes, notices, the queue's steps). */
-export function onAction(kind: string, fn: ActionHandler): void {
-  handlers.set(kind, fn)
+const handlers = new Map<string, { fn: ActionHandler; once: ActionOnce }>()
+
+/** Registers what an action kind does (P4 on: wakes, notices, the queue's steps), and how it is kept to once. */
+export function onAction(kind: string, fn: ActionHandler, once: ActionOnce = 'claimed'): void {
+  handlers.set(kind, { fn, once })
 }
 
 /** For tests: forgets the registered handlers. */
@@ -96,6 +107,14 @@ export function runActions(ws: WorkspaceService): Promise<void> {
   return run.done
 }
 
+/** Whether a run of the actions is going on (on any workspace's file). */
+export const actionsRunning = (): boolean => runs.size > 0
+
+/** Resolves once no run of the actions is going on: what a change's actions started (its handlers' work) has run. */
+export async function actionsSettled(): Promise<void> {
+  while (runs.size) await Promise.allSettled([...runs.values()].map((r) => r.done))
+}
+
 /** For tests: how many requesters the run going on for a workspace's file holds (0: none going on). */
 export function runRequesters(path: string): number {
   return runs.get(boardFile(path).toLowerCase())?.by.length ?? 0
@@ -115,25 +134,35 @@ async function drain(at: RunOf): Promise<void> {
   for (const a of pending) {
     if (!at.alive()) return
     const handler = handlers.get(a.kind)
-    // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile.
-    const first = await change(at, () =>
-      boardWriteOp(ws, (db) => (db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) ? deliverOnce(db, { action: a.id, kind: a.kind, target: '', payload: a.payload }) : null))
+    const claimed = !handler || handler.once === 'claimed'
+    // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile. A claimed one is
+    // marked done here, by the run that finds it pending: only that run goes on with it.
+    const mine = await change(at, () =>
+      boardWriteOp(ws, (db) =>
+        claimed
+          ? Number(db.prepare("UPDATE card_actions SET state = 'done', attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(a.id).changes) > 0
+          : !!db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id)
+      )
     )
     // Closed or switched while the claim committed (a listener of that commit may close it): no handler runs for it.
     if (!at.alive()) return
-    if (first === null) continue
-    let state: ActionRow['state'] = 'done'
-    if (first && handler) {
-      try {
-        await handler(a, ws)
-      } catch (e) {
-        state = 'failed'
-        log.warn(`action ${a.id} (${a.kind}) of #${a.card} failed`, e)
-      }
+    if (!mine || !handler) continue
+    let failed = false
+    try {
+      await handler.fn(a, ws)
+    } catch (e) {
+      failed = true
+      log.warn(`action ${a.id} (${a.kind}) of #${a.card} failed`, e)
     }
-    // Closed or switched while the handler ran: its mark waits for the next run there (its delivery is recorded, so it
-    // isn't run again).
-    await change(at, () => boardWriteOp(ws, (db) => db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(state, a.id)))
+    // Closed or switched while the handler ran: a delivered one's mark waits for the next run there, which finds its
+    // delivery made and makes none. A claimed one is already done (a failure is still recorded, when it can be).
+    await change(at, () =>
+      boardWriteOp(ws, (db) =>
+        claimed
+          ? failed && db.prepare("UPDATE card_actions SET state = 'failed' WHERE id = ? AND state = 'done'").run(a.id)
+          : db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(failed ? 'failed' : 'done', a.id)
+      )
+    )
   }
 }
 

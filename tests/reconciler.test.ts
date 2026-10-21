@@ -322,7 +322,8 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
   beforeAll(() => advanced.set(ENFORCE, true))
   afterEach(() => advanced.set(ENFORCE, true))
   afterAll(() => advanced.set(ENFORCE, false))
-  const actions = (w: WS, card: number): string[] => store.boardRead(w, (db) => (db.prepare('SELECT kind FROM card_actions WHERE card = ? ORDER BY id').all(card) as { kind: string }[]).map((r) => r.kind))
+  // Reconciliation's own actions: the loop's handoffs the board's changes write (#1266: a wake `about` a verdict) left out.
+  const actions = (w: WS, card: number): string[] => store.boardRead(w, (db) => (db.prepare("SELECT kind FROM card_actions WHERE card = ? AND json_extract(payload, '$.about') IS NULL ORDER BY id").all(card) as { kind: string }[]).map((r) => r.kind))
   const column = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card, w))).column
 
   it('S7: a Passed card merged by hand is Done (outside), its lane told and its slot released', async () => {
@@ -402,7 +403,7 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     expect(actions(w, card)).toEqual([])
     await advanced.set(ENFORCE, true)
     await reconcileNow(w, repo)
-    const wakes = () => store.boardRead(w, (db) => db.prepare("SELECT fact, payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { fact: number; payload: string }[])
+    const wakes = () => store.boardRead(w, (db) => db.prepare("SELECT fact, payload FROM card_actions WHERE card = ? AND kind = 'wake' AND json_extract(payload, '$.about') IS NULL").all(card) as { fact: number; payload: string }[])
     expect(wakes()).toHaveLength(1)
     expect(wakes()[0].fact).toBe(stale.seq)
     expect(JSON.parse(wakes()[0].payload)).toMatchObject({ agent: 'a1' })

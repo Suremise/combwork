@@ -158,6 +158,8 @@
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
+  "tips.laneNotices.text": "Hive te avisa cuando la revisión de un carril no se supera, una tarjeta se bloquea o se estanca, o todas las tarjetas superaron la revisión y toca fusionar, con un aviso por carril. Configuración → Notificaciones decide dónde aparecen.",
+  "tips.laneNotices.title": "Entérate de cómo va un carril, sin el Asistente",
   "tips.language.text": "Hive sigue el idioma de presentación de Windows cuando lo tiene. Configuración → General → Idioma elige otro; los idiomas traducidos por IA están marcados, y las mejoras son bienvenidas. A los agentes se les sigue hablando en inglés.",
   "tips.language.title": "Hive en tu idioma",
   "tips.leftoverProcesses.text": "Un servidor de vista previa o un tail -f que inició un agente pueden seguir en ejecución después de que se detenga, ocupando la carpeta del proyecto o un puerto. Hive los lista en el menú ⋯ del panel del agente y ofrece terminarlos; Configuración → Agentes y worktrees puede terminarlos siempre.",

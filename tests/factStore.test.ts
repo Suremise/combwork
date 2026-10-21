@@ -1,6 +1,6 @@
 // The fact store in the workspace's hive.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
-// transaction (a change undone leaves none of them), the actions worker (each action delivered once, also when run
-// again after a crash or at the same time), two Hives observing one transition writing it once, and the runtime's
+// transaction (a change undone leaves none of them), the actions worker (each action's effect once, also when run
+// again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Hives observing one transition writing it once, and the runtime's
 // columns of a card kept by the board's own saves while the card's JSON stays as it was.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -49,8 +49,8 @@ async function workspace(): Promise<{ ws: string; w: WS }> {
 const scope = { project: 'p', key: 'P' }
 type Store = import('../src/main/workflow/factStore').FactStore
 const factsOf = (s: Store, card: number): string[] => s.facts(card).map((f) => f.kind)
-const actionsOf = (ws: string): { id: number; kind: string; state: string; delivered: string | null }[] =>
-  store.workspaceDb(ws).reader.prepare('SELECT id, kind, state, delivered FROM card_actions ORDER BY id').all() as { id: number; kind: string; state: string; delivered: string | null }[]
+const actionsOf = (ws: string): { id: number; kind: string; state: string }[] =>
+  store.workspaceDb(ws).reader.prepare('SELECT id, kind, state FROM card_actions ORDER BY id').all() as { id: number; kind: string; state: string }[]
 
 describe('the facts step (#1215)', () => {
   it('is in the 1.0 group after the cards step, and a new board has its tables', async () => {
@@ -103,34 +103,60 @@ describe('the fact store in hive.db (#1215)', () => {
     expect(factsOf(facts, card)).toEqual(['Moved'])
     expect(facts.card(card)).toMatchObject({ stage: 'active', category: 'doing' })
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
-    // The worker starts once the change has committed.
-    await vi.waitFor(() => expect(actionsOf(ws)).toMatchObject([{ kind: 'notice', state: 'done' }]), HUNG_MS)
-    expect(ran).toHaveLength(1)
+    // The worker starts once the change has committed (a notice is claimed, done, before it runs).
+    await vi.waitFor(() => expect(ran).toHaveLength(1), HUNG_MS)
+    expect(actionsOf(ws)).toMatchObject([{ kind: 'notice', state: 'done' }])
     await worker.runActions(w)
     expect(ran).toHaveLength(1)
   })
 
-  it('a restart runs the actions a crash left pending, once; one delivered but not marked is marked, not run again', async () => {
+  it('a restart runs a claimed action a crash left pending, once; one claimed before the crash is not run again (#1266)', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Crashed', project: 'p' }, user))).number
     // Written by another Hive's connection (no worker there runs them): left pending, as a crash right after the commit.
     const other = FactStore.open(store.boardFile(ws), scope)
     stores.push(other)
     const [first, second] = other.tx((tx) => [tx.action(card, 'notice', { n: 1 }, null), tx.action(card, 'notice', { n: 2 }, null)])
-    // The second's delivery was recorded, and Hive ended before it was marked.
-    expect(other.deliver({ action: second, kind: 'notice', target: '', payload: { n: 2 } })).toBe(true)
-    expect(actionsOf(ws).map((a) => a.state)).toEqual(['pending', 'pending'])
+    // The second was claimed (marked done before its effect), and Hive ended before its effect: at most once, never again.
+    other.markAction(second, 'done')
     const ran: unknown[] = []
     worker.onAction('notice', (a) => void ran.push(a.payload.n))
-    // At start (the workspace opened), and again: each runs once.
+    // At start (the workspace opened), and again: each runs once at most.
     await worker.runActions(w)
     await worker.runActions(w)
     expect(ran).toEqual([1])
     expect(actionsOf(ws)).toMatchObject([{ id: first, state: 'done' }, { id: second, state: 'done' }])
-    expect(other.deliveries().map((d) => d.action)).toEqual([first, second])
   })
 
-  it('two runs at once, as two Hives would: each action delivered once', async () => {
+  it('a delivered action runs again until it is marked: after a crash between its delivery and its mark, its handler runs again and finds its delivery (#1266)', async () => {
+    const { ws, w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Delivered', project: 'p' }, user))).number
+    const other = FactStore.open(store.boardFile(ws), scope)
+    stores.push(other)
+    const [first, second] = other.tx((tx) => [tx.action(card, 'wake', { n: 1 }, null), tx.action(card, 'wake', { n: 2 }, null)])
+    // A stand-in for deliveries: the second's was made before the crash, its action not yet marked.
+    const made = new Set<number>([second])
+    const runs: number[] = []
+    const delivered: number[] = []
+    worker.onAction(
+      'wake',
+      (a) => {
+        runs.push(a.id)
+        if (!made.has(a.id)) delivered.push(a.id)
+        made.add(a.id)
+      },
+      'delivered'
+    )
+    expect(actionsOf(ws).map((a) => a.state)).toEqual(['pending', 'pending'])
+    await worker.runActions(w)
+    await worker.runActions(w)
+    // Each pending one ran once more, the second finding its delivery made; then marked, never run again.
+    expect(runs).toEqual([first, second])
+    expect(delivered).toEqual([first])
+    expect(actionsOf(ws)).toMatchObject([{ id: first, state: 'done' }, { id: second, state: 'done' }])
+  })
+
+  it('two runs at once, as two Hives would: each claimed action runs once', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Twice', project: 'p' }, user))).number
     const other = FactStore.open(store.boardFile(ws), scope)
@@ -140,8 +166,22 @@ describe('the fact store in hive.db (#1215)', () => {
     worker.onAction('notice', async (a) => void ran.push(a.payload.n))
     await Promise.all([worker.runActions(w), worker.runActions(w)])
     expect(ran).toEqual([1, 2, 3])
-    // The other Hive running them again (its own runtime's runner): every delivery is already there.
-    for (const a of other.pendingActions()) expect(other.deliver({ action: a.id, kind: a.kind, target: '', payload: a.payload })).toBe(false)
+    expect(actionsOf(ws).map((a) => a.state)).toEqual(['done', 'done', 'done'])
+  })
+
+  it("the runtime's own executor (tests/workflow) records a delivery once, by its action's id in deliveries (#1266)", async () => {
+    const { ws, w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Runtime', project: 'p' }, user))).number
+    const other = FactStore.open(store.boardFile(ws), scope)
+    stores.push(other)
+    const id = other.tx((tx) => tx.action(card, 'wake', { agent: 'r1' }, null))
+    expect(other.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(true)
+    // Again (a restart, another Hive's runner): the unique row is there.
+    const again = FactStore.open(store.boardFile(ws), scope)
+    stores.push(again)
+    expect(again.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(false)
+    expect(again.deliveries()).toEqual([{ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } }])
+    expect((store.workspaceDb(ws).reader.prepare('SELECT count(*) AS n FROM deliveries WHERE action = ?').get(id) as { n: number }).n).toBe(1)
   })
 
   it('two Hives (two connections) observing one transition write it once; the loser reads what is there', async () => {
@@ -339,16 +379,16 @@ describe('the fact store, owned writes and one snapshot (#1215 round 1)', () => 
     await worker.runActions(w)
     expect(openWhileRunning).toBe(false)
     expect(store.boardOpen(ws)).toBe(false)
-    // Its delivery recorded before the switch, its mark left for its next run there.
+    // Claimed before the switch (done: at most once, never run again there).
     const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
     try {
-      expect({ ...(raw.prepare('SELECT state, delivered IS NOT NULL AS delivered FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending', delivered: 1 })
+      expect({ ...(raw.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done' })
     } finally {
       raw.close()
     }
     // And the workspace it switched to is untouched.
     const there = store.workspaceDb(other).reader
-    expect({ ...(there.prepare('SELECT state, delivered FROM card_actions WHERE id = ?').get(otherId) as object) }).toEqual({ state: 'pending', delivered: null })
+    expect({ ...(there.prepare('SELECT state FROM card_actions WHERE id = ?').get(otherId) as object) }).toEqual({ state: 'pending' })
   })
 
   it('the worker stops when its workspace closes while it waits for the board: nothing opened or written', async () => {
@@ -379,7 +419,7 @@ describe('the fact store, owned writes and one snapshot (#1215 round 1)', () => 
     expect(store.boardOpen(ws)).toBe(false)
     const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
     try {
-      expect({ ...(raw.prepare('SELECT state, delivered FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending', delivered: null })
+      expect({ ...(raw.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'pending' })
     } finally {
       raw.close()
     }
@@ -398,10 +438,10 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
     own.close()
     return ids
   }
-  const statesIn = (ws: string): { id: number; state: string; delivered: number }[] => {
+  const statesIn = (ws: string): { id: number; state: string }[] => {
     const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
     try {
-      return (raw.prepare('SELECT id, state, delivered IS NOT NULL AS delivered FROM card_actions ORDER BY id').all() as { id: number; state: string; delivered: number }[]).map((r) => ({ ...r }))
+      return (raw.prepare('SELECT id, state FROM card_actions ORDER BY id').all() as { id: number; state: string }[]).map((r) => ({ ...r }))
     } finally {
       raw.close()
     }
@@ -416,7 +456,7 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
     // The first claim's commit closes the workspace (a listener of that commit, as anything after a change may).
     const off = store.onBoardCommitted(() => {
       if (closing || !store.boardOpen(ws)) return
-      const claimed = store.workspaceDb(ws).reader.prepare('SELECT 1 FROM card_actions WHERE id = ? AND delivered IS NOT NULL').get(first)
+      const claimed = store.workspaceDb(ws).reader.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'done'").get(first)
       if (claimed) closing = w.close()
     })
     try {
@@ -428,10 +468,10 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
     expect(closing).not.toBeNull()
     expect(ran).toEqual([])
     expect(store.boardOpen(ws)).toBe(false)
-    // Its delivery recorded (at most once: it isn't run again), the other untouched.
+    // Claimed (at most once: it isn't run again), the other untouched.
     expect(statesIn(ws)).toEqual([
-      { id: first, state: 'pending', delivered: 1 },
-      { id: first + 1, state: 'pending', delivered: 0 }
+      { id: first, state: 'done' },
+      { id: first + 1, state: 'pending' }
     ])
   })
 
@@ -457,11 +497,11 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
     await worker.runActions(w)
     await second$
     expect(w2).not.toBeNull()
-    // The first ran once (its delivery recorded, then marked by the run that took over); the second ran in the new window.
+    // The first ran once (claimed before it ran); the second ran in the new window.
     expect(ran).toEqual([first, second])
     expect(statesIn(ws)).toEqual([
-      { id: first, state: 'done', delivered: 1 },
-      { id: second, state: 'done', delivered: 1 }
+      { id: first, state: 'done' },
+      { id: second, state: 'done' }
     ])
   })
 

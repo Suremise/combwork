@@ -129,22 +129,6 @@ export async function cardBatch<T>(ws: WorkspaceService, fn: () => Promise<T>): 
   return boardWrite(ws, fn)
 }
 
-/** A card loop's handoff (#405): a card arrived in Review (moved or returned there), or its review gave a verdict. */
-export interface LoopEvent {
-  ws: WorkspaceService
-  card: TaskCard
-  kind: 'review' | 'verdict'
-  /** Who made the change. */
-  actor: TaskActor
-}
-let loopEvents: ((e: LoopEvent) => void) | null = null
-/** Told of each loop handoff once its change is saved (loopWakes.ts wakes the card's reviewer or builder). */
-export function onLoopEvent(fn: (e: LoopEvent) => void): void {
-  loopEvents = fn
-}
-/** History lines that bring a card into Review: moved there (to its top, bottom or before a card), or returned there for its next round. */
-const INTO_REVIEW = new Set<string>([HISTORY.moved.id, HISTORY.movedTop.id, HISTORY.movedBottom.id, HISTORY.movedBefore.id])
-const intoReview = (s: StoredText): boolean => s.id === HISTORY.returned.id || (INTO_REVIEW.has(s.id) && s.values?.column === 'review')
 
 /** A card as saved, with anything missing or of the wrong type made safe (a card from an older Hive or an export may lack fields). */
 function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?: ProjectIdIndex, key?: string): TaskCard {
@@ -1027,7 +1011,6 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
   const ws = workspace
   const by = actorName(actor)
   const comment = opts.comment === undefined ? null : commentText(opts.comment)
-  let handoff: LoopEvent['kind'] | null = null
   // Moved into Done: merged, a fact for the Assistant's journal (#1031) once it is saved.
   let intoDone = false
   const result = await (async () => {
@@ -1186,19 +1169,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // see the card as it was before this change.
     opts.commit?.()
     await saveCard(ws, n, card, before)
-    handoff = said.some((x) => x.id === HISTORY.reviewPassed.id || x.id === HISTORY.reviewFailed.id) ? 'verdict' : said.some(intoReview) ? 'review' : null
     return card
   })()
   changed(ws)
-  if (handoff) {
-    try {
-      // Once the change is saved (#1017: its transaction commits), outside it: its wake reads the card as saved.
-      const kind = handoff
-      afterBoardWrite(ws, () => loopEvents?.({ ws, card: result, kind, actor }))
-    } catch (e) {
-      log.warn('a loop handoff', e)
-    }
-  }
   if (intoDone) afterBoardWrite(ws, () => journalFact(ws, { summary: `#${n} "${result.title}" is Done (merged), moved there by ${by}`, project: result.project || null, links: [{ type: 'card', ref: String(n) }], tags: ['done'] })) // i18n-ignore: a journal fact (the Assistant's, English)
   return result
 }

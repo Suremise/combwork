@@ -144,6 +144,14 @@ interface HiveMessageValues {
   'service.transcripts.noTool': undefined
   'service.transcripts.none': undefined
   'service.workflow.closed': undefined
+  'service.workflowNotice.blocked': { card: string | number; reason: string | number }
+  'service.workflowNotice.blockedNoReason': { card: string | number }
+  'service.workflowNotice.failed': { card: string | number }
+  'service.workflowNotice.forYou': { card: string | number }
+  'service.workflowNotice.lane': { lane: string | number }
+  'service.workflowNotice.mergeDue': undefined
+  'service.workflowNotice.mergeStalled': undefined
+  'service.workflowNotice.stalled': { card: string | number }
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }

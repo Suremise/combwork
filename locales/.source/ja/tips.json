@@ -158,6 +158,8 @@
   "tips.inboxNotices.title": "Messages reach a busy agent between steps",
   "tips.keepAwake.text": "While an agent works, Hive stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
   "tips.keepAwake.title": "Leave agents working, the PC stays awake",
+  "tips.laneNotices.text": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
+  "tips.laneNotices.title": "Hear how a lane goes, without the Assistant",
   "tips.language.text": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Hive in your language",
   "tips.leftoverProcesses.text": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Hive lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
