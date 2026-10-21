@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { parse as parseToml } from 'smol-toml'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
@@ -278,18 +279,80 @@ describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP server
     expect(off()).toBe(false)
   })
 
-  it("Hive's hive server wins over a native one of that name, whose tool lists would filter it (it merges key by key)", async () => {
-    nativeConfig('[mcp_servers.hive]\ncommand = "node"\nargs = ["native.js"]\nenabled = false\nenabled_tools = ["only_this"]\ndisabled_tools = ["hive_notify"]\nstartup_timeout_sec = 5\n')
-    for (const isolation of [true, false]) {
-      await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
-      const t = hiveTable(context())!
-      expect(t).toContain('enabled=true')
-      expect(t).toContain(`enabled_tools=[${HIVE_TOOLS.map((n) => `"${n}"`).join(',')}]`)
-      expect(t).toContain('disabled_tools=[]')
-      expect(t).toContain('args=["hive-mcp.js"]')
+})
+
+// Codex merges Hive's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
+// each key a native one sets gets Hive's value, whatever the isolation switch, in the user's config or the project's.
+describe("Codex: Hive's hive server over a native one of that name", () => {
+  const homeBefore = process.env.CODEX_HOME
+  // A new Codex home (and project) per case: config files are read by their modification time.
+  let n = 0
+  const where = (place: 'home' | 'project', toml: string): LaunchContext => {
+    const root = join(base, `native-${++n}`)
+    process.env.CODEX_HOME = join(root, 'codex-home')
+    const cwd = join(root, 'proj')
+    const dir = place === 'home' ? process.env.CODEX_HOME : join(cwd, '.codex')
+    mkdirSync(dir, { recursive: true })
+    mkdirSync(cwd, { recursive: true })
+    writeFileSync(join(dir, 'config.toml'), `[mcp_servers.hive]\n${toml}`)
+    return context({ cwd })
+  }
+  afterEach(() => {
+    process.env.CODEX_HOME = homeBefore
+  })
+  /** Hive's hive table as Codex is given it. */
+  const table = (ctx: LaunchContext): Record<string, any> => {
+    const arg = codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.hive='))!
+    return parseToml(`hive = ${arg.slice('mcp_servers.hive='.length)}`).hive as Record<string, any>
+  }
+  const places = ['home', 'project'] as const
+
+  it('its tool lists and its off switch: all of Hive’s tools shown, on, isolation on and off', async () => {
+    for (const isolation of [true, false])
+      for (const place of places) {
+        await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
+        const t = table(where(place, 'command = "node"\nargs = ["native.js"]\nenabled = false\nenabled_tools = ["only_this"]\ndisabled_tools = ["hive_notify"]\n'))
+        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['hive-mcp.js'], enabled: true, enabled_tools: [...HIVE_TOOLS], disabled_tools: [] })
+      }
+  })
+
+  it('how it starts: the session’s folder, Codex’s default startup timeout, not required, its environment emptied', () => {
+    for (const place of places) {
+      const ctx = where(place, 'command = "node"\ncwd = "Z:/does-not-exist"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\nrequired = true\nenv = { NODE_OPTIONS = "--inspect", HIVE_API_URL = "http://elsewhere" }\nenv_vars = ["SECRET"]\n')
+      expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 10, startup_timeout_ms: 10000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
     }
-    expect(outrankNativeHive([join(home(), 'config.toml')])).toEqual({ enabled_tools: [...HIVE_TOOLS], disabled_tools: [] })
-    expect(outrankNativeHive([join(home(), 'missing.toml')])).toEqual({})
+    // Hive's own env stays Hive's (here the context's server has none to set).
+    const own = outrankNativeHive([], { env: { HIVE_PROJECT: 'p' } }, 'all', 'C:\\p')
+    expect(own).toEqual({})
+  })
+
+  it("its approvals: Hive's for every tool it names, Codex's own policy (auto) for the rest", async () => {
+    const native = 'command = "node"\ndefault_tools_approval_mode = "approve"\ntools = { hive_write_shared_note = { approval_mode = "approve" }, hive_list_tasks = { approval_mode = "prompt" } }\n'
+    for (const place of places) {
+      // An agent: everything approved, the native per-tool "prompt" too.
+      expect(table(where(place, native)), place).toMatchObject({ default_tools_approval_mode: 'approve', tools: { hive_write_shared_note: { approval_mode: 'approve' }, hive_list_tasks: { approval_mode: 'approve' } } })
+      // The Assistant: its trusted tools approved, the native blanket and per-tool approvals of the rest taken back.
+      const a = table({ ...where(place, native), trustedHiveTools: ['hive_list_tasks'] })
+      expect(a, place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_list_tasks: { approval_mode: 'approve' }, hive_write_shared_note: { approval_mode: 'auto' } } })
+      // An Assistant trusted with nothing: nothing approved.
+      expect(table({ ...where(place, native), trustedHiveTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_write_shared_note: { approval_mode: 'auto' }, hive_list_tasks: { approval_mode: 'auto' } } })
+    }
+    // The switch off: nothing approved, for an agent either.
+    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    expect(table(where('home', native))).toMatchObject({ default_tools_approval_mode: 'auto', tools: { hive_write_shared_note: { approval_mode: 'auto' }, hive_list_tasks: { approval_mode: 'auto' } } })
+  })
+
+  it('an HTTP one: refused, saying which file to rename it in (Codex itself would refuse the mix)', () => {
+    for (const place of places)
+      for (const http of ['url = "http://127.0.0.1:1/native"', 'bearer_token_env_var = "TOKEN"', 'http_headers = { X = "y" }']) {
+        const ctx = where(place, `${http}\n`)
+        const file = place === 'home' ? join(process.env.CODEX_HOME!, 'config.toml') : join(ctx.cwd, '.codex', 'config.toml')
+        expect(() => codex.buildCommand('C:\\bin\\codex.exe', ctx), `${place}: ${http}`).toThrow(`Your Codex config has an MCP server named hive, reached over HTTP (${file}).`)
+      }
+  })
+
+  it('none: nothing added', () => {
+    expect(outrankNativeHive([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
   })
 })
 
