@@ -340,7 +340,7 @@ const prose = (seed, n) => {
   check("no change while Change settings is off: the tool isn't offered", !offered && !toolDescription('hive_update_setting', 'assistant') && (await inv('settings:get')).sessions.transcriptWarnMB === 20)
   await inv('settings:update', { assistant: { changeSettings: true } })
   const changed = measure('hive_update_setting', tool('hive_update_setting', { id: 'sessions.transcriptWarnMB', value: 50 }, 'assistant+settings'), 400)
-  check('a change: old → new, and that the user can revert it', changed.startsWith('Changed Settings → Sessions → Warn when a transcript is over (sessions.transcriptWarnMB): 20 → 50. It applies now.'), changed)
+  check('a change: old → new, and that the user can undo it', changed.startsWith('Changed Settings → Sessions → Warn when a transcript is over (sessions.transcriptWarnMB): 20 → 50. It applies now.'), changed)
   // A table keeping its size: the reply says what changed in it, not "nothing changed".
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)

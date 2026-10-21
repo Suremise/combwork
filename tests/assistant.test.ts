@@ -159,7 +159,8 @@ describe('control', () => {
       expect(rules).toMatch(/never edit or create project files/)
       expect(rules).toMatch(/Never interrupt a working agent, answer a question an agent is asking the user/)
       expect(rules).toMatch(/worktree only if the user asked/)
-      expect(rules).toMatch(/30 changes per message/)
+      // No count of changes per message (#1170): undo, not a cap, protects the board.
+      expect(rules).not.toMatch(/changes per message/)
       // How to work within them is the coordinate-agents skill's.
       expect(rules).toMatch(/coordinate-agents skill/)
     }

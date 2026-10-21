@@ -73,7 +73,6 @@ export function publicReason(status: number | undefined): string {
   if (status === 403) return 'Not allowed'
   if (status === 404) return 'Not found'
   if (status === 409) return 'Not possible now'
-  if (status === 429) return 'Over the limit of changes for one message'
   return 'Failed'
 }
 
