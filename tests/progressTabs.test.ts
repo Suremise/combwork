@@ -135,3 +135,15 @@ describe('the Progress panel tabs (#1309)', () => {
     expect(latestRunOf([older], 5)).toBeNull()
   })
 })
+
+describe("Pulse's runs (#1309, the Assistant's change)", () => {
+  it('runs in progress, and one just ended for a few seconds, failed or passed; then only in Runs; a dismissed one never', async () => {
+    const { onPulse, PASSED_SHOWN_MS } = await import('../src/shared/progress')
+    expect(onPulse({ state: 'running', dismissed: false, finishedAt: null }, NOW)).toBe(true)
+    expect(onPulse({ state: 'stale', dismissed: false, finishedAt: null }, NOW)).toBe(true)
+    expect(onPulse({ state: 'failed', dismissed: false, finishedAt: NOW - 1000 }, NOW)).toBe(true)
+    expect(onPulse({ state: 'failed', dismissed: false, finishedAt: NOW - PASSED_SHOWN_MS }, NOW)).toBe(false)
+    expect(onPulse({ state: 'passed', dismissed: false, finishedAt: NOW - PASSED_SHOWN_MS - 1 }, NOW)).toBe(false)
+    expect(onPulse({ state: 'failed', dismissed: true, finishedAt: NOW - 1000 }, NOW)).toBe(false)
+  })
+})

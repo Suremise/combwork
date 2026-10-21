@@ -2454,7 +2454,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   that fold to icons below about 360 px (a container query on the panel), a tablist (arrow keys, Home, End), the tab
   kept per workspace. Badges: agents waiting for a merge slot, lanes, and in red the **unresolved failures** (a failed
   run with no later run of the same thing, a card's check or a command, that passed; dismissing doesn't resolve one).
-  Pulse lays out top to bottom with nothing pinned: the merge, the runs going on, a line for the unresolved failures
+  Pulse lays out top to bottom with nothing pinned and holds no finished runs (the Assistant for Darren, 21 Oct: a run
+  that ended stays a few seconds, then lives in Runs): the merge, the runs going on, a line for the unresolved failures
   (it opens Runs on them), then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
   every kept run by day, the same thing's runs on a day folded into one line ("AL-12 cardwork ×4 · 2 failed, then
   passed"), with search and filters (failures, a lane's cards, an agent). Merges and Lanes show theirs alone. #1228's

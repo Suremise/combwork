@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { ALL_PROJECTS, SHOW_ALL, activeFilter, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isListed, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
+import { ALL_PROJECTS, PASSED_SHOWN_MS, SHOW_ALL, activeFilter, onPulse, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -126,7 +126,7 @@ export function ProgressPanel() {
   const anyOpen = runs.some(isOpenRun)
   // Once a second while something runs or is about to fold into Recent (a passed run, a failure just seen), else now
   // and then.
-  const folding = runs.some((r) => !r.dismissed && (r.state === 'passed' || r.state === 'stopped' || r.seenAt !== null))
+  const folding = runs.some((r) => !r.dismissed && (r.state === 'passed' || r.state === 'stopped' || r.seenAt !== null || (r.finishedAt !== null && Date.now() - r.finishedAt < PASSED_SHOWN_MS)))
   const now = useNow(anyOpen || folding ? 1000 : 30000)
   const unseen = runs.some(unseenTrouble)
   // Looking at the open panel counts as seeing what failed or went stale: the taskbar's and the strip's red clear,
@@ -142,7 +142,8 @@ export function ProgressPanel() {
   const shown = filterRuns(runs, filter)
   const filterName = filter === SHOW_ALL ? null : `${choices.find((c) => c.value === filter.project)?.label ?? ''}${filter.agent ? ` · ${(shown[0] ? runAgentName(shown[0], tr) : '')}` : ''}`
   if (!open) return <ProgressRail runs={shown.filter((r) => inStrip(r, now))} filtered={filterName ? { name: filterName, all: runs.filter((r) => inStrip(r, now)).length } : null} />
-  const listed = shown.filter((r) => isListed(r, now))
+  // Pulse holds the runs in progress, and one just ended for a few seconds (#1309): finished runs live in Runs.
+  const listed = shown.filter((r) => onPulse(r, now))
   // The merges and lanes of the project (and agent) the runs are filtered to, or of every project (#810).
   const merging = filterMergeSlots(slots, filter)
   const shownLanes = filter.project === ALL_PROJECTS ? lanes : lanes.filter((l) => l.project.toLowerCase() === filter.project && (!filter.agent || l.builder.agentId === filter.agent || l.reviewer?.agentId === filter.agent))

@@ -49,6 +49,17 @@ export function isListed(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedA
   return r.seenAt === null || now - r.seenAt < PASSED_SHOWN_MS
 }
 
+/**
+ * Whether a run shows on Pulse (#1309, the Assistant's change): a run in progress (running, or stopped reporting and not
+ * yet ended), and one that just ended, failed or passed, for a few seconds; then only in Runs (Pulse's line counts the
+ * failures). A dismissed one never.
+ */
+export function onPulse(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedAt'>, now: number): boolean {
+  if (r.dismissed) return false
+  if (isOpenRun(r)) return true
+  return r.finishedAt !== null && now - r.finishedAt < PASSED_SHOWN_MS
+}
+
 /** Whether a run has a bar in the folded strip: listed, and not a failure (or stall) the user has already seen. */
 export function inStrip(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedAt' | 'seenAt'>, now: number): boolean {
   return isListed(r, now) && !((r.state === 'failed' || r.state === 'stale') && r.seenAt !== null)

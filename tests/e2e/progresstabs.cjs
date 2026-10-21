@@ -163,6 +163,10 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     check('…and the run going on', !!(await until(async () => (await panel.locator(`.progress-tab-pulse .progress-run[data-run="${e2e}"]`).count()) === 1, HUNG_MS)))
     const attention = panel.locator('.progress-attention')
     check('…and a line: 3 runs failed', !!(await until(async () => ((await attention.textContent()) ?? '').includes('3 runs failed'), HUNG_MS)), await attention.textContent().catch(() => ''))
+    // Finished runs live in Runs (#1309, the Assistant's change): the failed lints leave Pulse after a few seconds, the
+    // line counting them; only the run going on stays.
+    const pulseRuns = () => panel.locator('.progress-tab-pulse .progress-run').evaluateAll((els) => els.map((e) => e.getAttribute('data-run')))
+    check('…and the failed runs leave Pulse: only the run going on is a card there', !!(await until(async () => JSON.stringify(await pulseRuns()) === JSON.stringify([e2e]), HUNG_MS)), JSON.stringify(await pulseRuns()))
     const dot = panel.locator('.progress-tab-pulse .lane-run-dot')
     check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'), HUNG_MS)) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
     const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()

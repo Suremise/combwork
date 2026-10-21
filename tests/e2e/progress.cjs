@@ -264,7 +264,6 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   })
   await rail.click()
   check('opening the panel (window focused) clears the red', !!(await until(async () => taskbar()?.mode === 'none', HUNG_MS)), JSON.stringify(taskbar()))
-  check('the failed run is still listed now it has been seen, with its summary', (await row2.locator('.progress-fail').count()) === 1 && /2 errors in src\/a\.ts/.test((await row2.textContent()) ?? ''))
   // Seen (#220): a few seconds later it leaves Pulse, as a passed run does, and Pulse says a run failed (#1309: nothing
   // passed since), a line that opens the Runs tab on the failures.
   const attention = panel.locator('.progress-attention')
@@ -487,7 +486,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('folded right after: the seen failure and stall have no bar in the strip', !!(await until(async () => (await rail.count()) === 1, HUNG_MS)) && (await rail.locator(`[data-run="${failedId}"], [data-run="${run3}"]`).count()) === 0)
   await rail.click()
   await until(async () => (await panel.count()) === 1, HUNG_MS)
-  await panel.locator(`.progress-run[data-run="${failedId}"] button[aria-label^="Dismiss"]`).click()
+  // The failure, ended a while ago, may have left Pulse already (#1309: a few seconds): dismissed as its button does.
+  await inv('progress:dismiss', failedId)
   await row3.locator('button[aria-label^="Dismiss"]').click()
   check('dismissing the stale run ends it: gone from status, the taskbar off, no more reports', !!(await until(async () => !(await call(workspaceToken, 'GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Alfie')?.progress && taskbar()?.mode === 'none', HUNG_MS)) && (await call(alfieToken, 'PATCH', `/v1/progress/${run3}`, { step: 1 })).status !== 200, JSON.stringify(taskbar()))
 
