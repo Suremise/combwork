@@ -942,9 +942,14 @@ export class WorkspaceService {
     return { workspace: p.workspace, scope: p.scope }
   }
 
-  /** A session host's records (#1061: in the workspace's database). */
-  async sessionsFile(projectPath: string): Promise<SessionsFile> {
-    return readSessions(await this.sessionsPlace(projectPath))
+  /**
+   * A session host's records (#1061: in the workspace's database). `signal`: the opening of the workspace they're read
+   * for (background work); once it's aborted nothing is read, so a closed workspace's database isn't opened again (#1379).
+   */
+  async sessionsFile(projectPath: string, signal?: AbortSignal): Promise<SessionsFile> {
+    const place = await this.sessionsPlace(projectPath)
+    signal?.throwIfAborted()
+    return readSessions(place, signal)
   }
 
   /** One of a host's session records by its id (#1211: read by its key, not with every record), or undefined. */

@@ -246,7 +246,9 @@ class UsageHistory {
       this.post(send, { type: 'config', ...(JSON.parse(cfg) as Omit<Extract<Body, { type: 'config' }>, 'type'>) }).catch((e) => log.warn('sending the usage worker its settings', e))
     }
     const answer = this.post(send, body) as Promise<T>
-    if ('file' in body && body.type !== 'close') void answer.finally(() => this.closeIfUnused(body.file)).catch(() => undefined)
+    // The file it opens: its own, or the one a read takes a session's saved state from.
+    const file = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
+    if (file) void answer.finally(() => this.closeIfUnused(file)).catch(() => undefined)
     return answer
   }
 
@@ -346,8 +348,9 @@ class UsageHistory {
     return this.enqueue<IngestResult>(`ingest|${projectPath.toLowerCase()}|${sessionId}`, o.priority, async () => {
       const ws = workspaceFor(projectPath)
       if (!ws?.path) return null
+      const life = ws.lifetime
       const { workspace, scope } = await ws.sessionScope(projectPath)
-      const rec = (await ws.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+      const rec = (await ws.sessionsFile(projectPath, life)).sessions.find((s) => s.id === sessionId)
       if (!rec) return null
       const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId).catch(() => null)
       const { holds, holdsKey } = await this.holdsFor(ws, projectPath, rec)
@@ -459,7 +462,8 @@ class UsageHistory {
    * use couldn't be recorded (the delete then keeps it).
    */
   async recordNow(projectPath: string, sessionId: string): Promise<boolean> {
-    const rec = (await workspaceFor(projectPath)?.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)
+    const ws = workspaceFor(projectPath)
+    const rec = (await ws?.sessionsFile(projectPath, ws.lifetime).catch(() => null))?.sessions.find((s) => s.id === sessionId)
     const r = await this.ingest(projectPath, sessionId, { priority: 0, keepState: 'no' })
     if (!r || r.status === 'busy' || r.status === 'failed') return false
     if (rec?.keptUsage) {
@@ -509,7 +513,7 @@ class UsageHistory {
       if (!this.live(ws, run)) return
       const known = new Map((await this.call<SessionId[]>({ type: 'ids', file, scope })).map((s) => [s.session, s]))
       if (!this.live(ws, run)) return
-      for (const rec of (await ws.sessionsFile(host)).sessions) {
+      for (const rec of (await ws.sessionsFile(host, run.life)).sessions) {
         const k = known.get(rec.id)
         if (k?.path) {
           const st = await stat(k.path).catch(() => null)
@@ -535,8 +539,9 @@ class UsageHistory {
     try {
       for (const host of await this.hosts(ws, run)) {
         if (!this.live(ws, run)) return
-        await sessions.compressIdleBackups(host).catch((e) => log.warn('compressing backups', e))
-        await sessions.applyRetention(host).catch((e) => log.warn('backup retention', e))
+        await sessions.compressIdleBackups(host, run.life).catch((e) => log.warn('compressing backups', e))
+        if (!this.live(ws, run)) return
+        await sessions.applyRetention(host, run.life).catch((e) => log.warn('backup retention', e))
       }
     } finally {
       this.housekeeping.delete(key)
@@ -612,7 +617,7 @@ class UsageHistory {
     const items: Item[] = []
     for (const host of await this.hosts(ws, opening)) {
       if (!this.live(ws, opening)) return
-      const f = await ws.sessionsFile(host)
+      const f = await ws.sessionsFile(host, opening.life)
       for (const rec of f.sessions) {
         items.push({
           at: rec.lastActiveAt ?? rec.createdAt ?? '',

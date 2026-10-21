@@ -190,8 +190,10 @@ async function opening(place: SessionsPlace): Promise<void> {
  * A host's records. The deleted lists are read when first used, from the database as it is then: most readers never
  * use them.
  */
-export async function readSessions(place: SessionsPlace): Promise<SessionsFile> {
+export async function readSessions(place: SessionsPlace, signal?: AbortSignal): Promise<SessionsFile> {
   await opening(place)
+  // Closed meanwhile: its board, closed with it, isn't opened again by this read (#1379).
+  signal?.throwIfAborted()
   if (upgradeWaiting(place.workspace)) return sessionsOf(readStore(place.workspace, 'sessions', place.scope))
   return fromTables(workspaceDb(resolve(place.workspace)).reader, place.scope)
 }

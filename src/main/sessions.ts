@@ -5174,23 +5174,27 @@ class SessionManager {
    * session's transcript (it can still be opened and resumed from there), and only once the usage history has what it
    * used. A session whose only copy is Hive's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
    * the user's (Delete, Clean Up). Running sessions and those whose files are moving are skipped; each is checked again
-   * with its backups locked, just before they go. Returns how many sessions' copies went.
+   * with its backups locked, just before they go. Returns how many sessions' copies went. `signal`: the workspace's
+   * opening it runs in (background housekeeping), ending it when the workspace closes (#1379).
    */
-  async applyRetention(projectPath: string): Promise<number> {
+  async applyRetention(projectPath: string, signal?: AbortSignal): Promise<number> {
     if (!retentionDays()) return 0
-    const recs = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
+    const recs = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions ?? []
     // Whether a session's copies may go, as things are now: the setting, its record's last activity, not running, with
     // backups, and the CLI still having it. Asked before, and again under its reservation and locks, then once more
     // after what it used is recorded (that waits), just before they go: any of it can change meanwhile.
     // The record is read last, and nothing is awaited between these checks and the copies going.
     const eligible = async (id: string): Promise<boolean> => {
-      if (!(await this.providerTranscript(projectPath, id).catch(() => null))) return false
-      const rec = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((r) => r.id === id)
+      const cfg = await workspace.projectConfig(projectPath).catch(() => null)
+      const records = cfg && (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions
+      if (!cfg || !records || !(await this.providerTranscript(projectPath, id, { records, cfg }).catch(() => null))) return false
+      const rec = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions.find((r) => r.id === id)
       const days = retentionDays()
       return !!rec && !!days && Date.now() - Date.parse(rec.lastActiveAt) > days * 86_400_000 && !this.liveAnywhere(id) && this.backupFiles(projectPath, id).length > 0
     }
     let n = 0
     for (const rec of recs) {
+      if (signal?.aborted) break
       const days = retentionDays()
       if (!days || Date.now() - Date.parse(rec.lastActiveAt) <= days * 86_400_000 || !(await eligible(rec.id))) continue
       try {
@@ -5214,13 +5218,15 @@ class SessionManager {
 
   /**
    * Compresses the backups of a host's sessions that ended before this Hive did it (#1110): one at a time, in the
-   * background, the oldest first; those running or active in the last ten minutes are left for their end.
+   * background, the oldest first; those running or active in the last ten minutes are left for their end. `signal`: as
+   * applyRetention's.
    */
-  async compressIdleBackups(projectPath: string): Promise<number> {
-    const recs = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
+  async compressIdleBackups(projectPath: string, signal?: AbortSignal): Promise<number> {
+    const recs = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions ?? []
     const idle = recs.filter((r) => Date.now() - Date.parse(r.lastActiveAt) > 10 * 60_000).sort((a, b) => (a.lastActiveAt < b.lastActiveAt ? -1 : 1))
     let n = 0
     for (const r of idle) {
+      if (signal?.aborted) break
       if (![false, true].some((archived) => existsSync(this.backupPath(projectPath, r.id, archived)))) continue
       await this.compressBackups(projectPath, r.id)
       n++
