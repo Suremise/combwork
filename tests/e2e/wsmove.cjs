@@ -182,10 +182,13 @@ async function launch() {
     // Repair from the dialog, Third recreated: everything but the worktree it couldn't find, and the copy that fails.
     await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
     const text = async () => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: now at/.test(await text()) && /wasn.t found/.test(await text()) && /Point 1 session/.test(await text()) && /Copy \d+ files? of Claude Code/.test(await text()), 10000)), await text())
-    const thirdLine = dialog.locator('li', { hasText: 'Third' })
-    await thirdLine.locator('button', { hasText: 'Recreate worktree' }).click()
-    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Recreate Third.s worktree on its branch hive\/ws\/alpha\/third/.test(await text()), 10000)), await text())
+    // A table (#1305): each row read as one sentence (its first cell's, for screen readers): What · Was · Now · Will do.
+    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: was [^;]*, now [^;]*; will git worktree repair/.test(await text()) && /Second.s worktree: was [^;]*; will recreate, locate or remove its link/.test(await text()) && /Sessions: was [^;]*, now [^;]*; will point 1 session/.test(await text()) && /Claude Code.s conversations and memory: was 2 folders; will copy \d+ files?; the old ones stay/.test(await text()), 10000)), await text())
+    check('…as a table, What · Was · Now · Will do', (await dialog.locator('.repair-plan thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|WILL DO', JSON.stringify(await dialog.locator('.repair-plan thead th').allInnerTexts()))
+    check('…the paths as their part that differs, the full path on hover', (await dialog.locator('.repair-plan tr', { hasText: 'Builder’s worktree' }).or(dialog.locator('.repair-plan tr', { hasText: "Builder's worktree" })).locator('.short-path[data-path]').first().getAttribute('data-path')).toLowerCase() === wt1.toLowerCase())
+    const thirdLine = dialog.locator('.repair-plan tr', { hasText: "Third's worktree" })
+    await thirdLine.getByRole('button', { name: 'Recreate worktree' }).click()
+    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Third.s worktree: was [^;]*; will recreate on hive\/ws\/alpha\/third/.test(await text()), 10000)), await text())
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-2-plan.png') })
     await dialog.locator('button', { hasText: /^Repair$/ }).click()
     check('…then what it did, with problems: the copy that failed, and the worktree still to locate', !!(await lib.until(async () => /with problems/.test(await text()) && /for Builder.s worktree couldn.t be copied/.test(await text()) && /Second.s worktree wasn.t found/.test(await text()), 20000)), await text())

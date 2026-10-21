@@ -143,54 +143,41 @@ interface HiveMessageValues {
   'workspace.mcpView.tryAsking': undefined
   'workspace.mcpView.whatItDoes': undefined
   'workspace.mcpView.whatItRuns': undefined
-  'workspace.move.board': undefined
+  'workspace.move.branchesBanner': { count: number }
   'workspace.move.cancel': undefined
   'workspace.move.cards': { count: number }
   'workspace.move.cardsBanner': { lines: string | number }
   'workspace.move.cardsLine': { total: number; what: string | number; from: string | number; to: string | number }
   'workspace.move.cardsOld': undefined
   'workspace.move.close': undefined
-  'workspace.move.copy': { count: number; provider: string | number; hasOf: string; of: string | number; to: string | number }
-  'workspace.move.copyNone': { provider: string | number; hasOf: string; of: string | number }
   'workspace.move.createButton': undefined
-  'workspace.move.createNew': { agent: string | number; branch: string | number; to: string | number }
-  'workspace.move.found': { agent: string | number; how: string; to: string | number; located: string }
   'workspace.move.fromWorkspace': { from: string | number }
-  'workspace.move.give': { what: string | number; from: string | number; hasCards: string; cards: string | number; to: string | number }
   'workspace.move.hide': undefined
-  'workspace.move.kept': { count: number; to: string | number; files: string | number; more: number }
   'workspace.move.lanes': { count: number }
   'workspace.move.leftToDo': undefined
   'workspace.move.locate': undefined
-  'workspace.move.missing': { agent: string | number; from: string | number; gone: string }
   'workspace.move.movedFromTo': { from: string | number; to: string | number }
   'workspace.move.nothing': undefined
-  'workspace.move.original': { agent: string | number }
   'workspace.move.owner': { owner: string; agent: string | number }
   'workspace.move.pending': { projects: string | number }
   'workspace.move.problems': undefined
   'workspace.move.projects': { count: number; name: string | number }
   'workspace.move.projectsMoved': undefined
-  'workspace.move.recent': { to: string | number }
-  'workspace.move.recreate': { agent: string | number; branch: string | number; to: string | number }
   'workspace.move.recreateButton': undefined
   'workspace.move.repair': undefined
   'workspace.move.repairButton': undefined
   'workspace.move.repaired': undefined
   'workspace.move.repairing': undefined
-  'workspace.move.sessions': { count: number }
   'workspace.move.stays': undefined
   'workspace.move.stillPoint': undefined
   'workspace.move.stopFirst': { agents: string | number }
   'workspace.move.title': undefined
   'workspace.move.undo': undefined
-  'workspace.move.unlink': { agent: string | number }
   'workspace.move.unlinkButton': undefined
   'workspace.move.unreadable': { count: number; files: string | number; more: number }
   'workspace.move.untouched': undefined
   'workspace.move.watches': { count: number }
   'workspace.move.working': undefined
-  'workspace.move.workingOn': { projects: string | number }
   'workspace.notes.delete': undefined
   'workspace.notes.select': undefined
   'workspace.overview.agentLabel': { project: string | number; agent: string | number }
@@ -329,6 +316,43 @@ interface HiveMessageValues {
   'workspace.removal.with': { which: string; handovers: number; cards: number }
   'workspace.removal.worktree': { agent: string | number; branch: string | number; hasError: string; error: string | number; ahead: number; dirty: number }
   'workspace.removal.worktrees': { count: number; how: string }
+  'workspace.repair.board': { from: string | number }
+  'workspace.repair.branch': { agent: string | number }
+  'workspace.repair.choose': { gone: string }
+  'workspace.repair.chooseShort': undefined
+  'workspace.repair.conversations': { provider: string | number }
+  'workspace.repair.copy': { count: number; stays: string }
+  'workspace.repair.createShort': undefined
+  'workspace.repair.folders': { count: number }
+  'workspace.repair.give': { what: string | number; hasCards: string; cards: string | number; to: string | number }
+  'workspace.repair.hideFolders': undefined
+  'workspace.repair.keptFiles': { count: number }
+  'workspace.repair.keptTip': { count: number; files: string | number; more: number }
+  'workspace.repair.listNew': undefined
+  'workspace.repair.markAgain': { projects: string | number }
+  'workspace.repair.notFound': undefined
+  'workspace.repair.nothingToCopy': undefined
+  'workspace.repair.now': undefined
+  'workspace.repair.original': undefined
+  'workspace.repair.point': { count: number }
+  'workspace.repair.recent': undefined
+  'workspace.repair.recreate': { exists: string; branch: string | number }
+  'workspace.repair.recreateShort': undefined
+  'workspace.repair.relink': { located: string }
+  'workspace.repair.rename': { remote: string }
+  'workspace.repair.sentence': { what: string | number; hasWas: string; was: string | number; hasNow: string; now: string | number; does: string | number }
+  'workspace.repair.sessions': undefined
+  'workspace.repair.showFolders': undefined
+  'workspace.repair.taken': undefined
+  'workspace.repair.unlink': undefined
+  'workspace.repair.unlinkShort': undefined
+  'workspace.repair.unreadableFiles': { count: number }
+  'workspace.repair.was': undefined
+  'workspace.repair.what': undefined
+  'workspace.repair.willDo': undefined
+  'workspace.repair.workingOn': undefined
+  'workspace.repair.workspaceGroup': undefined
+  'workspace.repair.worktree': { agent: string | number }
   'workspace.reuse.alreadyAt': { branch: string | number; base: string | number }
   'workspace.reuse.keptWork': { branch: string | number }
   'workspace.reuse.newTree': { branch: string | number; why: string | number }
