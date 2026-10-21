@@ -9,6 +9,7 @@ interface HiveMessageValues {
   'tasks.error.archiveNumbers': undefined
   'tasks.error.archived': { n: string | number }
   'tasks.error.badAnswer': { max: string | number }
+  'tasks.error.badKind': { kind: string | number }
   'tasks.error.batchGone': undefined
   'tasks.error.beforeArchived': { before: string | number; column: string; n: string | number }
   'tasks.error.beforeElsewhere': { before: string | number; other: string; column: string; n: string | number }
@@ -31,12 +32,15 @@ interface HiveMessageValues {
   'tasks.error.holdNew': undefined
   'tasks.error.inDoingWith': { n: string | number; agent: string | number; column: string }
   'tasks.error.inDoingWithAnother': { n: string | number; column: string }
+  'tasks.error.kindNeedsReason': undefined
+  'tasks.error.kindNotAgents': undefined
   'tasks.error.labelFieldList': { field: string | number }
   'tasks.error.labelsAddedAndRemoved': { labels: string | number }
   'tasks.error.labelsList': undefined
   'tasks.error.labelsMixed': undefined
   'tasks.error.needsTitle': undefined
   'tasks.error.noCard': { n: string | number }
+  'tasks.error.noKindProposal': { n: string | number; kind: string | number }
   'tasks.error.noWorkspace': undefined
   'tasks.error.notReviewing': { n: string | number }
   'tasks.error.onlyUserArchives': undefined
@@ -93,6 +97,7 @@ interface HiveMessageValues {
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
   'tasks.history.imported': { project: string | number; was: string | number }
+  'tasks.history.kind': { how: string; kind: string }
   'tasks.history.labels': { labels: string | number }
   'tasks.history.labelsAdded': { labels: string | number }
   'tasks.history.labelsAddedTakenOff': { added: string | number; removed: string | number }

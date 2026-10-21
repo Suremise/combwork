@@ -943,6 +943,10 @@
     "defaultMessage": "Your OK before merging",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
   },
+  "workflow.rule.card.kind": {
+    "defaultMessage": "A card's kind is set when it is made",
+    "description": "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a trial) from when it is made; changing it later is an exception the user makes (glossary: override)."
+  },
   "workflow.rule.done.contained": {
     "defaultMessage": "Hive checks the merge",
     "description": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5)."

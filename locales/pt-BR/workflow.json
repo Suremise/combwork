@@ -235,6 +235,7 @@
   "workflow.refused.why.userOk": "ele aguarda a aprovação antes do merge.",
   "workflow.roundChoice": "{choice, select, carryOn {Continuar} split {Dividir} accept {Aceitar com continuações} takeOver {Assumir} other {{choice}}}",
   "workflow.rule.approval.given": "Sua aprovação antes do merge",
+  "workflow.rule.card.kind": "O tipo de um cartão é definido quando ele é criado",
   "workflow.rule.done.contained": "O Hive verifica o merge",
   "workflow.rule.integrate.approved": "O trabalho é revisado antes do merge",
   "workflow.rule.integrate.checksPassed": "As verificações passam no resultado mesclado",

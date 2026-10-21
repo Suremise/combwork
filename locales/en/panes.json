@@ -711,6 +711,26 @@
     "defaultMessage": "process exited with code {code}",
     "description": "Written into a terminal (in grey, in brackets) when its process ends. {code} is the exit code, a number."
   },
+  "panes.terminal.osc52.askCopy": {
+    "defaultMessage": "Copy",
+    "description": "Button of the question when an agent's CLI asks to put text on the clipboard: puts it there."
+  },
+  "panes.terminal.osc52.askDont": {
+    "defaultMessage": "Don't Copy",
+    "description": "Button of the question when an agent's CLI asks to put text on the clipboard: leaves the clipboard as it is."
+  },
+  "panes.terminal.osc52.askMessage": {
+    "defaultMessage": "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:",
+    "description": "The question when an agent's CLI asks to put text on the clipboard; the text follows it. {n} is how many characters."
+  },
+  "panes.terminal.osc52.askMore": {
+    "defaultMessage": "…and {n, plural, one {# more character} other {# more characters}}",
+    "description": "Under the text an agent's CLI asks to put on the clipboard, when the question shows only its start. {n} is how many characters it leaves out."
+  },
+  "panes.terminal.osc52.askTitle": {
+    "defaultMessage": "Copy to the clipboard?",
+    "description": "Title of the question when an agent's CLI asks to put text on the clipboard (OSC 52) and Settings → Advanced says to ask first."
+  },
   "panes.terminal.pasteFailed": {
     "defaultMessage": "Could not paste image",
     "description": "An error's title: pasting a screenshot into an agent's terminal (saved as an attachment) failed."

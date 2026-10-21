@@ -1775,6 +1775,16 @@ No-code cards have no revision: a submission is a summary (its submission id is 
 queue. With review they finish when the review (and approval, if any) passes; without review, submit finishes them.
 Changing the kind later is the user's, recorded as an override.
 
+**Built (#1277).** The kind is the card's `kind` column. The user (the New Card dialog's **No code (a decision, a
+write-up, a trial…)**) and the Assistant (`kind` on `POST /v1/tasks` and `hive_create_task`) make a no-code card at
+once; a project agent's `kind: "no-code"` is only **proposed** (OP-7: a `KindProposed` fact, the card stays code): its
+tile marks it ("No code?") and its dialog asks **Confirm No Code** / **Keep as Code** (the Assistant: `confirmKind` on
+`PATCH /v1/tasks/{n}` and `hive_update_task`), answered by a `KindDecided` fact. Changed later, the user's change asks
+first (the rule *A card's kind is set when it is made*, `card.kind`; a reason; **Change Anyway**) and the Assistant's
+needs `override.reason`; either records one `Override` (`card.kind`); agents never change or answer it (`403`). The
+card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
+Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
+
 #### 16.7.4 Other moves
 
 [P1, answering HB3's round 1 finding 15]
@@ -2532,7 +2542,20 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.
-Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants) wait for Darren's choice (#1292).
+**Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
+- `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
+  shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in
+  `shared/terminalInput.ts`). A two-step palette shortcut: its first key starts the window's chord (so it no longer
+  reaches the CLI alone), its second completes it while the chord is pending; any other key then goes to the CLI and
+  ends the chord (HR4's round 1). Ctrl+C and Ctrl+V keep their own switch (row 24).
+- `hive.terminal.osc52` (a choice: `allow` as before, `ask`, `block`): what a CLI's OSC 52 clipboard write gets, of those
+  the gate takes (the pane in use, a valid payload of at most 1 MiB): written; shown to the user first, one question
+  at a time, a write meanwhile refused; or refused (`osc52Decision`). A read is never answered, whatever the policy.
+  The `choice` kind is Advanced's own (its values in advanced.json and the tools, their names in Settings' select).
+- `hive.prompt.rawCardStart` (off): on, a card started on an agent is its title, the user's note and its description
+  alone (`rawTaskPrompt`), without Hive's wrapper (its board name, dependencies, Read first, the skill to follow). Only
+  the card's start has a raw variant: wakes, deliveries and Hive's other prompts stay wrapped (Hive's protocol). The
+  leading-dash `Task:` guard of a first prompt passed as an argument stays: without it the CLI would read an option.
 
 **Group A's rows 1 and 7** (#1284; Darren's decision on #1120 point 3):
 - **Row 1, the CLI's own setting** (`shared/cliOwnMode.ts`): a permission choice every descriptor lists last

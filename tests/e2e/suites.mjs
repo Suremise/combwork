@@ -149,6 +149,7 @@ export const SUITES = [
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
   { name: 'narrowmain' },
+  { name: 'nocode' },
   { name: 'numbers' },
   { name: 'overview' },
   { name: 'packaged', needs: ['packaged'] },

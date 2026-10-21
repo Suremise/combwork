@@ -630,6 +630,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
+    'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
+    'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),

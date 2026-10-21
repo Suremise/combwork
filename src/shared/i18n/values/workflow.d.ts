@@ -237,6 +237,7 @@ interface HiveMessageValues {
   'workflow.refused.why.userOk': undefined
   'workflow.roundChoice': { choice: string }
   'workflow.rule.approval.given': undefined
+  'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined

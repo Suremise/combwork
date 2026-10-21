@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'tips.agentSettings.title': undefined
   'tips.agentStates.text': undefined
   'tips.agentStates.title': undefined
+  'tips.allKeysToCli.text': undefined
+  'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
   'tips.antivirus.text': undefined
@@ -216,6 +218,8 @@ interface HiveMessageValues {
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
   'tips.newCard.title': undefined
+  'tips.noCodeCards.text': undefined
+  'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
   'tips.overview.text': { key: string | number }

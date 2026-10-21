@@ -4,13 +4,14 @@ import type { DeliverySender } from '../shared/deliveries'
 import { projectAgents } from '../shared/defaults'
 import { deliverNow, launchWith, NotGiven } from './deliveries'
 import { msg } from '../shared/i18n'
-import { taskPrompt } from '../shared/tasks'
+import { rawTaskPrompt, taskPrompt } from '../shared/tasks'
 import type { TaskCard, TaskStartTarget } from '../shared/types'
 import { emit } from './events'
 import { addAgent, removeAgent } from './projectAgents'
 import { sessions } from './sessions'
 import { HiveError, hiveError, errorText } from './hiveError'
-import { forAgents, withValues } from '../shared/advanced'
+import { RAW_CARD_START, forAgents, withValues } from '../shared/advanced'
+import { advanced } from './advanced'
 import { getTask, setContextProblems, UNKNOWN_AGENT, updateTask, type TaskActor } from './tasks'
 import { createLogger, userText } from './logger'
 import { workspace, workspaceOf } from './workspace'
@@ -199,7 +200,7 @@ async function giveCard(
       const current = await setContextProblems(n, context.flatMap((l) => (l.problem ? [l.problem] : [])), { context: refs, project: card.project, agent: agentId, column: card.column })
       if (!current) throw hiveError(msg({ id: 'tasks.start.changed', defaultMessage: '#{n} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.', description: "An error: the card #{n} (a number) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it." }), { n }, { kind: 'conflict' })
     }
-    const prompt = taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context })
+    const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context })
     // Again now: the agent may have started work, or the user typed in it, while the card was taken.
     live = availability(p, agentId, agentName, actor).live
     // A task delivery (#649), given now or not at all: typed into a running agent (and while it is typed, an agent that

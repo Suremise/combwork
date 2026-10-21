@@ -235,6 +235,7 @@
   "workflow.refused.why.userOk": "espera la aprobación antes de fusionarse.",
   "workflow.roundChoice": "{choice, select, carryOn {Continuar} split {Dividirla} accept {Aceptar con seguimientos} takeOver {Encargarme yo} other {{choice}}}",
   "workflow.rule.approval.given": "Tu aprobación antes de fusionar",
+  "workflow.rule.card.kind": "El tipo de una tarjeta se fija al crearla",
   "workflow.rule.done.contained": "Hive comprueba la fusión",
   "workflow.rule.integrate.approved": "El trabajo se revisa antes de fusionarlo",
   "workflow.rule.integrate.checksPassed": "Las comprobaciones pasan en el resultado fusionado",

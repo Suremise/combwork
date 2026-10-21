@@ -215,6 +215,16 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
   const [draft, setDraft] = useState(shown(value))
   useEffect(() => setDraft(shown(value)), [value])
   if (def.kind === 'boolean') return <Switch checked={value === true} label={label} onChange={(v) => void onCommit(v).catch(() => undefined)} />
+  if (def.kind === 'choice')
+    return (
+      <select className="select" aria-label={label} value={typeof value === 'string' ? value : String(def.default)} onChange={(e) => void onCommit(e.target.value).catch(() => undefined)}>
+        {(def.choices ?? []).map((c) => (
+          <option key={c.value} value={c.value}>
+            {shownText(c.label)}
+          </option>
+        ))}
+      </select>
+    )
   if (def.kind === 'number')
     return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} unit={advancedUnit(def) ?? undefined} onCommit={(v) => onCommit(v)} />
   const commit = (): void => {

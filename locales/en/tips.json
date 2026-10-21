@@ -47,6 +47,14 @@
     "defaultMessage": "Read your agents at a glance",
     "description": "A tip's title."
   },
+  "tips.allKeysToCli.text": {
+    "defaultMessage": "In an agent's pane, Hive's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.allKeysToCli.title": {
+    "defaultMessage": "Give every key to the agent's CLI",
+    "description": "A tip's title."
+  },
   "tips.alwaysOnTop.text": {
     "defaultMessage": "The pin in the title bar (or Ctrl+Alt+O) keeps the window above your other apps, so a test run or an emulator can work underneath. Each window has its own, remembered for its workspace.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -858,6 +866,14 @@
   "tips.newCard.title": {
     "defaultMessage": "Jot down a card",
     "description": "A tip's title."
+  },
+  "tips.noCodeCards.text": {
+    "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
+  },
+  "tips.noCodeCards.title": {
+    "defaultMessage": "Cards with no code",
+    "description": "A tip's title (glossary: no-code card)."
   },
   "tips.off.message": {
     "defaultMessage": "Help → Tips… still has them, and Settings → General turns them back on.",
