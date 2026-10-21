@@ -353,6 +353,8 @@ interface HiveMessageValues {
   'tips.workflowOptions.title': undefined
   'tips.workspaceMoved.text': undefined
   'tips.workspaceMoved.title': undefined
+  'tips.workspaceMovedDefender.text': undefined
+  'tips.workspaceMovedDefender.title': undefined
   'tips.worktreeReuse.text': undefined
   'tips.worktreeReuse.title': undefined
   'tips.worktrees.text': undefined

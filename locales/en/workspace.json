@@ -1347,6 +1347,10 @@
     "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",
     "description": "Repair's plan, under the table: Defender hides its exclusion list without administrator rights."
   },
+  "workspace.repair.noneToMove": {
+    "defaultMessage": "nothing (no exclusion of Hive's)",
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)."
+  },
   "workspace.repair.notFound": {
     "defaultMessage": "not found",
     "description": "Repair's plan, the Now column: an agent's worktree wasn't found."
@@ -1378,6 +1382,10 @@
   "workspace.repair.recent": {
     "defaultMessage": "Open Recent",
     "description": "Repair's plan, the What column: File → Open Recent's entry for the workspace. Use the menu's name as shown."
+  },
+  "workspace.repair.recheck": {
+    "defaultMessage": "Repair's administrator prompt reads Defender's list again before it changes anything.",
+    "description": "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Hive's exclusions reads them again first."
   },
   "workspace.repair.recreate": {
     "defaultMessage": "{exists, select, yes {recreate on {branch}} other {create new on {branch}}}",

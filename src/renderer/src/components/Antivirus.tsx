@@ -75,6 +75,9 @@ const M = {
   dontAsk: msg({ id: 'workspace.antivirus.dontAsk', defaultMessage: 'Don’t Ask Again', description: "The suggestion's button: no more suggestions for this workspace." })
 }
 
+/** Where the states come from, as the panel says it; Repair's Defender rows say it the same way (#1302). */
+export const AV_SOURCE = { live: M.live, adminCheck: M.adminCheck }
+
 const antivirusLink = (c: React.ReactNode[]): React.ReactNode => <a onClick={showAntivirus}>{c}</a>
 
 /** One line saying what scans the workspace. */

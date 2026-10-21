@@ -440,8 +440,7 @@ export const DEV_DRIVE_URL = 'https://learn.microsoft.com/windows/dev-drive/'
 /**
  * Defender and a moved workspace (#1302): its old folders (where it and its worktrees were) and its new ones, each with
  * whether Defender skips it, and what Repair would change: Hive's own exclusions of the old folders removed (`remove`,
- * exact entries Hive added) and the same kinds of folder added for the new ones (`add`, only those Hive may offer and
- * not already excluded), in one administrator prompt. Exclusions the user made of the old folders (`theirs`) are only
+ * exact entries Hive added) and the new folders that would lose Hive's cover (`add`), in one administrator prompt. Exclusions the user made of the old folders (`theirs`) are only
  * named, never changed. Null fields when Defender isn't the active antivirus: there's nothing to move.
  */
 export interface AvMovePlan {
@@ -453,6 +452,12 @@ export interface AvMovePlan {
   old: AvPath[]
   now: AvPath[]
   remove: string[]
+  /**
+   * The new folders the move may exclude: the safe ones of a kind that had one of Hive's, and any one Hive's removed
+   * entries cover now (moved inside the old folder). Candidates, whatever they show now: the elevated run adds only
+   * those Defender's live list, once the removals are made, doesn't cover (so an administrator read gone stale, or the
+   * old exclusion covering the new folder, never leaves it scanned).
+   */
   add: string[]
   theirs: string[]
 }
@@ -460,7 +465,7 @@ export interface AvMovePlan {
 /**
  * The plan from a status read with the old folders among its paths (`oldPaths`, as given: they needn't exist any
  * more). Never broader than Hive's own: only the entries Hive added are removed, and only folders Hive may offer (not
- * unsafe: a drive, a share, the home folder…) of a kind that had one of Hive's are added.
+ * unsafe: a drive, a share, the home folder…) are added, and only where Hive's cover would otherwise be lost.
  */
 export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): AvMovePlan {
   const isOld = (p: AvPath): boolean => oldPaths.some((o) => normPath(o) === normPath(p.path))
@@ -473,10 +478,11 @@ export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): A
   // folder too, and isn't Hive's to remove nor the user's to be told about. With the list hidden, Hive's own count.
   const mine = old.filter((p) => p.addedByHive && (p.listed || p.state === 'added'))
   const moved = new Set(mine.map((p) => p.kind))
+  const remove = mine.map((p) => p.path)
   return {
     ...base,
-    remove: mine.map((p) => p.path),
-    add: now.filter((p) => moved.has(p.kind) && !p.unsafe && p.state !== 'excluded' && p.state !== 'added').map((p) => p.path),
+    remove,
+    add: now.filter((p) => !p.unsafe && (moved.has(p.kind) || covered(p.path, remove))).map((p) => p.path),
     theirs: old.filter((p) => !p.addedByHive && p.listed).map((p) => p.path)
   }
 }

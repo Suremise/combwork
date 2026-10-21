@@ -7,8 +7,9 @@ import { call } from '../api'
 import { cardLabelOf, get, set, useStore } from '../store'
 import { BusyButton, Icon, IconButton, Modal, Tooltip, useBusy } from './ui'
 import { ItemTable, ShortPath, type ItemGroup, type ItemRow } from './ItemTable'
-import { AV_STATE } from './Antivirus'
-import { KIND_LABEL, type AvMovePlan, type AvPath } from '@shared/antivirus'
+import { AV_SOURCE, AV_STATE } from './Antivirus'
+import { formatDateTime } from '@shared/dates'
+import { covered, KIND_LABEL, type AvMovePlan, type AvPath } from '@shared/antivirus'
 import { cx } from '../util'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
@@ -148,6 +149,8 @@ const T = {
   leaveExclusion: msg({ id: 'workspace.repair.leaveExclusion', defaultMessage: "leave Hive's exclusion as it is", description: "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked." }),
   theirs: msg({ id: 'workspace.repair.theirs', defaultMessage: 'yours: change it in Windows Security', description: "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown." }),
   nothingToDo: msg({ id: 'workspace.repair.nothingToDo', defaultMessage: 'nothing to do', description: "Repair's plan, the Will do column of a Defender row: the new folder is already excluded." }),
+  noneToMove: msg({ id: 'workspace.repair.noneToMove', defaultMessage: "nothing (no exclusion of Hive's)", description: "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)." }),
+  recheck: msg({ id: 'workspace.repair.recheck', defaultMessage: "Repair's administrator prompt reads Defender's list again before it changes anything.", description: "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Hive's exclusions reads them again first." }),
   scanned: msg({ id: 'workspace.repair.scanned', defaultMessage: 'nothing (Defender scans it)', description: "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder." }),
   moveBox: msg({ id: 'workspace.repair.moveBox', defaultMessage: "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)", description: "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt." }),
   addLater: msg({ id: 'workspace.repair.addLater', defaultMessage: 'Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.', description: "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown." }),
@@ -349,9 +352,11 @@ function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
     const was = d.old.find((p) => p.kind === kind)
     const now = d.now.find((p) => p.kind === kind)
     if (!was && !now) continue
-    const mine = !!was && d.remove.some((x) => x.toLowerCase() === was.path.toLowerCase())
-    const theirs = !!was && d.theirs.some((x) => x.toLowerCase() === was.path.toLowerCase())
-    const does = mine ? tr(moving ? T.moveExclusion : T.leaveExclusion) : theirs ? tr(T.theirs) : now?.state === 'excluded' || now?.state === 'added' ? tr(T.nothingToDo) : tr(T.scanned)
+    const is = (list: string[], p?: AvPath): boolean => !!p && list.some((x) => x.toLowerCase() === p.path.toLowerCase())
+    // Hive's exclusion moves for this kind: its old entry, or one of Hive's removed entries covering the new folder.
+    const mine = is(d.remove, was) || (!!now && is(d.add, now) && covered(now.path, d.remove))
+    const theirs = is(d.theirs, was)
+    const does = mine ? tr(moving ? T.moveExclusion : T.leaveExclusion) : theirs ? tr(T.theirs) : now?.state === 'excluded' || now?.state === 'added' ? tr(T.nothingToDo) : now?.state === 'not-excluded' ? tr(T.scanned) : tr(T.noneToMove)
     rows.push(
       planRow(`defender#${kind}`, {
         what: tr(KIND_LABEL[kind]),
@@ -448,7 +453,7 @@ export function MoveRepairDialog() {
       <button className="btn" onClick={close}>
         {tr(M.cancel)}
       </button>
-      <BusyButton className="primary" busy={action.busy === 'repair'} busyLabel={tr(M.repairing)} disabled={!plan || nothing || plan.running.length > 0 || action.busy === 'plan'} onClick={() => void repair()}>
+      <BusyButton className="primary" busy={action.busy === 'repair'} busyLabel={tr(M.repairing)} disabled={!plan || nothing || plan.running.length > 0 || action.busy === 'plan' || (!!plan.from && defender === undefined)} onClick={() => void repair()}>
         {tr(M.repairConfirm)}
       </BusyButton>
     </>
@@ -489,6 +494,14 @@ export function MoveRepairDialog() {
                   defender.now.some((p) => p.state === 'not-excluded') && <p className="hint">{tr(T.addLater)}</p>
                 )}
                 {defender.theirs.length > 0 && <p className="hint">{tr(T.theirsNote)}</p>}
+                {/* Where the states come from, as the Antivirus panel says it: a kept administrator read has its date. */}
+                {defender.exclusionsFrom === 'live' && <p className="hint">{tr(AV_SOURCE.live)}</p>}
+                {defender.exclusionsFrom === 'admin-check' && (
+                  <p className="hint">
+                    {tr(AV_SOURCE.adminCheck, { when: formatDateTime(defender.adminCheckedAt!) })}
+                    {defender.remove.length > 0 && ` ${tr(T.recheck)}`}
+                  </p>
+                )}
                 {!defender.exclusionsFrom && <p className="hint">{tr(T.needsAdmin)}</p>}
               </div>
             )}

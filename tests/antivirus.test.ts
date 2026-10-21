@@ -207,8 +207,26 @@ describe('antivirus: moving Hive’s exclusions with a moved workspace (#1302)',
     // Only the kinds Hive had: the workspace's exclusion moves, the worktrees (never Hive's) get nothing.
     const one = plan(probe({ exclusions: [OLD[0]] }), { added: [OLD[0]] })
     expect([one.remove, one.add]).toEqual([[OLD[0]], ['E:\\Work\\HIVE']])
-    // A new folder already excluded isn't added again.
-    expect(plan(probe({ exclusions: [...OLD, 'E:\\Work'] }), { added: OLD }).add).toEqual([])
+    // A new folder that shows excluded now is still a candidate: the elevated run adds only what its live list, once
+    // Hive's old entries are gone, doesn't cover (an administrator read may be stale, or the cover may be Hive's own).
+    expect(plan(probe({ exclusions: [...OLD, 'E:\\Work'] }), { added: OLD }).add).toEqual(['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'])
+  })
+
+  it('a workspace moved inside its old folder: the new folders Hive’s old entry covers are candidates, whatever their kind', () => {
+    // Hive excluded D:\Scratch; the workspace moved into D:\Scratch\Tools; the user excluded the old worktrees folder.
+    const old = ['D:\\Scratch', 'D:\\Scratch.worktrees']
+    const inside: typeof folders = [
+      { path: 'D:\\Scratch\\Tools', kind: 'workspace' },
+      { path: 'D:\\Scratch\\Tools.worktrees', kind: 'worktrees' },
+      { path: old[0], kind: 'workspace' },
+      { path: old[1], kind: 'worktrees' }
+    ]
+    const p = defenderMovePlan(status(probe({ exclusions: old }), { folders: inside, added: [old[0]] }), old)
+    // Excluded now only through the entry being removed: both new folders would be left scanned without them.
+    expect([p.now.map((x) => x.state), p.remove, p.add, p.theirs]).toEqual([['excluded', 'excluded'], [old[0]], ['D:\\Scratch\\Tools', 'D:\\Scratch\\Tools.worktrees'], [old[1]]])
+    // The run removes D:\Scratch and, with nothing left covering them, adds both.
+    const done = changeOutcome('move', { started: true }, { ok: true, requested: p.add, removing: p.remove, listed: true, exclusions: [old[1], ...p.add] })
+    expect(done).toMatchObject({ outcome: 'done', added: p.add, removed: p.remove, message: expect.stringContaining('1 removed, 2 added') })
   })
 
   it('leaves the user’s own exclusions alone: named when they are of an old folder itself, never removed', () => {
@@ -231,7 +249,7 @@ describe('antivirus: moving Hive’s exclusions with a moved workspace (#1302)',
     expect([p.exclusionsFrom, p.remove, p.add, p.theirs]).toEqual([null, OLD, ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'], []])
     // An administrator check read before the move is used as the Antivirus panel uses it.
     const checked = plan(probe(), { added: OLD, adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: [...OLD, 'E:\\Work\\HIVE.worktrees'] } })
-    expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.add]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['E:\\Work\\HIVE']])
+    expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.add]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees']])
   })
 
   it('nothing to move unless Defender is the active antivirus', () => {

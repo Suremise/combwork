@@ -338,6 +338,7 @@ interface HiveMessageValues {
   'workspace.repair.moveBox': { count: number }
   'workspace.repair.moveExclusion': undefined
   'workspace.repair.needsAdmin': undefined
+  'workspace.repair.noneToMove': undefined
   'workspace.repair.notFound': undefined
   'workspace.repair.nothingToCopy': undefined
   'workspace.repair.nothingToDo': undefined
@@ -346,6 +347,7 @@ interface HiveMessageValues {
   'workspace.repair.point': { count: number }
   'workspace.repair.readingDefender': undefined
   'workspace.repair.recent': undefined
+  'workspace.repair.recheck': undefined
   'workspace.repair.recreate': { exists: string; branch: string | number }
   'workspace.repair.recreateShort': undefined
   'workspace.repair.relink': { located: string }
