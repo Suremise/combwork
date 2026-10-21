@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomUUID } from 'crypto'
-import type { ActivityKind } from '../shared/assistantActivity'
+import { UNDO_FINAL, type ActivityKind } from '../shared/assistantActivity'
 import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, TaskCard } from '../shared/types'
 import type { LaneRecord } from '../shared/lanes'
 import { currentTurn, type AssistantTurn } from './assistantControl'
@@ -109,10 +109,11 @@ export const sameValue = (a: unknown, b: unknown): boolean => stable(a) === stab
 function finalsOf(before: TaskCard | null, after: TaskCard): string[] {
   if (!before) return []
   const out: string[] = []
-  if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push('A decision it recorded stays: only the user changes or removes decisions.') // i18n-ignore: why, in the Assistant's tool replies (English); the window words it from the kind
-  if (after.comments.length > before.comments.length) out.push("A comment stays: undo doesn't take back what was said.") // i18n-ignore: as above
-  if (after.order !== before.order && after.column === before.column) out.push("The card's place in its column isn't put back.") // i18n-ignore: as above
-  if (!sameValue(after.context ?? [], before.context ?? [])) out.push('The doc sections to read first stay as set.') // i18n-ignore: as above
+  // Why, in the Assistant's tool replies (English); the window words it from its code (finalWhys, #1283).
+  if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push(UNDO_FINAL.decision)
+  if (after.comments.length > before.comments.length) out.push(UNDO_FINAL.comment)
+  if (after.order !== before.order && after.column === before.column) out.push(UNDO_FINAL.cardPlace)
+  if (!sameValue(after.context ?? [], before.context ?? [])) out.push(UNDO_FINAL.context)
   return out
 }
 

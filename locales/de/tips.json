@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "Der Assistent führt dein Team",
   "tips.assistantToldWaiting.text": "Während der Assistent die Lanes beobachtet, weckt ihn ein Agent, der eine Berechtigungsabfrage zeigt oder dich etwas fragt, und er sagt dir, welcher Agent es ist, welche Karte und was gefragt wird. Er antwortet nie für dich. Er kann auch eine Release-Karte außerhalb der Lanes beobachten.",
   "tips.assistantToldWaiting.title": "Der Assistent sagt dir, wenn ein Agent dich braucht",
+  "tips.assistantUndo.text": "„Vom Assistenten erledigt“ listet seine Änderungen nach deiner Nachricht. „Rückgängig“ bei einer Änderung stellt sie wieder her, „Rückgängig“ bei einer Nachricht alle ihre Änderungen; was du oder ein Agent seitdem geändert habt, bleibt erhalten.",
+  "tips.assistantUndo.title": "Änderungen des Assistenten rückgängig machen",
   "tips.assistantWaits.text": "Bitte den Assistenten, dir Bescheid zu geben, wenn ein Agent einen Build oder Testlauf abschließt: Er wartet, ohne nachzufragen, und Hive weckt ihn, wenn der Agent fertig ist, dich braucht oder stoppt.",
   "tips.assistantWaits.title": "Den Assistenten melden lassen, wenn ein Agent fertig ist",
   "tips.attachFiles.text": "Zieh ein PDF, ein Log oder eine beliebige Datei auf das Terminal eines Agenten: Hive legt eine Kopie bei der Sitzung ab und fügt ihren Pfad ein. Ein Chip zeigt, was angehängt ist, und sagt, wenn die CLI des Agenten diese Art Datei nicht selbst liest; der Agent öffnet sie dann über ihren Pfad.",

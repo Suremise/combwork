@@ -3,7 +3,7 @@
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
-import type { ActivityKind, ActivityTarget } from './assistantActivity'
+import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
@@ -338,6 +338,8 @@ export interface AssistantChangeRow {
   fields: string[]
   /** Why it can't be undone (a `final` change), in English. */
   final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
   undoneAt?: string
 }
 
@@ -361,6 +363,8 @@ export interface AssistantUndoResult {
   skipped: { field: string; why: 'changed' | 'gone' | 'ended' | 'failed'; error?: string }[]
   /** Why nothing of it can be undone (a `final` change), in English. */
   final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
   /** It was undone before: nothing more was done. */
   already?: true
 }
@@ -381,6 +385,9 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   revertOf?: string
   /** The line without what it quotes (a prompt, a message): what the Agent API's event stream gives (#620). */
   brief?: string
+  /** The user's message it came from, and when it was sent (#1283: the panel lists it with that message's changes). */
+  group?: string
+  groupAt?: string
 }
 
 /** A setting the Hive Assistant changed, as its activity list shows it and Revert undoes it. */

@@ -25,6 +25,8 @@ import type {
   AgentApiInfo,
   AgentInfo,
   AssistantAction,
+  AssistantChangeGroup,
+  AssistantUndoResult,
   AssistantQuestion,
   ProgressRun,
   MergeSlotInfo,
@@ -269,6 +271,9 @@ interface State {
   /** What the Hive Assistant did in this window's workspace (oldest first), and what it is asking the user. */
   assistantActions: AssistantAction[]
   assistantQuestions: AssistantQuestion[]
+  /** The Assistant's changes kept for undo, by the user's message (#1283), and what each undo in this window did. */
+  assistantChanges: AssistantChangeGroup[]
+  assistantUndone: Record<string, AssistantUndoResult>
   /** Agents the Assistant added that the user hasn't looked at yet, by project path (their page's button shows a dot). */
   newAgents: Record<string, string[]>
   modesVersion: number
@@ -487,6 +492,8 @@ export const useStore = create<State>(() => ({
   assistantSettingsOpen: false,
   assistantActions: [],
   assistantQuestions: [],
+  assistantChanges: [],
+  assistantUndone: {},
   newAgents: {},
   modesVersion: 0,
   docsPage: 'guide',

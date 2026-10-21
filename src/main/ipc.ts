@@ -53,6 +53,7 @@ import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
+import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
 import { advanced, updateSettingsChecked } from './advanced'
@@ -1051,7 +1052,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
       await revertSetting(workspace.path, String(actionId))
     },
-    'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()) : []),
+    // The window words what can't be undone in its language, from the reasons' codes (#1283).
+    'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()).map((g) => ({ ...g, changes: g.changes.map((c) => (c.final ? { ...c, finalWhy: finalWhys(c.final) } : c)) })) : []),
     'assistant:undo': async (sel) => {
       if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
       const s = sel && typeof sel === 'object' ? sel : {}
@@ -1059,7 +1061,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const group = typeof s.group === 'string' && s.group ? s.group : undefined
       if (!change === !group) throw hiveError(M.undoWhich, undefined, { kind: 'invalid' })
       try {
-        return await userUndo(currentWorkspace(), change ? { change } : { group })
+        return (await userUndo(currentWorkspace(), change ? { change } : { group })).map((r) => (r.final ? { ...r, finalWhy: finalWhys(r.final) } : r))
       } catch (e) {
         throw e instanceof UndoNotFound ? hiveError(M.undoGone, undefined, { kind: 'conflict' }) : e
       }
