@@ -2010,6 +2010,21 @@ report it this way rather than retry.
 
 [note §9, #1121] Hive performs merges. The merge slot becomes a **queue per target** (a project and target line).
 
+**Built [#1348], for a target checked out in no folder:** a card whose ruleset says Hive merges is queued as it is
+approved, and its target's queue runs in the app with the Assistant off: one host per open workspace, project and
+target, started by the card's queuing and, as a workspace opens, for every target with entries; it runs on the target's
+runner (§16.9.3), recovers its own target's entries first, then takes them in order through steps 1–2 and 4–8: the
+test merge in the runner's worktree, the merge checks as Hive's runs on exactly that result, and the advance by
+compare-and-swap under the repository lock, the lease checked inside it. A conflict or a red check returns the card to
+its builder with the files or the log; a check that couldn't start is transient, and the builder's resubmission of the
+same revision goes straight back into the queue (at most twice); a target that moved is tested again (three times in a
+row pause it); a hand merge meanwhile is observed, never merged twice. The card's ruleset decides, never the project's
+options now: a card started under Hive merges is merged by the queue after the options moved to another finisher. With
+workflow rules off nothing reaches an advance: open entries pause (**rules off**) before it, an advance already begun
+finishes, and they carry on when the rules are on again. A target checked out in a folder pauses (**checked out**)
+until §16.9.2's advance is built (#1351). A card's test-merge ref goes once its entry has an outcome, and its
+submissions' pins once it is archived.
+
 #### 16.9.1 An entry's way through
 
 1. Take the next entry (`IntegrationRequested` not cancelled, failed or integrated, in order).
@@ -3036,7 +3051,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59, S61, S62 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. **Built** (20 Oct): every scenario of this row passes in `tests/workflow` (ARCHITECTURE "Workflow layer" says where the code is and what it stands in for); the spec fixes it found are marked **[P2]**. **What P3 adopts** [#1118 20 Oct]: `src/shared/workflow` and the platform adapters (`src/main/platform`) as they are; `runtime.ts`, `reconcile.ts`, `mergeQueue.ts` and `checks.ts` as P4's and P5's starting point; the fact store replaced by hive.db tables written inside `boardWrite` (P3). This row's list (43 scenarios) is the source, not the 28 the card's brief named. |
 | P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
 | P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_update_setting` (built: #1278, §16.6.6); the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
-| P5 Hive merges | #1121 | The merge queue (§16.9), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
+| P5 Hive merges | #1121 | The merge queue (§16.9; in the app for a target checked out nowhere: #1348), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
 | P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6 | RC |
 | P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7 | RC |
 | Translation review | #1126 | §16.16 | — |
