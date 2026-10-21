@@ -105,6 +105,34 @@ export interface CheckRanData {
 
 export type ForYouKind = 'approve' | 'decide' | 'test' | 'signIn' | 'other'
 
+/** What the user chose at a card's round limit (§16.11.4). */
+export const ROUND_CHOICES = ['carryOn', 'split', 'accept', 'takeOver'] as const
+export type RoundChoice = (typeof ROUND_CHOICES)[number]
+
+/** The gate of Hive's question at a card's round limit (§16.11.4). */
+export const ROUND_LIMIT_GATE = 'roundLimit'
+
+/** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
+export interface AnswerShape {
+  outcome: 'approved' | 'declined' | 'answered'
+  reply?: boolean
+  decision?: boolean
+  choice?: RoundChoice
+  rounds?: number
+}
+
+/**
+ * Whether an answer fits its request (§16.8.5, #1269): at the round limit, a choice (a carry on with 1 to `maxRounds`
+ * more rounds), nothing else; an approval (kind Approve), approved or declined (a reply may say why), never a decision;
+ * any other question, answered with a reply or a decision.
+ */
+export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate'>, a: AnswerShape, maxRounds: number): boolean {
+  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
+  if (a.choice !== undefined) return false
+  if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && !a.decision
+  return a.outcome === 'answered' && (!!a.reply || !!a.decision)
+}
+
 export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook'
 
 /** The data of each kind (§16.4.2). */
@@ -121,8 +149,9 @@ export interface FactData {
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number }
-  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string }
+  /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds. */
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
@@ -180,6 +209,9 @@ export interface Submission extends SubmittedData {
   by: string | null
 }
 
+/** A request to the user (For you, §16.8.5), with when it was asked (`asker`: the agent whose own question it is). */
+export type Request = FactData['ApprovalRequested'] & { at: string }
+
 export interface QueueEntry {
   id: string
   seq: number
@@ -211,16 +243,18 @@ export interface CardState {
   approved: { revision: string | null; base: string | null } | null
   /** A content-stale pass (a new revision that isn't the same change), until the builder submits again. */
   stale: FactData['Stale'] | null
-  /** Open requests to the user: For you. */
-  requests: FactData['ApprovalRequested'][]
+  /** Open requests to the user: For you, each with when it was asked. */
+  requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
-  made: Record<string, FactData['ApprovalRequested']>
+  made: Record<string, Request>
   approvals: FactData['Approval'][]
   entries: QueueEntry[]
   integrated: FactData['Integrated'] | null
   accepted: FactData['Accepted'] | null
   /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
   rounds: number
+  /** The rounds the user added at the round limit ("carry on"), over the card's whole history. */
+  moreRounds: number
   /** Every agent recorded working the card (Started, Submitted): no-self-review reads these, never commit authors. */
   builders: string[]
   overrides: FactData['Override'][]
@@ -256,6 +290,7 @@ export const emptyState = (): CardState => ({
   integrated: null,
   accepted: null,
   rounds: 0,
+  moreRounds: 0,
   builders: [],
   overrides: [],
   approvalOverridden: false,
@@ -285,7 +320,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Adopted': {
         const d = f.data as StartedData
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq })
+        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
+        const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq })
+        s.requests = limit
+        for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
@@ -334,7 +373,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       }
       case 'ApprovalRequested': {
-        const d = f.data as FactData['ApprovalRequested']
+        const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at }
         s.requests.push(d)
         s.made[d.request] = d
         break
@@ -345,7 +384,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const d = f.data as FactData['Approval']
         s.approvals.push(d)
         s.requests = s.requests.filter((r) => r.request !== d.request)
-        if (d.answer === 'declined') s.rounds++
+        // A decline of a gate's request is a reviewed round (§16.11.4); of an agent's own question, only its answer.
+        const made = s.made[d.request]
+        if (d.answer === 'declined' && (!made || isGateRequest(made))) s.rounds++
+        if (d.rounds) s.moreRounds += d.rounds
         break
       }
       case 'IntegrationRequested': {
@@ -475,4 +517,13 @@ export function transientRequeues(s: CardState): number {
 }
 
 /** The card's For you, from its open requests (§16.8.5). */
-export const forYou = (s: CardState): FactData['ApprovalRequested'][] => s.requests
+export const forYou = (s: CardState): Request[] => s.requests
+
+/**
+ * Whether a card has reached its round limit (§16.11.4): its rounds (failed reviews and the user's declines) at its
+ * lane's limit and the rounds the user added since, with no round-limit question open. No limit (a card in no running
+ * lane): never.
+ */
+export function atRoundLimit(s: CardState, limit: number | null | undefined): boolean {
+  return typeof limit === 'number' && s.rounds >= limit + s.moreRounds && !s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)
+}

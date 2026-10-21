@@ -15,8 +15,15 @@ export const FOR_YOU = {
   okBefore: msg({ id: 'workflow.forYou.okBefore', defaultMessage: '{card} is approved: OK to merge?', description: "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12." }),
   passedReview: msg({ id: 'workflow.forYou.passedReview', defaultMessage: '{card} passed review: your OK?', description: "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12." }),
   newDecision: msg({ id: 'workflow.forYou.newDecision', defaultMessage: '{card} has a new decision: your review again?', description: 'A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12.' }),
-  decidedAfterMerge: msg({ id: 'workflow.forYou.decidedAfterMerge', defaultMessage: '{card} was decided after it merged: does it need a follow-up?', description: "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12." })
+  decidedAfterMerge: msg({ id: 'workflow.forYou.decidedAfterMerge', defaultMessage: '{card} was decided after it merged: does it need a follow-up?', description: "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12." }),
+  roundLimit: msg({ id: 'workflow.forYou.roundLimit', defaultMessage: '{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?', description: "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)." })
 }
+
+/** A For you request's kind (§16.8.5, OP-11), as the window names it. */
+export const FOR_YOU_KIND = msg({ id: 'workflow.forYouKind', defaultMessage: '{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}', description: 'The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces.' })
+
+/** The user's choices at a card's round limit (§16.11.4), as the window names them. */
+export const ROUND_CHOICE = msg({ id: 'workflow.roundChoice', defaultMessage: '{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}', description: "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces." })
 
 /**
  * What a platform couldn't read (§16.3.1), the {what} of "Hive couldn't read {what}" (workflow.refused.platform.unknown):
@@ -103,7 +110,7 @@ export const RULE_NAMES: Record<string, Msg> = {
   'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Hive checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' })
 }
 
-const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), ...Object.values(UNREADABLE), STAGE_NAME, ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
+const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), STAGE_NAME, ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
 
 /** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null

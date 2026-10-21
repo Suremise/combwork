@@ -40,6 +40,8 @@ export interface CardRecord {
   lane?: string
   /** The reviewer agent to wake: its lane's, else the pool. */
   reviewer?: string
+  /** Its lane's round limit (§16.11.4: the Card loops rounds the lane started with); none outside a running lane. */
+  rounds?: number
   /** A card from before 1.0 (§16.4.1). */
   preWorkflow?: boolean
   stage: StageId
@@ -241,10 +243,10 @@ export class FactStore {
       const blockedBy = lists<number>(`SELECT card, target AS v FROM card_links WHERE ${of} AND kind = 'blockedBy' ORDER BY card, ord`)
       const paths = lists<string>(`SELECT card, path AS v FROM card_paths WHERE ${of} AND kind = 'declared' ORDER BY card, ord`)
       // Its lane (#1291): the newest running lane of this project with it in its list or its queued one.
-      const lanes = new Map<number, { lane: string; reviewer: string | null }>()
-      const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
+      const lanes = new Map<number, { lane: string; reviewer: string | null; rounds: number }>()
+      const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer, l.rounds FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
         JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id`
-      for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer })
+      for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null; rounds: number }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer, rounds: r.rounds })
       return rows.map((r) => ({
         id: r.number,
         key: this.keyOf(r.number),
@@ -256,6 +258,7 @@ export class FactStore {
         ...(r.paths_declared ? { paths: paths.get(r.number) ?? [] } : {}),
         ...(lanes.has(r.number) ? { lane: lanes.get(r.number)!.lane } : {}),
         ...(lanes.get(r.number)?.reviewer ? { reviewer: lanes.get(r.number)!.reviewer! } : {}),
+        ...(lanes.has(r.number) ? { rounds: lanes.get(r.number)!.rounds } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
         stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
@@ -282,7 +285,7 @@ export class FactStore {
   }
 
   /** A new card of this project on the board (the runtime's own; the board's are made by tasks.ts), in Todo unless `stage` says. */
-  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer'> & { stage?: StageId }): CardRecord {
+  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'rounds'> & { stage?: StageId }): CardRecord {
     const stage = c.stage ?? 'todo'
     return this.conn.write((db) => {
       const n = takeNumberIn(db)
@@ -296,7 +299,7 @@ export class FactStore {
   }
 
   /** Changes what the runtime keeps of a card: its kind, target and declared paths (its lane is its lanes', #1291). */
-  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer'>>): CardRecord {
+  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'rounds'>>): CardRecord {
     const other = Object.keys(patch).filter((k) => !['kind', 'target', 'paths', 'title', 'labels', 'blockedBy', 'preWorkflow'].includes(k))
     if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
     return this.conn.write((db) => {
@@ -409,7 +412,7 @@ export class FactStore {
    * The runtime starts a lane of this project (tests/workflow until #1270 wires the app's): lanes.ts's lane of that id,
    * its cards and reviewer (if given) set, or a new one by Hive when there is none; with the ruleset in force now.
    */
-  startLane(id: string, cards: number[], ruleset: string, reviewer?: string): LaneList {
+  startLane(id: string, cards: number[], ruleset: string, reviewer?: string, rounds = LOOP_ROUNDS): LaneList {
     this.conn.write((db) => {
       const at = this.now().toISOString()
       const had = db.prepare('SELECT project FROM lanes WHERE id = ?').get(id) as { project: string } | undefined
@@ -418,7 +421,7 @@ export class FactStore {
         const ord = (db.prepare('SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM lanes').get() as { n: number }).n
         db.prepare(
           "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'hive', 'Hive', ?, ?, ?, ?, 'active', 'Hive', ?, ?)"
-        ).run(id, ord, this.scope.project, reviewer ?? null, reviewer ?? null, LOOP_ROUNDS, LOOP_WAIT_HOURS * 60, at, at)
+        ).run(id, ord, this.scope.project, reviewer ?? null, reviewer ?? null, rounds, LOOP_WAIT_HOURS * 60, at, at)
       } else if (reviewer) db.prepare('UPDATE lanes SET reviewer_id = ?, reviewer_name = ?, updated_at = ? WHERE id = ?').run(reviewer, reviewer, at, id)
       writeLane(db, newLane(id, cards, ruleset), at)
     })
@@ -501,7 +504,7 @@ export class FactStore {
         facts: (card) => this.facts(card),
         card: (id) => this.card(id),
         putCard: (c) => {
-          const { id, key: _k, stage: _s, category: _c, lane: _l, reviewer: _r, ...patch } = c
+          const { id, key: _k, stage: _s, category: _c, lane: _l, reviewer: _r, rounds: _n, ...patch } = c
           this.updateCard(id, patch)
         },
         meta: (k) => this.meta(k),
