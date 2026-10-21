@@ -36,14 +36,16 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## The Assistant's override, with its facts and a move that skips nothing: fakes, Codex (its default model), 21 October 2026
+## The Assistant's override, with its facts and a move that skips nothing: fakes, Codex (its default model), fixtures v71, 21 October 2026
+
+The runs below record fixtures v70: they ran #1319's checks before the version was bumped for them (v71).
 
 #1319, after #1265: the harness reads each scenario card's workflow facts (`tasks:facts`); **assistant-override-reason**
 checks one `Override` fact by the Assistant with the user's reason, **assistant-override-none** checks none, and the new
 **assistant-override-unneeded** (a Doing card put back in Todo: a move backwards skips no rule) checks it moves with no
 override and no `Override` fact.
 - **Fakes**: all three pass (`2026-10-21T04-55-29-fake`).
-- **Codex**, 1 sample each (`2026-10-21T04-56-27-codex`, $0.18): 11 of 11 checks pass. With no reason it told the user
+- **Codex**, 1 sample each (`2026-10-21T04-56-27-codex`, $0.18): 10 of 10 checks pass. With no reason it told the user
   what the move would skip; asked to put the card back it moved it without an override.
 - **Claude Code**: not run. Its test home is still signed out (`2026-10-21T04-58-14-claude-code`: "Not logged in · Run
   /login" in its status line, the prompt never taken; the harness counted that as 3 failures instead of skipping it for
