@@ -636,14 +636,17 @@ kbd {
 .pane-empty:has(+ .section-header) {
   padding-bottom: 0;
 }
-/* The same between sections each wrapped in an element of its own, its header first (the Memory tab's groups). */
+/* The same between sections each wrapped in an element of its own, its header first (the Memory tab's groups): the
+   gap above a group's header after another group, and a group's last item bringing no space of its own (whether or not
+   a group follows: nothing nested in :has(), which Chromium refuses, and a last group's end has nothing after it). A
+   panel's scrolling body that starts with a section isn't a group: what ends it (Skills' hint) keeps its space. */
 :has(> .section-header:first-child) + :has(> .section-header:first-child) > .section-header:first-child {
   margin-top: var(--space-3);
 }
-:has(> .section-header:first-child):has(+ :has(> .section-header:first-child)) > :last-child:not(.section-header) {
+:not(.pane-body):has(> .section-header:first-child) > :last-child:not(.section-header) {
   margin-bottom: 0;
 }
-:has(> .section-header:first-child):has(+ :has(> .section-header:first-child)) > .pane-empty:last-child {
+:not(.pane-body):has(> .section-header:first-child) > .pane-empty:last-child {
   padding-bottom: 0;
 }
 :not(.section-header) + .section-header {
