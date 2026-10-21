@@ -123,6 +123,7 @@ export const SUITES = [
   { name: 'journalbrowse' },
   { name: 'keys' },
   { name: 'keysui' },
+  { name: 'lanenotices' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
   { name: 'leftovers' },

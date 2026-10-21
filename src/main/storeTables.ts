@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, dbGeneration, inBoardWrite, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, boardOpen, closeBoard, dbGeneration, inBoardWrite, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -102,6 +102,8 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
     const wasOpen = boardOpen(path)
     try {
       saveEntries(path, store, docs, meta, wasOpen)
+      // The lanes are part of what the board's revision covers (#1266, boardRevision).
+      if (store === 'lanes') noteLanesSaved(path)
     } finally {
       if (!wasOpen) closeBoard(path)
     }

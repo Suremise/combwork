@@ -101,6 +101,7 @@
   "tasks.history.movedBottom": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」の末尾に移動",
   "tasks.history.movedTop": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」の先頭に移動",
   "tasks.history.noDependencies": "他のカードへの依存を解除",
+  "tasks.history.notified": "{event, select, failed {レビュー不合格} blocked {ブロックされている} stalled {停滞している} mergeDue {レーン {lane} のすべてのカードがレビューに合格し、マージの時である} mergeStalled {レーン {lane} のマージが停滞している} other {あなたの対応が必要である}}ことを通知しました{hasWhy, select, yes {：{why}} other {}}",
   "tasks.history.placed": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」の{place, selectordinal, other {#番目}}に配置",
   "tasks.history.renamed": "タイトルを「{title}」に変更",
   "tasks.history.repaired": "プロジェクト：{from} → {to}（名前の変更または移動）",

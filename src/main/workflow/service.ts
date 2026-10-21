@@ -22,6 +22,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { resolveLogged, type ResolvedOptions } from './rulesets'
+import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow } from './runtime'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
@@ -137,10 +138,20 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     get reconcileActs() {
       return workflowEnforced()
     },
-    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open.
+    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open. The
+    // requests for the user it writes (`notify`) are noted on their cards in it too: their durable notice (#1266).
     locked: (fn) => {
       if (!alive()) return Promise.reject(hiveError(M.closed, undefined, { kind: 'conflict' }))
-      return boardWrite(ws, async () => fn(), { alive })
+      return boardWrite(
+        ws,
+        async () => {
+          const after = lastActionId(ws)
+          const out = fn()
+          await noteRequestsSince(ws, after)
+          return out
+        },
+        { alive }
+      )
     }
   })
 }

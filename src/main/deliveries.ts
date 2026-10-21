@@ -35,7 +35,7 @@ import { onHiveEvent } from './events'
 import { readCapped, readJson, renameRetrying } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
-import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, writeDeliveries } from './schema/sessionDeliveryTables'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -166,6 +166,11 @@ interface Store {
   hooks: Map<string, DeliveryHooks>
   /** The workspace database's generation it was read from (#1207 round 2): from an older one, it is stale and never saved. */
   gen: number
+  /**
+   * Each delivery's row as this store last read or wrote it (#1266): a save changes only what its transaction changed,
+   * and only from these, so another Hive's receipt, ack or cancel since is never overwritten (saveDeliveryChanges).
+   */
+  base: Map<string, string>
 }
 
 /** A transaction's working copy: planned on, saved, then published. */
@@ -270,21 +275,41 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
       got = await read()
       await beforePlan?.()
     }
-    // From here to the save, nothing is awaited: the plan is made from `got` as `again` last judged it.
-    const d: Draft = { records: [...store.records], next: store.next, invalid: [...store.invalid], dirty: false, after: [] }
-    const planned = plan(d, got)
-    if (!d.dirty) return planned
-    try {
-      await save(store, d)
-    } catch (e) {
-      throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
+    for (let tries = 1; ; tries++) {
+      // From here to the save, nothing is awaited: the plan is made from `got` as `again` last judged it.
+      const d: Draft = { records: [...store.records], next: store.next, invalid: [...store.invalid], dirty: false, after: [] }
+      const planned = plan(d, got)
+      if (!d.dirty) return planned
+      try {
+        await save(store, d)
+      } catch (e) {
+        // Another Hive changed a row this plan changed, since this store read it (#1266): nothing was saved. The host's
+        // deliveries are read again and the plan made again on them (its receipt, ack or cancel kept), a few times at most.
+        if (e instanceof StaleDeliveries && tries < STALE_TRIES) {
+          await reread(store)
+          continue
+        }
+        throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
+      }
+      store.records = d.records
+      store.next = d.next
+      store.invalid = d.invalid
+      for (const f of d.after) f()
+      return planned
     }
-    store.records = d.records
-    store.next = d.next
-    store.invalid = d.invalid
-    for (const f of d.after) f()
-    return planned
   }).finally(() => running--)
+}
+
+/** How many times a transaction is planned and saved, at most, while another Hive keeps changing what it changes. */
+const STALE_TRIES = 4
+
+/** A host's deliveries read again from its workspace's database (another Hive saved since): what the store has is replaced. */
+async function reread(store: Store): Promise<void> {
+  const read = await readSaved(store.host, store.place)
+  store.records = read.records
+  store.next = read.next
+  store.invalid = read.invalid
+  store.base = read.base
 }
 
 /** How many times a transaction's read is made, at most, when what it read keeps being overtaken (transactAfter). */
@@ -337,7 +362,7 @@ export function load(host: string): Promise<Store> {
       const gen = dbGeneration(place.workspace)
       const read = await readSaved(host, place)
       if (stores.has(k)) return stores.get(k)!
-      const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen }
+      const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
       // Restored before anything else sees it (a second load waits for this one).
       await transact(store, (d) => {
         for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', 'may not have reached it: Hive stopped while offering it', undefined, { again: AGAIN_RESTART })
@@ -367,10 +392,12 @@ export function load(host: string): Promise<Store> {
  * A host's deliveries as saved in its workspace's database (#1018), moved in from its deliveries.json the first time:
  * each checked as it is read back; one that isn't valid is kept aside, not used.
  */
-async function readSaved(host: string, place: Store['place']): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[] }> {
+async function readSaved(host: string, place: Store['place']): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
   const file = fileOf(host)
   let raw: unknown[]
   let value: (key: string) => string | null
+  // The rows' texts as read (none while the upgrade waits: nothing is saved then).
+  let base = new Map<string, string>()
   if (upgradeWaiting(place.workspace)) {
     // The workspace's upgrade to 1.0 waits (#1207): its file is 0.9's, its deliveries rows of store_rows; nothing is moved in.
     const data = readStore(place.workspace, 'deliveries', place.scope)
@@ -379,9 +406,20 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
   } else {
     // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
     await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(host), DELIVERIES_TABLE)
+    // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
+    // record and its base are the same row's, never two reads another Hive committed between.
     const db = workspaceDb(place.workspace).reader
-    raw = readDeliveryRows(db, place.scope)
-    value = (key) => storeValue(db, 'deliveries', place.scope, key)
+    const values = new Map<string, string | null>()
+    db.exec('BEGIN')
+    try {
+      const read = readDeliveriesWithBases(db, place.scope)
+      raw = read.records
+      base = read.bases
+      for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', place.scope, key))
+    } finally {
+      db.exec('COMMIT')
+    }
+    value = (key) => values.get(key) ?? null
   }
   const kept = value('invalid')
   const savedNext = value('next') !== null ? (JSON.parse(value('next')!) as unknown) : undefined
@@ -395,7 +433,7 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
   if (records.length < raw.length) log.warn(`${raw.length - records.length} saved deliver${raw.length - records.length === 1 ? 'y is' : 'ies are'} not valid: kept aside, not used`)
   const top = records.reduce((m, r) => Math.max(m, r.seq), 0)
   const next = Number.isInteger(savedNext) && (savedNext as number) > top ? (savedNext as number) : top + 1
-  return { records, next, invalid }
+  return { records, next, invalid, base }
 }
 
 /** The deliveries' side of a move in (openTable): how many a host has, and a file's written beside them. */
@@ -483,9 +521,28 @@ async function save(store: Store, d: Draft): Promise<void> {
   const guard = (): void => {
     if (store.gen !== dbGeneration(store.place.workspace)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
   }
-  // Their table's rows that changed (#1211), the next id and the entries kept aside beside them, in one transaction.
-  const records = d.records as unknown as Record<string, unknown>[]
-  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => writeDeliveries(db, store.place.scope, records), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  // Only what this transaction changed (#1211's rows), the next id and the entries kept aside beside them, in one
+  // transaction, against the rows as they are committed (#1266): a row another Hive changed since this store read it
+  // fails the save (StaleDeliveries: planned again on the rows as they are), its rows saved since are never touched, and
+  // a new delivery whose id it took takes the next free one (made here, before it is published).
+  const was = new Map(store.records.map((r) => [r.id, r]))
+  const now = new Set(d.records.map((r) => r.id))
+  const changed = d.records.filter((r) => was.get(r.id) !== r) as unknown as Record<string, unknown>[]
+  const removed = [...was.keys()].filter((id) => !now.has(id))
+  let saved: ReturnType<typeof saveDeliveryChanges> = { written: new Map(), renamed: new Map() }
+  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => void (saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  for (const r of d.records) {
+    const to = saved.renamed.get(r.id)
+    if (!to) continue
+    // The same record (what the transaction returns is it): its id is the one saved.
+    Object.assign(r, to)
+    d.next = Math.max(d.next, to.seq + 1)
+  }
+  // What this store now last wrote: the rows it saves next are changed only from these.
+  const base = new Map(store.base)
+  for (const id of removed) base.delete(id)
+  for (const [id, row] of saved.written) base.set(id, row)
+  store.base = base
 }
 
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
@@ -673,6 +730,30 @@ export interface NewDelivery {
   again?: string
   /** Offered by a launch about to start (launchWith only). */
   launching?: true
+  /**
+   * The durable action making it (SPEC §16.4.5): one delivery per action. One this action already made is returned as it
+   * is; one of the same source and ref still waiting is cancelled as replaced, never rewritten (it keeps its own action).
+   */
+  action?: number
+}
+
+/**
+ * Whether a durable action has made its delivery (SPEC §16.4.5): one of a host's loaded here, or a row of its workspace's
+ * database with the action's id (another Hive's, or one from before a restart). That row (unique per action) is the
+ * record that it was delivered: an action run again finds it and makes nothing.
+ */
+export function actionDelivered(host: string, action: number): boolean {
+  const ws = workspaceFor(host)
+  if (!ws?.path) return false
+  // Action ids are a workspace database's own: only its hosts' deliveries count.
+  const mine = (s: Store): boolean => s.place.workspace.toLowerCase() === resolve(ws.path!).toLowerCase()
+  if ([...stores.values()].some((s) => mine(s) && s.records.some((r) => r.action === action))) return true
+  try {
+    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // i18n-ignore: SQL
+  } catch {
+    // A board waiting for its upgrade has no deliveries table: none made.
+    return false
+  }
 }
 
 /** How many of an agent's deliveries of a kind wait to be offered. */
@@ -694,7 +775,15 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
     if (why) throw new Error(`Not sent: ${why}.`)
-    const had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
+    // An action's delivery already made (two runs of it at once here): that one.
+    const made = nd.action ? d.records.find((x) => x.action === nd.action) : undefined
+    if (made) return made
+    let had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
+    // An action's own delivery: the one waiting is replaced by a new one (each action keeps its own row).
+    if (had && nd.action && nd.replace) {
+      set(store, d, had, 'cancelled', 'replaced by a newer one')
+      had = undefined
+    }
     if (had) {
       if (!nd.replace) return had
       const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
@@ -722,6 +811,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
       ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
       ...(nd.forRun ? { forRun: nd.forRun } : {}),
       ...(nd.again ? { again: nd.again } : {}),
+      ...(nd.action ? { action: nd.action } : {}),
       // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
       ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
     }
