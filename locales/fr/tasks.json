@@ -44,6 +44,8 @@
   "tasks.error.orderChanged": "La carte #{n} a changé pendant le classement des cartes ; relis le tableau.",
   "tasks.error.orderElsewhere": "La carte #{n} est dans {other, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{other}}}, pas dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}. Seules les cartes déjà dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}} peuvent y être ordonnées.",
   "tasks.error.orderNone": "cards : indique les numéros des cartes dans l’ordre voulu.",
+  "tasks.error.overrideNotAgents": "Les agents ne peuvent pas faire de dérogation aux règles du flux de travail : seuls l’utilisateur ou l’Assistant le peuvent.",
+  "tasks.error.overrideShape": "Une dérogation demande une raison : pourquoi la carte est déplacée malgré ses règles, sous forme de texte.",
   "tasks.error.ownCardsOnly": "Tu ne peux voir que les cartes de ton projet ({project}).",
   "tasks.error.projectThenAgent": "Déplace d’abord la carte vers l’autre projet, puis confie-la à l’un de ses agents.",
   "tasks.error.refsList": "{field} doit être une liste de numéros de cartes",

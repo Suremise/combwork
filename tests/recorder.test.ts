@@ -2,7 +2,9 @@
 // from git), a move into Review (Submitted, with the files changed and the candidate key), a review's start and verdict
 // tied to that submission, its next round, decisions and their generations, blocked and unblocked, what an agent has
 // received of the decisions, a folder that can't be read (recorded unknown, the move made all the same) and a card from
-// before 1.0 (no facts until it starts). Nothing is refused.
+// before 1.0 (no facts until it starts). Nothing is refused. This is P3's path: agents' moves (#1268 routes them) and
+// every move with the workflow rules not enforced (Settings → Advanced, #1263), as this file runs; the user's and the
+// Assistant's moves go through the runtime with them enforced (#1265, tests/gates.test.ts).
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { DatabaseSync } from 'node:sqlite'
@@ -24,10 +26,15 @@ const { newDecisionsOn } = await import('../src/main/decisionNotices')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { allOff } = await import('../src/shared/workflow/options')
 const { mustCompile } = await import('../src/shared/workflow/compile')
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
+advanced.load(join(base, 'profile'))
+await advanced.set(ENFORCE, false)
 afterAll(async () => {
+  advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
 })

@@ -179,6 +179,14 @@
     "defaultMessage": "cards: list the card numbers in the order wanted.",
     "description": "An error: a call to put cards in order listed none. \"cards:\" is the name of the call's field: keep it as it is."
   },
+  "tasks.error.overrideNotAgents": {
+    "defaultMessage": "Agents can't override workflow rules: only the user or the Assistant can.",
+    "description": "An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can."
+  },
+  "tasks.error.overrideShape": {
+    "defaultMessage": "An override needs a reason: why the card moves across its rules, as text.",
+    "description": "An error: an override (moving a card across a workflow rule) was passed without its reason as text."
+  },
   "tasks.error.ownCardsOnly": {
     "defaultMessage": "You can see only your project's cards ({project}).",
     "description": "An error: an agent asked for another project's cards; it sees only its own project's ({project}, its folder name)."

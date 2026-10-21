@@ -44,6 +44,8 @@
   "tasks.error.orderChanged": "並べ替えの途中で#{n}が変更されました。ボードを読み直してください。",
   "tasks.error.orderElsewhere": "#{n}は「{other, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{other}}}」にあり、「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」にはありません。そこで並べ替えられるのは、すでに「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」にあるカードだけです。",
   "tasks.error.orderNone": "cards: 並べたい順にカード番号を指定してください。",
+  "tasks.error.overrideNotAgents": "エージェントはワークフローのルールに例外を作れません。作れるのはユーザーかアシスタントだけです。",
+  "tasks.error.overrideShape": "例外には理由が必要です。ルールがあってもカードを移動する理由をテキストで指定してください。",
   "tasks.error.ownCardsOnly": "見られるのは自分のプロジェクト（{project}）のカードだけです。",
   "tasks.error.projectThenAgent": "先にカードを別のプロジェクトに移動してから、そのプロジェクトのエージェントに割り当ててください。",
   "tasks.error.refsList": "{field}はカード番号のリストで指定してください",

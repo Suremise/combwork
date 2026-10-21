@@ -36,6 +36,23 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## The Assistant's override of a card's workflow rules: fakes, Codex (its default model), fixtures v70, 21 October 2026
+
+#1265: the Assistant's `hive_update_task`/`hive_update_tasks` take `override: { reason }`; a move that skips a card's
+rules without it is refused (409, `move.needsOverride`: what it skips, the next step, where the rules are set). New
+scenarios on a project with Pair options: **assistant-override-reason** (the user says why: merged by hand) and
+**assistant-override-none** (the user only asks for the move).
+- **Fakes**: both pass (`2026-10-21T04-00-23-fake`). The whole fake set before and after the tool descriptions changed
+  (`hb2-1265-before`, `hb2-1265-after`, fixtures v69): no check changed; pick-up-latest and licence-audit timed out once
+  under load and pass alone (#1311).
+- **Codex**, 3 samples each, after (`2026-10-21T04-14-09-codex`, $0.30): 6 of 6 pass. Two wordings were tried first:
+  the refusal's next step "Give a reason to move it anyway…" let Codex make one up from the request
+  ("User explicitly requested: …", `04-05-23-codex`, 1 of 1 failed); "tell the user… a request isn't a reason" made it
+  skip the override even with the user's reason (`04-07-30-codex`, 0 of 3). Now: pass the user's own reason, given with
+  the request or after being told what the move skips; never make one up.
+- **Claude Code**: not run. Its test home isn't signed in (`04-03-47-claude-code`: "Hive shows the session waiting for
+  a sign-in"; an earlier haiku attempt's prompt wasn't taken, `04-01-06-claude-code`, and haiku has no price to budget).
+
 ## One answer per workflow rule (Phase 0 tidy): fakes, Claude Code and Codex (their default models), fixtures v67, 20 October 2026
 
 #1129: the board rule says Done in the project folder is committed; merge-ready says who merges (a lane's builder at

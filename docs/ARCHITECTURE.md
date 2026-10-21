@@ -401,6 +401,28 @@ each `workflowFor` first syncs them with the watcher (`syncHashes`, one at a tim
 `observer.changedBetween` saw written since the last sync are invalidated, or every hash is forgotten when its record
 of that time isn't complete. `cardRunRevision` (`runChecks.ts`) takes its runtime from `workflowFor` too.
 
+**Gates at boardWrite (#1265).** `tasks.ts` `runIntent(wf, n, actor, call, zero9)` is the one intent path: it runs a
+runtime intent (`call`) under `alongside` (runtime.ts, an AsyncLocalStorage), and `Workflow.write` calls it back inside
+each write that changed the card, in the same transaction (its `locked` joins the board change): `updateTaskAs` with
+`was` (the column before the runtime's `setStage`) writes the card's 0.9 fields (column, place, history, agent, review,
+loop events), inside `recordingByRuntime`, so the recorder writes no `Started`/`Moved`/`Submitted`/`ReviewStarted`/
+`Verdict` for it (one owner per fact) but still its `Blocked`, `Decision`s. The user's and the Assistant's column moves
+take it when `gateOf` says so (the rules enforced, a card from 1.0, a project with a platform, a stage its ruleset has;
+a batch's cards too, in the batch's change): `Workflow.move` with `confirm` for the user (interim until #1290/#1275),
+`override.reason` for the Assistant. A refusal is `WorkflowRefusedError` (its `refusal`), which `apiErrorReply` turns
+into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. Runtime writes outside an intent's write (a
+refusal's `Refused`, None's declared paths) go through `locked` too, and `start` stores its ruleset only in its write.
+Before P7 a builder's own worktree is its card's folder (`cfg.agentFolder`, from project.json; `StartPlan.existing`:
+no `prepareSlot`); `cfg.runsOf` is the agent's open Progress runs and background tasks (`setRunsGoing`, from index.ts).
+Start and submit are each a gather (`gatherStart`, `gatherSubmit`: the slow reads, outside the lock, nothing written;
+None's paths kept as `setPaths`) and an apply (`applyStart`, `applySubmit`, in the write). `dragForward` gathers every
+step first (a submission on `predicted`, the state the start would leave), decides on the union of the rules they skip
+(`failingOf`), and writes them all in one write, which checks the rules again (`failingIn`) and throws `DragUndone` to
+undo itself when one wasn't decided on or the evidence moved. Every write of the app's runtime is a `boardSavepoint`
+(boardStore): a part of the change undone on its own when it throws, with the after-commit callbacks it registered; a
+batch's card is one too, kept when it is a workflow refusal (its `Refused`). `cfg.enforced` (the Advanced switch) empties
+every move's guards (`idsOf`) and `skippedRules`.
+
 **Acting once (#1263).** `reconcile.ts` records an observation once (its dedupe key) and applies what follows from it
 apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
 (`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake

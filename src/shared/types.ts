@@ -18,6 +18,7 @@ import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { PresetId, WorkflowOptions } from './workflow/options'
+import type { Refusal } from './workflow/refusals'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -858,7 +859,19 @@ export interface TaskPatch {
   context?: string[]
   /** Records a decision the user made (#357), attributed to the user whoever records it. Editing or removing one is the user's (tasks:editDecision). */
   decision?: string
+  /**
+   * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
+   * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
+   */
+  override?: { reason: string }
 }
+
+/**
+ * What the window's move of a card came to (`tasks:move`, #1265): moved (the card as saved; `stopped`: it went only as
+ * far as it could, the step after refused for what no override makes true, such as nothing to submit, §16.8.4), or a
+ * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused.
+ */
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
 /** Which agent Start gives a card to. */
 export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree: boolean; name?: string; provider?: ProviderId }

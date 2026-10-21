@@ -44,6 +44,8 @@
   "tasks.error.orderChanged": "Karta #{n} zmieniła się podczas ustawiania kolejności; odczytaj tablicę ponownie.",
   "tasks.error.orderElsewhere": "Karta #{n} jest w kolumnie {other, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{other}}}, nie w kolumnie {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}. Kolejność można tam ustawiać tylko kartom, które już są w kolumnie {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}.",
   "tasks.error.orderNone": "cards: podaj numery kart w żądanej kolejności.",
+  "tasks.error.overrideNotAgents": "Agenci nie mogą robić wyjątków od reguł przepływu pracy: może to tylko użytkownik lub Asystent.",
+  "tasks.error.overrideShape": "Wyjątek wymaga powodu: dlaczego karta jest przenoszona mimo swoich reguł, jako tekst.",
   "tasks.error.ownCardsOnly": "Widzisz tylko karty swojego projektu ({project}).",
   "tasks.error.projectThenAgent": "Najpierw przenieś kartę do innego projektu, a potem przekaż ją jednemu z jego agentów.",
   "tasks.error.refsList": "{field} musi być listą numerów kart",

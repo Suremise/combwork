@@ -49,6 +49,8 @@ import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
+import { setRunsGoing } from './workflow/service'
+import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
@@ -964,8 +966,16 @@ app.whenReady().then(async () => {
   startBranchWatch()
   // The platform watcher (#1214): the open workspaces' repositories and folders.
   startObserving()
-  // What it sees reconciled with the cards' facts, recorded (#1217, record-only in P3).
+  // What it sees reconciled with the cards' facts: recorded (#1217), and acted on with the rules enforced (#1263).
   startReconciling()
+  // What an agent has going, which its submission waits for with "its own runs stopped" (#1265, G13): its open
+  // Progress runs and its CLI's background tasks.
+  setRunsGoing((project, agent) => {
+    const p = project.toLowerCase()
+    const runs = openWorkspaces().flatMap((w) => (w.path ? progress.list(w.path) : [])).filter((r) => r.source === 'agent' && r.agentId === agent && r.projectPath?.toLowerCase() === p && isOpenRun(r))
+    const tasks = sessions.agentNow(project, agent)?.backgroundTasks ?? 0
+    return [...runs.map((r) => r.title), ...(tasks ? [`its background tasks (${tasks})`] : [])] // i18n-ignore: agent-facing: what a refused submit names
+  })
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()

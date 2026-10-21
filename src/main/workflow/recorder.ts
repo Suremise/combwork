@@ -53,6 +53,12 @@ export interface Reads {
 interface Context {
   actor: ChangeActor
   reads: Map<number, Reads>
+  /**
+   * The change's move was made through the workflow runtime (#1265), which wrote its facts (Started, Moved, Submitted,
+   * a review's, a verdict's): one owner per fact, so this records only what isn't a move (blocked, decisions). `moved`: the
+   * runtime's `Moved` fact of the change, which a loop's builder is woken by into Passed or Done (#1266's loop wakes).
+   */
+  byRuntime?: { moved: number | null }
 }
 const context = new AsyncLocalStorage<Context>()
 
@@ -64,6 +70,12 @@ export function recording<T>(actor: ChangeActor, reads: Map<number, Reads> | nul
 /** Runs a card change as this actor's, keeping the reads its caller made before it (a change inside another, a batch's card). */
 export function recordingAs<T>(actor: ChangeActor, fn: () => Promise<T>): Promise<T> {
   return context.run({ actor, reads: context.getStore()?.reads ?? new Map() }, fn)
+}
+
+/** Runs a card change whose move the workflow runtime made and recorded (#1265): its other changes are recorded here. */
+export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null = null): Promise<T> {
+  const c = context.getStore()
+  return context.run({ actor: c?.actor ?? { kind: 'user' }, reads: c?.reads ?? new Map(), byRuntime: { moved } }, fn)
 }
 
 /** The reads made for a card not made yet (tasks.ts' createTask), before its number is taken. */
@@ -238,6 +250,8 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
   const intoDoing = after.column === 'doing' && !!after.agent && (!before || before.column !== 'doing' || before.agent !== after.agent)
   const starts = intoDoing && (!earlier.started || earlier.stage === 'done' || before?.column === 'done')
   const intoReview = after.column === 'review' && (!before || before.column !== 'review' || returned)
+  // The runtime made this change's move (#1265): its facts are the runtime's; only what isn't a move is recorded here.
+  const moves = !ctx?.byRuntime
   const comment = added(before?.comments ?? [], after.comments).at(-1)?.id ?? ''
   // Before 1.0 until it starts (its mark cleared by the start): no facts.
   if (record.preWorkflow && !starts) return
@@ -260,7 +274,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       for (const d of before?.decisions ?? []) decision(d)
     }
     const facts = () => foldCard(tx.facts(n), was)
-    if (starts) {
+    if (starts && moves) {
       const mine = reads && reads.agent === after.agent ? reads : null
       if (mine?.ruleset) tx.saveRuleset(mine.ruleset)
       tx.append(n, {
@@ -280,13 +294,16 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       })
     }
     let moved: number | null = null
-    if (was !== to) {
+    if (was !== to && moves) {
       moved = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }).seq // i18n-ignore: a fact's kind and codes, not text
       tx.setStage(n, to)
     }
+    // The runtime's own move: its loop wake is written here, with the board's other handoffs (a submission's reviewer
+    // wake is the runtime's own).
+    if (!moves) moved = ctx?.byRuntime?.moved ?? null
     let submitted: number | null = null
     let verdict: number | null = null
-    if (intoReview) {
+    if (intoReview && moves) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
       const failed = s.latest && s.verdicts.findLast((v) => v.submission === s.latest!.id && !v.pass)
@@ -310,11 +327,11 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
             })()
       submitted = tx.append(n, { kind: 'Submitted', actor, source: 'recorded', ...ruleset(), data }).seq // i18n-ignore: a fact's kind and codes, not text
     }
-    if (after.review && (!before?.review || before.review.agent !== after.review.agent)) {
+    if (moves && after.review && (!before?.review || before.review.agent !== after.review.agent)) {
       const s = facts()
       tx.append(n, { kind: 'ReviewStarted', actor, source: 'recorded', ...ruleset(), data: { reviewer: after.review.agent, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null } })
     }
-    for (const h of history) {
+    for (const h of moves ? history : []) {
       if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
       const s = facts()
       const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')

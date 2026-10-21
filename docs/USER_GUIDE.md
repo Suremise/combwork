@@ -674,6 +674,14 @@ Each project has a **key** of 2 to 4 letters (HI, AM, WEB), and its cards are na
 - **Moving a card** to another project gives it that project's next number; its old name keeps finding it, in the search, the palette, Depends on, Related and links.
 - **Agents** take a card's name wherever they take a card, and Hive names cards to them as **HI-12 (#40)**: the key, and the number their tools took before 1.0.
 
+### Moves and your project's rules
+
+From 1.0 a project has workflow rules (its version control's options): for example, that work is reviewed before it reaches Done. When you move a card to a column its rules have, Hive does what the move stands for: into **Doing** it starts the card's work (in its agent's worktree, if it has one), into **Review** it submits what the card's folder has now. A move that skips one of the rules, such as a card dragged to **Done** that was never reviewed or merged, is still made: Hive records it on the card as an exception, naming the rules it skipped. Asking first, with a reason, comes in a later 1.0 build. A move to a column the project's rules don't have (Review in a project with no review) is made as before.
+
+The Hive Assistant moves cards the same way, but a move of its that skips a rule is refused unless you asked for it and it gives the reason, which is recorded on the card. Agents can't make an exception.
+
+Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
+
 ### Exporting the board
 
 The board is kept in the workspace's database, `.hive/hive.db`, and so are the card loops' lanes, agents' card watches and every project's inbox (what Hive has for its agents to read): their `lanes.json`, `watches.json` and `deliveries.json` files are moved in the first time Hive 0.9 opens the workspace, and kept beside it as `….imported-<time>`. Every change to the board is saved whole or not at all, also when many cards change at once (Archive All, a batch move), and a board of a thousand cards stays quick. The database is this computer's: a workspace you commit to git leaves it out.
