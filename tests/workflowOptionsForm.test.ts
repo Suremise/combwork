@@ -5,7 +5,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -23,6 +23,10 @@ const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
 const { allOff, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
 const { agentActor } = await import('../src/shared/workflow/facts')
+const { compile } = await import('../src/shared/workflow/compile')
+
+/** The bound for a hung run: a start's facts are recorded within it. */
+const HUNG_MS = 15_000
 const { settingEntry, checkSettingValue, settingPatch } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
 
@@ -154,6 +158,27 @@ describe('the Workflow section (#1278)', () => {
     expect(after.id).toBe(overrides[0].ruleset)
     // A card not in flight gets none.
     expect(wf2.store.facts(todo.number).filter((f) => f.kind === 'Override')).toEqual([])
+  })
+})
+
+describe('the next card starts under the saved options (#1278, S19)', () => {
+  it("a card started after a save records Started under the new ruleset, resolved over the workspace's; one started before keeps its own", async () => {
+    const { w, repo } = await workspace({ project: allOff('git'), workspace: { git: { style: 'squash' } } })
+    const before = await inWorkspace(w, () => tasks.createTask({ title: 'Before', project: 'p', agent: 'b1', column: 'doing' }, user))
+    const after = await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
+    const wf = (await workflowFor(w, repo))!
+    const startedRuleset = (n: number): string | undefined => wf.store.facts(n).find((f) => f.kind === 'Started')?.ruleset
+    const old = await vi.waitFor(() => startedRuleset(before.number) ?? Promise.reject(new Error('not started yet')), { timeout: HUNG_MS })
+    // Only some options set: the rest inherit (the workspace's squash among them).
+    const { target: _t, style: _s, ...own } = allOff('git')
+    await form.setWorkflowOptions(w, repo, { preset: null, options: { ...own, preChecks: ['lint'], commands: { lint: 'npm run lint' } } })
+    await inWorkspace(w, () => tasks.updateTask(after.number, { column: 'doing', agent: 'b1' }, user))
+    const expected = compile({ ...allOff('git'), style: 'squash', preChecks: ['lint'], commands: { lint: 'npm run lint' } })
+    if (!expected.ok) throw new Error('the expected options contradict each other')
+    const now = await vi.waitFor(() => startedRuleset(after.number) ?? Promise.reject(new Error('not started yet')), { timeout: HUNG_MS })
+    expect(now).toBe(expected.ruleset.id)
+    expect(now).not.toBe(old)
+    expect(startedRuleset(before.number)).toBe(old)
   })
 })
 
