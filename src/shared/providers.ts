@@ -20,6 +20,7 @@ export interface ModeText {
   label: Msg
   description: Msg
   cliNote?: Msg
+  short?: Msg
 }
 
 /** A provider's notes in the window's words (Agent Setup, a pane's sign-in and safeguard notes). */
@@ -47,6 +48,10 @@ export interface ModeOption {
   reviewed?: boolean
   /** Where the CLI's own screen names the mode differently, why: shown with Hive's mode badge while a session runs in it. */
   cliNote?: string
+  /** A shorter name for the mode badge, where the label is long ("CLI's own"). */
+  short?: string
+  /** The CLI's own setting (cliOwnMode.ts): Hive passes no mode, switches none live, and the Assistant isn't offered it. */
+  cliOwn?: boolean
 }
 
 export interface ModelOption {
@@ -521,6 +526,13 @@ export function permissionLabel(provider: ProviderId, mode: PermissionMode, tr?:
   return m ? (tr ? shownText(m.label, m.text?.label, tr) : m.label) : mode
 }
 
+/** A mode's name on its badge: its short name where it has one ("CLI's own"), else its name (permissionLabel). */
+export function modeBadgeLabel(provider: ProviderId, mode: PermissionMode, tr?: Tr): string {
+  const m = modeOption(provider, mode)
+  if (!m?.short) return permissionLabel(provider, mode, tr)
+  return tr ? shownText(m.short, m.text?.short, tr) : m.short
+}
+
 /** What a mode does: in the window's language with tr (#861), else English; its id when the provider has no such mode. */
 export function modeDescription(provider: ProviderId, mode: PermissionMode, tr?: Tr): string {
   const m = modeOption(provider, mode)
@@ -543,9 +555,23 @@ export function labelList(labels: string[], and = 'and'): string {
   return labels.length < 2 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} ${and} ${labels[labels.length - 1]}`
 }
 
-/** The modes a picker offers: the provider's, without the dangerous one unless it is enabled. */
-export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, 'providers'> | null | undefined): ModeOption[] {
-  return providerDescriptor(provider).permissionModes.filter((m) => !m.danger || providerSettings(settings, provider).enableDangerousMode)
+/**
+ * The modes a picker offers: the provider's, without the dangerous one unless it is enabled. The Hive Assistant's
+ * (`assistant`) never include the CLI's own setting (#1284): Control relies on knowing the mode it runs in.
+ */
+export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, 'providers'> | null | undefined, assistant = false): ModeOption[] {
+  return providerDescriptor(provider).permissionModes.filter((m) => (!m.danger || providerSettings(settings, provider).enableDangerousMode) && !(assistant && m.cliOwn))
+}
+
+/**
+ * Whether a running session can switch to a mode without a restart: the provider's rule (canSwitchLive), never to or
+ * from the CLI's own setting (#1284), where Hive doesn't know the mode the session started in.
+ */
+export function canSwitchModeLive(provider: ProviderId | ProviderDescriptor, target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {
+  const d = typeof provider === 'string' ? providerDescriptor(provider) : provider
+  if (d.capabilities.liveModeSwitch === 'none') return false
+  if ([target, current, launched].some((m) => !!m && !!d.permissionModes.find((o) => o.value === m)?.cliOwn)) return false
+  return d.canSwitchLive(target, current, launched)
 }
 
 export interface AgentLaunchSettings {

@@ -143,6 +143,8 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
+  'settings.advanced.hive.assistant.otherMcpServers.desc': undefined
+  'settings.advanced.hive.assistant.otherMcpServers.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined

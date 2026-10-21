@@ -15,6 +15,7 @@ import type { AppSettings, ProjectConfig, ProviderId, WorkspaceConfig } from './
 import { LANE_MAX_ROUNDS, LOOP_ROUNDS, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS, loopDefaults } from './lanes'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES } from './defaults'
 import { PRICES_CHECKED } from './prices'
+import { isCliOwnMode } from './cliOwnMode'
 import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { language, msg } from './i18n'
 import { takesOption, type OptionKey } from './workflow/options'
@@ -1081,7 +1082,7 @@ export function settingOptions(e: SettingEntry): { value: string; label: string 
   if (e.id === 'project.defaultProvider') return [inherit, ...providers]
   const modes = (p: ProviderId) => providerDescriptor(p).permissionModes.map((m) => ({ value: m.value, label: englishText(m.label) }))
   if (e.scope === 'project' && e.provider && e.key === 'permissionMode') return [inherit, ...modes(e.provider)]
-  if (e.assistantProvider && fieldKey(e) === 'permissionMode') return [{ value: '', label: 'Default' }, ...modes(e.assistantProvider)] // i18n-ignore: the Assistant's tools (English)
+  if (e.assistantProvider && fieldKey(e) === 'permissionMode') return [{ value: '', label: 'Default' }, ...modes(e.assistantProvider).filter((m) => !isCliOwnMode(m.value))] // i18n-ignore: the Assistant's tools (English)
   if (e.assistantProvider && fieldKey(e) === 'use200kContext') return [{ value: '', label: 'Default' }, { value: 'on', label: 'On' }, { value: 'off', label: 'Off' }] // i18n-ignore: the Assistant's tools (English)
   return null
 }

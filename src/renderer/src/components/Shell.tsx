@@ -14,6 +14,7 @@ import { InboxStatusItem } from './Inbox'
 import { keepAwakeText } from '@shared/keepAwake'
 import { GIT_MIN, gitFixText, gitProblemText } from '@shared/gitTool'
 import { useInbox } from '../inbox'
+import { useForYou } from '../forYou'
 import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
@@ -35,6 +36,7 @@ const M = {
   withKey: msg({ id: 'workspace.activity.withKey', defaultMessage: '{label} ({key})', description: 'Tooltip on an activity bar button: its name and its shortcut ({key}: "Ctrl+Shift+E").' }),
   notifications: msg({ id: 'workspace.activity.notifications', defaultMessage: 'Notifications', description: 'The activity bar: the button that shows the notifications.' }),
   notificationsTip: msg({ id: 'workspace.activity.notificationsTip', defaultMessage: '{unread, plural, =0 {Notifications} other {Notifications (# unread)}}', description: 'Tooltip on the notifications button.' }),
+  forYouBadge: msg({ id: 'workspace.activity.forYou', defaultMessage: '{n, plural, one {# card waits for you} other {# cards wait for you}}', description: "Accessible name and tooltip line of the count on the activity bar's Task Board icon: how many cards wait for the user (an approval, a decision, a question: For you). Glossary: For you." }),
   unread: msg({ id: 'workspace.activity.unread', defaultMessage: '{count, plural, other {# unread}}', description: 'The notifications button, for screen readers: how many notifications are unread.' }),
   more: msg({ id: 'workspace.statusBar.more', defaultMessage: 'and {count} more', description: "Under the running agents' table in the status bar's tooltip: agents not listed." }),
   openWorkspace: msg({ id: 'workspace.statusBar.openWorkspace', defaultMessage: 'Open a workspace', description: 'The status bar with no workspace open: opens one.' }),
@@ -81,17 +83,23 @@ export function ActivityBar() {
   const unread = useStore((s) => s.unread)
   // Agents that need you (the inbox's count).
   const attention = useInbox().needYou.length
-  // Cards waiting for the user to look at them.
-  const review = useStore((s) => s.tasks.filter((c) => !c.archived && c.column === 'review').length)
+  // Cards waiting for the user (#1276, For you: an approval, a decision, a question); Review's count stays in the board
+  // sidebar's Waiting for review.
+  const forYou = new Set(useForYou().summary.items.map((i) => i.card)).size
 
-  const button = (id: Activity, icon: string, labelMsg: Msg, command: string, badge?: number) => {
+  const button = (id: Activity, icon: string, labelMsg: Msg, command: string, badge?: number, badgeLabel?: string) => {
     const kb = commandKeybinding(command)
     const label = tr(labelMsg)
+    const said = badge && badgeLabel ? `${label} · ${badgeLabel}` : label
     return (
-      <Tooltip key={id} content={kb ? tr(M.withKey, { label, key: formatKeybinding(kb) }) : label}>
-        <button className={cx('activity-btn', activity === id && (sidebarVisible || id === 'docs' || id === 'settings') && 'active')} onClick={() => setActivity(id)} aria-label={label}>
+      <Tooltip key={id} content={kb ? tr(M.withKey, { label: said, key: formatKeybinding(kb) }) : said}>
+        <button className={cx('activity-btn', activity === id && (sidebarVisible || id === 'docs' || id === 'settings') && 'active')} onClick={() => setActivity(id)} aria-label={label} aria-description={badge && badgeLabel ? badgeLabel : undefined}>
           {icon === ASSISTANT_ICON ? <AssistantMark className="activity-mark" /> : <Icon name={icon} />}
-          {!!badge && <span className="activity-badge">{badge}</span>}
+          {!!badge && (
+            <span className="activity-badge" aria-label={badgeLabel} data-badge={id}>
+              {badge}
+            </span>
+          )}
         </button>
       </Tooltip>
     )
@@ -99,7 +107,7 @@ export function ActivityBar() {
 
   return (
     <div className="activitybar">
-      {ACTIVITIES.map((a) => button(a.id, a.icon, a.label, a.command, a.id === 'projects' ? attention : a.id === 'board' ? review : undefined))}
+      {ACTIVITIES.map((a) => button(a.id, a.icon, a.label, a.command, a.id === 'projects' ? attention : a.id === 'board' ? forYou : undefined, a.id === 'board' ? tr(M.forYouBadge, { n: forYou }) : undefined))}
       <div className="activity-spacer" />
       <Tooltip content={tr(M.notificationsTip, { unread })}>
         <button

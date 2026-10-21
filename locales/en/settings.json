@@ -567,6 +567,14 @@
     "defaultMessage": "Agents per project",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.assistant.otherMcpServers.desc": {
+    "defaultMessage": "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
+    "description": "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
+  },
+  "settings.advanced.hive.assistant.otherMcpServers.title": {
+    "defaultMessage": "The Assistant uses the workspace's other MCP servers",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant."
+  },
   "settings.advanced.hive.assistant.startView.desc": {
     "defaultMessage": "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
     "description": "What the advanced setting \"The Assistant starts with Hive's start view\" does (Settings → Advanced, under Hive)."

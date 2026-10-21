@@ -3,6 +3,7 @@ import type { PermissionMode } from './types'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 import { codexModelLabel } from './codex'
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
 
 /**
@@ -107,6 +108,7 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
       return ['--autopilot']
     case 'allow-all':
       return ['--allow-all']
+    // Ask, and the CLI's own setting (#1284): no flag, so Copilot's own config decides.
     default:
       return []
   }
@@ -198,7 +200,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   icon: 'copilot',
   setupUrl: 'https://docs.github.com/copilot/how-tos/copilot-cli',
   pricingUrl: 'https://docs.github.com/copilot/reference/ai-models/supported-models',
-  permissionModes: COPILOT_PERMISSION_MODES,
+  permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
   // Ask, with edits in the agent's folder approved (#468).
   defaultPermissionMode: 'accept-edits',
   // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedHiveTools).

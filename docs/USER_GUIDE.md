@@ -686,6 +686,12 @@ Moving a **Done** card back to Doing (or further) reopens it: its work starts ag
 
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
 
+### For you
+
+Some cards wait for you: a review or an OK that is yours to give, a question an agent asked (*"OK to push the release tag?"*), a rule an agent couldn't keep, or a card loop that reached its round limit. Each such card shows a **For you** chip with what it asks (Approve, Decide, Test, Sign in or Other; hover it to read the request), the **Task Board** icon on the activity bar counts them, and the **For you** box in the board's toolbar shows only those cards (with the search box, both apply).
+
+Open the card to answer in its **For you** section: **Approve** or **Decline…** for an approval (declining asks why, and the agent reads your reason; declining your own review sends the card back to its builder as a round), or for a question, type your answer and **Send Reply**, or **Record as Decision** to keep it as one of the card's decisions. At a card loop's round limit you choose how it goes on: carry on with more rounds, split it, accept it with follow-ups, or take it over. A Test request lists what to try. Answering clears the chip at once and wakes the agent waiting on it. Only you answer: agents and the Assistant can ask, never answer for you. If the request was answered or retired meanwhile (a new submission, the card moved on), your answer isn't taken and Hive says why.
+
 ### Exporting the board
 
 The board is kept in the workspace's database, `.hive/hive.db`, and so are the card loops' lanes, agents' card watches and every project's inbox (what Hive has for its agents to read): their `lanes.json`, `watches.json` and `deliveries.json` files are moved in the first time Hive 0.9 opens the workspace, and kept beside it as `….imported-<time>`. Every change to the board is saved whole or not at all, also when many cards change at once (Archive All, a batch move), and a board of a thousand cards stays quick. The database is this computer's: a workspace you commit to git leaves it out.
@@ -1119,6 +1125,8 @@ When you switch a running Codex agent's preset, the badge says **Switching to �
 
 In **Approve for me**, Codex's reviewer decides on risky actions itself: while it does, the agent stays **Working…** with a small shield beside its status (hover it to see what's being checked), and Hive doesn't ask for you. Hive tells you an agent needs you only when Codex actually puts a question or an approval to you, and once for each, even when a new session is slow to start on a busy computer.
 
+**The CLI's own setting.** Every CLI's modes end with **The CLI's own setting**, for an agent, a project or a CLI's default like any mode: Hive then passes no permission mode at all, and the CLI starts in the one its own config sets (Claude Code's `defaultMode`, Codex's `sandbox_mode` and `approval_policy`, Copilot's own settings), or its default. Hive doesn't know which mode that is, so the agent's badge says **CLI's own** (the CLI's own screen shows the mode), and Hive switches no mode in such a session while it runs: choosing a mode from its menu restarts the session in that mode, the conversation continuing. A mode your CLI config sets is yours to choose, so Hive doesn't ask first for one without guardrails, as it does for **Bypass permissions** or **Full access**. The Hive Assistant isn't offered it: what it may do (**Control**) relies on knowing the mode it runs in.
+
 ### Codex's Windows sandbox
 
 On Windows, Codex runs commands in a sandbox, which it sets up once. **Help → Agent Setup… → Codex → Set up** opens Codex and, once it has finished loading and is idle (on a busy computer this can take a little while), brings up its setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.
@@ -1225,6 +1233,8 @@ Hive changes some of what each CLI does in the sessions it starts, never by edit
 - **Pass right-click to Claude Code**, **to Codex** and **to Copilot** (`<cli>.mouse.rightClickToCli`, off by default): right-click in a pane is Hive's copy and paste. Turned on, right-clicks go to the CLI instead, at once. Codex and Copilot track the mouse themselves; Claude Code doesn't at its prompt, so there a right-click then does nothing (Ctrl+C and Ctrl+V still copy and paste).
 - **Codex runs without its shared background server** (`--no-daemon`), with no switch: Codex uses that server only when it is given no configuration on its command line, and Hive gives every session its own (its hooks, MCP servers and guidance). A session on that server would also keep working after **Stop**.
 - **The model and effort** Hive passes (`--model`, `--effort` and each CLI's equivalents) are already yours to leave out: when no model or effort is chosen for the agent, its project or the CLI's settings page, Hive passes neither and the CLI uses its own.
+
+Under **Hive**, **The Assistant uses the workspace's other MCP servers** (`hive.assistant.otherMcpServers`, off) gives the Hive Assistant, from its next session, every MCP server that is on in the workspace (its switch in the MCP view), as it works across every project; off, it has only Hive's own tools, as before. Its **Control** setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is that CLI's **Only the workspace's MCP servers**.
 
 Under **Hive**, four more switches cover what Hive does with a pane's keys and with what it types into the CLIs, the same for every CLI. Each is as Hive has always done by default, and applies at once (the start view at the Assistant's next start or compaction, a running Assistant's too):
 
