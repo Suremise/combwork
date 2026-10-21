@@ -16,7 +16,7 @@ import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardComman
 import type { StartHint } from '../../../shared/startFailure'
 import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
-import { mergeLaunchSettings, userSettings, withoutSettingsArgs } from './launchSettings'
+import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
 import { claudeSafeguards } from './safeguards'
 import type { SafeguardEvent } from '../../../shared/safeguards'
@@ -374,8 +374,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       else hooks[ev] = [ev === 'PostToolUse' ? { matcher: '*', hooks: [hook] } : { hooks: [hook] }]
     }
     // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Hive and
-    // prints nothing, so no line is added to the terminal.
-    const statusLine = { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile, timeout), padding: 0 }
+    // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
+    // same JSON, and shows its output: Hive still reads the status.
+    const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs))
+    const statusLine = hiveStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
     // The user's --settings merged in: Hive passes only this file (#330).
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' }))
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })

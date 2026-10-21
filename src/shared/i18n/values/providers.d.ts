@@ -29,6 +29,10 @@ interface HiveMessageValues {
   'providers.claude.hint.model': undefined
   'providers.claude.hint.signIn': undefined
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
+  'providers.codex.developerUnread.agentMessage': undefined
+  'providers.codex.developerUnread.agentTitle': undefined
+  'providers.codex.developerUnread.assistantMessage': undefined
+  'providers.codex.developerUnread.assistantTitle': undefined
   'providers.codex.hint.broken': undefined
   'providers.codex.hint.model': undefined
   'providers.codex.hint.settings': undefined

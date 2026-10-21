@@ -22,7 +22,7 @@ const M = {
   tooLarge: msg({ id: 'providers.settings.tooLarge', defaultMessage: "it's over Claude Code's 2 MiB limit for settings files", description: "Why a settings file can't be read, after \"can't be read:\" in another message: it is larger than Claude Code takes. Keep 2 MiB as it is." }),
   notJson: msg({ id: 'providers.settings.notJson', defaultMessage: "The settings file {file} (--settings in Extra arguments) isn't valid JSON ({why}). Fix it or remove it in Agent Settings or Settings → Claude Code.", description: "Starting a Claude Code agent is refused: its settings file isn't JSON. {file} is its path; {why} is the JSON parser's own words (English). Keep --settings and JSON as they are." }),
   notObject: msg({ id: 'providers.settings.notObject', defaultMessage: "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} isn't a settings object ('{ … }'). Fix it or remove it in Agent Settings or Settings → Claude Code.", description: "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep { … } as it is." }),
-  hooksOff: msg({ id: 'providers.settings.hooksOff', defaultMessage: "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks), which Hive needs for the agent's status, file locks and status line. Remove it in Agent Settings or Settings → Claude Code.", description: "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them." }),
+  hooksOff: msg({ id: 'providers.settings.hooksOff', defaultMessage: "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.", description: "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them." }),
   notList: msg({ id: 'providers.settings.notList', defaultMessage: "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} sets {key} to something other than a list, which stops Hive's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.", description: "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep [ … ] as it is." })
 }
 
@@ -75,7 +75,8 @@ export async function userSettings(args: readonly string[], cwd: string): Promis
     }
   }
   if (!json || typeof json !== 'object' || Array.isArray(json)) throw hiveError(M.notObject, what)
-  // It would turn off Hive's hooks and status line with the user's (Claude Code 2.1.292): Hive can't keep both.
+  // It would turn off Hive's hooks and status line with the user's (Claude Code 2.1.292): Hive can't keep both. Refused,
+  // not launched without them (#1285, Darren's decision: no hooks-free mode): the hooks are how Hive knows the agent.
   if ((json as Record<string, unknown>).disableAllHooks === true) throw hiveError(M.hooksOff, what)
   // A list's entries are added to (mergeLaunchSettings); anything else in its place blocks Hive's hooks (2.1.292).
   for (const key of HOOK_ALLOWLISTS) {
@@ -145,4 +146,39 @@ export function mergeLaunchSettings(hive: { hooks: Record<string, unknown[]>; st
   allowing('allowedHttpHookUrls', needs.url)
   allowing('httpHookAllowedEnvVars', needs.envVar)
   return out
+}
+
+/** A status line Claude Code runs: its command, and its padding when it sets one. */
+export interface StatusLine {
+  type: 'command'
+  command: string
+  padding?: number
+}
+
+/**
+ * The user's own status line, as Claude Code would take it without Hive's (#1285, #966 row 12): the first settings
+ * scope, highest first (managed, the user's --settings, the project's local and shared files, theirs), that sets a
+ * command one. Null when none does.
+ */
+export function ownStatusLine(scopes: readonly { json: unknown }[]): StatusLine | null {
+  for (const s of scopes) {
+    const line = s.json && typeof s.json === 'object' ? (s.json as Record<string, any>).statusLine : undefined
+    if (!line || typeof line !== 'object') continue
+    if (line.type !== 'command' || typeof line.command !== 'string' || !line.command.trim()) continue
+    return { type: 'command', command: line.command, ...(typeof line.padding === 'number' ? { padding: line.padding } : {}) }
+  }
+  return null
+}
+
+/**
+ * Hive's status line (#1285): its forwarding command (`forward`, posting Claude Code's status JSON to Hive), alone and
+ * showing nothing, or with the user's own after it. Then Hive's server echoes the JSON back (the URL's `echo`), which
+ * goes on the user's command's input as Claude Code would give it, and the user's command's output is the status line.
+ * The user's command is grouped in a subshell, on lines of its own, so all of it reads that input and nothing of it (a
+ * comment at its end, several lines) can reach past the group: Claude Code runs status lines with bash (Git Bash on
+ * Windows), where that holds for any command that runs alone.
+ */
+export function hiveStatusLine(forward: (echo: boolean) => string, own: StatusLine | null): StatusLine {
+  if (!own) return { type: 'command', command: forward(false), padding: 0 }
+  return { ...own, command: `${forward(true)} | (\n${own.command}\n)` }
 }

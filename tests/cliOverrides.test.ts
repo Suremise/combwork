@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { parse as parseToml } from 'smol-toml'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
@@ -54,7 +54,7 @@ describe('the override switches', () => {
   it('are booleans, on by default (what Hive does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
     const switches = ADVANCED_DEFS.filter((d) => d.override)
     expect(switches.map((d) => d.id).sort()).toEqual([
-      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveHiveTools', 'claude-code.override.promptSnapshotOff',
+      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveHiveTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
       'codex.override.mcpIsolation', 'codex.override.preApproveHiveTools', 'codex.override.terminalTitle',
       'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveHiveTools', 'copilot.override.stripGitHubTokens'
     ])
@@ -284,7 +284,12 @@ describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP server
 // Codex merges Hive's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
 // each key a native one sets gets Hive's value, whatever the isolation switch, in the user's config or the project's.
 describe("Codex: Hive's hive server over a native one of that name", () => {
-  const homeBefore = process.env.CODEX_HOME
+  // The suite's own home, as beforeAll set it (read then, not as the module loads, when it isn't set yet: putting that
+  // back would leave the string "undefined", a folder in the current one, for the tests after these).
+  let homeBefore: string | undefined
+  beforeEach(() => {
+    homeBefore = process.env.CODEX_HOME
+  })
   // A new Codex home (and project) per case: config files are read by their modification time.
   let n = 0
   const where = (place: 'home' | 'project', toml: string): LaunchContext => {
@@ -382,6 +387,208 @@ describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
       expect(args()).toContain('--additional-mcp-config')
     } finally {
       rmSync(join(home, 'mcp-config.json'), { force: true })
+    }
+  })
+})
+
+describe("Claude Code's status line (#1285, row 12)", () => {
+  const claudeDir = join(base, 'claude-config')
+  const launch = async (): Promise<Record<string, any>> => {
+    const ctx = context({ privateDir: join(base, 'private-statusline'), env: { PATH: 'C:\\Windows', CLAUDE_CONFIG_DIR: claudeDir } })
+    await claudeCode.prepareLaunch(ctx)
+    return JSON.parse(readFileSync(join(ctx.privateDir, 'settings.json'), 'utf8')).statusLine
+  }
+  const project = join(base, 'proj', '.claude')
+  afterEach(() => {
+    rmSync(claudeDir, { recursive: true, force: true })
+    rmSync(project, { recursive: true, force: true })
+  })
+
+  it("is Hive's alone with the switch on, whatever the user's settings say", async () => {
+    mkdirSync(claudeDir, { recursive: true })
+    writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'node mine.js', padding: 2 } }))
+    const line = await launch()
+    expect(line).toEqual({ type: 'command', command: expect.stringMatching(/^curl(\.exe)? .*&statusline"$/), padding: 0 })
+    expect(line.command).not.toContain('mine.js')
+  })
+
+  it("off, runs the user's own after Hive's, given the JSON Hive's server echoes back, with their padding", async () => {
+    await advanced.set(overrideId('claude-code', 'statusLine'), false)
+    mkdirSync(claudeDir, { recursive: true })
+    writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'node mine.js && echo done', padding: 2 } }))
+    const line = await launch()
+    expect(line.padding).toBe(2)
+    expect(line.command).toMatch(/^curl(\.exe)? .*&statusline&echo" \| \(\nnode mine\.js && echo done\n\)$/)
+    // The project's own wins over the user's, as Claude Code takes them.
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(project, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'project-line' } }))
+    expect((await launch()).command).toMatch(/\| \(\nproject-line\n\)$/)
+    // None of theirs: Hive's own, as with the switch on.
+    rmSync(join(claudeDir, 'settings.json'))
+    rmSync(join(project, 'settings.json'))
+    expect(await launch()).toEqual({ type: 'command', command: expect.stringMatching(/&statusline"$/), padding: 0 })
+  })
+
+  // Run as Claude Code runs it, with Git's bash (Claude Code's shell on Windows; found from git itself, never WSL's
+  // bash): the user's command, however written, gets the echoed JSON unchanged and its output is the status line.
+  it("off, chains any command that runs alone in bash: a comment at its end, several lines, a pipeline (HR4's round 1)", async () => {
+    const { execFileSync, spawnSync } = await import('child_process')
+    const bash = join(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '..', '..', '..', 'bin', 'bash.exe')
+    expect(existsSync(bash), bash).toBe(true)
+    const { hiveStatusLine } = await import('../src/main/providers/claude/launchSettings')
+    const json = '{"model":{"display_name":"Opus 5.5"},"note":"a  b\\n#c"}'
+    // Hive's forwarding command stands in as what it prints: the JSON its server echoed.
+    const forward = (echo: boolean): string => (echo ? `printf '%s' '${json}'` : 'true')
+    const run = (command: string): { out: string; code: number | null } => {
+      const line = hiveStatusLine(forward, { type: 'command', command, padding: 3 })
+      expect(line.padding).toBe(3)
+      const r = spawnSync(bash, ['-c', line.command], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } })
+      return { out: r.stdout, code: r.status }
+    }
+    expect(run('printf MYLINE # my status line')).toEqual({ out: 'MYLINE', code: 0 })
+    expect(run('read -r line\nprintf "first %s" "$(printf %s "$line" | head -c 10)"')).toEqual({ out: 'first {"model":{', code: 0 })
+    expect(run('cat | wc -c | tr -d " "')).toEqual({ out: `${json.length}\n`, code: 0 })
+    // The input whole, byte for byte.
+    expect(run('cat')).toEqual({ out: json, code: 0 })
+    // A command of its own that fails still fails alone: nothing of Hive's around it hides that.
+    expect(run('exit 3').code).toBe(3)
+  })
+})
+
+describe("Hive's guidance for agents (#1285, row 13)", () => {
+  const codexArgs = (ctx: LaunchContext): string[] => codex.buildCommand('C:\\bin\\codex.exe', ctx).args
+  const developer = (args: string[]): string | null => {
+    const a = args.findLast((x) => x.startsWith('developer_instructions='))
+    return a ? (parseToml(a) as { developer_instructions: string }).developer_instructions : null
+  }
+  /** Every developer_instructions given, in the command's order (Codex keeps the last). */
+  const developers = (args: string[]): string[] => args.filter((x) => x.startsWith('developer_instructions=')).map((x) => (parseToml(x) as { developer_instructions: string }).developer_instructions)
+  afterEach(() => rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true }))
+
+  // What Codex itself would give the session (#1285, the Assistant's design in round 4): its offline prompt rendered
+  // with the agent's own arguments, as is and with developer_instructions cleared. Hive parses no profile and ranks no
+  // layer; e2e codexownhooks checks the real Codex at every layer (HR4's probes). Here the fake Codex renders it.
+  it('reads them from two renders of the prompt: one text more in front is the value, the same renders none', async () => {
+    const { developerInstructionsOf } = await import('../src/main/providers/codex/adapter')
+    const rest = ['<skills_instructions>', '<permissions instructions>']
+    expect(developerInstructionsOf(['Mine.', ...rest], rest)).toBe('Mine.')
+    expect(developerInstructionsOf(['  Mine.\n', ...rest], rest)).toBe('Mine.')
+    // The same renders: none set, or set empty or blank (an empty one clears every layer below it, in Codex).
+    expect(developerInstructionsOf(rest, rest)).toBe('')
+    expect(developerInstructionsOf([], [])).toBe('')
+    // Anything else Hive can't tell apart, or a render missing: no answer (Hive's guidance alone).
+    expect(developerInstructionsOf(['Mine.', 'other', ...rest], rest)).toBeNull()
+    expect(developerInstructionsOf(['Mine.', '<skills_instructions> changed', rest[1]], rest)).toBeNull()
+    expect(developerInstructionsOf(null, rest)).toBeNull()
+    expect(developerInstructionsOf(rest, null)).toBeNull()
+  })
+
+  it("Codex: Hive's guidance after the developer_instructions Codex renders for the session's own arguments, never in their place", async () => {
+    const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
+    // A Codex home of this test's own.
+    const homeBefore = process.env.CODEX_HOME
+    const home = join(base, 'developer-codex-home')
+    process.env.CODEX_HOME = home
+    mkdirSync(home, { recursive: true })
+    const said = join(home, 'fake-developer-instructions.txt')
+    const runs = (): { args: string[] }[] => (existsSync(join(home, 'fake-prompt-input.jsonl')) ? readFileSync(join(home, 'fake-prompt-input.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+    const env = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }
+    /** A launch as Hive makes it: the developer_instructions Codex keeps (the last given), every one given, and its notice. */
+    const launch = async (over: Partial<LaunchContext> = {}) => {
+      const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env, ...over })
+      await codex.prepareLaunch(ctx)
+      const args = codexArgs(ctx)
+      return { kept: developer(args), all: developers(args), notice: codex.launchNotice!(ctx), args }
+    }
+    const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => (await launch(over)).kept
+    try {
+      // Codex renders none: Hive's alone.
+      expect(await launched()).toBe('Hive guidance')
+      // Codex renders some (whatever layer they came from): Hive's after them, the Assistant's role after that.
+      writeFileSync(said, 'Codex says this.')
+      expect(await launched()).toBe('Codex says this.\n\nHive guidance')
+      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('Codex says this.\n\nHive guidance\n\nYou are the Assistant.')
+      // The agent's own arguments reach Codex untouched (it parses -pmine, -p=mine and the rest), with the cleared render.
+      const before = runs().length
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
+      expect(runs().slice(before).map((r) => r.args)).toEqual(expect.arrayContaining([['-pmine', '-m', 'gpt-x'], ['-pmine', '-m', 'gpt-x', '-c', 'developer_instructions=""']]))
+      expect(runs().slice(before)).toHaveLength(2)
+      // Asked again at every launch (HR4's round 4: no cache): only what Codex renders changed, and Hive takes it.
+      writeFileSync(said, 'SECOND-TARGET')
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('SECOND-TARGET\n\nHive guidance')
+      // Set empty or blank where Codex takes them: the same renders, Hive's alone.
+      for (const v of ['', '   ']) {
+        writeFileSync(said, v)
+        expect(await launched(), JSON.stringify(v)).toBe('Hive guidance')
+      }
+
+      // The user's own -c developer_instructions in Extra arguments (HR4's round 4): already in what Codex renders, and
+      // Hive's combined value comes after it, so it is the one Codex keeps. Its forms, with the Assistant's role too.
+      rmSync(said)
+      for (const flag of ['-c', '--config']) {
+        const extra = [flag, 'developer_instructions="EXTRA-ONLY"']
+        const agent = await launch({ extraArgs: extra })
+        expect(agent.kept, flag).toBe('EXTRA-ONLY\n\nHive guidance')
+        expect(agent.all, flag).toEqual(['EXTRA-ONLY', 'EXTRA-ONLY\n\nHive guidance'])
+        expect((await launch({ extraArgs: extra, instructions: 'You are the Assistant.' })).kept).toBe('EXTRA-ONLY\n\nHive guidance\n\nYou are the Assistant.')
+        // No guidance of Hive's: theirs alone, as they gave it.
+        expect((await launch({ extraArgs: extra, guidance: '' })).all).toEqual(['EXTRA-ONLY'])
+      }
+
+      // Codex can't say (a render failing): never anything in place of the user's own (HR4's round 4, the Assistant's
+      // decision). An agent: no override at all, its guidance missing, told once; the Assistant: its role alone, told.
+      writeFileSync(said, '!fail')
+      const failed = await launch()
+      expect(failed.all).toEqual([])
+      expect(failed.notice?.title).toBe("Hive's guidance is missing for this agent")
+      expect(failed.notice?.message).toMatch(/leaves yours as they are and adds none of its guidance/)
+      const theirsKept = await launch({ extraArgs: ['-c', 'developer_instructions="EXTRA-ONLY"'] })
+      expect(theirsKept.all).toEqual(['EXTRA-ONLY'])
+      const assistant = await launch({ instructions: 'You are the Assistant.' })
+      expect(assistant.kept).toBe('You are the Assistant.')
+      expect(assistant.notice?.title).toBe('The Assistant started with its role only')
+      // A launch Codex could answer has no notice.
+      writeFileSync(said, 'Codex says this.')
+      expect((await launch()).notice).toBeNull()
+      // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, and Codex isn't asked.
+      const none = runs().length
+      expect(await launched({ guidance: '' })).toBeNull()
+      expect(runs()).toHaveLength(none)
+    } finally {
+      process.env.CODEX_HOME = homeBefore
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it("reads Codex's render no longer than Settings → Advanced says (codex.promptInput.timeoutSeconds)", () => {
+    expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 15, unit: 's', applies: 'sessions' })
+  })
+
+  it('is a switch of its own under Hive, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {
+    const { HIVE_GUIDANCE } = await import('../src/shared/advanced')
+    expect(advancedDef(HIVE_GUIDANCE)).toMatchObject({ group: 'hive', kind: 'boolean', default: true, applies: 'sessions' })
+  })
+})
+
+// Row 11 has no switch (Darren, 21 Oct): Codex keeps the user's hooks beside Hive's, each layer's under its own key, and
+// merges the trust table (e2e codexownhooks asks the installed Codex). Hive's part: its hooks and its trust records are
+// its own session-flags keys only, so nothing of the user's is named, replaced or trusted by Hive.
+describe("Codex: Hive's hooks beside the user's own (row 11)", () => {
+  it("passes its hooks per event and trust records for its own session-flags keys alone, whatever the user's config has", () => {
+    mkdirSync(process.env.CODEX_HOME!, { recursive: true })
+    writeFileSync(join(process.env.CODEX_HOME!, 'config.toml'), '[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\ncommand = "echo mine"\n')
+    try {
+      const args = codex.buildCommand('C:\\bin\\codex.exe', context()).args
+      const values = args.filter((a, i) => args[i - 1] === '-c')
+      const state = values.find((v) => v.startsWith('hooks.state='))!
+      const keys = Object.keys((parseToml(state) as { hooks: { state: Record<string, unknown> } }).hooks.state)
+      expect(keys.length).toBeGreaterThan(5)
+      for (const k of keys) expect(k).toMatch(/^C:\\<session-flags>\\config\.toml:[a-z_]+:0:0$/)
+      // Its hooks are its own forwarding command; the user's hook is neither repeated nor named.
+      expect(values.filter((v) => v.startsWith('hooks.') && !v.startsWith('hooks.state=')).every((v) => v.includes('curl') && !v.includes('echo mine'))).toBe(true)
+      expect(args.join(' ')).not.toContain('echo mine')
+    } finally {
+      rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true })
     }
   })
 })

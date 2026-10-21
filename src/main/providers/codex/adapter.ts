@@ -206,11 +206,75 @@ function hookOverrides(url: string, authFile: string, hashes?: Record<string, st
 
 /** Asks Codex (its app server) for the keys and hashes of the given hooks. */
 async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string): Promise<Record<string, string> | null> {
+  const result = await askAppServer(executable, hookArgs, cwd, 'hooks/list', { cwds: [cwd] })
+  const out: Record<string, string> = {}
+  for (const entry of result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
+  return Object.keys(out).length ? out : null
+}
+
+/**
+ * The developer_instructions Codex itself would give a session started with `args` (the agent's Extra arguments) in
+ * `cwd` (#1285, the Assistant's design on it): Hive parses no profile and ranks no layer, Codex does. Its offline prompt
+ * inspector (`debug prompt-input`, no model call or sign-in) renders the session's prompt twice, as it is and with
+ * developer_instructions cleared (`-c developer_instructions=""`, which overrides every layer, profile and project
+ * alike): what the first's developer message has in front of the second's is the value, and the same renders mean none
+ * (missing, empty or blank). Its app server can't do this: it can't select a profile (0.163.0). Null when Codex couldn't
+ * render it or the two renders differ otherwise: Hive then gives its guidance alone, as before #1285.
+ */
+async function developerInstructionsFromCodex(executable: string, cwd: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
+  const [as, cleared] = await Promise.all([promptDeveloper(executable, cwd, [...args], env), promptDeveloper(executable, cwd, [...args, '-c', 'developer_instructions=""'], env)])
+  return developerInstructionsOf(as, cleared)
+}
+
+/**
+ * The developer_instructions in a session's rendered prompt (`as`, its developer message's texts), given the same prompt
+ * with them cleared (`cleared`): one text more in front, the rest the same, is the value; the same texts, none (''). Null
+ * for anything else (a render missing, or renders Hive can't tell apart).
+ */
+export function developerInstructionsOf(as: readonly string[] | null, cleared: readonly string[] | null): string | null {
+  if (!as || !cleared) return null
+  const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((t, i) => t === b[i])
+  if (same(as, cleared)) return ''
+  return as.length === cleared.length + 1 && same(as.slice(1), cleared) ? as[0].trim() : null
+}
+
+/** Remembers `value` for a launch (`key`), keeping only the latest 16: a launch stopped part-way never takes its own. */
+function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > 16) map.delete(map.keys().next().value!)
+}
+
+/** The texts of the developer message in Codex's rendering of a session's prompt (`codex <args> debug prompt-input`), or null. */
+function promptDeveloper(executable: string, cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string[] | null> {
   return new Promise((resolveP) => {
-    const s = toSpawnable(executable, ['app-server', ...hookArgs])
-    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
+    const s = toSpawnable(executable, [...args, 'debug', 'prompt-input'])
+    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], ...(env ? { env } : {}) })
+    let out = ''
+    const timer = setTimeout(() => (p.kill(), resolveP(null)), advanced.number('codex.promptInput.timeoutSeconds') * 1000)
+    p.stdout.on('data', (d) => (out += d))
+    p.on('error', () => (clearTimeout(timer), resolveP(null)))
+    p.on('close', (code) => {
+      clearTimeout(timer)
+      if (code !== 0) return resolveP(null)
+      try {
+        const items = JSON.parse(out) as { role?: string; content?: { text?: unknown }[] }[]
+        const dev = items.find((x) => x.role === 'developer')
+        resolveP(dev ? (dev.content ?? []).map((c) => (typeof c.text === 'string' ? c.text : '')) : [])
+      } catch {
+        resolveP(null)
+      }
+    })
+  })
+}
+
+/** One request to Codex's app server (started for it, in `cwd`, with `args`): its result, or null on an error or after 20 s. */
+function askAppServer(executable: string, args: string[], cwd: string, method: string, params: unknown, env?: NodeJS.ProcessEnv): Promise<any> {
+  return new Promise((resolveP) => {
+    const s = toSpawnable(executable, ['app-server', ...args])
+    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], ...(env ? { env } : {}) })
     let buf = ''
-    const done = (v: Record<string, string> | null): void => {
+    const done = (v: any): void => {
       clearTimeout(timer)
       p.kill()
       resolveP(v)
@@ -232,12 +296,8 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
         }
         if (m.id === 1) {
           send({ method: 'initialized' })
-          send({ id: 2, method: 'hooks/list', params: { cwds: [cwd] } })
-        } else if (m.id === 2) {
-          const out: Record<string, string> = {}
-          for (const entry of m.result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
-          done(Object.keys(out).length ? out : null)
-        }
+          send({ id: 2, method, params })
+        } else if (m.id === 2) done(m.error ? null : (m.result ?? null))
       }
     })
     send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive', version: '1' } } })
@@ -632,7 +692,57 @@ export class CodexAdapter implements ProviderAdapter {
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     await this.checkHookHashes(ctx)
+    // The developer_instructions Codex would give this session, for Hive's guidance to follow (#1285): asked at each
+    // launch Hive adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
+    // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
+    if ([ctx.guidance, ctx.instructions].some((t) => t && t.trim())) {
+      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, ctx.extraArgs, ctx.env)
+      if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Hive leaves them as they are")
+      keepBounded(this.developerByRun, ctx.runId, theirs)
+    }
     return delivered
+  }
+
+  /**
+   * What Codex said each launch's developer_instructions are (prepareLaunch): the text, or null when it couldn't say;
+   * taken by buildCommand. A launch stopped before its command is built leaves its entry, so only the latest few are kept.
+   */
+  private developerByRun = new Map<string, string | null>()
+
+  /** Launches whose developer_instructions Codex couldn't say (buildCommand), for their notice (launchNotice). */
+  private developerUnread = new Map<string, 'agent' | 'assistant'>()
+
+  /**
+   * The launch's developer_instructions, or null for none of Hive's (#1285, #966 row 13; the Assistant's decisions on
+   * it): Hive's guidance and the Assistant's role after those Codex gives the session (prepareLaunch), never in their
+   * place. Codex unable to say: an agent's left as they are, with no guidance of Hive's, and the Assistant's role alone
+   * (without it there is no Assistant), each told once (launchNotice). Hive never writes Codex's config.
+   */
+  private developerOverride(ctx: LaunchContext): string | null {
+    const guidance = ctx.guidance?.trim() ?? ''
+    const role = ctx.instructions?.trim() ?? ''
+    const theirs = this.developerByRun.get(ctx.runId)
+    this.developerByRun.delete(ctx.runId)
+    if (!guidance && !role) return null
+    if (typeof theirs === 'string') return [theirs, guidance, role].filter(Boolean).join('\n\n')
+    keepBounded(this.developerUnread, ctx.runId, role ? 'assistant' : 'agent')
+    return role || null
+  }
+
+  launchNotice(ctx: LaunchContext): { title: string; message: string } | null {
+    const unread = this.developerUnread.get(ctx.runId)
+    this.developerUnread.delete(ctx.runId)
+    if (unread === 'assistant')
+      return {
+        title: tr(msg({ id: 'providers.codex.developerUnread.assistantTitle', defaultMessage: 'The Assistant started with its role only', description: "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role." })),
+        message: tr(msg({ id: 'providers.codex.developerUnread.assistantMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.", description: 'The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it.' }))
+      }
+    if (unread === 'agent')
+      return {
+        title: tr(msg({ id: 'providers.codex.developerUnread.agentTitle', defaultMessage: "Hive's guidance is missing for this agent", description: "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance." })),
+        message: tr(msg({ id: 'providers.codex.developerUnread.agentMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.", description: "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it." }))
+      }
+    return null
   }
 
   /** Which hook hashes to trust for this launch (hashesByRun): Hive's own, unless this Codex version hashes differently. */
@@ -676,9 +786,8 @@ export class CodexAdapter implements ProviderAdapter {
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
-    const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
-    if (developer) args.push('-c', `developer_instructions=${toToml(developer)}`)
     const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
       const { table, warning } = codexMcpServer(name, def, hive)
@@ -699,6 +808,8 @@ export class CodexAdapter implements ProviderAdapter {
       }
     }
     args.push(...ctx.extraArgs)
+    // After the user's own arguments, so it is the one Codex keeps: their own -c developer_instructions is already in it.
+    if (developer !== null) args.push('-c', `developer_instructions=${toToml(developer)}`)
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
