@@ -426,7 +426,7 @@
   "board.lanes.usualOrderDetail": "Carriles en ejecución, los más nuevos primero; los pausados después",
   "board.lanes.usualOrderSaid": "Carriles de nuevo en el orden habitual",
   "board.lanes.waitingForYou": "{n, plural, one {# te espera} other {# te esperan}}",
-  "board.lanes.waits": "{reason, select, blocked {{card} está bloqueada} hold {{card} está en espera} you {esperándote ({ask, select, approve {aprobación} decide {una decisión} test {una prueba} signIn {un inicio de sesión} other {una respuesta}}): {card}} roundLimit {esperándote: {card} llegó al límite de rondas} notMerged {esperando: {card} sin fusionar} merging {esperando: {card} fusionándose} stale {caducada: hay que volver a enviar {card}} reviewer {esperando un revisor para {card}} hooks {en pausa: no llegan los hooks de {agent}} other {cambios de la lista después de {card}}}",
+  "board.lanes.waits": "{reason, select, blocked {{card} está bloqueada} hold {{card} está en espera} you {esperándote ({ask, select, approve {aprobación} decide {una decisión} test {una prueba} signIn {un inicio de sesión} other {una respuesta}}): {card}} roundLimit {esperándote: {card} llegó al límite de rondas} notMerged {esperando: {card} sin fusionar} merging {esperando: {card} fusionándose} stale {caducada: hay que volver a enviar {card}} reviewer {esperando un revisor para {card}} lineUpdate {esperando: se actualiza la rama del autor antes de {card}} hooks {en pausa: no llegan los hooks de {agent}} other {cambios de la lista después de {card}}}",
   "board.links.archivedTitle": "{card} {title} · Archivada (de la columna {column}) · Ctrl+clic para abrir",
   "board.links.title": "{card} {title} · {column} · Ctrl+clic para abrir",
   "board.menu.delete": "Eliminar…",
