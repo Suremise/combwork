@@ -300,8 +300,8 @@
     "description": "Agent Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
   },
   "providers.settings.hooksOff": {
-    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks), which Hive needs for the agent's status, file locks and status line. Remove it in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
+    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
+    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
   },
   "providers.settings.noFile": {
     "defaultMessage": "there is no such file",

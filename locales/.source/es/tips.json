@@ -97,6 +97,8 @@
   "tips.cardSummaries.title": "Reports start with the gist",
   "tips.cardWork.text": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",
   "tips.cardWork.title": "See what a card’s work went through",
+  "tips.claudeStatusLine.text": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
+  "tips.claudeStatusLine.title": "Keep your own Claude Code status line",
   "tips.cliOverrides.text": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
   "tips.cliOverrides.title": "Keep a CLI as it is outside Hive",
   "tips.cliOwnMode.text": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",

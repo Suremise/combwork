@@ -874,7 +874,11 @@ const offered = tools.filter((t) => (t.name !== 'hive_console' || DEV_CONSOLE) &
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0'), JOURNAL_SCOPE)
 
+/** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
+const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'
+
 async function instructions(): Promise<string> {
+  if (!GUIDED) return ''
   // Without a project (the Hive Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
@@ -1006,7 +1010,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         protocolVersion: params?.protocolVersion ?? '2025-06-18',
         capabilities: { tools: {} },
         serverInfo: { name: 'hive', version: VERSION },
-        instructions: await instructions()
+        ...(GUIDED ? { instructions: await instructions() } : {})
       })
     case 'notifications/initialized':
       return sayConnected()

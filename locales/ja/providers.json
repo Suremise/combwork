@@ -74,7 +74,7 @@
   "providers.readiness.notInstalled": "{provider}がインストールされていません。",
   "providers.readiness.signedOut": "{provider}にサインインしていません。",
   "providers.readiness.update": "{provider} {version}が利用できます。",
-  "providers.settings.hooksOff": "{source, select, inline {「追加の引数」の--settings} other {設定ファイル{file}（「追加の引数」の--settings）}}がすべてのフックをオフにしています（disableAllHooks）。Hiveはエージェントのステータス、ファイルロック、ステータスラインにフックを使います。「エージェント設定」または「設定」→「Claude Code」で削除してください。",
+  "providers.settings.hooksOff": "{source, select, inline {「追加の引数」の--settings} other {設定ファイル{file}（「追加の引数」の--settings）}}がすべてのフックをオフにしています（disableAllHooks）。Hiveはフックでエージェントが何をしているか（ステータス、ファイルロック、エージェントへの通知）を知り、フックがステータスラインも運ぶため、フックなしではエージェントを起動しません。その設定からdisableAllHooksを外すか、「エージェント設定」または「設定」→「Claude Code」で「追加の引数」から--settingsを削除してください。",
   "providers.settings.noFile": "そのファイルはありません",
   "providers.settings.noValue": "「追加の引数」の最後の--settingsに値がありません。設定ファイルかインラインのJSONを指定するか（--settings '''<file or JSON>'''）、「エージェント設定」または「設定」→「Claude Code」で削除してください。",
   "providers.settings.notAFile": "ファイルではありません",

@@ -391,6 +391,14 @@
     "defaultMessage": "See what a card’s work went through",
     "description": "A tip's title. Glossary: work (a card's Work section)."
   },
+  "tips.claudeStatusLine.text": {
+    "defaultMessage": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.claudeStatusLine.title": {
+    "defaultMessage": "Keep your own Claude Code status line",
+    "description": "A tip's title. The status line is the line Claude Code shows under its input."
+  },
   "tips.cliOverrides.text": {
     "defaultMessage": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

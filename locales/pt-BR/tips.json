@@ -97,6 +97,8 @@
   "tips.cardSummaries.title": "Relatórios começam pelo essencial",
   "tips.cardWork.text": "Abra um cartão: a seção Trabalho lista cada versão enviada para revisão, com rodada, arquivos, veredictos e verificações, e como foi mesclada. No quadro, um cartão mostra sua versão e o último veredito.",
   "tips.cardWork.title": "Veja por onde passou o trabalho de um cartão",
+  "tips.claudeStatusLine.text": "A linha de status do Hive alimenta o rodapé de um agente e não mostra nada no painel. Desative Configurações → Avançado → A linha de status do Hive no lugar da sua para ver de novo a das suas configurações do Claude Code: o Hive continua lendo o status.",
+  "tips.claudeStatusLine.title": "Mantenha a sua própria linha de status do Claude Code",
   "tips.cliOverrides.text": "O Hive muda um pouco o comportamento de cada CLI nas sessões dele, como o Copilot não se atualizar sozinho ou o título do terminal do Codex. Cada mudança pode ser desativada em Configurações → Avançado, sob a CLI dela, que diz o que o Hive não consegue mais fazer sem ela.",
   "tips.cliOverrides.title": "Mantenha uma CLI como ela é fora do Hive",
   "tips.cliOwnMode.text": "Escolha \"A configuração própria da CLI\" como modo de permissão de um agente ou projeto e o Hive não passa nenhum: a CLI começa no modo definido pela própria configuração dela. O selo diz \"Da CLI\", e mudar uma sessão em execução a reinicia.",

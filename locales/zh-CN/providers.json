@@ -74,7 +74,7 @@
   "providers.readiness.notInstalled": "{provider} 未安装。",
   "providers.readiness.signedOut": "{provider} 未登录。",
   "providers.readiness.update": "{provider} {version} 已发布。",
-  "providers.settings.hooksOff": "{source, select, inline {额外参数中的 --settings} other {设置文件 {file}（额外参数中的 --settings）}}关闭了所有钩子（disableAllHooks），而 Hive 需要钩子来获取智能体的状态、文件锁和状态行。请在“智能体设置”或“设置”→“Claude Code”中删除它。",
+  "providers.settings.hooksOff": "{source, select, inline {额外参数中的 --settings} other {设置文件 {file}（额外参数中的 --settings）}}关闭了所有钩子（disableAllHooks）。Hive 通过钩子了解智能体在做什么（其状态、文件锁、告诉它的内容），钩子也承载其状态行，因此 Hive 不会在没有钩子的情况下启动智能体。请从这些设置中去掉 disableAllHooks，或在“智能体设置”或“设置”→“Claude Code”中从额外参数里删除该 --settings。",
   "providers.settings.noFile": "该文件不存在",
   "providers.settings.noValue": "额外参数中最后一个 --settings 没有值。请为它提供设置文件或内联 JSON（--settings '''<file or JSON>'''），或在“智能体设置”或“设置”→“Claude Code”中删除它。",
   "providers.settings.notAFile": "它不是文件",

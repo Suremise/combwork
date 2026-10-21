@@ -74,7 +74,7 @@
   "providers.readiness.notInstalled": "{provider} no está instalado.",
   "providers.readiness.signedOut": "{provider} no tiene la sesión iniciada.",
   "providers.readiness.update": "Ya está disponible {provider} {version}.",
-  "providers.settings.hooksOff": "{source, select, inline {El --settings de Argumentos adicionales} other {El archivo de configuración {file} (--settings en Argumentos adicionales)}} desactiva todos los hooks (disableAllHooks), que Hive necesita para el estado del agente, los bloqueos de archivos y la línea de estado. Quítalo en Configuración del agente o en Configuración → Claude Code.",
+  "providers.settings.hooksOff": "{source, select, inline {El --settings de Argumentos adicionales} other {El archivo de configuración {file} (--settings en Argumentos adicionales)}} desactiva todos los hooks (disableAllHooks). Los hooks de Hive son cómo Hive sabe lo que hace el agente (su estado, los bloqueos de archivos, lo que se le dice) y llevan su línea de estado, así que Hive no inicia un agente sin ellos. Quita disableAllHooks de esa configuración o quita el --settings de Argumentos adicionales en Configuración del agente o en Configuración → Claude Code.",
   "providers.settings.noFile": "no existe ese archivo",
   "providers.settings.noValue": "El último --settings de Argumentos adicionales no tiene valor. Dale un archivo de configuración o JSON en línea (--settings '''<file or JSON>'''), o quítalo en Configuración del agente o en Configuración → Claude Code.",
   "providers.settings.notAFile": "no es un archivo",

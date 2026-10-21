@@ -2456,7 +2456,7 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | Group / rows | What | Phase |
 |---|---|---|
 | A (1, 3–8) | Inherit the CLI's own permission policy (badges, resume state and Control kept honest); pre-approval of Hive's tools (Copilot `--allow-tool=hive`, Claude Assistant `--allowedTools`), separating availability, CLI trust and API authorization; MCP isolation per CLI (Claude `--strict-mcp-config`, Codex `.enabled=false`, Copilot `--disable-builtin-mcps`/`--disable-mcp-server`); the Assistant's non-Hive servers; Copilot's `GH_TOKEN`/`GITHUB_TOKEN` strip (displayed and running account agree) | P4 |
-| B (10–14) | Claude's `--settings` merge, widened hook allowlists and the `disableAllHooks` refusal; Codex's hook replacement and trust; Claude's status line (keep or chain the user's); guidance and the Assistant's role injection (Codex `developer_instructions`). Several need a defined **reduced, hooks-free mode** per provider, with visible limits (no status, locks or inbox notices from hooks; the pane says so) | P4 |
+| B (10–14) | Claude's `--settings` merge, widened hook allowlists and the `disableAllHooks` refusal; Codex's hook replacement and trust; Claude's status line (keep or chain the user's); guidance and the Assistant's role injection (Codex `developer_instructions`). Built in #1285 (below): rows 12 and 13 have switches; rows 10, 11 and 14 have their recorded reasons, with no hooks-free mode | P4 |
 | E (24, 26–30) | Ctrl+C/V passthrough; all-keys passthrough; the OSC 52 policy; prompt fidelity (Ctrl+U clearing a draft, collapsed whitespace, stripped characters); raw variants of Hive's wrapped prompts | P4 |
 | #1167 (19–23, 25, 34) | Copilot auto-update (both suppressors, every path); right-click for Claude Code and Codex; Codex terminal title omitted; `--system-prompt-snapshot off`; `--allow-all-mcp-server-instructions`; Codex `--no-daemon` (only if verified); model/effort flags (check first) | P4 |
 | #1174 | Codex: the Assistant pre-approves only its Control subset of Hive tools (parity; built in #1281, §9.3) | P4 |
@@ -2498,6 +2498,37 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
   workspace server on in the workspace (its master switch: the Assistant's home has no MCP tab, and it works across
   every project), its own choice narrowing them, Hive's `hive` still Hive's (`effectiveHere`). Its CLI's own servers
   follow that CLI's `mcpIsolation` either way. Control governs only Hive's tools; another server's ask per the CLI.
+
+**Group B's rows 10–14** (#1285; Darren's decisions on #1120 point 4 and on #1285):
+- **Row 10, Hive's hooks: no switch and no hooks-free mode** (Darren, 21 Oct): Hive's hooks are how it knows what an
+  agent is doing (its status, waiting for you, file locks, the lines Hive types and their taking, inbox notices, a new
+  Codex conversation's id); without them it isn't Hive, and a user who can't run them is better served by a plain
+  terminal. Mapped on #1285: without the hooks no status reaches Hive at all, since its screen readings only follow a
+  turn a hook opened. Claude Code's `--settings` merge stays as it is (§6.1: the user's settings and hooks kept, the
+  allowlists widened for Hive's), and `disableAllHooks: true` stays refused, the message saying why and what to change
+  (`providers.settings.hooksOff`).
+- **Row 11, Codex's hooks: no switch**, nothing to keep (Darren, 21 Oct). Codex keeps each config layer's hooks
+  apart: the user's (their `config.toml`, keyed by that file) and Hive's (`-c hooks.<event>`, the session flags'
+  `C:\<session-flags>\config.toml:<event>:0:0`) both run, and Hive's `-c hooks.state` table merges into the user's, whose
+  trust records stay (Codex 0.163.0, its app server's `hooks/list`). Hive names only its own keys. `codexownhooks`
+  asks the installed Codex, so a Codex that starts displacing them fails there; a unit test pins Hive's keys. A
+  `-c hooks.<event>` in the user's Extra arguments comes after Hive's and replaces Hive's for that event.
+- **Row 12, `claude-code.override.statusLine`** ("Hive's status line in place of yours", on; sessions started
+  afterwards): off, the status line in the user's Claude Code settings (the first scope that sets a command one,
+  highest first: managed, their `--settings`, the project's local and shared files, theirs; `ownStatusLine`) runs after
+  Hive's: `curl … "<hook URL>&statusline&echo" | (<their command>)`, with their padding. Hive's hook server answers the
+  `echo` form with the JSON it was sent, so their command gets Claude Code's input whole on stdin, and its output is the
+  status line; Hive still reads the status. The brackets group their whole command in bash and cmd. With none of
+  theirs, Hive's alone. `claudestatusline` checks it on the real Claude Code (2.1.306).
+- **Row 13, `hive.guidance`** ("Hive's guidance for agents", on; sessions started afterwards), separate from Settings →
+  Agent API → Provide Hive tools, without which there is no guidance either: off, project agents get Hive's tools
+  without it: `sessions.hiveGuidance` gives none (Codex's `developer_instructions`, Copilot's custom instructions), and
+  the hive server answers `initialize` with no `instructions` (`HIVE_GUIDANCE=0`). On Codex, Hive's guidance (and the
+  Assistant's role) now follow the user's own `developer_instructions` (the user's `config.toml`, then the project's,
+  which wins; a profile's aren't read) instead of replacing them; with none of Hive's, theirs apply as Codex reads them.
+  Hive reads `config.toml`, never writes it.
+- **Row 14, the Assistant's role and its guidance: no switch** (Darren, on #1120 point 4): the Assistant is its role and
+  its Control; without them it is no Assistant, only an agent. `hive.guidance` doesn't reach it.
 
 ### 16.16 Other 1.0 rules
 

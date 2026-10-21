@@ -369,6 +369,19 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
   return out
 }
 
+/**
+ * The user's own developer_instructions, as Codex takes them from its config files (the user's, then the project's,
+ * which wins), or '' when none sets them. A profile's own aren't read: Hive passes no --profile.
+ */
+export function ownDeveloperInstructions(files: readonly string[]): string {
+  let out = ''
+  for (const f of files) {
+    const v = readToml(f).developer_instructions
+    if (typeof v === 'string') out = v.trim()
+  }
+  return out
+}
+
 /** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
 function mcpServersIn(file: string): Record<string, McpServerDef> {
   const servers = readToml(file).mcp_servers
@@ -676,9 +689,11 @@ export class CodexAdapter implements ProviderAdapter {
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
-    const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
-    if (developer) args.push('-c', `developer_instructions=${toToml(developer)}`)
     const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    // Hive's guidance and the Assistant's role after the user's own developer_instructions, never in their place (#1285,
+    // #966 row 13): read from their config, which Hive never writes. With none of Hive's, theirs apply as Codex reads them.
+    const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
+    if (developer) args.push('-c', `developer_instructions=${toToml([ownDeveloperInstructions(files), developer].filter(Boolean).join('\n\n'))}`)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
       const { table, warning } = codexMcpServer(name, def, hive)

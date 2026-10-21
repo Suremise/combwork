@@ -74,7 +74,7 @@
   "providers.readiness.notInstalled": "{provider} is not installed.",
   "providers.readiness.signedOut": "{provider} is not signed in.",
   "providers.readiness.update": "{provider} {version} is available.",
-  "providers.settings.hooksOff": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks), which Hive needs for the agent's status, file locks and status line. Remove it in Agent Settings or Settings → Claude Code.",
+  "providers.settings.hooksOff": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
   "providers.settings.noFile": "there is no such file",
   "providers.settings.noValue": "The last --settings in Extra arguments has no value. Give it a settings file or inline JSON (--settings '''<file or JSON>'''), or remove it in Agent Settings or Settings → Claude Code.",
   "providers.settings.notAFile": "it isn't a file",

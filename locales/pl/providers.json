@@ -74,7 +74,7 @@
   "providers.readiness.notInstalled": "{provider} nie jest zainstalowany.",
   "providers.readiness.signedOut": "{provider} nie jest zalogowany.",
   "providers.readiness.update": "Dostępna nowa wersja: {provider} {version}.",
-  "providers.settings.hooksOff": "{source, select, inline {Opcja --settings w dodatkowych argumentach} other {Plik ustawień {file} (--settings w dodatkowych argumentach)}} wyłącza wszystkie hooki (disableAllHooks), których Hive potrzebuje do stanu agenta, blokad plików i paska stanu. Usuń to w Ustawieniach agenta lub w Ustawienia → Claude Code.",
+  "providers.settings.hooksOff": "{source, select, inline {Opcja --settings w dodatkowych argumentach} other {Plik ustawień {file} (--settings w dodatkowych argumentach)}} wyłącza wszystkie hooki (disableAllHooks). Dzięki hookom Hive wie, co robi agent (jego stan, blokady plików, co mu przekazano), a one niosą też jego pasek stanu, więc Hive nie uruchamia agenta bez nich. Usuń disableAllHooks z tych ustawień albo usuń --settings z dodatkowych argumentów w Ustawieniach agenta lub w Ustawienia → Claude Code.",
   "providers.settings.noFile": "nie ma takiego pliku",
   "providers.settings.noValue": "Ostatnia opcja --settings w dodatkowych argumentach nie ma wartości. Podaj plik ustawień albo JSON wprost (--settings '''<file or JSON>''') albo usuń ją w Ustawieniach agenta lub w Ustawienia → Claude Code.",
   "providers.settings.notAFile": "to nie jest plik",
