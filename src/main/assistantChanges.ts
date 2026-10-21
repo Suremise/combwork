@@ -74,6 +74,11 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
 export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project'] as const
 export type CardField = (typeof CARD_FIELDS)[number]
 
+/** The implicit field a card's move records (its review, as it was and became): checked by undo, never restored. */
+export const REVIEW = 'review'
+/** A card's review as a value: who reviews it and since when (a later review by the same reviewer is another). */
+export const reviewOf = (card: Pick<TaskCard, 'review'>): Value => (card.review ? { agent: card.review.agent, since: card.review.since } : null)
+
 /** A card's field as a value. */
 export function cardValue(card: TaskCard, field: CardField): Value {
   switch (field) {
@@ -123,6 +128,9 @@ export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: T
   if (!r || !ws.path || !same(ws.path, r.workspace) || changeActor()?.kind !== 'assistant') return
   const n = after.number
   const fields: FieldChange[] = before ? CARD_FIELDS.filter((f) => !sameValue(cardValue(before, f), cardValue(after, f))).map((f) => ({ field: f, old: cardValue(before, f), new: cardValue(after, f) })) : [{ field: 'created', old: false, new: true }]
+  // A move (of column or project) can stop a review: what the card's review was and became, its reviewer and when it
+  // started, so undo's move back never stops a review someone started since (round 3). Compared, never written back.
+  if (before && fields.some((f) => f.field === 'column' || f.field === 'project')) fields.push({ field: REVIEW, old: reviewOf(before), new: reviewOf(after) })
   const finals = finalsOf(before, after)
   const made = r.cards.get(n)
   if (!fields.length && !finals.length && !made) return
@@ -152,7 +160,7 @@ export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: T
         r.recorded++
       }
     }
-    prune(ws, db)
+    prune(ws.path!, db)
   })
 }
 
@@ -190,6 +198,8 @@ export function noteChangeIn(db: Db['writer'], workspacePath: string, o: NoteCha
   insertChange(db, id, r, o)
   for (const f of o.fields ?? []) putField(db, id, f)
   r.recorded++
+  // Every recording path prunes (#1282 round 2): a workspace whose Assistant changes only settings, lanes or agents too.
+  prune(workspacePath, db)
   return id
 }
 
@@ -265,8 +275,8 @@ export function valueOf(rows: readonly ValueRow[]): Value {
 
 /** Prunes changes past KEEP_DAYS, once an hour at most per workspace (inside a write, with the change being recorded). */
 const pruned = new Map<string, number>()
-function prune(ws: WorkspaceService, db: Db['writer'], now = Date.now()): void {
-  const key = (ws.path ?? '').toLowerCase()
+function prune(workspacePath: string, db: Db['writer'], now = Date.now()): void {
+  const key = workspacePath.toLowerCase()
   if (now - (pruned.get(key) ?? 0) < 60 * 60_000) return
   pruned.set(key, now)
   db.prepare('DELETE FROM assistant_changes WHERE grp_at < ?').run(new Date(now - KEEP_MS).toISOString()) // i18n-ignore: SQL
@@ -275,7 +285,7 @@ function prune(ws: WorkspaceService, db: Db['writer'], now = Date.now()): void {
 /** Prunes now, whenever it last did (tests; the window's list does it on its way). */
 export async function pruneChanges(ws: WorkspaceService, now = Date.now()): Promise<void> {
   pruned.delete((ws.path ?? '').toLowerCase())
-  await boardWrite(ws, async () => boardWriteOp(ws, (db) => prune(ws, db, now)))
+  await boardWrite(ws, async () => boardWriteOp(ws, (db) => prune(ws.path ?? '', db, now)))
 }
 
 /** A change as recorded, with its fields' values. */
@@ -336,7 +346,8 @@ export function recordedChanges(ws: WorkspaceService, sel: { change?: string; gr
         ...(r.target !== null ? { target: r.target } : {}),
         ...(r.final !== null ? { final: r.final } : {}),
         ...(r.undone_at !== null ? { undoneAt: r.undone_at } : {}),
-        fields: values.map((f) => f.field),
+        // The fields it set; its implicit snapshot (a card's review, checked by undo) isn't one.
+        fields: values.map((f) => f.field).filter((f) => f !== REVIEW),
         values
       }
     })
@@ -376,8 +387,19 @@ export function noteLaneIn(db: Db['writer'], workspacePath: string, before: Reco
   if (fields.length) noteChangeIn(db, workspacePath, { kind: 'lane', project: after.project, target: after.id, fields })
 }
 
-/** An agent's settings the Assistant changed (as read just before, and after), recorded for undo: those that changed. */
+/**
+ * What a provider change resets of an agent (projectAgents' updateAgent): undo puts its provider back only with these,
+ * each as the change left it, so they are all recorded with it, changed or not (round 3).
+ */
+export const PROVIDER_DEPENDENTS = ['model', 'effort', 'permissionMode', 'use200kContext', 'lastSessionId'] as const
+
+/**
+ * An agent's settings the Assistant changed (as saved under the project's lock just before, and after), recorded for
+ * undo: those that changed; with a provider change, everything it resets too.
+ */
 export async function noteAgent(ws: WorkspaceService, project: string, was: AgentDef, now: AgentDef): Promise<void> {
-  const fields = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k])).map((k) => ({ field: k, old: was[k] ?? null, new: now[k] ?? null }))
+  const keys: (keyof AgentDef)[] = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k]))
+  if (keys.includes('provider')) for (const k of PROVIDER_DEPENDENTS) if (!keys.includes(k)) keys.push(k)
+  const fields = keys.map((k) => ({ field: k, old: was[k] ?? null, new: now[k] ?? null }))
   if (fields.length) await noteChange(ws, { kind: 'agent', project, target: now.id, fields })
 }

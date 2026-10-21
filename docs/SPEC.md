@@ -2489,11 +2489,19 @@ built on the fact log and the Assistant's activity list:
   - A field goes back only while it still holds what the change wrote, checked at the write under that thing's own lock
     (a card's, the lanes', the project's for an agent's settings, a setting's guard). One changed since is skipped and
     said, the rest still go back. A price table's removed models are a field of their own.
+  - Every value a write changes, implicitly too, is checked: a card's project goes back with its agent in one transaction
+    (both or neither), only while its agent and review are as the move left them. A column move back never stops a review
+    started since. A provider goes back with everything a provider change resets (model, effort, permission mode, context,
+    its last conversation), each as the change left it, never while the agent runs; one it inherited is inherited again.
+  - What is reported is what the write saved, read inside it. A change is marked undone only when every field ended undone
+    or skipped for good; one that failed stays to be tried again.
   - A card it made is archived only while its history goes no further than the change left it.
   - A column move goes back through the rules with `override: { reason: "undo" }`.
   - A lane it started is abandoned; its list, reviewer, rounds, wait and name go back through the lane record. A lane
     that ended stays ended.
-  - An agent it started is stopped only while the launch it started still runs.
+  - An agent it started is stopped only while the launch the start returned still runs.
+  - Every successful change is listed: one that recorded nothing undoable gets a final row with why. An intent's facts
+    (a submission, a verdict, a question) stay beside its card fields' undo, and that is said. Undo itself isn't recorded.
   - An undo's own writes aren't recorded. Each change is marked undone as soon as it is undone.
 - **The user** undoes from the window (IPC `assistant:changes`, `assistant:undo`: the panel's, #1283).
 - **The Assistant** undoes its own with `hive_undo` (`GET /v1/assistant/changes`, `POST /v1/assistant/undo`, Control

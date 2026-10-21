@@ -43,6 +43,9 @@ let token = ''
 beforeAll(async () => {
   mkdirSync(join(alpha, '.hive'), { recursive: true })
   writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'r1', name: 'R1' }] }))
+  // Another project, for a card moved to it (round 3).
+  mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
+  writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
   advanced.load(join(base, 'profile'))
   // No version control chosen: the board's moves are plain (the rules' own undo, an override, is the runtime's to test).
   await advanced.set(ENFORCE, false)
@@ -255,11 +258,12 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     const c = await make('Race', ['p4'])
     const group = newMessage()
     await asAssistant('change it', () => tasks.updateTask(c.number, { labels: ['triage'], title: 'Its title' }, assistant))
-    // The user's edit, saved on its own just before the undo's write (after the undo read the card).
-    const real = tasks.updateTask
-    const spy = vi.spyOn(tasks, 'updateTask').mockImplementationOnce(async (...args) => {
-      await real(c.number, { labels: ['mine'] }, user)
-      return real(...args)
+    // The user's edit, saved on its own just before the undo's write (after the undo read the card): as its board
+    // change begins.
+    const realWrite = store.boardWrite
+    const spy = vi.spyOn(store, 'boardWrite').mockImplementationOnce(async (...args) => {
+      await run(() => tasks.updateTask(c.number, { labels: ['mine'] }, user))
+      return realWrite(...args)
     })
     try {
       const [r] = await userUndo(w, { group })
@@ -435,5 +439,156 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     expect(listed.some((x) => /comment/.test(x.final ?? ''))).toBe(true)
     const results = await userUndo(w, { group })
     expect(results.every((r) => !!r.final && !r.undone.length)).toBe(true)
+  })
+})
+
+// HR1's round 2 findings and the round 3 design's cases: every value a write changes, implicitly too, is checked under its
+// lock; the project and its agent go back together or not at all; Change settings is checked at the write; every
+// recording path prunes; a change that failed stays to be tried again.
+describe('undo, round 3: implicit effects, permission at the write, retention (#1282)', async () => {
+  const { sessions } = await import('../src/main/sessions')
+  const agent = async (id: string) => projectAgents(await w.projectConfig(alpha)).find((x) => x.id === id)!
+  /** Changes an agent's settings as the route does: what it was, from updateAgent's check under the lock. */
+  const changeAgent = (id: string, patch: Parameters<typeof updateAgent>[2]) =>
+    asAssistant(
+      `change ${id}'s settings`,
+      async () => {
+        let was: Awaited<ReturnType<typeof agent>> | undefined
+        const def = await updateAgent(alpha, id, patch, { check: (cur) => void (was = structuredClone(cur)) })
+        await changes.noteAgent(w, 'alpha', was!, def)
+      },
+      'update-agent'
+    )
+  const addAgent = (id: string, extra: Record<string, unknown> = {}) => w.mutateProjectConfig(alpha, (cfg) => ({ agents: [...projectAgents(cfg), { id, name: id.toUpperCase(), ...extra }] as never }))
+  const removeAgent = (id: string) => w.mutateProjectConfig(alpha, (cfg) => ({ agents: projectAgents(cfg).filter((a) => a.id !== id) as never }))
+
+  it('a provider goes back with everything it reset, its last conversation too; an inherited one is inherited again', async () => {
+    await addAgent('p1', { provider: 'claude-code', model: 'claude-opus-5-5', effort: 'high', lastSessionId: 'conv-1' })
+    const group = newMessage()
+    await changeAgent('p1', { provider: 'codex' })
+    expect(groupOf(group)!.changes[0].fields.sort()).toEqual(['effort', 'lastSessionId', 'model', 'permissionMode', 'provider', 'use200kContext'])
+    const [r] = await userUndo(w, { group })
+    expect(r.skipped).toEqual([])
+    expect(await agent('p1')).toMatchObject({ provider: 'claude-code', model: 'claude-opus-5-5', effort: 'high', lastSessionId: 'conv-1' })
+    // Inherited (no provider of its own): set by it, then inherited again by undo, not an empty provider.
+    await addAgent('p2')
+    const second = newMessage()
+    await changeAgent('p2', { provider: 'codex' })
+    await userUndo(w, { group: second })
+    expect('provider' in (await agent('p2')) && (await agent('p2')).provider !== undefined).toBe(false)
+    await removeAgent('p1')
+    await removeAgent('p2')
+  })
+
+  it("a provider whose dependent setting the user changed since stays, with all it reset; one that runs isn't changed", async () => {
+    await addAgent('p3', { provider: 'claude-code' })
+    const group = newMessage()
+    await changeAgent('p3', { provider: 'codex', model: 'assistant-model' })
+    await updateAgent(alpha, 'p3', { model: 'user-model' })
+    const [r] = await userUndo(w, { group })
+    expect(r.undone).toEqual([])
+    expect(r.skipped.map((s) => s.field).sort()).toEqual(['effort', 'lastSessionId', 'model', 'permissionMode', 'provider', 'use200kContext'])
+    expect(await agent('p3')).toMatchObject({ provider: 'codex', model: 'user-model' })
+    // Running: its provider isn't changed under it (failed, said why), and the change stays to try again.
+    await addAgent('p4', { provider: 'claude-code' })
+    const second = newMessage()
+    await changeAgent('p4', { provider: 'codex' })
+    const live = vi.spyOn(sessions, 'liveFor').mockReturnValue({ runId: 'r', agentId: 'p4', projectPath: alpha, status: 'working' } as never)
+    try {
+      const [running] = await userUndo(w, { group: second })
+      expect(running.skipped.every((s) => s.why === 'failed' && /Stop the agent/.test(s.error ?? ''))).toBe(true)
+    } finally {
+      live.mockRestore()
+    }
+    expect((await agent('p4')).provider).toBe('codex')
+    expect(groupOf(second)!.changes[0].undoneAt).toBeUndefined()
+    await removeAgent('p3')
+    await removeAgent('p4')
+  })
+
+  it('a card moved to another project goes back with its agent, both or neither; a later assignment is kept', async () => {
+    const c = (await run(() => tasks.createTask({ title: 'Moved', project: 'alpha', agent: 'a1' }, user))).number
+    const group = newMessage()
+    await asAssistant('move it to beta', () => tasks.updateTask(c, { project: 'beta' }, assistant))
+    expect(await card(c)).toMatchObject({ project: 'beta', agent: null })
+    const [r] = await userUndo(w, { group })
+    expect(r.undone.sort()).toEqual(['agent', 'project'])
+    expect(await card(c)).toMatchObject({ project: 'alpha', agent: 'a1' })
+    // Given to beta's agent since: the move back would clear it, so the card stays where it is, with its agent.
+    const second = newMessage()
+    await asAssistant('move it to beta', () => tasks.updateTask(c, { project: 'beta' }, assistant))
+    await run(() => tasks.updateTask(c, { agent: 'b1' }, user))
+    const [kept] = await userUndo(w, { group: second })
+    expect(kept.skipped.map((s) => [s.field, s.why]).sort()).toEqual([['agent', 'changed'], ['project', 'changed']])
+    expect(await card(c)).toMatchObject({ project: 'beta', agent: 'b1' })
+  })
+
+  it("an agent that can't be given back undoes the project move too: nothing half-restored, the change left to try again", async () => {
+    await addAgent('gone')
+    const c = (await run(() => tasks.createTask({ title: 'Half', project: 'alpha', agent: 'gone' }, user))).number
+    const group = newMessage()
+    await asAssistant('move it to beta', () => tasks.updateTask(c, { project: 'beta' }, assistant))
+    await removeAgent('gone')
+    const [r] = await userUndo(w, { group })
+    expect(r.undone).toEqual([])
+    expect(r.skipped.every((s) => s.why === 'failed')).toBe(true)
+    expect(await card(c)).toMatchObject({ project: 'beta', agent: null })
+    expect(groupOf(group)!.changes[0].undoneAt).toBeUndefined()
+  })
+
+  it('a column move back that would stop a review started since is kept', async () => {
+    const c = await make('Reviewed')
+    const group = newMessage()
+    await asAssistant('send it to Review', () => tasks.updateTask(c.number, { column: 'review' }, assistant))
+    await run(() => tasks.updateTask(c.number, { review: 'start' }, { kind: 'agent', name: 'R1 (alpha)', self: { project: 'alpha', agentId: 'r1' }, scope: 'alpha' }))
+    const [r] = await userUndo(w, { group })
+    expect(r.skipped).toEqual([{ field: 'column', why: 'changed' }])
+    expect(await card(c.number)).toMatchObject({ column: 'review', review: { agent: 'r1' } })
+  })
+
+  it("Change settings turned off at the write stops the Assistant's undo: the setting stays", async () => {
+    const e = entryOf('sessions.confirmStop')
+    const settings = config.settings.assistant
+    config.settings.assistant = { ...settings, changeSettings: true } as typeof settings
+    const group = newMessage()
+    await asAssistant('change a setting', async () => {
+      const r = await applySetting(e, !config.settings.sessions?.confirmStop, null)
+      await changes.noteChange(w, { kind: 'setting', target: e.id, fields: [{ field: 'value', old: r.old, new: r.new }] })
+    }, 'setting')
+    const set = !!config.settings.sessions?.confirmStop
+    // The user turns it off just as the undo writes (its guard runs first in the setting's change).
+    const guard = (): void => {
+      config.settings.assistant = { ...config.settings.assistant, changeSettings: false } as typeof settings
+    }
+    try {
+      await expect(undoChanges(w, { group }, 'assistant', guard)).rejects.toThrow(/Change settings is off/)
+      expect(!!config.settings.sessions?.confirmStop).toBe(set)
+      expect(groupOf(group)!.changes[0].undoneAt).toBeUndefined()
+    } finally {
+      config.settings.assistant = settings
+    }
+  })
+
+  it("a change that isn't a card's is pruned too, past 7 days", async () => {
+    const e = entryOf('sessions.confirmStop')
+    const record = (what: string) =>
+      asAssistant(what, async () => {
+        const r = await applySetting(e, !config.settings.sessions?.confirmStop, null)
+        await changes.noteChange(w, { kind: 'setting', target: e.id, fields: [{ field: 'value', old: r.old, new: r.new }] })
+      }, 'setting')
+    const old = newMessage()
+    await record('old')
+    const count = (g: string) => (store.workspaceDb(wsPath).reader.prepare('SELECT count(*) AS n FROM assistant_changes WHERE grp = ?').get(g) as { n: number }).n
+    expect(count(old)).toBe(1)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // Ten days on: past the 7 days, and past the hour the prune waits since the last one (the earlier test's, 8 days on).
+    vi.setSystemTime(Date.now() + 10 * 24 * 60 * 60_000)
+    try {
+      newMessage()
+      await record('later')
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(count(old)).toBe(0)
   })
 })

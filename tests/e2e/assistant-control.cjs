@@ -328,6 +328,10 @@ const check = (name, ok, extra = '') => {
   check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
   check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
   check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
+  // A change undo can't take back is still listed, with why (#1282 round 3): withdrawn messages aren't sent again.
+  const cancelled = await api('POST', '/v1/projects/alpha/agents/Builder/message', { cancel: true })
+  const finals = ((await api('GET', '/v1/assistant/changes')).body?.[0]?.changes ?? []).filter((c) => c.final)
+  check("a change it can't undo is listed with why", cancelled.status === 200 && finals.some((c) => /withdrew/.test(c.final)), JSON.stringify({ status: cancelled.status, finals }))
 
   // The tools its hive MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {

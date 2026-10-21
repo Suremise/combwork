@@ -663,11 +663,11 @@ export class LaneChangedSince extends Error {
  * Undo of the Assistant's change of a running lane (#1282): each field back to what it was, only while every one still
  * holds what the change wrote, checked under the lanes' lock (with `guard`, the undo's own permission, just before the
  * save). A list goes back as any list change does (queued while a card is in flight); a reviewer or name back to none
- * too. Throws LaneChangedSince (nothing saved) otherwise.
+ * too. Throws LaneChangedSince (nothing saved) otherwise. Returns its record's values as saved.
  */
-export async function restoreLane(ws: WorkspaceService, id: string, back: readonly FieldChange[], by: string, guard?: () => void): Promise<void> {
+export async function restoreLane(ws: WorkspaceService, id: string, back: readonly FieldChange[], by: string, guard?: () => void): Promise<Record<string, unknown>> {
   const on = await enforced()
-  await mutate(ws, async (lanes, checks) => {
+  const saved = await mutate(ws, async (lanes, checks) => {
     const l = lanes.find((x) => x.id === id)
     if (!l) throw new LaneChangedSince(back.map((v) => v.field), 'gone')
     if (!running(l)) throw new LaneChangedSince(back.map((v) => v.field), 'ended')
@@ -697,8 +697,11 @@ export async function restoreLane(ws: WorkspaceService, id: string, back: readon
     }
     l.updatedAt = now()
     if (guard) checks.push(guard)
+    // What it saves, as read here under the lock: what the undo reports.
+    return laneValues(l)
   })
   log.info(`Lane ${id}: ${back.map((v) => v.field).join(', ')} set back (${userText(by)}'s undo)`)
+  return saved
 }
 
 /**

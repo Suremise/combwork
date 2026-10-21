@@ -507,7 +507,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
  */
-async function assistantChange<T>(need: AssistantControl, what: string, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: string; said?: string; brief?: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+async function assistantChange<T>(need: AssistantControl, what: string, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: string; said?: string; brief?: string; act?: Partial<ActivityTarget>; result: T } & UndoNotes>): Promise<T> {
   const ws = assistantCaller()
   if (!ws) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API.`)
   const line = what.charAt(0).toUpperCase() + what.slice(1)
@@ -516,11 +516,9 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
     // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
-    // The launch an agent had before the change: one the change started is a launch other than it (#1282 round 1).
-    const runBefore = act.agent && act.project ? (sessions.liveFor(join(ws, act.project), act.agent.id)?.runId ?? null) : null
     const { done, said, brief, act: more, result } = await recordingChanges(ws, act.kind, what, async () => {
       const out = await fn(guard)
-      await noteDone(requireWorkspace(), { ...act, ...out.act }, runBefore)
+      await noteDone(requireWorkspace(), { ...act, ...out.act }, out)
       return out
     })
     const pub = brief ?? (said ? done : undefined)
@@ -548,18 +546,33 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'add-agent': "An agent it added stays: remove it in the project's agents if it isn't wanted.",
   'stop-agent': "An agent it stopped isn't started again by undo: start it if it should run.",
   'reorder-tasks': "The cards' order isn't put back.",
+  'cancel-messages': "Messages it withdrew aren't sent again.",
   'lane-end': 'A lane that ended stays ended: start it again if it should go on.'
 }
 
 /**
- * What the change running here leaves for undo once done (#1282): an agent it started (the launch it started, `run`:
- * undo stops only that one, while it runs; an agent already running before, given a card, wasn't started), or why it
- * can't be undone.
+ * What a change of the Assistant's tells its recorder for undo (#1282): the launch it started, as the start returned it
+ * (undo stops only that one, while it runs), and what of it stays whatever undo does (an intent's facts: its
+ * submission, verdict, question), said beside what can be undone.
  */
-async function noteDone(ws: WorkspaceService, act: ActivityTarget, runBefore: string | null): Promise<void> {
-  const run = (act.kind === 'start-agent' || act.kind === 'start-task') && act.agent && act.project && ws.path ? (sessions.liveFor(join(ws.path, act.project), act.agent.id)?.runId ?? null) : null
-  if (run && run !== runBefore && act.agent && act.project) await noteChange(ws, { kind: 'started', project: act.project, target: act.agent.id, card: act.card ?? null, fields: [{ field: 'run', old: null, new: run }] })
-  else if (FINAL_WHY[act.kind] && !recordedHere()) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: FINAL_WHY[act.kind]! })
+interface UndoNotes {
+  started?: { project: string; agentId: string; run: string }
+  stays?: string
+}
+
+/** Said of a change that changed nothing undo puts back, when its kind has no words of its own. */
+const NOTHING_TO_UNDO = 'It changed nothing undo puts back.'
+
+/**
+ * What the change running here leaves for undo once done (#1282 round 3): an agent it started (the launch the start
+ * returned), what of it stays, and, for any change that recorded nothing else, why it can't be undone: every change is
+ * listed, none left out. Undo itself is never recorded (it is deliberately not undoable).
+ */
+async function noteDone(ws: WorkspaceService, act: ActivityTarget, notes: UndoNotes): Promise<void> {
+  if (act.kind === 'undo') return
+  if (notes.started) await noteChange(ws, { kind: 'started', project: notes.started.project, target: notes.started.agentId, card: act.card ?? null, fields: [{ field: 'run', old: null, new: notes.started.run }] })
+  if (notes.stays) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: notes.stays })
+  if (!recordedHere()) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: FINAL_WHY[act.kind] ?? NOTHING_TO_UNDO })
 }
 
 /** An agent as an action names it (#763). */
@@ -1042,10 +1055,11 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     let started = ''
     let didStart: boolean | null = null
+    // The launch it started, for undo (#1282): stopped only while that one runs.
+    let launched: string | null = null
     if (body?.start || prompt) {
       try {
-        if (prompt) await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line }))
-        else await sessions.start(p, { agentId: def.id })
+        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line })) : await sessions.start(p, { agentId: def.id })).runId
         started = ' and started it'
         didStart = true
       } catch (e) {
@@ -1057,7 +1071,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     const said = prompt && didStart ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined
     // The stream's line is Hive's own words: neither why it didn't start nor the reuse note (git's words) goes there.
     const brief = `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch})` : ''}${didStart === true ? ' and started it' : didStart === false ? "; it didn't start" : ''}`
-    return { done: `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch}${reuse ? `: ${reuse}` : ''})` : ''}${started}`, said, brief, act: { agent: actAgent(def) }, result: { agent: addedForAgents(def), project: await projectSummary(p), ...(reuse ? { reuse } : {}) } }
+    return { done: `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch}${reuse ? `: ${reuse}` : ''})` : ''}${started}`, said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p), ...(reuse ? { reuse } : {}) } }
   })
 })
 
@@ -1089,7 +1103,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line })) : await sessions.start(p, { agentId, resumeId })
-    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st }
+    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, started: { project: basename(p), agentId, run: st.runId } }
   })
 })
 
@@ -2470,8 +2484,25 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
     const { done, card } = await runCardIntent(ref, actor, intent)
     const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
-    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done }
+    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
   })
+}
+
+/**
+ * What of an intent stays whatever undo does (#1282 round 3): its facts in the card's work. A column or agent it changed
+ * is undone as any card field; this is said beside it, so nothing of it is left out.
+ */
+const INTENT_STAYS: Partial<Record<CardIntent['kind'], string>> = {
+  start: "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
+  putBack: "Its reason stays as a comment.",
+  submit: "Its submission stays in the card's work.",
+  declarePaths: 'The paths it declared stay with the card.',
+  startReview: "The review it started stays in the card's work.",
+  verdict: "Its verdict stays in the card's work, and its round with it.",
+  reportMerge: "The merge it reported stays in the card's work.",
+  ask: 'Its question stays under For you: answer or dismiss it there.',
+  cannot: 'Its request stays under For you: answer or dismiss it there.',
+  request: "Its request to the builder stays as a comment."
 }
 
 /** A body's text field, trimmed; required ones refused when missing or empty. */
@@ -2562,6 +2593,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     return {
       done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },
+      ...(r.run && card.project ? { started: { project: card.project, agentId: r.agentId, run: r.run } } : {}),
       result: { ok: true, agent: r.agentName, added: r.added, card: shortReply(body) ? taskRow(await taskView(r.card)) : await taskView(r.card) }
     }
   })

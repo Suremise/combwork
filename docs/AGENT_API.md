@@ -308,7 +308,9 @@ From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assist
 - An agent it started is stopped only while the launch it started still runs (what it did stays).
 - A Hive setting goes back only while Change settings is on. A provider's removed models go back only if they too are unchanged.
 - Its control level and its launch are checked again at each write: turned down to Look and advise, or its session ended, partway through a message's changes, the undo stops there and is refused, the changes undone so far kept.
-- A card's decision, comment or place in its column can't be undone: those changes are listed with why.
+- A card's decision, comment or place in its column can't be undone: those changes are listed with why. So is every change of its that changed nothing undo puts back (an intent's facts, withdrawn messages): none is left out.
+- A card's project goes back with its agent, both or neither, only while its agent and review are as the move left them; a move back never stops a review started since. A provider goes back with everything a provider change resets, never while the agent runs.
+- A change is marked undone only when every field went back or was skipped for good; one that failed (`failed`) can be undone again.
 - An id that isn't one of its changes (they are its own only) is `404`, as is a message with none.
 
 Replies `{ "results": [{ "change", "what", "card"?, "undone": ["labels"], "skipped": [{ "field", "why": "changed" | "gone" | "ended" | "failed", "error"? }], "final"?, "already"?: true }] }`.
