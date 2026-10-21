@@ -133,10 +133,13 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
   return { n: m.n, kind: m.kind as LoopWakeKind, agentName: m.agentName, since, ...(typeof m.text === 'string' && m.text ? { text: m.text } : {}) }
 }
 
-/** The card changes a wake's line tells, and the watch kind that would tell the same (none: a request, a note). */
+/**
+ * The card changes a wake's line tells, and the watch kind that would tell the same (none: a note, an answer). A
+ * reviewer's request is told by a watch that counts it (#1272): then the watch's line is its only wake.
+ */
 const kindsOf = (kind: LoopWakeKind): ('column' | 'verdict')[] => (kind === 'review' || kind === 'approved' || kind === 'done' ? ['column'] : ['verdict'])
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
-  kind !== 'request' && kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : 'moved', card.column)
+  kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' ? 'request' : 'moved', card.column)
 
 /**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
@@ -257,7 +260,7 @@ registerSource('loop', {
     const card = await getTask(p.n, ws).catch(() => null)
     // Its own watch told it already (#578): a watch whose line had read this handoff's own history entry, even one that
     // has ended since (a handoff slower than the watch's settle and typing found no watch to leave it to).
-    const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since)
+    const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request')
     if (!card || !stillDue({ ...p, agentId: r.agentId }, card) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     const to = await targetOf(ws, host, card, p.kind)

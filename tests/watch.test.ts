@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { alreadyThere, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail } from '../src/shared/watch'
+import { alreadyThere, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
@@ -137,6 +137,42 @@ describe('what counts as a change', () => {
     expect(changesSince(asked, base, cond)).toEqual(['comment'])
     // Without a watcher (the Assistant's watches), every comment counts as before.
     expect(changesSince(sent, { ...base, watcher: undefined }, cond)).toEqual(['comment'])
+  })
+
+  it("a reviewer's request and the user's decisions count for a watch that counts a verdict, a move or a comment; not for one waiting only for a column, nor the watcher's own (#1272, #912)", () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    const review = cardOf({ column: 'review', agent: 'a1', history: [h(1, 'Moved to Review', 'B (alpha)'), h(2, 'Started reviewing', 'R (alpha)')], comments: [{ at: at(1), by: 'B (alpha)', text: 'Round 1 ready' }] })
+    const base = { mark: markOf(review), seen: seenOf(review), since: at(2), watcher: 'B (alpha)' }
+    // #912's case: the builder's watch asked for its verdict and Passed only, not comments.
+    const builder = { changes: ['verdict' as const, 'column' as const], column: 'passed' as const, moveInto: true as const }
+    const asked = { ...review, history: [...review.history, h(3, 'Asked the builder: "Which commit?"', 'R (alpha)')], comments: [...review.comments, { at: at(3), by: 'R (alpha)', text: 'Which commit?' }] }
+    expect(changesSince(asked, base, builder)).toEqual(['request'])
+    // With comments counted too: the comment and the request, one wake.
+    expect(changesSince(asked, base, { changes: ['verdict', 'column', 'comment'], column: 'passed', moveInto: true })).toEqual(['comment', 'request'])
+    for (const what of ['Recorded a decision: "Keep it short"', 'Changed a decision to "Shorter" (was "Keep it short")', 'Removed a decision: "Shorter"']) {
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'You')] }, base, builder)).toEqual(['decision'])
+      // Any of verdict, column or comment, and a watch on any change.
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'Assistant')] }, base, { changes: ['comment'] })).toEqual(['decision'])
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'Assistant')] }, base, { changes: [] })).toEqual(['decision'])
+    }
+    // A reviewer waiting only for the card to arrive in Review, and a watch on its agent only: neither counts them.
+    const decided = { ...asked, history: [...asked.history, h(4, 'Recorded a decision: "Keep it short"', 'You')] }
+    expect(changesSince(decided, { ...base, watcher: 'R (alpha)' }, { changes: ['column'], column: 'review' })).toEqual([])
+    expect(changesSince(decided, base, { changes: ['agent'] })).toEqual([])
+    // Its own request (the reviewer's watch after asking) and a decision it wrote down itself aren't news to it.
+    expect(changesSince(asked, { ...base, watcher: 'R (alpha)' }, { changes: ['comment'] })).toEqual([])
+    expect(changesSince({ ...review, history: [...review.history, h(3, 'Recorded a decision: "Keep it short"', 'B (alpha)')] }, base, builder)).toEqual([])
+    // A wait that compares marks (a bounded wait) finds them by the history since it began.
+    expect(handoffsSince(decided, at(2), builder)).toEqual(['request', 'decision'])
+    expect(handoffsSince(decided, at(3), builder)).toEqual(['decision'])
+    expect(handoffsSince(decided, at(2), { changes: ['column'], column: 'review' })).toEqual([])
+    expect(handoffsSince(null, at(2), builder)).toEqual([])
+    expect(hearsHandoffs({ changes: ['column'], column: 'passed', moveInto: true })).toBe(true)
+    expect(hearsHandoffs({ changes: ['column'], column: 'review' })).toBe(false)
+    // The wake line says so, with the request's words as the latest comment; the short form too.
+    const line = wakeLine({ ...cardChange(7, decided, ['request', 'decision']), about: wakeAbout(decided, ['request', 'decision'], 'a1') })
+    expect(line).toBe('[Hive] #7 is in Review (its reviewer asks you something; a new decision from the user: read its decisions); latest comment by R (alpha): "Which commit?". Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).')
+    expect(brief(cardChange(7, decided, ['request']))).toBe('#7 in Review, a request')
   })
 
   it('an entry exactly like the one seen (time, author, words) is still a new one; the one seen is never counted again (#224)', () => {

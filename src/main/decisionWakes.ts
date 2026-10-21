@@ -13,6 +13,7 @@ import { getTask, noteOnCard } from './tasks'
 import { actionDelivered, createDelivery, fromSource, offerNow, registerSource } from './deliveries'
 import { cardReviewer, wakesOn } from './loopWakes'
 import { onAction } from './workflow/actionWorker'
+import { watchCovers, watchToldDecisions } from './watches'
 import type { ActionRow } from './workflow/factStore'
 import { isWaiting } from '../shared/deliveries'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
@@ -68,6 +69,26 @@ export function decisionLine(cards: Map<number, { count: number }>): string {
   return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) and carry on from where you asked.`
 }
 
+/**
+ * A line's decisions less what the agent's own card watch tells it (#1272: one wake per event): a card whose watch
+ * counts them is left out; one whose watch's line told some has only those made since counted, and is left out when
+ * none is. What is left is the line's.
+ */
+async function leftToWatches<T extends { count: number; latest: number }>(ws: WorkspaceService, projectPath: string, agentId: string, cards: Map<number, T>): Promise<Map<number, T>> {
+  for (const [n, d] of [...cards]) {
+    const card = await getTask(n, ws).catch(() => null)
+    const byWatch = card ? watchToldDecisions(projectPath, agentId, card) : 0
+    if (byWatch === 0) continue
+    const since = byWatch === 'all' ? Infinity : byWatch
+    const left = (card!.decisions ?? []).filter((x) => Math.max(Date.parse(x.at) || 0, Date.parse(x.editedAt ?? '') || 0) > since).length
+    if (!left || d.latest <= since) cards.delete(n)
+    else cards.set(n, { ...d, count: Math.min(d.count, left) })
+  }
+  return cards
+}
+/** Whether a watch of the agent's counts a card's decisions now (a decision has no column: any will do). */
+const watchHearsDecisions = (projectPath: string, agentId: string, n: number): boolean => watchCovers(projectPath, agentId, n, 'decision', 'review')
+
 /** The decisions are the user's: Hive relays them. */
 const USER = { kind: 'user', name: 'the user' } as const
 
@@ -122,7 +143,7 @@ registerSource('decision', {
     const reads = cardReadsBy(agent)
     // A decision wake's line (#1266) also tells its cards where only their loop makes them the agent's (`loop`).
     const loop = loopOf(r)
-    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop))
+    const cards = fitting(await leftToWatches(ws, host, r.agentId, await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop)))
     if (!cards.size) return { cancel: 'nothing new to tell' }
     // This version: its line, and what its receipt tells (saved with it), and what its holds compares with.
     const v = ++versions
@@ -133,7 +154,7 @@ registerSource('decision', {
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
-    return !!m && openWorkspaces().includes(m.ws) && genOf(m.ws) === m.gen && cardReadsBy({ projectPath: host, agentId: r.agentId }) === m.reads
+    return !!m && openWorkspaces().includes(m.ws) && genOf(m.ws) === m.gen && cardReadsBy({ projectPath: host, agentId: r.agentId }) === m.reads && ![...decodeCards(r.meta?.cards).keys()].some((n) => watchHearsDecisions(host, r.agentId, n))
   },
   received: (r, host) => {
     made.delete(madeKey(host, r.id, r.meta?.v))
@@ -183,7 +204,7 @@ async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: str
     if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && (r.state === 'offered' || (r.action !== undefined && isWaiting(r))))) return
     const self = await boardSelf(ws, projectPath, agentId)
     if (!self) return
-    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(key)))
+    const cards = fitting(await leftToWatches(ws, projectPath, agentId, await newDecisionsOn(ws, agent, self, told.get(key))))
     if (!cards.size) return
     // Made again from the decisions as they are when it is offered (one waiting is that one).
     await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
@@ -219,7 +240,8 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
       // One line per agent, telling every card a decision wake waiting for it was for, this one's too: the one waiting is
       // replaced (cancelled, its action done) by this one, which carries its cards on.
       const loop = new Set([a.card, ...fromSource(projectPath, 'decision').filter((r) => r.agentId === to.id && r.action !== undefined && isWaiting(r)).flatMap((r) => [...loopOf(r)])])
-      const cards = fitting(await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop))
+      // Its own card watch's cards that tell it of their decisions (#1272) are left to that watch.
+      const cards = fitting(await leftToWatches(ws, projectPath, to.id, await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop)))
       if (!cards.size) return
       try {
         await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })

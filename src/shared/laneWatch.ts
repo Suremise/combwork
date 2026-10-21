@@ -15,10 +15,10 @@ import { cardRef } from './projectKeys'
  * blocked), and wakes when an agent of the projects it follows starts waiting for the user (`waiting`).
  */
 
-/** What a lane watch counts. The default is all but `passed` and `moved`. */
-export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused'] as const
+/** What a lane watch counts. The default is all but `passed`, `moved` and `paused`. */
+export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused', 'unblocked'] as const
 export type LaneEvent = (typeof LANE_EVENTS)[number]
-export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting']
+export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting']
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
 export const LANE_CARD_CHANGES: WatchChange[] = ['comment', 'column', 'verdict']
 /** At most this many lanes named in one watch ("all" follows every running lane, however many). */
@@ -61,6 +61,8 @@ export interface LaneNow {
   mergeStall?: string | null
   /** Why it waits (#1270), as main worked it out: a pause the other events don't tell (a card not merged, merging). */
   status?: LaneStatus | null
+  /** Its merge commit once it ended, verified from its cards' facts while rules are enforced (#1270). */
+  mergeCommit?: string | null
 }
 
 /** One lane's events since its mark: what the wake line tells. */
@@ -148,6 +150,8 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('failed') && is.f > was.f) parts.push({ n: c.number, event: 'failed', text: `${cardRef(c.number)} failed review${c.failedBy ? ` (${c.failedBy})` : ''}` })
     if (on.has('passed') && is.p > was.p) parts.push({ n: c.number, event: 'passed', text: `${cardRef(c.number)} passed review${c.passedBy ? ` (${c.passedBy})` : ''}` })
     if (on.has('blocked') && is.b && !was.b) parts.push({ n: c.number, event: 'blocked', text: `${cardRef(c.number)} is blocked`, ...(c.blocked ? { detail: c.blocked } : {}) })
+    // Its block lifted (#922, #1272): the agent or the user cleared it, so the lane goes on.
+    if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: `${cardRef(c.number)} is no longer blocked` })
     if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: `${cardRef(c.number)} is stalled`, ...(c.stalled ? { detail: c.stalled } : {}) })
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: `${cardRef(c.number)} is in ${columnLabel(is.c)}` })
   }
@@ -157,7 +161,8 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
   // limit are told as themselves (blocked, For you); one card at a time waiting for a merge isn't.
   const s = now.status
   if (on.has('paused') && now.mark.state === 'paused' && before.state !== 'paused' && s && (s.reason === 'notMerged' || s.reason === 'merging')) parts.push({ n: s.card, event: 'paused', text: `paused: ${laneStatusText(s)}`, detail: s.reason })
-  if (on.has('ended') && now.mark.state === 'ended' && before.state !== 'ended') parts.push({ n: null, event: 'ended', text: 'ended (merged)' })
+  // With its merge commit when the lane's end named one (#1270: from its cards' facts, never an agent's say-so).
+  if (on.has('ended') && now.mark.state === 'ended' && before.state !== 'ended') parts.push({ n: null, event: 'ended', text: now.mergeCommit ? `ended: merged at ${now.mergeCommit.slice(0, 12)}` : 'ended (merged)' })
   if (on.has('abandoned') && now.mark.state === 'abandoned' && before.state !== 'abandoned') parts.push({ n: null, event: 'abandoned', text: 'was abandoned' })
   return parts.length ? { id: now.id, label: now.label, parts } : null
 }
