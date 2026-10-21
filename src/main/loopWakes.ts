@@ -109,8 +109,9 @@ export async function cardReviewer(ws: WorkspaceService, projectPath: string, ca
  */
 async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
-  const reviewer = await reviewerOf(ws, card, agents)
-  if (!reviewer) return null
+  // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
+  const reviewer = kind === 'answer' ? null : await reviewerOf(ws, card, agents)
+  if (!reviewer && kind !== 'answer') return null
   const target = kind === 'review' ? reviewer : (agent ?? card.agent)
   if (!target || (kind === 'review' && target === card.agent)) return null
   const found = agents.find((a) => a.id === target)
@@ -135,7 +136,7 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
 /** The card changes a wake's line tells, and the watch kind that would tell the same (none: a request, a note). */
 const kindsOf = (kind: LoopWakeKind): ('column' | 'verdict')[] => (kind === 'review' || kind === 'approved' || kind === 'done' ? ['column'] : ['verdict'])
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
-  kind !== 'request' && kind !== 'note' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : 'moved', card.column)
+  kind !== 'request' && kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : 'moved', card.column)
 
 /**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
@@ -160,7 +161,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
  */
 function aboutOf(ws: WorkspaceService, a: ActionRow): { kind: LoopWakeKind; text?: string } {
   const p = a.payload
-  if (LOOP_WAKE_KINDS.includes(p.about as LoopWakeKind)) return { kind: p.about as LoopWakeKind }
+  if (LOOP_WAKE_KINDS.includes(p.about as LoopWakeKind)) return { kind: p.about as LoopWakeKind, ...(typeof p.why === 'string' && p.why ? { text: p.why } : {}) }
   const f = a.fact !== null ? cardFacts(ws, a.card).find((x) => x.seq === a.fact) : undefined
   const data = (f?.data ?? {}) as Record<string, unknown>
   if (f?.kind === 'ReviewerRequest') return { kind: 'request', text: String(data.text ?? '') }
@@ -220,6 +221,8 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null): boolean
   if (!card || card.archived) return false
   const since = historySince(card, p.since)
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
+  // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until that agent acts on it.
+  if (p.kind === 'answer') return !since.some((h) => same(h.by, p.agentName))
   if (card.agent !== p.agentId) return false
   return !since.some((h) => same(h.by, p.agentName) || /^(Moved to (the (top|bottom) of )?Review\b|Returned for review|Started reviewing)/.test(h.what))
 }
@@ -278,7 +281,7 @@ registerSource('loop', {
     const p = wakeOf(r)
     const ws = workspaceFor(host)
     if (!p || !ws) return
-    inBackground(`noting a loop wake on #${p.n}`, noteOnCard(p.n, storedText(HISTORY.loopWake, { agent: p.agentName, kind: p.kind === 'review' ? 'review' : 'verdict' }), ws))
+    inBackground(`noting a loop wake on #${p.n}`, noteOnCard(p.n, p.kind === 'answer' ? storedText(HISTORY.answerTold, { agent: p.agentName }) : storedText(HISTORY.loopWake, { agent: p.agentName, kind: p.kind === 'review' ? 'review' : 'verdict' }), ws))
     log.info(`Loop wake: #${p.n} to ${userText(p.agentName)}`)
   },
   ended: (r, host) => {

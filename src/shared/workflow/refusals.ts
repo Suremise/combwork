@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
+export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
 
 export type RuleId = GuardId | MoveRule
 
@@ -141,6 +141,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),
     msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Agent Setup or the folder, then try again.', description: 'The next step when Hive could not read what a rule needs.' })
+  ),
+  'loop.roundLimit': r(
+    msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: the user decides how it goes on.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked the user how to go on (For you); until they answer, its loop is paused. {card} is a card key." }),
+    msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: "Wait for the user's answer to the question on the card: you are woken when they answer.", description: 'The next step while a card waits for the user at its round limit (said to an agent or the Hive Assistant): wait; Hive wakes the agent when the user answers.' })
   ),
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),

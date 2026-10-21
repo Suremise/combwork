@@ -46,6 +46,8 @@ interface HiveMessageValues {
   'workflow.refused.integrate.upToDate.change': undefined
   'workflow.refused.integrate.upToDate.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.integrate.upToDate.next': undefined
+  'workflow.refused.loop.roundLimit.message': { card: string | number }
+  'workflow.refused.loop.roundLimit.next': undefined
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined

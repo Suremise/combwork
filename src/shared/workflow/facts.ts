@@ -112,6 +112,27 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 /** The gate of Hive's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
+/** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
+export interface AnswerShape {
+  outcome: 'approved' | 'declined' | 'answered'
+  reply?: boolean
+  decision?: boolean
+  choice?: RoundChoice
+  rounds?: number
+}
+
+/**
+ * Whether an answer fits its request (§16.8.5, #1269): at the round limit, a choice (a carry on with 1 to `maxRounds`
+ * more rounds), nothing else; an approval (kind Approve), approved or declined (a reply may say why), never a decision;
+ * any other question, answered with a reply or a decision.
+ */
+export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate'>, a: AnswerShape, maxRounds: number): boolean {
+  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
+  if (a.choice !== undefined) return false
+  if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && !a.decision
+  return a.outcome === 'answered' && (!!a.reply || !!a.decision)
+}
+
 export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook'
 
 /** The data of each kind (§16.4.2). */
@@ -299,7 +320,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Adopted': {
         const d = f.data as StartedData
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
+        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
+        const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
         Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq })
+        s.requests = limit
+        for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }

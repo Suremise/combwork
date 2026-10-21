@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "Unknown review \"{review}\": start, passed or failed.",
   "tasks.error.unknownTask": "Unknown card #{n}",
   "tasks.error.verdictNotYours": "{agent} is reviewing #{n}: its verdict is its own.",
+  "tasks.history.answerTold": "Told {agent} of your answer",
   "tasks.history.archived": "Archived",
   "tasks.history.archivedDone": "Archived after {days, plural, one {# day} other {# days}} in Done",
   "tasks.history.archivedHidden": "Archived: {project} was hidden",

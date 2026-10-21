@@ -73,6 +73,7 @@ interface HiveMessageValues {
   'tasks.error.unknownReview': { review: string | number }
   'tasks.error.unknownTask': { n: string | number }
   'tasks.error.verdictNotYours': { agent: string | number; n: string | number }
+  'tasks.history.answerTold': { agent: string | number }
   'tasks.history.archived': undefined
   'tasks.history.archivedDone': { days: number }
   'tasks.history.archivedHidden': { project: string | number }

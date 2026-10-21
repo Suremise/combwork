@@ -287,6 +287,10 @@
     "defaultMessage": "{agent} is reviewing #{n}: its verdict is its own.",
     "description": "An error: an agent tried to give a verdict on card #{n} (a number), which another agent ({agent}, its name) is reviewing."
   },
+  "tasks.history.answerTold": {
+    "defaultMessage": "Told {agent} of your answer",
+    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit)."
+  },
   "tasks.history.archived": {
     "defaultMessage": "Archived",
     "description": "A line in a card's history: the user archived the card (hidden from the board, kept)."

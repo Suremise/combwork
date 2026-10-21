@@ -18,7 +18,7 @@ import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectNam
 import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
-import { CATEGORY_STAGE, ROUND_CHOICES, ROUND_LIMIT_GATE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
+import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import type { ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -1166,19 +1166,15 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   })()
   const req = wf && rec ? wf.state(rec).requests.find((r) => r.request === request) : undefined
   if (!wf || !req) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
-  // What each kind takes: an approval is approved or declined; at the round limit, a choice (a carry on with its rounds);
-  // any other question, a reply or a decision.
-  const limit = req.gate === ROUND_LIMIT_GATE
-  const choice = a.choice && ROUND_CHOICES.includes(a.choice) ? a.choice : undefined
-  if (a.choice !== undefined && !choice) throw bad()
-  if (limit ? a.outcome !== 'answered' || !choice || (choice === 'carryOn' && !(Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= LANE_MAX_ROUNDS)) : choice) throw bad()
-  if (a.outcome === 'answered' && !limit && !reply && !decision) throw bad()
-  if (a.outcome !== 'answered' && (req.kind !== 'approve' || decision)) throw bad()
+  // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
+  // its rounds); any other question, a reply or a decision. Checked before anything is written.
+  const choice = a.choice as RoundChoice | undefined
+  if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds }, LANE_MAX_ROUNDS)) throw bad()
   const { reply: r } = await runIntent(
     wf,
     n,
     actor,
-    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
+    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
     (_w, first) => ({ patch: first && decision ? { decision } : {} })
   )
   if (isRefusal(r)) throw new WorkflowRefusedError(r)

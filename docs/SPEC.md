@@ -1878,16 +1878,19 @@ comes back from On Hold to the stage whose gate is still unmet [P2].
 
 **Answering, main side (#1269).** Only the user answers (Darren's point 7, as recommended: never an agent or the
 Assistant, which relays and asks): the window's `tasks:answer(n, request, answer)` on the intent path, the answer
-checked under the transaction as above. What an answer may be follows the request: an approval (kind Approve) is
-**approved** or **declined**; any other question is **answered** with a reply (kept with the answer, `Approval.note`) or
+checked under the transaction as above. What an answer may be follows the request (`answerFits`, checked in `tasks.ts`
+and again by the runtime, before anything is written): an approval (kind Approve) is **approved** or **declined** (a
+reply may say why), never answered with a reply or a decision alone; any other question is **answered** with a reply (kept with the answer, `Approval.note`) or
 a decision (recorded on the card, a new generation, its agents told as any decision is); at the round limit (§16.11.4)
 the answer is a choice, **carry on** (with 1 to 50 more rounds), **split it**, **accept it with follow-ups** or **take it
 over**; anything else is refused before anything is written. Only an approval of a gate's request (the user's review,
 the OK before merging) moves the card on; a decline of one is a round and returns the card to its builder; an answer to
 an agent's own question (ask the user, couldn't within the rules) moves nothing, is never a round, and an approval of
 it is recorded (`Approval`) as the OK it asked for (#922's push or release OK). **Answering wakes the waiting agent**,
-once (the runtime's durable `wake`): the agent that asked (its request records it, `asker`), else the card's builder;
-at the round limit the builder and the reviewer, with the user's choice. Each request records whom it is for
+once (the runtime's durable `wake`, `about: 'answer'`): the agent that asked (its request records it, `asker`), else the
+card's builder; at the round limit the builder and the lane's reviewer, with the user's choice. An answer's wake needs
+no loop: it reaches an agent working on its own, with no lane or reviewer (*"…The user answered: carry on from where you
+asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
 `tasks-changed`; the list in the window and its answers are #1276's. Until that window side lands, a dev build of
@@ -2185,8 +2188,10 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   **Built (#1269):** the limit is the rounds of the running lane the card is in (the Card loops settings it started
   with; a card in no running lane has none), counted from the facts (`Verdict` fails and the user's declines of a gate's
   request); a failed verdict or a decline that reaches it asks once (`ApprovalRequested`, gate `roundLimit`, and its
-  notice), whether the verdict is the runtime's or given on the board. The lane reads as **paused** on that card until
-  the user answers; "carry on" adds the rounds chosen to the card's limit (`Approval.rounds`), and every answer wakes
+  notice), whether the verdict is the runtime's or given on the board. The question isn't bound to a submission: a new
+  one (or a new start) never retires it, only the user's answer. Until then an agent's submission and the Assistant's
+  move on are refused (`loop.roundLimit`: the user decides how it goes on), the user's own moves go on, and the lane
+  reads as **paused** on that card (a submission made on the board before #1268 keeps the question and the pause); "carry on" adds the rounds chosen to the card's limit (`Approval.rounds`), and every answer wakes
   the builder and the reviewer with the choice. With the rules not enforced (Settings → Advanced) nothing asks and no
   lane pauses for it; G10 (the OK before merging) doesn't ask either, while an agent's own question still does.
 - **Overlaps:** Hive warns when two lanes' cards are likely to touch the same files (the cards' references, and past

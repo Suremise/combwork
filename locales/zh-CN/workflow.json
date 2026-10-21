@@ -44,6 +44,8 @@
   "workflow.refused.integrate.upToDate.change": "此规则在“版本控制”→“合并前工作与目标同步”中设置。",
   "workflow.refused.integrate.upToDate.message": "{card} 的修订版本 {revision} 不包含 {target} 的最新提交。",
   "workflow.refused.integrate.upToDate.next": "合并队列会自行将它与目标同步。",
+  "workflow.refused.loop.roundLimit.message": "{card} 已达到轮次上限：由用户决定如何继续。",
+  "workflow.refused.loop.roundLimit.next": "请等待用户回答卡片上的问题：用户回答后会唤醒你。",
   "workflow.refused.move.needsOverride.change": "这些规则在“版本控制”中设置，用户可以在那里更改。",
   "workflow.refused.move.needsOverride.message": "将 {card} 移到{stage}会跳过以下规则：{rules}。",
   "workflow.refused.move.needsOverride.next": "只有在有用户理由时才仍然移动：用户已给出的理由，或在得知会跳过哪些规则后给出的理由。",

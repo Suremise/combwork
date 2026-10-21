@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "Valor de review desconocido “{review}”: start, passed o failed.",
   "tasks.error.unknownTask": "Tarjeta desconocida #{n}",
   "tasks.error.verdictNotYours": "El agente {agent} está revisando la tarjeta #{n}: el veredicto es suyo.",
+  "tasks.history.answerTold": "Avisó al agente {agent} de tu respuesta",
   "tasks.history.archived": "Archivada",
   "tasks.history.archivedDone": "Archivada tras {days, plural, one {# día} many {# días} other {# días}} en Hecho",
   "tasks.history.archivedHidden": "Archivada: se ocultó el proyecto {project}",

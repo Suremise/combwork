@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "Nieznana wartość review „{review}”: start, passed lub failed.",
   "tasks.error.unknownTask": "Nieznana karta #{n}",
   "tasks.error.verdictNotYours": "{agent} recenzuje #{n}: werdykt należy do tego recenzenta.",
+  "tasks.history.answerTold": "Przekazano agentowi {agent} twoją odpowiedź",
   "tasks.history.archived": "Zarchiwizowano",
   "tasks.history.archivedDone": "Zarchiwizowano po {days, plural, one {# dniu} few {# dniach} many {# dniach} other {# dnia}} w kolumnie Gotowe",
   "tasks.history.archivedHidden": "Zarchiwizowano: ukryto projekt {project}",

@@ -420,7 +420,7 @@ export function wakeLine(change: CardChange, more = 0): string {
  * card-loop skill reads it the same way.
  */
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
-  const who = kind === 'review' ? "You review this card in its loop: carry on with it" : 'This is your card in its loop: carry on'
+  const who = kind === 'review' ? "You review this card in its loop: carry on with it" : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
   // A reviewer's request (#912) or Hive's own note (stale, an answer): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
   const what = !said.length ? '' : `. ${kind === 'request' ? 'The reviewer asks' : 'Hive'}: "${said.length > 200 ? `${said.slice(0, 199).join('')}…` : said.join('')}"`
@@ -429,10 +429,10 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
 
 /**
  * What a loop wake is about (#405, #1266): a card arrived in Review (its reviewer's), a verdict, the card moved into Passed
- * or Done, a reviewer's request mid-review (#912), or a note of Hive's (a pass gone stale, the user's answer): the rest
- * are its builder's.
+ * or Done, a reviewer's request mid-review (#912), a note of Hive's (a pass gone stale), or the user's answer to a request
+ * (#1269: the agent waiting on it, whether or not the card is in a loop): the rest are its builder's.
  */
-export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note'] as const
+export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer'] as const
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 
 function lineOf(change: CardChange, tail: string): string {

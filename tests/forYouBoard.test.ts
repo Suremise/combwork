@@ -18,6 +18,8 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
+const loopWakes = await import('../src/main/loopWakes')
+const worker = await import('../src/main/workflow/actionWorker')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { forYou } = await import('../src/main/workflow/cardWork')
@@ -27,6 +29,7 @@ const { allOff } = await import('../src/shared/workflow/options')
 const { FOR_YOU } = await import('../src/shared/workflow/texts')
 
 advanced.load(join(base, 'profile'))
+loopWakes.initLoopWakes()
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 afterEach(() => advanced.set(ENFORCE, true))
@@ -68,6 +71,13 @@ const actions = (w: WS, card: number): { kind: string; payload: Record<string, u
 const create = (w: WS) => inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
 const update = (w: WS, card: number, patch: Parameters<typeof tasks.updateTask>[1], actor: Parameters<typeof tasks.updateTask>[2] = user, opts: Parameters<typeof tasks.updateTask>[3] = {}) => inWorkspace(w, () => tasks.updateTask(card, patch, actor, opts))
 const answer = (w: WS, card: number, request: string, a: Parameters<typeof tasks.answerTask>[2]) => inWorkspace(w, () => tasks.answerTask(card, request, a))
+/** The loop wakes the workspace's actions made for an agent (their deliveries), once the actions have run. */
+async function deliveredTo(w: WS, agent: string): Promise<string[]> {
+  await worker.runActions(w)
+  await worker.actionsSettled()
+  await loopWakes.settled()
+  return (store.workspaceDb(w.path!).reader.prepare("SELECT body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all(agent) as { body: string }[]).map((r) => r.body)
+}
 function commitIn(wt: string, file: string): void {
   writeFileSync(join(wt, file), `${file}\n`)
   git(wt, 'add', '-A')
@@ -99,6 +109,48 @@ describe('For you on the board (#1269)', () => {
     expect(actions(w, card).filter((a) => a.kind === 'wake').at(-1)?.payload).toMatchObject({ agent: 'a1', why: 'approved: merge it and report the merge' })
     // Answered: a second answer is refused.
     await expect(answer(w, card, req, { outcome: 'approved' })).rejects.toThrow()
+  })
+
+  it("an approval takes no reply or decision as its answer: refused, nothing written (HR3's round 1 finding 2)", async () => {
+    const { w, wt } = await workspace({ ...allOff('git'), review: 'you', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    commitIn(wt, 'b.txt')
+    await update(w, card, { column: 'review' })
+    const req = forYou(w).items[0].request
+    const before = facts(w, card).length
+    await expect(answer(w, card, req, { outcome: 'answered', reply: 'Looks fine' })).rejects.toThrow(/doesn't fit the request/)
+    await expect(answer(w, card, req, { outcome: 'answered', decision: 'Ship it' })).rejects.toThrow(/doesn't fit the request/)
+    expect(facts(w, card)).toHaveLength(before)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([req])
+    const now = await inWorkspace(w, () => tasks.getTask(card, w))
+    expect(now.column).toBe('review')
+    expect(now.decisions ?? []).toEqual([])
+    // A decline may say why.
+    expect((await answer(w, card, req, { outcome: 'declined', reply: 'Not yet: the names' })).column).toBe('doing')
+  })
+
+  it("a solo agent's question (no lane, no reviewer) is answered and the asker woken, rules on or off (HR3's round 1 finding 3)", async () => {
+    const { w } = await workspace({ ...allOff('git'), finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    for (const [enforced, ask, a] of [
+      [true, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'OK to push the tag?' }), { outcome: 'approved' }],
+      [false, () => wf.cannotWithinRules(`#${card}`, 'agent:a1', { rule: 'submit.checksPassed', why: 'Which database?' }), { outcome: 'answered', reply: 'SQLite' }]
+    ] as const) {
+      await advanced.set(ENFORCE, enforced)
+      await inWorkspace(w, ask)
+      const req = forYou(w).items[0]
+      expect(req.asker).toBe('a1')
+      await answer(w, card, req.request, a)
+      expect(forYou(w).count).toBe(0)
+    }
+    const told = await deliveredTo(w, 'a1')
+    expect(told).toHaveLength(2)
+    expect(told[0]).toContain('approved "OK to push the tag?"')
+    expect(told[1]).toContain('answered "Which database?": SQLite')
+    expect(told.every((t) => t.includes('The user answered: carry on from where you asked'))).toBe(true)
   })
 
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
@@ -134,6 +186,11 @@ describe('For you on the board (#1269)', () => {
     let lane = (await lanes.listLanes(w, { project: 'p' }))[0]
     expect(lane).toMatchObject({ state: 'paused', pausedOn: card })
     expect(lane.cards[0].roundLimit).toBe(true)
+    // Its builder sends it to Review again on the board without the user's answer: the question and the pause stay.
+    await update(w, card, { column: 'doing' }, b1)
+    await update(w, card, { column: 'review' }, b1)
+    expect(forYou(w).items.map((i) => i.gate)).toEqual(['roundLimit'])
+    expect((await lanes.listLanes(w, { project: 'p' }))[0].state).toBe('paused')
     // With the rules turned off, nothing pauses the lane for it; on again, it waits for the answer.
     await advanced.set(ENFORCE, false)
     expect((await lanes.listLanes(w, { project: 'p' }))[0].state).toBe('active')

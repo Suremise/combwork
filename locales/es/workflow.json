@@ -44,6 +44,8 @@
   "workflow.refused.integrate.upToDate.change": "Esta regla se configura en Control de versiones → El trabajo está al día antes de fusionarse.",
   "workflow.refused.integrate.upToDate.message": "La tarjeta {card} en la versión {revision} no contiene el último commit de la rama {target}.",
   "workflow.refused.integrate.upToDate.next": "La cola de fusión la pone al día por sí misma.",
+  "workflow.refused.loop.roundLimit.message": "La tarjeta {card} llegó a su límite de rondas: el usuario decide cómo seguir.",
+  "workflow.refused.loop.roundLimit.next": "Espera la respuesta del usuario a la pregunta de la tarjeta: se te despertará cuando responda.",
   "workflow.refused.move.needsOverride.change": "Estas reglas se configuran en Control de versiones, donde el usuario puede cambiarlas.",
   "workflow.refused.move.needsOverride.message": "Mover la tarjeta {card} a {stage} se salta estas reglas: {rules}.",
   "workflow.refused.move.needsOverride.next": "Muévela de todos modos solo con el motivo del usuario: uno que haya dado, o uno que dé cuando sepa qué reglas se salta.",

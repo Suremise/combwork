@@ -179,6 +179,14 @@
     "defaultMessage": "The merge queue brings it up to date itself.",
     "description": "What happens next after the strict up-to-date rule refuses."
   },
+  "workflow.refused.loop.roundLimit.message": {
+    "defaultMessage": "{card} reached its round limit: the user decides how it goes on.",
+    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked the user how to go on (For you); until they answer, its loop is paused. {card} is a card key."
+  },
+  "workflow.refused.loop.roundLimit.next": {
+    "defaultMessage": "Wait for the user's answer to the question on the card: you are woken when they answer.",
+    "description": "The next step while a card waits for the user at its round limit (said to an agent or the Hive Assistant): wait; Hive wakes the agent when the user answers."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."

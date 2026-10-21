@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "Valeur de review inconnue « {review} » : start, passed ou failed.",
   "tasks.error.unknownTask": "Carte #{n} inconnue",
   "tasks.error.verdictNotYours": "L’agent {agent} relit la carte #{n} : le verdict lui revient.",
+  "tasks.history.answerTold": "Agent {agent} informé de ta réponse",
   "tasks.history.archived": "Archivée",
   "tasks.history.archivedDone": "Archivée après {days, plural, one {# jour} many {# jours} other {# jours}} dans Terminé",
   "tasks.history.archivedHidden": "Archivée : le projet {project} a été masqué",

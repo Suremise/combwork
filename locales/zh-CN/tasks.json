@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "未知的 review 值“{review}”：可用 start、passed 或 failed。",
   "tasks.error.unknownTask": "未知的卡片 #{n}",
   "tasks.error.verdictNotYours": "{agent} 正在评审 #{n}：结论只能由它给出。",
+  "tasks.history.answerTold": "已将你的回答告知 {agent}",
   "tasks.history.archived": "已归档",
   "tasks.history.archivedDone": "在“已完成”中停留 {days, plural, other {# 天}}后已归档",
   "tasks.history.archivedHidden": "已归档：{project} 已隐藏",

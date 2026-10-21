@@ -71,6 +71,7 @@
   "tasks.error.unknownReview": "不明なreview「{review}」：start、passed、failedのいずれかを指定してください。",
   "tasks.error.unknownTask": "不明なカード#{n}",
   "tasks.error.verdictNotYours": "#{n}は{agent}がレビュー中です。判定はそのエージェントが出します。",
+  "tasks.history.answerTold": "{agent}にあなたの回答を伝達",
   "tasks.history.archived": "アーカイブ",
   "tasks.history.archivedDone": "「完了」に入って{days, plural, other {#日}}後にアーカイブ",
   "tasks.history.archivedHidden": "アーカイブ：{project}が非表示になったため",

@@ -176,6 +176,44 @@ describe('For you at the core (#1269)', () => {
     expect(forYouItems({ card: card.id, project: 'project', stage: s.stage }, e.store.facts(card.id))).toEqual([expect.objectContaining({ card: card.id, gate: ROUND_LIMIT_GATE, kind: 'decide', shown: { id: FOR_YOU.roundLimit.id, values: { card: card.key, rounds: 3 } }, asker: null, for: 'user' })])
   })
 
+  it("the round limit's question outlives a new submission: an agent's submission or the Assistant's move on is refused until the user answers (HR3's round 1 finding 1)", async () => {
+    let enforced = true
+    const e = pair({}, () => enforced)
+    const { card, folder } = await started(e)
+    e.wf.startLane('L', [card.id], 'R1', 1)
+    await failOnce(e, card.key)
+    const limit = e.wf.state(card).requests.find((r) => r.gate === ROUND_LIMIT_GATE)!
+    expect(limit.submission).toBeUndefined()
+    commit(folder, { 'src/next.txt': 'next\n' }, 'next')
+    // The builder submits again without the user's answer: refused, the question kept.
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'loop.roundLimit')
+    expect(r.message).toBe(`${card.key} reached its round limit: the user decides how it goes on.`)
+    refusedBy(await e.wf.move(card.key, 'review', 'assistant', { reason: 'go on' }), 'loop.roundLimit')
+    expect(e.wf.state(card)).toMatchObject({ stage: 'active', requests: [expect.objectContaining({ request: limit.request })] })
+    // The rules off: the escape hatch, the question still waiting for the user.
+    enforced = false
+    moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
+    expect(e.wf.state(card).requests.map((x) => x.request)).toContain(limit.request)
+    enforced = true
+    // A new submission didn't retire it: the user's answer does, and the loop goes on.
+    moved(await e.wf.answer(card.key, limit.request, 'answered', { choice: 'carryOn', rounds: 2 }))
+    expect(e.wf.state(card).requests).toEqual([])
+    moved(await e.wf.startReview(card.key, R1))
+  })
+
+  it("an answer that doesn't fit its request is refused before anything is written (HR3's round 1 finding 2)", async () => {
+    const e = pair({ review: 'you', noSelfReview: false })
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'one' }))
+    const req = e.wf.state(card).requests[0]
+    const facts = e.store.facts(card.id).length
+    await expect(e.wf.answer(card.key, req.request, 'answered', { note: 'Looks fine' })).rejects.toThrow(/doesn't fit/)
+    await expect(e.wf.answer(card.key, req.request, 'answered', { decided: true })).rejects.toThrow(/doesn't fit/)
+    await expect(e.wf.answer(card.key, req.request, 'approved', { choice: 'split' })).rejects.toThrow(/doesn't fit/)
+    expect(e.store.facts(card.id)).toHaveLength(facts)
+    expect(e.wf.state(card)).toMatchObject({ stage: 'review', requests: [expect.objectContaining({ request: req.request })] })
+  })
+
   it('the round limit is off outside a running lane, and with the rules not enforced', async () => {
     for (const [lane, enforced] of [
       [false, true],
