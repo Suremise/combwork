@@ -46,6 +46,8 @@ interface HiveMessageValues {
   'tasks.error.orderChanged': { n: string | number }
   'tasks.error.orderElsewhere': { n: string | number; other: string; column: string }
   'tasks.error.orderNone': undefined
+  'tasks.error.overrideNotAgents': undefined
+  'tasks.error.overrideShape': undefined
   'tasks.error.ownCardsOnly': { project: string | number }
   'tasks.error.projectThenAgent': undefined
   'tasks.error.refsList': { field: string | number }
@@ -103,6 +105,7 @@ interface HiveMessageValues {
   'tasks.history.movedBottom': { column: string }
   'tasks.history.movedTop': { column: string }
   'tasks.history.noDependencies': undefined
+  'tasks.history.notified': { event: string; lane: string | number; hasWhy: string; why: string | number }
   'tasks.history.placed': { place: number; column: string }
   'tasks.history.renamed': { title: string | number }
   'tasks.history.repaired': { from: string | number; to: string | number }

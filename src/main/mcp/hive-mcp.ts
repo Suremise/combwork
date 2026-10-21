@@ -71,6 +71,19 @@ const notices = new AsyncLocalStorage<Set<string>>()
  * Calls the Agent API. `replyMs` is how long the reply may take: a wait passes its own (waitReplyMs), the rest take the
  * usual limit. Not fetch, whose 300 s limit on a reply's headers cut longer waits short (#371).
  */
+/** A workflow refusal as the Agent API gives it (SPEC §16.8.3). */
+interface Refused {
+  refused: true
+  rule: string
+  message: string
+  next: string
+  change?: string
+  override: string | null
+}
+
+/** A refusal's three sentences, each on a line, and its rule: what was refused, what to do next, where the rule is changed. */
+const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : [])].join('\n')
+
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Hive-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
   const res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
@@ -88,7 +101,7 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
-  if (res.status < 200 || res.status >= 300) throw new Error(typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : `HTTP ${res.status}`)
+  if (res.status < 200 || res.status >= 300) throw new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : `HTTP ${res.status}`)
   return data
 }
 
@@ -115,6 +128,8 @@ const settingsArgs = {
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
+/** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
+const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: "Moves the card across the workflow rules the move skips: reason is the user's own why (recorded on the card with the rules), given with the request or after you told them what it skips; never made up." }
 const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its number (#12 is 12) or key ("HI-12").` })
 /** Numbers that aren't cards (a console's events). */
 const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
@@ -553,7 +568,7 @@ const tools: Tool[] = [
   {
     name: 'hive_update_task',
     description: ASSISTANT
-      ? "Change a card and/or comment on it. column moves it: into doing it keeps its agent (or none) and starts nothing; when the user only says to move a card to doing, ask whether they want nobody on it, an agent assigned (agent), or an agent started on it (hive_start_task). position (top, bottom) or before (a card in the column it ends in) places it; blocked sets a reason (empty clears it); blockedBy and links replace their lists; agent gives it to an agent of its project (empty takes it away); project moves it to another project, taking it from its agent. hold parks a card and done means merged: move a card to either only when the user asks. Archived cards can't change. Replies with what changed and where the card is now."
+      ? "Change a card and/or comment on it. column moves it: into doing it keeps its agent (or none) and starts nothing; when the user only says to move a card to doing, ask whether they want nobody on it, an agent assigned (agent), or an agent started on it (hive_start_task). position (top, bottom) or before (a card in the column it ends in) places it; blocked sets a reason (empty clears it); blockedBy and links replace their lists; agent gives it to an agent of its project (empty takes it away); project moves it to another project, taking it from its agent. hold parks a card and done means merged: move a card to either only when the user asks. A move that skips the card's workflow rules (its review, its merge…) is refused, naming them: when the user said why (\"I merged it by hand\"), pass override with that reason (recorded on the card); when they only asked for the move, tell them what it skips and ask. Never make a reason up. Archived cards can't change. Replies with what changed and where the card is now."
       : "Change a card of your project and/or comment on it. column moves it: into doing from another column without agent gives it to you. position (top, bottom) or before (a card in the column it ends in) places it; blocked sets a reason (empty clears it); blockedBy and links replace their lists; agent gives it to an agent of the project (empty takes it away). review: on a card in review, start marks you as its reviewer (it keeps its column and agent: reviewing isn't working on it); passed or failed, with your verdict as comment, ends your review (passed with column passed moves it on: reviewed, not merged); your own card failed and still in review, column review returns it for its next round (wakes its reviewer). done means merged: move your card there once its work is merged, or when the user asks. hold is the user's (refused). A card in doing with another agent is its work in progress: you can't move it to review, passed or done (refused). Archived cards can't change. Replies with what changed and where the card is now.",
     inputSchema: {
       type: 'object',
@@ -575,20 +590,20 @@ const tools: Tool[] = [
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
         decision: { type: 'string', description: "Records a decision the user made about the card (scope, wording, a default), in a sentence; it is attributed to the user. Only what the user decided, never your own choice. Only the user changes or removes decisions." },
-        ...(ASSISTANT ? {} : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
+        ...(ASSISTANT ? { override: overrideArg } : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
       },
       required: ['number']
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override']) if (a[k] !== undefined) body[k] = a[k]
       return changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
     }
   },
   {
     name: 'hive_update_tasks',
     description: ASSISTANT
-      ? "Change up to 100 cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (unknown, archived, in Doing with another agent...) is left as it was and the rest still change. The call counts as one change toward this message's limit, however many cards it has. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. Replies with each card's change and any refused."
+      ? "Change up to 100 cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (unknown, archived, in Doing with another agent...) is left as it was and the rest still change. The call counts as one change toward this message's limit, however many cards it has. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. A move that skips a card's workflow rules is refused for that card, naming them; override (the user's own reason) applies to every card. Replies with each card's change and any refused."
       : "Change up to 100 of your project's cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (another project's or unknown, archived, in Doing with another agent...) is left as it was and the rest still change. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. Replies with each card's change and any refused.",
     inputSchema: {
       type: 'object',
@@ -600,13 +615,14 @@ const tools: Tool[] = [
         labels: { type: 'array', items: { type: 'string' }, description: "Replaces each card's labels. To tag cards, use addLabels and removeLabels." },
         addLabels: { type: 'array', items: { type: 'string' }, description: "Labels added to each card, its others kept." },
         removeLabels: { type: 'array', items: { type: 'string' }, description: "Labels taken off each card, its others kept." },
-        agent: { type: 'string', description: 'Agent name or id, given to each card (empty takes it from each).' }
+        agent: { type: 'string', description: 'Agent name or id, given to each card (empty takes it from each).' },
+        ...(ASSISTANT ? { override: overrideArg } : {})
       },
       required: ['numbers']
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent', 'override']) if (a[k] !== undefined) body[k] = a[k]
       return batchText((await api('POST', '/v1/tasks/batch', body)) as TaskBatch)
     }
   },

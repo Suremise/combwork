@@ -1262,8 +1262,20 @@ function laneCheckSoon(store: Store): void {
  * Each lane's cards as the board has them now, with their verdicts, blocks and stalls.
  */
 async function lanesNow(store: Store, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string }, board: LaneBoard = laneBoard(store.ws)): Promise<LaneNow[]> {
+  return lanesIn(store.ws, rec, board)
+}
+
+/**
+ * A workspace's lanes as a lane watch sees them (lanesNow), for a follower of its own: Hive's lane notices (#1266, which
+ * follow every running lane, and those whose end they haven't told, by their marks).
+ */
+export function lanesNowIn(ws: WorkspaceService, laneMarks: Record<string, LaneMark>, since: string): Promise<LaneNow[]> {
+  return lanesIn(ws, { scope: null, lanes: { ids: 'all', events: [] }, laneMarks, since }, laneBoard(ws))
+}
+
+async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string }, board: LaneBoard): Promise<LaneNow[]> {
   const cond = rec.lanes!
-  const inView = (await listLanes(store.ws, { all: true })).filter((l) => rec.scope === null || same(l.project, rec.scope))
+  const inView = (await listLanes(ws, { all: true })).filter((l) => rec.scope === null || same(l.project, rec.scope))
   // Every running lane, and a lane it follows until its end has been told (round 1 finding: one that ended between a
   // wake and the watch after it, which starts from what the wake told).
   const told = (id: string): boolean => !!rec.laneMarks?.[id] && rec.laneMarks[id].state !== 'ended' && rec.laneMarks[id].state !== 'abandoned'
@@ -1283,7 +1295,7 @@ async function lanesNow(store: Store, rec: Pick<WatchRecord, 'scope' | 'lanes' |
       const found = byNumber.get(lc.number)
       // A card moved to another project is gone from the lane.
       const card = found && same(found.project, l.project) ? found : null
-      const stalled = card && !card.archived ? await cardStallIn(store.ws, card, agents) : null
+      const stalled = card && !card.archived ? await cardStallIn(ws, card, agents) : null
       marks[lc.number] = laneCardMark(card, stalled)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null
@@ -1291,7 +1303,7 @@ async function lanesNow(store: Store, rec: Pick<WatchRecord, 'scope' | 'lanes' |
     }
     const label = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}${l.name ? ` (${l.name})` : ''}`
     // #869: a merge due with its builder idle and no merge slot claimed (a step it stopped on for the user) is a stall.
-    const builder = store.ws.path ? (sessions.liveFor(join(store.ws.path, l.project), l.builder.id) ?? null) : null
+    const builder = ws.path ? (sessions.liveFor(join(ws.path, l.project), l.builder.id) ?? null) : null
     const mergeStall = mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
     out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall })
   }
@@ -1571,10 +1583,11 @@ const settling = new Set<string>()
  * Whether an agent's own card watch tells it of this change to card n (#405: Hive's loop wakes leave it to the watch),
  * the card being in `column` now: a watch on the card that counts a move into Review (`review`); one that counts a
  * verdict, or a move into the card's column now (`verdict`: a passing one that moved it to Passed; a failed one leaves
- * it in Review, which a watch for Passed doesn't count); or one that has fired and tells the card. Its watches not
- * loaded yet: false.
+ * it in Review, which a watch for Passed doesn't count); one that counts a move into the card's column now (`moved`: a
+ * move into Passed or Done with no verdict, #1266); or one that has fired and tells the card. Its watches not loaded
+ * yet: false.
  */
-export function watchCovers(projectPath: string, agentId: string, n: number, kind: 'review' | 'verdict', column: TaskColumn): boolean {
+export function watchCovers(projectPath: string, agentId: string, n: number, kind: 'review' | 'verdict' | 'moved', column: TaskColumn): boolean {
   const store = storeFor(projectPath)
   const rec = store && recordOf(store, projectPath, agentId)
   // A lane watch's cards beside its lanes (#726) are its cards like any other.
@@ -1582,6 +1595,7 @@ export function watchCovers(projectPath: string, agentId: string, n: number, kin
   if (rec.fired) return rec.fired.cards.includes(n)
   const into = (c: TaskColumn): boolean => rec.cond.changes.includes('column') && (!rec.cond.column || rec.cond.column === c)
   if (kind === 'verdict') return rec.cond.changes.includes('verdict') || (column !== 'review' && into(column))
+  if (kind === 'moved') return into(column)
   return into('review')
 }
 

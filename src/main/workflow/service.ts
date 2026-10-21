@@ -10,8 +10,9 @@
 // (`hive.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
 
 import { join } from 'path'
+import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
-import { boardWrite } from '../boardStore'
+import { boardSavepoint, boardWrite } from '../boardStore'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
 import { isUnknown } from '../platform/types'
@@ -21,6 +22,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
+import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow } from './runtime'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
@@ -28,6 +30,15 @@ export const ENFORCE = 'hive.workflow.enforce'
 
 const M = {
   closed: msg({ id: 'service.workflow.closed', defaultMessage: 'The workspace this card belongs to has closed', description: 'An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace.' })
+}
+
+/**
+ * What an agent has going that its submission waits for (G13, `submit.ownRunsStopped`): its open Progress runs and
+ * background tasks, each named. Given by the app as it starts (sessions and progress are its; none in unit tests).
+ */
+let runsGoing: ((project: string, agent: string) => string[]) | null = null
+export function setRunsGoing(fn: ((project: string, agent: string) => string[]) | null): void {
+  runsGoing = fn
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -132,13 +143,32 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     slots: join(ws.hiveDir, 'slots'),
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
+    runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
+    // Before P7's slots, an agent's own worktree is a card's folder (SPEC §16.19.1), as project.json has it.
+    agentFolder: async (agent) => {
+      const a = projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent)
+      return a?.worktree?.path ? { path: a.worktree.path, base: a.worktree.base ?? null } : null
+    },
     get reconcileActs() {
       return workflowEnforced()
     },
-    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open.
+    // A change of the board (joining the caller's, when it holds one), only while this workspace is the one open; each
+    // write a part of it undone on its own if it throws (#1265: a batch's other cards, the caller's change, go on). The
+    // requests for the user it writes (`notify`) are noted on their cards in it too: their durable notice (#1266).
     locked: (fn) => {
       if (!alive()) return Promise.reject(hiveError(M.closed, undefined, { kind: 'conflict' }))
-      return boardWrite(ws, async () => fn(), { alive })
-    }
+      return boardWrite(
+        ws,
+        () =>
+          boardSavepoint(ws, async () => {
+            const after = lastActionId(ws)
+            const out = await fn()
+            await noteRequestsSince(ws, after)
+            return out
+          }),
+        { alive }
+      )
+    },
+    enforced: workflowEnforced
   })
 }

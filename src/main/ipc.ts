@@ -629,6 +629,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }),
+    'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
     'docs:section': (p, ref) => checkDocRef(p ? workspace.assertProject(p) : null, workspace.sharedDir, String(ref ?? '')),
     'tasks:comment': (n, text) => tasks.commentTask(n, text, { kind: 'user' }),

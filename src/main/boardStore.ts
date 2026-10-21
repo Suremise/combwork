@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { CARDS_STEP, FACTS_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -167,6 +167,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
       const n = moveLaneRecords(db)
       if (n.lanes || n.dropped) log.info(`moved ${n.lanes} runtime lane(s) into the lanes (${n.added} new), left out ${n.dropped} with no cards`)
     }
+  },
+  {
+    // #1266: an action's delivery is recorded by its row in `deliveries` (the action's id, unique), and a notice counts its
+    // tries instead; `card_actions.delivered` (#1215's stand-in) goes. And what lane notices have told (workflowNotices.ts).
+    version: 10,
+    name: ACTIONS_DELIVERED_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of ACTIONS_DELIVERED_STEP.ddl) db.exec(sql)
+    }
   }
 ]
 
@@ -195,6 +205,8 @@ interface Board {
   poll: NodeJS.Timeout
   /** The presence marker's heartbeat (presence.ts). */
   presence: NodeJS.Timeout
+  /** This process's changes of the board committed since it was opened (boardRevision): its cards' and lanes'. */
+  revision: number
 }
 
 const boards = new Map<string, Board>()
@@ -564,6 +576,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
       dataVersion: 0,
+      revision: 0,
       poll: setInterval(() => pollOther(key), POLL_MS),
       presence: setInterval(() => markPresent(hive), HEARTBEAT_MS)
     }
@@ -675,6 +688,25 @@ function pollOther(key: string): void {
   }
 }
 
+/**
+ * The board's revision (#1266): what has been committed to its cards and lanes, as a token that only moves on, never a
+ * clock. This process's changes are counted as they commit (a board change that changed something, a save of the lanes:
+ * noteLanesSaved); another process's move the writer's `data_version`; a database replaced or restored moves its
+ * generation. The same revision twice: none of them changed between, so what was read between is still current. Lane
+ * notices check it under the board's lock (workflowNotices.ts). Writes nothing.
+ */
+export function boardRevision(ws: WorkspaceService): string {
+  const path = pathOf(ws)
+  const b = boardOf(path)
+  return `${dbGeneration(path)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
+}
+
+/** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
+export function noteLanesSaved(path: string): void {
+  const b = boards.get(keyOf(path))
+  if (b) b.revision++
+}
+
 /** Closes a workspace's board (it closed): the stub's next number brought up to date for older versions. */
 export function closeBoard(path: string): void {
   const key = keyOf(path)
@@ -777,7 +809,12 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       throw state.lost ?? e
     } finally {
       state.open = false
-      if (state.changed) emit({ type: 'tasks-changed', workspacePath: path })
+      if (state.changed) {
+        // Committed (a change undone isn't one): the board's revision moves on.
+        const ob = boards.get(keyOf(path))
+        if (ob) ob.revision++
+        emit({ type: 'tasks-changed', workspacePath: path })
+      }
       for (const then of state.after) {
         try {
           writing.exit(then)
@@ -905,6 +942,41 @@ export function markPreWorkflow(ws: WorkspaceService, cards: AdoptionCard[]): { 
 export const boardValue = (ws: WorkspaceService, key: string): string | null => readSnapshot(ws, (_b, db) => meta(db, key))
 /** Sets one of the board's own values (inside boardWrite). */
 export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
+
+let savepoints = 0
+
+/**
+ * Part of the change running here that can be undone on its own (#1265: a workflow intent's write, a batch's card): if
+ * `fn` throws, its writes and what it asked to run after the change (afterBoardWrite) are undone, and the rest of the
+ * change goes on (the error is passed on). `keep(e)`: an error whose part is kept all the same (a refusal's own record).
+ * Outside a change of `ws`'s board, `fn` as it is.
+ */
+export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<T>, keep: (e: unknown) => boolean = () => false): Promise<T> {
+  const path = pathOf(ws)
+  const state = writing.getStore()
+  if (!state || !state.open || state.key !== keyOf(path)) return fn()
+  const db = boardOf(path).db.writer
+  const name = `part${++savepoints}`
+  const after = state.after.length
+  const changed = state.changed
+  db.exec(`SAVEPOINT ${name}`)
+  try {
+    const out = await fn()
+    db.exec(`RELEASE ${name}`)
+    return out
+  } catch (e) {
+    // Undone part way by SQLite meanwhile: the whole change fails (boardWrite), nothing to undo here.
+    if (!state.lost && db.isTransaction) {
+      if (!keep(e)) {
+        db.exec(`ROLLBACK TO ${name}`)
+        state.after.length = after
+        state.changed = changed
+      }
+      db.exec(`RELEASE ${name}`)
+    }
+    throw e
+  }
+}
 
 /** A write to the board's database: inside a change of `ws`'s board only, and only while its transaction is live (writeOp). */
 export function boardWriteOp<T>(ws: WorkspaceService, fn: (db: Db['writer']) => T): T {

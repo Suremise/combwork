@@ -287,7 +287,7 @@ describe('workflow scenarios, Git', () => {
     }
     // Every stage all off has; a stage it doesn't (no review: no Review column) isn't a place to drag to.
     expect(e.wf.currentRuleset().stages.map((x) => x.id)).toEqual(['hold', 'todo', 'active', 'done'])
-    expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ refused: true, rule: 'move.notFromHere' })
+    expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ refused: true, rule: 'move.noStage' })
   })
 
   it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', async () => {

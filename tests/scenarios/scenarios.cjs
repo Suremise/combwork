@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 69
+const FIXTURES_VERSION = 71
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -89,6 +89,18 @@ async function coderTask(c, task, agent = c.agents.coder) {
 const read = (o, skill) => o.skillsRead.includes(skill)
 /** card-loop-merge-refused's pre-commit hook (#869): commits need the maintainer's OK, a file they make in .git. */
 const MAINTAINER_HOOK = '#!/bin/sh\n[ -f "$(git rev-parse --git-dir)/maintainer-ok" ] && exit 0\necho "pre-commit: commits in this repository need the maintainer\'s OK. Ask them first." >&2\nexit 1\n'
+/**
+ * Gives alpha "Pair (the agent merges)" workflow options (#1265, SPEC §16.19.1): a reviewer agent, the agent merges, review
+ * before Done. Its cards' moves then go through the rules: a move that skips them needs the user's reason.
+ */
+async function pairRules(c) {
+  const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
+  const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+  const options = { platform: 'git', review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'agentMerges', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
+  require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options } }, null, 2))
+}
+/** The Override facts of the scenario's card `key` (#1319: the harness reads each card's facts). */
+const overridesOf = (o, key) => (o.facts?.[key] ?? []).filter((f) => f.kind === 'Override')
 /** A call's arguments (JSON) have key: value. */
 const field = (args, key, value) => new RegExp(`"?${key}"?\\s*:\\s*"?${value}\\b`).test(String(args))
 const moved = (o, n, column) => ran(o, 'hive_update_task').some((c) => field(c.args, 'number', n) && field(c.args, 'column', column))
@@ -2141,6 +2153,72 @@ module.exports.SCENARIOS = [
       ["changed nothing (it can't): no change it asked for worked", !o.hiveCalls.some((x) => /hive_(start|create|update|prompt|add|reorder)_/.test(x.tool) && x.ok) && o.cards.h?.column === 'todo'],
       ['no agent was started', !o.live.some((x) => x.project === 'alpha')]
     ]
+  },
+  {
+    id: 'assistant-override-reason',
+    title: "The Assistant asked to move a card past its workflow rules, with the user's reason (#1265): it passes override with that reason",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await pairRules(c)
+      await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+    },
+    prompt: (c) => `I merged card #${c.cards.m}'s branch into main by hand this morning. Move #${c.cards.m} to Done.`,
+    fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done","override":{"reason":"The user merged its branch into main by hand"}}`,
+    expect: (o, c) => {
+      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      const given = calls.find((x) => x.ok && argsOf(x).override)
+      const overrides = overridesOf(o, 'm')
+      return [
+        ['the card is in Done', o.cards.m?.column === 'done', o.cards.m?.column],
+        ["moved it with an override giving the user's reason (merged by hand)", !!given && /merg|hand/i.test(String(argsOf(given).override?.reason ?? '')), calls.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        // #1319: the card's facts have it once, as the Assistant's, with the reason it gave.
+        ['one Override fact, by the Assistant, with that reason', overrides.length === 1 && overrides[0].data.by === 'assistant' && /merg|hand/i.test(overrides[0].data.reason), JSON.stringify(overrides.map((f) => f.data))]
+      ]
+    }
+  },
+  {
+    id: 'assistant-override-none',
+    title: "The Assistant asked to move a card past its workflow rules with no reason given (#1265): it doesn't invent one; it says what the move would skip",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await pairRules(c)
+      await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+    },
+    prompt: (c) => `Move card #${c.cards.m} to Done.`,
+    fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done"}`,
+    expect: (o, c) => {
+      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      return [
+        ['passed no override (the user gave no reason)', !calls.some((x) => argsOf(x).override), calls.map((x) => x.args).join(' | ')],
+        ['the card is not in Done', o.cards.m?.column !== 'done', o.cards.m?.column],
+        ['no Override fact', !overridesOf(o, 'm').length, JSON.stringify(overridesOf(o, 'm').map((f) => f.data))],
+        ['told the user what the move would skip, or asked', o.replies.some((r) => /review|merg|rule|skip|requir|integrat|submi/i.test(r)), o.replies.at(-1)]
+      ]
+    },
+    fakeSkips: ['told the user what the move would skip, or asked']
+  },
+  {
+    id: 'assistant-override-unneeded',
+    title: "The Assistant asked for a move that skips none of the card's workflow rules (#1319): it just moves it, with no override",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await pairRules(c)
+      await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+    },
+    // Back to Todo: a move backwards skips no rule.
+    prompt: (c) => `Card #${c.cards.m} isn't ready to work on yet: put it back in Todo.`,
+    fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"todo"}`,
+    expect: (o, c) => {
+      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      return [
+        ['the card is in Todo', o.cards.m?.column === 'todo', o.cards.m?.column],
+        ['passed no override (the move skips nothing)', calls.length > 0 && !calls.some((x) => argsOf(x).override), calls.map((x) => x.args).join(' | ')],
+        ['no Override fact', !overridesOf(o, 'm').length, JSON.stringify(overridesOf(o, 'm').map((f) => f.data))]
+      ]
+    }
   },
   {
     id: 'assistant-dispatch',

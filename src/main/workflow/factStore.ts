@@ -354,14 +354,31 @@ export class FactStore {
     this.conn.write((db) => db.prepare('UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ?').run(state, id))
   }
 
-  /** Records an action's delivery once: false when it was already delivered (an action run twice, §16.4.5). */
+  /**
+   * The runtime's own executor (Workflow.runActions, `tests/workflow` only: the app's actions worker makes real
+   * deliveries, #1266): records an action's delivery once, as a row of `deliveries` under this store's own host, with
+   * the action's id, whose unique index is the record. False when it was already delivered (an action run twice, §16.4.5).
+   */
   deliver(d: Delivery): boolean {
-    return this.conn.write((db) => deliverOnce(db, d))
+    const at = this.now().toISOString()
+    return this.conn.write(
+      (db) =>
+        Number(
+          db
+            .prepare("INSERT INTO deliveries (host, id, seq, agent_id, kind, sender, body, state, created, expires, action) VALUES (?, ?, ?, ?, ?, '{}', ?, 'received', ?, ?, ?) ON CONFLICT DO NOTHING")
+            .run(this.runtimeHost(), `a${d.action}`, d.action, d.target, d.kind, JSON.stringify(d.payload), at, at, d.action).changes
+        ) > 0
+    )
   }
 
-  /** This project's actions' deliveries, in the actions' order. */
+  /** What the runtime's own executor delivered (deliver), in the actions' order. */
   deliveries(): Delivery[] {
-    return this.conn.read((db) => (db.prepare('SELECT a.id, a.delivered FROM card_actions a JOIN cards c ON c.number = a.card WHERE a.delivered IS NOT NULL AND c.project = ? ORDER BY a.id').all(this.scope.project) as { id: number; delivered: string }[]).map((r) => ({ action: r.id, ...(JSON.parse(r.delivered) as Omit<Delivery, 'action'>) })))
+    return this.conn.read((db) => (db.prepare('SELECT action, kind, agent_id, body FROM deliveries WHERE host = ? ORDER BY action').all(this.runtimeHost()) as { action: number; kind: string; agent_id: string; body: string }[]).map((r) => ({ action: r.action, kind: r.kind, target: r.agent_id, payload: JSON.parse(r.body) as Record<string, unknown> })))
+  }
+
+  /** The host the runtime's own executor records its deliveries under: never a session host's (a folder or `assistant`). */
+  private runtimeHost(): string {
+    return `runtime:${this.scope.project.toLowerCase()}`
   }
 
   // --- Shared folders, lanes, the queue's pauses, values.
@@ -544,12 +561,6 @@ export function factOf(r: Record<string, string | number | null>): Fact {
 
 function actionOf(r: Record<string, string | number | null>): ActionRow {
   return { id: r.id as number, card: r.card as number, kind: r.kind as string, payload: JSON.parse(r.payload as string), state: r.state as ActionRow['state'], attempts: r.attempts as number, fact: r.fact as number | null }
-}
-
-/** Records an action's delivery once (the conditional update is the guard): false when it was already delivered. */
-export function deliverOnce(w: DatabaseSync, d: Delivery): boolean {
-  const { action, ...rest } = d
-  return Number(w.prepare('UPDATE card_actions SET delivered = ? WHERE id = ? AND delivered IS NULL').run(JSON.stringify(rest), action).changes) > 0
 }
 
 /** Every pending action of the workspace, in the order written (the actions worker's list). */

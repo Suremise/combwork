@@ -14,6 +14,7 @@ import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
+import { workflowMessage } from '@shared/workflow/texts'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -1415,7 +1416,8 @@ export function BoardPanel() {
 function storedLine(english: string, stored: StoredText | undefined): string {
   if (!stored) return english
   const shown = stored.values && typeof stored.values.label === 'string' ? { ...stored, values: { ...stored.values, label: archiveBatchText(stored.values.label, tr) } } : stored
-  return storedLineText(shown, (m, values) => tr(m, values), providerMessage) ?? english
+  // A message within its values: a CLI's sentence, or the workflow's (a request's question, #1266).
+  return storedLineText(shown, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)) ?? english
 }
 
 /** Who wrote a history line or a comment, as stored (English: "You", "Assistant", "Repair"), in the window's language; Hive and agents' names as they are. */
@@ -1916,7 +1918,7 @@ export function TaskDialog() {
                 </div>
               </div>
             )}
-            <div className="task-section-h clickable" onClick={() => setShowHistory(!showHistory)}>
+            <div className="task-section-h clickable" data-section="history" onClick={() => setShowHistory(!showHistory)}>
               <Icon name={showHistory ? 'chevron-down' : 'chevron-right'} /> {tr(msg({ id: 'board.dialog.history', defaultMessage: 'History ({n})', description: "A heading in the card dialog (click to show or hide): the card's history of changes, and how many entries ({n})." }), { n: card.history.length })}
             </div>
             {showHistory && (

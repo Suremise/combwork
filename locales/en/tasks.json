@@ -179,6 +179,14 @@
     "defaultMessage": "cards: list the card numbers in the order wanted.",
     "description": "An error: a call to put cards in order listed none. \"cards:\" is the name of the call's field: keep it as it is."
   },
+  "tasks.error.overrideNotAgents": {
+    "defaultMessage": "Agents can't override workflow rules: only the user or the Assistant can.",
+    "description": "An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can."
+  },
+  "tasks.error.overrideShape": {
+    "defaultMessage": "An override needs a reason: why the card moves across its rules, as text.",
+    "description": "An error: an override (moving a card across a workflow rule) was passed without its reason as text."
+  },
   "tasks.error.ownCardsOnly": {
     "defaultMessage": "You can see only your project's cards ({project}).",
     "description": "An error: an agent asked for another project's cards; it sees only its own project's ({project}, its folder name)."
@@ -406,6 +414,10 @@
   "tasks.history.noDependencies": {
     "defaultMessage": "No longer depends on other cards",
     "description": "A line in a card's history: the list of cards that had to be done first was cleared."
+  },
+  "tasks.history.notified": {
+    "defaultMessage": "Notified you {event, select, failed {that its review failed} blocked {that it's blocked} stalled {that it has stalled} mergeDue {that every card of lane {lane} passed review, so its merge is due} mergeStalled {that the merge of lane {lane} has stalled} other {that it needs you}}{hasWhy, select, yes {: {why}} other {}}",
+    "description": "A line in a card's history: Hive sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Hive's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Hive's own sentence already translated)."
   },
   "tasks.history.placed": {
     "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",

@@ -175,7 +175,10 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     await broken.getByRole('button', { name: 'Close', exact: true }).click()
     await page.keyboard.press('Escape')
     const discard = page.getByRole('button', { name: 'Discard' })
-    if (await lib.until(async () => (await discard.count()) > 0, 3000)) await discard.click()
+    // Escape either closes the dialog or asks to discard the edit: wait for whichever comes.
+    await lib.until(async () => (await discard.count()) > 0 || (await dialog.count()) === 0, HUNG_MS)
+    if ((await discard.count()) > 0) await discard.click()
+    await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)
 
     // --- Started on an agent: its prompt lists them with their sizes, not their text.
     const agent = await lib.addAgent(inv, alpha, { name: 'Builder' })

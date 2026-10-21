@@ -101,7 +101,8 @@ const runtimeLane = (db: DatabaseSync, project: string, id: string, l: { ruleset
 describe('the one lane record step (#1291)', () => {
   it('is the 1.0 group’s step after the keys step', () => {
     expect(STEP).toMatchObject({ group: '1.0' })
-    expect(STEP.version).toBe(Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version)))
+    // The step after it (#1266's, the next, follows).
+    expect(STEP.version).toBe(store.BOARD_MIGRATIONS.find((m) => m.name === 'project keys')!.version + 1)
     expect(STEP.version).toBeGreaterThan(store.BOARD_MIGRATIONS.find((m) => m.name === 'project keys')!.version)
   })
 
@@ -124,7 +125,7 @@ describe('the one lane record step (#1291)', () => {
       db.prepare("UPDATE cards SET lane_reviewer = 'R9' WHERE number = 4").run()
     })
     const up = upgrade(file)
-    expect(up.version).toBe(STEP.version)
+    expect(up.version).toBe(Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version)))
     expect(up.tables).toEqual(expect.arrayContaining(['lanes', 'lane_cards', 'lane_runs', 'lane_pending']))
     expect(up.tables).not.toEqual(expect.arrayContaining(['workflow_lanes']))
     expect(up.tables).not.toEqual(expect.arrayContaining(['workflow_lane_cards']))
@@ -208,7 +209,7 @@ describe('the one lane record step (#1291)', () => {
       before = readEntries(db, 'lanes').map((e) => e.doc)
     })
     const up = upgrade(file)
-    expect(up.version).toBe(STEP.version)
+    expect(up.version).toBe(Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version)))
     expect(up.lanesDocs).toEqual(before)
     const db = new DatabaseSync(file, { readOnly: true })
     try {

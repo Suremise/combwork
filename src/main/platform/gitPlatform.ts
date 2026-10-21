@@ -50,7 +50,31 @@ export class GitPlatform implements PlatformAdapter {
     return this.wf.cfg.project
   }
 
-  async start(card: CardRecord, o: WorkflowOptions): Promise<Maybe<StartPlan>> {
+  async start(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<StartPlan>> {
+    // Before P7 (SPEC §16.19.1): the builder's own worktree stands in for a slot, and is where its work is whatever the
+    // folder option says (as P3 recorded it). Its line is the worktree's branch, and the card's base the merge base of its
+    // head with the target's (sound: a lane's next card starts once the last is Done).
+    const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
+    if (own) {
+      const target = card.target || o.target || own.base || (await G.defaultBranch(this.project))
+      if (isUnknown(target)) return target
+      const line = await G.branch(own.path)
+      const head = await G.head(own.path)
+      const th = await G.lineHead(this.project, target)
+      if (isUnknown(line)) return line
+      if (isUnknown(head)) return head
+      if (isUnknown(th)) return th
+      if (!head) return unknown(UNREADABLE.head, { where: own.path })
+      if (!th) return unknown(UNREADABLE.head, { where: target })
+      const base = await G.mergeBase(own.path, head, th)
+      if (isUnknown(base)) return base
+      if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
+      return { folder: own.path, line, base, target, existing: true }
+    }
+    if (o.folder === 'slots' && this.wf.cfg.agentFolder) {
+      // In the app, no slots yet (P7): a card started with no agent's worktree works in the project folder, as all-off does.
+      return this.start(card, { ...o, folder: 'project' })
+    }
     if (o.folder === 'slots') {
       const target = card.target || o.target || (await G.defaultBranch(this.project))
       if (isUnknown(target)) return target
@@ -179,7 +203,7 @@ export class GitPlatform implements PlatformAdapter {
     return { revision, tested, testedIs: 'checkout', ...(named !== null ? { named: folder ? known(await G.resolve(folder, named)) : null } : {}) }
   }
 
-  async submission(card: CardRecord, s0: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan> {
+  async submission(card: CardRecord, s0: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[]; predicted?: boolean }): Promise<SubmitPlan> {
     let s = s0
     const folder = this.wf.folderOf(s)
     let revision: string | null
@@ -196,9 +220,12 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb
     } else {
-      // A shared folder: the card's change is its own attributed commits (§16.3.2).
-      await reconcileGit(this.wf, card, {})
-      s = this.wf.state(card)
+      // A shared folder: the card's change is its own attributed commits (§16.3.2), attributed by reconciling first; a
+      // start not written yet (a drag planning, #1265) has none yet, and nothing is written for it.
+      if (!args.predicted) {
+        await reconcileGit(this.wf, card, {})
+        s = this.wf.state(card)
+      }
       commits = s.attributed
       revision = commits.at(-1) ?? s.started!.base
       base = s.started!.base

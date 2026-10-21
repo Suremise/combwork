@@ -19,6 +19,8 @@ export interface StartPlan {
   line: string | null
   base: string | null
   target: string | null
+  /** The folder is there already (an agent's own worktree standing in for a slot): nothing to prepare. */
+  existing?: boolean
   manifest?: Manifest
   deliverables?: Manifest
 }
@@ -66,13 +68,18 @@ export interface RunRevision {
 export interface PlatformAdapter {
   readonly id: PlatformId
   /** Start (§16.7.2): where the card works and what its change starts from. */
-  start(card: CardRecord, o: WorkflowOptions): Promise<Maybe<StartPlan>>
+  /** `builder`: the agent the card starts with (an agent's worktree stands in for a slot before P7, SPEC §16.19.1). */
+  start(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<StartPlan>>
   /** The card's revision now (Git: its folder's head, or its newest attributed commit; None: its paths' hash). */
   revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
   /** A progress run's revisions for the card, run in `folder` (null: none given), resolving `named` if given (§16.13). */
   runRevision(card: CardRecord, s: CardState, folder: string | null, named: string | null): Promise<RunRevision>
   /** Submit's platform side; a refusal for an empty change, a wrong revision or what couldn't be read. */
-  submission(card: CardRecord, s: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan>
+  /**
+   * `predicted`: `s` is the state a start not written yet would leave (a drag planning its steps, #1265): read the
+   * folder only, reconcile and write nothing, and take the card's state as given.
+   */
+  submission(card: CardRecord, s: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[]; predicted?: boolean }): Promise<SubmitPlan>
   /** What a finish needs (§16.7.2's Finish table). */
   finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs>
   /** The card's work moved on since `from` (a pass's revision): to what, and is it the same change (§16.3.2)? */

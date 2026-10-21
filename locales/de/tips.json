@@ -162,6 +162,8 @@
   "tips.inboxNotices.title": "Nachrichten erreichen beschäftigte Agenten zwischen zwei Schritten",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Hive den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
+  "tips.laneNotices.text": "Hive benachrichtigt dich, wenn eine Karte einer Lane das Review nicht besteht, blockiert ist oder festfährt, oder wenn alle Karten bestanden haben und der Merge ansteht, mit einer Benachrichtigung pro Lane. Einstellungen → Benachrichtigungen legt fest, wo sie erscheinen.",
+  "tips.laneNotices.title": "Erfahre, wie eine Lane läuft, auch ohne den Assistenten",
   "tips.language.text": "Hive folgt der Anzeigesprache von Windows, wenn es sie hat. Einstellungen → Allgemein → Sprache wählt eine andere; von KI übersetzte Sprachen sind gekennzeichnet, und Verbesserungen sind willkommen. Mit Agenten spricht Hive weiterhin Englisch.",
   "tips.language.title": "Hive in deiner Sprache",
   "tips.leftoverProcesses.text": "Ein Vorschauserver oder ein tail -f, das ein Agent gestartet hat, kann weiterlaufen, nachdem er stoppt, und den Ordner des Projekts oder einen Port belegen. Hive listet solche Prozesse im ⋯-Menü des Agentenbereichs auf und bietet an, sie zu beenden; Einstellungen → Agenten kann sie jedes Mal beenden.",

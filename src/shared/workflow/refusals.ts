@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
 
 export type RuleId = GuardId | MoveRule
 
@@ -125,13 +125,19 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.move.notFromHere.message', defaultMessage: "{card} is in {stage}: {move} isn't possible from there.", description: 'A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent.' }),
     msg({ id: 'workflow.refused.move.notFromHere.next', defaultMessage: 'From {stage}, use: {moves}.', description: 'The next step: the intents possible from the stage. {moves} lists them.' })
   ),
+  'move.noStage': r(
+    msg({ id: 'workflow.refused.move.noStage.message', defaultMessage: "{card} can't go to {stage}: this project's rules have no such step.", description: 'A refused move: the card was moved to a board stage the project\'s workflow rules don\'t have (Review with no review, say). {card} is a card key, {stage} a stage name.' }),
+    msg({ id: 'workflow.refused.move.noStage.next', defaultMessage: 'Move it to one of its steps: {stages}.', description: 'The next step after a move to a stage the rules lack: the stages they have. {stages} lists stage names.' }),
+    msg({ id: 'workflow.refused.move.noStage.change', defaultMessage: "A project's steps follow its options in Version Control.", description: 'Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it).' })
+  ),
   'move.useIntent': r(
     msg({ id: 'workflow.refused.move.useIntent.message', defaultMessage: "Agents don't move cards between columns.", description: 'A refused column move by an agent: agents act by intent.' }),
     msg({ id: 'workflow.refused.move.useIntent.next', defaultMessage: 'Use the {intent} intent instead.', description: 'The next step after a refused column move: {intent} is the intent to use.' })
   ),
   'move.needsOverride': r(
     msg({ id: 'workflow.refused.move.needsOverride.message', defaultMessage: 'Moving {card} to {stage} skips: {rules}.', description: 'A move that skips rules: {rules} lists the rule names.' }),
-    msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: 'Give a reason to move it anyway, or take the steps the rules need.', description: 'The next step for a move that skips rules: an override with a reason.' })
+    msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.", description: "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips." }),
+    msg({ id: 'workflow.refused.move.needsOverride.change', defaultMessage: 'These rules are set in Version Control, where the user can change them.', description: 'Where the rules a move would skip are changed: the project\'s Version Control tab (a tab name: use it as Hive shows it).' })
   ),
   'card.plainNumber': r(
     msg({ id: 'workflow.refused.card.plainNumber.message', defaultMessage: 'A plain number is not a card reference.', description: 'A refused intent: the card was named by a bare number.' }),
@@ -217,6 +223,8 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
     if (typeof vals.stage === 'string') vals.stage = f.one(STAGE_NAME, { stage: vals.stage })
     for (const k of ['move', 'intent', 'rule'] as const) if (typeof vals[k] === 'string') vals[k] = name(vals[k] as string)
     for (const k of ['moves', 'rules'] as const) if (vals[k] !== undefined) vals[k] = names(vals[k])
+    // A list of stages (`move.noStage`'s), each by its stage name.
+    if (vals.stages !== undefined) vals.stages = f.list(String(vals.stages).split(', ').filter(Boolean).map((x) => f.one(STAGE_NAME, { stage: x })))
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })

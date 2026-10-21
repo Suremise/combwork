@@ -92,6 +92,7 @@ import type {
   SkillTarget,
   TaskCard,
   TaskColumn,
+  TaskMoveResult,
   TaskPatch,
   TaskStartTarget,
   Transcript,
@@ -331,6 +332,11 @@ export interface HiveRequests {
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   'tasks:update': (n: number, patch: TaskPatch) => TaskCard
+  /**
+   * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
+   * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
+   */
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string }) => TaskMoveResult
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
   'tasks:facts': (n: number) => Fact[]
   'tasks:comment': (n: number, text: string) => TaskCard
