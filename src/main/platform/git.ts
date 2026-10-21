@@ -4,8 +4,8 @@
 //
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
-import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, unlinkSync } from 'original-fs'
-import { isAbsolute, join } from 'path'
+import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
+import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
@@ -25,6 +25,22 @@ const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
 export async function commonDir(repo: string): Promise<Maybe<string>> {
   const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   return r.ok ? r.out.trim() : unknown(U.gitFolder, { folder: repo })
+}
+
+/**
+ * A folder's own git dir, read from its `.git` (a folder, or a linked worktree's `gitdir:` file) with no git process, as
+ * `rev-parse --absolute-git-dir` would answer it there (#1373: asked by every intent's evidence). Null when the folder
+ * has no readable `.git` of its own (a repository's subfolder): ask git.
+ */
+export function gitDirSync(folder: string): string | null {
+  const dot = join(folder, '.git')
+  try {
+    if (statSync(dot).isDirectory()) return resolvePath(dot)
+    const m = /^gitdir: (.+)$/m.exec(readFileSync(dot, 'utf8'))
+    return m ? resolvePath(folder, m[1].trim()) : null
+  } catch {
+    return null
+  }
 }
 
 /**

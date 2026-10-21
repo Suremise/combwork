@@ -39,6 +39,8 @@ interface Primed {
   files: string[]
   /** A shared folder's own paths (what the evidence covers there), or null: the whole folder. */
   own: string[] | null
+  /** The index as prime read it (`ls-files --stage`, the whole folder's), for content's first answer only (#1373). */
+  staged?: Awaited<ReturnType<typeof git>>
 }
 
 export class GitPlatform implements PlatformAdapter {
@@ -104,14 +106,22 @@ export class GitPlatform implements PlatformAdapter {
     // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
     if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [], own: null } satisfies Primed
     const folder = this.wf.folderOf(s)
-    const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
-    const ls = await git(folder, ['ls-files', '-z'])
-    if (!gd.ok || !ls.ok) return null
+    // Its git dir from its `.git` where it has one (no git process: #1373), else git's answer.
+    let gitDir = G.gitDirSync(folder)
+    if (!gitDir) {
+      const gd = await git(folder, ['rev-parse', '--path-format=absolute', '--absolute-git-dir'])
+      if (!gd.ok) return null
+      gitDir = gd.out.trim()
+    }
+    // The index's entries, once (#1373): the tracked files (a conflicted path's stages listed once), and content's first
+    // answer where it covers the whole folder.
+    const ls = await git(folder, ['ls-files', '--stage', '-z'])
+    if (!ls.ok) return null
     // In a shared folder only the builder's own paths count (others' edits are "not yours", §16.3.2's dirty).
     const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
-    const all = ls.out.split('\0').filter(Boolean)
+    const all = [...new Set(ls.out.split('\0').filter(Boolean).map((rec) => rec.slice(rec.indexOf('\t') + 1)))]
     const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
-    return { gitDir: gd.out.trim(), folder, files, own } satisfies Primed
+    return { gitDir, folder, files, own, ...(own ? {} : { staged: ls }) } satisfies Primed
   }
 
   /**
@@ -158,7 +168,10 @@ export class GitPlatform implements PlatformAdapter {
       // A shared folder with no paths of the builder's: nothing of the index or files is covered.
       if (!p.own || p.own.length) {
         const spec = p.own ? ['--', ...p.own] : []
-        const staged = await git(p.folder, ['ls-files', '--stage', '-z', ...spec])
+        // Prime's read of the index, just before, answers the first time (evidenceOf's); asked again (revalidate), git.
+        const first = p.staged
+        delete p.staged
+        const staged = first ?? (await git(p.folder, ['ls-files', '--stage', '-z', ...spec]))
         const differ = await git(p.folder, ['diff-files', '--name-only', '-z', ...spec])
         if (!staged.ok || !differ.ok) return null
         parts.push(`index:${createHash('sha256').update(staged.buf).digest('hex')}`)
