@@ -71,15 +71,48 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- The Todo column's menu: Start Lane with These Cards…, its cards in the column's order.
     await page.getByRole('button', { name: 'Task Board' }).click()
     const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-header', { hasText: label }) })
     await until(async () => (await column('Todo').locator('.task-card').count()) === 3, HUNG_MS)
-    await column('Todo').locator('.board-column-header').click({ button: 'right' })
     const item = (label) => page.locator('.menu[role="menu"] .menu-item', { hasText: label })
-    await until(async () => (await item('Start Lane with These Cards…').count()) === 1, HUNG_MS)
-    await item('Start Lane with These Cards…').click()
     const dialog = page.locator('.dialog', { hasText: 'Start Lane' })
+    const openFromTodo = async () => {
+      await column('Todo').locator('.board-column-header').click({ button: 'right' })
+      await until(async () => (await item('Start Lane with These Cards…').count()) === 1, HUNG_MS)
+      await item('Start Lane with These Cards…').click()
+      return until(async () => (await dialog.count()) === 1, HUNG_MS)
+    }
+    const brief = async (agent) => {
+      const v = await api(`/v1/projects/alpha/agents/${agent}/deliveries?limit=5`)
+      return (v.items ?? v.deliveries ?? []).map((d) => d.body ?? d.text ?? '').join('\n')
+    }
+
+    // --- HR6's round 1: B1 busy, Wait and Start, then Cancel: when B1 is idle again, nothing starts.
+    await inv('pty:write', lib.ptyKey(alpha, b1.id), 'holduntil lanestart-cancel-go')
+    // Typed, then entered (the fake reads a line).
+    await lib.sleep(300)
+    await inv('pty:write', lib.ptyKey(alpha, b1.id), '\r')
+    check('B1 is working', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))
+    await openFromTodo()
+    const waitButton = dialog.getByRole('button', { name: 'Wait and Start' })
+    check('the dialog says B1 is busy and offers to wait', !!(await until(async () => (await waitButton.count()) === 1 && /B1 is busy now/.test(await dialog.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await waitButton.click()
+    check('…Wait and Start waits for it', !!(await until(async () => /Waiting for B1 to be idle/.test(await dialog.innerText()), HUNG_MS)))
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    check('Cancel closes the dialog', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)))
+    fs.writeFileSync(path.join(claudeHome, 'lanestart-cancel-go'), '')
+    check('B1 is idle again', !!(await until(async () => ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)))
+    // Its next status changes (the turn's end settling) would have started it: the lane list, B1's session and its
+    // deliveries are read after them, a few times, and stay as they were.
+    let still = true
+    for (let i = 0; i < 5 && still; i++) {
+      await until(async () => ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)
+      still = (await inv('lanes:list')).length === 0 && (await live(b1.id))?.sessionId === firstSession && !/builder of a lane/.test(await brief('B1'))
+    }
+    check('…and nothing started: no lane, the same conversation, no brief', still, JSON.stringify({ lanes: await inv('lanes:list'), session: (await live(b1.id))?.sessionId, firstSession }))
+
+    // --- The Todo column's menu: Start Lane with These Cards…, its cards in the column's order.
+    await openFromTodo()
     const order = () => dialog.locator('.lane-start-cards > li[data-card]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-card'))))
     check('Start Lane opens with the Todo cards, in the column\'s order', !!(await until(async () => (await dialog.count()) === 1 && (await order()).length === 3, HUNG_MS)), JSON.stringify(await order()))
     const todoOrder = await order()
@@ -105,10 +138,6 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       return !!s?.sessionId && s.sessionId !== firstSession
     }, HUNG_MS)), JSON.stringify(await live(b1.id)))
     check('R1 is started', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
-    const brief = async (agent) => {
-      const v = await api(`/v1/projects/alpha/agents/${agent}/deliveries?limit=5`)
-      return (v.items ?? v.deliveries ?? []).map((d) => d.body ?? d.text ?? '').join('\n')
-    }
     check("B1's brief: the builder of the lane, card-loop as the builder, with R1", !!(await until(async () => /You are the builder of a lane in alpha that the user started: use the card-loop skill as the builder, with R1 as the reviewer/.test(await brief('B1')), HUNG_MS)), (await brief('B1')).slice(0, 400))
     check("R1's brief: the reviewer of B1's lane", !!(await until(async () => /You are the reviewer of B1's lane in alpha/.test(await brief('R1')), HUNG_MS)), (await brief('R1')).slice(0, 400))
 

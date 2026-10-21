@@ -81,10 +81,29 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
     const started: LaneStartResult['started'] = []
     for (const [a, role] of [[builder, 'builder'], ...(reviewer ? [[reviewer, 'reviewer']] : [])] as [typeof builder, LaneRole][]) {
       const brief = laneBrief(input, role)
-      const live = !!sessions.liveFor(projectPath, a.id)
+      let how: 'fresh' | 'started' = 'started'
       try {
-        await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief }, (line) => (live ? sessions.newConversation(projectPath, a.id, line) : sessions.start(projectPath, { agentId: a.id, prompt: line }))) // i18n-ignore: who the brief is from, as agents read it
-        started.push({ agentId: a.id, name: a.name, role, how: live ? 'fresh' : 'started' })
+        // Still the project's agent, read again after the awaits above.
+        if (!projectAgents(await ws.projectConfig(projectPath)).some((x) => x.id === a.id)) throw hiveError(M.unknownAgent, { agent: a.name, project }, { kind: 'notFound' })
+        // Free where it is launched (HR6's #1280 round 1): checked with no await before its conversation is replaced
+        // (newConversation's `allowed` runs just before it stops the agent), so one that started work meanwhile keeps
+        // it: it is reported as not started, and the lane stays.
+        const free = (): void => {
+          const st = sessions.liveFor(projectPath, a.id)
+          if (st && BUSY.has(st.status)) throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
+        }
+        await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief }, (line) => { // i18n-ignore: who the brief is from, as agents read it
+          free()
+          if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line })
+          how = 'fresh'
+          // Its first call is just before the agent is stopped; later ones (as the new conversation starts) aren't ours.
+          let first = true
+          return sessions.newConversation(projectPath, a.id, line, () => {
+            if (first) free()
+            first = false
+          })
+        })
+        started.push({ agentId: a.id, name: a.name, role, how })
       } catch (e) {
         // The lane is recorded: the user can start the agent themselves, or end the lane from its row.
         log.warn(`starting ${userText(a.name)} for lane ${recorded.lane.id}`, e)

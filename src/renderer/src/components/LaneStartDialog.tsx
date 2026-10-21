@@ -3,7 +3,7 @@ import type { AgentInfo, ProjectInfo } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { cardLabel } from '@shared/projectKeys'
 import { call } from '../api'
-import { NO_PROJECTS, notify, set, useLanguage, useStore } from '../store'
+import { NO_PROJECTS, get, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
 import { BusyButton, Icon, IconButton, Modal, statusText, useBusy } from './ui'
 
@@ -70,7 +70,8 @@ export function LaneStartDialog() {
 
   // Opened: its project and cards, the first two agents as builder and reviewer.
   useEffect(() => {
-    if (!req) return
+    // Closed (Cancel, Escape, another workspace): nothing waits any more (HR6's #1280 round 1).
+    if (!req) return setWaiting(false)
     const named = req.project?.toLowerCase()
     const p = projects.find((x) => x.path.toLowerCase() === named || x.name.toLowerCase() === named) ?? projects.find((x) => x.agents.length > 0) ?? projects[0] ?? null
     setProjectPath(p?.path ?? null)
@@ -90,7 +91,8 @@ export function LaneStartDialog() {
   const ready = !!project && !!agentOf(builder) && builder !== reviewer && cards.length > 0
 
   const go = async (): Promise<void> => {
-    if (!project || !ready) return
+    // Only for the request still open: a dialog closed or opened again since starts nothing.
+    if (!project || !ready || !req || get().laneStartFor !== req) return
     const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: reviewer || null, cards, note, name }))
     if (!out) return setWaiting(false)
     const r = out.value
@@ -102,12 +104,15 @@ export function LaneStartDialog() {
 
   // Waiting (Wait and Start): starts once both are idle.
   useEffect(() => {
-    if (waiting && busyNow.length === 0 && !action.busy) void go()
+    if (req && waiting && busyNow.length === 0 && !action.busy) void go()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waiting, busyNow.length])
+  }, [req, waiting, busyNow.length])
 
   if (!req) return null
-  const close = (): void => set({ laneStartFor: null })
+  const close = (): void => {
+    setWaiting(false)
+    set({ laneStartFor: null })
+  }
   const todo = project ? tasks.filter((c) => !c.archived && c.column === 'todo' && c.project.toLowerCase() === project.name.toLowerCase() && !cards.includes(c.number)) : []
   const cardOf = (n: number) => tasks.find((c) => c.number === n)
   const move = (i: number, by: -1 | 1): void => {
