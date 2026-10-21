@@ -28,6 +28,7 @@ import { returnRound } from '@shared/watch'
 import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useClipped, useContextMenu, type MenuEntry } from './ui'
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
+import { openLaneStart } from './LaneStartDialog'
 import { EXPORT_BOARD, exportBoard, reportArchived, unarchiveBatch } from '../boardBatches'
 import { readOnlyReason } from './BoardUpgrade'
 import { SET_ASIDE_ITEM } from './SetAside'
@@ -282,6 +283,7 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
       ? []
       : [
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
+          ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
@@ -307,6 +309,8 @@ const WAITING_FOR_REVIEW = msg({ id: 'board.overview.waitingForReview', defaultM
 /** Stalled cards, counted (the Overview's strip, the Board sidebar's section). */
 const STALLED = msg({ id: 'board.overview.stalled', defaultMessage: 'Stalled', description: "Cards nobody is getting on with, counted: on the Overview's board strip (after the number) and as a heading in the Board sidebar." })
 /** Dialog buttons. */
+/** Start lane… (#1280): the board's ⋯ menu item. */
+const START_LANE = msg({ id: 'board.toolbar.startLane', defaultMessage: 'Start Lane…', description: "An item of the board's ⋯ menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
 const CANCEL = msg({ id: 'board.dialog.cancel', defaultMessage: 'Cancel', description: "Button: closes a board dialog without doing anything." })
 const TRY_AGAIN = msg({ id: 'board.dialog.tryAgain', defaultMessage: 'Try Again', description: "A board dialog's main button after it failed: does it again." })
 const ARCHIVING = msg({ id: 'board.dialog.archiving', defaultMessage: 'Archiving…', description: 'A button while cards are being archived.' })
@@ -791,6 +795,21 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     { separator: true },
     { label: collapseLabel(tr(COLUMN_TEXT[col.id].label)), icon: 'chevron-left', onClick: () => collapseColumn(col.id, true) },
     { separator: true },
+    // Todo's cards as a lane (#1280), in the column's order: the first card's project's (a lane is one project's).
+    ...(col.id === 'todo' && list.some((c) => c.project)
+      ? [
+          {
+            label: tr(msg({ id: 'board.columns.startLane', defaultMessage: 'Start Lane with These Cards…', description: "Menu item in the Todo column's menu: opens Start Lane with the column's cards, in its order (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })),
+            icon: 'list-ordered',
+            disabled: !!readOnly,
+            onClick: () => {
+              const first = list.find((c) => c.project)!.project
+              openLaneStart(first, list.filter((c) => c.project.toLowerCase() === first.toLowerCase()).map((c) => c.number))
+            }
+          },
+          { separator: true }
+        ]
+      : []),
     archiveAllItem(all, { column: col.id, project, scope, query }, readOnly)
   ]
 
@@ -1132,6 +1151,8 @@ export function BoardToolbar({
           onClick={(e) => {
             const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
             menu.openAt(b.left, b.bottom, [
+              { label: tr(START_LANE), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(project) },
+              { separator: true },
               archiveAllItem(get().tasks, { column: null, project, scope, query }, readOnly),
               { label: tr(EXPORT_BOARD), icon: 'export', onClick: () => void exportBoard() },
               ...(aside ? [{ label: tr(SET_ASIDE_ITEM, { n: aside }), icon: 'archive', onClick: () => set({ setAsideOpen: true }) }] : [])

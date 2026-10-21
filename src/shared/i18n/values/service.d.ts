@@ -112,6 +112,14 @@ interface HiveMessageValues {
   'service.keys.prefix': { key: string | number; other: string | number }
   'service.keys.taken': { key: string | number }
   'service.keys.unknownProject': undefined
+  'service.laneStart.busy': { agent: string | number; status: string }
+  'service.laneStart.done': { card: string | number }
+  'service.laneStart.needsReviewer': { project: string | number }
+  'service.laneStart.noCards': undefined
+  'service.laneStart.notTheProjects': { card: string | number; project: string | number }
+  'service.laneStart.sameAgent': undefined
+  'service.laneStart.starting': { agent: string | number }
+  'service.laneStart.unknownAgent': { agent: string | number; project: string | number }
   'service.lanes.noWorkspace': undefined
   'service.lanes.unknown': { id: string | number }
   'service.metrics.badProvider': undefined

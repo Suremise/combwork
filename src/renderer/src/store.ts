@@ -410,6 +410,8 @@ interface State {
   taskOpen: number | { project: string } | null
   /** The card whose Start dialog is open. */
   taskStartFor: number | null
+  /** Start lane… (#1280): open for a project (its path; null: the first with agents), with these cards chosen first. */
+  laneStartFor: { project: string | null; cards: number[] } | null
   /** The Archive All dialog (#351): a column's (or the whole board's, column null) cards as the board shows them. */
   boardArchiveAll: ArchiveAllRequest | null
   /** A card being moved to Doing: the Move to Doing dialog asks who has it. */
@@ -561,6 +563,7 @@ export const useStore = create<State>(() => ({
   boardForYou: false,
   taskOpen: null,
   taskStartFor: null,
+  laneStartFor: null,
   boardArchiveAll: null,
   taskDoing: null,
   removeProjectFor: null,

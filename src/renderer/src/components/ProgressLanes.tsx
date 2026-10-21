@@ -8,8 +8,9 @@ import { latestRunOf } from '@shared/progressTabs'
 import { useWorkBadges } from '../cardWork'
 import { OVERRIDE_NAMES } from './CardWork'
 import { fmt, msg, tr } from '@shared/i18n'
-import { call } from '../api'
-import { NO_PROJECTS, cardLabelOf, get, set, useLanguage, useStore } from '../store'
+import { call, errorMessage } from '../api'
+import { NO_PROJECTS, cardLabelOf, confirm, get, notify, set, useLanguage, useStore } from '../store'
+import { openLaneStart } from './LaneStartDialog'
 import { saveLaneOrder, useLaneOrder, type Lane } from '../laneSource'
 import { useNow } from '../usage'
 import { cx } from '../util'
@@ -114,7 +115,13 @@ export function LanesSection({ lanes, all, width, runs = [], full = false }: { l
       { label: tr(msg({ id: 'board.lanes.moveUp', defaultMessage: 'Move Up', description: "A lane's context menu item in the Progress panel: moves it up among the running lanes." })), icon: 'arrow-up', keybinding: 'Alt+Up', disabled: i <= 0, onClick: () => moved(nudgedLaneOrder(running, l.id, -1), l, true) },
       { label: tr(msg({ id: 'board.lanes.moveDown', defaultMessage: 'Move Down', description: "A lane's context menu item in the Progress panel: moves it down among the running lanes." })), icon: 'arrow-down', keybinding: 'Alt+Down', disabled: i >= running.length - 1, onClick: () => moved(nudgedLaneOrder(running, l.id, 1), l, true) },
       { separator: true },
-      { label: tr(msg({ id: 'board.lanes.usualOrder', defaultMessage: 'Usual Order', description: "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own." })), icon: 'list-ordered', detail: tr(msg({ id: 'board.lanes.usualOrderDetail', defaultMessage: 'Running lanes newest first, paused ones after them', description: 'Under Usual Order in a lane\'s context menu (Progress panel): what the usual order is.' })), disabled: !custom, onClick: usual }
+      { label: tr(msg({ id: 'board.lanes.usualOrder', defaultMessage: 'Usual Order', description: "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own." })), icon: 'list-ordered', detail: tr(msg({ id: 'board.lanes.usualOrderDetail', defaultMessage: 'Running lanes newest first, paused ones after them', description: 'Under Usual Order in a lane\'s context menu (Progress panel): what the usual order is.' })), disabled: !custom, onClick: usual },
+      // Ending one needs no tool (#1280, SPEC §16.11.3): End Lane, and Abandon Lane after asking.
+      { separator: true },
+      { label: tr(msg({ id: 'board.lanes.end', defaultMessage: 'End Lane', description: "A lane's context menu item in the Progress panel: ends the lane (its agents' card loop is over; the cards stay as they are). Glossary: lane." })), icon: 'flag', onClick: () => void endLane(l, false) },
+      { label: tr(msg({ id: 'board.lanes.abandon', defaultMessage: 'Abandon Lane…', description: "A lane's context menu item in the Progress panel: gives the lane up unmerged, after asking. Glossary: lane." })), icon: 'close', danger: true, onClick: () => void endLane(l, true) },
+      { separator: true },
+      { label: tr(START_LANE), icon: 'add', onClick: () => openLaneStart(l.project) }
     ])
   }
   /**
@@ -246,7 +253,14 @@ export function LanesSection({ lanes, all, width, runs = [], full = false }: { l
     return () => watch.disconnect()
   }, [open, lanes, width, full])
   if (!lanes.length)
-    return full ? <div className="pane-empty progress-empty">{tr(msg({ id: 'board.lanes.none', defaultMessage: 'No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.', description: "The Progress panel's Lanes tab when there are no lanes. Glossary: lane." }))}</div> : null
+    return full ? (
+      <div className="pane-empty progress-empty">
+        <p>{tr(msg({ id: 'board.lanes.none', defaultMessage: 'No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.', description: "The Progress panel's Lanes tab when there are no lanes. Glossary: lane." }))}</p>
+        <button type="button" className="btn small progress-lanes-start" onClick={() => openLaneStart(null)}>
+          <Icon name="add" /> {tr(START_LANE)}
+        </button>
+      </div>
+    ) : null
   const { chosen, shown, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
   return (
     <div className={cx('progress-lanes', folded && 'folded', full && 'full')} role="region" aria-label={tr(LANES)}>
@@ -258,6 +272,13 @@ export function LanesSection({ lanes, all, width, runs = [], full = false }: { l
         <span className="progress-lanes-count">{lanes.length}</span>
         {lanes.some(waitsForYou) && <span className="progress-lanes-you">{tr(msg({ id: 'board.lanes.waitingForYou', defaultMessage: '{n, plural, one {# waiting for you} other {# waiting for you}}', description: "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane." }), { n: lanes.filter(waitsForYou).length })}</span>}
       </button>
+      )}
+      {full && (
+        <div className="progress-lanes-actions">
+          <button type="button" className="btn small subtle progress-lanes-start" onClick={() => openLaneStart(null)}>
+            <Icon name="add" /> {tr(START_LANE)}
+          </button>
+        </div>
       )}
       {!folded && (
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
@@ -351,6 +372,29 @@ function LanesEdge({ rowsKey: key, chosen, shown, max, count, pitch, fallback }:
 }
 
 const LANE_DRAG = 'application/x-hive-lane'
+
+const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…', description: "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
+
+/** Ends a lane from its row (#1280): at once, or abandoned after asking; a failure says why. */
+async function endLane(l: Lane, abandoned: boolean): Promise<void> {
+  const pair = l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.builder.name
+  const lane = l.name ? `${pair} (${l.name})` : pair
+  if (abandoned) {
+    await confirm({
+      title: tr(msg({ id: 'board.lanes.abandonTitle', defaultMessage: 'Abandon {lane}?', description: "Title of the question before abandoning a lane from the Progress panel: the lane's builder / reviewer and its name ({lane}). Glossary: lane." }), { lane }),
+      message: tr(msg({ id: 'board.lanes.abandonMessage', defaultMessage: 'The lane stops here, unmerged: its cards stay where they are, and its agents are told no more. Start a new lane to carry on.', description: 'The question before abandoning a lane (Progress panel): what abandoning does. Glossary: lane.' })),
+      confirmLabel: tr(msg({ id: 'board.lanes.abandonConfirm', defaultMessage: 'Abandon Lane', description: 'The confirm button of the question before abandoning a lane (Progress panel).' })),
+      danger: true,
+      run: () => call('lanes:end', l.id, true)
+    })
+    return
+  }
+  try {
+    await call('lanes:end', l.id, false)
+  } catch (e) {
+    notify('error', tr(msg({ id: 'board.lanes.endFailed', defaultMessage: "Couldn't end {lane}", description: "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows." }), { lane }), errorMessage(e))
+  }
+}
 
 const LANES = msg({ id: 'board.lanes.title', defaultMessage: 'Lanes', description: "The Progress panel's section of lanes (a builder and its reviewer working through cards in turn): its bar's label and accessible name." })
 

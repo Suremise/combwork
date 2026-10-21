@@ -62,6 +62,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneStartRequest,
+  LaneStartResult,
   ModelPrice,
   MemorySource,
   NoteFile,
@@ -607,6 +609,11 @@ export interface HiveRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
+   * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.
+   */
+  'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

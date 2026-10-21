@@ -131,6 +131,7 @@ export const SUITES = [
   { name: 'keys' },
   { name: 'keysui' },
   { name: 'lanenotices' },
+  { name: 'lanestart' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
   { name: 'leftovers' },

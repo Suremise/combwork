@@ -178,6 +178,8 @@
   "tips.laneGates.title": "Zobacz, dlaczego tor stoi",
   "tips.laneNotices.text": "Hive powiadamia Cię, gdy recenzja na torze jest niezaliczona, karta zostaje zablokowana lub utknie albo wszystkie karty zaliczyły recenzję i czas na scalenie, jednym powiadomieniem na tor. Gdzie się pojawiają, decyduje Ustawienia → Powiadomienia.",
   "tips.laneNotices.title": "Wiesz, jak idzie tor, także bez Asystenta",
+  "tips.laneStart.text": "Kliknij prawym przyciskiem kolumnę Do zrobienia i wybierz Uruchom tor z tymi kartami…: wybierz wykonawcę i recenzenta, ułóż karty po kolei, a obaj zaczną z instrukcją. Zakończ lub porzuć tor z jego wiersza w panelu Postęp.",
+  "tips.laneStart.title": "Uruchom tor samodzielnie",
   "tips.language.text": "Hive używa języka wyświetlania Windows, jeśli go obsługuje. Ustawienia → Ogólne → Język pozwala wybrać inny; języki przetłumaczone przez AI są oznaczone, a poprawki mile widziane. Z agentami Hive nadal rozmawia po angielsku.",
   "tips.language.title": "Hive w Twoim języku",
   "tips.leftoverProcesses.text": "Serwer podglądu lub tail -f uruchomiony przez agenta może działać po jego zatrzymaniu, blokując folder projektu lub port. Hive wymienia je w menu ⋯ panelu agenta i proponuje ich zakończenie; w Ustawienia → Agenci możesz kończyć je za każdym razem.",

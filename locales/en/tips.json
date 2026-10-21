@@ -715,6 +715,14 @@
     "defaultMessage": "Hear how a lane goes, without the Assistant",
     "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
+  "tips.laneStart.text": {
+    "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
+  },
+  "tips.laneStart.title": {
+    "defaultMessage": "Start a lane yourself",
+    "description": "A tip's title. A lane: a builder and a reviewer agent working through cards in turn (glossary 2.5: lane)."
+  },
   "tips.language.text": {
     "defaultMessage": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -435,6 +435,10 @@
     "defaultMessage": "{column}: more",
     "description": "Tooltip on a board column's ⋯ button: opens its menu. {column} is its name."
   },
+  "board.columns.startLane": {
+    "defaultMessage": "Start Lane with These Cards…",
+    "description": "Menu item in the Todo column's menu: opens Start Lane with the column's cards, in its order (a lane: a builder and a reviewer working through cards in turn). Glossary: lane."
+  },
   "board.context.close": {
     "defaultMessage": "Close",
     "description": "Button: closes the doc section viewer."
@@ -1483,6 +1487,134 @@
     "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
     "description": "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are."
   },
+  "board.laneStart.addCard": {
+    "defaultMessage": "Add a card from Todo…",
+    "description": "The first entry of the Start Lane dialog's card picker: choosing a card adds it at the end of the lane's list. Todo is a board column."
+  },
+  "board.laneStart.agentState": {
+    "defaultMessage": "{agent} ({status})",
+    "description": "An agent in the Start Lane dialog's choices, with what it is doing ({status}: \"Working…\", \"Not running\")."
+  },
+  "board.laneStart.builder": {
+    "defaultMessage": "Builder",
+    "description": "A field label in the Start Lane dialog: the agent that builds the cards. Glossary: builder."
+  },
+  "board.laneStart.busyNow": {
+    "defaultMessage": "{agents} {n, plural, one {is busy} other {are busy}} now: Wait and Start waits until {n, plural, one {it is} other {they are}} idle, then starts the lane.",
+    "description": "In the Start Lane dialog: the chosen builder or reviewer ({agents}: their names, joined) can't start a new conversation now; the Wait and Start button waits for them."
+  },
+  "board.laneStart.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Button of the Start Lane dialog: closes it without starting anything (and stops waiting)."
+  },
+  "board.laneStart.cards": {
+    "defaultMessage": "Cards, in order",
+    "description": "A field label in the Start Lane dialog: the cards the lane works through, in the order they are worked."
+  },
+  "board.laneStart.down": {
+    "defaultMessage": "Move {card} down",
+    "description": "Tooltip of a button in the Start Lane dialog: moves the card ({card}, its key) one place later in the lane."
+  },
+  "board.laneStart.intro": {
+    "defaultMessage": "The builder works through the cards in this order, one at a time, and the reviewer reviews each. Both start in a new conversation with a brief: the cards, where the builder works, what the project’s rules ask, and your note.",
+    "description": "At the top of the Start Lane dialog. Glossary: lane, rule."
+  },
+  "board.laneStart.name": {
+    "defaultMessage": "What it is about (optional)",
+    "description": "A field label in the Start Lane dialog: a short name for the lane, shown in the Progress panel."
+  },
+  "board.laneStart.noAgents": {
+    "defaultMessage": "The project has no agents. Add one first.",
+    "description": "In the Start Lane dialog: the chosen project has no agents to build the cards."
+  },
+  "board.laneStart.noCards": {
+    "defaultMessage": "No cards yet: add them from the project’s Todo below.",
+    "description": "In the Start Lane dialog's list of cards, while none is chosen. Todo is a board column."
+  },
+  "board.laneStart.noReviewer": {
+    "defaultMessage": "No reviewer",
+    "description": "A choice of the Start Lane dialog’s reviewer: the lane has none (the project’s rules may need one)."
+  },
+  "board.laneStart.notRunning": {
+    "defaultMessage": "not running",
+    "description": "An agent's state in the Start Lane dialog's choices: its session isn't running (it starts with the brief)."
+  },
+  "board.laneStart.notStarted": {
+    "defaultMessage": "{agent} didn't start",
+    "description": "A toast's title: the lane was recorded, but one of its agents ({agent}) couldn't be started. The reason follows."
+  },
+  "board.laneStart.notStartedText": {
+    "defaultMessage": "{why} The lane is recorded: start {agent} yourself, or end the lane from its row in the Progress panel.",
+    "description": "The text of the toast when a lane's agent ({agent}) didn't start: why ({why}, a sentence), and what the user can do."
+  },
+  "board.laneStart.note": {
+    "defaultMessage": "Note for the agents (optional)",
+    "description": "A field label in the Start Lane dialog: anything the user wants both agents to know, added to their brief."
+  },
+  "board.laneStart.project": {
+    "defaultMessage": "Project",
+    "description": "A field label in the Start Lane dialog: the project whose cards the lane works through."
+  },
+  "board.laneStart.remove": {
+    "defaultMessage": "Take {card} out of the lane",
+    "description": "Tooltip of a button in the Start Lane dialog: removes the card ({card}, its key) from the lane's list (the card stays on the board)."
+  },
+  "board.laneStart.reviewer": {
+    "defaultMessage": "Reviewer",
+    "description": "A field label in the Start Lane dialog: the agent that reviews each card. Glossary: reviewer."
+  },
+  "board.laneStart.show": {
+    "defaultMessage": "Show",
+    "description": "A button on the toast after a lane started: shows its builder."
+  },
+  "board.laneStart.start": {
+    "defaultMessage": "Start Lane",
+    "description": "Button of the Start Lane dialog: records the lane and starts both agents."
+  },
+  "board.laneStart.started": {
+    "defaultMessage": "Lane started: {pair}",
+    "description": "A toast's title after a lane started from the window: its builder / reviewer ({pair}). Glossary: lane."
+  },
+  "board.laneStart.startedText": {
+    "defaultMessage": "{n, plural, one {# card} other {# cards}}. Each agent starts in a new conversation with its brief.",
+    "description": "The text of the toast after a lane started: how many cards ({n}), and that both agents started fresh with their brief."
+  },
+  "board.laneStart.starting": {
+    "defaultMessage": "Starting…",
+    "description": "The Start Lane button while the lane is being started."
+  },
+  "board.laneStart.title": {
+    "defaultMessage": "Start Lane",
+    "description": "Title of the Start Lane dialog: a builder and a reviewer agent work through cards in turn (a lane, a card loop), started from the window. Glossary: lane."
+  },
+  "board.laneStart.up": {
+    "defaultMessage": "Move {card} up",
+    "description": "Tooltip of a button in the Start Lane dialog: moves the card ({card}, its key) one place earlier in the lane."
+  },
+  "board.laneStart.waitAndStart": {
+    "defaultMessage": "Wait and Start",
+    "description": "Button of the Start Lane dialog while the builder or reviewer is busy: waits until they are idle, then starts the lane."
+  },
+  "board.laneStart.waiting": {
+    "defaultMessage": "Waiting for {agents} to be idle…",
+    "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting."
+  },
+  "board.lanes.abandon": {
+    "defaultMessage": "Abandon Lane…",
+    "description": "A lane's context menu item in the Progress panel: gives the lane up unmerged, after asking. Glossary: lane."
+  },
+  "board.lanes.abandonConfirm": {
+    "defaultMessage": "Abandon Lane",
+    "description": "The confirm button of the question before abandoning a lane (Progress panel)."
+  },
+  "board.lanes.abandonMessage": {
+    "defaultMessage": "The lane stops here, unmerged: its cards stay where they are, and its agents are told no more. Start a new lane to carry on.",
+    "description": "The question before abandoning a lane (Progress panel): what abandoning does. Glossary: lane."
+  },
+  "board.lanes.abandonTitle": {
+    "defaultMessage": "Abandon {lane}?",
+    "description": "Title of the question before abandoning a lane from the Progress panel: the lane's builder / reviewer and its name ({lane}). Glossary: lane."
+  },
   "board.lanes.alreadyEnd": {
     "defaultMessage": "{where, select, first {{lane} is already the first running lane} other {{lane} is already the last running lane}}",
     "description": "Said to screen readers when a lane (its builder / reviewer: {lane}) is moved with Alt+Up or Alt+Down but is already first or last among the running lanes."
@@ -1506,6 +1638,14 @@
   "board.lanes.edgeValue": {
     "defaultMessage": "{shown} of {count, plural, one {# lane} other {# lanes}} shown",
     "description": "The value of the handle on the top edge of the Progress panel's lanes, for screen readers: {shown} of the {count} lanes show."
+  },
+  "board.lanes.end": {
+    "defaultMessage": "End Lane",
+    "description": "A lane's context menu item in the Progress panel: ends the lane (its agents' card loop is over; the cards stay as they are). Glossary: lane."
+  },
+  "board.lanes.endFailed": {
+    "defaultMessage": "Couldn't end {lane}",
+    "description": "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows."
   },
   "board.lanes.fold": {
     "defaultMessage": "Fold the lanes",
@@ -1538,6 +1678,10 @@
   "board.lanes.stalled": {
     "defaultMessage": "stalled",
     "description": "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why."
+  },
+  "board.lanes.start": {
+    "defaultMessage": "Start Lane…",
+    "description": "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane."
   },
   "board.lanes.state": {
     "defaultMessage": "{state, select, paused {paused} ended {merged} other {abandoned}}",
@@ -1594,6 +1738,10 @@
   "board.menu.start": {
     "defaultMessage": "Start…",
     "description": "Menu item on a card (right-click): gives it to an agent to start (opens a dialog)."
+  },
+  "board.menu.startLane": {
+    "defaultMessage": "Start Lane with It…",
+    "description": "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane."
   },
   "board.merge.fold": {
     "defaultMessage": "Fold the merge to one line",
@@ -2430,6 +2578,10 @@
   "board.toolbar.search": {
     "defaultMessage": "Search cards (AM-12, words, labels)",
     "description": "Placeholder of the board's search box: finds cards by name (AM-12: a project key, a hyphen and a number; AM- finds all of that project's; #12 works too), words or labels."
+  },
+  "board.toolbar.startLane": {
+    "defaultMessage": "Start Lane…",
+    "description": "An item of the board's ⋯ menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane."
   },
   "board.upgrade.askDetail": {
     "defaultMessage": "Close every other Hive that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",

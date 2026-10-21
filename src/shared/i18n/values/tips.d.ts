@@ -180,6 +180,8 @@ interface HiveMessageValues {
   'tips.laneGates.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
+  'tips.laneStart.text': undefined
+  'tips.laneStart.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
   'tips.leftoverProcesses.text': undefined
