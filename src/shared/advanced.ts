@@ -726,6 +726,19 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.162.1.json`, version: '0.162.1', text: '"tool_timeout_sec": 900.0', shows: "Codex reading the hive server's tool_timeout_sec from Hive's -c override (codex mcp list --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
+    id: 'codex.mcp.startupTimeoutSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.title', defaultMessage: 'hive tools: startup timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.desc', defaultMessage: "How long Codex waits for Hive's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Hive gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Hive's tools.", description: 'What the advanced setting "hive tools: startup timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced). hive is the name of Hive\'s MCP server.' }),
+    kind: 'number',
+    default: 10,
+    min: 5,
+    max: 300,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the hive server's startup_timeout_sec from Hive's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
     id: drawnWaitId('codex'),
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.prompt.drawnSeconds.title', defaultMessage: 'Typed line: wait to be drawn', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -1050,6 +1063,119 @@ const SOURCES: readonly AdvancedSource[] = [
     override: true,
     samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--allow-all-mcp-server-instructions', shows: "Copilot's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // Hive's tools pre-approved (#1281, #966 row 3): CLI trust only. What a session may do with them is the Agent API's and
+  // Control's either way, and whether it has them at all is the workspace's MCP settings.
+  {
+    id: overrideId('claude-code', 'preApproveHiveTools'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.override.preApproveHiveTools.title', defaultMessage: "Pre-approve the Assistant's Hive tools", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.override.preApproveHiveTools.desc',
+      defaultMessage: "When the Hive Assistant runs on Claude Code, Hive passes --allowedTools with the Hive tools its Control settings let it use without asking, so Claude Code doesn't ask before them. Turned off, Claude Code asks before each Hive tool as its own permission mode says. Control still decides what the Assistant may do either way. Agents' Hive tools are never pre-approved on Claude Code.",
+      description: 'What the advanced setting "Pre-approve the Assistant\'s Hive tools" does (Settings → Advanced, under Claude Code). --allowedTools is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--allowedTools, --allowed-tools <tools...>', shows: "Claude Code's help for the flag Hive passes the Assistant's tools in" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // Only the workspace's MCP servers (#1281, #966 rows 4–6). Off, the CLI's own load beside them, and the workspace's
+  // (Hive's hive among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
+  // Copilot 1.0.100 natively; Codex by Hive's table, outrankNativeHive).
+  {
+    id: overrideId('claude-code', 'mcpIsolation'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    desc: msg({
+      id: 'settings.advanced.claude-code.override.mcpIsolation.desc',
+      defaultMessage: "Hive starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Hive (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Hive's own hive among them, win over yours of the same name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. hive is the name of Hive\'s MCP server.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: 'Only use MCP servers from --mcp-config,', shows: "Claude Code's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('copilot', 'mcpIsolation'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    desc: msg({
+      id: 'settings.advanced.copilot.override.mcpIsolation.desc',
+      defaultMessage: "Hive starts Copilot with --disable-builtin-mcps, and --disable-mcp-server for each server in your own Copilot config and the project's, so its sessions get only the MCP servers the workspace gives them. Turned off, those and Copilot's built-in GitHub servers load beside them, as they would outside Hive. The workspace's servers, Hive's own hive among them, win over yours of the same name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under GitHub Copilot). --disable-builtin-mcps and --disable-mcp-server are command-line options: keep them. hive is the name of Hive\'s MCP server.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable all built-in MCP servers (currently:', shows: "Copilot's help for the flag Hive passes" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable a specific MCP server (can be used multiple times)', shows: "Copilot's help for the flag Hive passes for each of the user's servers" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: overrideId('codex', 'preApproveHiveTools'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Hive's tools", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.codex.override.preApproveHiveTools.desc',
+      defaultMessage: "Hive gives Codex its hive server with its tools approved (for the Hive Assistant, only those its Control settings let it use without asking), so Codex doesn't ask before them in any mode. Turned off, Codex asks before them as its own approval policy says. What an agent or the Assistant may do with them is still decided by Hive.",
+      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under Codex). hive is the name of Hive\'s MCP server. Control is the name of the Assistant\'s settings page.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/mcp-tool-approval-codex-0.163.0.txt`, version: '0.163.0', text: 'Allow the probe MCP server to run tool "b"?', shows: 'Codex running a tool approved alone (tools.a.approval_mode="approve") without asking, then asking before the server\'s other tool' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('codex', 'mcpIsolation'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    desc: msg({
+      id: 'settings.advanced.codex.override.mcpIsolation.desc',
+      defaultMessage: "Hive's Codex sessions get the MCP servers the workspace gives them, and Hive turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Hive. Hive's own hive server always wins over one of yours with that name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. hive is the name of Hive\'s MCP server.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.163.0-disabled.json`, version: '0.163.0', text: '"enabled": false', shows: "Codex listing a server of its own config turned off for one launch (-c mcp_servers.<name>.enabled=false)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('copilot', 'preApproveHiveTools'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Hive's tools", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.copilot.override.preApproveHiveTools.desc',
+      defaultMessage: "Hive starts Copilot with --allow-tool for Hive's tools (for the Hive Assistant, only those its Control settings let it use without asking), so Copilot doesn't ask before them in any mode. Turned off, Copilot asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Hive.",
+      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under GitHub Copilot). --allow-tool is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Tools the CLI has permission to use; will not prompt for', shows: "Copilot's help for the flag Hive pre-approves its tools with" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('copilot', 'stripGitHubTokens'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.override.stripGitHubTokens.title', defaultMessage: 'Keep GH_TOKEN and GITHUB_TOKEN from Copilot', description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them." }),
+    desc: msg({
+      id: 'settings.advanced.copilot.override.stripGitHubTokens.desc',
+      defaultMessage: "Hive leaves GH_TOKEN and GITHUB_TOKEN, which other tools set, out of Copilot's environment, so a token left there never signs Copilot agents in to another account; COPILOT_GITHUB_TOKEN, set for Copilot, is kept. Turned off, Copilot gets them and signs in with them before its own login, as it would outside Hive, and Agent Setup shows that sign-in.",
+      description: 'What the advanced setting "Keep GH_TOKEN and GITHUB_TOKEN from Copilot" does (Settings → Advanced, under GitHub Copilot). GH_TOKEN, GITHUB_TOKEN and COPILOT_GITHUB_TOKEN are environment variables: keep them. Agent Setup is a dialog\'s name.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '`COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` (in order of precedence)', shows: "Copilot's help for the token variables it signs in with" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'claude-code.hooks.knownEvents',
     group: 'claude-code',
@@ -1352,6 +1478,18 @@ const UNITS: Record<string, Msg> = {
   min: msg({ id: 'settings.advanced.unit.minutes', defaultMessage: '{n, number} min', description: 'An advanced setting\'s value in minutes, short: "10 min". {n} is the number.' }),
   captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." })
 }
+
+/** A number's unit on its own, beside its box in Settings → Advanced ("s"): the unit of the values UNITS writes. */
+const UNIT_LABELS: Record<string, Msg> = {
+  s: msg({ id: 'settings.advanced.unitLabel.seconds', defaultMessage: 's', description: 'Beside the box of an advanced setting given in seconds (Settings → Advanced): the unit, short, as in "300 s".' }),
+  lanes: msg({ id: 'settings.advanced.unitLabel.lanes', defaultMessage: 'lanes', description: 'Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced).' }),
+  agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
+  min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
+  captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." })
+}
+
+/** A number's unit as its box shows it beside it (#1281), in the user's language; null without one. */
+export const advancedUnit = (def: AdvancedDef): string | null => (def.unit && UNIT_LABELS[def.unit] ? tr(UNIT_LABELS[def.unit]) : null)
 
 /** A value as Settings → Advanced's list shows it, in the user's language: "300 s", "on", "4 lanes". */
 export function advancedShown(def: AdvancedDef, v: unknown): string {

@@ -301,6 +301,11 @@ export interface ProviderAdapter {
   configHome?(): string
   /** What still keeps agents from running, given what locate() found. */
   readiness(info: AgentInstallInfo): ReadinessIssue[]
+  /**
+   * Advanced settings (ids) that change what locate() finds (#1281: the environment its sign-in is checked in): a change
+   * of one checks the CLI again, so the account shown is the one its sessions get.
+   */
+  readonly locateSettings?: readonly string[]
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
   /** The CLI's own default model from its settings, if set. */

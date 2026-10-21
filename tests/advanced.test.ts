@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedRow, checkAdvanced, cliFacing, parseAdvancedFile, sampleMiss, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, parseAdvancedFile, sampleMiss, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -60,6 +60,12 @@ describe('advanced defaults', () => {
       // Every value of a CLI's is CLI-facing (what Hive reads from it, and what it gives it); Hive's own aren't.
       expect(cliFacing(d), d.id).toBe(d.group !== 'hive')
     }
+  })
+
+  it("every number's unit has a label for beside its box (#1281), and a number of seconds says s", () => {
+    for (const d of ADVANCED_DEFS.filter((x) => x.unit)) expect(advancedUnit(d), d.id).toBeTruthy()
+    expect(advancedUnit(def('codex.mcp.startupTimeoutSeconds'))).toBe('s')
+    expect(advancedUnit(def('hive.showDeveloperFeatures'))).toBeNull()
   })
 
   it('every CLI-facing default has recorded samples, each found in its fixture, and reads every one', () => {
