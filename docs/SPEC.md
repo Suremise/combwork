@@ -1779,7 +1779,7 @@ tile marks it ("No code?") and its dialog asks **Confirm No Code** / **Keep as C
 first (the rule *A card's kind is set when it is made*, `card.kind`; a reason; **Change Anyway**) and the Assistant's
 needs `override.reason`; either records one `Override` (`card.kind`); agents never change or answer it (`403`). The
 card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
-Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, as it does `stage`.
+Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
 
 #### 16.7.4 Other moves
 

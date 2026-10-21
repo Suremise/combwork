@@ -212,15 +212,16 @@ function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): 
  * and the card stays where the move stopped. `agent`: the Move to Doing dialog's choice. Whether it reached the column;
  * the board is read again either way (an optimistic move undone on Cancel or a refusal).
  */
-export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null } = {}): Promise<boolean> {
+export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null; rethrow?: boolean } = {}): Promise<boolean> {
   const name = cardLabelOf(get(), c.number)
   const where = tr(COLUMN_TEXT[column].label)
+  const { rethrow, ...move } = o
   try {
-    let r = await call('tasks:move', c.number, column, o)
+    let r = await call('tasks:move', c.number, column, move)
     if ('ask' in r) {
       const reason = await askToSkip(name, column, r.ask)
       if (reason === null) return false
-      r = await call('tasks:move', c.number, column, { ...o, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
     }
     if ('refused' in r) {
       notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
@@ -233,6 +234,8 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
     }
     return true
   } catch (e) {
+    // A dialog that offers Try Again (Move to Doing, the card dialog's Save) shows the failure itself.
+    if (rethrow) throw e
     notify('error', tr(MOVE_FAILED), errorMessage(e))
     return false
   } finally {
@@ -1757,7 +1760,7 @@ export function TaskDialog() {
       delete patch.column
       if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
       if (give) await call('tasks:update', card.number, { agent: give })
-      if (to !== undefined && !(await moveCard(card, to))) {
+      if (to !== undefined && !(await moveCard(card, to, { rethrow: true }))) {
         // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
         // the dialog's saved state follows, so Save again or Cancel never claims a column it isn't in.
         const at = get().tasks.find((t) => t.number === card.number)?.column ?? card.column
@@ -2367,7 +2370,7 @@ export function MoveToDoingDialog() {
         }
         // Start doesn't place the card: where it was dropped, if it still can be (the order only).
         if (req.before !== undefined) await call('tasks:update', card.number, before).catch(() => undefined)
-      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before }))) {
+      } else if (!(await moveCard(card, 'doing', { agent: mode === 'assign' ? assignee : null, ...before, rethrow: true }))) {
         // Cancelled or refused (its toast says why): the dialog closes, the card where the move left it.
         moved = false
       }

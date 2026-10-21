@@ -1851,7 +1851,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
   // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
   const k = cardKind(workspace, c.number)
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), stage, ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}) }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
