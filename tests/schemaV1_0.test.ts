@@ -14,8 +14,6 @@ import { composeCard, decomposeCard, readCardRows, writeCardRows } from '../src/
 function schemaDb(): DatabaseSync {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys = ON')
-  // 0.9's board_meta, which the steps' tables are made beside (the board's revision, #1266, is kept there).
-  db.exec('CREATE TABLE board_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
   for (const step of V1_0_STEPS) for (const sql of step.ddl) db.exec(sql)
   return db
 }

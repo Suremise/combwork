@@ -2156,8 +2156,9 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   passed (its merge due) and the merge stalled: one notice per lane at a time, a banner or a Windows notification as
   **Settings → Notifications** says, with the Assistant on or off. What was told of each lane is kept with the board
   (`lane_notice_lanes`, `lane_notice_cards`): one board change moves it on and writes the lane's notice as a durable
-  `laneNotice` action, only when the board's revision (`board_rev`, moved on by every write to a card or a lane, by
-  trigger: never a clock) and the marks' writes are as the look read them, under its lock, else it looks again, so
+  `laneNotice` action, only when the board's revision (this Hive's committed changes of cards and lanes, counted as
+  they commit; another Hive's by SQLite's `data_version`; a replaced or restored file by its generation: never a clock)
+  and the marks' writes are as the look read them, under its lock, else it looks again, so
   marks never move back to an older look, a restart tells what it hadn't yet and two Hives tell each event once (the
   toast best effort, as §16.4.5 says; the lane itself always shows in the Progress panel); a lane running when
   Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the

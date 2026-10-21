@@ -6,7 +6,7 @@ import { laneHits, newLaneBase, type LaneCardMark, type LaneEvent, type LaneMark
 import { cardLabel } from '../shared/projectKeys'
 import type { TaskColumn } from '../shared/types'
 import { workflowLine } from '../shared/workflow/texts'
-import { boardRead, boardReadOnly, boardWrite, boardWriteOp } from './boardStore'
+import { boardRead, boardReadOnly, boardRevision, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
 import { listLanes } from './lanes'
@@ -143,12 +143,13 @@ const metaOf = (db: DatabaseSync, key: string): string | null => (db.prepare('SE
 const SEQ = 'lane_notices_seq'
 
 /**
- * What a look reads, as of now (#1266 round 3): the board's revision (`board_rev`, moved on in the same transaction as
- * every write to a card, a lane or a lane's cards, by trigger: never a clock) and the marks' writes. The same stamp at
- * the write as at the read: nothing a look reads changed between (a session's stall aside, which no write marks).
+ * What a look reads, as of now (#1266 round 3): the board's revision (boardRevision: its cards' and lanes' changes, this
+ * process's counted as they commit, another's by `data_version`, a replaced file by its generation: never a clock) and
+ * the marks' writes. The same stamp at the write as at the read: nothing a look reads changed between (a session's stall
+ * aside, which no write marks).
  */
-function stampOf(db: DatabaseSync): string {
-  return `${metaOf(db, 'board_rev') ?? '0'}|${metaOf(db, SEQ) ?? '0'}`
+function stampOf(ws: WorkspaceService, db: DatabaseSync): string {
+  return `${boardRevision(ws)}|${metaOf(db, SEQ) ?? '0'}`
 }
 
 /** How many times a look is made again, at most, while the board keeps changing under it (the next change or tick looks then). */
@@ -173,7 +174,7 @@ async function look(ws: WorkspaceService): Promise<boolean> {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path && openWorkspaces().includes(ws)
   let told: { marks: Record<string, LaneMark>; since: string; stamp: string }
   try {
-    told = boardRead(ws, (db) => ({ marks: readMarks(db), since: metaOf(db, SINCE) ?? new Date().toISOString(), stamp: stampOf(db) }))
+    told = boardRead(ws, (db) => ({ marks: readMarks(db), since: metaOf(db, SINCE) ?? new Date().toISOString(), stamp: stampOf(ws, db) }))
   } catch {
     // A board without the lane notices' tables (not upgraded): nothing to follow.
     return true
@@ -189,7 +190,7 @@ async function look(ws: WorkspaceService): Promise<boolean> {
     async () =>
       boardWriteOp(ws, (db) => {
         // Written since the read (another look, a change, another Hive): the read is stale, and nothing is written.
-        if (stampOf(db) !== told.stamp) return false
+        if (stampOf(ws, db) !== told.stamp) return false
         const since = metaOf(db, SINCE) ?? told.since
         db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
         // As the marks are now: what another Hive told since this one read them isn't told again.

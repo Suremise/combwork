@@ -631,8 +631,10 @@ backup; a newer file opens read-only.
 (`decisionWakes.ts`, which the runtime's `wakeOnDecision` extends to the reviewer: built, #1266), loop wakes (`loopWakes.ts`, fed by
 the facts' `wake` actions instead of `onLoopEvent`: built, #1266), Hive's own notices of the work (`workflowNotices.ts`:
 the `notify` and `laneNotice` actions; what lanes were told in `lane_notice_lanes` and `lane_notice_cards`, moved on
-in the board change that writes the notice, only while the look's stamp (board_meta `board_rev`, moved on by triggers
-on `cards`, `lanes` and `lane_cards`, and `lane_notices_seq`) is unchanged under the lock, else it looks again, #1266),
+in the board change that writes the notice, only while the look's stamp (`boardRevision`: the database's generation,
+the writer's `data_version` and this process's committed changes of cards and lanes, counted by boardWrite and
+storeTables' lanes saves, writing nothing; and `lane_notices_seq`) is unchanged under the lock, else it looks again,
+#1266),
 the Progress runs (`ProgressRun` gains `card` and
 `revision`).
 
