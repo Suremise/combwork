@@ -1,8 +1,8 @@
 import { msg } from './i18n/msg'
 import { columnName, type Tr } from './tasks'
 import { cardLabel } from './projectKeys'
-import type { LaneCard, LaneState, TaskCard, TaskColumn } from './types'
-import type { WorkBadge, WorkOverride } from './workflow/workView'
+import type { LaneCard, LaneState, LaneStatus, TaskCard, TaskColumn } from './types'
+import type { WorkBadge, WorkOverride, WorkRefusal } from './workflow/workView'
 
 /**
  * A lane in the Progress panel (#484): a segmented bar, one equal-width segment per card in the lane's order, coloured
@@ -134,6 +134,11 @@ function whereText(column: TaskColumn, round: number | null, how: 'failed' | 'in
 export interface OverrideNames {
   list: ListOf
   ruleName: (id: string) => string
+  /**
+   * A refusal's reason and next step in the window's language (#1279: refusals.ts's `refusalLines`, which this module
+   * doesn't import: hive-mcp reaches it, and must never load the translations). Without it, no refused line.
+   */
+  refusal?: (rule: string, values: WorkRefusal['values']) => { message: string; next: string }
 }
 
 /** A move past a card's rules (#1275, §16.8.4): who made it, the rules it skipped and why, for its mark and hover. */
@@ -142,9 +147,28 @@ export function overrideNote(o: WorkOverride, tr: Tr, names: OverrideNames): str
   return tr(msg({ id: 'board.work.badgeOverride', defaultMessage: '{by, select, assistant {The Assistant moved it past its rules} other {You moved it past its rules}}: {rules}. {hasReason, select, yes {Reason: {reason}} other {No reason given.}}', description: "Tooltip and accessible name of a mark on a board card (and a line in its lane segment's hover): a move made an exception to the card's workflow rules (glossary: override), by the user (other) or the Hive Assistant (assistant) (select: translate each); {rules} lists the rules it skipped (their names); then the reason the user or the Assistant gave (their own words), or that none was given. Glossary: rule, override." }), { by: o.by, rules: names.list(o.rules.map(names.ruleName), 'unit'), hasReason: reason ? 'yes' : 'no', reason }) // i18n-ignore: select keys, never shown
 }
 
-export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMerge: string | null, short: (id: string) => string, tr: Tr, names?: OverrideNames): string[] {
+/**
+ * A refused request (#1279), in the window's language as the agent got it in English: its reason and next step, on one
+ * line, then how many times in a row it was refused. `name`: the card as the window names it.
+ */
+export function refusedNote(r: WorkRefusal, tr: Tr, lines: NonNullable<OverrideNames['refusal']>, name?: string): string {
+  const l = lines(r.rule, { ...r.values, ...(name && r.values.card !== undefined ? { card: name } : {}) })
+  return tr(msg({ id: 'board.lane.workRefused', defaultMessage: '{message} {next}{times, plural, one {} other { (refused # times)}}', description: "A line in a lane segment's hover (Progress panel), for its red notch: the card's latest request was refused by its workflow rules: why ({message}) and what to do next ({next}), each a whole sentence already translated, then, when it was refused more than once in a row, how many times ({times}; nothing when once). Glossary: refused, rule." }), { times: r.times, message: l.message, next: l.next })
+}
+
+/** A content-stale pass (#1279): "Pass was for a3f2c1d; now at b71e09a", revisions through the project's platform. */
+export function stalePassNote(p: { approved: string | null; current: string | null }, short: (id: string) => string, tr: Tr): string {
+  return tr(msg({ id: 'board.lane.workStalePass', defaultMessage: '{now, select, none {Pass was for {approved}: it no longer holds} other {Pass was for {approved}; now at {current}}}', description: "A line in a lane segment's hover (Progress panel), with its stale mark: the card's pass was for one revision ({approved}, a short commit id) and the card is at another now ({current}); none: the revision now isn't known. Keep the select keys." }), { approved: p.approved ? short(p.approved) : '?', current: p.current ? short(p.current) : '', now: p.current ? 'yes' : 'none' }) // i18n-ignore: select keys and a placeholder, never shown
+}
+
+export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMerge: string | null, short: (id: string) => string, tr: Tr, names?: OverrideNames, name?: string): string[] {
   const out: string[] = []
-  if (b?.revision) out.push(tr(msg({ id: 'board.lane.workRevision', defaultMessage: '{review, select, yes {Under review: {revision}} other {Revision: {revision}}}', description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }), { review: b.stage === 'review' ? 'yes' : 'no', revision: short(b.revision) }))
+  // A no-code card has no commits (#1279): it says so, and has no revision or merge lines.
+  if (b?.noCode) out.push(tr(msg({ id: 'board.lane.workNoCode', defaultMessage: 'No-code card: no commits', description: "A line in a lane segment's hover (Progress panel): the card is a no-code card (its work isn't code), so it has no commits to show. Glossary: no-code card." })))
+  if (b?.refused && names?.refusal) out.push(refusedNote(b.refused, tr, names.refusal, name))
+  // Stale until it is submitted again; once Done (merged, or moved there past its rules) it no longer matters.
+  if (b?.stalePass && state !== 'done') out.push(stalePassNote(b.stalePass, short, tr))
+  if (b?.revision && !b.noCode) out.push(tr(msg({ id: 'board.lane.workRevision', defaultMessage: '{review, select, yes {Under review: {revision}} other {Revision: {revision}}}', description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }), { review: b.stage === 'review' ? 'yes' : 'no', revision: short(b.revision) }))
   if (b?.verdict)
     out.push(
       tr(
@@ -159,7 +183,7 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
   if (b && b.checks.passed + b.checks.failed > 0) out.push(tr(msg({ id: 'board.lane.workChecks', defaultMessage: 'Checks on it: {passed, number} passed, {failed, number} failed', description: "A line in a lane segment's hover (Progress panel): how many of the checks on the card's revision passed and failed (each check's latest run that counted)." }), { passed: b.checks.passed, failed: b.checks.failed }))
   if (b?.override && names) out.push(overrideNote(b.override, tr, names))
   const merge = b?.merged ?? (state === 'done' ? laneMerge : null)
-  if (merge && state === 'done') out.push(tr(msg({ id: 'board.lane.workMerged', defaultMessage: 'Merged as {commit}', description: "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)." }), { commit: /^[0-9a-f]{12,}$/i.test(merge) ? short(merge) : merge }))
+  if (merge && state === 'done' && !b?.noCode) out.push(tr(msg({ id: 'board.lane.workMerged', defaultMessage: 'Merged as {commit}', description: "A line in a lane segment's hover (Progress panel), for a Done card: the commit that merged it (a short commit id)." }), { commit: /^[0-9a-f]{12,}$/i.test(merge) ? short(merge) : merge }))
   return out
 }
 
@@ -170,7 +194,71 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
  * only the lane's own record of its merge.
  */
 export function laneSegmentWork(lane: { frozen: unknown; mergeCommit: string | null }, badge: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names?: OverrideNames): string[] {
-  return workNotes(lane.frozen ? undefined : badge, s.state, lane.mergeCommit, short, tr, names)
+  return workNotes(lane.frozen ? undefined : badge, s.state, lane.mergeCommit, short, tr, names, s.name)
+}
+
+/**
+ * A running lane's segment marks from its card's facts (#1279), each by pattern and colour beside the state's, with what
+ * it means (its accessible name says it too): a request refused (a red notch, cleared by the card's next move), a stale
+ * pass (amber dashed edges, until it is submitted again or is Done), a move past its rules (a corner mark). An ended lane's
+ * segments have none (their facts may be a later cycle's).
+ */
+export interface SegmentMarks {
+  refused?: string
+  stale?: string
+  override?: string
+}
+
+export function segmentMarks(lane: { frozen: unknown }, b: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names: OverrideNames): SegmentMarks {
+  if (lane.frozen || !b) return {}
+  return {
+    ...(b.refused && names.refusal ? { refused: refusedNote(b.refused, tr, names.refusal, s.name) } : {}),
+    ...(b.stalePass && s.state !== 'done' ? { stale: stalePassNote(b.stalePass, short, tr) } : {}),
+    ...(b.override ? { override: overrideNote(b.override, tr, names) } : {})
+  }
+}
+
+/**
+ * Why a running lane waits (#1270's status, #1279), for its header and accessible name: "waiting for you (approval)",
+ * "waiting: HI-11 not merged", "waiting for a reviewer on HI-12", "list changes after HI-12". `name`: a card as the
+ * window names it (its key).
+ */
+export function laneWaitText(s: LaneStatus, name: (n: number) => string, tr: Tr): string {
+  const card = s.card !== null ? name(s.card) : ''
+  return tr(
+    msg({
+      id: 'board.lanes.waits',
+      defaultMessage:
+        '{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} other {list changes after {card}}}',
+      description:
+        "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+    }),
+    { reason: s.reason, ask: s.ask ?? 'other', card } // i18n-ignore: select keys, never shown
+  )
+}
+
+/**
+ * A folded segment's marks ("✓ n", "+n": HR6's #1279 round 1): every mark of the cards folded into it, so folding never
+ * hides one (an override is never invisible, a refusal never lost on a long lane). Each kind is shown once on the folded
+ * segment, its lines naming their card ("AL-1: You moved it past its rules…"), for its hover and accessible name.
+ * `cards`: the lane's card segments; `short`: a card's revisions as its project shows them.
+ */
+export interface FoldedMarks {
+  refused: string[]
+  stale: string[]
+  override: string[]
+}
+
+export function foldedMarks(lane: { frozen: unknown }, badges: ReadonlyMap<number, WorkBadge>, cards: readonly CardSegment[], numbers: readonly number[], short: (n: number) => (id: string) => string, tr: Tr, names: OverrideNames): FoldedMarks {
+  const out: FoldedMarks = { refused: [], stale: [], override: [] }
+  for (const n of numbers) {
+    const s = cards.find((c) => c.number === n)
+    if (!s) continue
+    const m = segmentMarks(lane, badges.get(n), s, short(n), tr, names)
+    const name = s.name ?? `#${n}`
+    for (const k of ['refused', 'stale', 'override'] as const) if (m[k]) out[k].push(tr(msg({ id: 'board.lane.foldedMark', defaultMessage: '{card}: {mark}', description: "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)." }), { card: name, mark: m[k]! }))
+  }
+  return out
 }
 
 /** A card segment's accessible name: its label and its notes (#706). */

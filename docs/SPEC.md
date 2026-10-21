@@ -2435,6 +2435,22 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
 - **P4** [#1120 c]: a refused move marks the segment (a notch, red, by pattern and colour) with the one-line reason and
   next step; a stale pass is marked ("Pass was for a3f2c1d; now at b71e09a"); overrides marked with who, rule and why;
   no-code cards say so; paused lanes say why; a failed run that blocks a gate says so ("blocks review for AM-12").
+  **Built [#1279]:** a running lane's segment marks come from its card's facts (none on an ended lane's, whose facts
+  may be a later cycle's), each a shape of its own beside the state's colour and pattern, and each said in the
+  segment's hover and accessible name: a **refused** request since the card last moved (its latest `Refused`) is a red
+  notch in the segment's end corner, its hover the refusal's reason and next step in the window's language (the
+  agent's English from the same messages, §16.8.3), "(refused 3 times)" when the same rule refused it in a row, cleared
+  by the card's next move; a content-**stale** pass is amber dashed top and bottom edges over a paler fill, "Pass was
+  for a3f2c1d; now at b71e09a" (revisions through the project's descriptor), until it is submitted again or Done; the
+  latest **override** since it was last Done is a ringed dot in the start corner, its hover who, which rules by name
+  and why (§16.8.4's note); a **no-code card**'s hover says so and has no revision or merge lines. A lane with a status
+  (#1270) says why in its header, in the room the lane's name had (every lane keeps one height; paused in the paused colour, others faint; its whole text in its title), and in its accessible name:
+  *waiting for you (approval): AM-12* (the open request's kind), *waiting: AM-11 not merged*, *waiting: AM-11
+  merging*, *stale: AM-12 must be submitted again*, *waiting for a reviewer on AM-12*, *list changes after AM-12*, the
+  round limit, a card blocked or On Hold; the Lanes bar counts the lanes waiting for you (an open request or the round
+  limit). A finished check run for a card whose result failed and whose name is one of the card's ruleset's checks
+  before review (`blocks()`, `checks.ts`) records `blocks: review` with how it counted (`RunCheck`, kept with the
+  run), and its row says **Blocks review for AM-12** under the failure, for as long as the failed run shows.
 - **P5** [#1121 c]: the merge slot card becomes the queue's summary per target (testing now, queued, just merged,
   returned with Open card and Show log), Pause/Resume and Remove from queue, the queue's runs attributed to Hive, the
   full queue view in the Version Control tab, state changes announced politely.
