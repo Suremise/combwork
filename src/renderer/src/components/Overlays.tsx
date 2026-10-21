@@ -68,7 +68,13 @@ export function Dialogs() {
       setSecondOwn(false)
       setChecked(dialog.check?.initial ?? false)
       setError(null)
-      setTimeout(() => inputRef.current?.select(), 30)
+      // Its box takes the focus as it opens, unless the user is already in a box (#1221: run late, on a busy machine,
+      // the select took what was being typed into the key box into the name box).
+      setTimeout(() => {
+        const active = document.activeElement
+        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
+        inputRef.current?.select()
+      }, 30)
     }
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
   }, [dialog, setActionError])

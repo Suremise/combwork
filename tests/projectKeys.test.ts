@@ -166,6 +166,31 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     await close(w)
   })
 
+  it('a reservation is its workspace’s own: another workspace changes a key to it, or makes a project with it, meanwhile (round 2, finding 1)', async () => {
+    const [wsA, wsB, wsC] = [workspace(['hive']), workspace(['hive']), workspace(['hive'])]
+    const [a, b, c] = [await open(wsA), await open(wsB), await open(wsC)]
+    for (const w of [a, b, c]) await keys.keyProjects(w)
+    const make = a.createProject.bind(a)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    a.createProject = async (name: string) => {
+      await held
+      return make(name)
+    }
+    const creating = keys.createProjectWithKey(a, 'web-app', 'ZZ')
+    // B's and C's keys are their own: ZZ is free there, for a new project and for a key change.
+    await keys.createProjectWithKey(b, 'other', 'ZZ')
+    await keys.changeProjectKey(c, join(wsC, 'hive'), 'ZZ')
+    expect([await keyOf(b, 'other'), await keyOf(c, 'hive')]).toEqual(['ZZ', 'ZZ'])
+    // …and in A, the reservation still holds.
+    await expect(keys.changeProjectKey(a, join(wsA, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    release()
+    await creating
+    expect([await keyOf(a, 'web-app'), await keyOf(a, 'hive')]).toEqual(['ZZ', 'HI'])
+    a.createProject = make
+    for (const w of [a, b, c]) await close(w)
+  })
+
   it("a moved card's names in the project it left, for the window: under each key that project holds or held (round 1, finding 1)", async () => {
     const ws = workspace()
     const w = await open(ws)
