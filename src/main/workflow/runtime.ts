@@ -9,22 +9,23 @@
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
 import { AsyncLocalStorage } from 'async_hooks'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { resolve as resolvePath } from 'path'
+import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
-import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { FinishInputs, PlatformAdapter } from '../platform/adapter'
+import type { FinishInputs, LineNow, PlatformAdapter } from '../platform/adapter'
 import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
 import { NonePlatform } from '../platform/nonePlatform'
-import { isUnknown, type Maybe } from '../platform/types'
+import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 
@@ -237,6 +238,23 @@ interface SubmitGathered {
 const NO_CODE_GUARDS: GuardId[] = ['submit.notDuplicate', 'submit.ownRunsStopped', 'submit.decisionsReceived']
 
 /** A drag's write undone (it throws, so its part of the change is undone): a refusal, or rules not decided on (ask again). */
+/**
+ * The lanes' next cards whose builder's line is being moved now (moveLineOn, #1271), by project folder and card: their
+ * start waits for that move's LineMoved, whichever runtime of the project starts them (HR2's round 2 finding 2).
+ */
+const lineMoving = new Map<string, LineBehind>()
+
+/** A lane's next card held up by its builder's line (lineBehind, §16.19.2): the cards, the builder, its worktree and line now. */
+export interface LineBehind extends LineNow {
+  next: CardRecord
+  prev: CardRecord
+  builder: string
+  folder: string
+  target: string
+  /** A move begun (its `LineMoving`) with no `LineMoved` after it, and the line not back where it was (HR2's round 3). */
+  unfinished?: { from: string; to: string }
+}
+
 class DragUndone extends Error {
   constructor(readonly refused: GuardRefusal) {
     super(refused.rule)
@@ -472,6 +490,17 @@ export class Workflow {
     // user's own drag is theirs to make.
     const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
     if (lane) return this.refuse(card, actor, 'start', lane)
+    // Its builder's worktree still has an earlier card's squashed work (§16.19.2, #1271): it waits for Hive (or the user)
+    // to bring the branch up to date, so its change is only its own.
+    const behind = this.enforced() && !opts.drag ? await this.lineBehind(card) : null
+    if (behind) return this.refuse(card, actor, 'start', { rule: 'lane.lineBehind', values: { card: card.key, earlier: behind.prev.key, line: behind.line ?? behind.folder, target: behind.target } })
+    // Its line being moved right now: it waits for that move's LineMoved (refused as behind, checked again in its write).
+    const moving = (): GuardRefusal | null => {
+      const m = this.enforced() && !opts.drag ? lineMoving.get(this.movingKey(card.id)) : undefined
+      return m ? { rule: 'lane.lineBehind', values: { card: card.key, earlier: m.prev.key, line: m.line ?? m.folder, target: m.target } } : null
+    }
+    const inMove = moving()
+    if (inMove) return this.refuse(card, actor, 'start', inMove)
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
@@ -502,7 +531,7 @@ export class Workflow {
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
       }
-      const waits = this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null
+      const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
       if (waits) return undone(waits)
       // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
       const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
@@ -1652,6 +1681,145 @@ export class Workflow {
   private laneRefusal(card: CardRecord): GuardRefusal | null {
     const earlier = this.laneWaits(card)
     return earlier ? { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } } : null
+  }
+
+  // --- An agent's worktree between a lane's cards (§16.19.2, #1271).
+
+  /**
+   * Whether a lane's card would start on a line that still has an earlier card's squashed work: its builder's own worktree
+   * (standing in for a slot), the last card before it in the lane that was worked there and is Done, and the worktree as
+   * it is now, its head not in that card's target. Null when the card isn't a lane's, its builder has no worktree, no
+   * earlier card was worked there, the head is in the target (a merge commit or a fast-forward leaves it so), or the
+   * folder can't be read (nothing is held up on what can't be told).
+   */
+  async lineBehind(card: CardRecord): Promise<LineBehind | null> {
+    if (!card.lane || !this.cfg.agentFolder) return null
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return null
+    const builder = this.store.laneBuilder(l.id)
+    const own = builder ? await this.cfg.agentFolder(builder) : null
+    if (!builder || !own) return null
+    const cards = this.laneNow(l).cards
+    const at = cards.indexOf(card.id)
+    const same = (a: string | undefined): boolean => !!a && a !== 'project' && resolvePath(a).toLowerCase() === resolvePath(own.path).toLowerCase()
+    const prev = (at < 0 ? cards : cards.slice(0, at))
+      .map((c) => this.store.card(c))
+      .reverse()
+      .find((c) => this.laneDone(c.id) && same(this.state(c).started?.folder))
+    if (!prev) return null
+    const ps = this.state(prev)
+    const target = ps.started?.target
+    if (!target) return null
+    const p = this.platform(this.rulesetOf(prev, ps).options)
+    if (!p.lineNow) return null
+    const now = await p.lineNow(own.path, target)
+    if (isUnknown(now)) return null
+    // A move begun and not recorded as done (it failed part way, or Hive stopped during it): held until it is settled,
+    // unless the line is back where it began.
+    const facts = this.store.facts(prev.id)
+    // Its outcome is a fact (HR2's round 4): a head back where it began proves nothing of the files and index.
+    const moving = facts.findLast((f) => f.kind === 'LineMoving')
+    const begun = moving && !facts.some((f) => (f.kind === 'LineMoved' || f.kind === 'LineMoveUndone') && f.seq > moving.seq) ? (moving.data as FactData['LineMoving']) : null
+    const unfinished = begun ? { from: begun.from, to: begun.to } : undefined
+    if (now.inTarget && !unfinished) return null
+    return { next: card, prev, builder, folder: own.path, target, ...now, ...(unfinished ? { unfinished } : {}) }
+  }
+
+  /**
+   * What on the line isn't in the target (§16.19.2 step 2): nothing when the line's change since the earlier card's base
+   * is in the target (the squash replays it), else the commits after what was approved there (a commit made after the
+   * approval), as short ids and subjects.
+   */
+  async lineWorkNotIn(b: LineBehind): Promise<Maybe<string[]>> {
+    const s = this.state(b.prev)
+    const p = this.platform(this.rulesetOf(b.prev, s).options)
+    const base = s.approved?.base ?? s.latest?.base ?? s.started?.base
+    if (!base) return unknown(UNREADABLE.branchedOffTarget)
+    const c = await p.contains(b.target, { base, revision: b.head, key: null })
+    if (isUnknown(c)) return c
+    if (c) return []
+    const from = s.approved?.revision ?? base
+    const list = p.commitsBetween ? await p.commitsBetween(b.folder, from, b.head) : []
+    return isUnknown(list) || list.length ? list : [b.head.slice(0, 7)]
+  }
+
+  /**
+   * Moves the line to the target (§16.19.2 step 3) and records it: a `LineMoved` on the card just Done, before the next
+   * card's `Started` (whose base is its `to`), and the builder told. Only from the state checked (HR2's #1271 round 1):
+   * the line, its head and the target's head read again, the worktree clean and `still()` (the caller's own conditions:
+   * the rules on, the switch or the user's approval, the builder idle with no run, the workspace open) just before, and
+   * the platform's move itself serialized with the worktree's other git work and conditional on that branch, head and
+   * target, `still()` asked again at its boundary (HR2's round 2). The next card is reserved meanwhile (`lineMoving`):
+   * its start is refused until the `LineMoved` is saved, and the move goes ahead only while the card is still in Todo.
+   * A move whose fact can't be saved is undone the same way. Git's refusal comes back as its reason; null when anything
+   * changed (nothing moved, nothing recorded: looked at again).
+   */
+  async moveLineOn(b: LineBehind, still: () => boolean): Promise<true | string | null> {
+    const s = this.state(b.prev)
+    const p = this.platform(this.rulesetOf(b.prev, s).options)
+    if (!p.moveLine || !p.lineNow) return 'no line to move' // i18n-ignore: a platform with no lines (never asked: lineBehind is Git's)
+    const key = this.movingKey(b.next.id)
+    if (lineMoving.has(key)) return null
+    lineMoving.set(key, b)
+    try {
+      const ok = (): boolean => this.state(b.next).stage === 'todo' && still()
+      const now = await p.lineNow(b.folder, b.target)
+      if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !ok()) return null
+      const line = b.line ?? b.folder
+      // Begun, durably, before anything moves (HR2's round 3): a move that doesn't finish (it fails part way and can't be
+      // put back, or Hive stops) holds the next card until it is settled.
+      await this.write(b.prev, null, 'hive', (w) => {
+        w.fact('LineMoving', { line, from: b.head, to: b.targetHead }) // i18n-ignore: a fact's kind and codes, not text
+        return null
+      })
+      const moved = await p.moveLine(b.folder, b.targetHead, { line: b.line, head: b.head, target: b.target }, ok)
+      // Not made, everything as it was (the platform put it back, or never began): the move's outcome, recorded.
+      if (moved !== true) {
+        await this.lineMoveUndoneRecord(b, b.head)
+        return moved
+      }
+      try {
+        await this.lineMovedRecord(b, b.head, b.targetHead)
+      } catch (e) {
+        // Not recorded (the workspace closed, the board failing): the branch put back where it was, as conditionally.
+        await p.moveLine(b.folder, b.head, { line: b.line, head: b.targetHead }, () => true)
+        throw e
+      }
+      return true
+    } finally {
+      lineMoving.delete(key)
+    }
+  }
+
+  /** Records a line's move as not made, everything as it was at `at` (`LineMoveUndone` on the card just Done). */
+  async lineMoveUndoneRecord(b: LineBehind, at: string): Promise<void> {
+    await this.write(b.prev, null, 'hive', (w) => {
+      w.fact('LineMoveUndone', { line: b.line ?? b.folder, at }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
+  }
+
+  /** Records a line's move as done (`LineMoved` on the card just Done) and tells its builder the next card can start. */
+  async lineMovedRecord(b: LineBehind, from: string, to: string): Promise<void> {
+    const line = b.line ?? b.folder
+    await this.write(b.prev, null, 'hive', (w) => {
+      w.fact('LineMoved', { line, from, to, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
+      this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
+      return null
+    })
+  }
+
+  /** A card as `lineMoving` keys it: its project's folder, resolved, and its number (any runtime of that project sees it). */
+  private movingKey(card: number): string {
+    return `${resolvePath(this.cfg.project).toLowerCase()}#${card}`
+  }
+
+  /** Asks the user about a line held up (§16.19.2): on the lane's next card, bound to the line's head, so asked once for it. */
+  async askAboutLine(b: LineBehind, kind: ForYouKind, text: StoredText): Promise<void> {
+    await this.write(b.next, null, 'hive', (w) => {
+      this.askUser(w, kind, LINE_GATE, text, { unbound: true, revision: b.head })
+      return null
+    })
   }
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */

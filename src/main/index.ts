@@ -49,6 +49,7 @@ import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
+import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
@@ -972,6 +973,14 @@ app.whenReady().then(async () => {
   startObserving()
   // What it sees reconciled with the cards' facts: recorded (#1217), and acted on with the rules enforced (#1263).
   startReconciling()
+  // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
+  // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
+  // its CLI hasn't taken yet, it is busy.
+  setAgentBusy((project, agent) => {
+    const now = sessions.agentNow(project, agent)
+    return !!now && (now.pending || ['starting', 'working', 'waiting', 'background'].includes(now.status))
+  })
+  startLineUpdates()
   // What an agent has going, which its submission waits for with "its own runs stopped" (#1265, G13): its open
   // Progress runs and its CLI's background tasks.
   setRunsGoing((project, agent) => {

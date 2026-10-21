@@ -112,6 +112,9 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 /** The gate of Hive's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
+/** The gate of Hive's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
+export const LINE_GATE = 'lineUpdate'
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
@@ -146,6 +149,13 @@ export interface FactData {
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
+  /**
+   * A line's move begun (#1271): written before it, so a move with no outcome after it (`LineMoved`, or
+   * `LineMoveUndone`) holds the next card until it is settled.
+   */
+  LineMoving: { line: string; from: string; to: string }
+  /** A line's move begun and not made: everything as it was (put back, or found so), the move's outcome (#1271). */
+  LineMoveUndone: { line: string; at: string }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
