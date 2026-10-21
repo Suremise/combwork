@@ -21,7 +21,7 @@
   "tips.archiveNew.title": "Archiver et repartir",
   "tips.assistant.text": "Le panneau de droite supervise l’espace de travail : demande ce que font les agents, ce que coûtent les choses, ou un plan. {key}",
   "tips.assistant.title": "Demander au Hive Assistant",
-  "tips.assistantBatch.text": "L’Assistant peut déplacer ou étiqueter jusqu’à {cards, plural, one {# carte} many {# cartes} other {# cartes}} en une étape, chaque carte restant listée séparément. L’étape compte pour une seule de ses {changes, plural, one {# modification} many {# modifications} other {# modifications}} par message : elle ne s’arrête donc jamais à mi-chemin.",
+  "tips.assistantBatch.text": "L’Assistant peut déplacer ou étiqueter jusqu’à {cards, plural, one {# carte} many {# cartes} other {# cartes}} en une étape, chaque carte restant listée séparément.",
   "tips.assistantBatch.title": "Beaucoup de cartes en une étape",
   "tips.assistantCompact.text": "L’Assistant travaille d’habitude avec un contexte plus grand que tes agents, donc son bouton Compacter devient orange plus tard : au-delà de {tokens, plural, one {# jeton} many {# jetons} other {# jetons}} par défaut. Paramètres → Assistant → Mettre en avant Compacter dès le modifie, ou Jamais le désactive.",
   "tips.assistantCompact.title": "Quand l’Assistant suggère de compacter",

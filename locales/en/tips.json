@@ -88,8 +88,8 @@
     "description": "A tip's title."
   },
   "tips.assistantBatch.text": {
-    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own. The step counts as one of its {changes, plural, one {# change} other {# changes}} for a message, so it never stops part-way through them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100), {changes} how many changes the Assistant may make for one message (30)."
+    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."
   },
   "tips.assistantBatch.title": {
     "defaultMessage": "Many cards in one step",

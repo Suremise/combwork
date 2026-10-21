@@ -23,7 +23,7 @@ interface HiveMessageValues {
   'tips.archiveNew.title': undefined
   'tips.assistant.text': { key: string | number }
   'tips.assistant.title': undefined
-  'tips.assistantBatch.text': { cards: number; changes: number }
+  'tips.assistantBatch.text': { cards: number }
   'tips.assistantBatch.title': undefined
   'tips.assistantCompact.text': { tokens: number }
   'tips.assistantCompact.title': undefined

@@ -21,7 +21,7 @@
   "tips.archiveNew.title": "Archive and Start New",
   "tips.assistant.text": "The panel on the right oversees the workspace: ask what the agents are doing, what things cost, or for a plan. {key}",
   "tips.assistant.title": "Ask the Hive Assistant",
-  "tips.assistantBatch.text": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own. The step counts as one of its {changes, plural, one {# change} other {# changes}} for a message, so it never stops part-way through them.",
+  "tips.assistantBatch.text": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
   "tips.assistantBatch.title": "Many cards in one step",
   "tips.assistantCompact.text": "The Assistant usually works with a bigger context than your agents, so its Compact button turns orange later: past {tokens, plural, one {# token} other {# tokens}} by default. Settings → Assistant → Highlight Compact over changes that, or Never turns it off.",
   "tips.assistantCompact.title": "When the Assistant suggests compacting",

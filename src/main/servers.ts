@@ -869,7 +869,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
 
 /**
  * A setting the Hive Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
- * within this turn's limit of changes, and listed in its panel with old → new for Revert. Other callers can't.
+ * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
   const path = settingPath(e)
@@ -887,12 +887,8 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     assistant.record(ws, act, line, 'only the user can change it', { reason: 'Only the user can change it' })
     throw new HttpError(403, `${e.readOnly} Tell the user how, instead.`)
   }
-  // Checked before it counts as a change: a value it can't take is the Assistant's to fix, not one of its 30.
+  // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
-  if (!assistant.countAction(ws)) {
-    assistant.record(ws, act, line, `limit of ${assistant.MAX_ACTIONS_PER_TURN} changes for one message`, { reason: publicReason(429) })
-    throw new HttpError(429, `You have made ${assistant.MAX_ACTIONS_PER_TURN} changes for this message, the most Hive allows for one. Tell the user what is done and ask whether to go on.`)
-  }
   // Asked again at the moment of the change (a project's under its lock, after any wait for it): Change settings may have
   // been turned off, or the Assistant stopped, meanwhile.
   // The same session, too: one started since (a restart) mustn't carry out this one's pending change.

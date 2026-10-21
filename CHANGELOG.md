@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **No limit on the Assistant's changes for a message.** It used to stop after 30 changes for one message and ask to go on, so relabelling 70 cards took several messages. Now it carries on, and you undo what you don't want from its panel. What it may do at all is still Settings → Assistant → Control (#1170).
 - **Undo the Assistant's changes from its panel.** **Done by the Assistant** lists its changes by your message (*Your message at 08:14: 61 changes*), newest open, each change with **Undo**, and each message with **Undo** for all of them: it asks first, then says what it undid and what it kept because you or an agent changed it since. Undone changes stay listed, struck through; what can't be undone (a prompt sent, a comment) says so and why. A setting's **Revert** is now this **Undo** (#1283).
 - **The Assistant can undo its own changes.** Hive keeps what the Assistant changes for 7 days, grouped by your message: cards' fields and the cards it made, lanes, agents' settings, Hive's settings and the agents it started. Ask it to undo, and it puts back what is still as it left it; anything you or an agent changed since stays, and it says so (#1282).
 - **Start a lane yourself.** Right-click the Todo column for **Start Lane with These Cards…**: choose the builder and the reviewer, put the cards in order and add a note; both agents start in a new conversation with a brief of the cards, where to work and what the project's rules ask. A lane's row in the Progress panel has **End Lane** and **Abandon Lane…**.

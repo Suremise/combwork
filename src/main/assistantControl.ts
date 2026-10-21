@@ -20,8 +20,6 @@ import { createLogger, userText } from './logger'
 
 const log = createLogger('assistant')
 
-/** Changes the Assistant may make for one message from the user; then it must ask the user to go on. */
-export const MAX_ACTIONS_PER_TURN = 30
 const MAX_LISTED = 200
 
 interface Pending {
@@ -33,7 +31,6 @@ interface Pending {
 interface WorkspaceState {
   token: string
   actions: AssistantAction[]
-  turnActions: number
   pending: Map<string, Pending>
   /** The user's message the Assistant works on now (#1282): its changes are grouped by it for undo. */
   turn: AssistantTurn | null
@@ -50,7 +47,7 @@ const states = new Map<string, WorkspaceState>()
 function stateOf(workspacePath: string): WorkspaceState {
   const k = workspacePath.toLowerCase()
   let s = states.get(k)
-  if (!s) states.set(k, (s = { token: '', actions: [], turnActions: 0, pending: new Map(), turn: null }))
+  if (!s) states.set(k, (s = { token: '', actions: [], pending: new Map(), turn: null }))
   return s
 }
 
@@ -130,22 +127,6 @@ export function actions(workspacePath: string): AssistantAction[] {
   return stateOf(workspacePath).actions
 }
 
-/** Changes left for this turn's limit. */
-export function actionsLeft(workspacePath: string): number {
-  return Math.max(0, MAX_ACTIONS_PER_TURN - stateOf(workspacePath).turnActions)
-}
-
-/**
- * Counts a change against this turn's limit; false, and nothing counted, once the limit is reached. A batch of cards is
- * one change (#488). Synchronous, so nothing else counts between the check and the count.
- */
-export function countAction(workspacePath: string): boolean {
-  const s = stateOf(workspacePath)
-  if (s.turnActions >= MAX_ACTIONS_PER_TURN) return false
-  s.turnActions++
-  return true
-}
-
 /** A change the Assistant may not make: the Agent API's status, and what it reports beside the error. */
 export class ChangeRefused extends Error {
   constructor(
@@ -160,7 +141,7 @@ export class ChangeRefused extends Error {
 // i18n-ignore: the control levels as the Assistant's refusals name them (Agent API replies stay English)
 export const LEVEL_NAME: Record<AssistantControl, string> = { look: 'Look and advise', agents: 'Control agents', projects: 'Control agents and create projects' }
 
-/** Refuses (and records) a change the control level doesn't allow: the Assistant's change boundary, before anything counts. */
+/** Refuses (and records) a change the control level doesn't allow: the Assistant's change boundary, before anything changes. */
 export function refuseUnlessAllowed(workspacePath: string, need: AssistantControl, what: string, act: ActivityTarget): void {
   if (allows(need)) return
   // i18n-ignore: the Agent API's event stream (#763) speaks English, as the rest of the API does
@@ -171,20 +152,12 @@ export function refuseUnlessAllowed(workspacePath: string, need: AssistantContro
 
 /**
  * The Assistant's change boundary, shared by its single changes (the Agent API's assistantChange) and its batches
- * (taskBatch). Admitting a change checks the control level and counts it against this message's limit: a batch is one
- * change, however many cards it has (#488; a refusal records the change). Returns the guard
- * to run again as each card is written: the control level and the session must still allow the change then, after the
- * last read, or nothing is saved.
+ * (taskBatch). Admitting a change checks the control level (a refusal records the change); there is no count of changes
+ * per message (#1170: undo, not a count, protects the board). Returns the guard to run again as each card is written: the
+ * control level and the session must still allow the change then, after the last read, or nothing is saved.
  */
 export function admit(workspacePath: string, token: string, need: AssistantControl, what: string, act: ActivityTarget): () => void {
   refuseUnlessAllowed(workspacePath, need, what, act)
-  if (!countAction(workspacePath)) {
-    // i18n-ignore: the Agent API's event stream (#763) speaks English, as the rest of the API does
-    record(workspacePath, act, what.charAt(0).toUpperCase() + what.slice(1), `limit of ${MAX_ACTIONS_PER_TURN} changes for one message`, { reason: publicReason(429) })
-    // `fits` (none, now) stays on the refusal: the batch route's reply contract (#417).
-    // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-    throw new ChangeRefused(429, `You have made ${MAX_ACTIONS_PER_TURN} changes for this message, the most Hive allows for one. Tell the user what is done and ask whether to go on.`, { fits: 0 })
-  }
   return () => {
     // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
     if (!allows(need)) throw new ChangeRefused(403, 'The user turned Settings → Assistant → Control down before this change was made: nothing changed here.')
@@ -193,10 +166,9 @@ export function admit(workspacePath: string, token: string, need: AssistantContr
   }
 }
 
-/** The user sent the Assistant a message: a new turn, with a fresh limit. */
+/** The user sent the Assistant a message: a new turn, which groups its changes for undo. */
 export function newTurn(workspacePath: string): void {
   const s = stateOf(workspacePath)
-  s.turnActions = 0
   s.turn = { id: randomUUID(), at: new Date().toISOString() }
 }
 

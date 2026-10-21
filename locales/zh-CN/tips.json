@@ -21,7 +21,7 @@
   "tips.archiveNew.title": "归档并新建会话",
   "tips.assistant.text": "右侧面板负责照看整个工作区：可以问它智能体在做什么、花了多少钱，或让它做个计划。{key}",
   "tips.assistant.title": "问问 Hive Assistant",
-  "tips.assistantBatch.text": "助手一步就能移动最多 {cards, plural, other {# 张卡片}}或为它们加标签，每张卡片仍会单独列出。这一步只算作每条消息 {changes, plural, other {# 次更改}}中的一次，因此不会中途停下。",
+  "tips.assistantBatch.text": "助手一步就能移动最多 {cards, plural, other {# 张卡片}}或为它们加标签，每张卡片仍会单独列出。",
   "tips.assistantBatch.title": "一步处理多张卡片",
   "tips.assistantCompact.text": "助手使用的上下文通常比智能体大，所以它的“压缩”按钮更晚才变橙色：默认在超过 {tokens, plural, other {# 个 Token}}时。“设置”→“助手”→“压缩按钮高亮阈值”可以更改这个值，选“从不”则关闭。",
   "tips.assistantCompact.title": "助手何时建议压缩",
