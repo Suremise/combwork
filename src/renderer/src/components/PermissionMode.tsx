@@ -1,4 +1,5 @@
 import { agentLaunchSettings, canSwitchModeLive, modeBadgeLabel, modeOption, offeredModes, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, shownText } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { msg, tr } from '@shared/i18n'
 import type { AgentInfo, AppSettings, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
 import * as actions from '../actions'
@@ -167,7 +168,8 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
   const provider = agentProviderOf(project, a)
   const mode = currentMode(project, a, settings)
   const option = modeOption(provider, mode)
-  const bypass = !!option?.danger
+  // Marked by the mode in effect: on the CLI's own setting, one without guardrails its CLI showed (#1284).
+  const bypass = !!modeOption(provider, (a.live ? modeInEffect(a.live) : undefined) ?? mode)?.danger
   const label = a.live?.modeSwitching
     ? tr(msg({ id: 'agents.permission.switching', defaultMessage: 'Switching to {mode}…', description: "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)." }), { mode: permissionLabel(provider, a.live.modeSwitching, tr) })
     : a.live?.planMode

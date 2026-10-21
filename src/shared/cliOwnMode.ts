@@ -14,6 +14,14 @@ export const CLI_OWN_MODE: PermissionMode = 'cli-own'
 /** Whether a mode is the CLI's own setting. */
 export const isCliOwnMode = (mode: PermissionMode | '' | null | undefined): boolean => mode === CLI_OWN_MODE
 
+/**
+ * The mode a session's CLI is in, for what depends on it (Codex's reviewer answering its permission requests, the
+ * warning for a no-guardrails mode): its mode, or on the CLI's own setting the one the CLI last showed (absent until it
+ * has shown one). What Hive shows and switches stays the CLI's own setting.
+ */
+export const modeInEffect = (s: { permissionMode?: PermissionMode; modeObserved?: PermissionMode } | null | undefined): PermissionMode | undefined =>
+  isCliOwnMode(s?.permissionMode) ? s?.modeObserved : s?.permissionMode
+
 // The English label and description are what agents and the Agent API read; `text` is the window's (#800).
 export const CLI_OWN_OPTION: ModeOption = {
   value: CLI_OWN_MODE,

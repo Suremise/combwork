@@ -18,7 +18,7 @@ import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
-import { isCliOwnMode } from '../shared/cliOwnMode'
+import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
@@ -3211,7 +3211,7 @@ class SessionManager {
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen (a permission request its own reviewer decides is none). */
   private guardCandidate(l: LiveSession, ev: HookEvent): ev is Extract<HookEvent, { kind: 'ask' }> {
     if (ev.kind !== 'ask' || !ev.ask.blocking || !l.adapter.safeguardAsk) return false
-    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === l.state.permissionMode)?.reviewed)
+    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(l.state))?.reviewed)
   }
 
   /**
@@ -4235,7 +4235,8 @@ class SessionManager {
       backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes,
       tasks: l.tasks?.size ?? 0,
       attention: l.titleAttention ? 'title' : 'hooks',
-      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === st.permissionMode)?.reviewed,
+      // The mode the CLI is in: on the CLI's own setting, the one it showed (#1284).
+      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(st))?.reviewed,
       titleAsks: !!l.titleAsks,
       open: l.open ?? [],
       waitingOn: l.waitingOn ?? null,

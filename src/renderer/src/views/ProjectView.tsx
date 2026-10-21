@@ -1,6 +1,7 @@
 import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { agentLaunchSettings, defaultProviderWarning, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
@@ -463,7 +464,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const dangerous = settings
     ? project.agents.flatMap((a) => {
         const l = agentLaunchSettings(a, project.config, settings)
-        const m = modeOption(l.provider, a.live?.permissionMode ?? l.permissionMode)
+        // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
+        const m = modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)
         return m?.danger ? [many ? tr(M.dangerousMode, { agent: a.name, mode: m.label }) : m.label] : []
       })
     : []

@@ -120,6 +120,48 @@ describe('a launch on it', () => {
   })
 })
 
+// A conversation resumed on it (#1284: the brief's resume guarantee): the same command, resuming the conversation,
+// with still no mode flag; what the session then shows is the next describe's.
+describe('a resumed launch on it', () => {
+  const SID = '0cb916db-26aa-40f2-86b5-1ba81b225fd2'
+  const context = (over: Partial<LaunchContext>): LaunchContext => {
+    const cwd = join(base, 'proj')
+    mkdirSync(cwd, { recursive: true })
+    return {
+      projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: 'r2', sessionId: SID,
+      resume: true, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: CLI_OWN_MODE, extraArgs: [],
+      hookUrl: 'http://127.0.0.1:5000/hook?run=r2', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+      env: { PATH: 'C:\\Windows' },
+      ...over
+    }
+  }
+
+  it('Claude Code: --resume <id>, no --permission-mode', async () => {
+    const { claudeCode } = await import('../src/main/providers/claude/adapter')
+    const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({})).args
+    expect(args.join(' ')).toContain(`--resume ${SID}`)
+    expect(args).not.toContain('--permission-mode')
+    expect(claudeCode.buildCommand('C:\\bin\\claude.exe', context({ permissionMode: 'plan' })).args.join(' ')).toContain('--permission-mode plan')
+  })
+
+  it('Codex: resume <id>, no sandbox, approval or Approve for me flag', async () => {
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const args = codex.buildCommand('C:\\bin\\codex.exe', context({})).args
+    expect(args.slice(0, 2)).toEqual(['resume', SID])
+    for (const flag of ['-s', '-a', '--approve-for-me']) expect(args).not.toContain(flag)
+    expect(codex.buildCommand('C:\\bin\\codex.exe', context({ permissionMode: 'approve-for-me' })).args).toContain('--approve-for-me')
+  })
+
+  it('Copilot: its resume, no mode flag or edit rule', async () => {
+    const { copilot } = await import('../src/main/providers/copilot/adapter')
+    const args = copilot.buildCommand('C:\\bin\\copilot.exe', context({})).args
+    expect(args.join(' ')).toContain(SID)
+    for (const flag of ['--allow-all', '--plan', '--autopilot']) expect(args).not.toContain(flag)
+    expect(args.some((a) => a.startsWith('--allow-tool=write('))).toBe(false)
+    expect(copilot.buildCommand('C:\\bin\\copilot.exe', context({ permissionMode: 'allow-all' })).args).toContain('--allow-all')
+  })
+})
+
 // A running session started on it, as sessions.ts holds it (no process runs).
 describe('a running session on it', () => {
   const wsPath = join(base, 'ws')
@@ -141,11 +183,13 @@ describe('a running session on it', () => {
   afterAll(() => (sessions as unknown as { live: Map<string, unknown> }).live.clear())
 
   let n = 0
-  async function live(provider: 'claude-code' | 'codex', launchMode: string, projectPath = p) {
-    const adapter = provider === 'codex' ? (await import('../src/main/providers/codex/adapter')).codex : (await import('../src/main/providers/claude/adapter')).claudeCode
+  async function live(provider: 'claude-code' | 'codex' | 'copilot', launchMode: string, projectPath = p, over: { resumed?: boolean; title?: boolean } = {}) {
+    const adapter =
+      provider === 'codex' ? (await import('../src/main/providers/codex/adapter')).codex : provider === 'copilot' ? (await import('../src/main/providers/copilot/adapter')).copilot : (await import('../src/main/providers/claude/adapter')).claudeCode
     const agentId = projectPath === p ? `a${++n}` : 'assistant'
-    const state: Record<string, unknown> = { provider, runId: `run-own-${++n}`, projectPath, agentId, cwd: projectPath, status: 'ready', startedAt: new Date().toISOString(), launchSignature: '', unseen: false, permissionMode: launchMode }
-    const l = { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode, configuredMode: launchMode, recognition: { footerOf: () => null } }
+    const state: Record<string, unknown> = { provider, runId: `run-own-${++n}`, projectPath, agentId, cwd: projectPath, status: 'ready', startedAt: new Date().toISOString(), launchSignature: '', unseen: false, permissionMode: launchMode, ...(over.resumed ? { sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2' } : {}) }
+    // `title`: Codex's attention read from its terminal title (its terminalTitle switch on), saying no person must act yet.
+    const l = { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode, configuredMode: launchMode, recognition: { footerOf: () => null }, resumed: !!over.resumed, ...(over.title ? { titleAttention: () => false } : {}) }
     const s = sessions as unknown as { live: Map<string, unknown>; runs: Map<string, string> }
     s.live.set(`${projectPath.toLowerCase()}#${agentId}`, l)
     s.runs.set(state.runId as string, `${projectPath.toLowerCase()}#${agentId}`)
@@ -168,6 +212,67 @@ describe('a running session on it', () => {
     expect(other.state.permissionMode).toBe('acceptEdits')
     priv.observeMode(other.l, 'plan')
     expect(other.state.permissionMode).toBe('plan')
+  })
+
+  it('resumed, keeps saying so for every provider, the mode each CLI reports recorded as seen', async () => {
+    const priv = sessions as unknown as { readFooterMode: (l: unknown, s: unknown) => void; applyDetails: (l: unknown, d: object) => void; observeMode: (l: unknown, m: string) => void }
+    // Claude Code: its footer and its hooks (handleHook's observeMode).
+    const claude = await live('claude-code', CLI_OWN_MODE, p, { resumed: true })
+    priv.readFooterMode(claude.l, footer('⏵⏵ auto mode on (shift+tab to cycle)'))
+    priv.observeMode(claude.l, 'acceptEdits')
+    expect([claude.state.permissionMode, claude.state.modeObserved]).toEqual([CLI_OWN_MODE, 'acceptEdits'])
+    // Codex: its rollout's preset, through the status details.
+    const cx = await live('codex', CLI_OWN_MODE, p, { resumed: true })
+    priv.applyDetails(cx.l, { permissionMode: 'ask' })
+    expect([cx.state.permissionMode, cx.state.modeObserved]).toEqual([CLI_OWN_MODE, 'ask'])
+    // Copilot: its footer.
+    const cp = await live('copilot', CLI_OWN_MODE, p, { resumed: true })
+    priv.readFooterMode(cp.l, footer('· Plan · Manual Approval ·'))
+    expect([cp.state.permissionMode, cp.state.modeObserved]).toEqual([CLI_OWN_MODE, 'plan'])
+    // Each one's live switch still restarts.
+    for (const [a, to] of [[claude, 'plan'], [cx, 'read-only'], [cp, 'plan']] as const) expect(await run(() => sessions.setPermissionMode(p, a.agentId, to))).toMatchObject({ ok: false, restart: true })
+  })
+
+  // Codex's Approve for me: its reviewer, not a person, answers its permission requests (ModeOption.reviewed). On the CLI's
+  // own setting Hive knows it from the mode Codex reports, for its status: by its hooks or its title (#1284 round 1).
+  describe("Codex's reviewer, by the mode Codex reports", () => {
+    const priv = () => sessions as unknown as { applyDetails: (l: unknown, d: object) => void; statusInput: (l: unknown) => { reviewed: boolean; attention: string }; guardCandidate: (l: unknown, ev: object) => boolean }
+    const ask = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'Codex asks to run a command' } } as const
+    const step = async (launchMode: string, reported: string | null, title: boolean) => {
+      const { hookStep, titleStep } = await import('../src/main/hookStatus')
+      const a = await live('codex', launchMode, p, { title })
+      a.state.status = 'working'
+      if (reported) priv().applyDetails(a.l, { permissionMode: reported })
+      const input = priv().statusInput(a.l)
+      return { a, input, result: hookStep(ask as never, input as never), raised: titleStep(true, input as never), guard: priv().guardCandidate(a.l, ask) }
+    }
+    for (const title of [false, true]) {
+      const how = title ? 'its title' : 'its hooks'
+      it(`by ${how}: reported Approve for me, a permission request is the reviewer's, as on an explicit Approve for me`, async () => {
+        for (const [launch, reported] of [[CLI_OWN_MODE, 'approve-for-me'], ['approve-for-me', null]] as const) {
+          const { a, input, result, guard } = await step(launch, reported, title)
+          expect(input.attention).toBe(title ? 'title' : 'hooks')
+          expect(input.reviewed).toBe(true)
+          expect(result).toMatchObject({ next: null, review: ask.ask.message, actions: [] })
+          expect(guard).toBe(false)
+          expect(a.state.permissionMode).toBe(launch)
+        }
+      })
+      it(`by ${how}: reported Ask (or nothing yet), it is put to you`, async () => {
+        for (const reported of ['ask', null]) {
+          const { input, result } = await step(CLI_OWN_MODE, reported, title)
+          expect(input.reviewed).toBe(false)
+          expect((result as { review?: string | null }).review ?? null).toBeNull()
+          if (title) expect(result).toMatchObject({ next: null, open: [ask.ask] })
+          else expect(result).toMatchObject({ next: 'waiting', actions: expect.arrayContaining(['notifyWaiting']) })
+        }
+      })
+    }
+    it('by its title: the reviewer handing one to you still reaches you on Approve for me (the title says so)', async () => {
+      const { input, raised } = await step(CLI_OWN_MODE, 'approve-for-me', true)
+      expect(input.reviewed).toBe(true)
+      expect(raised).toMatchObject({ next: 'waiting', actions: expect.arrayContaining(['notifyWaiting']) })
+    })
   })
 
   it('switches to a mode only by restarting, and a mode-launched one to it only by restarting', async () => {

@@ -2429,7 +2429,9 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
   passes no mode flag (Claude Code no `--permission-mode`; Codex no `-s`/`-a`/`--approve-for-me`; Copilot no mode flag
   or edit rule), so the CLI's own config decides. The session's mode is `cli-own` for the whole launch, in the window,
   the Agent API and what a restart or resume starts in (the settings'); the mode a footer, hook or status line shows is
-  recorded only as seen (`modeObserved`). The badge says "CLI's own" (`short`), its tooltip that the CLI's screen shows
+  recorded only as seen (`modeObserved`). What depends on the mode the CLI is in reads that one (`modeInEffect`):
+  Codex's reviewer answering its permission requests (`reviewed` in the status rules and the safeguard check) and the
+  no-guardrails warnings (the badge, the project's warning and its sidebar mark). The badge says "CLI's own" (`short`), its tooltip that the CLI's screen shows
   the mode. No live switch to or from it (`canSwitchModeLive`): a choice restarts the session, and the running menu
   says why. The dangerous-mode confirmation doesn't apply (the user's config chose). **Never the Assistant's**: not in
   its pickers or its settings' options, one set anyway is its provider's `assistantMode` (`assistantProjectConfig`),

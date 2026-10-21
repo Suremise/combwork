@@ -2,8 +2,9 @@
 // Code session (fake-claude/), so nothing signs in or spends tokens.
 // 1. A project's agents on the CLI's own setting: the stopped agent's badge says "CLI's own" and its menu marks the
 //    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Hive records as
-//    seen while the badge keeps saying "CLI's own"; the running agent's menu says why nothing switches live, and a
-//    switch restarts it in the mode chosen (then passed again).
+//    seen while the badge keeps saying "CLI's own"; a conversation of its own, stopped and resumed, resumes with no flag
+//    and the same state; the running agent's menu says why nothing switches live, and a switch restarts it in the mode
+//    chosen (then passed again).
 // 2. The new Advanced row for the Assistant's servers, off by default.
 // Screenshots of the badge, the menus and the row in both themes (cliownmode-*.png in the run's folder).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -82,6 +83,25 @@ const check = (name, ok, extra = '') => {
     const tip = await lib.hoverTip(page, badge, (t) => /the CLI's own screen shows the one it is in/.test(t), HUNG_MS)
     check("its tooltip says the CLI's screen shows the mode", /Permission mode of the running session: CLI's own\. Hive passed no mode, so the CLI's own screen shows the one it is in\./.test(tip), tip)
     await page.mouse.move(5, 5)
+
+    // A conversation of its own (a prompt taken), stopped and resumed: resumed on the CLI's own setting, with no flag again.
+    const transcriptHas = (text) => {
+      const dir = path.join(claudeHome, 'projects')
+      return fs.existsSync(dir) && fs.readdirSync(dir).some((d) => fs.readdirSync(path.join(dir, d)).some((f) => f.endsWith('.jsonl') && fs.readFileSync(path.join(dir, d, f), 'utf8').includes(text)))
+    }
+    const key = lib.ptyKey(alpha, def.id)
+    check('a prompt is taken (a conversation to resume)', (await lib.sendPrompt(inv, key, 'hello from cli-own', { submitted: async () => transcriptHas('hello from cli-own'), waitMs: lib.TURN_HUNG_MS })) > 0)
+    check('…and its turn ends', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.TURN_HUNG_MS)), (await live())?.status)
+    const sid = (await live()).sessionId
+    await inv('session:stop', alpha, def.id)
+    await lib.until(async () => !(await live()), HUNG_MS)
+    const beforeResume = launches().length
+    await inv('session:start', alpha, { agentId: def.id, resumeId: sid })
+    check('resumed and ready', !!(await lib.until(async () => launches().length > beforeResume && (await live())?.status === 'ready', HUNG_MS)), JSON.stringify(await live().then((l) => l && { status: l.status })))
+    const resumed = launches().at(-1)
+    check('…resuming its conversation, with no --permission-mode', resumed?.opts['--resume'] === sid && !('--permission-mode' in resumed.opts), JSON.stringify(resumed?.opts))
+    check("…its mode still the CLI's own, the one its hooks report seen", !!(await lib.until(async () => (await live())?.modeObserved === 'manual', HUNG_MS)) && (await live())?.permissionMode === 'cli-own' && (await live())?.sessionId === sid, JSON.stringify(await live().then((l) => l && { mode: l.permissionMode, seen: l.modeObserved, same: l.sessionId === sid })))
+    check("…and its badge says CLI's own", !!(await lib.until(async () => /CLI's own/.test(await badge.innerText()), HUNG_MS)), await badge.innerText())
 
     await badge.click()
     check("the running agent's menu says why no mode switches live", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Hive can't switch this session's mode: it started in the CLI's own setting/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
