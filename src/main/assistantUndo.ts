@@ -1,26 +1,28 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
-import type { AgentDef, AgentPatch, AssistantUndoResult, TaskCard, TaskPatch } from '../shared/types'
-import { CARD_FIELDS, cardValue, laneValues, markUndone, notRecording, recordedChanges, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, TaskCard, TaskPatch } from '../shared/types'
+import { CARD_FIELDS, cardValue, markUndone, notRecording, recordedChanges, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import * as assistant from './assistantControl'
+import { config } from './config'
 import * as lanes from './lanes'
 import { updateAgent } from './projectAgents'
 import { sessions } from './sessions'
-import { applySetting, entryOf } from './settingsTools'
-import { config } from './config'
-import * as assistant from './assistantControl'
+import { applySetting, entryOf, removedPrices } from './settingsTools'
 import * as tasks from './tasks'
 import { inWorkspace, type WorkspaceService } from './workspace'
 
 /**
  * Undo for the Hive Assistant's changes (#1282, SPEC §16.14), from what assistantChanges.ts recorded: one change, or every
  * change of a message of the user's, newest first. Each field goes back to what the change replaced only while it still
- * holds what the change wrote, checked at the moment of the write (under the card's lock, a setting's guard): one someone
- * changed since (the user, an agent, the Assistant later) is skipped and said, never overwritten. A card it made is
- * archived (unless anyone else has changed it since); a column move goes back through the card's rules as a move with
- * the override reason "undo"; a lane it started is abandoned, and a lane's list, reviewer, rounds, wait or name it changed
- * go back through the lane record; an agent's settings and a Hive setting are set back; an agent it started is stopped
- * (its work stays). What can't be undone (a prompt, a comment) says why. An undo's own writes aren't recorded as changes:
- * undoing is never itself undone. The user undoes from the window (IPC), the Assistant its own with its tool.
+ * holds what the change wrote, checked at the moment of the write under that thing's own lock: a card's (its change's
+ * `check`), the lanes' (lanes.ts' restoreLane, abandonLaneIf), the project's for an agent's settings (updateAgent's
+ * `check`), a setting's guard. One someone changed since (the user, an agent, the Assistant later) is left as it is and
+ * said, never overwritten, and the rest still goes back. A card it made is archived while nobody else has changed it since
+ * (its history past what the change left); a column move goes back through the card's rules as a move with the override
+ * reason "undo"; a lane it started is abandoned while it is as it started; an agent it started is stopped while that same
+ * launch runs (its work stays). What can't be undone (a prompt, a comment, a decision) says why. The Assistant's own undo
+ * passes its guard (its control level, its launch), checked again under each write's lock: turned down or ended meanwhile,
+ * the undo stops there, the changes undone so far marked. An undo's own writes aren't recorded as changes.
  */
 
 /** Who undoes: the user (the window) or the Assistant (its tool). */
@@ -29,35 +31,60 @@ export type UndoBy = 'user' | 'assistant'
 /** An undo asked for something that isn't there: no such change (kept 7 days), or no changes for that message. */
 export class UndoNotFound extends Error {}
 
-/** A field found changed since at the moment of the write (a card's check under its lock, a setting's guard). */
+/** Fields found changed since at the moment of the write (a card's check under its lock, a setting's guard): nothing written. */
 class ChangedSince extends Error {
   constructor(public fields: string[]) {
     super(`changed since: ${fields.join(', ')}`) // i18n-ignore: an internal signal, never shown
   }
 }
 
+/** The undo's guard refused at a write (the Assistant's control turned down, its launch ended): the undo stops. */
+class UndoStopped extends Error {
+  constructor(public refusal: unknown) {
+    super((refusal as Error)?.message ?? String(refusal))
+  }
+}
+
+/** Whether an error, however a write wrapped it, is the undo's guard refusing. */
+const stopped = (e: unknown): UndoStopped | null => (e instanceof UndoStopped ? e : (e as { cause?: unknown } | null)?.cause instanceof UndoStopped ? (e as { cause: UndoStopped }).cause : null)
+
 /**
  * Undoes the change `sel.change` names, or every change of the message `sel.group` names, newest first. A change undone
- * before is left as it is (`already`); every other one is marked undone once tried, as far as it could be: what was
- * skipped stays as it is.
+ * before is left as it is (`already`); every other one is marked undone as soon as it is tried, as far as it could be:
+ * what was skipped stays as it is. `guard` (the Assistant's own undo): checked at each write, under its lock; its refusal
+ * stops the undo and is thrown, with what was undone before it kept and marked.
  */
-export async function undoChanges(ws: WorkspaceService, sel: { change?: string; group?: string }, by: UndoBy): Promise<AssistantUndoResult[]> {
+export async function undoChanges(ws: WorkspaceService, sel: { change?: string; group?: string }, by: UndoBy, guard?: () => void): Promise<AssistantUndoResult[]> {
   const list = recordedChanges(ws, sel)
   // i18n-ignore: an Agent API refusal (English); the window offers only changes it listed
   if (!list.length) throw new UndoNotFound(sel.change ? `No change of the Assistant's ${sel.change} is kept (changes are kept 7 days).` : `No changes of the Assistant's are kept for message ${sel.group ?? ''} (they are kept 7 days).`)
+  const g = guard
+    ? (): void => {
+        try {
+          guard()
+        } catch (e) {
+          throw new UndoStopped(e)
+        }
+      }
+    : undefined
   return notRecording(async () => {
     const out: AssistantUndoResult[] = []
-    const tried: string[] = []
     for (const c of list) {
       const head = { change: c.id, act: c.act, what: c.what, ...(c.card !== undefined ? { card: c.card } : {}) }
       if (c.undoneAt) out.push({ ...head, undone: [], skipped: [], already: true })
       else if (c.kind === 'final') out.push({ ...head, undone: [], skipped: [], final: c.final ?? '' })
       else {
-        out.push({ ...head, ...(await undoOne(ws, c, by)) })
-        tried.push(c.id)
+        let r: Outcome
+        try {
+          r = await undoOne(ws, c, by, g)
+        } catch (e) {
+          const s = stopped(e)
+          throw s ? s.refusal : e
+        }
+        out.push({ ...head, ...r })
+        await markUndone(ws, [c.id])
       }
     }
-    await markUndone(ws, tried)
     return out
   })
 }
@@ -76,87 +103,123 @@ export async function userUndo(ws: WorkspaceService, sel: { change?: string; gro
 }
 
 type Outcome = Pick<AssistantUndoResult, 'undone' | 'skipped'>
+type Skipped = Outcome['skipped']
+const changed = (fields: readonly string[]): Skipped => fields.map((field) => ({ field, why: 'changed' as const })) // i18n-ignore: a skip's code, worded by whoever shows it
 const failedAll = (fields: readonly string[], e: unknown): Outcome => ({ undone: [], skipped: fields.map((field) => ({ field, why: 'failed' as const, error: (e as Error).message })) }) // i18n-ignore: a skip's code, worded by whoever shows it
 const goneAll = (fields: readonly string[]): Outcome => ({ undone: [], skipped: fields.map((field) => ({ field, why: 'gone' as const })) }) // i18n-ignore: a skip's code, worded by whoever shows it
 
-function undoOne(ws: WorkspaceService, c: RecordedChange, by: UndoBy): Promise<Outcome> {
+/** A write's failure: the guard's refusal stops the undo (thrown on); another is the change's, said as failed. */
+const failedOr = (fields: readonly string[], e: unknown): Outcome => {
+  if (stopped(e)) throw e
+  return failedAll(fields, e)
+}
+
+function undoOne(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard?: () => void): Promise<Outcome> {
   switch (c.kind) {
     case 'card':
-      return undoCard(ws, c, by)
+      return undoCard(ws, c, by, guard)
     case 'lane':
-      return undoLane(ws, c, by)
+      return undoLane(ws, c, by, guard)
     case 'agent':
-      return undoAgent(ws, c)
+      return undoAgent(ws, c, guard)
     case 'setting':
-      return undoSetting(ws, c, by)
+      return undoSetting(ws, c, by, guard)
     case 'started':
-      return undoStarted(ws, c)
+      return undoStarted(ws, c, guard)
     default:
       return Promise.resolve({ undone: [], skipped: [] })
   }
 }
 
 /**
- * What of a change's fields to set back, from where they are now: those back as they were already count as undone,
- * those someone changed since are skipped, the rest (still as the change left them) are set back.
+ * What of a change's fields to set back, from where they are as read: those back as they were already count as undone,
+ * those someone changed since are skipped, the rest (still as the change left them) are to be set back, under the
+ * write's lock, which checks them again.
  */
-function plan(values: readonly FieldChange[], now: (field: string) => unknown): { back: FieldChange[]; undone: string[]; skipped: Outcome['skipped'] } {
+function plan(values: readonly FieldChange[], now: (field: string) => unknown): { back: FieldChange[]; undone: string[]; skipped: Skipped } {
   const back: FieldChange[] = []
   const undone: string[] = []
-  const skipped: Outcome['skipped'] = []
+  const skipped: Skipped = []
   for (const v of values) {
     const cur = now(v.field)
     if (sameValue(cur, v.old)) undone.push(v.field)
     else if (sameValue(cur, v.new)) back.push(v)
-    else skipped.push({ field: v.field, why: 'changed' }) // i18n-ignore: a skip's code, worded by whoever shows it
+    else skipped.push(...changed([v.field]))
   }
   return { back, undone, skipped }
 }
 
-const BY_NAME: Record<UndoBy, string> = { user: 'You', assistant: 'Assistant' } // i18n-ignore: who started a lane, as the board stores it (shown through its own messages)
+/**
+ * Sets fields back with `write`, which checks them again under its lock (throwing ChangedSince for those moved since,
+ * nothing written); then the rest is tried again alone, so a later change of one field never keeps the others back.
+ */
+async function setBack(back: FieldChange[], write: (back: FieldChange[]) => Promise<void>, fail: (fields: readonly string[], e: unknown) => Outcome = failedOr): Promise<Outcome> {
+  let rest = back
+  const skipped: Skipped = []
+  while (rest.length) {
+    try {
+      await write(rest)
+      return { undone: rest.map((v) => v.field), skipped }
+    } catch (e) {
+      if (!(e instanceof ChangedSince)) return { undone: [], skipped: [...skipped, ...fail(rest.map((v) => v.field), e).skipped] }
+      skipped.push(...changed(e.fields))
+      const left = rest.filter((v) => !e.fields.includes(v.field))
+      // Nothing it named among those tried: said as changed, all of them, rather than tried again forever.
+      if (left.length === rest.length) return { undone: [], skipped: [...skipped, ...changed(rest.map((v) => v.field))] }
+      rest = left
+    }
+  }
+  return { undone: [], skipped }
+}
+
+const BY_NAME: Record<UndoBy, string> = { user: 'You', assistant: 'Assistant' } // i18n-ignore: who undid, as the board and lanes store an actor's name (shown through their own messages)
+
+/** A card's history past the entry the change left it at (`id`), or null when that entry is no longer kept. */
+function historyAfter(card: TaskCard, id: string | undefined): TaskCard['history'] | null {
+  if (!id) return null
+  const i = card.history.findIndex((h) => h.id === id)
+  return i < 0 ? null : card.history.slice(i + 1)
+}
 
 /**
- * A card: one it made is archived, unless someone other than the Assistant or Hive has changed it since; its fields go
- * back in one change of the card, which checks under the card's lock that each is still as the change left it.
+ * A card: one it made is archived while its history goes no further than the change left it (Hive's own notes aside),
+ * checked under the board's lock; its fields go back in one change of the card, checked under the card's lock.
  */
-async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy): Promise<Outcome> {
+async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard?: () => void): Promise<Outcome> {
   const n = c.card!
   const actor: tasks.TaskActor = by === 'user' ? { kind: 'user' } : { kind: 'assistant' }
   const card = await inWorkspace(ws, () => tasks.getTask(n, ws)).catch(() => null)
   if (!card || card.archived) return goneAll(c.fields)
   if (c.fields.includes('created')) {
-    const others = card.history.some((h) => h.at > c.at && h.by !== 'Assistant' && h.by !== 'Hive')
-    if (others) return { undone: [], skipped: [{ field: 'created', why: 'changed' }] } // i18n-ignore: a skip's code, worded by whoever shows it
+    const check = (now: TaskCard): void => {
+      const since = historyAfter(now, c.target)
+      if (!since || since.some((h) => h.by !== 'Hive')) throw new ChangedSince(['created'])
+      guard?.()
+    }
     try {
-      await inWorkspace(ws, () => tasks.archiveTask(n, true))
+      await inWorkspace(ws, () => tasks.archiveTask(n, true, { check, actor }))
       return { undone: ['created'], skipped: [] }
     } catch (e) {
-      return failedAll(['created'], e)
+      if (e instanceof ChangedSince) return { undone: [], skipped: changed(['created']) }
+      return failedOr(['created'], e)
     }
   }
   const values = c.values.filter((v) => (CARD_FIELDS as readonly string[]).includes(v.field))
   const { back, undone, skipped } = plan(values, (f) => cardValue(card, f as CardField))
   if (!back.length) return { undone, skipped }
-  const patch: TaskPatch = {}
-  for (const v of back) setCardField(patch, v.field as CardField, v.old as Value)
-  // A move back skips what it must of the card's rules, as an override whose reason is the undo (SPEC §16.8.4).
-  if (patch.column) patch.override = { reason: 'undo' } // i18n-ignore: the override's reason, a code (SPEC §16.14: undo's moves show as overrides)
-  const check = (now: TaskCard): void => {
-    const moved = back.filter((v) => !sameValue(cardValue(now, v.field as CardField), v.new)).map((v) => v.field)
-    if (moved.length) throw new ChangedSince(moved)
-  }
-  try {
-    await inWorkspace(ws, () => tasks.updateTask(n, patch, actor, { check }))
-    return { undone: [...undone, ...back.map((v) => v.field)], skipped }
-  } catch (e) {
-    // Changed meanwhile: nothing was written (the whole change is refused), so those still as left are tried again alone.
-    if (e instanceof ChangedSince) {
-      const rest = back.filter((v) => !e.fields.includes(v.field))
-      const again = rest.length ? await undoCard(ws, { ...c, values: rest, fields: rest.map((v) => v.field) }, by) : { undone: [], skipped: [] }
-      return { undone: [...undone, ...again.undone], skipped: [...skipped, ...e.fields.map((field) => ({ field, why: 'changed' as const })), ...again.skipped] } // i18n-ignore: a skip's code, worded by whoever shows it
+  const r = await setBack(back, async (rest) => {
+    const patch: TaskPatch = {}
+    for (const v of rest) setCardField(patch, v.field as CardField, v.old as Value)
+    // A move back skips what it must of the card's rules, as an override whose reason is the undo (SPEC §16.8.4); the
+    // runtime writes the Override only when a rule refuses the move.
+    if (patch.column) patch.override = { reason: 'undo' } // i18n-ignore: the override's reason, a code (SPEC §16.14)
+    const check = (now: TaskCard): void => {
+      const moved = rest.filter((v) => !sameValue(cardValue(now, v.field as CardField), v.new)).map((v) => v.field)
+      if (moved.length) throw new ChangedSince(moved)
     }
-    return { undone, skipped: [...skipped, ...failedAll(back.map((v) => v.field), e).skipped] }
-  }
+    await inWorkspace(ws, () => tasks.updateTask(n, patch, actor, { check, ...(guard ? { commit: guard } : {}) }))
+  })
+  return { undone: [...undone, ...r.undone], skipped: [...skipped, ...r.skipped] }
 }
 
 function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
@@ -187,43 +250,49 @@ function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
   }
 }
 
+/** A lane as the Agent API lists it, as its record's values (assistantChanges' laneValues). */
+const infoValues = (l: LaneInfo): Record<string, Value> => ({ cards: l.queued ?? l.cards.map((x) => x.number), reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
+
+/** A lane's refusal under its lock, as undo says it: the fields changed since, or the lane ended or gone. */
+function laneFail(fields: readonly string[], e: unknown): Outcome {
+  if (e instanceof lanes.LaneChangedSince) return { undone: [], skipped: (e.why === 'changed' ? fields : e.fields).map((field) => ({ field, why: e.why })) }
+  return failedOr(fields, e)
+}
+
 /**
- * A lane: one it started is abandoned while it runs (an ended one stays as it ended); its list, reviewer, rounds, wait or
- * name go back through the lane record (a list change while a card is in flight is queued to that card's end, as any).
+ * A lane: one it started is abandoned while it runs as it started (lanes.ts' abandonLaneIf, under the lanes' lock); its
+ * list, reviewer, rounds, wait or name go back (restoreLane), each only while still as the change left it.
  */
-async function undoLane(ws: WorkspaceService, c: RecordedChange, by: UndoBy): Promise<Outcome> {
-  const lane = (await lanes.listLanes(ws, { all: true })).find((l) => l.id === c.target)
-  if (!lane) return goneAll(c.fields)
-  const running = lane.state === 'active' || lane.state === 'paused'
+async function undoLane(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard?: () => void): Promise<Outcome> {
+  if (!c.target) return goneAll(c.fields)
   if (c.fields.includes('created')) {
-    if (!running) return { undone: [], skipped: [{ field: 'created', why: 'ended' }] } // i18n-ignore: a skip's code, worded by whoever shows it
+    const expect = Object.fromEntries(c.values.filter((v) => v.field !== 'created').map((v) => [v.field, v.new]))
     try {
-      await lanes.endLane(ws, lane.id, { abandoned: true })
+      await lanes.abandonLaneIf(ws, c.target, expect, guard)
       return { undone: ['created'], skipped: [] }
     } catch (e) {
-      return failedAll(['created'], e)
+      return laneFail(['created'], e)
     }
   }
-  if (!running) return { undone: [], skipped: c.fields.map((field) => ({ field, why: 'ended' as const })) } // i18n-ignore: a skip's code, worded by whoever shows it
-  const now = laneValues(lane)
+  const lane = (await lanes.listLanes(ws, { all: true })).find((l) => l.id === c.target)
+  if (!lane) return goneAll(c.fields)
+  if (lane.state !== 'active' && lane.state !== 'paused') return { undone: [], skipped: c.fields.map((field) => ({ field, why: 'ended' as const })) } // i18n-ignore: a skip's code, worded by whoever shows it
+  const now = infoValues(lane)
   const { back, undone, skipped } = plan(c.values, (f) => now[f])
   if (!back.length) return { undone, skipped }
-  const old = (f: string, fallback: Value): Value => back.find((v) => v.field === f)?.old as Value ?? fallback
-  try {
-    await lanes.startLane(ws, {
-      project: lane.project,
-      builder: lane.builder.id,
-      reviewer: old('reviewer', now.reviewer) as string | null,
-      cards: old('cards', now.cards) as number[],
-      rounds: old('rounds', now.rounds) as number,
-      waitMinutes: old('waitMinutes', now.waitMinutes) as number,
-      name: old('name', now.name) as string | null,
-      by: BY_NAME[by]
-    })
-    return { undone: [...undone, ...back.map((v) => v.field)], skipped }
-  } catch (e) {
-    return { undone, skipped: [...skipped, ...failedAll(back.map((v) => v.field), e).skipped] }
-  }
+  const r = await setBack(
+    back,
+    async (rest) => {
+      try {
+        await lanes.restoreLane(ws, c.target!, rest, BY_NAME[by], guard)
+      } catch (e) {
+        if (e instanceof lanes.LaneChangedSince && e.why === 'changed') throw new ChangedSince(e.fields)
+        throw e
+      }
+    },
+    laneFail
+  )
+  return { undone: [...undone, ...r.undone], skipped: [...skipped, ...r.skipped] }
 }
 
 /** The patch that sets an agent's setting back: an empty or missing one follows the project again. */
@@ -238,8 +307,8 @@ function agentPatch(back: readonly FieldChange[]): AgentPatch {
   return p
 }
 
-/** An agent's settings: those still as the change left them go back (an agent removed since is gone). */
-async function undoAgent(ws: WorkspaceService, c: RecordedChange): Promise<Outcome> {
+/** An agent's settings: those still as the change left them go back, checked under the project's lock (an agent removed since is gone). */
+async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard?: () => void): Promise<Outcome> {
   if (!ws.path || !c.project || !c.target) return goneAll(c.fields)
   const projectPath = join(ws.path, c.project)
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
@@ -251,51 +320,71 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange): Promise<Outco
   const set = back.filter((v) => !followed.includes(v))
   const failed = followed.map((v) => ({ field: v.field, why: 'failed' as const, error: "It followed the project's provider: set it in the agent's settings." })) // i18n-ignore: an Agent API reply (English)
   if (!set.length) return { undone, skipped: [...skipped, ...failed] }
-  try {
-    await updateAgent(projectPath, c.target, agentPatch(set))
-    return { undone: [...undone, ...set.map((v) => v.field)], skipped: [...skipped, ...failed] }
-  } catch (e) {
-    return { undone, skipped: [...skipped, ...failed, ...failedAll(set.map((v) => v.field), e).skipped] }
-  }
+  const r = await setBack(set, async (rest) => {
+    const check = (current: AgentDef): void => {
+      const moved = rest.filter((v) => !sameValue(current[v.field as keyof AgentDef] ?? null, v.new)).map((v) => v.field)
+      if (moved.length) throw new ChangedSince(moved)
+      guard?.()
+    }
+    await updateAgent(projectPath, c.target!, agentPatch(rest), { check })
+  })
+  return { undone: [...undone, ...r.undone], skipped: [...skipped, ...failed, ...r.skipped] }
 }
 
 /**
- * A Hive setting: set back through the same checked change, refused at the moment of the change if it changed since. The
+ * A Hive setting: its value set back through the same checked change, refused at the moment of the change if it changed
+ * since; a provider's removed models with it only while they too are as the change left them (else left, and said). The
  * Assistant's own undo only while Settings → Assistant → Control → Change settings is on, as any change of a setting.
  */
-async function undoSetting(ws: WorkspaceService, c: RecordedChange, by: UndoBy): Promise<Outcome> {
+async function undoSetting(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard?: () => void): Promise<Outcome> {
   const value = c.values.find((v) => v.field === 'value')
   const removed = c.values.find((v) => v.field === 'removed')
   if (!value || !c.target) return { undone: [], skipped: [] }
-  if (by === 'assistant' && config.settings.assistant?.changeSettings !== true) return failedAll(c.fields, new Error("Settings → Assistant → Control → Change settings is off: the user can undo it in your panel.")) // i18n-ignore: an Agent API reply (English)
+  if (by === 'assistant' && config.settings.assistant?.changeSettings !== true) return failedAll(c.fields, new Error('Settings → Assistant → Control → Change settings is off: the user can undo it in your panel.')) // i18n-ignore: an Agent API reply (English)
   const projectPath = c.project && ws.path ? join(ws.path, c.project) : null
-  try {
-    const e = entryOf(c.target)
+  const e = entryOf(c.target)
+  const apply = async (withRemoved: boolean): Promise<void> => {
     await applySetting(
       e,
       value.old,
       projectPath,
       (current) => {
         if (!sameValue(current, value.new)) throw new ChangedSince(['value'])
+        if (withRemoved && removed && e.provider && !sameValue(removedPrices(e.provider), removed.new)) throw new ChangedSince(['removed'])
+        guard?.()
       },
-      removed ? (removed.old as string[]) : undefined
+      withRemoved && removed ? (removed.old as string[]) : undefined
     )
+  }
+  try {
+    await apply(true)
     return { undone: c.fields, skipped: [] }
-  } catch (e) {
-    if (e instanceof ChangedSince) return { undone: [], skipped: c.fields.map((field) => ({ field, why: 'changed' as const })) } // i18n-ignore: a skip's code, worded by whoever shows it
-    return failedAll(c.fields, e)
+  } catch (err) {
+    if (!(err instanceof ChangedSince)) return failedOr(c.fields, err)
+    if (err.fields.includes('value')) return { undone: [], skipped: changed(c.fields) }
+    // Only its removed models changed since: its value goes back alone, they stay.
+    try {
+      await apply(false)
+      return { undone: ['value'], skipped: changed(['removed']) }
+    } catch (again) {
+      if (again instanceof ChangedSince) return { undone: [], skipped: changed(c.fields) }
+      return failedOr(c.fields, again)
+    }
   }
 }
 
-/** An agent it started: stopped if it still runs (what it did meanwhile stays). */
-async function undoStarted(ws: WorkspaceService, c: RecordedChange): Promise<Outcome> {
-  if (!ws.path || !c.project || !c.target) return goneAll(['running'])
+/** An agent it started: stopped only while the launch it started still runs (what it did meanwhile stays). */
+async function undoStarted(ws: WorkspaceService, c: RecordedChange, guard?: () => void): Promise<Outcome> {
+  const run = c.values.find((v) => v.field === 'run')?.new
+  if (!ws.path || !c.project || !c.target || typeof run !== 'string') return goneAll(['running'])
   const projectPath = join(ws.path, c.project)
-  if (!sessions.liveFor(projectPath, c.target)) return { undone: [], skipped: [{ field: 'running', why: 'ended' }] } // i18n-ignore: a skip's code, worded by whoever shows it
+  // Another launch since (the user started it again), or none: not this change's to stop.
+  if (sessions.liveFor(projectPath, c.target)?.runId !== run) return { undone: [], skipped: [{ field: 'running', why: 'ended' }] } // i18n-ignore: a skip's code, worded by whoever shows it
   try {
+    guard?.()
     sessions.stop(projectPath, c.target)
     return { undone: ['running'], skipped: [] }
   } catch (e) {
-    return failedAll(['running'], e)
+    return failedOr(['running'], e)
   }
 }

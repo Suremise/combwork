@@ -2479,22 +2479,26 @@ built on the fact log and the Assistant's activity list:
 - **Recorded:** every change the Assistant makes through `assistantChange()` (and its batches) is kept in hive.db's
   `assistant_changes` and `assistant_change_values` (a 1.0 group step), as it is made (`assistantChanges.ts`).
   - A card's fields are recorded as the card is saved, in the same transaction.
-  - A lane, an agent's settings, a Hive setting and an agent it started are recorded by the route that made them.
-  - What can't be undone is recorded with why.
+  - A lane is recorded in its own save's transaction (lanes.ts), from the lane as read under its lock.
+  - An agent's settings are recorded from what its change saw under the project's lock. A Hive setting is recorded by its
+    route. An agent it started is recorded with the launch it started.
+  - What can't be undone is recorded with why: a prompt or message, and a card's decision, comment or place.
   - Each change keeps what it replaced and what it wrote, per field, as typed rows (a list or table as a row per member,
     never JSON). It is grouped by the user's message (`assistantControl`'s turn) and pruned after 7 days.
 - **Undone** (`assistantUndo.ts`) one change or a message's, newest first.
-  - A field goes back only while it still holds what the change wrote, checked at the write (a card's under its lock, a
-    setting's guard); one changed since is skipped and said.
-  - A card it made is archived unless someone else changed it since.
+  - A field goes back only while it still holds what the change wrote, checked at the write under that thing's own lock
+    (a card's, the lanes', the project's for an agent's settings, a setting's guard). One changed since is skipped and
+    said, the rest still go back. A price table's removed models are a field of their own.
+  - A card it made is archived only while its history goes no further than the change left it.
   - A column move goes back through the rules with `override: { reason: "undo" }`.
   - A lane it started is abandoned; its list, reviewer, rounds, wait and name go back through the lane record. A lane
     that ended stays ended.
-  - An agent it started is stopped.
-  - An undo's own writes aren't recorded.
+  - An agent it started is stopped only while the launch it started still runs.
+  - An undo's own writes aren't recorded. Each change is marked undone as soon as it is undone.
 - **The user** undoes from the window (IPC `assistant:changes`, `assistant:undo`: the panel's, #1283).
 - **The Assistant** undoes its own with `hive_undo` (`GET /v1/assistant/changes`, `POST /v1/assistant/undo`, Control
-  agents, its activity kind `undo`). It undoes a Hive setting only while Change settings is on.
+  agents, its activity kind `undo`). Its control level and launch are checked again at each write: turned down or ended
+  partway through, the undo stops there. It undoes a Hive setting only while Change settings is on.
 
 ### 16.15 Override switches for the CLIs
 

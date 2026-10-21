@@ -1852,21 +1852,26 @@ export async function editDecision(n: number, id: string, newText: string | null
 }
 
 /** Archives a card (hidden from the board, kept) or brings it back. The user's alone. */
-export function archiveTask(n: number, archived: boolean): Promise<TaskCard> {
-  return boardLock(workspace, () => archiveTaskLocked(n, archived))
+/**
+ * Archives a card or brings it back, as the user (or `opts.actor`); `opts.check` sees the card as saved, under the board's
+ * lock, and refuses by throwing (#1282: an undo archives a card only while no one has changed it since).
+ */
+export function archiveTask(n: number, archived: boolean, opts: { check?: (card: TaskCard) => void; actor?: TaskActor } = {}): Promise<TaskCard> {
+  return boardLock(workspace, () => archiveTaskLocked(n, archived, opts))
 }
 
-async function archiveTaskLocked(n: number, archived: boolean): Promise<TaskCard> {
+async function archiveTaskLocked(n: number, archived: boolean, opts: { check?: (card: TaskCard) => void; actor?: TaskActor } = {}): Promise<TaskCard> {
   const ws = workspace
   return (async () => {
     const c = await getTask(n, ws)
     if (c.archived === archived) return c
+    opts.check?.(c)
     c.archived = archived
     if (archived) c.archivedFor = 'user'
     else delete c.archivedFor
     // Brought back on its own, it leaves its batch: that batch's Undo no longer moves it.
     delete c.archivedBatch
-    note(c, BY.you, storedText(archived ? HISTORY.archived : HISTORY.unarchived))
+    note(c, opts.actor ? actorName(opts.actor) : BY.you, storedText(archived ? HISTORY.archived : HISTORY.unarchived))
     // Back at the end of its column.
     if (!archived) c.order = orderIn(await boardPlaces(ws), c.column, n, null)
     await saveCard(ws, n, c)

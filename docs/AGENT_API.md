@@ -305,8 +305,10 @@ From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assist
 - A card it made is archived, unless someone else has changed it since.
 - A column move goes back through the card's rules, as a move with the override reason `undo`.
 - A lane it started is abandoned; a lane's list, reviewer, rounds, wait or name go back.
-- An agent it started is stopped (what it did stays).
-- A Hive setting goes back only while Change settings is on.
+- An agent it started is stopped only while the launch it started still runs (what it did stays).
+- A Hive setting goes back only while Change settings is on. A provider's removed models go back only if they too are unchanged.
+- Its control level and its launch are checked again at each write: turned down to Look and advise, or its session ended, partway through a message's changes, the undo stops there and is refused, the changes undone so far kept.
+- A card's decision, comment or place in its column can't be undone: those changes are listed with why.
 - An id that isn't one of its changes (they are its own only) is `404`, as is a message with none.
 
 Replies `{ "results": [{ "change", "what", "card"?, "undone": ["labels"], "skipped": [{ "field", "why": "changed" | "gone" | "ended" | "failed", "error"? }], "final"?, "already"?: true }] }`.

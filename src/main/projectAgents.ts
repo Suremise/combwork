@@ -447,7 +447,7 @@ export function cleanRole(role: unknown): string {
   return r
 }
 
-export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch): Promise<AgentDef> {
+export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void } = {}): Promise<AgentDef> {
   // The Hive Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
   // The Assistant gets Hive's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
@@ -488,9 +488,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
       ? await withAgentNames(projectPath, async () => {
           const now = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
           if (!now || !sameAgentName(now.name, name)) await assertNameFree(projectPath, name, { self: agentId })
-          return workspace.updateAgent(projectPath, agentId, clean)
+          return workspace.updateAgent(projectPath, agentId, clean, opts.check)
         })
-      : await workspace.updateAgent(projectPath, agentId, clean)
+      : await workspace.updateAgent(projectPath, agentId, clean, opts.check)
   const live = sessions.liveFor(projectPath, agentId)
   if (live && patch.name) live.agentName = patch.name
   await workspaceOf(projectPath).refresh()

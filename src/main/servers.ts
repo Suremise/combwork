@@ -4,13 +4,13 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
-import { changeGroups, noteAgent, noteChange, noteLane, recordedHere, recordingChanges } from './assistantChanges'
+import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { fallbackEfforts, modelGroups } from '../shared/models'
@@ -516,11 +516,11 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
     // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
-    // An agent already running when a card is started on it wasn't started by this change: undo leaves it running.
-    const running = act.kind === 'start-task' && !!act.agent && !!act.project && !!sessions.liveFor(join(ws, act.project), act.agent.id)
+    // The launch an agent had before the change: one the change started is a launch other than it (#1282 round 1).
+    const runBefore = act.agent && act.project ? (sessions.liveFor(join(ws, act.project), act.agent.id)?.runId ?? null) : null
     const { done, said, brief, act: more, result } = await recordingChanges(ws, act.kind, what, async () => {
       const out = await fn(guard)
-      await noteDone(requireWorkspace(), { ...act, ...out.act }, running)
+      await noteDone(requireWorkspace(), { ...act, ...out.act }, runBefore)
       return out
     })
     const pub = brief ?? (said ? done : undefined)
@@ -551,9 +551,14 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'lane-end': 'A lane that ended stays ended: start it again if it should go on.'
 }
 
-/** What the change running here leaves for undo once done (#1282): an agent it started, or why it can't be undone. */
-async function noteDone(ws: WorkspaceService, act: ActivityTarget, wasRunning: boolean): Promise<void> {
-  if ((act.kind === 'start-agent' || act.kind === 'start-task') && act.agent && act.project && !wasRunning) await noteChange(ws, { kind: 'started', project: act.project, target: act.agent.id, card: act.card ?? null })
+/**
+ * What the change running here leaves for undo once done (#1282): an agent it started (the launch it started, `run`:
+ * undo stops only that one, while it runs; an agent already running before, given a card, wasn't started), or why it
+ * can't be undone.
+ */
+async function noteDone(ws: WorkspaceService, act: ActivityTarget, runBefore: string | null): Promise<void> {
+  const run = (act.kind === 'start-agent' || act.kind === 'start-task') && act.agent && act.project && ws.path ? (sessions.liveFor(join(ws.path, act.project), act.agent.id)?.runId ?? null) : null
+  if (run && run !== runBefore && act.agent && act.project) await noteChange(ws, { kind: 'started', project: act.project, target: act.agent.id, card: act.card ?? null, fields: [{ field: 'run', old: null, new: run }] })
   else if (FINAL_WHY[act.kind] && !recordedHere()) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: FINAL_WHY[act.kind]! })
 }
 
@@ -925,10 +930,12 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
     group = changeGroups(ws).find((g) => g.changes.some((c) => !c.undoneAt && !c.final))?.id
     if (!group) throw new HttpError(404, 'None of your changes of the last 7 days is left to undo.')
   }
-  return assistantChange('agents', change ? `undo a change of yours` : `undo your changes for a message`, { kind: 'undo' }, async () => {
+  return assistantChange('agents', change ? `undo a change of yours` : `undo your changes for a message`, { kind: 'undo' }, async (guard) => {
     let results: AssistantUndoResult[]
     try {
-      results = await undoChanges(ws, change ? { change } : { group }, 'assistant')
+      // Its control level and its launch, checked again at each change's write (#1282 round 1): turned down or ended
+      // meanwhile, the rest isn't undone.
+      results = await undoChanges(ws, change ? { change } : { group }, 'assistant', guard)
     } catch (e) {
       throw e instanceof UndoNotFound ? new HttpError(404, e.message) : e
     }
@@ -1059,10 +1066,10 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   const agentId = await agentParam(p, params[1] && decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async () => {
-    const was = await agentDefOf(p, agentId)
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) })
-    // What of its settings changed, for undo (#1282).
-    await noteAgent(requireWorkspace(), basename(p), was, def)
+    // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
+    let was: AgentDef | undefined
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) }, { check: (current) => void (was = structuredClone(current)) })
+    if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }
   })
@@ -1643,9 +1650,8 @@ route('POST', '/v1/lanes', async ({ body }) =>
     if (!assistantCaller()) return start()
     const builderAct = await knownAgent(basename(p), builder)
     return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
-      const before = await lanes.listLanes(ws, { project: basename(p) })
+      // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
       const r = await start()
-      await noteLane(ws, r.did === 'started' ? null : (before.find((l) => l.id === r.lane.id) ?? null), r.lane)
       // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
       // lane watch (#531) on every running lane, or on this one, follows it.
       const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
@@ -1670,9 +1676,7 @@ route('POST', '/v1/lanes/join', async ({ body }) =>
     if (!assistantCaller()) return joined()
     const reviewerAct = await knownAgent(basename(p), reviewer)
     return assistantChange('agents', `join a lane in ${basename(p)}`, { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async () => {
-      const before = await lanes.listLanes(ws, { project: basename(p) })
       const r = await joined()
-      await noteLane(ws, before.find((l) => l.id === r.lane.id) ?? null, r.lane)
       return { done: `${r.lane.reviewer?.name ?? 'A reviewer'} joined lane ${r.lane.id} in ${basename(p)}`, act: { ...laneAct(r.lane), ...(r.lane.reviewer ? { agent: actAgent(r.lane.reviewer) } : {}) }, result: r }
     })
   })

@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomUUID } from 'crypto'
 import type { ActivityKind } from '../shared/assistantActivity'
-import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, LaneInfo, TaskCard } from '../shared/types'
+import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, TaskCard } from '../shared/types'
+import type { LaneRecord } from '../shared/lanes'
 import { currentTurn, type AssistantTurn } from './assistantControl'
 import { boardRead, boardWrite, boardWriteOp } from './boardStore'
 import type { Db } from './db'
@@ -22,7 +23,7 @@ import type { WorkspaceService } from './workspace'
 export type Value = null | boolean | number | string | Value[] | { [k: string]: Value }
 
 /** A lane's record as undo puts it back: its cards (a queued list as it will be), reviewer, rounds, wait and name. */
-export const laneValues = (l: LaneInfo): Record<string, Value> => ({ cards: l.queued ?? l.cards.map((c) => c.number), reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
+export const laneValues = (l: LaneRecord): Record<string, Value> => ({ cards: [...(l.pending ?? l.cards)], reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
 
 /** An agent's settings undo puts back: those the Assistant can change (servers.ts' agentSettings, and its name). */
 export const AGENT_FIELDS = ['name', 'provider', 'model', 'effort', 'permissionMode', 'use200kContext', 'mcpServers'] as const
@@ -45,6 +46,8 @@ interface Recording {
   act: ActivityKind
   what: string
   cards: Map<number, string>
+  /** Each card's change that can't be undone (a decision, a comment, its place), and why. */
+  finals: Map<number, { id: string; why: Set<string> }>
   recorded: number
 }
 const recording = new AsyncLocalStorage<Recording | null>()
@@ -54,7 +57,7 @@ const recording = new AsyncLocalStorage<Recording | null>()
  * what it changes for undo.
  */
 export function recordingChanges<T>(workspacePath: string, act: ActivityKind, what: string, fn: () => Promise<T>): Promise<T> {
-  return recording.run({ workspace: workspacePath, turn: currentTurn(workspacePath), act, what, cards: new Map(), recorded: 0 }, fn)
+  return recording.run({ workspace: workspacePath, turn: currentTurn(workspacePath), act, what, cards: new Map(), finals: new Map(), recorded: 0 }, fn)
 }
 
 /** Runs `fn` recording nothing, inside one of the Assistant's changes too: an undo's own writes aren't changes to undo. */
@@ -95,24 +98,60 @@ const stable = (v: unknown): string => JSON.stringify(v ?? null, (_k, x: unknown
 export const sameValue = (a: unknown, b: unknown): boolean => stable(a) === stable(b)
 
 /**
+ * What of a card's change undo can't put back (#1282 round 1: never left out), and why: a decision recorded (only the
+ * user changes or removes decisions), a comment, its place in its column, the doc sections to read first.
+ */
+function finalsOf(before: TaskCard | null, after: TaskCard): string[] {
+  if (!before) return []
+  const out: string[] = []
+  if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push('A decision it recorded stays: only the user changes or removes decisions.') // i18n-ignore: why, in the Assistant's tool replies (English); the window words it from the kind
+  if (after.comments.length > before.comments.length) out.push("A comment stays: undo doesn't take back what was said.") // i18n-ignore: as above
+  if (after.order !== before.order && after.column === before.column) out.push("The card's place in its column isn't put back.") // i18n-ignore: as above
+  if (!sameValue(after.context ?? [], before.context ?? [])) out.push('The doc sections to read first stay as set.') // i18n-ignore: as above
+  return out
+}
+
+/**
  * A card saved inside one of the Assistant's changes (tasks.ts' saveCard, in the board change's transaction): what it
- * changed of the card's fields, as one change per card (a batch's cards each their own); a new card, as made by it. Only
- * the Assistant's own saves count, not Hive's or another actor's inside the same call.
+ * changed of the card's fields, as one change per card (a batch's cards each their own); a new card, as made by it, with
+ * the last entry of its history as the change left it (`target`: what came after it is someone else's). What of it undo
+ * can't put back is a change of its own, final, with why. Only the Assistant's own saves count, not Hive's or another
+ * actor's inside the same call.
  */
 export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: TaskCard): void {
   const r = recording.getStore()
   if (!r || !ws.path || !same(ws.path, r.workspace) || changeActor()?.kind !== 'assistant') return
+  const n = after.number
   const fields: FieldChange[] = before ? CARD_FIELDS.filter((f) => !sameValue(cardValue(before, f), cardValue(after, f))).map((f) => ({ field: f, old: cardValue(before, f), new: cardValue(after, f) })) : [{ field: 'created', old: false, new: true }]
-  if (!fields.length) return
+  const finals = finalsOf(before, after)
+  const made = r.cards.get(n)
+  if (!fields.length && !finals.length && !made) return
   boardWriteOp(ws, (db) => {
-    let id = r.cards.get(after.number)
-    if (!id) {
+    let id = made
+    if (!id && fields.length) {
       id = randomUUID()
-      r.cards.set(after.number, id)
-      insertChange(db, id, r, { kind: 'card', card: after.number, project: after.project || null })
+      r.cards.set(n, id)
+      insertChange(db, id, r, { kind: 'card', card: n, project: after.project || null })
       r.recorded++
     }
-    for (const f of fields) putField(db, id, f)
+    if (id) {
+      for (const f of fields) putField(db, id, f)
+      // A card it made: the last history entry as this change has left it so far.
+      const last = after.history.at(-1)?.id
+      if (last) db.prepare("UPDATE assistant_changes SET target = ? WHERE id = ? AND EXISTS (SELECT 1 FROM assistant_change_values WHERE change = ? AND field = 'created')").run(last, id, id) // i18n-ignore: SQL
+    }
+    if (finals.length) {
+      const had = r.finals.get(n)
+      if (had) {
+        for (const w of finals) had.why.add(w)
+        db.prepare('UPDATE assistant_changes SET final = ? WHERE id = ?').run([...had.why].join(' '), had.id) // i18n-ignore: SQL
+      } else {
+        const fid = randomUUID()
+        r.finals.set(n, { id: fid, why: new Set(finals) })
+        insertChange(db, fid, r, { kind: 'final', card: n, project: after.project || null, final: finals.join(' ') })
+        r.recorded++
+      }
+    }
     prune(ws, db)
   })
 }
@@ -122,17 +161,34 @@ export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: T
  * started), or one that can't be undone (`final`: why), in the change running here. Its own board change. Returns its id,
  * or null outside one of the Assistant's changes.
  */
-export async function noteChange(ws: WorkspaceService, o: { kind: Exclude<AssistantChangeKind, 'card'>; project?: string | null; target?: string | null; card?: number | null; fields?: FieldChange[]; final?: string }): Promise<string | null> {
+export async function noteChange(ws: WorkspaceService, o: NoteChange): Promise<string | null> {
   const r = recording.getStore()
   if (!r || !ws.path || !same(ws.path, r.workspace)) return null
+  let id: string | null = null
+  await boardWrite(ws, async () => boardWriteOp(ws, (db) => (id = noteChangeIn(db, ws.path!, o))))
+  return id
+}
+
+/** One of the Assistant's changes as noteChange records it. */
+interface NoteChange {
+  kind: Exclude<AssistantChangeKind, 'card'>
+  project?: string | null
+  target?: string | null
+  card?: number | null
+  fields?: FieldChange[]
+  final?: string
+}
+
+/**
+ * noteChange's write, in a transaction the caller has open (a lane's save: its record of the change is part of it). Null,
+ * and nothing written, outside one of the Assistant's changes in this workspace.
+ */
+export function noteChangeIn(db: Db['writer'], workspacePath: string, o: NoteChange): string | null {
+  const r = recording.getStore()
+  if (!r || !same(workspacePath, r.workspace)) return null
   const id = randomUUID()
-  await boardWrite(ws, async () =>
-    boardWriteOp(ws, (db) => {
-      insertChange(db, id, r, o)
-      for (const f of o.fields ?? []) putField(db, id, f)
-      prune(ws, db)
-    })
-  )
+  insertChange(db, id, r, o)
+  for (const f of o.fields ?? []) putField(db, id, f)
   r.recorded++
   return id
 }
@@ -310,16 +366,14 @@ export async function markUndone(ws: WorkspaceService, ids: readonly string[], a
   )
 }
 
-/** A lane the Assistant started (`before` null) or changed, recorded for undo: what of its record changed. */
-export async function noteLane(ws: WorkspaceService, before: LaneInfo | null, after: LaneInfo): Promise<void> {
-  if (!before) {
-    await noteChange(ws, { kind: 'lane', project: after.project, target: after.id, fields: [{ field: 'created', old: false, new: true }] })
-    return
-  }
-  const was = laneValues(before)
+/**
+ * A lane the Assistant started (`before` null: it is made, with its record as it started) or changed (what of its record
+ * changed), recorded for undo in the lane's save (lanes.ts: `before` read under the lanes' lock, `after` as saved).
+ */
+export function noteLaneIn(db: Db['writer'], workspacePath: string, before: Record<string, Value> | null, after: LaneRecord): void {
   const now = laneValues(after)
-  const fields = Object.keys(now).filter((k) => !sameValue(was[k], now[k])).map((k) => ({ field: k, old: was[k], new: now[k] }))
-  if (fields.length) await noteChange(ws, { kind: 'lane', project: after.project, target: after.id, fields })
+  const fields = before ? Object.keys(now).filter((k) => !sameValue(before[k], now[k])).map((k) => ({ field: k, old: before[k], new: now[k] })) : [{ field: 'created', old: false, new: true }, ...Object.keys(now).map((k) => ({ field: k, old: null, new: now[k] }))]
+  if (fields.length) noteChangeIn(db, workspacePath, { kind: 'lane', project: after.project, target: after.id, fields })
 }
 
 /** An agent's settings the Assistant changed (as read just before, and after), recorded for undo: those that changed. */

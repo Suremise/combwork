@@ -2,7 +2,7 @@
 // it replaced, grouped by the user's message, kept 7 days across restarts; undo puts back what is still as it left it and
 // says what someone changed since, never overwriting it. Through the same code the Agent API runs: assistantBatch for a
 // batch (as POST /v1/tasks/batch), recordingChanges around a single change (as assistantChange), and the routes' own
-// recorders (noteLane, noteAgent, noteChange for a setting). The tool's route and its activity line: e2e assistant-control.
+// recorders (lanes.ts' own, noteAgent, noteChange for a setting). The tool's route and its activity line: e2e assistant-control.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -144,9 +144,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     const [a, b, c] = [await make('L1'), await make('L2'), await make('L3')].map((x) => x.number)
     const group = newMessage()
     const started = await asAssistant('start a lane in alpha', async () => {
-      const r = await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [a, b], by: 'Assistant' })
-      await changes.noteLane(w, null, r.lane)
-      return r
+      return lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [a, b], by: 'Assistant' })
     }, 'lane-start')
     const [made] = await undoChanges(w, { group }, 'assistant')
     expect(made.undone).toEqual(['created'])
@@ -155,15 +153,13 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     const lane = await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [a, b], by: 'You' })
     const second = newMessage()
     await asAssistant('start a lane in alpha', async () => {
-      const before = (await lanes.listLanes(w, { project: 'alpha' })).find((l) => l.id === lane.lane.id)!
-      const r = await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [a, b, c], rounds: 4, by: 'Assistant' })
-      await changes.noteLane(w, before, r.lane)
+      await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [a, b, c], rounds: 4, by: 'Assistant' })
     }, 'lane-start')
     expect(groupOf(second)!.changes[0].fields.sort()).toEqual(['cards', 'rounds'])
     const [back] = await undoChanges(w, { group: second }, 'assistant')
     expect(back.undone.sort()).toEqual(['cards', 'rounds'])
     const now = (await lanes.listLanes(w, { project: 'alpha' })).find((l) => l.id === lane.lane.id)!
-    expect(changes.laneValues(now)).toMatchObject({ cards: [a, b], rounds: lane.lane.rounds })
+    expect([now.queued ?? now.cards.map((x) => x.number), now.rounds]).toEqual([[a, b], lane.lane.rounds])
     await lanes.endLane(w, lane.lane.id, { abandoned: true })
   })
 
@@ -242,5 +238,202 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
 
   it("a value of any shape comes back as it was written (a setting's table, a list, nothing)", () => {
     for (const v of [null, true, 0, -2.5, '', 'x', [], [1, 'a', null], {}, { a: { b: [1, { c: 'd' }] }, 'e.f': false }]) expect(changes.valueOf(changes.rowsOf(v))).toEqual(v)
+  })
+})
+
+// HR1's round 1 findings: what undo checks is checked at the write, under that thing's own lock (a change landing just
+// before it is kept, never overwritten); an agent started is stopped only in the launch it started; the Assistant's own
+// undo stops when its permission does; a lane's empty reviewer or name comes back; a price's removed models are their
+// own field; what can't be undone is still listed. Each race is made to happen at the write, as a spy on the write.
+describe('undo checks at the write (#1282 round 1)', async () => {
+  const projectAgentsMod = await import('../src/main/projectAgents')
+  const { sessions } = await import('../src/main/sessions')
+  const tools = await import('../src/main/settingsTools')
+  const a1 = async () => projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
+
+  it("a card's field changed just before the write is kept; the others still go back", async () => {
+    const c = await make('Race', ['p4'])
+    const group = newMessage()
+    await asAssistant('change it', () => tasks.updateTask(c.number, { labels: ['triage'], title: 'Its title' }, assistant))
+    // The user's edit, saved on its own just before the undo's write (after the undo read the card).
+    const real = tasks.updateTask
+    const spy = vi.spyOn(tasks, 'updateTask').mockImplementationOnce(async (...args) => {
+      await real(c.number, { labels: ['mine'] }, user)
+      return real(...args)
+    })
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r).toMatchObject({ undone: ['title'], skipped: [{ field: 'labels', why: 'changed' }] })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(await card(c.number)).toMatchObject({ labels: ['mine'], title: 'Race' })
+  })
+
+  it('a card it made, edited just before the archive, is kept', async () => {
+    const group = newMessage()
+    const c = await asAssistant('make it', () => tasks.createTask({ title: 'Assistant card', project: 'alpha' }, assistant), 'create-task')
+    const real = tasks.archiveTask
+    const spy = vi.spyOn(tasks, 'archiveTask').mockImplementationOnce(async (...args) => {
+      await run(() => tasks.updateTask(c.number, { title: 'User edited' }, user))
+      return real(...args)
+    })
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([{ field: 'created', why: 'changed' }])
+    } finally {
+      spy.mockRestore()
+    }
+    expect(await card(c.number)).toMatchObject({ archived: false, title: 'User edited' })
+  })
+
+  it("an agent's setting changed just before the write is kept", async () => {
+    const group = newMessage()
+    await asAssistant(
+      'its model',
+      async () => {
+        let was: Awaited<ReturnType<typeof a1>> | undefined
+        const def = await updateAgent(alpha, 'a1', { model: 'assistant-model' }, { check: (cur) => void (was = structuredClone(cur)) })
+        await changes.noteAgent(w, 'alpha', was!, def)
+      },
+      'update-agent'
+    )
+    const real = projectAgentsMod.updateAgent
+    const spy = vi.spyOn(projectAgentsMod, 'updateAgent').mockImplementationOnce(async (...args) => {
+      await real(alpha, 'a1', { model: 'user-model' })
+      return real(...args)
+    })
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([{ field: 'model', why: 'changed' }])
+    } finally {
+      spy.mockRestore()
+    }
+    expect((await a1()).model).toBe('user-model')
+    await updateAgent(alpha, 'a1', { model: '' })
+  })
+
+  it("a lane's setting changed just before the write is kept; one it started, changed since, isn't abandoned", async () => {
+    const c = await make('Lane race')
+    const lane = await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [c.number], rounds: 3, by: 'You' })
+    const group = newMessage()
+    await asAssistant('its rounds', () => lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [c.number], rounds: 4, by: 'Assistant' }), 'lane-start')
+    const real = lanes.restoreLane
+    const spy = vi.spyOn(lanes, 'restoreLane').mockImplementationOnce(async (...args) => {
+      await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [c.number], rounds: 8, by: 'You' })
+      return real(...args)
+    })
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([{ field: 'rounds', why: 'changed' }])
+    } finally {
+      spy.mockRestore()
+    }
+    expect((await lanes.listLanes(w, { all: true })).find((l) => l.id === lane.lane.id)!.rounds).toBe(8)
+    await lanes.endLane(w, lane.lane.id, { abandoned: true })
+    // A lane it started, given another card by the user just before the undo: it runs on.
+    const d = await make('Lane race 2')
+    const started = newMessage()
+    const mine = await asAssistant('start a lane', () => lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [c.number], by: 'Assistant' }), 'lane-start')
+    const realAbandon = lanes.abandonLaneIf
+    const spy2 = vi.spyOn(lanes, 'abandonLaneIf').mockImplementationOnce(async (...args) => {
+      await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', cards: [c.number, d.number], by: 'You' })
+      return realAbandon(...args)
+    })
+    try {
+      const [r] = await userUndo(w, { group: started })
+      expect(r.skipped).toEqual([{ field: 'created', why: 'changed' }])
+    } finally {
+      spy2.mockRestore()
+    }
+    expect((await lanes.listLanes(w, { all: true })).find((l) => l.id === mine.lane.id)!.state).toBe('active')
+    await lanes.endLane(w, mine.lane.id, { abandoned: true })
+  })
+
+  it("a lane's reviewer and name added by it go back to none", async () => {
+    const c = await make('Lane no reviewer')
+    const lane = await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: null, cards: [c.number], by: 'You' })
+    const group = newMessage()
+    await asAssistant('its reviewer and name', () => lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'r1', name: 'Assistant name', cards: [c.number], by: 'Assistant' }), 'lane-start')
+    const [r] = await userUndo(w, { group })
+    expect(r.undone.sort()).toEqual(['name', 'reviewer'])
+    const now = (await lanes.listLanes(w, { all: true })).find((l) => l.id === lane.lane.id)!
+    expect([now.reviewer, now.name]).toEqual([null, null])
+    await lanes.endLane(w, lane.lane.id, { abandoned: true })
+  })
+
+  it("a price table's removed models the user changed since are kept; its prices still go back", async () => {
+    const e = entryOf('claude-code.prices')
+    config.setProviderPrices('claude-code', {}, ['old-removed'])
+    const group = newMessage()
+    await asAssistant(
+      'reset the prices',
+      async () => {
+        const r = await applySetting(e, null, null)
+        await changes.noteChange(w, { kind: 'setting', target: e.id, fields: [{ field: 'value', old: r.old, new: r.new }, { field: 'removed', old: r.removed!.old, new: r.removed!.new }] })
+      },
+      'setting'
+    )
+    config.setProviderPrices('claude-code', null as never, ['user-removed'])
+    const [r] = await userUndo(w, { group })
+    expect(tools.removedPrices('claude-code')).toEqual(['user-removed'])
+    expect(r.skipped).toContainEqual({ field: 'removed', why: 'changed' })
+    config.setProviderPrices('claude-code', null as never, [])
+  })
+
+  it('an agent it started is stopped only in the launch it started: a later launch runs on', async () => {
+    const group = newMessage()
+    await asAssistant('start A1', () => changes.noteChange(w, { kind: 'started', project: 'alpha', target: 'a1', fields: [{ field: 'run', old: null, new: 'its-launch' }] }), 'start-agent')
+    const later = vi.spyOn(sessions, 'liveFor').mockReturnValue({ runId: 'later-user-launch', agentId: 'a1', projectPath: alpha, status: 'working' } as never)
+    const stop = vi.spyOn(sessions, 'stop').mockImplementation(() => undefined as never)
+    try {
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([{ field: 'running', why: 'ended' }])
+      expect(stop).not.toHaveBeenCalled()
+    } finally {
+      later.mockRestore()
+      stop.mockRestore()
+    }
+    // Its own launch still running: stopped.
+    const again = newMessage()
+    await asAssistant('start A1', () => changes.noteChange(w, { kind: 'started', project: 'alpha', target: 'a1', fields: [{ field: 'run', old: null, new: 'its-launch' }] }), 'start-agent')
+    const same = vi.spyOn(sessions, 'liveFor').mockReturnValue({ runId: 'its-launch', agentId: 'a1', projectPath: alpha, status: 'working' } as never)
+    const stop2 = vi.spyOn(sessions, 'stop').mockImplementation(() => undefined as never)
+    try {
+      expect((await userUndo(w, { group: again }))[0].undone).toEqual(['running'])
+      expect(stop2).toHaveBeenCalledWith(alpha, 'a1')
+    } finally {
+      same.mockRestore()
+      stop2.mockRestore()
+    }
+  })
+
+  it("the Assistant's own undo stops when its permission does, part way through a message's changes: those undone so far are kept and marked", async () => {
+    const cards = [await make('G1', ['x']), await make('G2', ['x']), await make('G3', ['x'])].map((c) => c.number)
+    const group = newMessage()
+    await assistantBatch(wsPath, token, cards, { labels: ['y'] }, assistant)
+    let calls = 0
+    const refused = new control.ChangeRefused(403, 'turned down')
+    const guard = (): void => {
+      if (++calls > 1) throw refused
+    }
+    await expect(undoChanges(w, { group }, 'assistant', guard)).rejects.toBe(refused)
+    const labels = await Promise.all(cards.map(async (n) => (await card(n)).labels))
+    expect(labels.filter((l) => l.join() === 'x')).toHaveLength(1)
+    expect(labels.filter((l) => l.join() === 'y')).toHaveLength(2)
+    expect(groupOf(group)!.changes.filter((c) => c.undoneAt)).toHaveLength(1)
+  })
+
+  it("what undo can't put back is listed, never left out: a decision only, a comment only", async () => {
+    const c = await make('Decision only')
+    const group = newMessage()
+    await asAssistant('record a decision', () => tasks.updateTask(c.number, { decision: 'Keep the icon' }, assistant))
+    await asAssistant('comment on it', () => tasks.commentTask(c.number, 'Noted.', assistant), 'comment-task')
+    const listed = groupOf(group)!.changes
+    expect(listed.map((x) => x.kind)).toEqual(['final', 'final'])
+    expect(listed.some((x) => /decision/.test(x.final ?? ''))).toBe(true)
+    expect(listed.some((x) => /comment/.test(x.final ?? ''))).toBe(true)
+    const results = await userUndo(w, { group })
+    expect(results.every((r) => !!r.final && !r.undone.length)).toBe(true)
   })
 })
