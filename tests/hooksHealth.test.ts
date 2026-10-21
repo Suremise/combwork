@@ -56,16 +56,14 @@ describe('a prompt', () => {
 
   it('no false alarm on a long silent think: its prompt hook came, and nothing more for a long while', () => {
     const w = started()
-    expect(promptSent(w, 10_000, true)).toBe(true)
-    w.submit!.requests = 3
+    expect(promptSent(w, 10_000, true, 3)).toBe(true)
     hookArrived(w, 10_200)
-    for (let t = 10_000; t <= 10_000 + 30 * BOUND; t += 5_000) expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 3 }, t, BOUND)).toBeNull()
+    for (let t = 10_000; t <= 10_000 + 30 * BOUND; t += 5_000) expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 5 }, t, BOUND)).toBeNull()
   })
 
   it('no hook after it while its screen shows it working: missing once the bound has passed and the work has stood a while', () => {
     const w = started()
-    promptSent(w, 10_000, true)
-    w.submit!.requests = 3
+    promptSent(w, 10_000, true, 3)
     const working = { ...quiet, screen: 'working' as const, requests: 3 }
     // Working from the first look, but not missing before the bound.
     expect(hooksMissing(w, working, 15_000, BOUND)).toBeNull()
@@ -73,62 +71,46 @@ describe('a prompt', () => {
     expect(hooksMissing(w, working, 10_000 + BOUND, BOUND)).toBe('prompt')
   })
 
-  it('its records gaining a request count as work, which must stand for the grace too', () => {
+  it('a quick turn over before the first look (HR6 round 2): its count from before the prompt shows the request it made', () => {
     const w = started()
-    promptSent(w, 10_000, true)
-    w.submit!.requests = 3
-    // A quick turn: over (idle at its prompt) by the time the bound passed, its records one request on.
-    const at = 10_000 + BOUND
-    expect(hooksMissing(w, { ...quiet, screen: 'idle', requests: 4 }, at, BOUND)).toBeNull()
-    expect(hooksMissing(w, { ...quiet, screen: 'idle', requests: 4 }, at + HOOKS_GRACE_MS - 1, BOUND)).toBeNull()
-    expect(hooksMissing(w, { ...quiet, screen: 'idle', requests: 4 }, at + HOOKS_GRACE_MS, BOUND)).toBe('prompt')
+    // A resumed conversation's 3 requests before the prompt (the last look's count, the transcript unchanged since).
+    promptSent(w, 1_000, true, 3)
+    // Idle at its prompt at every look, a fourth request recorded.
+    const quick = { ...quiet, screen: 'idle' as const, requests: 4 }
+    expect(hooksMissing(w, quick, 6_000, BOUND)).toBeNull()
+    expect(w.submit).not.toBeNull()
+    expect(hooksMissing(w, quick, 1_000 + BOUND - 1, BOUND)).toBeNull()
+    expect(hooksMissing(w, quick, 1_000 + BOUND, BOUND)).toBe('prompt')
   })
 
-  it('the requests it had before the prompt are unknown: its records alone show nothing yet', () => {
+  it('its records unreadable just before the prompt: unknown, never none, so its history is no new work; its screen still counts', () => {
     const w = started()
-    promptSent(w, 10_000, true)
-    expect(hooksMissing(w, { ...quiet, requests: 9 }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
+    // A resumed conversation with 12 requests, a local command's Enter (no hook), its transcript unreadable then.
+    promptSent(w, 1_000, true, null)
+    for (const t of [6_000, 61_000, 10 * BOUND]) expect(hooksMissing(w, { ...quiet, requests: 12 }, t, BOUND)).toBeNull()
+    expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 12 }, 11 * BOUND, BOUND)).toBeNull()
+    expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 12 }, 11 * BOUND + HOOKS_GRACE_MS, BOUND)).toBe('prompt')
   })
 
   it('an Enter that started nothing (a menu, a local command): dropped once its screen shows it idle', () => {
     const w = started()
-    promptSent(w, 10_000, true)
-    w.submit!.requests = 3
+    promptSent(w, 10_000, true, 3)
     expect(hooksMissing(w, { ...quiet, screen: 'idle', requests: 3 }, 10_000 + HOOKS_GRACE_MS, BOUND)).toBeNull()
     expect(w.submit).toBeNull()
     // Its CLI's later turn of its own (a background task's end) isn't that prompt's.
     expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 4 }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
   })
 
-  it('its records unreadable when the prompt was sent: their requests are unknown, never none, so its history is no new work', () => {
-    const w = started()
-    // A resumed conversation with 12 requests before, a local command's Enter (no hook), its transcript unreadable then.
-    promptSent(w, 1_000, true)
-    w.submit!.requests = null
-    for (const t of [6_000, 61_000, 10 * BOUND]) expect(hooksMissing(w, { ...quiet, requests: 12 }, t, BOUND)).toBeNull()
-  })
-
-  it('a baseline read a moment late (a quick turn already recorded) only hides that evidence: its screen still counts', () => {
-    const w = started()
-    promptSent(w, 10_000, true)
-    // The read came after the turn's request was written: no growth to see.
-    w.submit!.requests = 4
-    expect(hooksMissing(w, { ...quiet, screen: null, requests: 4 }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
-    expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 4 }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
-    expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 4 }, 10_000 + 10 * BOUND + HOOKS_GRACE_MS, BOUND)).toBe('prompt')
-  })
-
   it("a launch's task, for a CLI whose first hook comes with its first prompt: watched from its start", () => {
     const w = newHooksWatch(0, false)
-    expect(promptSent(w, 0, true)).toBe(true)
-    w.submit!.requests = 0
+    expect(promptSent(w, 0, true, 0)).toBe(true)
     expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 1 }, 5_000, BOUND)).toBeNull()
     expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 1 }, 120_000, BOUND)).toBe('prompt')
   })
 
   it("a prompt sent while it works isn't watched (its hooks may come only at the turn's end)", () => {
     const w = started()
-    expect(promptSent(w, 10_000, false)).toBe(false)
+    expect(promptSent(w, 10_000, false, 3)).toBe(false)
     expect(hooksMissing(w, { ...quiet, screen: 'working', requests: 9 }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
   })
 

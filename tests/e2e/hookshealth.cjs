@@ -93,7 +93,8 @@ const hooksOff = (agent, off) => {
     /** Types a prompt and waits until the fake shows it working on it (its screen: hooks may be off). */
     const say = async (a, text) => {
       const mark = (await raw(a)).length
-      return lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), text, { submitted: async () => lib.plainText((await raw(a)).slice(mark)).includes('esc to interrupt') })
+      // Working, or a quick turn already done ("Worked for").
+      return lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), text, { submitted: async () => /esc to interrupt|Worked for/.test(lib.plainText((await raw(a)).slice(mark))) })
     }
 
     // The lane: Builder on a card in Doing, Reviewer reviewing.
@@ -108,10 +109,13 @@ const hooksOff = (agent, off) => {
     check('no false alarm: a long silent think after its prompt hook, nor an idle agent, ever shows its hooks missing', ever.size === 0 && !(await live(reviewer))?.hooksMissing, JSON.stringify([...ever]))
     clearInterval(sampler)
 
-    // --- Builder's hooks stop mid-session: its next prompt's work, with no hook, shows it.
+    // --- Builder's hooks stop mid-session: its next prompt, with no hook, shows it. A quick turn (1 s), over and idle at
+    // its prompt before Hive's first look (every 5 s): its records' request timed after the prompt shows it worked,
+    // though the conversation had requests before (its history never counts).
     hooksOff('Builder', true)
     const runBefore = (await live(builder))?.runId
-    check("a prompt it works on with its hooks off (seen on its screen)", (await say(builder, 'work 8')) > 0)
+    check('a quick prompt with its hooks off', (await say(builder, 'work 1')) > 0)
+    check('it is over and idle at its prompt on screen', !!(await until(async () => /Worked for/.test(lib.plainText(await raw(builder))), HUNG_MS)))
     const gone = await until(async () => (await live(builder))?.hooksMissing, HUNG_MS)
     check('its hooks are missing, shown after the prompt', gone?.after === 'prompt', JSON.stringify(gone))
     const header = page.locator('.pane-header-bar', { hasText: 'Builder' }).first()

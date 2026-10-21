@@ -7,8 +7,10 @@
  * requests). Two signs, each needing time and evidence, never time alone:
  * - its start: a CLI that sends a hook as it starts (capabilities.startHook) sent none within the bound of starting,
  *   with no question at its start in the way (the time a question waits for the user doesn't count);
- * - a prompt: one sent while it was idle (the user's Enter, or a line Hive typed) had no hook after it for the bound, while
- *   its CLI went to work on it (its screen shows it working, or its records gained a request) for a while too.
+ * - a prompt: one sent while it was idle (the user's Enter, a line Hive typed, its launch's task) had no hook after it for
+ *   the bound, while its CLI went to work on it (its screen shows it working, or its records have more requests than
+ *   just before the prompt: a count from before it, so a quick turn over before the first look still counts, and an
+ *   unknown one shows nothing) for a while too.
  * A long silent think never counts: its prompt's hook came. An Enter that started nothing (a menu, a local command) is
  * dropped once its screen shows it idle. Any hook clears it.
  */
@@ -24,7 +26,10 @@ export interface HooksWatch {
   startHook: boolean
   /** From when its start counts: its launch, or the last check that found a question at its start in the way. */
   startFrom: number
-  /** The first prompt since its last hook that was sent while it was idle: when, and its records' requests then (null until read). */
+  /**
+   * The first prompt since its last hook that was sent while it was idle: when (ms), and its records' requests just
+   * before it (null: unknown, so its records show nothing for it).
+   */
   submit: { at: number; requests: number | null } | null
   /** When the evidence of work on that prompt was first seen. */
   workAt: number | null
@@ -40,10 +45,14 @@ export function hookArrived(w: HooksWatch, now: number): void {
   w.workAt = null
 }
 
-/** A prompt was sent (`idle`: while the agent was idle, so a hook should follow). Whether it is the one now watched. */
-export function promptSent(w: HooksWatch, now: number, idle: boolean): boolean {
+/**
+ * A prompt was sent (`idle`: while the agent was idle, so a hook should follow), with its records' requests just before
+ * it when known (`requests`: a count from before it, never one read after, which a quick turn could be in). Whether it is
+ * the one now watched.
+ */
+export function promptSent(w: HooksWatch, now: number, idle: boolean, requests: number | null = null): boolean {
   if (!idle || w.submit) return false
-  w.submit = { at: now, requests: null }
+  w.submit = { at: now, requests }
   w.workAt = null
   return true
 }
@@ -54,7 +63,7 @@ export interface HooksEvidence {
   startWaits: boolean
   /** Its screen's reading of its turn (null: not read, or not sure). */
   screen: 'idle' | 'working' | null
-  /** Its records' requests now (null: unknown). */
+  /** Its records' (its transcript's) requests now; null: unknown. */
   requests: number | null
 }
 

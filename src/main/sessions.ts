@@ -9,7 +9,7 @@ import { overridesNow } from './advancedValues'
 import { folderChanging, folderSteady } from './folderFence'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
-import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
+import { constants as fsConstants, existsSync, realpathSync, statSync } from 'original-fs'
 import { typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
@@ -285,6 +285,8 @@ interface LiveSession {
   /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Hive was tested with. */
   hooksOffIn?: () => string | null
   newerThanTested?: boolean
+  /** Its transcript's requests at the last look, and the size they were read at (#1336: a prompt's count from before it). */
+  requestsSeen?: { path: string; bytes: number; requests: number }
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
   costAt?: number
   /** The cost the CLI last reported for this launch, kept while the user's prices are shown instead (#436). */
@@ -2298,17 +2300,29 @@ class SessionManager {
   }
 
   /**
-   * A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it,
-   * and its records' requests now are read for the hooks check to compare with. Read a moment late (a quick turn's
-   * request already in), the baseline only hides that evidence; unknown (unreadable), its records show nothing.
+   * A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it.
+   * Its records' requests just before it, for the hooks check: the last look's count when the transcript hasn't changed
+   * since (exact, whatever comes after), none for a new conversation with no transcript yet; else read at once (a few
+   * milliseconds, where a model's turn takes a second or more), unknown when that can't be read.
    */
   private notePrompt(l: LiveSession, launch = false): void {
     const w = l.hooksWatch
     const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
-    if (!w || !promptSent(w, Date.now(), idle)) return
+    if (!w) return
+    const path = l.transcriptPath
+    // Its size now: a number, 'none' (no transcript yet), or null (it couldn't be read).
+    let bytes: number | 'none' | null = 'none'
+    try {
+      if (path) bytes = statSync(path).size
+    } catch (e) {
+      bytes = (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'none' : null
+    }
+    const seen = l.requestsSeen?.path === path ? l.requestsSeen : undefined
+    const exact = seen && bytes === seen.bytes ? seen.requests : bytes === 'none' && !l.resumed && !seen ? 0 : null
+    if (!promptSent(w, Date.now(), idle, exact) || exact !== null) return
     const s = w.submit!
     void this.requestsNow(l).then((n) => {
-      if (w.submit === s) s.requests = n
+      if (w.submit === s && s.requests === null) s.requests = n
     })
   }
 
@@ -2337,8 +2351,9 @@ class SessionManager {
     // A question at its start (its folder's trust) waits for the user while it is on its screen.
     const text = l.screen?.text() ?? null
     const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
-    const requests = w.submit && w.submit.requests !== null ? await this.requestsNow(l) : null
-    if (this.live.get(id) !== l || l.hooksWatch !== w || st.hooksMissing) return
+    const s = w.submit
+    const requests = s && s.requests !== null ? await this.requestsNow(l) : null
+    if (this.live.get(id) !== l || l.hooksWatch !== w || st.hooksMissing || w.submit !== s) return
     const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l), requests }, Date.now(), advanced.number('hive.hooks.missingSeconds') * 1000)
     if (after) this.hooksGone(l, after)
   }
@@ -3132,6 +3147,10 @@ class SessionManager {
       if (l.state.turn?.state === 'unknown') this.noteTurn(l)
     }
     emit({ type: 'usage-changed', projectPath, sessionId })
+    // Its requests as of this look, with the size they were read at (#1336: the count a prompt sent next compares with).
+    const counted = sessionId ? await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider) : null
+    const read = usageSeen.get(src)
+    if (counted && read?.sessionId === sessionId) l.requestsSeen = { path: src, bytes: read.size, requests: counted.requests }
     await this.readDetails(l, src, size, hooks)
     this.settleBackground(l, await this.readBackground(l, src, size))
     await this.readSafeguards(l, src)
