@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "Hooks: antes de una herramienta, tiempo de espera",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Cuánto espera Codex a que Hive reciba uno de sus hooks. El propio Codex limita los hooks de interrupción y de fin de sesión a {most, plural, one {# segundo} many {# segundos} other {# segundos}} como máximo. Hive aprueba él mismo sus hooks para Codex, así que un cambio no necesita revisión en Codex.",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "Hooks: tiempo de espera",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Cuánto espera Codex a que arranque el servidor hive de Hive, cuando tu propia configuración de Codex tiene un servidor llamado hive con su propio tiempo de espera de inicio: Hive le da a Codex este en su lugar (si no, se aplica el de Codex, 10 s). Si es demasiado corto, los agentes de Codex arrancan sin las herramientas de Hive.",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "Herramientas hive: tiempo de espera de inicio en Codex",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Cuánto deja Codex que se ejecute una de las herramientas de Hive (su tool_timeout_sec para el servidor hive). Las esperas de Hive se quedan un minuto por debajo.",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "Herramientas hive: tiempo de espera en Codex",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "El clic derecho en un panel de Codex es de Hive, como en todos los paneles: copia la selección del terminal (Mayús+arrastrar) o pega. Si lo activas, Hive pasa los clics derechos a Codex, que sigue el ratón por su cuenta.",

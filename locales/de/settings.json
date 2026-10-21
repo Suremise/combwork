@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "Hooks: Timeout vor einem Tool",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Wie lange Codex wartet, bis Hive einen seiner Hooks annimmt. Codex selbst begrenzt die Hooks für Unterbrechung und Sitzungsende auf höchstens {most, plural, one {# Sekunde} other {# Sekunden}}. Hive genehmigt seine Hooks für Codex selbst, eine Änderung muss in Codex also nicht geprüft werden.",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "Hooks: Timeout",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Wie lange Codex wartet, bis der hive-Server von Hive gestartet ist, wenn deine eigene Codex-Konfiguration einen Server namens hive mit einem eigenen Start-Timeout hat: Hive gibt Codex stattdessen diesen (sonst gilt der von Codex, 10 s). Zu kurz, und Codex-Agenten starten ohne die Tools von Hive.",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "hive-Tools: Start-Timeout in Codex",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Wie lange Codex eines der Tools von Hive laufen lässt (sein tool_timeout_sec für den hive-Server). Hives Wartezeiten bleiben eine Minute darunter.",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "hive-Tools: Timeout in Codex",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "Ein Rechtsklick in einem Codex-Bereich gehört Hive, wie in jedem Bereich: Er kopiert die Auswahl des Terminals (Umschalt+Ziehen) oder fügt ein. Eingeschaltet gibt Hive Rechtsklicks stattdessen an Codex weiter, das die Maus selbst verfolgt.",

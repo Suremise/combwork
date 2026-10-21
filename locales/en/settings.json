@@ -207,6 +207,14 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
+    "defaultMessage": "How long Codex waits for Hive's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Hive gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Hive's tools.",
+    "description": "What the advanced setting \"hive tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). hive is the name of Hive's MCP server."
+  },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
+    "defaultMessage": "hive tools: startup timeout in Codex",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex lets one of Hive's tools run (its tool_timeout_sec for the hive server). Hive's waits stay a minute under it.",
     "description": "What the advanced setting \"hive tools: timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

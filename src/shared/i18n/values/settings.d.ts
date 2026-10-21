@@ -53,6 +53,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.codex.hooks.timeoutSeconds.desc': { most: number }
   'settings.advanced.codex.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.codex.mcp.startupTimeoutSeconds.desc': undefined
+  'settings.advanced.codex.mcp.startupTimeoutSeconds.title': undefined
   'settings.advanced.codex.mcp.toolTimeoutSeconds.desc': undefined
   'settings.advanced.codex.mcp.toolTimeoutSeconds.title': undefined
   'settings.advanced.codex.mouse.rightClickToCli.desc': undefined

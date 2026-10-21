@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "Hooks: tempo limite antes de uma ferramenta",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Quanto tempo o Codex espera o Hive receber um dos seus hooks. O próprio Codex limita os hooks de interrupção e de fim de sessão a {most, plural, one {# segundo} other {# segundos}} no máximo. O Hive aprova os próprios hooks para o Codex, então uma mudança não precisa de revisão no Codex.",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "Hooks: tempo limite",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Quanto tempo o Codex espera o servidor hive do Hive iniciar, quando a sua própria configuração do Codex tem um servidor chamado hive com um tempo limite de inicialização próprio: o Hive dá este ao Codex no lugar dele (caso contrário, vale o do Codex, 10 s). Curto demais, e os agentes do Codex iniciam sem as ferramentas do Hive.",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "Ferramentas hive: tempo limite de inicialização no Codex",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Quanto tempo o Codex deixa uma das ferramentas do Hive rodar (o tool_timeout_sec do servidor hive). As esperas do Hive ficam um minuto abaixo disso.",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "Ferramentas hive: tempo limite no Codex",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "O clique com o botão direito em um painel do Codex é do Hive, como em todos os painéis: copia a seleção do terminal (Shift+arrastar) ou cola. Ativado, o Hive passa os cliques com o botão direito ao Codex, que acompanha o mouse por conta própria.",

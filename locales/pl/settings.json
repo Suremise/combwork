@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "Hooki: limit czasu przed narzędziem",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Jak długo Codex czeka, aż Hive przyjmie jeden z jego hooków. Sam Codex ogranicza hooki przerwania i końca sesji do najwyżej {most, plural, one {# sekundy} few {# sekund} many {# sekund} other {# sekundy}}. Hive sam zatwierdza swoje hooki dla Codex, więc zmiana nie wymaga przeglądu w Codex.",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "Hooki: limit czasu",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Jak długo Codex czeka na uruchomienie serwera hive od Hive, gdy Twoja własna konfiguracja Codex ma serwer o nazwie hive z własnym limitem czasu uruchamiania: Hive daje wtedy Codex ten limit (w przeciwnym razie obowiązuje limit Codex, 10 s). Zbyt krótki, a agenci Codex uruchamiają się bez narzędzi Hive.",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "Narzędzia hive: limit czasu uruchamiania w Codex",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Jak długo Codex pozwala działać jednemu z narzędzi Hive (jego tool_timeout_sec dla serwera hive). Oczekiwania Hive są o minutę krótsze.",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "Narzędzia hive: limit czasu w Codex",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "Prawy przycisk myszy w panelu Codex należy do Hive, jak w każdym panelu: kopiuje zaznaczenie terminala (Shift+przeciąganie) albo wkleja. Po włączeniu Hive przekazuje kliknięcia prawym przyciskiem do Codex, który sam śledzi mysz.",

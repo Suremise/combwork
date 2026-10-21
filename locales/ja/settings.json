@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "フック：ツール実行前のタイムアウト",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "CodexがフックをHiveに渡すときに待つ時間です。中断とセッション終了のフックは、Codex自身が最大{most, plural, other {#秒}}に制限します。HiveはCodex用のフックを自分で承認するため、変更してもCodexでのレビューは不要です。",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "フック：タイムアウト",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "CodexがHiveのhiveサーバーの起動を待つ時間です。自分のCodexの設定に、独自の起動タイムアウトを持つhiveという名前のサーバーがある場合、Hiveは代わりにこの値をCodexに渡します（それ以外の場合はCodex自身の値、10秒が使われます）。短すぎると、CodexのエージェントはHiveのツールなしで起動します。",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "hiveツール：Codexでの起動タイムアウト",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "CodexがHiveのツール1回の実行を許す時間です（hiveサーバーのtool_timeout_sec）。Hiveの待機はこれより1分短く保たれます。",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "hiveツール：Codexでのタイムアウト",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "Codexのペインでの右クリックは、他のすべてのペインと同じくHiveが処理します。ターミナルの選択範囲（Shift+ドラッグ）があればコピーし、なければ貼り付けます。オンにすると、Hiveは右クリックをCodexに渡し、Codexがマウス操作を自分で扱います。",

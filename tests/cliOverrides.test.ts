@@ -316,11 +316,14 @@ describe("Codex: Hive's hive server over a native one of that name", () => {
       }
   })
 
-  it('how it starts: the session’s folder, Codex’s default startup timeout, not required, its environment emptied', () => {
+  it('how it starts: the session’s folder, Hive’s startup timeout (Codex’s own default, from Settings → Advanced), not required, its environment emptied', async () => {
     for (const place of places) {
       const ctx = where(place, 'command = "node"\ncwd = "Z:/does-not-exist"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\nrequired = true\nenv = { NODE_OPTIONS = "--inspect", HIVE_API_URL = "http://elsewhere" }\nenv_vars = ["SECRET"]\n')
       expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 10, startup_timeout_ms: 10000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
     }
+    // The startup timeout follows Settings → Advanced.
+    await advanced.set('codex.mcp.startupTimeoutSeconds', 45)
+    expect(table(where('home', 'command = "node"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\n'))).toMatchObject({ startup_timeout_sec: 45, startup_timeout_ms: 45000 })
     // Hive's own env stays Hive's (here the context's server has none to set).
     const own = outrankNativeHive([], { env: { HIVE_PROJECT: 'p' } }, 'all', 'C:\\p')
     expect(own).toEqual({})

@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "Hooks : avant un outil, délai",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Combien de temps Codex attend que Hive prenne en charge un de ses hooks. Codex limite lui-même les hooks d’interruption et de fin de session à {most, plural, one {# seconde} many {# secondes} other {# secondes}} au plus. Hive approuve lui-même ses hooks pour Codex, donc une modification n’a pas besoin d’être relue dans Codex.",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "Hooks : délai",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Combien de temps Codex attend que le serveur hive de Hive démarre, quand ta propre configuration Codex a un serveur nommé hive avec son propre délai de démarrage : Hive donne plutôt celui-ci à Codex (sinon celui de Codex, 10 s, s’applique). Trop court, et les agents Codex démarrent sans les outils de Hive.",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "Outils hive : délai de démarrage dans Codex",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Combien de temps Codex laisse tourner un outil de Hive (son tool_timeout_sec pour le serveur hive). Les attentes de Hive restent une minute en dessous.",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "Outils hive : délai dans Codex",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "Le clic droit dans un volet Codex revient à Hive, comme dans tous les volets : il copie la sélection du terminal (Maj+glisser), ou colle. Activé, Hive transmet plutôt les clics droits à Codex, qui suit lui-même la souris.",

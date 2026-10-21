@@ -310,9 +310,6 @@ export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServer
 /** A native hive server's keys for an HTTP server, which can't be taken out of Hive's stdio one (Codex refuses the mix). */
 const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
 
-/** Codex's documented default startup timeout (config reference), put back over a native hive's own. */
-const CODEX_STARTUP_TIMEOUT_SEC = 10
-
 /** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
 const NATIVE_HIVE = msg({
   id: 'providers.codex.nativeHive',
@@ -328,7 +325,8 @@ const NATIVE_HIVE = msg({
  * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, hiveTable);
  * - their approval: the server default and each native per-tool mode as this launch approves them (`approved`: every
  *   tool, the Assistant's trusted ones, or none), "auto" (Codex's own policy) for the rest;
- * - how it starts: the session's folder for its `cwd`, Codex's default startup timeout, not `required`, and the native
+ * - how it starts: the session's folder for its `cwd`, Hive's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
+ *   own default), not `required`, and the native
  *   `env` and `env_vars` emptied (an environment variable Hive doesn't set is set empty: Codex can't remove one).
  * An HTTP one (`url` and its kin, HTTP_KEYS) can't be taken out of a stdio server: the launch is refused with what to do
  * (NATIVE_HIVE; Codex itself would refuse to start).
@@ -357,8 +355,10 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
       out.tools = { ...own, ...merged }
     }
     if ('cwd' in n && !('cwd' in table)) out.cwd = cwd
-    if ('startup_timeout_sec' in n) out.startup_timeout_sec = CODEX_STARTUP_TIMEOUT_SEC
-    if ('startup_timeout_ms' in n) out.startup_timeout_ms = CODEX_STARTUP_TIMEOUT_SEC * 1000
+    // Settings → Advanced (default Codex's own documented 10 s), over the native one's.
+    const startup = advanced.number('codex.mcp.startupTimeoutSeconds')
+    if ('startup_timeout_sec' in n) out.startup_timeout_sec = startup
+    if ('startup_timeout_ms' in n) out.startup_timeout_ms = startup * 1000
     if ('required' in n) out.required = false
     const env = n.env && typeof n.env === 'object' ? Object.keys(n.env as Record<string, unknown>) : []
     const ownEnv = (table.env ?? {}) as Record<string, string>

@@ -51,6 +51,8 @@
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": "钩子：工具运行前超时",
   "settings.advanced.codex.hooks.timeoutSeconds.desc": "Codex 等待 Hive 接收其钩子的时长。Codex 自身将中断和会话结束钩子限制在最多 {most, plural, other {# 秒}}。Hive 会替 Codex 批准自己的钩子，因此更改后无需在 Codex 中审核。",
   "settings.advanced.codex.hooks.timeoutSeconds.title": "钩子：超时",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": "Codex 等待 Hive 的 hive 服务器启动的时长。当你自己的 Codex 配置中有一个名为 hive 且自带启动超时的服务器时，Hive 会改为把这个值交给 Codex（否则使用 Codex 自己的值，10 秒）。太短的话，Codex 智能体会在没有 Hive 工具的情况下启动。",
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": "hive 工具：Codex 中的启动超时",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": "Codex 允许 Hive 的单个工具运行的时长（hive 服务器的 tool_timeout_sec）。Hive 的等待时长始终比它少一分钟。",
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": "hive 工具：Codex 中的超时",
   "settings.advanced.codex.mouse.rightClickToCli.desc": "Codex 窗格中的右键单击和其他所有窗格一样由 Hive 处理：复制终端的所选内容（Shift+拖动），否则粘贴。开启后，Hive 会把右键单击交给 Codex，由 Codex 自己跟踪鼠标。",
