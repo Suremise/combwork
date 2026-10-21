@@ -179,6 +179,10 @@ interface HiveMessageValues {
   'panes.template.save': undefined
   'panes.template.scopeHeading': { scope: string }
   'panes.terminal.exited': { code: string | number }
+  'panes.terminal.osc52.askCopy': undefined
+  'panes.terminal.osc52.askDont': undefined
+  'panes.terminal.osc52.askMessage': { n: number }
+  'panes.terminal.osc52.askTitle': undefined
   'panes.terminal.pasteFailed': undefined
   'panes.tiles.back': undefined
   'panes.tiles.backTip': { key: string }

@@ -1,6 +1,7 @@
 import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, resolveKeybinding } from '@shared/defaults'
 import { PROVIDERS, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
+import { appTakesTerminalKey } from '@shared/terminalInput'
 import type { ProjectInfo, ProviderId, SessionLayout } from '@shared/types'
 import { tilePageCount } from '@shared/tiles'
 import { APP_NAME } from '@shared/appName'
@@ -727,11 +728,10 @@ export function terminalReserved(provider?: ProviderId): Set<string> {
 }
 
 /** Keys the terminal must pass through to Hive instead of the agent. Chords are not started from the terminal. */
-export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId): boolean {
+export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId, allKeysToCli = false): boolean {
   if (e.type !== 'keydown') return false
   const key = eventToKey(e)
   if (!key) return false
-  const norm = key.toUpperCase()
-  if (terminalReserved(provider).has(norm)) return false
-  return bound().some((b) => b.key === norm)
+  // Every key to the CLI (#1292, Settings → Advanced) but the command palette's, so every command stays in reach.
+  return appTakesTerminalKey(key, { allKeysToCli, palette: commandKeybinding('palette.show'), reserved: terminalReserved(provider), bound: bound().map((b) => b.key) })
 }

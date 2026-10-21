@@ -6,6 +6,9 @@
 // 2. Ctrl+C and Ctrl+V go to the CLI: by default Ctrl+C over a selection copies it and Ctrl+V pastes the clipboard's
 //    text; turned on, at once, the CLI gets both keys (^C, ^V) and Hive neither copies nor reads the clipboard; off
 //    again, Hive's once more. The clipboard is stubbed in the page: never the real one.
+// 3. All keys go to the CLI (#1292, #966 row 26): Hive's Ctrl+P is Hive's by default; turned on, it reaches the CLI
+//    (^P), and the command palette's Ctrl+Shift+P still opens the palette.
+// 4. A card's start in its own words (#1292, #966 row 30): the CLI gets the card's title and description alone.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -21,6 +24,8 @@ const alpha = path.join(ws, 'alpha')
 const PORT = Number(lib.port(47840))
 const AS_TYPED = 'hive.prompt.asTyped'
 const CTRL_CV = 'hive.terminal.ctrlCVToCli'
+const ALL_KEYS = 'hive.terminal.allKeysToCli'
+const RAW_START = 'hive.prompt.rawCardStart'
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -78,12 +83,13 @@ const check = (name, ok, extra = '') => {
     /** Starts a card on the agent as the user does from the board: typed into its CLI (no hive tools), its turn then ended. */
     const startCard = async (title, description) => {
       const card = await inv('tasks:create', { title, description, project: 'alpha' })
-      // Hive keeps an agent it just typed a card into as being given it for a few seconds, and refuses one still working
-      // on the last card's turn (its end can reach Hive after the status read before): started once neither holds.
+      // Hive keeps an agent it just typed a card into as being given it for a few seconds, refuses one still working on
+      // the last card's turn (its end can reach Hive after the status read before), and one the user has just typed in
+      // (the keys of part 3): started once none holds.
       let started = null
       await lib.until(async () => {
         started = await inv('tasks:start', card.number, { kind: 'agent', agentId: def.id }).then(() => true, (e) => String(e?.message ?? e))
-        return started === true || !/being given another card|is working/.test(started)
+        return started === true || !/being given another card|is working|has just typed in it/.test(started)
       }, HUNG_MS, 300)
       // Its prompt taken (in the transcript), then its turn over: the next card can be started on it.
       await lib.until(async () => transcriptHas(title), HUNG_MS, 200)
@@ -170,6 +176,43 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+V')
     check("off again, Ctrl+V is Hive's paste once more", !!(await lib.until(async () => inputSince(from).includes('\x1b[200~AGAIN\x1b[201~'), HUNG_MS, 100)) && (await reads()) === r + 1, `${(await reads()) - r} read(s), ${JSON.stringify(inputSince(from))}`)
     check('…and the CLI gets no ^V', !inputSince(from).includes('\x16'))
+
+    // ---- 3. All keys go to the CLI (#1292, #966 row 26): Hive's shortcut Ctrl+P (Go to Project) is Hive's by default;
+    // turned on, it reaches the CLI (^P), and the command palette's own (Ctrl+Shift+P) still opens the palette.
+    const palette = page.locator('.palette')
+    const focusPane = async () => {
+      await page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"] .xterm-helper-textarea`)?.focus(), key)
+      return lib.until(() => page.evaluate((k) => !!document.activeElement?.closest(`.terminal-host[data-pty="${CSS.escape(k)}"]`), key), HUNG_MS, 100)
+    }
+    const closePalette = async () => {
+      await page.keyboard.press('Escape')
+      await lib.until(async () => (await palette.count()) === 0, HUNG_MS, 100)
+    }
+    check('the pane has the focus', !!(await focusPane()))
+    from = readsOfInput().length
+    await page.keyboard.press('Control+P')
+    check("by default Ctrl+P in the pane is Hive's: Go to Project opens", !!(await lib.until(async () => (await palette.count()) === 1, HUNG_MS, 100)))
+    check('…and the CLI gets no ^P', !inputSince(from).includes('\x10'), JSON.stringify(inputSince(from)))
+    await closePalette()
+    await inv('advanced:set', ALL_KEYS, true)
+    check('switched on, the pane has the focus again', !!(await focusPane()))
+    from = readsOfInput().length
+    await page.keyboard.press('Control+P')
+    check('switched on, Ctrl+P goes to the CLI (^P)', !!(await lib.until(async () => inputSince(from).includes('\x10'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
+    check("…and Hive's Go to Project doesn't open", (await palette.count()) === 0)
+    await page.keyboard.press('Control+Shift+P')
+    check("…while the command palette's Ctrl+Shift+P still opens it", !!(await lib.until(async () => (await palette.count()) === 1, HUNG_MS, 100)))
+    await page.screenshot({ path: path.join(lib.WORK, 'terminalinput-3-all-keys.png') })
+    await closePalette()
+    await inv('advanced:set', ALL_KEYS, false)
+
+    // ---- 4. A card's start in its own words (#1292, #966 row 30): its title and description, nothing of Hive's.
+    await inv('advanced:set', RAW_START, true)
+    from = readsOfInput().length
+    started = await startCard('Card raw', 'Only this.')
+    check('in its own words, a card started on the agent is typed into its CLI', started === true, String(started))
+    check("…as the card's title and description alone, with none of Hive's wrapper", !!(await lib.until(async () => transcriptHas('Card raw Only this.'), HUNG_MS, 200)) && !inputSince(from).includes('Hive task board'), JSON.stringify(inputSince(from)))
+    await inv('advanced:set', RAW_START, false)
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))
   } finally {

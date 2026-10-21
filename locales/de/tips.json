@@ -11,6 +11,8 @@
   "tips.agentSettings.title": "Ein Modell pro Agent",
   "tips.agentStates.text": "Jeder Agent hat einen von vier Zuständen, an der Form wie an der Farbe zu erkennen: Eine Raute wartet auf dich, ein Quadrat ist festgefahren, ein pulsierender Punkt arbeitet und ein Ring ist inaktiv. Der Projektkopf zählt sie: „1 wartet · 2 arbeiten“.",
   "tips.agentStates.title": "Agenten auf einen Blick",
+  "tips.allKeysToCli.text": "Im Bereich eines Agenten nehmen Hives Tastenkürzel ihre Tasten. Schalte Einstellungen → Erweitert → Alle Tasten gehen an die CLI ein, um stattdessen jede Taste an die CLI zu senden, außer der der Befehlspalette (Alle Befehle anzeigen), damit jeder Befehl erreichbar bleibt.",
+  "tips.allKeysToCli.title": "Gib jede Taste an die CLI des Agenten",
   "tips.alwaysOnTop.text": "Die Pinnadel in der Titelleiste (oder Strg+Alt+O) hält das Fenster über deinen anderen Apps, sodass darunter ein Testlauf oder ein Emulator arbeiten kann. Jedes Fenster hat eine eigene, gespeichert für seinen Arbeitsbereich.",
   "tips.alwaysOnTop.title": "Ein Hive-Fenster im Vordergrund halten",
   "tips.antivirus.text": "Unter Windows prüft Microsoft Defender jede Datei, die Builds, Tests und Git anfassen. Einstellungen → Arbeitsbereich → Virenscan zeigt, ob er deinen Arbeitsbereich prüft, und kann dessen Ordner mit deiner Zustimmung ausschließen.",

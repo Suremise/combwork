@@ -14,7 +14,18 @@ export const OSC52_MAX_BYTES = 1024 * 1024
  */
 export const OSC52_INPUT_MS = 10_000
 
-export type Osc52Refusal = 'read' | 'not-in-use' | 'too-large' | 'invalid'
+export type Osc52Refusal = 'read' | 'not-in-use' | 'too-large' | 'invalid' | 'blocked' | 'declined'
+
+/** What Hive does with a write it would take (#1292, Settings → Advanced): take it, ask the user first, or take none. */
+export type Osc52Policy = 'allow' | 'ask' | 'block'
+
+/** A write osc52() takes, by the policy: written, asked about first, or refused ('blocked'). Reads and the rest are refused either way. */
+export function osc52Decision(r: Osc52, policy: Osc52Policy | string | undefined): { write: string } | { ask: string } | { refuse: Osc52Refusal } {
+  if (r.kind === 'refused') return { refuse: r.reason }
+  if (policy === 'block') return { refuse: 'blocked' }
+  if (policy === 'ask') return { ask: r.text }
+  return { write: r.text }
+}
 export type Osc52 = { kind: 'write'; text: string } | { kind: 'refused'; reason: Osc52Refusal }
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/

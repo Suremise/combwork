@@ -114,6 +114,20 @@ describe('advanced defaults', () => {
 })
 
 describe('an override', () => {
+  // A choice (#1292: the OSC 52 policy): one of its values, as advanced.json and the tools write them.
+  it('takes one of a choice\'s values, any case, shown by its name; anything else refused, listing them', async () => {
+    const { advancedShown, advancedText } = await import('../src/shared/advanced')
+    const policy = def('hive.terminal.osc52')
+    expect(policy).toMatchObject({ kind: 'choice', default: 'allow', applies: 'now' })
+    expect(policy.choices!.map((c) => c.value)).toEqual(['allow', 'ask', 'block'])
+    expect(checkAdvanced(policy, 'ask')).toEqual({ value: 'ask' })
+    expect(checkAdvanced(policy, ' Block ')).toEqual({ value: 'block' })
+    expect(checkAdvanced(policy, 'maybe')).toMatchObject({ error: 'A CLI putting text on the clipboard takes one of allow, ask, block.' })
+    expect(checkAdvanced(policy, true)).toMatchObject({ error: expect.any(String) })
+    expect(advancedText(policy, 'ask')).toBe('ask')
+    expect(advancedShown(policy, 'ask')).toBe('Ask each time')
+  })
+
   it('takes a pattern that compiles and finds something, text, a field name, names, a whole number in range', () => {
     const trust = def('claude-code.trust.prompt')
     expect(checkAdvanced(trust, 'trust (this|the) folder')).toEqual({ value: 'trust (this|the) folder' })

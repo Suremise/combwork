@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Terminal } from '@xterm/headless'
-import { osc52, OSC52_MAX_BYTES } from '../src/shared/osc52'
+import { osc52, osc52Decision, OSC52_MAX_BYTES } from '../src/shared/osc52'
 
 // What GitHub Copilot CLI 1.0.95 printed when Ctrl+C copied its own mouse selection ("SELECTME alpha beta gamma delta"),
 // offline against the stand-in model (#736): a BEL-terminated OSC 52 write between its redraw and "copied to clipboard".
@@ -52,5 +52,23 @@ describe('osc52', () => {
   it('changes nothing for an empty or malformed payload', () => {
     for (const data of ['c;', 'c', '', 'c;not base64!', 'c;QQ===', 'c;A'])
       expect(osc52(data, true), JSON.stringify(data)).toEqual({ kind: 'refused', reason: 'invalid' })
+  })
+})
+
+// The policy (#1292, #966 row 27, Darren's choice: Allow as before, Ask each time, Block; reads never allowed).
+describe('osc52Decision (#1292)', () => {
+  const write = osc52(`c;${b64('copied')}`, true)
+  it('Allow (the default) writes, Ask asks first with the text, Block refuses', () => {
+    expect(osc52Decision(write, 'allow')).toEqual({ write: 'copied' })
+    expect(osc52Decision(write, undefined)).toEqual({ write: 'copied' })
+    expect(osc52Decision(write, 'ask')).toEqual({ ask: 'copied' })
+    expect(osc52Decision(write, 'block')).toEqual({ refuse: 'blocked' })
+  })
+  it('a read, a write from a terminal not in use, or a bad one is refused whatever the policy', () => {
+    for (const policy of ['allow', 'ask', 'block']) {
+      expect(osc52Decision(osc52('c;?', true), policy)).toEqual({ refuse: 'read' })
+      expect(osc52Decision(osc52(`c;${b64('x')}`, false), policy)).toEqual({ refuse: 'not-in-use' })
+      expect(osc52Decision(osc52('c;not base64!', true), policy)).toEqual({ refuse: 'invalid' })
+    }
   })
 })

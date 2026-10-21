@@ -189,6 +189,29 @@ const check = (name, ok, extra = '') => {
     await writeB64('after a click')
     check('…and taken after a click in the pane', JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
 
+    // 4c. The policy (#1292, Settings → Advanced: A CLI putting text on the clipboard). Block: a write from the pane in
+    // use is refused too. Ask each time: the question shows the text; Don't Copy leaves the clipboard, Copy fills it.
+    const POLICY = 'hive.terminal.osc52'
+    const question = page.locator('.dialog', { hasText: 'Copy to the clipboard?' })
+    await inv('advanced:set', POLICY, 'block')
+    await clickBelow()
+    await writeB64('blocked write')
+    check('Block: a write from the pane in use is refused', !!(await lib.until(() => logged(/OSC 52 clipboard write refused \(blocked\)/), HUNG_MS, 100)) && JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await inv('advanced:set', POLICY, 'ask')
+    await clickBelow()
+    await writeB64('asked write')
+    check('Ask each time: the question shows the text', !!(await lib.until(async () => (await question.count()) === 1 && (await question.innerText()).includes('asked write'), HUNG_MS, 100)), await question.innerText().catch(() => 'no question'))
+    await page.screenshot({ path: path.join(lib.WORK, 'copilotcopy-ask.png') })
+    check('…and nothing is copied while it waits', JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await question.getByRole('button', { name: "Don't Copy" }).click()
+    check("Don't Copy leaves the clipboard as it was", !!(await lib.until(async () => (await question.count()) === 0, HUNG_MS, 100)) && JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await clickBelow()
+    await writeB64('copied when asked')
+    check('…asked again for the next write', !!(await lib.until(async () => (await question.count()) === 1, HUNG_MS, 100)))
+    await question.getByRole('button', { name: 'Copy', exact: true }).click()
+    check('Copy puts the text on the clipboard', !!(await lib.until(async () => JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click', 'copied when asked']), HUNG_MS, 100)), JSON.stringify(await copied()))
+    await inv('advanced:set', POLICY, 'allow')
+
     // 5. Shift+drag: Hive's own selection, whatever Copilot does with the mouse; Ctrl+C copies it and Copilot never
     // sees the key (no new "copied to clipboard", no interrupt).
     const before = (await screen()).split('copied to clipboard').length

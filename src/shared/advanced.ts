@@ -96,8 +96,14 @@ export const englishText = (t: TextPart): string => formatText(t, IN_ENGLISH)
 /** Text in the language Hive shows now (call it when the text is rendered, never when a module loads). */
 export const shownText = (t: TextPart): string => formatText(t, AS_SHOWN)
 
-/** What a value is: a regular expression's source (its flags are fixed), a piece of text, a field name, a list of names, a whole number, on or off. */
-export type AdvancedKind = 'pattern' | 'text' | 'field' | 'list' | 'number' | 'boolean'
+/** What a value is: a regular expression's source (its flags are fixed), a piece of text, a field name, a list of names, a whole number, on or off, one of a few choices. */
+export type AdvancedKind = 'pattern' | 'text' | 'field' | 'list' | 'number' | 'boolean' | 'choice'
+
+/** One of a `choice` value's choices: as advanced.json and the tools write it, and its name as Settings shows it. */
+export interface AdvancedChoice {
+  value: string
+  label: Text
+}
 
 /** Where a value is listed: Hive's own, or one CLI's. */
 export type AdvancedGroup = 'hive' | ProviderId
@@ -138,6 +144,8 @@ export interface AdvancedDef {
   default: string | number | string[] | boolean
   /** A pattern's flags: part of the default, not of the value. */
   flags?: string
+  /** A `choice` value's choices, in the order Settings lists them. */
+  choices?: readonly AdvancedChoice[]
   min?: number
   max?: number
   /** A number's unit, for the list. */
@@ -170,6 +178,18 @@ export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
 
 /** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
 export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
+
+/**
+ * Every key in an agent's pane goes to its CLI, but the command palette's shortcut, so every command stays reachable
+ * (#1292, #966 row 26): read by TerminalView, through isAppShortcut.
+ */
+export const ALL_KEYS_TO_CLI = 'hive.terminal.allKeysToCli'
+
+/** What Hive does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
+export const OSC52_POLICY = 'hive.terminal.osc52'
+
+/** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
+export const RAW_CARD_START = 'hive.prompt.rawCardStart'
 
 /** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
@@ -504,6 +524,51 @@ const SOURCES: readonly AdvancedSource[] = [
     }),
     kind: 'boolean',
     default: true,
+    applies: 'now'
+  },
+  // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Hive did by default.
+  {
+    id: ALL_KEYS_TO_CLI,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.terminal.allKeysToCli.title', defaultMessage: 'All keys go to the CLI', description: "An advanced setting's title (Settings → Advanced), listed under Hive: every key pressed in an agent's pane goes to its CLI." }),
+    desc: msg({
+      id: 'settings.advanced.hive.terminal.allKeysToCli.desc',
+      defaultMessage: "In an agent's pane, Hive's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Hive's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",
+      description: 'What the advanced setting "All keys go to the CLI" does (Settings → Advanced, under Hive). Show All Commands is a command\'s name and Settings → Keyboard Shortcuts a place in Hive: use them as Hive shows them. Ctrl+C and Ctrl+V name keys.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: OSC52_POLICY,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.terminal.osc52.title', defaultMessage: 'A CLI putting text on the clipboard', description: "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)." }),
+    desc: msg({
+      id: 'settings.advanced.hive.terminal.osc52.desc',
+      defaultMessage: "An agent's CLI can put text on the clipboard (OSC 52) just after you press a key or click in its pane, as Copilot does when you copy its own selection. Allow takes it at once; Ask each time shows you the text first, to copy or not; Block takes none. A CLI can never read the clipboard, whatever this says.",
+      description: 'What the advanced setting "A CLI putting text on the clipboard" does (Settings → Advanced, under Hive). OSC 52 is the name of a terminal feature: keep it. Allow, Ask each time and Block are the setting\'s choices: use the words its list shows.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'allow', label: msg({ id: 'settings.advanced.hive.terminal.osc52.allow', defaultMessage: 'Allow', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": take the text at once.' }) },
+      { value: 'ask', label: msg({ id: 'settings.advanced.hive.terminal.osc52.ask', defaultMessage: 'Ask each time', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": show the user the text and ask first.' }) },
+      { value: 'block', label: msg({ id: 'settings.advanced.hive.terminal.osc52.block', defaultMessage: 'Block', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": take none.' }) }
+    ],
+    default: 'allow',
+    applies: 'now'
+  },
+  {
+    id: RAW_CARD_START,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.prompt.rawCardStart.title', defaultMessage: "A card's start in its own words", description: "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive types into an agent when a card is started on it." }),
+    desc: msg({
+      id: 'settings.advanced.hive.prompt.rawCardStart.desc',
+      defaultMessage: "When a card is started on an agent, Hive gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Hive's other prompts (its wakes and messages) stay as they are: they are how Hive and its agents talk.",
+      description: 'What the advanced setting "A card\'s start in its own words" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'boolean',
+    default: false,
     applies: 'now'
   },
   // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
@@ -1417,6 +1482,7 @@ const NOT_TAKEN = {
   text: msg({ id: 'settings.advanced.error.text', defaultMessage: '{title} takes text.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
   field: msg({ id: 'settings.advanced.error.field', defaultMessage: '{title} takes a field name: letters, digits and _ (not starting with a digit).', description: "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title." }),
   list: msg({ id: 'settings.advanced.error.list', defaultMessage: '{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
+  choice: msg({ id: 'settings.advanced.error.choice', defaultMessage: '{title} takes one of {choices}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them." }),
   boolean: msg({ id: 'settings.advanced.error.boolean', defaultMessage: '{title} takes true or false.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them." }),
   number: msg({ id: 'settings.advanced.error.number', defaultMessage: '{title} takes a whole number from {min} to {max}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {min} and {max} are numbers." })
 }
@@ -1460,6 +1526,12 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
       if (raw === 'true' || raw === 'on') return { value: true }
       if (raw === 'false' || raw === 'off') return { value: false }
       return refused(withValues(NOT_TAKEN.boolean, { title }))
+    }
+    case 'choice': {
+      const v = typeof raw === 'string' ? raw.trim().toLowerCase() : null
+      const found = def.choices?.find((c) => c.value === v)
+      if (!found) return refused(withValues(NOT_TAKEN.choice, { title, choices: (def.choices ?? []).map((c) => c.value).join(', ') }))
+      return { value: found.value }
     }
     case 'number': {
       const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim()) : NaN
@@ -1632,6 +1704,8 @@ export function advancedShown(def: AdvancedDef, v: unknown): string {
       ? tr(msg({ id: 'settings.advanced.on', defaultMessage: 'on', description: "An advanced setting's value when it is on (Settings → Advanced)." }))
       : tr(msg({ id: 'settings.advanced.off', defaultMessage: 'off', description: "An advanced setting's value when it is off (Settings → Advanced)." }))
   if (def.kind === 'number' && typeof v === 'number' && def.unit && UNITS[def.unit]) return tr(UNITS[def.unit], { n: v })
+  const choice = def.kind === 'choice' ? def.choices?.find((c) => c.value === v) : undefined
+  if (choice) return shownText(choice.label)
   return advancedText(def, v)
 }
 
@@ -1695,5 +1769,7 @@ export function advancedTakesText(d: AdvancedDef): Text {
       return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Hive looks for on a CLI's screen, as it is." })
     case 'boolean':
       return msg({ id: 'settings.advanced.takes.boolean', defaultMessage: 'On or off (true or false).', description: 'What an advanced setting takes (Settings → Advanced). true and false are the values as written in advanced.json: keep them.' })
+    case 'choice':
+      return withValues(msg({ id: 'settings.advanced.takes.choice', defaultMessage: 'One of {choices}.', description: 'What an advanced setting takes (Settings → Advanced): one of a few values. {choices} lists them as advanced.json writes them (allow, ask, block): keep them.' }), { choices: (d.choices ?? []).map((c) => c.value).join(', ') })
   }
 }

@@ -11,11 +11,11 @@ import { deferredFocus } from '../deferredFocus'
 import { isAppShortcut } from '../commands'
 import { cardLinkProvider } from '../cardLinks'
 import { fileLinkProvider } from '../fileLinks'
-import { useStore } from '../store'
+import { confirm, useStore } from '../store'
 import { offerTip } from '../tips'
 import type { ProviderId } from '@shared/types'
-import { CTRL_CV_TO_CLI } from '@shared/advanced'
-import { osc52, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
+import { ALL_KEYS_TO_CLI, CTRL_CV_TO_CLI, OSC52_POLICY } from '@shared/advanced'
+import { osc52, osc52Decision, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
 import { copyPasteKey } from '@shared/terminalInput'
 import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
@@ -222,6 +222,25 @@ const USER_SCROLL_MS = 500
 /** A terminal logs each kind of refused OSC 52 request at most this often: a program may repeat one. */
 const OSC52_LOG_MS = 60_000
 
+/** The most of a clipboard write the question shows (#1292): the rest is counted, not shown. */
+const OSC52_PREVIEW = 500
+
+/**
+ * Asks the user whether a CLI's clipboard write goes on the clipboard (#1292, Settings → Advanced: Ask each time),
+ * showing what it would put there.
+ */
+function askClipboardWrite(text: string): Promise<boolean> {
+  const shown = text.length > OSC52_PREVIEW ? `${text.slice(0, OSC52_PREVIEW)}…` : text
+  return confirm({
+    title: tr(msg({ id: 'panes.terminal.osc52.askTitle', defaultMessage: 'Copy to the clipboard?', description: "Title of the question when an agent's CLI asks to put text on the clipboard (OSC 52) and Settings → Advanced says to ask first." })),
+    message: tr(msg({ id: 'panes.terminal.osc52.askMessage', defaultMessage: "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:", description: "The question when an agent's CLI asks to put text on the clipboard; the text follows it. {n} is how many characters." }), { n: text.length }),
+    detail: shown,
+    scrollDetail: true,
+    confirmLabel: tr(msg({ id: 'panes.terminal.osc52.askCopy', defaultMessage: 'Copy', description: "Button of the question when an agent's CLI asks to put text on the clipboard: puts it there." })),
+    cancelLabel: tr(msg({ id: 'panes.terminal.osc52.askDont', defaultMessage: "Don't Copy", description: "Button of the question when an agent's CLI asks to put text on the clipboard: leaves the clipboard as it is." }))
+  })
+}
+
 /**
  * Fits a terminal to its pane and tells its process the size: the only place that does (#247). Never while the
  * terminal is hidden (its own class, or an ancestor's display: none, as when Settings is open) or measures smaller than
@@ -361,6 +380,13 @@ export function TerminalView({
   const ctrlCVToCli = useAdvancedValue<boolean>(CTRL_CV_TO_CLI) && !!provider
   const ctrlCVToCliRef = useRef(ctrlCVToCli)
   ctrlCVToCliRef.current = ctrlCVToCli
+  // Every key to an agent's CLI but the palette's, and what its clipboard writes get (#1292, Settings → Advanced).
+  const allKeysToCli = useAdvancedValue<boolean>(ALL_KEYS_TO_CLI) && !!provider
+  const allKeysToCliRef = useRef(allKeysToCli)
+  allKeysToCliRef.current = allKeysToCli
+  const osc52Policy = useAdvancedValue<string>(OSC52_POLICY)
+  const osc52PolicyRef = useRef(osc52Policy)
+  osc52PolicyRef.current = osc52Policy
   // The key handler is set once per terminal; these keep it pointed at the current agent.
   const pathRef = useRef(projectPath)
   pathRef.current = projectPath
@@ -436,7 +462,7 @@ export function TerminalView({
         e.preventDefault()
         return false
       }
-      return !isAppShortcut(e, providerRef.current)
+      return !isAppShortcut(e, providerRef.current, allKeysToCliRef.current)
     })
     // Removed with the terminal: the host element can outlive it (a new ptyKey in the same view).
     const listeners = new AbortController()
@@ -488,11 +514,23 @@ export function TerminalView({
       refusalLogged.set(reason, Date.now())
       void call('pty:clipboardRefused', ptyKey, reason).catch(() => undefined)
     }
+    // Ask each time (#1292): one question at a time, a write meanwhile refused, never queued behind it.
+    let asking = false
     const disposeOsc52 = term.parser.registerOscHandler(52, (data) => {
       const inUse = Date.now() - inputAt < OSC52_INPUT_MS && document.hasFocus() && !!host.current?.contains(document.activeElement)
-      const r = osc52(data, inUse)
-      if (r.kind === 'write') void navigator.clipboard.writeText(r.text).catch(() => undefined)
-      else refuse(r.reason)
+      const d = osc52Decision(osc52(data, inUse), osc52PolicyRef.current)
+      if ('write' in d) void navigator.clipboard.writeText(d.write).catch(() => undefined)
+      else if ('refuse' in d) refuse(d.refuse)
+      else if (asking) refuse('declined')
+      else {
+        asking = true
+        void askClipboardWrite(d.ask)
+          .then((ok) => (ok ? navigator.clipboard.writeText(d.ask) : refuse('declined')))
+          .catch(() => undefined)
+          .finally(() => {
+            asking = false
+          })
+      }
       return true
     })
 

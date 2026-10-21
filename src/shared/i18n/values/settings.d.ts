@@ -138,6 +138,7 @@ interface HiveMessageValues {
   'settings.advanced.data.title': undefined
   'settings.advanced.error.badPattern': { title: string | number; why: string | number }
   'settings.advanced.error.boolean': { title: string | number }
+  'settings.advanced.error.choice': { title: string | number; choices: string | number }
   'settings.advanced.error.field': { title: string | number }
   'settings.advanced.error.list': { title: string | number }
   'settings.advanced.error.matchesAll': { title: string | number }
@@ -169,6 +170,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.prompt.asTyped.title': undefined
   'settings.advanced.hive.prompt.clearDraft.desc': undefined
   'settings.advanced.hive.prompt.clearDraft.title': undefined
+  'settings.advanced.hive.prompt.rawCardStart.desc': undefined
+  'settings.advanced.hive.prompt.rawCardStart.title': undefined
   'settings.advanced.hive.recorder.afterSeconds.desc': undefined
   'settings.advanced.hive.recorder.afterSeconds.title': undefined
   'settings.advanced.hive.recorder.keep.desc': undefined
@@ -187,8 +190,15 @@ interface HiveMessageValues {
   'settings.advanced.hive.recorder.version.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
+  'settings.advanced.hive.terminal.allKeysToCli.desc': undefined
+  'settings.advanced.hive.terminal.allKeysToCli.title': undefined
   'settings.advanced.hive.terminal.ctrlCVToCli.desc': undefined
   'settings.advanced.hive.terminal.ctrlCVToCli.title': undefined
+  'settings.advanced.hive.terminal.osc52.allow': undefined
+  'settings.advanced.hive.terminal.osc52.ask': undefined
+  'settings.advanced.hive.terminal.osc52.block': undefined
+  'settings.advanced.hive.terminal.osc52.desc': undefined
+  'settings.advanced.hive.terminal.osc52.title': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.desc': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined
@@ -209,6 +219,7 @@ interface HiveMessageValues {
   'settings.advanced.reset.title': undefined
   'settings.advanced.showDeveloperFeatures.tip': undefined
   'settings.advanced.takes.boolean': undefined
+  'settings.advanced.takes.choice': { choices: string | number }
   'settings.advanced.takes.field': undefined
   'settings.advanced.takes.list': undefined
   'settings.advanced.takes.number': { unit: string; min: string | number; max: string | number }

@@ -11,6 +11,8 @@
   "tips.agentSettings.title": "Model dla każdego agenta",
   "tips.agentStates.text": "Każdy agent ma jeden z czterech stanów, rozróżnianych kształtem, nie tylko kolorem: romb czeka na Ciebie, kwadrat oznacza zastój, pulsująca kropka pracuje, a pierścień jest bez zajęcia. Nagłówek projektu je liczy: „czeka: 1 · pracuje: 2”.",
   "tips.agentStates.title": "Agenci w jednym spojrzeniu",
+  "tips.allKeysToCli.text": "W panelu agenta skróty Hive przejmują swoje klawisze. Włącz Ustawienia → Zaawansowane → Wszystkie klawisze trafiają do CLI, by wysyłać każdy klawisz do CLI, poza klawiszem palety poleceń (Pokaż wszystkie polecenia), by każde polecenie było w zasięgu.",
+  "tips.allKeysToCli.title": "Daj każdy klawisz CLI agenta",
   "tips.alwaysOnTop.text": "Pinezka na pasku tytułu (lub Ctrl+Alt+O) trzyma okno nad innymi aplikacjami, a pod nim mogą działać testy albo emulator. Każde okno ma własne ustawienie, zapamiętane dla jego obszaru roboczego.",
   "tips.alwaysOnTop.title": "Okno Hive zawsze na wierzchu",
   "tips.antivirus.text": "W Windows Microsoft Defender skanuje każdy plik, którego dotykają kompilacje, testy i git. Ustawienia → Obszar roboczy → Skanowanie antywirusowe pokazuje, czy skanuje Twój obszar roboczy, i za Twoją zgodą może wykluczyć jego foldery.",
