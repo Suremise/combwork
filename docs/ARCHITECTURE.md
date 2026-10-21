@@ -261,6 +261,16 @@ moved head and sameness, containment, reconcile, a check's bracket, check copies
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Hive merges needs Git).
 
+**The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
+target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
+with open entries) start it; it takes the target's lease (`QueueRunner.acquire`, with agents' process supervisor), runs
+`MergeQueue.recover(target)` once, then `drain(target)` with the runner's folder, its recording git and spawn, #1349's
+checks (`queueChecksApp.ts`, on `spawnNow`), the advance under #1347's `withRepoLock` (the lease checked again inside
+it) and `workflowEnforced` (off: entries pause `rulesOff` before the advance); a target checked out in a folder pauses
+`checkedOut` until #1351. It releases the runner when the queue is empty or paused; a workspace closing releases its
+runners first, so a check the close ends writes nothing. The action worker's runs and the hosts' run outside any write
+fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is a no-op until P7.
+
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
 holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease

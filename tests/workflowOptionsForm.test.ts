@@ -90,7 +90,6 @@ describe('checking options for a save (#1278)', () => {
       { kind: 'contradiction', id: 'committedNeedsFolder' }
     ])
     expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', strict: true } }).problems).toEqual([
-      { kind: 'notOffered', id: 'hiveMerges' },
       { kind: 'notOffered', id: 'later' }
     ])
     // The workspace's defaults aren't the project's to answer for.

@@ -159,6 +159,17 @@ describe('recording facts from the board’s moves (#1216)', () => {
     await inWorkspace(w, () => tasks.updateTask(card, { title: 'Renamed' }, user))
     expect(kinds(w, card)).toEqual([])
   })
+
+  it("#1348: a card in Merging (its column Passed) that a change leaves in Passed isn't moved back to Approved", async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Queued', project: 'p' }, user))).number
+    // As the queue leaves it: the stage Merging, its column Passed (STAGE_CATEGORY).
+    await inWorkspace(w, () => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare("UPDATE cards SET stage = 'merging', col = 'passed' WHERE number = ?").run(card))))
+    await inWorkspace(w, () => tasks.commentTask(card, 'Waiting for the queue', user))
+    await inWorkspace(w, () => tasks.updateTask(card, { title: 'Queued (renamed)' }, user))
+    expect(kinds(w, card)).not.toContain('Moved')
+    expect(store.boardRead(w, (db) => (db.prepare('SELECT stage FROM cards WHERE number = ?').get(card) as { stage: string }).stage)).toBe('merging')
+  })
 })
 
 // HR4's #1216 round 1: the work cycle kept through a review's fixes, no partial facts, decisions' generations, receipts

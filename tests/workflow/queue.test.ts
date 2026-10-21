@@ -131,8 +131,9 @@ describe('the merge queue', () => {
     expect(s.generation).toBe(0)
   })
 
-  it('S27: the target moves between the test and the advance → tested again, never an untested advance (checked out nowhere, and in the project folder)', async () => {
-    for (const checkedOut of [false, true]) {
+  // One case each (#1380: both in one test took 16.7 s alone, 138 gits, and timed out at 20 s under a loaded full run).
+  for (const checkedOut of [false, true]) {
+    it(`S27: the target moves between the test and the advance → tested again, never an untested advance (${checkedOut ? 'in the project folder' : 'checked out nowhere'})`, async () => {
       const e = team()
       if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')
       const { card } = await queued(e)
@@ -153,12 +154,11 @@ describe('the merge queue', () => {
       expect(sh(e.project, 'log', '-1', '--format=%s', 'main^1')).toBe('race')
       expect(e.wf.state(card).stage).toBe('done')
       if (checkedOut) expect(readFileSync(join(e.project, 'src/c.txt'), 'utf8')).toBe('c\n')
-      e.close()
-      env = null
-    }
-  })
+    })
+  }
 
-  it('S32: a transient merge check failure requeues unchanged at most twice; a red check needs a new revision or the user\'s Retry merge', async () => {
+  // The transient and the red check each in their own case (#1380, as S27).
+  it('S32: a transient merge check failure requeues unchanged at most twice', async () => {
     const e = team()
     const { card } = await queued(e)
     const transient = e.queue({ runCheck: async () => ({ ok: false, transient: true, output: 'npm ERR! network' }) })
@@ -172,8 +172,10 @@ describe('the merge queue', () => {
     }
     const limit = refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'requeue.allowed')
     expect(limit.message).toContain('sent back unchanged 2 times already')
+  })
+
+  it("S32: a red check needs a new revision or the user's Retry merge", async () => {
     // A red check is a result: refused; the user's Retry merge (an override) requeues it once.
-    e.close()
     const r2 = team()
     const c2 = await queued(r2)
     expect((await r2.queue({ runCheck: async () => ({ ok: false, output: 'red' }) }).drain('main'))[0]).toMatchObject({ outcome: 'returned', transient: false })
