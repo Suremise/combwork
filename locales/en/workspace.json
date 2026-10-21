@@ -1383,10 +1383,6 @@
     "defaultMessage": "{count, plural, one {# can't be read} other {# can't be read}}",
     "description": "Repair's plan, after the Will do column's copy: files that couldn't be read (Repair tries them again; the list in its tooltip)."
   },
-  "workspace.repair.untilDone": {
-    "defaultMessage": "{n, plural, one {kept until {cards} is Done} other {kept until {cards} are Done}}",
-    "description": "Repair's plan, the Will do column: an agent's branch isn't renamed yet, because an unfinished card works on it ({cards}: the cards, #12; {n}: how many); the Repair after renames it."
-  },
   "workspace.repair.was": {
     "defaultMessage": "Was",
     "description": "Repair's plan, a column heading: where it was before the move (a folder or a branch)."

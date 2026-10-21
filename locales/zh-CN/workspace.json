@@ -345,7 +345,6 @@
   "workspace.repair.unlink": "删除工作树链接",
   "workspace.repair.unlinkShort": "删除链接",
   "workspace.repair.unreadableFiles": "{count, plural, other {# 个无法读取}}",
-  "workspace.repair.untilDone": "{n, plural, other {保留到 {cards} 完成}}",
   "workspace.repair.was": "原来",
   "workspace.repair.what": "项目",
   "workspace.repair.willDo": "将",

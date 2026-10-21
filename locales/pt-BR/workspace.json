@@ -345,7 +345,6 @@
   "workspace.repair.unlink": "remover o vínculo do worktree",
   "workspace.repair.unlinkShort": "Remover vínculo",
   "workspace.repair.unreadableFiles": "{count, plural, one {# não pode ser lido} other {# não podem ser lidos}}",
-  "workspace.repair.untilDone": "{n, plural, one {mantido até {cards} estar em Concluído} other {mantido até {cards} estarem em Concluído}}",
   "workspace.repair.was": "Antes",
   "workspace.repair.what": "O quê",
   "workspace.repair.willDo": "Vai",

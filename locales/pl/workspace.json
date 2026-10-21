@@ -345,7 +345,6 @@
   "workspace.repair.unlink": "usuń powiązanie z worktree",
   "workspace.repair.unlinkShort": "Usuń powiązanie",
   "workspace.repair.unreadableFiles": "{count, plural, one {# nieczytelny} few {# nieczytelne} many {# nieczytelnych} other {# nieczytelnego}}",
-  "workspace.repair.untilDone": "{n, plural, one {bez zmian, dopóki {cards} nie będzie gotowa} few {bez zmian, dopóki {cards} nie będą gotowe} many {bez zmian, dopóki {cards} nie będą gotowe} other {bez zmian, dopóki {cards} nie będą gotowe}}",
   "workspace.repair.was": "Było",
   "workspace.repair.what": "Co",
   "workspace.repair.willDo": "Zrobi",

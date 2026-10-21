@@ -345,7 +345,6 @@
   "workspace.repair.unlink": "ワークツリーへのリンクを削除",
   "workspace.repair.unlinkShort": "リンクを削除",
   "workspace.repair.unreadableFiles": "{count, plural, other {#件は読み取れません}}",
-  "workspace.repair.untilDone": "{n, plural, other {{cards}が完了するまでそのまま}}",
   "workspace.repair.was": "以前",
   "workspace.repair.what": "対象",
   "workspace.repair.willDo": "処理",

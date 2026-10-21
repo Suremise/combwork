@@ -1,12 +1,14 @@
 // Repair renames agents' branches named after where the workspace was (#1305, Darren's decision on #1303: always, never
-// offered). Before: workspace Scratch with project juniper and three worktree agents on hive/Scratch/juniper/<agent>;
-// JB1 has a card started (its work's line is JB1's branch), JB2's branch tracks a remote, and a branch
-// hive/Tools/juniper/jb3 is already there. Hive is closed; the workspace and its worktrees folder move to Tools.
-// Repair's plan lists each branch in its table (Was → Now): JB2's "rename" with its remote's note, JB3's kept (its new
-// name is taken), JB1's kept until its card is Done (a rename under the card's work would read as its branch gone).
-// Repair renames JB2's in git (the worktree follows, its upstream kept) and in project.json, and says what it kept;
-// Repair again changes nothing. Then JB1's card is Done: on opening, the banner says a branch is still named after an
-// old folder, and Repair renames it. Dev build, throwaway profile and folders, the fake Claude Code; quiet.
+// offered, Hive's records with them). Before: workspace Scratch with project juniper and three worktree agents on
+// hive/Scratch/juniper/<agent>; JB1 has a card started (its work's line is JB1's branch), JB2's branch tracks a remote,
+// and a branch hive/Tools/juniper/jb3 is already there. Hive is closed; the workspace and its worktrees folder move to
+// Tools. Repair's plan lists each branch in its table (Was → Now): "rename", the remote's note, JB3's kept (its new name
+// is taken). Repair renames JB1's and JB2's in git (the worktrees follow, JB2's upstream kept), in project.json, and on
+// JB1's card (LineRenamed), whose reconciliation then follows the new name (a commit on it seen, never Gone: line).
+// Repair again changes nothing. Last, with nothing moved: JB1's branch named after another place (not renamed yet) and
+// JB2's rename cut short after git's step (its pending record and the agent's old name left). With project.json
+// unwritable, Repair fails JB1's before git is touched and says JB2's isn't recorded yet; writable again, it finishes
+// both. Dev build, throwaway profile and folders, the fake Claude Code; quiet.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -27,7 +29,8 @@ const check = (name, ok, extra = '') => {
 }
 const git = (cwd, args) => execFileSync('git', args, { cwd, env: baseEnv(), encoding: 'utf8' }).trim()
 const branches = (cwd) => git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split(/\r?\n/)
-const agentsOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8')).agents
+const configOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
+const agentsOf = (project) => configOf(project).agents
 
 ;(async () => {
   for (const d of [userData, root, home]) fs.rmSync(d, { recursive: true, force: true })
@@ -40,8 +43,8 @@ const agentsOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hi
     try {
       await lib.openWorkspace(inv, page, scratch)
       const added = []
-      for (const name of ['JB1', 'JB2', 'JB3']) added.push(await inv('agents:add', juniper, { location: 'new-worktree', name }))
-      check('the agents work on branches named after Scratch', JSON.stringify(agentsOf(juniper).map((a) => a.worktree.branch)) === JSON.stringify(['hive/Scratch/juniper/jb1', 'hive/Scratch/juniper/jb2', 'hive/Scratch/juniper/jb3']), JSON.stringify(agentsOf(juniper).map((a) => a.worktree?.branch)))
+      for (const name of ['JB1', 'JB2', 'JB3', 'JB4']) added.push(await inv('agents:add', juniper, { location: 'new-worktree', name }))
+      check('the agents work on branches named after Scratch', JSON.stringify(agentsOf(juniper).map((a) => a.worktree.branch)) === JSON.stringify(['hive/Scratch/juniper/jb1', 'hive/Scratch/juniper/jb2', 'hive/Scratch/juniper/jb3', 'hive/Scratch/juniper/jb4']), JSON.stringify(agentsOf(juniper).map((a) => a.worktree?.branch)))
       // JB1's card, started from the window: its work is on JB1's branch. Its session is stopped (Repair waits for that).
       card = (await inv('tasks:create', { title: 'Work on JB1’s branch', project: 'juniper' })).number
       await inv('tasks:start', card, { kind: 'agent', agentId: added[0].id })
@@ -49,7 +52,7 @@ const agentsOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hi
       await lib.until(async () => (await inv('session:live')).some((s) => s.agentId === added[0].id), HUNG_MS)
       await inv('session:stop', juniper, added[0].id)
       await lib.until(async () => !(await inv('session:live')).length, HUNG_MS)
-      await lib.until(() => JSON.parse(fs.readFileSync(path.join(juniper, '.hive', 'project.json'), 'utf8')).lastPath, HUNG_MS)
+      await lib.until(() => configOf(juniper).lastPath, HUNG_MS)
     } finally {
       await app.close()
     }
@@ -62,6 +65,9 @@ const agentsOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hi
   fs.renameSync(scratch, tools)
   fs.renameSync(`${scratch}.worktrees`, `${tools}.worktrees`)
   const proj = path.join(tools, 'juniper')
+  // JB4's worktree is gone after the move (its branch kept): Recreate makes it again, on its branch renamed in the same Repair.
+  fs.rmSync(path.join(`${tools}.worktrees`, 'juniper', 'jb4'), { recursive: true, force: true })
+  const cfgFile = path.join(proj, '.hive', 'project.json')
   const wt = (agent) => agentsOf(proj).find((a) => a.name === agent).worktree
 
   {
@@ -71,50 +77,82 @@ const agentsOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hi
       const plan = await inv('workspace:movePlan')
       const planned = plan?.hosts.find((h) => h.name === 'juniper')?.branches ?? []
       const b = (agent) => planned.find((x) => x.agentName === agent)
-      check('the plan: JB2’s branch to hive/Tools/juniper/jb2, noting the remote it tracks', b('JB2')?.from === 'hive/Scratch/juniper/jb2' && b('JB2')?.to === 'hive/Tools/juniper/jb2' && b('JB2')?.remote === 'origin' && !b('JB2')?.kept, JSON.stringify(planned))
+      check('the plan: JB1’s branch to hive/Tools/juniper/jb1, its card’s work on it too', b('JB1')?.from === 'hive/Scratch/juniper/jb1' && b('JB1')?.to === 'hive/Tools/juniper/jb1' && !b('JB1')?.kept, JSON.stringify(planned))
+      check('…JB2’s, noting the remote it tracks', b('JB2')?.to === 'hive/Tools/juniper/jb2' && b('JB2')?.remote === 'origin' && !b('JB2')?.kept, JSON.stringify(b('JB2')))
       check('…JB3’s kept: its new name is taken', b('JB3')?.kept === 'exists', JSON.stringify(b('JB3')))
-      check('…JB1’s kept until its card is Done', b('JB1')?.kept === 'card' && JSON.stringify(b('JB1')?.cards) === JSON.stringify([card]), JSON.stringify(b('JB1')))
-      check('…one to rename, for the banner', plan?.branches === 1, String(plan?.branches))
+      check('…two to rename, for the banner', plan?.branches === 2, String(plan?.branches))
 
       const banner = page.locator('.moved-banner')
       await lib.until(async () => (await banner.count()) === 1, HUNG_MS)
       await banner.locator('button.primary').click()
       const dialog = page.locator('.dialog', { has: page.locator('.move-repair') })
       const text = async () => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
-      check('the dialog lists each branch: was, now, rename with the remote’s note', !!(await lib.until(async () => /JB2's branch: was hive\/Scratch\/juniper\/jb2, now hive\/Tools\/juniper\/jb2; will rename; origin keeps the old name/.test(await text()), HUNG_MS)), await text())
+      check('the dialog lists each branch: was, now, rename', !!(await lib.until(async () => /JB1's branch: was hive\/Scratch\/juniper\/jb1, now hive\/Tools\/juniper\/jb1; will rename/.test(await text()), HUNG_MS)), await text())
+      check('…JB2’s with its remote’s note', /JB2's branch: [^;]*; will rename; origin keeps the old name/.test(await text()), await text())
       check('…JB3’s kept, in the warning colour', /JB3's branch: [^;]*; will kept: the new name is taken/.test(await text()) && (await dialog.locator('.repair-plan tr', { hasText: "JB3's branch" }).locator('.warn-text').count()) > 0, await text())
-      check('…JB1’s kept until its card is Done, naming the card', new RegExp(`JB1's branch: [^;]*; will kept until \\S*${card}\\b[^;]* is Done`).test(await text()), await text())
+      // JB4's worktree recreated: its branch is renamed in this Repair too, not the one after.
+      await dialog.locator('.repair-plan tr', { hasText: "JB4's worktree" }).getByRole('button', { name: 'Recreate worktree' }).click()
+      check('…JB4’s worktree recreated: its branch listed to rename now', !!(await lib.until(async () => /JB4's worktree: was [^;]*; will recreate on hive\/Scratch\/juniper\/jb4/.test(await text()) && /JB4's branch: was hive\/Scratch\/juniper\/jb4, now hive\/Tools\/juniper\/jb4; will rename/.test(await text()), HUNG_MS)), await text())
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-plan.png') })
 
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
-      check('Repair renames JB2’s, and says why JB1’s and JB3’s keep their names', !!(await lib.until(async () => /JB2's branch hive\/Scratch\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2; it still tracks origin's hive\/Scratch\/juniper\/jb2/.test(await text()) && /JB3's branch hive\/Scratch\/juniper\/jb3 keeps its name/.test(await text()) && new RegExp(`JB1's branch hive/Scratch/juniper/jb1 keeps its name until #${card} is Done`).test(await text()), HUNG_MS)), await text())
+      check('Repair renames JB1’s and JB2’s, and keeps JB3’s', !!(await lib.until(async () => /JB1's branch hive\/Scratch\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1\./.test(await text()) && /JB2's branch hive\/Scratch\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2; it still tracks origin's hive\/Scratch\/juniper\/jb2/.test(await text()) && /JB3's branch hive\/Scratch\/juniper\/jb3 keeps its name/.test(await text()), HUNG_MS)), await text())
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-report.png') })
       const now = branches(proj)
-      check('git has JB2’s new name, JB1’s and JB3’s as they were', now.includes('hive/Tools/juniper/jb2') && !now.includes('hive/Scratch/juniper/jb2') && now.includes('hive/Scratch/juniper/jb1') && now.includes('hive/Scratch/juniper/jb3'), JSON.stringify(now))
-      check('JB2’s worktree has it out', git(wt('JB2').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb2')
-      check('…its upstream kept, at the remote’s old name', git(proj, ['config', '--get', 'branch.hive/Tools/juniper/jb2.merge']) === 'refs/heads/hive/Scratch/juniper/jb2')
-      check('Hive’s record changed with it (project.json)', wt('JB2').branch === 'hive/Tools/juniper/jb2' && wt('JB1').branch === 'hive/Scratch/juniper/jb1' && wt('JB3').branch === 'hive/Scratch/juniper/jb3', JSON.stringify(agentsOf(proj).map((a) => a.worktree.branch)))
-      check("JB1's card still works on its branch", (await inv('tasks:work', card))?.line === 'hive/Scratch/juniper/jb1')
+      check('git has the new names', now.includes('hive/Tools/juniper/jb1') && now.includes('hive/Tools/juniper/jb2') && !now.includes('hive/Scratch/juniper/jb1') && !now.includes('hive/Scratch/juniper/jb2') && now.includes('hive/Scratch/juniper/jb3'), JSON.stringify(now))
+      check('JB4’s worktree is back on its renamed branch, its record with it', fs.existsSync(wt('JB4').path) && git(wt('JB4').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb4' && wt('JB4').branch === 'hive/Tools/juniper/jb4' && !branches(proj).includes('hive/Scratch/juniper/jb4'), JSON.stringify({ wt: wt('JB4'), git: branches(proj) }))
+      check('the worktrees have them out', git(wt('JB1').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb1' && git(wt('JB2').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb2')
+      check('…JB2’s upstream kept, at the remote’s old name', git(proj, ['config', '--get', 'branch.hive/Tools/juniper/jb2.merge']) === 'refs/heads/hive/Scratch/juniper/jb2')
+      check('Hive’s record changed with them, nothing left pending (project.json)', wt('JB1').branch === 'hive/Tools/juniper/jb1' && wt('JB2').branch === 'hive/Tools/juniper/jb2' && wt('JB3').branch === 'hive/Scratch/juniper/jb3' && !configOf(proj).pendingBranchRenames, JSON.stringify(configOf(proj).agents.map((a) => a.worktree.branch)))
+      check("JB1's card follows its line (LineRenamed)", (await inv('tasks:work', card))?.line === 'hive/Tools/juniper/jb1' && (await inv('tasks:facts', card)).some((f) => f.kind === 'LineRenamed' && f.data.to === 'hive/Tools/juniper/jb1'), JSON.stringify(await inv('tasks:work', card)))
+      // A commit on the renamed branch: reconciliation reads the card's line by its new name (its head moved), never gone.
+      fs.writeFileSync(path.join(wt('JB1').path, 'work.txt'), 'work\n')
+      git(wt('JB1').path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', 'work.txt'])
+      git(wt('JB1').path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'work'])
+      const head = git(wt('JB1').path, ['rev-parse', 'HEAD'])
+      check('…its reconciliation sees the commit on hive/Tools/juniper/jb1', !!(await lib.until(async () => (await inv('tasks:facts', card)).some((f) => f.kind === 'HeadMoved' && f.data.line === 'hive/Tools/juniper/jb1' && f.data.to === head), HUNG_MS)), JSON.stringify((await inv('tasks:facts', card)).map((f) => f.kind)))
+      // Its folder (the worktree, by its old path) is another matter: that the card follows the moved folder is #1343's.
+      check('…and never took its branch for gone', !(await inv('tasks:facts', card)).some((f) => f.kind === 'Gone' && f.data.what === 'line'), JSON.stringify((await inv('tasks:facts', card)).filter((f) => f.kind === 'Gone')))
       await dialog.locator('.btn.primary', { hasText: 'Close' }).click()
-      check('the banner goes: branches kept are nothing left to do', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
+      check('the banner goes: a branch kept for its taken name is nothing left to do', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
       const again = await inv('workspace:moveRepair')
       check('Repair again renames nothing', !again.done.some((l) => /branch/.test(l)) && again.failed.length === 0, JSON.stringify(again))
-      // JB1's card is done (moved there past its rules, with a reason, as a person may).
-      const moved = await inv('tasks:move', card, 'done', { confirm: true, reason: 'merged by hand (test)' })
-      check("JB1's card is Done", !!(await lib.until(async () => (await inv('tasks:list')).find((c) => c.number === card)?.column === 'done', HUNG_MS)), JSON.stringify(moved))
     } finally {
       await app.close()
     }
   }
-  // Opened again, nothing moved: the banner says a branch is still named after an old folder, and Repair renames it.
+  // Nothing moved now. JB2's rename cut short after git's step (project.json not written then): git has
+  // hive/Tools/juniper/jb2, the agent's record and the pending rename still name hive/Elsewhere/juniper/jb2.
+  const cfg = configOf(proj)
+  const jb2 = cfg.agents.find((a) => a.name === 'JB2')
+  // JB1's branch named after another place too (renamed outside Hive, say), its record with it: a rename not begun.
+  git(proj, ['branch', '-m', 'hive/Tools/juniper/jb1', 'hive/Elsewhere/juniper/jb1'])
+  cfg.agents = cfg.agents.map((a) => (a.id === jb2.id ? { ...a, worktree: { ...a.worktree, branch: 'hive/Elsewhere/juniper/jb2' } } : a.name === 'JB1' ? { ...a, worktree: { ...a.worktree, branch: 'hive/Elsewhere/juniper/jb1' } } : a))
+  cfg.pendingBranchRenames = [{ agentId: jb2.id, from: 'hive/Elsewhere/juniper/jb2', to: 'hive/Tools/juniper/jb2' }]
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   {
     const { app, page, inv } = await lib.launch({ userData, env })
     try {
       await lib.openWorkspace(inv, page, tools)
       const banner = page.locator('.moved-banner')
-      check('a branch still named after an old folder, nothing moved: the banner says so', !!(await lib.until(async () => /branch is still named after an old folder/.test(await banner.innerText().catch(() => '')), HUNG_MS)), await banner.innerText().catch(() => ''))
+      check('nothing moved, two branches to finish: the banner says so', !!(await lib.until(async () => /branches are still named after an old folder/.test(await banner.innerText().catch(() => '')), HUNG_MS)), await banner.innerText().catch(() => ''))
+      const plan = await inv('workspace:movePlan')
+      check('…the plan: JB2’s rename finished, JB1’s made', JSON.stringify(plan?.hosts.find((h) => h.name === 'juniper')?.branches?.filter((b) => !b.kept).map((b) => [b.from, b.to, !!b.pending])) === JSON.stringify([['hive/Elsewhere/juniper/jb2', 'hive/Tools/juniper/jb2', true], ['hive/Elsewhere/juniper/jb1', 'hive/Tools/juniper/jb1', false]]), JSON.stringify(plan?.hosts))
+      // Hive's record can't be written (project.json read-only): JB1's rename fails before git is touched; JB2's, whose
+      // git step is done, is said not recorded yet. Nothing is left half done either way.
+      fs.chmodSync(cfgFile, 0o444)
+      let refused
+      try {
+        refused = await inv('workspace:moveRepair')
+      } finally {
+        fs.chmodSync(cfgFile, 0o644)
+      }
+      check('with project.json unwritable: JB1’s rename fails, JB2’s isn’t recorded yet', refused.failed.some((l) => /JB1's branch hive\/Elsewhere\/juniper\/jb1 couldn't be renamed/.test(l)) && refused.failed.some((l) => /JB2's branch is now hive\/Tools\/juniper\/jb2, but Hive couldn't record it yet/.test(l)), JSON.stringify(refused))
+      check('…git has JB1’s as it was, and the records are unchanged', branches(proj).includes('hive/Elsewhere/juniper/jb1') && !branches(proj).includes('hive/Tools/juniper/jb1') && wt('JB1').branch === 'hive/Elsewhere/juniper/jb1' && wt('JB2').branch === 'hive/Elsewhere/juniper/jb2', JSON.stringify({ git: branches(proj), cfg: configOf(proj).agents.map((a) => a.worktree.branch) }))
+      check('…and the banner stays', (await banner.count()) === 1)
       const report = await inv('workspace:moveRepair')
-      check('…and Repair renames JB1’s, now its card is Done', report.done.some((l) => /JB1's branch hive\/Scratch\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1\./.test(l)) && branches(proj).includes('hive/Tools/juniper/jb1') && wt('JB1').branch === 'hive/Tools/juniper/jb1', JSON.stringify(report))
+      check('writable again, Repair finishes both: the records have the new names, nothing pending', report.done.some((l) => /JB2's branch hive\/Elsewhere\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2/.test(l)) && report.done.some((l) => /JB1's branch hive\/Elsewhere\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1/.test(l)) && wt('JB1').branch === 'hive/Tools/juniper/jb1' && wt('JB2').branch === 'hive/Tools/juniper/jb2' && branches(proj).includes('hive/Tools/juniper/jb1') && !configOf(proj).pendingBranchRenames && report.complete, JSON.stringify(report))
+      check("…JB1's card followed both renames", (await inv('tasks:work', card))?.line === 'hive/Tools/juniper/jb1')
       check('…and the banner goes', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
     } finally {
       await app.close()

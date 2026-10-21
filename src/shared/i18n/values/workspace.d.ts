@@ -347,7 +347,6 @@ interface HiveMessageValues {
   'workspace.repair.unlink': undefined
   'workspace.repair.unlinkShort': undefined
   'workspace.repair.unreadableFiles': { count: number }
-  'workspace.repair.untilDone': { n: number; cards: string | number }
   'workspace.repair.was': undefined
   'workspace.repair.what': undefined
   'workspace.repair.willDo': undefined

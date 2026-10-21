@@ -83,11 +83,13 @@ interface HiveMessageValues {
   'main.move.already': undefined
   'main.move.alsoMoved': { n: number; things: string | number; from: string | number; to: string | number }
   'main.move.assistant': undefined
-  'main.move.branchCard': { host: string | number; agent: string | number; from: string | number; cards: string | number; n: number }
+  'main.move.branchBoth': undefined
   'main.move.branchFailed': { host: string | number; agent: string | number; from: string | number; to: string | number; why: string | number }
+  'main.move.branchGone': { host: string | number; agent: string | number; from: string | number }
   'main.move.branchRenamed': { host: string | number; agent: string | number; from: string | number; to: string | number }
   'main.move.branchRenamedRemote': { host: string | number; agent: string | number; from: string | number; to: string | number; remote: string | number }
   'main.move.branchTaken': { host: string | number; agent: string | number; from: string | number; to: string | number }
+  'main.move.branchUnrecorded': { host: string | number; agent: string | number; to: string | number; why: string | number }
   'main.move.cards': { n: number; from: string | number; to: string | number }
   'main.move.copied': { n: number; owner: string; host: string | number; provider: string | number; agent: string | number; of: string | number }
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
