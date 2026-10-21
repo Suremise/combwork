@@ -155,6 +155,51 @@ describe('the one lane record step (#1291)', () => {
     expect(p.card(4)).not.toHaveProperty('reviewer')
   })
 
+  it("never loses a runtime lane that only shares lanes.ts's id: another list, another state, a suffix another lane has, an empty list (HR6's round 1)", () => {
+    const file = boardBefore((db) => {
+      for (let c = 1; c <= 12; c++) writeCardRows(db, decomposeCard(c, card(c, c === 6 ? 'q' : 'p')))
+      // D: lanes.ts's lane of the project has other cards; the runtime's is in flight on 2.
+      lanesRow(db, 'D', 'p', [1])
+      runtimeLane(db, 'p', 'D', { ruleset: 'r1', current: 2, cards: [2] })
+      // S: lanes.ts's is running, the runtime's ended; T: the other way round.
+      lanesRow(db, 'S', 'p', [3])
+      runtimeLane(db, 'p', 'S', { ruleset: 'r2', ended: true, cards: [3] })
+      lanesRow(db, 'T', 'p', [4])
+      db.prepare("UPDATE lanes SET state = 'ended', ended_at = '2026-10-20T09:30:00.000Z' WHERE id = 'T'").run()
+      runtimeLane(db, 'p', 'T', { ruleset: 'r3', current: 4, cards: [4] })
+      // C: another project's lane has it, and C-2 is another runtime lane's.
+      lanesRow(db, 'C', 'q', [6])
+      runtimeLane(db, 'p', 'C', { ruleset: 'r4', cards: [7] })
+      runtimeLane(db, 'p', 'C-2', { ruleset: 'r5', cards: [8] })
+      // Q: its list emptied, a change queued.
+      runtimeLane(db, 'p', 'Q', { ruleset: 'r6', cards: [], pending: [9, 10] })
+      // Two runtime lanes of one id in two projects.
+      runtimeLane(db, 'p', 'M', { ruleset: 'r7', cards: [11] })
+      runtimeLane(db, 'q', 'M', { ruleset: 'r8', cards: [6] })
+    })
+    const up = upgrade(file)
+    const ids = up.lanesDocs.map((d) => readLane(d)?.id)
+    expect(ids.sort()).toEqual(['C', 'C-2', 'C-3', 'D', 'D-2', 'M', 'M-2', 'Q', 'S', 'S-2', 'T', 'T-2'])
+    const p = FactStore.open(file, { project: 'p', key: 'P' })
+    const q = FactStore.open(file, { project: 'q', key: 'Q' })
+    stores.push(p, q)
+    // lanes.ts's lanes as they were, with nothing of the runtime's beside them.
+    expect(p.lane('D')).toEqual({ id: 'D', cards: [1], ruleset: null, pending: null, current: null, ended: false })
+    expect(p.lane('S')).toMatchObject({ cards: [3], ruleset: null, ended: false })
+    expect(p.lane('T')).toMatchObject({ cards: [4], ruleset: null, ended: true })
+    // The runtime's, whole, each its own lane.
+    expect(p.lane('D-2')).toEqual({ id: 'D-2', cards: [2], ruleset: 'r1', pending: null, current: 2, ended: false })
+    expect(p.lane('S-2')).toEqual({ id: 'S-2', cards: [3], ruleset: 'r2', pending: null, current: null, ended: true })
+    expect(p.lane('T-2')).toEqual({ id: 'T-2', cards: [4], ruleset: 'r3', pending: null, current: 4, ended: false })
+    expect(p.lane('C-2')).toMatchObject({ cards: [8], ruleset: 'r5' })
+    expect(p.lane('C-3')).toMatchObject({ cards: [7], ruleset: 'r4' })
+    expect(p.lane('Q')).toEqual({ id: 'Q', cards: [9, 10], ruleset: 'r6', pending: [9, 10], current: null, ended: false })
+    expect(p.lane('M')).toMatchObject({ cards: [11], ruleset: 'r7' })
+    expect(q.lane('M-2')).toMatchObject({ cards: [6], ruleset: 'r8' })
+    expect(p.card(2).lane).toBe('D-2')
+    expect(p.card(4).lane).toBe('T-2')
+  })
+
   it('on a board with no runtime lanes changes no lane', () => {
     let before: unknown[] = []
     const file = boardBefore((db) => {
