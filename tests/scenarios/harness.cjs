@@ -659,6 +659,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     const tokens = [apiToken, ...tokensIn(path.join(userData, 'agent-api')), ...tokensIn(path.join(userData, 'assistant-api'))].filter((t) => typeof t === 'string' && t.length >= 16)
     observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || observed.replies.some((r) => r.includes(t)))
     observed.cards = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await api('GET', `/v1/tasks/${n}`)).body])))
+    // Each card's workflow facts (1.0: Moved, Override, Refused…), for scenarios about what a move recorded (#1319).
+    observed.facts = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await inv('tasks:facts', n).catch(() => null)) ?? []])))
     observed.allCards = (await api('GET', '/v1/tasks')).body ?? []
     // The lanes as the run left them (#402): running and lately ended.
     observed.lanes = (await api('GET', '/v1/lanes')).body ?? []
