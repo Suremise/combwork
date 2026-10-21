@@ -56,7 +56,9 @@ const until = async (fn, ms = 10000) => {
   check('Idle is ready and Busy is working', !!(await until(async () => (await live(idle))?.status === 'ready' && (await live(busy))?.status === 'working', 20000)), JSON.stringify([(await live(idle))?.status, (await live(busy))?.status]))
 
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
-  // Each card's name as the window gives it (#1221): its key.
+  // Prompts name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = async (n) => `${(await card(n)).key} (#${n})`
+  // The window names a card by key (#1221).
   const keyOf = new Map()
   const make = async (title, extra = {}) => {
     const c = await inv('tasks:create', { title, project: 'alpha', ...extra })
@@ -136,7 +138,9 @@ const until = async (fn, ms = 10000) => {
     return x.column === 'doing' && x.agent === busy.id
   }, 5000)))
   await lib.sleep(1000) // A fixed wait on purpose: this checks that nothing starts.
-  check('and starts nothing', !transcripts().includes(`task #${c} `) && (await live(busy))?.status === 'working' && !(await live(sleepy)))
+  const cName = await named(c)
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(cName), cName)
+  check('and starts nothing', !transcripts().includes(`task ${cName} `) && (await live(busy))?.status === 'working' && !(await live(sleepy)))
 
   // --- Within Doing: reordering doesn't ask.
   await until(async () => (await order('Doing')).length === 3, 5000)
@@ -184,7 +188,8 @@ const until = async (fn, ms = 10000) => {
   check('Assign and start gives it to the stopped agent, in Doing', !!dd, JSON.stringify(await card(d)))
   check('with the dialog edits saved', dd?.title === 'Card D, renamed', dd?.title)
   check('and the card dialog closed', !!(await until(async () => (await edit.count()) === 0, 5000)))
-  check('the agent gets the card as its prompt', !!(await until(async () => lib.unkey(transcripts()).includes(`Work on task #${d} from the Hive task board: Card D, renamed`), 20000)))
+  const dName = await named(d)
+  check('the agent gets the card as its prompt', !!(await until(async () => transcripts().includes(`Work on task ${dName} from the Hive task board: Card D, renamed`), 20000)))
 
   // --- Availability changes while the dialog is open: Idle gets busy, and can no longer be started.
   await until(async () => (await live(idle))?.status === 'ready', 10000)

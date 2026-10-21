@@ -51,10 +51,9 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  // The wakes as their checks read them: cards by number (they name them by key too, #1219: checked once below).
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => lib.unkey(w.text))
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
   }
   const say = async (id, text) => {
     await inv('pty:write', lib.ptyKey(alpha, id), text)
@@ -81,6 +80,10 @@ const check = (name, ok, extra = '') => {
   const c3 = await newCard('Third', 'todo')
   const c5 = await newCard('Fifth')
   const c6 = await newCard('Sixth')
+  // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = async (n) => `${(await card(n)).key} (#${n})`
+  const [n1, n5, n6] = [await named(c1), await named(c5), await named(c6)]
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(n1), n1)
   // The builder registers its lane (card-loop does): Reviewer reviews its cards. Card 4 is in no lane.
   const lane = (who) => `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c1, c2, c3, c5, c6], reviewer: who })}`
   await say(builder.id, lane('Reviewer'))
@@ -89,15 +92,14 @@ const check = (name, ok, extra = '') => {
 
   // Into Review, no watches: the reviewer is woken, the builder (who moved it) isn't.
   await say(builder.id, `boardmove ${c1} review`)
-  check('a card arriving in Review wakes its reviewer', !!(await until(async () => wakes('Reviewer').length === 1, 20000)) && wakes('Reviewer')[0] === `[Hive] #${c1} (Builder's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`, JSON.stringify(wakes('Reviewer')))
-  check('…naming the card by key, with the number the tools take (#1219)', fs.readFileSync(path.join(claudeHome, 'fake-wakes.jsonl'), 'utf8').split('\n').some((l) => lib.KEYED.test(l)))
+  check('a card arriving in Review wakes its reviewer', !!(await until(async () => wakes('Reviewer').length === 1, 20000)) && wakes('Reviewer')[0] === `[Hive] ${n1} (Builder's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`, JSON.stringify(wakes('Reviewer')))
   check('…noted on the card', !!(await until(async () => (await said(c1)).includes('Hive: Woke Reviewer (alpha) to review it (a loop wake)'), 10000)), JSON.stringify(await said(c1)))
   check("…and the builder isn't woken by its own move", wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // Failed: the builder is woken with the verdict.
   await say(reviewer.id, `boardreview ${c1} start then boardreview ${c1} failed`)
-  check('a failed verdict wakes the builder', !!(await until(async () => wakes('Builder').length === 1, 20000)) && new RegExp(`^\\[Hive\\] #${c1} is in Review: Reviewer \\(alpha\\) failed it\\. This is your card in its loop: carry on`).test(wakes('Builder')[0]), JSON.stringify(wakes('Builder')))
+  check('a failed verdict wakes the builder', !!(await until(async () => wakes('Builder').length === 1, 20000)) && (wakes('Builder')[0] ?? '').startsWith(`[Hive] ${n1} is in Review: Reviewer (alpha) failed it. This is your card in its loop: carry on`), JSON.stringify(wakes('Builder')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // The reviewer works: the builder returns the card; nothing is typed into the reviewer until it is idle, then once.
@@ -107,14 +109,14 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await said(c1)).some((x) => /Returned for review, round 2|Moved to Review/.test(x) && x.startsWith('Builder')), 10000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing is typed while it works.
   check('nothing is typed into a working agent', (await live(reviewer.id))?.status === 'working' && wakes('Reviewer').length === 1, JSON.stringify({ status: (await live(reviewer.id))?.status, wakes: wakes('Reviewer') }))
-  check('…it is woken once it is idle', !!(await until(async () => wakes('Reviewer').length === 2, 30000)) && wakes('Reviewer')[1].startsWith(`[Hive] #${c1} (Builder's card) was returned for review (round 2)`), JSON.stringify(wakes('Reviewer')))
+  check('…it is woken once it is idle', !!(await until(async () => wakes('Reviewer').length === 2, 30000)) && wakes('Reviewer')[1].startsWith(`[Hive] ${n1} (Builder's card) was returned for review (round 2)`), JSON.stringify(wakes('Reviewer')))
   await lib.sleep(2000) // A fixed wait on purpose: no second line for the same handoff.
   check('…once', wakes('Reviewer').length === 2, JSON.stringify(wakes('Reviewer')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // Passed: the builder is woken.
   await say(reviewer.id, `boardreview ${c1} start then boardreview ${c1} passed passed`)
-  check('a passing verdict wakes the builder', !!(await until(async () => wakes('Builder').length === 2, 20000)) && wakes('Builder')[1].startsWith(`[Hive] #${c1} is in Passed: Reviewer (alpha) passed it`), JSON.stringify(wakes('Builder')))
+  check('a passing verdict wakes the builder', !!(await until(async () => wakes('Builder').length === 2, 20000)) && wakes('Builder')[1].startsWith(`[Hive] ${n1} is in Passed: Reviewer (alpha) passed it`), JSON.stringify(wakes('Builder')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // The reviewer waits with its own watch: one line, its watch's, not two.
@@ -145,7 +147,7 @@ const check = (name, ok, extra = '') => {
   check('the reviewer is busy with its prompt', !!(await until(async () => (await live(reviewer.id))?.status === 'working', 10000)))
   await say(builder.id, `boardmove ${c6} review`)
   check('…and reviews the card that arrived meanwhile', !!(await until(async () => (await said(c6)).includes('Reviewer (alpha): Review failed'), 30000)), JSON.stringify(await said(c6)))
-  check('the builder is woken with that verdict', !!(await until(async () => wakes('Builder').some((x) => x.startsWith(`[Hive] #${c6} is in Review: Reviewer (alpha) failed it`)), 20000)), JSON.stringify(wakes('Builder')))
+  check('the builder is woken with that verdict', !!(await until(async () => wakes('Builder').some((x) => x.startsWith(`[Hive] ${n6} is in Review: Reviewer (alpha) failed it`)), 20000)), JSON.stringify(wakes('Builder')))
   await until(() => idle(reviewer.id), 20000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that the reviewed arrival is NOT told.
   check("the reviewer isn't told of the arrival it has reviewed", wakes('Reviewer').length === 3 && !(await said(c6)).some((x) => x.startsWith('Hive: Woke Reviewer')), JSON.stringify({ wakes: wakes('Reviewer').slice(3), history: await said(c6) }))
@@ -159,7 +161,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(builder.id), 15000)
   await say(builder.id, lane('Other'))
   check("the lane's reviewer is now Other", !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === other.id), 15000)))
-  check('the waiting wake goes to the new reviewer', !!(await until(async () => wakes('Other').length === 1, 30000)) && wakes('Other')[0].startsWith(`[Hive] #${c5} (Builder's card) is in Review. You review this card in its loop`), JSON.stringify(wakes('Other')))
+  check('the waiting wake goes to the new reviewer', !!(await until(async () => wakes('Other').length === 1, 30000)) && wakes('Other')[0].startsWith(`[Hive] ${n5} (Builder's card) is in Review. You review this card in its loop`), JSON.stringify(wakes('Other')))
   await until(() => idle(reviewer.id), 20000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that the old reviewer gets nothing.
   check('…and not to the old one', wakes('Reviewer').length === 3, JSON.stringify(wakes('Reviewer').slice(3)))

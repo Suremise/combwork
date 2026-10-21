@@ -287,16 +287,17 @@ const check = (name, ok, extra = '') => {
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-hive-notice')
-    // As the checks read it: cards by number (it names them by key too, #1219: checked once below).
-    return { status: res.status, notice: notice ? lib.unkey(decodeURIComponent(notice)) : null, rawNotice: notice ? decodeURIComponent(notice) : null }
+    return { status: res.status, notice: notice ? decodeURIComponent(notice) : null }
   }
   await inv('tasks:update', n, { agent: coder.id })
   check("the agent's read of its card has no flag", (await asCoder(`/v1/tasks/${n}`)).notice === null)
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'Errors stay on screen until fixed.' })
+  // Notices name the card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await card(n)).key} (#${n})`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
   const status = await asCoder('/v1/projects/alpha')
-  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
-  check('…naming the card by key, with the number the tools take (#1219)', lib.KEYED.test(status.rawNotice ?? ''), status.rawNotice)
+  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
   // Through the real hive MCP server, as the agent's tools see it: the reply ends with the line.
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
@@ -307,7 +308,7 @@ const check = (name, ok, extra = '') => {
       .toString()
       .split('\n')[0]
   ).result
-  check('…and hive_project_status ends with it', !viaMcp.isError && lib.unkey(viaMcp.content[0].text).endsWith(`\n[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
+  check('…and hive_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
   await asCoder(`/v1/tasks/${n}`)
   // Its read in full is recorded as a fact (#1216): the decision generation that reply gave it, the card's newest.
   const received = await until(async () => {
@@ -323,7 +324,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'One message per field.' })
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
-  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(moved))
+  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(moved))
   check('…and once out of its hands, its next replies say nothing more', (await asCoder('/v1/projects/alpha')).notice === null)
 
   await app.close()

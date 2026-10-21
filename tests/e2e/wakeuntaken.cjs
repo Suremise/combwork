@@ -74,6 +74,9 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Watcher' })
   const card = (await inv('tasks:create', { title: 'Watched', project: 'alpha' })).number
+  // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key} (#${card})`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   const watch = async () => {
@@ -97,7 +100,7 @@ const check = (name, ok, extra = '') => {
   check('it watches again', !!(await watch()))
   await inv('tasks:comment', card, 'Second change')
   const marked = await until(async () => (await live(agent.id))?.untakenLine, HUNG_MS)
-  check('not taken after Enter again: the agent is marked', !!marked && /^\[Hive\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\./.test(lib.unkey(marked.text)) && lib.KEYED.test(marked.text), JSON.stringify(marked))
+  check('not taken after Enter again: the agent is marked', !!marked && marked.text.startsWith(`[Hive] New in your inbox: 1 card event (${named}) (m`) && /^\[Hive\] New in your inbox: 1 card event \(.+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
   // Hive's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Hive pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
