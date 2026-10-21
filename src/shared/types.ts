@@ -2710,8 +2710,11 @@ export interface LaneStatus {
   agent?: string
 }
 
-/** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */
-export type ProgressSource = 'agent' | 'assistant' | 'api'
+/**
+ * Who reported a progress run: a project agent (by its token), the Hive Assistant, a script with the workspace token, or
+ * Hive itself (its merge queue's checks, #1349: no agent and no token reports them).
+ */
+export type ProgressSource = 'agent' | 'assistant' | 'api' | 'hive'
 
 /**
  * A merge slot (#350): one merge at a time into a project's branch. `holder` is who merges now (an agent, or the user's
@@ -2762,7 +2765,7 @@ export interface ProgressRun {
    * `agentName` is a name Hive gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
    * for a kept run with no name. The window shows it in its language; the Agent API leaves this out (publicRun).
    */
-  defaultName?: 'script' | 'agent'
+  defaultName?: 'script' | 'agent' | 'mergeQueue'
   provider: ProviderId | null
   source: ProgressSource
   title: string
@@ -2825,6 +2828,10 @@ export interface ProgressRun {
   folder?: string
   /** A finished run for a card (#1222): how it counted as a check of the card's revision (its `CheckRan`). */
   counts?: RunCheck
+  /** Hive's own run (#1349): nothing was installed before the merge checks (no setup command and no lock file). */
+  noInstall?: true
+  /** Hive's own install run (#1349): the setup command as written, after node_modules was removed (Hive has no clean form of it). */
+  installAsWritten?: true
 }
 
 /** Why a run doesn't count as a check (SPEC §16.13), as its `CheckRan` says. */

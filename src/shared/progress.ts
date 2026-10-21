@@ -399,6 +399,9 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
         )
     out.push({ label: tr(msg({ id: 'board.details.check', defaultMessage: 'Check', description: "A label in a run's details (Progress panel): whether it counts as a check of its card follows." })), text })
   }
+  // The merge queue's checks with nothing installed before them (#1349): said once, on the first check after it.
+  if (r.installAsWritten) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.installAsWritten', defaultMessage: 'The setup command as written, after removing node_modules: Hive has no clean form of it', description: "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch." })) })
+  if (r.noInstall) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.noInstall', defaultMessage: 'Nothing installed: the project has no setup command and no lock file', description: "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents & Worktrees) nor a package lock file." })) })
   out.push({ label: tr(msg({ id: 'board.details.agent', defaultMessage: 'Agent', description: "A label in a run's details (Progress panel): the agent that ran it (and its project) follows." })), text: `${runAgentName(r, tr)}${project ? ` · ${project}` : ''}` })
   if (r.provider) out.push({ label: tr(msg({ id: 'board.details.provider', defaultMessage: 'Provider', description: "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)." })), text: providerName(r.provider) })
   out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt), at: r.startedAt })
@@ -413,12 +416,13 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 
 /**
  * Who ran a run, as the window shows it (#872): a name Hive gave it (`defaultName`: "Script" for a script, "Agent" for
- * a kept run with no name) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
+ * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
  * too. The stored name stays English: agents read it through the Agent API and hive-progress.
  */
 export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName'>, tr: Tr): string {
   if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent." }))
   if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
+  if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
   return r.agentName
 }
 

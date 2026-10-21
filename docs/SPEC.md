@@ -2039,6 +2039,28 @@ report it this way rather than retry.
    lock files differ from those the worktree last installed, the queue runs the project's install in a clean state
    (the setup script with a clean flag; for npm, `npm ci`) before the checks, so a dependency missing from the manifest
    fails here (#187). Team's merge checks always install clean.
+   **Built [#1349]:** the runner (`queueChecks.ts`) runs each G9 check's configured command (OP-24) one after another
+   in the queue's worktree, stopping at the first that isn't green, hidden, with a session command's environment (never
+   `ELECTRON_RUN_AS_NODE` or a session's `HIVE_*`), and ends its whole tree at a time limit (Advanced
+   `hive.queue.checkMinutes`, 90 minutes). Each check is a progress run of `source: 'hive'` ("Hive (merge queue)"),
+   titled "AM-12 · typecheck · a3f2c1d", with its output in a bounded log (its first 2 MB and last 64 KB). The queue
+   brackets each one and writes `CheckRan` at the **result** revision: green only if it exited 0 **and** counted (§16.13:
+   at exactly that revision, clean at the start and the end, nothing written to a tracked file and no HEAD reflog entry
+   between, by stat snapshot since the queue's folder isn't watched). Exit 0 but uncounted isn't green: the entry is
+   tested again from a fresh test merge, and after `MAX_RETESTS` (3) it pauses `uncounted` (the card's `CheckRan`
+   says why). The install is G9's **`mergeInstall`**: `onManifestChange` (the default, Pair's: a clean install whenever
+   the manifests' hash differs from the folder's last install, which holds whatever the option says) or `always`
+   (Team's: before every entry's checks). It is the worktree setup command in its clean form where Hive knows one (a
+   package manager's install with only known flags after it, those that change what it prints, how it fetches or which
+   scripts run: `npm install --no-audit` → `npm ci --no-audit`; pnpm and yarn with their frozen lock file), else **as
+   written**, which its run's details say (Hive has no clean form of a compound command, one naming packages, one with
+   another flag such as `--dry-run`, `--prefix` or `-g`, or another tool's). **Before every install** the queue folder's
+   `node_modules` is removed (a link removed as a link, never through), so no warm package outlives an install that
+   installed nothing: the checks then fail on what's missing rather than pass on what was there [HR3's #1349 round 2]; `npm ci` for a lock file with no setup command; or nothing, which the first check's run
+   says once. The install is a run too, titled with its command line, which can hold a token, so it is
+   `titleFromCommand` and the Agent API never gives its title out (#620). A log that can't be written (a full disk)
+   never stops a run: it is closed and given as no log, and every run started is finished. G9 empty: no checks and no
+   install, so a clean test merge alone merges.
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
@@ -2049,7 +2071,12 @@ report it this way rather than retry.
    card goes to Active, back to its builder. A conflict, red checks or a hook failure need a new revision (review
    again unless it's the same change); a transient failure is resubmitted unchanged, straight into the queue, at most
    twice (`requeue.allowed`, §16.8.1)
-   [note §9; answering HR2's round 1 finding 7]. **Pauses are not failures:** a busy or dirty target folder, a missing
+   [note §9; answering HR2's round 1 finding 7]. **Built [#1349], the certain cases** (`classifyCheckFailure`): a check
+   that couldn't start (a spawn error, or its program not found, told before it starts on Windows, where cmd exits 1 for
+   it), one ended by its time limit, or one killed from outside (a signal, Windows' interrupt status) is transient;
+   anything else is red. A process another program ends with TerminateProcess exits with the code that program gave,
+   which can't be told from the check's own, so it counts as red. Network errors are #1362's (Darren, 21 Oct: exit 75,
+   or Node's and npm's network error codes in the last 40 lines, an Advanced list). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target
@@ -2514,6 +2541,16 @@ copies (§16.10.5), leased to that run and written by nothing else, so it counts
 refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
 running again when the deliverables are quiet, which the refusal says. Hive running pre-review checks itself is OP-27.
+
+**The queue's runs, attributed to Hive** (§16.9.1 step 5). **Built [#1349]:** a run Hive starts itself has
+`source: 'hive'`, is the card's project's, and shows as **Hive (merge queue)** (`defaultName: 'mergeQueue'`, in the
+window's language; no provider, no agent to show). Only Hive updates or finishes it (a script's token gets `404`, as for
+another caller's run), it never goes stale (no reporter to fall quiet: Hive ends it itself, its time limit included), and
+it is kept in the run history like other runs, with its log path (Show log) and its `counts` once the queue has
+bracketed it. Its `CheckRan` is for the card at the test merge's result revision, `by: 'Hive (merge queue)'`, counted or
+not by the rules above; it never counts for a submission (its revision is the result, not the card's). `noInstall`
+marks the first check after an install that had nothing to run. The window's side (the row in Runs and Pulse) is
+#1356's e2e; the queue in the app is #1348's.
 
 The Progress panel stays; its 1.0 changes per phase are on the phase cards and are part of this spec:
 - **P3** [#1119 c]: run rows show "AM-12 · a3f2c1d" (links the card, copies the revision); details show Card, Revision
