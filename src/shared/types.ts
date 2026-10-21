@@ -2596,7 +2596,7 @@ export interface LaneInfo {
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate'
 
 export interface LaneStatus {
   reason: LaneWaitReason

@@ -193,6 +193,8 @@
   "settings.advanced.hive.wait.cardMaxSeconds.title": "カードの待機：最長",
   "settings.advanced.hive.workflow.enforce.desc": "カードが移動するとき、Hive は各プロジェクトのワークフローのルールを守ります。カードがレビュー、承認済み、完了に進む前にバージョン管理のオプションが求めること、そして Hive の外でカードの作業がマージまたは変更されたのを Hive が見つけたときに続く処理です。オフにすると、すべてのプロジェクトですべてのルールが一度にオフになります。カードは置いた場所に移動し、何も拒否されず確認もされません。Hive は各カードの作業に起きたことを記録するだけで、そのためにカードを移動したりエージェントを起こしたりはしません。",
   "settings.advanced.hive.workflow.enforce.title": "ワークフローのルールを適用する",
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": "エージェント自身のワークツリーで作業したカードがスカッシュでターゲットにマージされると、エージェントのブランチにはそのコミットが残るため、レーンの次のカードにそれらが含まれてしまいます。オンにすると、エージェントがアイドルで、実行が終わり、ワークツリーがクリーンになったときに、ブランチ上のすべてがターゲットに含まれている場合に限り、次のカードの開始前に Hive がブランチをターゲットへ移動します。それ以外の場合は「要対応」で確認します。オフにすると、Hive は毎回確認します。承認すると一度だけブランチを移動し、拒否するとあなたが自分で行います。ワークフローのルールがオフのときは、Hive はブランチを移動しません。",
+  "settings.advanced.hive.workflow.updateAgentBranch.title": "スカッシュマージ後にエージェントのブランチを最新にする",
   "settings.advanced.logs.desc": "Hiveのログファイルがあるフォルダーを開きます。",
   "settings.advanced.logs.tip": "問題を報告するときに役立ちます。",
   "settings.advanced.logs.title": "ログ",

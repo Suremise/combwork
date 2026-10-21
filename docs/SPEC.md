@@ -2875,6 +2875,41 @@ ancestor of the target (a merge commit or a fast-forward leaves it so). If it is
 
 So two squashed cards in a row each review only their own work (S54, S55).
 
+**Built [#1271]:** the runtime refuses the lane's next card's start while its builder's own worktree (the last card
+before it in the lane worked there, Done) has a head not in that card's target (`lane.lineBehind`, 7 locales; the user's
+drag isn't refused), and Hive's line updater (`workflow/lineUpdates.ts`, after board changes and an agent's status
+changes, one pass per workspace at a time) does the steps above between cards: the builder busy (in a turn, starting,
+asking a permission, its background tasks running, or a prompt not yet taken), a Progress run of it going, or the
+worktree dirty, the lane's `status` is `lineUpdate` ("waiting: bringing the builder's branch up to date", not pausing);
+the line's change since the card's approved base not in the target (containment, as `done.contained` checks it), a For
+you **Decide** on the next card naming the commits after the approved revision; git's refusal, a For you **Decide** with
+git's reason. Each is asked once for the branch's head (bound to it), so a branch nobody touches isn't asked about twice.
+The move goes through the platform (`lineNow`, `moveLine`: `git reset --keep`), then `LineMoved` on the card just Done
+and a wake to the builder ("<line> is up to date with <target> …: <next> can start"); the next card's start then reads
+its base as `LineMoved.to`. **The move is checked again at its boundary** [HR2's round 1]: just before it, the line,
+its head and the target's head are read again (the worktree still clean), and the rules on, the switch (or the user's
+approval), the builder idle with no run and the workspace open checked again. The platform's move [HR2's round 2] is
+serialized with the worktree's own git work: it holds the worktree's index lock (a commit or other git write there
+meanwhile is refused by git, nothing lost), checks the branch, head, target head and a clean worktree under it, asks
+those conditions once more at that boundary, brings the files from the head's tree to the target's through a separate
+index (`read-tree -m -u`, which won't overwrite a local change), then moves the branch only if it is still at that
+head (`update-ref <to> <head>`, compare and swap; else the files go back and nothing moves). Never a reset of a branch
+that may have moved on. Anything changed: nothing moves or is recorded, and the next pass looks again. While the move
+runs, the next card is reserved: its start is refused (`lane.lineBehind`, also inside its own write) until the
+`LineMoved` is saved, and a `LineMoved` that can't be saved has the move undone the same way. **A failure after the
+move's first change** [HR2's round 3] is put back conditionally: the new index is staged in the held lock and published
+only once the branch has moved (a refused rename tried a few times); unpublished, the branch is swapped back (only if
+still where the move put it) and the files restored from that index. A `LineMoving` fact is written before the move
+and its outcome after it: `LineMoved`, or `LineMoveUndone` when nothing was made (the platform put everything back).
+One with no outcome (a move that couldn't be put back, or Hive stopping during it) holds the next card wherever the head
+is [HR2's round 4: a head back where it began proves nothing of the files and index]; the next pass records `LineMoved`
+once the line is at its target and clean, `LineMoveUndone` once it is back where it began and clean, else asks the user
+once (For you, Decide), that question the unfinished move's (answered, it doesn't stop the next move). What waits is each workspace's own (forgotten when it closes). **Settings → Advanced → Bring an agent's branch up to date after a squash merge**
+(`hive.workflow.updateAgentBranch`, default on): off, the user is asked every time, a For you **Approve** on the next
+card (approve: Hive moves it once, by the steps above; decline: the user does it). With workflow rules off, nothing
+moves, nothing is asked and nothing waits: P3's behaviour (Darren's decision on #1120, point 2; the Assistant on #1271),
+and the Merge dialog's squash still moves the branch itself, as before 1.0 (tested).
+
 So the contradiction "Hive merges and the agent merges need each card in its own folder" (§16.7.2) is met before P7
 by an agent's worktree, and "Committed is done" still needs the project folder.
 
