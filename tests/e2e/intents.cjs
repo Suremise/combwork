@@ -57,7 +57,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // Pair: a reviewer agent, who isn't the builder; everyone in the project folder, committed is done.
-    await inv('project:updateConfig', alpha, { workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } })
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
