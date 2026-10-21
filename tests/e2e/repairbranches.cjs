@@ -5,9 +5,10 @@
 // Tools. Repair's plan lists each branch in its table (Was → Now): "rename", the remote's note, JB3's kept (its new name
 // is taken). Repair renames JB1's and JB2's in git (the worktrees follow, JB2's upstream kept), in project.json, and on
 // JB1's card (LineRenamed), whose reconciliation then follows the new name (a commit on it seen, never Gone: line).
-// Repair again changes nothing. Last, with nothing moved: JB1's branch named after another place (not renamed yet) and
-// JB2's rename cut short after git's step (its pending record and the agent's old name left). With project.json
-// unwritable, Repair fails JB1's before git is touched and says JB2's isn't recorded yet; writable again, it finishes
+// Repair again changes nothing. Last, with nothing moved: JB1's rename cut short after git's step, before its card's
+// LineRenamed (reopened, its reconciliation follows the rename, never Gone: line), and JB2's branch named after another
+// place, not renamed yet. With project.json
+// unwritable, Repair fails JB2's before git is touched and says JB1's isn't recorded yet; writable again, it finishes
 // both. Dev build, throwaway profile and folders, the fake Claude Code; quiet.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -121,24 +122,30 @@ const agentsOf = (project) => configOf(project).agents
       await app.close()
     }
   }
-  // Nothing moved now. JB2's rename cut short after git's step (project.json not written then): git has
-  // hive/Tools/juniper/jb2, the agent's record and the pending rename still name hive/Elsewhere/juniper/jb2.
+  // Nothing moved now. JB1's rename (its card's line) was cut short after git's step, before the card's LineRenamed and
+  // the record (a crash, say): git has hive/Tools/juniper/jb1-3; the agent's record, the card's line and the pending
+  // rename still name hive/Tools/juniper/jb1. JB2's branch is named after another place (renamed outside Hive), its
+  // record with it: a rename not begun.
+  git(proj, ['branch', '-m', 'hive/Tools/juniper/jb1', 'hive/Tools/juniper/jb1-3'])
+  git(proj, ['branch', '-m', 'hive/Tools/juniper/jb2', 'hive/Elsewhere/juniper/jb2'])
   const cfg = configOf(proj)
-  const jb2 = cfg.agents.find((a) => a.name === 'JB2')
-  // JB1's branch named after another place too (renamed outside Hive, say), its record with it: a rename not begun.
-  git(proj, ['branch', '-m', 'hive/Tools/juniper/jb1', 'hive/Elsewhere/juniper/jb1'])
-  cfg.agents = cfg.agents.map((a) => (a.id === jb2.id ? { ...a, worktree: { ...a.worktree, branch: 'hive/Elsewhere/juniper/jb2' } } : a.name === 'JB1' ? { ...a, worktree: { ...a.worktree, branch: 'hive/Elsewhere/juniper/jb1' } } : a))
-  cfg.pendingBranchRenames = [{ agentId: jb2.id, from: 'hive/Elsewhere/juniper/jb2', to: 'hive/Tools/juniper/jb2' }]
+  const jb1 = cfg.agents.find((a) => a.name === 'JB1')
+  cfg.agents = cfg.agents.map((a) => (a.name === 'JB2' ? { ...a, worktree: { ...a.worktree, branch: 'hive/Elsewhere/juniper/jb2' } } : a))
+  cfg.pendingBranchRenames = [{ agentId: jb1.id, from: 'hive/Tools/juniper/jb1', to: 'hive/Tools/juniper/jb1-3' }]
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   {
     const { app, page, inv } = await lib.launch({ userData, env })
     try {
       await lib.openWorkspace(inv, page, tools)
+      const lineGone = async () => (await inv('tasks:facts', card)).filter((f) => f.kind === 'Gone' && f.data.what === 'line')
+      // Its Work view read (which reconciles it) before any Repair: the card follows the rename git made, never gone.
+      await inv('tasks:work', card)
+      check("reopened, the card's reconciliation follows the cut-short rename (LineRenamed), never takes its line for gone", !!(await lib.until(async () => (await inv('tasks:facts', card)).some((f) => f.kind === 'LineRenamed' && f.data.to === 'hive/Tools/juniper/jb1-3'), HUNG_MS)) && (await inv('tasks:work', card))?.line === 'hive/Tools/juniper/jb1-3' && !(await lineGone()).length, JSON.stringify({ line: (await inv('tasks:work', card))?.line, gone: await lineGone(), facts: (await inv('tasks:facts', card)).map((f) => [f.kind, f.data.what ?? f.data.line ?? f.data.to ?? '']) }))
       const banner = page.locator('.moved-banner')
       check('nothing moved, two branches to finish: the banner says so', !!(await lib.until(async () => /branches are still named after an old folder/.test(await banner.innerText().catch(() => '')), HUNG_MS)), await banner.innerText().catch(() => ''))
       const plan = await inv('workspace:movePlan')
-      check('…the plan: JB2’s rename finished, JB1’s made', JSON.stringify(plan?.hosts.find((h) => h.name === 'juniper')?.branches?.filter((b) => !b.kept).map((b) => [b.from, b.to, !!b.pending])) === JSON.stringify([['hive/Elsewhere/juniper/jb2', 'hive/Tools/juniper/jb2', true], ['hive/Elsewhere/juniper/jb1', 'hive/Tools/juniper/jb1', false]]), JSON.stringify(plan?.hosts))
-      // Hive's record can't be written (project.json read-only): JB1's rename fails before git is touched; JB2's, whose
+      check('…the plan: JB1’s rename finished, JB2’s made', JSON.stringify(plan?.hosts.find((h) => h.name === 'juniper')?.branches?.filter((b) => !b.kept).map((b) => [b.from, b.to, !!b.pending])) === JSON.stringify([['hive/Tools/juniper/jb1', 'hive/Tools/juniper/jb1-3', true], ['hive/Elsewhere/juniper/jb2', 'hive/Tools/juniper/jb2', false]]), JSON.stringify(plan?.hosts))
+      // Hive's record can't be written (project.json read-only): JB2's rename fails before git is touched; JB1's, whose
       // git step is done, is said not recorded yet. Nothing is left half done either way.
       fs.chmodSync(cfgFile, 0o444)
       let refused
@@ -147,12 +154,13 @@ const agentsOf = (project) => configOf(project).agents
       } finally {
         fs.chmodSync(cfgFile, 0o644)
       }
-      check('with project.json unwritable: JB1’s rename fails, JB2’s isn’t recorded yet', refused.failed.some((l) => /JB1's branch hive\/Elsewhere\/juniper\/jb1 couldn't be renamed/.test(l)) && refused.failed.some((l) => /JB2's branch is now hive\/Tools\/juniper\/jb2, but Hive couldn't record it yet/.test(l)), JSON.stringify(refused))
-      check('…git has JB1’s as it was, and the records are unchanged', branches(proj).includes('hive/Elsewhere/juniper/jb1') && !branches(proj).includes('hive/Tools/juniper/jb1') && wt('JB1').branch === 'hive/Elsewhere/juniper/jb1' && wt('JB2').branch === 'hive/Elsewhere/juniper/jb2', JSON.stringify({ git: branches(proj), cfg: configOf(proj).agents.map((a) => a.worktree.branch) }))
+      check('with project.json unwritable: JB2’s rename fails, JB1’s isn’t recorded yet', refused.failed.some((l) => /JB2's branch hive\/Elsewhere\/juniper\/jb2 couldn't be renamed/.test(l)) && refused.failed.some((l) => /JB1's branch is now hive\/Tools\/juniper\/jb1-3, but Hive couldn't record it yet/.test(l)), JSON.stringify(refused))
+      check('…git has JB2’s as it was, and the records are unchanged', branches(proj).includes('hive/Elsewhere/juniper/jb2') && !branches(proj).includes('hive/Tools/juniper/jb2') && wt('JB1').branch === 'hive/Tools/juniper/jb1' && wt('JB2').branch === 'hive/Elsewhere/juniper/jb2', JSON.stringify({ git: branches(proj), cfg: configOf(proj).agents.map((a) => a.worktree.branch) }))
       check('…and the banner stays', (await banner.count()) === 1)
       const report = await inv('workspace:moveRepair')
-      check('writable again, Repair finishes both: the records have the new names, nothing pending', report.done.some((l) => /JB2's branch hive\/Elsewhere\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2/.test(l)) && report.done.some((l) => /JB1's branch hive\/Elsewhere\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1/.test(l)) && wt('JB1').branch === 'hive/Tools/juniper/jb1' && wt('JB2').branch === 'hive/Tools/juniper/jb2' && branches(proj).includes('hive/Tools/juniper/jb1') && !configOf(proj).pendingBranchRenames && report.complete, JSON.stringify(report))
-      check("…JB1's card followed both renames", (await inv('tasks:work', card))?.line === 'hive/Tools/juniper/jb1')
+      check('writable again, Repair finishes both: the records have the new names, nothing pending', report.done.some((l) => /JB1's branch hive\/Tools\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1-3\./.test(l)) && report.done.some((l) => /JB2's branch hive\/Elsewhere\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2/.test(l)) && wt('JB1').branch === 'hive/Tools/juniper/jb1-3' && wt('JB2').branch === 'hive/Tools/juniper/jb2' && branches(proj).includes('hive/Tools/juniper/jb2') && !configOf(proj).pendingBranchRenames && report.complete, JSON.stringify(report))
+      check("…JB1's card on its new name, its line never taken for gone through the recovery", (await inv('tasks:work', card))?.line === 'hive/Tools/juniper/jb1-3' && !(await lineGone()).length)
+      check('…and nothing is left to rename', !(await inv('workspace:movePlan'))?.hosts?.some((h) => h.branches?.some((x) => !x.kept)), JSON.stringify(await inv('workspace:movePlan')))
       check('…and the banner goes', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
     } finally {
       await app.close()

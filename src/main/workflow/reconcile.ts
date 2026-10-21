@@ -95,6 +95,25 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
 }
 
 /**
+ * A card whose line is the old name of a rename Repair began and hasn't finished (#1305, `pendingRename`): when the
+ * old name is gone and the new one is there (git's step done), the card follows it (LineRenamed, as Repair writes it),
+ * once, in its cycle. Whether it did: its line is then read by the new name, never taken for gone meanwhile.
+ */
+async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promise<boolean> {
+  const line = s.started?.line
+  if (!line || !wf.cfg.pendingRename) return false
+  const to = await wf.cfg.pendingRename(line)
+  if (!to || (await G.lineHead(wf.cfg.project, line)) !== null) return false
+  const head = await G.lineHead(wf.cfg.project, to)
+  if (head === null || isUnknown(head)) return false
+  return wf.write(card, null, 'hive', (w) => {
+    if (!sameCycle(w, s) || w.state().started?.line !== line) return false
+    w.fact('LineRenamed', { from: line, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
+    return true
+  })
+}
+
+/**
  * Records an observed head change once (the dedupe key names the fact it follows). When another observer already wrote
  * a fact after the same one, reads the winner and the platform now, and writes only what is true now, after it.
  */
@@ -164,7 +183,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     await attributeFolder(wf)
     if (card.stage !== 'done') return
   } else if (card.stage !== 'done') {
-    const line = s.started.line!
+    // A rename Repair began and was cut short after git's step (#1305: a crash, a file it couldn't write): the card
+    // follows it now, before its line is read, rather than take it for gone.
+    if (await followRename(wf, card, s)) s = wf.state(card)
+    const line = s.started!.line!
     await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
     s = wf.state(card)
     const lh = await G.lineHead(project, line)

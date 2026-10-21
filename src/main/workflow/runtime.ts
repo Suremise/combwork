@@ -105,6 +105,11 @@ export interface WorkflowConfig {
    * its project.json names as its base. Null for an agent without one.
    */
   agentFolder?: (agent: string) => Promise<{ path: string; base: string | null } | null>
+  /**
+   * The new name of a line Repair began renaming and hasn't finished (#1305: project.json's `pendingBranchRenames`), or
+   * null: reconciliation then follows the rename rather than take the line for gone.
+   */
+  pendingRename?: (line: string) => Promise<string | null>
   /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
   locksOf?: (agent: string) => string[]
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
