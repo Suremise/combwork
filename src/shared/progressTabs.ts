@@ -16,13 +16,14 @@ export const tabAt = (i: number | undefined): ProgressTab => PROGRESS_TABS[i ?? 
 
 /**
  * What a run is a run of, so a later one is "the same thing" (a retry): a card's check, else a check's name in its
- * project, else its command (or title) in its project, by the same agent.
+ * project, else its command (or title) for its card (HR6's #1309 round 1: never another card's) in its project, by the
+ * same agent; a run for no card by its command alone.
  */
 export function runThing(r: Pick<ProgressRun, 'projectPath' | 'agentId' | 'card' | 'check' | 'command' | 'title'>): string {
   const project = (r.projectPath ?? '').toLowerCase()
   if (r.card && r.check) return `check\n${project}\n${r.card}\n${r.check}` // i18n-ignore: a key, never shown
   if (r.check) return `check\n${project}\n\n${r.check}` // i18n-ignore: a key, never shown
-  return `run\n${project}\n${r.agentId ?? ''}\n${r.command ?? r.title}` // i18n-ignore: a key, never shown
+  return `run\n${project}\n${r.agentId ?? ''}\n${r.card ?? ''}\n${r.command ?? r.title}` // i18n-ignore: a key, never shown
 }
 
 /**
@@ -102,21 +103,26 @@ export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr): string 
   )
 }
 
-/** The Runs tab's filters (#1309): failures only, a lane's cards, an agent, and words to find. */
+/**
+ * The Runs tab's filters (#1309): failures only, a lane (its id: its cards are read from the lane as it is now, HR6's
+ * round 1), an agent, and words to find.
+ */
 export interface RunsFilter {
   failedOnly: boolean
-  /** A lane's cards (its id chosen), or null: any. */
-  laneCards: readonly number[] | null
+  lane: string | null
   agent: string | null
   query: string
 }
 
-export const NO_RUNS_FILTER: RunsFilter = { failedOnly: false, laneCards: null, agent: null, query: '' }
+export const NO_RUNS_FILTER: RunsFilter = { failedOnly: false, lane: null, agent: null, query: '' }
 
-/** Whether a run is in the Runs tab's filter. `words`: what it's found by (its agent, title, command, card). */
-export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun) => string): boolean {
+/**
+ * Whether a run is in the Runs tab's filter. `words`: what it's found by (its agent, title, command, card); `laneCards`:
+ * the chosen lane's cards now (null: no lane chosen, or it is gone).
+ */
+export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun) => string, laneCards: readonly number[] | null = null): boolean {
   if (f.failedOnly && r.state !== 'failed') return false
-  if (f.laneCards && !(r.card && f.laneCards.includes(r.card))) return false
+  if (f.lane && laneCards && !(r.card && laneCards.includes(r.card))) return false
   if (f.agent && r.agentId !== f.agent) return false
   const q = f.query.trim().toLowerCase()
   return !q || words(r).toLowerCase().includes(q)

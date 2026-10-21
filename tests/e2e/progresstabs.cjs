@@ -226,6 +226,32 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     check('Home, then Right: Merges', !!(await until(async () => (await tab('merges').getAttribute('aria-selected')) === 'true')))
     const key = `progress-tab:${ws.toLowerCase()}`
     check('the tab is kept for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[key] === 1)))
+
+    // --- HR6's round 1: a card is part of what a run is a run of. The same command fails for A, then passes for B:
+    // A's failure stays unresolved (the badge up by one, and stays), and the two are lines of their own.
+    const custom = async (card, ok) => {
+      const id = (await api(t1, 'POST', '/v1/progress', { title: 'custom verification', command: 'node custom-verification.cjs', card: card.key })).body?.id
+      await api(t1, 'POST', `/v1/progress/${id}/finish`, { ok })
+      return id
+    }
+    const badgeNow = async () => Number((await tab('runs').locator('.progress-tab-badge').textContent().catch(() => '0')) ?? 0)
+    const before = await badgeNow()
+    await custom(a, false)
+    check("a card's run failing raises the badge by one", !!(await until(async () => (await badgeNow()) === before + 1)), String(await badgeNow()))
+    await custom(b, true)
+    await showTab('runs')
+    check("…another card's run of the same command passing doesn't resolve it, nor fold with it", !!(await until(async () => /custom verification/.test(await text()))) && (await badgeNow()) === before + 1 && !/custom verification ×2/.test(await text()), `${await badgeNow()} ${await text()}`)
+
+    // --- HR6's round 1: the lane filter reads the lane as it is now. Chosen with [A, B, C]; A Done and the list
+    // changed between cards to [A, C]: B's runs leave the filtered list, the choice stays the lane.
+    await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
+    check("the lane's filter shows B's unit run while B is in the lane", !!(await until(async () => /unit/.test(await text()))), await text())
+    await inv('tasks:move', a.number, 'done', { confirm: true, reason: 'Merged by hand' })
+    await until(async () => (await inv('tasks:list')).find((x) => x.number === a.number)?.column === 'done')
+    const changed = await api(t1, 'POST', '/v1/lanes', { cards: [a.number, c.number], reviewer: 'R1', name: 'tabs' })
+    check('between cards, the lane becomes [A, C]', changed.status === 200 && JSON.stringify(changed.body?.lane?.cards?.map((x) => x.number)) === JSON.stringify([a.number, c.number]), JSON.stringify(changed.body?.lane?.cards))
+    check("…the filter follows it: B's runs leave, A's stay, the lane still chosen", !!(await until(async () => !/unit/.test(await text()) && /e2e/.test(await text()))) && (await panel.locator('.progress-runs-choices select[aria-label="Lane"]').inputValue()) !== '', await text())
+    await panel.locator('.progress-runs-clear').click()
     await api(t1, 'POST', `/v1/progress/${e2e}/finish`, { ok: true })
     await api(t1, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
   } finally {

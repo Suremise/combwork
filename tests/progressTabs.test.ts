@@ -58,6 +58,17 @@ describe('the Progress panel tabs (#1309)', () => {
     expect(runThing(run({ projectPath: 'D:\\WS\\ALPHA' }))).toBe(runThing(run()))
   })
 
+  it("a run's card is part of what it is a run of (HR6's round 1): another card's pass resolves nothing, nor groups with it", () => {
+    const failedA = run({ card: 1, command: 'node custom-verification.cjs', state: 'failed', startedAt: NOW - 2 * HOUR, finishedAt: NOW - 2 * HOUR + 1000 })
+    const passedB = run({ card: 2, command: 'node custom-verification.cjs', state: 'passed', startedAt: NOW - HOUR, finishedAt: NOW - HOUR + 1000 })
+    expect(runThing(failedA)).not.toBe(runThing(passedB))
+    expect(unresolvedFailures([failedA, passedB]).map((r) => r.id)).toEqual([failedA.id])
+    expect(runDays([failedA, passedB], NOW)[0].groups.map((g) => g.runs.length)).toEqual([1, 1])
+    // A later pass of the same card's command resolves it; a run for no card groups by its command alone.
+    expect(unresolvedFailures([failedA, run({ card: 1, command: 'node custom-verification.cjs', startedAt: NOW })])).toEqual([])
+    expect(runThing(run({ card: undefined, command: 'npm test', agentId: 'b1' }))).toBe(runThing(run({ card: undefined, command: 'npm test', agentId: 'b1', title: 'x' })))
+  })
+
   it('a failure is unresolved until a later run of the same thing passes; dismissing it does not resolve it', () => {
     const f1 = run({ state: 'failed', startedAt: NOW - 3 * HOUR })
     const p = run({ state: 'passed', startedAt: NOW - 2 * HOUR })
@@ -97,11 +108,15 @@ describe('the Progress panel tabs (#1309)', () => {
     const words = (r: ProgressRun): string => `${r.agentName}\n${r.title}\n${r.command ?? ''}`
     const failedOfCard = run({ state: 'failed', card: 4, title: 'e2e' })
     const passed = run({ card: 9, agentId: 'r1', agentName: 'R1', title: 'lint' })
-    const f = (over: Partial<typeof NO_RUNS_FILTER>) => [failedOfCard, passed].filter((r) => runMatches(r, { ...NO_RUNS_FILTER, ...over }, words)).map((r) => r.title)
+    const f = (over: Partial<typeof NO_RUNS_FILTER>, laneCards: number[] | null = null) => [failedOfCard, passed].filter((r) => runMatches(r, { ...NO_RUNS_FILTER, ...over }, words, laneCards)).map((r) => r.title)
     expect(f({})).toEqual(['e2e', 'lint'])
     expect(f({ failedOnly: true })).toEqual(['e2e'])
-    expect(f({ laneCards: [4, 5] })).toEqual(['e2e'])
-    expect(f({ laneCards: [] })).toEqual([])
+    // A lane by its id, its cards as it has them now (HR6's round 1): changed, the filter follows it.
+    expect(f({ lane: 'l1' }, [4, 5])).toEqual(['e2e'])
+    expect(f({ lane: 'l1' }, [5, 9])).toEqual(['lint'])
+    expect(f({ lane: 'l1' }, [])).toEqual([])
+    // Gone (null cards): no lane filter until the tab clears it.
+    expect(f({ lane: 'l1' }, null)).toEqual(['e2e', 'lint'])
     expect(f({ agent: 'r1' })).toEqual(['lint'])
     expect(f({ query: '  LINT ' })).toEqual(['lint'])
     expect(f({ query: 'npm test' })).toEqual(['e2e', 'lint'])

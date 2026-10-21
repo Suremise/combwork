@@ -116,6 +116,8 @@ export function ProgressPanel() {
     void call('ui:setPane', tabKey, i ? i : null)
   }
   const [runsFilter, setRunsFilter] = useState<RunsFilter>(NO_RUNS_FILTER)
+  // Another workspace: its own filters, from none.
+  useEffect(() => setRunsFilter(NO_RUNS_FILTER), [workspace?.path])
   const width = usePaneSize('progress', 280)
   // The run whose details are open.
   const [detail, setDetail] = useState<string | null>(null)
@@ -299,15 +301,21 @@ const FIND_RUNS = msg({ id: 'board.runs.search', defaultMessage: 'Find runs', de
 function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs: ProgressRun[]; lanes: Lane[]; now: number; detail: string | null; toggle: (id: string) => void; filter: RunsFilter; setFilter: (f: RunsFilter) => void }) {
   const cardName = (n: number): string => cardLabelOf(get(), n)
   const words = (r: ProgressRun): string => [runAgentName(r, tr), r.title, r.command ?? '', r.card ? cardName(r.card) : ''].join('\n')
-  const lane = filter.laneCards ? lanes.find((l) => l.cards.join() === filter.laneCards!.join()) : undefined
+  // The lane chosen, as it is now (its cards change between cards, #1270); one no longer shown leaves the filter.
+  const lane = filter.lane ? lanes.find((l) => l.id === filter.lane) : undefined
   const agents = [...new Map(runs.filter((r) => r.agentId).map((r) => [r.agentId!, runAgentName(r, tr)])).entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  const matched = runs.filter((r) => runMatches(r, filter, words))
+  const goneLane = !!filter.lane && !lane
+  const goneAgent = !!filter.agent && !agents.some(([id]) => id === filter.agent)
+  useEffect(() => {
+    if (goneLane || goneAgent) setFilter({ ...filter, ...(goneLane ? { lane: null } : {}), ...(goneAgent ? { agent: null } : {}) })
+  }, [goneLane, goneAgent, filter, setFilter])
+  const matched = runs.filter((r) => runMatches(r, filter, words, lane?.cards ?? null))
   const running = matched.filter(isOpenRun)
   const days = runDays(
     matched.filter((r) => !isOpenRun(r)),
     now
   )
-  const filtered = filter.failedOnly || !!filter.laneCards || !!filter.agent || !!filter.query.trim()
+  const filtered = filter.failedOnly || !!lane || !!filter.agent || !!filter.query.trim()
   return (
     <>
       <div className="progress-runs-filters">
@@ -317,7 +325,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
             <Icon name="error" /> {tr(msg({ id: 'board.runs.failedOnly', defaultMessage: 'Failed', description: "A toggle in the Progress panel's Runs tab: shows only the runs that failed." }))}
           </button>
           {lanes.length > 0 && (
-            <select className="select" aria-label={tr(msg({ id: 'board.runs.lane', defaultMessage: 'Lane', description: "Accessible name of the Progress panel's Runs tab filter by lane: only the runs for a lane's cards." }))} value={lane?.id ?? ''} onChange={(e) => setFilter({ ...filter, laneCards: lanes.find((l) => l.id === e.target.value)?.cards ?? null })}>
+            <select className="select" aria-label={tr(msg({ id: 'board.runs.lane', defaultMessage: 'Lane', description: "Accessible name of the Progress panel's Runs tab filter by lane: only the runs for a lane's cards." }))} value={lane?.id ?? ''} onChange={(e) => setFilter({ ...filter, lane: e.target.value || null })}>
               <option value="">{tr(msg({ id: 'board.runs.anyLane', defaultMessage: 'Any lane', description: "A choice of the Progress panel's Runs tab filter by lane: runs of any card." }))}</option>
               {lanes.map((l) => (
                 <option key={l.id} value={l.id}>
