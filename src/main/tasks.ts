@@ -372,7 +372,7 @@ export async function getTask(n: number, ws: WorkspaceService = workspace): Prom
  * have now (removed, or renamed before it had an id) keeps the id it was saved with, if any, and never takes another
  * project's: shown as goneProject's while another project has its name, it is saved with that name as it was.
  */
-async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null): Promise<void> {
+async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null, withRow?: () => void): Promise<void> {
   // Who holds it now, for its cost (#602): a hold that ended gets its end, a new one starts.
   trackHolds(card, new Date().toISOString())
   const ids = await ws.projectIds()
@@ -386,6 +386,9 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
   }
   const { number, title, description, project: _shown, key: _key, ...rest } = card
   putCard(ws, n, { number, title, description, project: saved, ...(projectId ? { projectId } : {}), ...rest })
+  // What the caller writes with its row before its facts are recorded (a new card's kind, #1277: a card made in Doing
+  // starts as the kind it was made).
+  withRow?.()
   // Its facts, in the same transaction (#1216): what this change moved, started, submitted, reviewed, blocked or decided.
   recordChange(ws, before !== undefined ? before : was ? clean(was, n, ids) : null, { ...card, project: saved })
   // Its key now (#1219: a card moved to another project has that project's): what callers return of it.
@@ -967,12 +970,9 @@ async function createTaskLocked(
     createdBy: by,
     updatedAt: now
   }
-  await saveCard(ws, n, card, null)
-  if (kind === 'no-code') {
-    const store = FactStore.forBoard(ws, { project: card.project, key: '' })
-    if (proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
-    else store.updateCard(n, { kind })
-  }
+  const store = kind === 'no-code' ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
+  await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined)
+  if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
   log.info(`#${n} created by ${userText(by)}: ${userText(title)}`)
   changed(ws)
   return card
@@ -1192,7 +1192,7 @@ export async function moveColumns(n: number): Promise<TaskColumn[] | null> {
 }
 
 /** A card's kind as a call gives it (#1277): `code` unless `no-code`; anything else is refused. */
-function kindOf(v: unknown): CardKind {
+export function kindOf(v: unknown): CardKind {
   if (v === undefined || v === null || v === 'code') return 'code'
   if (v === 'no-code') return 'no-code'
   throw hiveError(KIND.bad, { kind: String(v) }, { kind: 'invalid' })
@@ -1218,7 +1218,7 @@ function kindProposal(store: FactStore, n: number): CardKind | null {
  * (`card.kind`), the user's (asked first: `ask` unless `confirm`) or the Assistant's (with `reason`, the user's); never
  * an agent's. An open proposal is answered by it too.
  */
-export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { confirm?: boolean; reason?: string } = {}): Promise<{ ask: true } | TaskCard> {
+export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { confirm?: boolean; reason?: string; commit?: () => void } = {}): Promise<{ ask: true } | TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(KIND.agents)
   const to = kindOf(kind)
   const ws = workspace
@@ -1232,6 +1232,9 @@ export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { c
       if (was === to) return card
       if (actor.kind === 'user' && !o.confirm) return { ask: true as const }
       if (actor.kind === 'assistant' && !reason) throw new TaskConflictError(KIND.needsReason)
+      // The caller's authority, checked last before anything is written (the Assistant's Control and session, under this
+      // lock: HR3's #1277 round 1), as updateTask's `commit`.
+      o.commit?.()
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.kind, { how: 'changed', kind: to }))
       await saveCard(ws, n, card, before)
@@ -1251,7 +1254,7 @@ export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { c
  * Answers a kind an agent proposed (#1277, OP-6/OP-7): the user's or the Assistant's. `accept` makes it the card's kind;
  * else the card stays code. Refused when nothing proposes one (answered meanwhile).
  */
-export async function confirmKind(n: number, accept: boolean, actor: TaskActor): Promise<TaskCard> {
+export async function confirmKind(n: number, accept: boolean, actor: TaskActor, o: { commit?: () => void } = {}): Promise<TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(KIND.agents)
   const ws = workspace
   return recordingAs(actor, () =>
@@ -1261,6 +1264,7 @@ export async function confirmKind(n: number, accept: boolean, actor: TaskActor):
       const proposed = kindProposal(store, n)
       if (!proposed) throw new TaskConflictError(withValues(KIND.noProposal, { n, kind: store.card(n).kind }))
       const kind: CardKind = accept ? proposed : 'code'
+      o.commit?.()
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.kind, { how: accept ? 'confirmed' : 'kept', kind }))
       await saveCard(ws, n, card, before)

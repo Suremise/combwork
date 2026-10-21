@@ -189,7 +189,7 @@ export interface WorkView {
   /** Started by the upgrade from what could be read (an `Adopted` fact), and the column it was in. */
   adopted: boolean
   adoptedFrom?: 'doing' | 'review' | 'passed'
-  /** Its kind (#1277): its cycle's (Started's), else the card's own; null when neither is known (before 1.0). */
+  /** Its kind (#1277): the card's own now (changed later as an override), else its cycle's; null when neither is known. */
   kind: CardKind | null
   /** A kind a project agent proposed when it made the card, not answered yet (OP-6/OP-7, #1277). */
   kindProposed: CardKind | null
@@ -292,7 +292,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     preWorkflow: c.preWorkflow,
     adopted: !!started?.adopted,
     ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
-    kind: started?.cardKind ?? c.kind ?? null,
+    // The card's kind now, not the one its cycle started with: a change after its start shows at once (HR3's #1277 round 1).
+    kind: c.kind ?? started?.cardKind ?? null,
     kindProposed: kindProposed(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,

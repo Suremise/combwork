@@ -2020,15 +2020,17 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const kind = body?.kind
   const confirmKind = body?.confirmKind
   if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, 'confirmKind is true (make it no-code, as proposed) or false (keep it as code).')
+  // Checked before anything is written (HR3's #1277 round 1): a kind no card has is refused whole.
+  if (kind !== undefined) tasks.kindOf(kind)
   // The override's reason is the kind change's when no column moves with it.
   if (kind !== undefined && patch.column === undefined) delete patch.override
-  const apply = async (commit?: () => void): Promise<TaskCard> => {
+  const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
-      await tasks.confirmKind(n, confirmKind, actor)
+      await tasks.confirmKind(n, confirmKind, actor, { commit })
       changes.push(confirmKind ? 'Confirmed as no code' : 'Kept as code')
     }
     if (kind !== undefined) {
-      await tasks.setKind(n, kind, actor, { reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
+      await tasks.setKind(n, kind, actor, { commit, reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
       changes.push(`Kind: ${kind}`)
     }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
@@ -2036,6 +2038,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     if (comment) changes.push('Commented')
     return c
   }
+  // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
+  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await apply())
   const was = await tasks.getTask(n).catch(() => null)

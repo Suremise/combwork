@@ -16,7 +16,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { cardKind } = await import('../src/main/workflow/cardWork')
+const { cardKind, workBadges } = await import('../src/main/workflow/cardWork')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -108,5 +108,61 @@ describe("a card's kind (#1277)", () => {
     expect(kindOf(w, c.number)).toBe('no-code')
     expect(FactStore.forBoard(w, { project: 'p', key: '' }).facts(c.number).find((f) => f.kind === 'Override')).toMatchObject({ actor: 'assistant', data: { by: 'assistant', reason: 'The user says it is a decision' } })
     expect(cardKind(w, c.number)).toEqual({ kind: 'no-code', kindProposed: null })
+  })
+
+  it("a revoked caller (the Assistant's Control or session, its `commit` check) changes nothing: neither a kind nor a proposal's answer (HR3's round 1)", async () => {
+    const w = await workspace()
+    const c = await create(w, agent, 'no-code')
+    const before = kinds(w, c.number)
+    const history = (await inWorkspace(w, () => tasks.getTask(c.number, w))).history.length
+    const revoked = () => {
+      throw new Error('Control was turned down meanwhile')
+    }
+    await expect(inWorkspace(w, () => tasks.setKind(c.number, 'no-code', assistant, { reason: 'x', commit: revoked }))).rejects.toThrow(/turned down/)
+    await expect(inWorkspace(w, () => tasks.confirmKind(c.number, true, assistant, { commit: revoked }))).rejects.toThrow(/turned down/)
+    expect(kindOf(w, c.number)).toBe('code')
+    expect(kinds(w, c.number)).toEqual(before)
+    expect((await inWorkspace(w, () => tasks.getTask(c.number, w))).history).toHaveLength(history)
+    expect(cardKind(w, c.number)).toEqual({ kind: 'code', kindProposed: 'no-code' })
+  })
+
+  it("one change of a kind with other fields (a PATCH) is one board change: refused part way, none of it is saved (HR3's round 1)", async () => {
+    const w = await workspace()
+    const c = await create(w, agent, 'no-code')
+    const before = kinds(w, c.number)
+    await expect(
+      inWorkspace(w, () =>
+        tasks.cardBatch(w, async () => {
+          await tasks.confirmKind(c.number, true, assistant)
+          await tasks.updateTask(c.number, { agent: 'nobody-here' }, assistant)
+        })
+      )
+    ).rejects.toThrow()
+    expect(kindOf(w, c.number)).toBe('code')
+    expect(kinds(w, c.number)).toEqual(before)
+    expect(cardKind(w, c.number)).toEqual({ kind: 'code', kindProposed: 'no-code' })
+    expect(() => tasks.kindOf('docs')).toThrow(/code or no-code, not docs/)
+  })
+
+  it("after a start the card shows its kind now: changed both ways, a proposal confirmed; one made in Doing starts as its kind (HR3's round 1)", async () => {
+    const w = await workspace()
+    const badge = (n: number) => workBadges(w).find((b) => b.card === n)
+    const c = await create(w, user)
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing', agent: 'a1' }, user))
+    expect(kinds(w, c.number)).toContain('Started')
+    await inWorkspace(w, () => tasks.setKind(c.number, 'no-code', user, { confirm: true, reason: 'A write-up' }))
+    expect(badge(c.number)?.kind).toBe('no-code')
+    await inWorkspace(w, () => tasks.setKind(c.number, 'code', user, { confirm: true, reason: 'A script after all' }))
+    expect(badge(c.number)?.kind).toBe('code')
+    // A proposal answered after the card started.
+    const p = await create(w, agent, 'no-code')
+    await inWorkspace(w, () => tasks.updateTask(p.number, { column: 'doing', agent: 'a1' }, user))
+    await inWorkspace(w, () => tasks.confirmKind(p.number, true, user))
+    expect(badge(p.number)).toMatchObject({ kind: 'no-code', kindProposed: null })
+    // Made in Doing as no code: its start says so.
+    const d = await inWorkspace(w, () => tasks.createTask({ title: 'Decide', project: 'p', column: 'doing', agent: 'a1', kind: 'no-code' }, user))
+    const started = FactStore.forBoard(w, { project: 'p', key: '' }).facts(d.number).find((f) => f.kind === 'Started')
+    expect(started?.data).toMatchObject({ cardKind: 'no-code' })
+    expect(badge(d.number)?.kind).toBe('no-code')
   })
 })
