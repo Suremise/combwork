@@ -555,4 +555,41 @@ interface HiveMessageValues {
   'board.view.noWorkspace': undefined
   'board.view.title': undefined
   'board.view.workspaceCards': undefined
+  'board.work.accepted': { when: string | number }
+  'board.work.adopted': { column: string | number }
+  'board.work.badgeOutside': undefined
+  'board.work.badgeStale': undefined
+  'board.work.base': undefined
+  'board.work.branch': undefined
+  'board.work.carriedOver': { from: string | number; to: string | number }
+  'board.work.check': { name: string | number; result: string; counted: string }
+  'board.work.failed': { error: string | number }
+  'board.work.files': { n: number }
+  'board.work.filesNotRead': { why: string | number }
+  'board.work.folder': undefined
+  'board.work.folderGone': { folder: string | number }
+  'board.work.integrated': { method: string; target: string | number; result: string | number }
+  'board.work.leftTarget': { target: string | number; revision: string | number }
+  'board.work.mergedInPart': { target: string | number }
+  'board.work.noCode': undefined
+  'board.work.noRecord': undefined
+  'board.work.noRevision': undefined
+  'board.work.none': undefined
+  'board.work.notRead': { why: string | number }
+  'board.work.openFile': { path: string | number }
+  'board.work.outsideHive': undefined
+  'board.work.outsideRules': { rules: string | number }
+  'board.work.overridden': undefined
+  'board.work.preWorkflow': undefined
+  'board.work.projectFolder': undefined
+  'board.work.reading': undefined
+  'board.work.retry': undefined
+  'board.work.revisionNotRead': { why: string | number }
+  'board.work.revisions': undefined
+  'board.work.round': { round: number }
+  'board.work.staleChange': { approved: string | number; current: string | number }
+  'board.work.staleDecision': undefined
+  'board.work.target': undefined
+  'board.work.title': undefined
+  'board.work.verdict': { reviewer: string | number; pass: string; current: string }
 }
