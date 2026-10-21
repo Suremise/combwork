@@ -4,7 +4,8 @@ import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId
 import { modelCaps } from '../shared/models'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
-import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { checkOptions, problemText } from './workflow/rulesets'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
@@ -62,6 +63,7 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   const def = e.advanced ? advancedDef(e.advanced.id) : undefined
   if (def) return `${advancedTakes(def)} null: ${e.advanced?.scope === 'workspace' ? "Settings → Advanced's value" : "Hive's default"}.`
   const kind = settingKind(e)
+  if (e.workflow) return workflowTakes(e, kind)
   const inherit = e.scope === 'project' && e.inherits && (kind === 'number' || e.key === 'worktreeCopy') ? ', or null to inherit' : ''
   switch (kind) {
     case 'boolean':
@@ -205,7 +207,9 @@ export async function applySetting(
     const next = await workspace.mutateProjectConfig(projectPath, (cfg) => {
       old = settingValue(e, config.settings, cfg)
       guard?.(old)
-      return change.project(cfg)
+      const patch = change.project(cfg)
+      if (e.workflow) checkWorkflowPatch(projectPath, patch)
+      return patch
     })
     return { old, new: settingValue(e, config.settings, next) }
   }
@@ -256,6 +260,17 @@ export async function applySetting(
     return { old, new: settingValue(e, config.settings), ...(JSON.stringify(before) !== JSON.stringify(after) ? { removed: { old: before, new: after } } : {}) }
   } else config.setProviderFallback(change.fallback.provider, change.fallback.kind, change.fallback.list as (FallbackModel | EffortOption)[] | null)
   return { old, new: settingValue(e, config.settings) }
+}
+
+/**
+ * A workflow option changed alone (#1278), as Project Settings → Workflow saves the options: with the others it would
+ * make, refused with every reason (a contradiction, a value this version doesn't offer yet), under the project's lock.
+ */
+function checkWorkflowPatch(projectPath: string, patch: Partial<ProjectConfig>): void {
+  const wf = patch.workflow
+  if (!wf?.platform) throw new SettingRefused(409, `${basename(projectPath)} has no version control recorded yet: its workflow options can be set once Hive has detected it (reopen the project).`)
+  const { problems } = checkOptions(wf.platform, { global: config.settings.workflow, workspace: workspace.config.workflow, project: wf.options })
+  if (problems.length) throw new SettingRefused(400, `These workflow options can't be saved: ${problems.map(problemText).join(' ')} Change the other options first, or tell the user.`)
 }
 
 /** Reverts in progress, by the change's action id: a second click while one runs is refused. */

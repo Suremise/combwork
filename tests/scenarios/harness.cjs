@@ -125,6 +125,19 @@ function trialEnvironment({ status = null, replies = [], screen = '' } = {}) {
   return lib.environmentProblem([...replies, screen].join('\n'))
 }
 
+/**
+ * Why a prompt the CLI never took was refused by the environment, or null (#1321): what it drew once the prompt was
+ * typed (Claude Code's "Not logged in · Run /login" can show only then), not counting what the prompt itself names, or,
+ * when its screen says nothing, its own sign-in status (`auth`: Claude Code's `auth status --json`, or null).
+ */
+function promptRefused({ prompt = '', screen = '', auth = null } = {}) {
+  const named = new Set(lib.environmentProblems(prompt).map((x) => x.why.split(':')[0]))
+  const drawn = lib.environmentProblems(screen).find((x) => !named.has(x.why.split(':')[0]))
+  if (drawn) return drawn.why
+  if (auth?.loggedIn === false) return "not signed in: its auth status says it isn't logged in"
+  return null
+}
+
 /** The lines of Hive's log (a test profile's), or none. */
 const logLines = (file) => {
   try {
@@ -208,7 +221,7 @@ function environmentAdvice(why, providerKey) {
 /**
  * Runs `sc` with `providerKey` (fake, claude-code or codex). `opts`: { model, effort, timeoutMs, port, keep, workRoot,
  * signedOut (a fake only: it acts out an expired sign-in, for checking the environment skip; 'launch': one that stops it
- * at launch) }.
+ * at launch; 'late': one shown only once the prompt is sent, #1321) }.
  * Returns { scenario, provider, model, cliVersion, guidance, observed, checks, usage, seconds, error }.
  */
 async function runScenario(sc, providerKey, opts = {}) {
@@ -252,7 +265,7 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
   fs.writeFileSync(path.join(fakeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
-  if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : {}) }))
+  if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))
   if (providerKey === 'codex') {
     lib.trustForCodex(alpha)
     lib.trustForCodex(ws)
@@ -301,7 +314,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
       ...(providerKey === 'codex' ? { PATH: lib.pathWithoutStoreAliases() } : {}),
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
-      ...(standIn ? copilotTestEnv(standIn, root) : {})
+      ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
     ;({ app, inv } = await lib.launch({ userData, env }))
   } catch (e) {
@@ -563,7 +576,15 @@ async function runScenario(sc, providerKey, opts = {}) {
       const items = s?.sessionId ? ((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items ?? []) : []
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
-    if (!endedAtLaunch) await lib.sendPrompt(inv, key, text, { submitted, waitMs: 20000 })
+    if (!endedAtLaunch) {
+      const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
+      if (!(await lib.sendPrompt(inv, key, text, { submitted, waitMs: 20000 }))) {
+        // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
+        const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
+        const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'hive.log'), agentId, env) : null })
+        if (refused) return skipFor(refused)
+      }
+    }
     const sentAt = Date.now()
 
     // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
@@ -659,6 +680,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     const tokens = [apiToken, ...tokensIn(path.join(userData, 'agent-api')), ...tokensIn(path.join(userData, 'assistant-api'))].filter((t) => typeof t === 'string' && t.length >= 16)
     observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || observed.replies.some((r) => r.includes(t)))
     observed.cards = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await api('GET', `/v1/tasks/${n}`)).body])))
+    // Each card's workflow facts (1.0: Moved, Override, Refused…), for scenarios about what a move recorded (#1319).
+    observed.facts = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await inv('tasks:facts', n).catch(() => null)) ?? []])))
     observed.allCards = (await api('GET', '/v1/tasks')).body ?? []
     // The lanes as the run left them (#402): running and lately ended.
     observed.lanes = (await api('GET', '/v1/lanes')).body ?? []
@@ -733,4 +756,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

@@ -538,6 +538,30 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     expect(trialEnvironment({})).toBeNull()
   })
 
+  // #1321: Claude Code drew "Not logged in · Run /login" only once the prompt was typed, and never took it.
+  describe('a prompt never taken (promptRefused)', () => {
+    const { promptRefused } = require('./scenarios/harness.cjs') as {
+      promptRefused: (o: { prompt?: string; screen?: string; auth?: { loggedIn?: boolean } | null }) => string | null
+    }
+    const prompt = 'Work on card #1: move it to Doing first.'
+
+    it('what the CLI drew after it was typed', () => {
+      expect(promptRefused({ prompt, screen: `> ${prompt}\r\n  Not logged in · Run /login\r\n` })).toMatch(/^not signed in: /)
+    })
+
+    it('not what the prompt itself names', () => {
+      const named = 'If it says "not logged in", report it.'
+      expect(promptRefused({ prompt: named, screen: `> ${named}` })).toBeNull()
+      expect(promptRefused({ prompt: named, screen: `> ${named} You've hit your usage limit` })).toMatch(/^usage or rate limit: /)
+    })
+
+    it("its auth status when the screen says nothing, and nothing when it's signed in", () => {
+      expect(promptRefused({ prompt, screen: `> ${prompt}`, auth: { loggedIn: false } })).toMatch(/^not signed in: its auth status/)
+      expect(promptRefused({ prompt, screen: `> ${prompt}`, auth: { loggedIn: true } })).toBeNull()
+      expect(promptRefused({ prompt, screen: `> ${prompt}` })).toBeNull()
+    })
+  })
+
   // #577: Claude Code 2.1.296 with an OAuth session it couldn't refresh printed this and exited with 1 at launch.
   describe('a CLI that exits at launch (launchEnded)', () => {
     const { launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus } = require('./scenarios/harness.cjs') as {

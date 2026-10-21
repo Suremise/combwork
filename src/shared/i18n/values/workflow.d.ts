@@ -15,6 +15,71 @@ interface HiveMessageValues {
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
   'workflow.forYouKind': { kind: string }
+  'workflow.form.addCheck': undefined
+  'workflow.form.agentsSection': undefined
+  'workflow.form.cantSave': undefined
+  'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
+  'workflow.form.changesHead': undefined
+  'workflow.form.checkCommand': undefined
+  'workflow.form.checkName': undefined
+  'workflow.form.choose': undefined
+  'workflow.form.confirmMessage': undefined
+  'workflow.form.confirmTitle': undefined
+  'workflow.form.copied': undefined
+  'workflow.form.copy': undefined
+  'workflow.form.defaultBranch': undefined
+  'workflow.form.discard': undefined
+  'workflow.form.fileLocks': undefined
+  'workflow.form.fileLocksValue': undefined
+  'workflow.form.folders': undefined
+  'workflow.form.from.global': undefined
+  'workflow.form.from.platform': undefined
+  'workflow.form.from.preset': undefined
+  'workflow.form.from.project': undefined
+  'workflow.form.from.workspace': undefined
+  'workflow.form.git': undefined
+  'workflow.form.identity': { name: string | number; email: string | number }
+  'workflow.form.identityValue': { name: string | number; email: string | number }
+  'workflow.form.inFlight': { n: number }
+  'workflow.form.inherit': undefined
+  'workflow.form.inheritTip': { value: string | number }
+  'workflow.form.invalid': undefined
+  'workflow.form.labels': undefined
+  'workflow.form.labelsValue': { labels: string | number }
+  'workflow.form.lane': { builder: string | number; name: string | number }
+  'workflow.form.laneUnnamed': { builder: string | number }
+  'workflow.form.lanes': { n: number }
+  'workflow.form.loadFailed': { error: string | number }
+  'workflow.form.loops': undefined
+  'workflow.form.loopsSection': undefined
+  'workflow.form.loopsValue': { rounds: number; hours: number }
+  'workflow.form.noChanges': undefined
+  'workflow.form.noChecks': undefined
+  'workflow.form.noIdentity': undefined
+  'workflow.form.none': undefined
+  'workflow.form.noneValue': undefined
+  'workflow.form.notEnforced': undefined
+  'workflow.form.off': undefined
+  'workflow.form.on': undefined
+  'workflow.form.openAdvanced': undefined
+  'workflow.form.owned': { where: string | number }
+  'workflow.form.ownedPrefix': undefined
+  'workflow.form.paste': undefined
+  'workflow.form.pasteApply': undefined
+  'workflow.form.pasteBad': undefined
+  'workflow.form.pasteMessage': undefined
+  'workflow.form.pastePlatform': undefined
+  'workflow.form.pasteTitle': undefined
+  'workflow.form.platform': undefined
+  'workflow.form.platformDesc': undefined
+  'workflow.form.preset': undefined
+  'workflow.form.presetDesc': undefined
+  'workflow.form.removeCheck': undefined
+  'workflow.form.save': undefined
+  'workflow.form.saved': undefined
+  'workflow.form.startedFrom': { preset: string | number }
+  'workflow.form.unavailable': { preset: string | number; why: string | number }
+  'workflow.form.worktree': undefined
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
   'workflow.move.move': undefined
@@ -26,6 +91,52 @@ interface HiveMessageValues {
   'workflow.move.startReview': undefined
   'workflow.move.submit': undefined
   'workflow.move.verdict': undefined
+  'workflow.notOffered.hiveMerges': undefined
+  'workflow.notOffered.later': undefined
+  'workflow.option.commands.desc': undefined
+  'workflow.option.commands.title': undefined
+  'workflow.option.dependenciesDone.desc': undefined
+  'workflow.option.dependenciesDone.none': undefined
+  'workflow.option.dependenciesDone.title': undefined
+  'workflow.option.excluded.desc': undefined
+  'workflow.option.excluded.title': undefined
+  'workflow.option.finish.desc': undefined
+  'workflow.option.finish.title': undefined
+  'workflow.option.folder.desc': undefined
+  'workflow.option.folder.title': undefined
+  'workflow.option.identity.desc': undefined
+  'workflow.option.identity.title': undefined
+  'workflow.option.noSelfReview.desc': undefined
+  'workflow.option.noSelfReview.title': undefined
+  'workflow.option.okBefore.desc': undefined
+  'workflow.option.okBefore.title': undefined
+  'workflow.option.preChecks.desc': undefined
+  'workflow.option.preChecks.title': undefined
+  'workflow.option.review.desc': undefined
+  'workflow.option.review.none': undefined
+  'workflow.option.review.title': undefined
+  'workflow.option.reviewers.desc': undefined
+  'workflow.option.reviewers.title': undefined
+  'workflow.option.sameness.desc': undefined
+  'workflow.option.sameness.title': undefined
+  'workflow.option.sharedFolderWarning.desc': undefined
+  'workflow.option.sharedFolderWarning.title': undefined
+  'workflow.option.stopOwnRuns.desc': undefined
+  'workflow.option.stopOwnRuns.title': undefined
+  'workflow.option.style.desc': undefined
+  'workflow.option.style.title': undefined
+  'workflow.option.target.desc': undefined
+  'workflow.option.target.title': undefined
+  'workflow.preset.custom': undefined
+  'workflow.preset.needs.hiveMerges': undefined
+  'workflow.preset.needs.slots': undefined
+  'workflow.preset.pair': undefined
+  'workflow.preset.pairAgent': undefined
+  'workflow.preset.solo': undefined
+  'workflow.preset.team': undefined
+  'workflow.presetsNotice.choose': undefined
+  'workflow.presetsNotice.notNow': undefined
+  'workflow.presetsNotice.text': { n: number; projects: string | number }
   'workflow.refused.approval.given.change': undefined
   'workflow.refused.approval.given.message': { card: string | number }
   'workflow.refused.approval.given.next': undefined
@@ -51,6 +162,9 @@ interface HiveMessageValues {
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined
+  'workflow.refused.move.noStage.change': undefined
+  'workflow.refused.move.noStage.message': { card: string | number; stage: string | number }
+  'workflow.refused.move.noStage.next': { stages: string | number }
   'workflow.refused.move.notFromHere.message': { card: string | number; stage: string | number; move: string | number }
   'workflow.refused.move.notFromHere.next': { stage: string | number; moves: string | number }
   'workflow.refused.move.notFromHere.nextNone': undefined
@@ -166,4 +280,22 @@ interface HiveMessageValues {
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }
+  'workflow.value.finish.agentMerges': undefined
+  'workflow.value.finish.committed': undefined
+  'workflow.value.finish.hiveMerges': undefined
+  'workflow.value.finish.notChecked': undefined
+  'workflow.value.folder.project': undefined
+  'workflow.value.folder.slots': undefined
+  'workflow.value.okBefore.every': undefined
+  'workflow.value.okBefore.labels': undefined
+  'workflow.value.okBefore.never': undefined
+  'workflow.value.review.agent': undefined
+  'workflow.value.review.agentThenYou': undefined
+  'workflow.value.review.none': undefined
+  'workflow.value.review.noneNone': undefined
+  'workflow.value.review.you': undefined
+  'workflow.value.sameness.change': undefined
+  'workflow.value.sameness.exact': undefined
+  'workflow.value.style.merge': undefined
+  'workflow.value.style.squash': undefined
 }

@@ -1647,8 +1647,30 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   facts are still recorded, nothing is refused or asked, and reconciliation records only (§16.4.4), as in P3. Each
   rule has its own option too.
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
-  by the Assistant within Control (as settings are, `hive_change_setting`), never by project agents [note §3].
+  by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
+- **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it:
+  - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per
+    option this version offers (§16.19.1): Git's G1–G7, G10–G14 and G16 (G11's own folder is the builder's worktree),
+    None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link to their
+    owner. N5 (stage names), G8, G9, G15 and G17 wait for later phases.
+  - Each row shows its origin (the preset, the project, the workspace, Hive's settings, or the platform's all-off). An
+    option the project sets has **Inherit**: project.json keeps only the options the project sets (`workflow.options`
+    is partial), and the runtime, the recorder's start and the adoption resolve them over the other levels.
+  - **Save…** runs `workflow:setOptions`, never `project:updateConfig` (which refuses `workflow`). It is checked under
+    the project's lock: an option that can't be read, a contradiction, or a value the project sets that this version
+    doesn't offer yet (Hive merges, strict, merge checks, slots kept up to date) refuses the whole save, with each
+    reason a sentence of its own. Before it, §16.6.5's warning lists what changes, the project's running lanes and its
+    cards in flight (started, not Done).
+  - **Apply to cards in flight** (§16.11.4, OP-38): the user ticks cards in that warning. Each one still in flight gets
+    an `Override` (`move: applyOptions`, `rules: option.<name>` per option changed, by the user, no reason) carrying the
+    new ruleset, which the card works under from then on (`rulesetOf`: the latest such override after its start).
+  - **Copy as JSON / Paste JSON…**: the version control, the preset and every option in force; a paste is checked as a
+    save is and fills the form, to save.
+  - Agents read the options with `hive_project_status` (`workflow`: the options in force, which levels set which, the
+    preset, whether the rules are enforced, why they work as all-off). The Assistant sets one at a time with
+    `hive_update_setting` (`project.workflow.<option>`, null inherits), checked against the others under the lock.
+  - With `hive.workflow.enforce` off the form still saves, and says the rules aren't enforced.
 
 ### 16.7 Moves and gates
 
@@ -1679,7 +1701,12 @@ the submission on the state the start would leave; the rules they skip together 
 which a rule not decided on undoes (asked again). A submission refused for what no override makes true stops the drag
 after its start (§16.8.4), the start written alone. With the rules not enforced, the runtime runs no guard for any
 intent (`cfg.enforced`). A batch's card is a part of the batch's change undone on its own when refused (savepoint),
-its `Refused` kept. Agents' column moves keep
+its `Refused` kept. **Built [#1290]:** the window's move (`tasks:move`) has §16.8.4's drag semantics whole: the
+question names only the rules that refuse; a stage the card's ruleset lacks is refused with why (`move.noStage`: the
+stages it has, and that they follow its Version Control options); a Done card dragged past Todo is reopened and started
+in one write (a new cycle, nothing skipped by the reopening); On Hold's returns as above; with the rules not enforced,
+every move just moves. Until the window asks through it (#1275), its drags (`tasks:update`) stay confirmed, and a column
+the ruleset lacks keeps P3's move there. Agents' column moves keep
 P3's path until #1268. A builder with its own worktree starts there whatever the folder option says (it stands in for a
 slot, §16.19.1; P3 recorded it so too), with no `prepareSlot`.
 
@@ -2494,7 +2521,10 @@ when a role or name says *review*.
 - **A stage stays visible while any card is in it,** even if the options no longer produce it; the card finishes under
   its own ruleset.
 - A one-time notice offers the presets. This reads the clean cut-over as "everyone moves to the layer at once, no warn
-  mode", with options starting where the project is (OP-22).
+  mode", with options starting where the project is (OP-22). **Built [#1278]:** a banner after the upgrade names the
+  projects with no preset chosen; **Choose…** opens the first one's Project Settings → Workflow, **Not Now** dismisses
+  it. Either answer is recorded in `board_meta` (`workflow.presetsNotice`), so it shows once per workspace, and never on
+  a board made by 1.0 (no card from before it: `adoption_upto` 0).
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`
@@ -2582,7 +2612,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 |---|---|---|---|
 | P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59, S61, S62 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. **Built** (20 Oct): every scenario of this row passes in `tests/workflow` (ARCHITECTURE "Workflow layer" says where the code is and what it stands in for); the spec fixes it found are marked **[P2]**. **What P3 adopts** [#1118 20 Oct]: `src/shared/workflow` and the platform adapters (`src/main/platform`) as they are; `runtime.ts`, `reconcile.ts`, `mergeQueue.ts` and `checks.ts` as P4's and P5's starting point; the fact store replaced by hive.db tables written inside `boardWrite` (P3). This row's list (43 scenarios) is the source, not the 28 the card's brief named. |
 | P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
-| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_change_setting`; the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
+| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_update_setting` (built: #1278, §16.6.6); the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
 | P5 Hive merges | #1121 | The merge queue (§16.9), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
 | P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6 | RC |
 | P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7 | RC |

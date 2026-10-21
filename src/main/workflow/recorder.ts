@@ -16,7 +16,6 @@ import { HISTORY } from '../../shared/taskHistory'
 import type { TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
-import type { WorkflowOptions } from '../../shared/workflow/options'
 import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE } from '../../shared/workflow/facts'
 import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import { advanced } from '../advanced'
@@ -26,6 +25,7 @@ import * as G from '../platform/git'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown, type Maybe } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
+import { resolvedOf } from './rulesets'
 import { FactStore, type Tx } from './factStore'
 
 const log = createLogger('workflow')
@@ -133,11 +133,12 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {} }
   // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
   if (p.why === 'start') {
-    const options = (cfg as { workflow?: { options?: unknown } }).workflow?.options
+    // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
+    const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {
-      const c = options && typeof options === 'object' ? compile(options as WorkflowOptions) : null
+      const c = resolved && !resolved.invalid ? compile(resolved.options) : null
       if (c?.ok) r.ruleset = c.ruleset
-      else r.unknown.ruleset = c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)" // i18n-ignore: a fact's note, in English for agents
+      else r.unknown.ruleset = resolved?.invalid ? `the project's options can't be used (${resolved.invalid})` : c ? `the project's options contradict each other (${c.contradictions.join(', ')})` : "the project has no options yet (project.json's workflow)" // i18n-ignore: a fact's note, in English for agents
     } catch (e) {
       r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})` // i18n-ignore: a fact's note, in English for agents
     }

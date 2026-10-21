@@ -20,6 +20,7 @@ import { shownText } from '@shared/advanced'
 import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
+import { WorkflowOptionsForm } from '../components/WorkflowOptions'
 import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { confirmDangerousMode } from '../components/PermissionMode'
@@ -1578,9 +1579,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'agents' | 'sessions' | 'loops' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'agents' | 'sessions' | 'loops' | 'workflow' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { agents: 'organization', sessions: 'history', loops: 'sync', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { agents: 'organization', sessions: 'history', loops: 'sync', workflow: 'git-pull-request', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1935,6 +1936,13 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.loopWaitHours'),
       modified: cfg.loopWaitHours !== null,
       render: () => <NumberField value={cfg.loopWaitHours} min={1} max={LOOP_WAIT_MAX_HOURS} step={1} label={tr(S.waitHours)} inherit={inherit(tr(S.hours, { count: workspaceLoops.waitHours }))} onCommit={(v) => update({ loopWaitHours: v })} />
+    },
+    {
+      section: 'workflow',
+      key: 'workflow',
+      ...rowText('project.workflow'),
+      wide: true,
+      render: () => <WorkflowOptionsForm project={project} />
     },
     {
       section: 'storage',

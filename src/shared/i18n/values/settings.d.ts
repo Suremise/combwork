@@ -649,6 +649,8 @@ interface HiveMessageValues {
   'settings.project.transcriptWarnMB.off': undefined
   'settings.project.transcriptWarnMB.tip': undefined
   'settings.project.transcriptWarnMB.title': undefined
+  'settings.project.workflow.desc': undefined
+  'settings.project.workflow.title': undefined
   'settings.project.worktreeCopy.desc': undefined
   'settings.project.worktreeCopy.tip': undefined
   'settings.project.worktreeCopy.title': undefined
@@ -683,6 +685,8 @@ interface HiveMessageValues {
   'settings.projectSection.sessions.label': undefined
   'settings.projectSection.storage.desc': undefined
   'settings.projectSection.storage.label': undefined
+  'settings.projectSection.workflow.desc': undefined
+  'settings.projectSection.workflow.label': undefined
   'settings.provider.allowBackgroundSessions.desc': { provider: string | number }
   'settings.provider.allowBackgroundSessions.tip': { provider: string | number; cli: string | number }
   'settings.provider.allowBackgroundSessions.title': undefined
