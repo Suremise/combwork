@@ -16,7 +16,6 @@ import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
-import { workflowEnforced, workflowFor } from './workflow/service'
 import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
 import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
@@ -1011,6 +1010,8 @@ interface Gate {
  */
 async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<Gate | null> {
   if (patch.column === undefined || !isTaskColumn(patch.column) || (actor.kind !== 'user' && actor.kind !== 'assistant')) return null
+  // Imported when first needed: the service reaches the board's notices (#1266), which reach back here.
+  const { workflowEnforced, workflowFor } = await import('./workflow/service')
   if (!ws.path || !workflowEnforced()) return null
   const head = cardHeads(ws, [n])[0]
   if (!head || typeof head.project !== 'string' || !head.project || head.column === patch.column) return null
