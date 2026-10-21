@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed'
 
 export type RuleId = GuardId | MoveRule
 
@@ -124,6 +124,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'move.notFromHere': r(
     msg({ id: 'workflow.refused.move.notFromHere.message', defaultMessage: "{card} is in {stage}: {move} isn't possible from there.", description: 'A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent.' }),
     msg({ id: 'workflow.refused.move.notFromHere.next', defaultMessage: 'From {stage}, use: {moves}.', description: 'The next step: the intents possible from the stage. {moves} lists them.' })
+  ),
+  'move.noStage': r(
+    msg({ id: 'workflow.refused.move.noStage.message', defaultMessage: "{card} can't go to {stage}: this project's rules have no such step.", description: 'A refused move: the card was moved to a board stage the project\'s workflow rules don\'t have (Review with no review, say). {card} is a card key, {stage} a stage name.' }),
+    msg({ id: 'workflow.refused.move.noStage.next', defaultMessage: 'Move it to one of its steps: {stages}.', description: 'The next step after a move to a stage the rules lack: the stages they have. {stages} lists stage names.' }),
+    msg({ id: 'workflow.refused.move.noStage.change', defaultMessage: "A project's steps follow its options in Version Control.", description: 'Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it).' })
   ),
   'move.useIntent': r(
     msg({ id: 'workflow.refused.move.useIntent.message', defaultMessage: "Agents don't move cards between columns.", description: 'A refused column move by an agent: agents act by intent.' }),

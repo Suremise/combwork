@@ -375,6 +375,114 @@ describe("the runtime's moves and #1266's loop wakes", () => {
   })
 })
 
+// #1290, SPEC §16.8.4 and §16.7.4: the window's drags (tasks:move) run the intents they stand for, on Git and None.
+describe('drags run the intents they stand for (#1290)', () => {
+  /** "Pair" without version control: a reviewer agent, accepted where it is, dependencies first. */
+  const PAIR_NONE = { ...allOff('none'), review: 'agent', noSelfReview: true, dependenciesDone: true } as const
+  const move = (w: WS, card: number, column: Parameters<typeof tasks.moveTask>[1], o: Parameters<typeof tasks.moveTask>[2] = {}) => inWorkspace(w, () => tasks.moveTask(card, column, o))
+  const stage = (w: WS, card: number) => foldCard(facts(w, card)).stage
+
+  it('Todo to the furthest stage asks for exactly the rules that refuse, nothing written; confirmed, one Override naming them (Git and None)', async () => {
+    for (const [platform, options, to, rules] of [
+      ['git', PAIR, 'passed', ['start.notBlocked', 'integrate.approved']],
+      // None: a start takes the folder as it is as its base, so a drag from Todo has nothing to submit (the next test):
+      // its question is the start's.
+      ['none', PAIR_NONE, 'doing', ['start.notBlocked']]
+    ] as const) {
+      const { w, wt } = await workspace(options, platform)
+      const card = await create(w)
+      await update(w, card, { agent: 'a1', blocked: 'Waiting on the API' })
+      // Work to submit: a commit in a1's worktree (Git).
+      if (platform === 'git') {
+        writeFileSync(join(wt, 'b.txt'), 'b\n')
+        git(wt, 'add', '-A')
+        git(wt, 'commit', '-qm', 'b')
+      }
+      const asked = await move(w, card, to)
+      expect(asked).toEqual({ ask: [...rules] })
+      expect(kinds(w, card)).toEqual(['Blocked'])
+      expect(await move(w, card, to, { confirm: true })).toMatchObject({ moved: { column: to } })
+      const o = facts(w, card).filter((f) => f.kind === 'Override')
+      expect(o).toHaveLength(1)
+      expect([...(o[0].data as { rules: string[] }).rules].sort()).toEqual([...rules].sort())
+    }
+  })
+
+  it('a step no override can make true stops the drag there: started, nothing to submit (Git and None)', async () => {
+    for (const [platform, options] of [['git', PAIR], ['none', PAIR_NONE]] as const) {
+      const { w } = await workspace(options, platform)
+      const card = await create(w)
+      await update(w, card, { agent: 'a1' })
+      const r = await move(w, card, 'review', { confirm: true })
+      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
+      expect(stage(w, card)).toBe('active')
+      expect(kinds(w, card)).not.toContain('Submitted')
+    }
+  })
+
+  it('On Hold: back where it was returns it there; past it, back there and on in one change; behind it counts from where it was', async () => {
+    const { w, wt } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    writeFileSync(join(wt, 'b.txt'), 'b\n')
+    git(wt, 'add', '-A')
+    git(wt, 'commit', '-qm', 'b')
+    // Into On Hold keeps everything: its start and cycle.
+    const cycle = foldCard(facts(w, card)).cycle
+    await move(w, card, 'hold')
+    expect(foldCard(facts(w, card))).toMatchObject({ stage: 'hold', cycle })
+    // Back where it was (Active): returned, no new start.
+    expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
+    expect(kinds(w, card).filter((k) => k === 'Started')).toHaveLength(1)
+    // Past it (On Hold → Review): back to Active and submitted, in one change, no question (nothing skipped).
+    await move(w, card, 'hold')
+    const before = facts(w, card).length
+    expect(await move(w, card, 'review')).toMatchObject({ moved: { column: 'review' } })
+    expect(facts(w, card).slice(before).map((f) => f.kind)).toEqual(['Moved', 'Submitted', 'Moved'])
+    // Behind it (On Hold, from Review → Doing): counted from Review, nothing skipped, a plain move.
+    await move(w, card, 'hold')
+    expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
+    expect(kinds(w, card)).not.toContain('Override')
+  })
+
+  it('reopening a Done card: back to Todo with no Override; dragged on to Doing, a new cycle starts in the same change', async () => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    await move(w, card, 'done', { confirm: true })
+    const first = foldCard(facts(w, card)).cycle
+    // Done → Doing: reopened (to Todo) and started again, one change; the reopening skips nothing.
+    const before = facts(w, card).length
+    expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
+    expect(facts(w, card).slice(before).map((f) => f.kind)).toEqual(['Moved', 'Started', 'Moved'])
+    expect(foldCard(facts(w, card)).cycle).toBeGreaterThan(first)
+    expect(facts(w, card).filter((f) => f.kind === 'Override')).toHaveLength(1)
+    // And Done → Todo is a plain move.
+    await move(w, card, 'done', { confirm: true })
+    expect(await move(w, card, 'todo')).toMatchObject({ moved: { column: 'todo' } })
+  })
+
+  it("a stage the card's rules don't have is refused, saying why; the board's other moves keep today's move until the window asks (#1275)", async () => {
+    const { w } = await workspace(null)
+    const card = await create(w)
+    await update(w, card, { column: 'doing' })
+    const r = await move(w, card, 'review')
+    expect(r).toMatchObject({ refused: { rule: 'move.noStage', next: expect.stringContaining('done') } })
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
+    expect((await update(w, card, { column: 'review' })).column).toBe('review')
+  })
+
+  it('with the rules not enforced, every drag just moves: no question, no Override, no refusal', async () => {
+    await advanced.set(ENFORCE, false)
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { agent: 'a1', blocked: 'Waiting' })
+    for (const column of ['passed', 'review', 'done', 'doing', 'hold', 'todo'] as const) expect(await move(w, card, column)).toMatchObject({ moved: { column } })
+    expect(kinds(w, card)).not.toContain('Override')
+    expect(kinds(w, card)).not.toContain('Refused')
+  })
+})
+
 describe('with nothing to enforce (#1265)', () => {
   it('S39: all off (Git and None): the user and the Assistant move any card anywhere, nothing asked, refused or overridden', async () => {
     for (const platform of ['git', 'none'] as const) {
