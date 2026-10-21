@@ -103,12 +103,13 @@ const until = async (fn, ms = 10000) => {
     const content = lines.length ? JSON.parse(lines.at(-1)).message.content : null
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
   }, 15000)
-  // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done and
-  // Done only once merged or when the user asks (#170; the session's Hive instructions say it too, for a session without the skill).
+  // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done (by
+  // submitting it, #1274) and Done only once merged (#170). The session's Hive instructions say both too, with "or when the
+  // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
   const skill = path.join(alpha, '.hive', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')
   const skillText = fs.existsSync(skill) ? fs.readFileSync(skill, 'utf8') : ''
-  check('…which says Review when the work is done, and Done once merged or when the user asks', /[Mm]ove it to `review`/.test(skillText) && /`done` means merged: move your card there once its work is merged \(merge-ready\), or when the user asks/.test(skillText), skillText.slice(0, 200))
+  check('…which says Review when the work is done, and Done once merged', /`hive_submit`[^\n]*it moves to Review/.test(skillText) && /Done means merged: once you have merged its work \(merge-ready\), report it with `hive_report_merge`/.test(skillText), skillText.slice(0, 200))
 
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
   await app.close()

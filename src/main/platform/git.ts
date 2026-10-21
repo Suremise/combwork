@@ -4,8 +4,8 @@
 //
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
-import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, unlinkSync } from 'original-fs'
-import { isAbsolute, join } from 'path'
+import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
+import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
@@ -25,6 +25,22 @@ const lines = (s: string): string[] => s.split(/\r?\n/).filter(Boolean)
 export async function commonDir(repo: string): Promise<Maybe<string>> {
   const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   return r.ok ? r.out.trim() : unknown(U.gitFolder, { folder: repo })
+}
+
+/**
+ * A folder's own git dir, read from its `.git` (a folder, or a linked worktree's `gitdir:` file) with no git process, as
+ * `rev-parse --absolute-git-dir` would answer it there (#1373: asked by every intent's evidence). Null when the folder
+ * has no readable `.git` of its own (a repository's subfolder): ask git.
+ */
+export function gitDirSync(folder: string): string | null {
+  const dot = join(folder, '.git')
+  try {
+    if (statSync(dot).isDirectory()) return resolvePath(dot)
+    const m = /^gitdir: (.+)$/m.exec(readFileSync(dot, 'utf8'))
+    return m ? resolvePath(folder, m[1].trim()) : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -116,32 +132,64 @@ export async function mergeBase(repo: string, a: string, b: string): Promise<May
  * rebase or cherry-pick under way. With `paths`, only those count (a shared folder: the agent's own).
  */
 export async function dirty(folder: string, paths?: string[]): Promise<Maybe<string[]>> {
-  const r = await git(folder, ['status', '--porcelain=v2', '-z', '--untracked-files=all'])
+  const now = await worktreeNow(folder)
+  if (isUnknown(now)) return now
+  if (!paths) return now.dirty
+  const mine = (f: string) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`))
+  return now.dirty.filter((f) => f.startsWith('(') || mine(f))
+}
+
+/** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
+const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
+
+/** A worktree as it is now (worktreeNow): its branch (null: detached), head and uncommitted state (dirty's list). */
+export interface WorktreeNow {
+  line: string | null
+  /** Null: no commit yet. */
+  head: string | null
+  dirty: string[]
+  /** The line asked for's head (null: no such line), when one was. */
+  target?: string | null
+  /** The git paths asked for, absolute, in their order. */
+  gitPaths: string[]
+}
+
+/**
+ * A worktree's branch, head and uncommitted state, and optionally a line's head and some git paths, in two gits run at
+ * once (#1374: lanes read this several times a pass, and six gits each outran tests' bounds under load): `status
+ * --branch` for the branch, head and files, and one `rev-parse` for the markers' paths, `gitPaths` and the line (a
+ * line in the folder's repository: an agent's worktree shares the project's branches).
+ */
+export async function worktreeNow(folder: string, o: { target?: string; gitPaths?: string[] } = {}): Promise<Maybe<WorktreeNow>> {
+  const asked = [...MARKERS, ...(o.gitPaths ?? [])]
+  const where = (target?: string) => git(folder, ['rev-parse', '--path-format=absolute', ...asked.flatMap((m) => ['--git-path', m]), ...(target ? ['--revs-only', `refs/heads/${target}`, '--'] : [])])
+  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all']), where(o.target)])
   if (!r.ok) return unknown(U.uncommitted, { folder })
+  let line: string | null = null
+  let oid: string | null = null
   const files: string[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i]
     if (!p) continue
-    if (p.startsWith('1 ')) files.push(p.split(' ').slice(8).join(' '))
+    if (p.startsWith('# branch.oid ')) oid = /^[0-9a-f]{40,64}$/.test(p.slice(13)) ? p.slice(13) : null
+    else if (p.startsWith('# branch.head ')) line = p.slice(14) === '(detached)' ? null : p.slice(14)
+    else if (p.startsWith('1 ')) files.push(p.split(' ').slice(8).join(' '))
     else if (p.startsWith('2 ')) {
       files.push(p.split(' ').slice(9).join(' '))
       i++ // the original path
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
     else if (p.startsWith('? ')) files.push(p.slice(2))
   }
-  // One git for all the markers, a line each in their order.
-  const markers = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
-  const g = await git(folder, ['rev-parse', ...markers.flatMap((m) => ['--git-path', m])])
-  const where = g.ok ? g.out.split(/\r?\n/).filter(Boolean) : []
-  if (where.length !== markers.length) return unknown(U.state, { folder })
-  markers.forEach((marker, i) => {
-    const at = where[i].trim()
-    if (existsSync(isAbsolute(at) ? at : join(folder, at))) files.push(`(${marker})`)
+  // No such line: rev-parse refuses the whole call, so the paths are read again without it (rare: a target deleted).
+  const [g, target] = o.target && !first.ok ? await Promise.all([where(), lineHead(folder, o.target)]) : [first, undefined]
+  if (isUnknown(target)) return target
+  const out = g.ok ? lines(g.out).map((l) => l.trim()) : []
+  if (out.length !== asked.length + (o.target && target === undefined ? 1 : 0)) return unknown(U.state, { folder })
+  MARKERS.forEach((marker, i) => {
+    if (existsSync(isAbsolute(out[i]) ? out[i] : join(folder, out[i]))) files.push(`(${marker})`)
   })
-  if (!paths) return files
-  const mine = (f: string) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`))
-  return files.filter((f) => f.startsWith('(') || mine(f))
+  return { line, head: oid, dirty: files, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
 /** Files changed from base to head, as git lists them. */
@@ -323,9 +371,9 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
   // The new index, once read: where it is (the separate file, then the lock), for putting the files back with it.
   let staged = next
   try {
-    const [line, h, d, t] = await Promise.all([branch(folder), head(folder), dirty(folder), expect.target ? lineHead(folder, expect.target) : Promise.resolve(to)])
+    const now = await worktreeNow(folder, expect.target ? { target: expect.target } : {})
     // The target still where it was read too (`to`, its head then): moved on, it is looked at again.
-    if (isUnknown(line) || isUnknown(h) || isUnknown(d) || isUnknown(t) || line !== expect.line || h !== expect.head || t !== to || d.length || !go()) return null
+    if (isUnknown(now) || now.line !== expect.line || now.head !== expect.head || (expect.target ? now.target : to) !== to || now.dirty.length || !go()) return null
     copyFileSync(index, next)
     const files = await git(folder, ['read-tree', '-m', '-u', expect.head, to], undefined, undefined, { env: { ...process.env, GIT_INDEX_FILE: next } })
     if (!files.ok) return (files.err || files.out || 'git read-tree failed').trim() // i18n-ignore: git's own words, or the command
