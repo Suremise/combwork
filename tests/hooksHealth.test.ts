@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { HookIds, LaunchContext } from '../src/main/providers/types'
+import { claudeTranscriptTurns } from '../src/main/providers/claude/turns'
 import { admit, newLedger } from '../src/main/turnLedger'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
 import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptAnswered, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
@@ -312,6 +313,56 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(transcriptAnswered(older, 'A')).toBe(false)
     expect(transcriptTurns(older, [turn('E', 3_000)], 81_000, since)).toBe(false)
     expect(older.flagged).toBe('E')
+  })
+
+  it("answered stays answered (HR6's recovery case, the real Claude reader): a late record of E after N cleared it never flags E again; a new turn with no hook after that still does", () => {
+    const at = (s: number) => new Date(Date.parse('2026-10-21T18:00:00.000Z') + s * 1000).toISOString()
+    const prompt = (id: string, s: number) => JSON.stringify({ type: 'user', uuid: `u-${id}`, parentUuid: null, promptId: id, origin: { kind: 'human' }, timestamp: at(s), message: { role: 'user', content: 'do it' } }) + '\n'
+    const reply = (uuid: string, parent: string, s: number) => JSON.stringify({ type: 'assistant', uuid, parentUuid: parent, timestamp: at(s), message: { role: 'assistant', content: [] } }) + '\n'
+    const started = Date.parse(at(0))
+    const memo = {}
+    const read = (text: string, now: number) => transcriptTurns(w, claudeTranscriptTurns(text, memo), now, started)
+    const w = newHooksWatch(started, false, 'id')
+    // E is worked and no hook names it: flagged after the bound.
+    read(prompt('E', 1) + reply('a-E', 'u-E', 2), 10_000)
+    expect(hooksMissing(w, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    // N's hook, then its records: E is answered by the newer turn.
+    hookTurn(w, 80_000, 'N')
+    expect(read(prompt('N', 70) + reply('a-N', 'u-N', 71), 81_000)).toBe(true)
+    expect(w.flagged).toBeNull()
+    // A record of E appended late (chained to E's reply): the reader returns E worked again, and it isn't waited on.
+    const late = claudeTranscriptTurns(reply('a-E2', 'a-E', 72), memo)
+    expect(late.filter((t) => t.worked).map((t) => t.id)).toContain('E')
+    transcriptTurns(w, late, 82_000, started)
+    expect(w.unheard.has('E')).toBe(false)
+    expect(hooksMissing(w, quiet, 82_000 + 10 * BOUND, BOUND)).toBeNull()
+    // A new turn X after the recovery, with no hook: flagged again.
+    read(prompt('X', 700) + reply('a-X', 'u-X', 701), 900_000)
+    expect(hooksMissing(w, quiet, 900_000 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('X')
+  })
+
+  it("answered stays answered for both hook orders and Copilot's any hook, but only up to what was read; a reset lets go of it", () => {
+    // The newer turn's hook after its record (transcriptAnswered): E's late record isn't waited on.
+    const after = idWatch()
+    transcriptTurns(after, [turn('E', 3_000), turn('N', 4_000)], 10_000, since)
+    hookTurn(after, 10_001, 'N')
+    expect(hooksMissing(after, quiet, 10_000 + BOUND, BOUND)).toBe('transcript')
+    expect(transcriptAnswered(after, 'N')).toBe(true)
+    transcriptTurns(after, [turn('E', 3_000)], 80_000, since)
+    expect(hooksMissing(after, quiet, 100 * BOUND, BOUND)).toBeNull()
+    // Copilot: any hook answers what was read, never a turn read after it.
+    const copilot = newHooksWatch(since, false, 'time')
+    transcriptTurns(copilot, [turn('I1', 10_000)], 11_000, since)
+    expect(hooksMissing(copilot, quiet, 11_000 + BOUND, BOUND)).toBe('transcript')
+    expect(transcriptAnswered(copilot, null)).toBe(true)
+    expect(copilot.answered).toBe(copilot.order.get('I1'))
+    transcriptTurns(copilot, [turn('I2', 200_000)], 201_000, since)
+    expect(hooksMissing(copilot, quiet, 201_000 + BOUND, BOUND)).toBe('transcript')
+    expect(copilot.flagged).toBe('I2')
+    // A reset (another file or conversation) starts the frontier again.
+    expect(transcriptReset(copilot)).toBe(true)
+    expect(copilot.answered).toBe(0)
   })
 
   it("a newer turn already heard when the transcript shows both: the older turn waited on before it is answered, never flagged", () => {

@@ -60,6 +60,11 @@ export interface HooksWatch {
   /** Each transcript turn's place in the order read (the latest), to tell a newer turn's hook from an older one's. */
   order: Map<string, number>
   seq: number
+  /**
+   * How far its turns are answered (a place in order, this reading's): a turn placed at or before it is never waited on
+   * again, though a later read returns it worked once more (a record of it appended late).
+   */
+  answered: number
   /** The transcript turn that showed its hooks missing, while that flag stands. */
   flagged: string | null
 }
@@ -77,6 +82,7 @@ export const newHooksWatch = (startedAt: number, startHook: boolean, join: 'id' 
   prompts: new Map(),
   order: new Map(),
   seq: 0,
+  answered: 0,
   flagged: null
 })
 
@@ -113,8 +119,12 @@ export function hookTurn(w: HooksWatch, now: number, turn: string | null, prompt
   for (const [id, u] of w.unheard) if (u.at <= now || (key && u.prompt === key)) w.unheard.delete(id)
 }
 
-/** The turns waited on up to `upTo` (a place in the transcript) are answered, and so is the flag if its turn is among them. */
+/**
+ * The turns up to `upTo` (a place in the transcript) are answered, and so is the flag if its turn is among them: never
+ * waited on again. At most the places read so far, so a turn read later (Copilot's any hook answers all) still counts.
+ */
 function answeredUpTo(w: HooksWatch, upTo: number): boolean {
+  w.answered = Math.max(w.answered, Math.min(upTo, w.seq))
   for (const [id, u] of w.unheard) if (u.seq <= upTo) w.unheard.delete(id)
   if (w.flagged === null || (w.order.get(w.flagged) ?? 0) > upTo) return false
   w.flagged = null
@@ -137,7 +147,7 @@ export function transcriptTurns(w: HooksWatch, turns: { id: string; at: number; 
       keep(w.order, MAX_TURNS)
     }
     if (w.join === 'id' && w.heard.has(t.id)) heardUpTo = Math.max(heardUpTo, w.order.get(t.id)!)
-    if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id)) continue
+    if (!t.worked || !(t.at >= since - HOOKS_SKEW_MS) || w.unheard.has(t.id) || w.order.get(t.id)! <= w.answered) continue
     const hookAt = t.prompt ? w.prompts.get(t.prompt) : undefined
     const heard = w.join === 'time' ? (w.lastHookAt !== null && w.lastHookAt >= t.at) || (hookAt !== undefined && hookAt >= t.at - PROMPT_HOOK_WINDOW_MS) : w.heard.has(t.id)
     if (heard) continue
@@ -155,6 +165,7 @@ export function transcriptReset(w: HooksWatch): boolean {
   const flagged = w.flagged !== null
   w.unheard.clear()
   w.order.clear()
+  w.answered = 0
   w.flagged = null
   return flagged
 }
