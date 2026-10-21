@@ -175,6 +175,7 @@
   "board.details.stepsLabel": "Kroki",
   "board.details.stepsLast": "Ukończono {done, number} z {total, number} · ostatni: {step}",
   "board.details.summary": "Podsumowanie",
+  "board.details.testedOn": "Testowano na",
   "board.details.took": "Czas",
   "board.details.tookSoFar": "{took} do tej pory{expected, select, none {} other { · zwykle około {expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · zwykle około {expected}}}",

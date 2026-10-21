@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 71
+const FIXTURES_VERSION = 72
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -99,6 +99,17 @@ async function pairRules(c) {
   const options = { platform: 'git', review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'agentMerges', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
   require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options } }, null, 2))
 }
+/**
+ * "Pair" in the project folder (#1267): a reviewer agent who isn't the builder, everyone in alpha's own folder, committed
+ * is done; so a setup can start and submit a card as the user moves it, with no worktree to prepare.
+ */
+async function pairInProject(c) {
+  const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
+  const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+  require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } } }, null, 2))
+}
+/** The facts of kind `kind` of the scenario's card `key`. */
+const factsOf = (o, key, kind) => (o.facts?.[key] ?? []).filter((f) => f.kind === kind)
 /** The Override facts of the scenario's card `key` (#1319: the harness reads each card's facts). */
 const overridesOf = (o, key) => (o.facts?.[key] ?? []).filter((f) => f.kind === 'Override')
 /** A call's arguments (JSON) have key: value. */
@@ -2217,6 +2228,56 @@ module.exports.SCENARIOS = [
         ['the card is in Todo', o.cards.m?.column === 'todo', o.cards.m?.column],
         ['passed no override (the move skips nothing)', calls.length > 0 && !calls.some((x) => argsOf(x).override), calls.map((x) => x.args).join(' | ')],
         ['no Override fact', !overridesOf(o, 'm').length, JSON.stringify(overridesOf(o, 'm').map((f) => f.data))]
+      ]
+    }
+  },
+  {
+    id: 'intent-put-back',
+    title: "A builder starts a card and puts it back with why (#1267): the card's intents, start and put back, record both",
+    async setup(c) {
+      await pairInProject(c)
+      await c.card('k', { title: 'Choose the cache store', description: 'Pick Redis or SQLite for the cache, and wire it in.', agent: 'coder' })
+    },
+    prompt: (c) => `Start work on card #${c.cards.k}. Before you change anything: its design isn't decided yet, so put it back in Todo for now, saying why.`,
+    fake: (c) => `hive hive_start_card {"card":"#${c.cards.k}"} then hive hive_put_back {"card":"#${c.cards.k}","why":"The design isn't decided yet."}`,
+    expect: (o) => {
+      const back = factsOf(o, 'k', 'Moved').find((f) => f.data.to === 'todo')
+      return [
+        ['the card is in Todo', o.cards.k?.column === 'todo', o.cards.k?.column],
+        ['it was started first (a Started fact)', factsOf(o, 'k', 'Started').length > 0, (o.facts?.k ?? []).map((f) => f.kind).join(',')],
+        ['put back with why (the move records it)', !!back?.data.why, JSON.stringify(back?.data)],
+        ['started it with hive_start_card', ran(o, 'hive_start_card').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['put it back with hive_put_back', ran(o, 'hive_put_back').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+      ]
+    }
+  },
+  {
+    id: 'intent-review-request',
+    title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with a test.', agent: 'implementer' })
+      // Implementer's work, as the user moves it: started (Doing), a commit, submitted (Review).
+      await c.inv('tasks:move', n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+      await c.inv('tasks:move', n, 'review')
+    },
+    prompt: (c) => `Review card #${c.cards.r}. Before your verdict, ask its builder which Node version they tested on. Then fail the review: it has no test.`,
+    fake: (c) =>
+      `hive hive_start_review {"card":"#${c.cards.r}"} then hive hive_request_builder {"card":"#${c.cards.r}","text":"Which Node version did you test on?"} then hive hive_verdict {"card":"#${c.cards.r}","pass":false,"failKind":"content","comment":"Round 1: FAILED. 1. greet.js has no test."}`,
+    expect: (o) => {
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['it reviewed the submission (a ReviewStarted fact)', factsOf(o, 'r', 'ReviewStarted').length > 0, (o.facts?.r ?? []).map((f) => f.kind).join(',')],
+        ['asked the builder (a ReviewerRequest fact)', factsOf(o, 'r', 'ReviewerRequest').length > 0],
+        ['failed it (a failed Verdict)', factsOf(o, 'r', 'Verdict').some((f) => f.data.pass === false)],
+        ["the card is back in Doing, still Implementer's", o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`],
+        ['started the review with hive_start_review', ran(o, 'hive_start_review').length > 0, calls],
+        ['asked with hive_request_builder', ran(o, 'hive_request_builder').length > 0, calls],
+        ['gave the verdict with hive_verdict', ran(o, 'hive_verdict').length > 0, calls]
       ]
     }
   },

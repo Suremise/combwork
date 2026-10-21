@@ -675,7 +675,8 @@ describe('approved labels', () => {
   it("the tool names metrics take are exactly the hive MCP server's tools", async () => {
     const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
     const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
-    const offered = [...source.matchAll(/^ {4}name: '(hive_[a-z_]+)'/gm)].map((m) => m[1])
+    // A tool's name, or an intent tool's (#1267: intent('hive_submit', …)).
+    const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(hive_[a-z_]+)'/gm)].map((m) => m[1])
     expect([...offered].sort()).toEqual([...HIVE_TOOLS].sort())
   })
 })

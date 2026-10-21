@@ -175,6 +175,7 @@
   "board.details.stepsLabel": "步骤",
   "board.details.stepsLast": "已完成 {done, number}/{total, number} · 最后：{step}",
   "board.details.summary": "摘要",
+  "board.details.testedOn": "测试基于",
   "board.details.took": "用时",
   "board.details.tookSoFar": "已用 {took}{expected, select, none {} other { · 预计约 {expected}}}",
   "board.details.tookTotal": "{took}{expected, select, none {} other { · 预计约 {expected}}}",

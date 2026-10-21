@@ -149,7 +149,7 @@ export interface FactData {
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[] }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds. */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
@@ -163,7 +163,8 @@ export interface FactData {
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
-  Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' }
+  /** `why`: the agent's own reason, given with a put back (#1267). */
+  Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override'; why?: string }
   /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
   Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }

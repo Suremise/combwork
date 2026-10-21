@@ -120,6 +120,7 @@ export const SUITES = [
   { name: 'inbox', serial: 'window focus' },
   { name: 'inboxnotices' },
   { name: 'installdir' },
+  { name: 'intents' },
   { name: 'isolation' },
   { name: 'journal' },
   { name: 'journalbrowse' },

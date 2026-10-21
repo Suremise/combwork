@@ -1,0 +1,123 @@
+import { join } from 'path'
+import type { TaskCard, TaskPatch } from '../shared/types'
+import type { IntentDone } from '../shared/toolReplies'
+import type { ForYouKind } from '../shared/workflow/facts'
+import { boardLock, readTask, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
+import { actorOf } from './workflow/recorder'
+import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
+import { refusal } from '../shared/workflow/refusals'
+import { workflowFor } from './workflow/service'
+import { workspace } from './workspace'
+import { hiveError } from './hiveError'
+import { msg } from '../shared/i18n'
+
+/**
+ * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
+ * merge, ask the user, couldn't within the rules, request to builder. Each runs the card's runtime intent on the board's
+ * one intent path (tasks.ts' runIntent, #1265), so its guards decide and its facts are written, and in each of its writes
+ * the card's 0.9 fields follow (column, agent, its review, a comment), for the board, watches, lanes and the Agent API's
+ * card. A refusal is the runtime's (§16.8.3), thrown as WorkflowRefusedError: the Agent API's 409 with the rule, what to
+ * do next and who can override. With workflow rules off (Settings → Advanced) every intent runs with no guard.
+ *
+ * A card is named by its key (`HI-12`) or `#1061` (§16.12): an agent's plain number is refused, naming both forms (S48).
+ */
+
+export type CardIntent =
+  | { kind: 'start' }
+  | { kind: 'putBack'; why: string }
+  | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[] }
+  | { kind: 'declarePaths'; paths: string[] }
+  | { kind: 'startReview'; submission?: number }
+  | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
+  | { kind: 'reportMerge'; result?: string }
+  | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
+  | { kind: 'cannot'; rule: string; why: string }
+  | { kind: 'request'; text: string }
+
+const M = {
+  noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {n} is the card's number." })
+}
+
+/** The card's number from a reference as the Agent API got it: `HI-12`, `#12`, or a plain number (`12`), and whether it was plain. */
+export interface CardRefIn {
+  n: number
+  plain: boolean
+}
+
+/**
+ * Runs an intent of a card for an actor (an agent by its own token, the Assistant, a script): the card read in the
+ * caller's view (another project's is unknown to an agent), its runtime's intent with the card named as the runtime takes
+ * it (an agent's plain number refused there), and the card's 0.9 fields in each write. Throws the runtime's refusal.
+ */
+export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: CardIntent): Promise<{ done: IntentDone; card: TaskCard }> {
+  const ws = workspace
+  const before = await readTask(ref.n, actor)
+  const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
+  if (!wf) throw hiveError(M.noWorkflow, { n: ref.n }, { kind: 'conflict' })
+  const who = actorOf(actor)
+  const self = actor.kind === 'agent' ? actor.self : undefined
+  // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
+  if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}`, alias: `#${ref.n}` }, null))
+  const named = `#${ref.n}`
+  const call = (w: Workflow): Promise<Reply> => {
+    switch (intent.kind) {
+      case 'start':
+        return w.start(named, who)
+      case 'putBack':
+        return w.putBack(named, who, { why: intent.why })
+      case 'submit':
+        return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}) })
+      case 'startReview':
+        return w.startReview(named, who, { ...(intent.submission !== undefined ? { submission: intent.submission } : {}) })
+      case 'verdict':
+        return w.verdict(named, who, { pass: intent.pass, comment: intent.comment, ...(intent.submission !== undefined ? { submission: intent.submission } : {}), ...(intent.failKind ? { failKind: intent.failKind } : {}) })
+      case 'reportMerge':
+        return w.reportMerge(named, who, { ...(intent.result ? { result: intent.result } : {}) })
+      case 'ask':
+        return w.askTheUser(named, who, { kind: intent.askKind, text: intent.text, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.checklist?.length ? { checklist: intent.checklist } : {}) })
+      case 'cannot':
+        return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
+      case 'request':
+        return w.requestToBuilder(named, who, intent.text)
+      default:
+        throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Hive's code, never shown
+    }
+  }
+
+  // Declaring paths moves nothing: the runtime's own change of the card, in a change of the board.
+  if (intent.kind === 'declarePaths') {
+    const r = await boardLock(ws, () => wf.declarePaths(named, who, intent.paths))
+    if (isRefusal(r)) throw new WorkflowRefusedError(r)
+    const card = await readTask(ref.n, actor)
+    return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: '', to: '', data: { prefill: r.prefill, unclaimed: r.unclaimed, revision: r.revision } }, card }
+  }
+
+  // Every write keeps the card's agent as it is then, under the board's lock (an agent moving a card into Doing would take
+  // it: a reviewer's failed verdict), but the start's, which gives the card to the agent that starts it. What else each
+  // intent changes of the card's 0.9 fields (its review, a comment) goes with its first write.
+  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean } } => {
+    if (intent.kind === 'start') return first && self ? { patch: { agent: self.agentId } } : {}
+    const keepAgent = true
+    if (!first) return { opts: { keepAgent } }
+    switch (intent.kind) {
+      case 'putBack':
+        return { opts: { keepAgent, comment: intent.why } }
+      case 'submit':
+        return { opts: { keepAgent, comment: intent.summary } }
+      case 'startReview':
+        // The card marked as this reviewer's (an agent's own review; the Assistant and scripts don't review).
+        return { ...(self ? { patch: { review: 'start' } } : {}), opts: { keepAgent } }
+      case 'verdict':
+        return { ...(self ? { patch: { review: intent.pass ? 'passed' : 'failed' } } : {}), opts: { keepAgent, comment: intent.comment } }
+      case 'request':
+        return { opts: { keepAgent, comment: intent.text } }
+      default:
+        return { opts: { keepAgent } }
+    }
+  }
+  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9)
+  if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
+  const card = saved ?? (await readTask(ref.n, actor))
+  const m = reply as Moved
+  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}) }, card }
+}
