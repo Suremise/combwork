@@ -1,0 +1,27 @@
+import { useEffect, useMemo } from 'react'
+import type { ForYouItem, ForYouSummary } from '@shared/workflow/workView'
+import { useScopedLoad } from './scopedLoad'
+import { useStore } from './store'
+
+// What waits for the user (For you, #1276, SPEC §16.8.5): every live card's open requests, read from main
+// (`tasks:forYou`, #1269) and read again each time the board is (a tasks-changed event: a request or an answer is a board
+// change), so an answered request leaves at once.
+
+const NONE: ForYouSummary = { items: [], count: 0 }
+
+/** The workspace's requests for the user, and by card; empty while loading. */
+export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {
+  const ws = useStore((s) => s.workspace?.path ?? '')
+  const tasks = useStore((s) => s.tasks)
+  const { data, load } = useScopedLoad<ForYouSummary>(ws)
+  useEffect(() => {
+    if (ws) load(ws, () => window.hive.invoke('tasks:forYou'))
+  }, [ws, tasks, load])
+  const summary = data ?? NONE
+  const byCard = useMemo(() => {
+    const m = new Map<number, ForYouItem[]>()
+    for (const i of summary.items) m.set(i.card, [...(m.get(i.card) ?? []), i])
+    return m
+  }, [summary])
+  return { summary, byCard }
+}

@@ -1,6 +1,7 @@
 import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { agentLaunchSettings, defaultProviderWarning, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
@@ -17,7 +18,7 @@ import { paneColumnsFor, projectSessionView, tileStripRoom } from '@shared/defau
 import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
-import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useStore, type ProjectTab } from '../store'
+import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
 import { carriesFiles, cx, formatKeybinding } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { GitTab } from './GitTab'
@@ -285,6 +286,12 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const ended = epoch !== undefined
   // Its workspace's 1.0 upgrade waits (#1230): no session can start.
   const startBlocked = useStartBlocked()
+  // From the click until the session runs (#1177): the focused agent's, or with no agent, the one being added.
+  const agentStarting = useStarting(project.path, focused?.id ?? null)
+  const addingStarting = useProjectStarting(project.path)
+  const starting = focused ? agentStarting : addingStarting
+  const resuming = starting?.kind === 'resume'
+  const startingNew = starting?.kind === 'start'
   // An ended session keeps its terminal; the pane shows the Resume bar over it.
   if (ended) return null
   const many = project.agents.length > 1
@@ -294,11 +301,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
-            <Icon name="debug-continue" /> {tr(M.resume)}
+          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
+            <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
-          <button className="btn act-start" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
-            <Icon name="add" /> {tr(M.newSession)}
+          <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+            <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)}
           </button>
         </>
       ) : (
@@ -320,8 +327,8 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
             </p>
           )}
           <div className="btns">
-            <button className="btn act-start solid" disabled={!!startBlocked} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
-              <Icon name="add" /> {tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
+            <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+              <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
             </button>
             {focused ? <ResumeButton project={project} a={focused} className={RESUME_TINT} label={tr(M.resumeLast)} /> : <AddAgentButton project={project} className="tint-amber" />}
             <button className="btn subtle" onClick={() => setProjectTab(project.path, 'sessions')}>
@@ -402,6 +409,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const agentsDescription = useAgentsText(project)
   const cards = useStore((s) => s.tasks)
   const startFailures = useStore((s) => s.startFailures)
+  // An agent starting or resuming (#1177): what would start it again waits.
+  const anyStarting = !!useProjectStarting(project?.path ?? '')
 
   if (!workspace) return null
 
@@ -454,8 +463,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   // Agents ▾ (#974): every agent at once, after one confirmation (#216), Remove All last after a line (#291); with one
   // agent, no count. In ⋯ when cramped.
   const batch: MenuEntry[] = [
-    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll, onClick: () => void actions.startNewAll(project.path) }] : []),
-    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll, onClick: () => void actions.startNewAll(project.path, true) }] : []),
+    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll || anyStarting, onClick: () => void actions.startNewAll(project.path) }] : []),
+    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll || anyStarting, onClick: () => void actions.startNewAll(project.path, true) }] : []),
     ...(project.agents.length
       ? [...(counts.startNew || counts.archive ? [{ separator: true as const }] : []), { label: tr(M.removeAllMenu, { many: yes, count: project.agents.length }), icon: 'trash', action: 'remove' as const, disabled: removingAll, onClick: () => void actions.removeAllAgents(project.path) }]
       : [])
@@ -463,7 +472,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const dangerous = settings
     ? project.agents.flatMap((a) => {
         const l = agentLaunchSettings(a, project.config, settings)
-        const m = modeOption(l.provider, a.live?.permissionMode ?? l.permissionMode)
+        // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
+        const m = modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)
         return m?.danger ? [many ? tr(M.dangerousMode, { agent: a.name, mode: m.label }) : m.label] : []
       })
     : []
@@ -505,7 +515,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
           )}
           {resumable.length > 0 && !runInMenu && (
             <Tooltip content={resumeTip}>
-              <button className="btn act-resume quiet" disabled={resuming} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
+              <button className="btn act-resume quiet" disabled={resuming || anyStarting} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
                 <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} />
                 {!tight && ` ${resuming ? tr(M.resuming) : resumeLabel}`}
                 {tight && resumable.length > 1 && <span className="btn-count">{resumable.length}</span>}
@@ -539,7 +549,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
               menu.open(e, [
                 // At the narrowest (#1051), what folded away, in the header's order: Active, Resume, Stop, Agents ▾'s.
                 ...(activeInMenu ? [{ label: tr(M.active), icon: project.active ? 'check' : undefined, detail: tr(project.active ? M.workingOn : M.notWorkingOn), onClick: () => void actions.setProjectActive(project.path, !project.active) }] : []),
-                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming, onClick: () => void actions.resumeAllAgents(project.path) }] : []),
+                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming || anyStarting, onClick: () => void actions.resumeAllAgents(project.path) }] : []),
                 ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }] : []),
                 ...(activeInMenu ? [{ separator: true as const }] : []),
                 ...(cramped && batch.length ? [...batch, { separator: true as const }] : []),

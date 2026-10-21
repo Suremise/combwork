@@ -140,6 +140,7 @@
   "panes.session.renameFailed": "名前を変更できませんでした",
   "panes.session.renameItem": "セッション名を変更…",
   "panes.session.renameTitle": "セッションの名前を変更",
+  "panes.session.starting": "{kind, select, resume {再開中…} other {開始中…}}",
   "panes.tab.failed": "開始に失敗：{why}",
   "panes.tab.mcp": "MCPサーバー：{servers}",
   "panes.tab.notRunning": "停止中",

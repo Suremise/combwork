@@ -141,6 +141,8 @@
   "settings.advanced.error.text": "“{title}”需要文本。",
   "settings.advanced.hive.agents.perProject.desc": "一个项目可以有多少个智能体（#562）：除非需要更多，否则用 {usual} 个，最多 {most} 个。每个智能体都运行自己的 CLI 副本，因此智能体越多，占用的内存越多，而且它们共用你套餐的用量限额。调低此值不会删除智能体：超出数量的项目只是不能再添加。模板和 Agent API 也遵守此限制。",
   "settings.advanced.hive.agents.perProject.title": "每个项目的智能体数",
+  "settings.advanced.hive.assistant.otherMcpServers.desc": "Hive 助手只用 Hive 自己的工具照看工作区：不会给它工作区的其他 MCP 服务器。开启后，由于它跨所有项目工作，从下一次会话起，它会获得工作区中已开启的每个服务器（在 MCP 视图中的开关）。它的“控制”设置仍然决定它能用 Hive 的工具做什么；其他服务器的工具按其 CLI 的权限模式询问。是否同时加载其 CLI 自身的服务器，由该 CLI 的“仅使用工作区的 MCP 服务器”设置决定。",
+  "settings.advanced.hive.assistant.otherMcpServers.title": "助手使用工作区的其他 MCP 服务器",
   "settings.advanced.hive.assistant.startView.desc": "Hive Assistant 的日志开启时，Hive 会在它启动时以及每次压缩后，向它提供工作区的简短视图：正在进行和等待中的事项，以及日志的最近条目。关闭后，从下次启动或压缩起它就不再获得这一视图（正在运行的助手也是如此），会用自己的工具读取所需内容。",
   "settings.advanced.hive.assistant.startView.title": "助手启动时使用 Hive 的启动视图",
   "settings.advanced.hive.console.showText.desc": "在开发者控制台中显示文本：提示词、回复、命令和工具参数，上方有横幅说明内容未脱敏，并且每次录制开始时默认勾选其文本框。无论此设置如何，Token、API 密钥和登录信息始终遮盖；智能体的 hive_console 仍会脱敏，含文本的录制永远不会附加到“复制诊断信息”中。",

@@ -36,6 +36,23 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Agents' old moves as intents: fakes, Codex (its default model), fixtures v73, 21 October 2026
+
+#1268 makes a project agent's `hive_update_task` `column` and `review` the card's intents while the skills still say
+to move cards (§16.17), and says so in the tool's description: +592 B to every session's tool list (27,105 to 27,697 B
+a start; `before-1268`, 1.0.0 at dd4ed990, against `2026-10-21T08-18-00-fake`, fixtures v72: every scenario passes on
+both, with no regression or failed check). A reply to a translated move adds a line naming the tool to use next time
+(`As start: next time call hive_start_card`, 43 B). The baseline is marked as mixed source: files were edited while it
+ran, after its build, which is made from the source at the start. Two new scenarios, in Pair with everyone in the
+project folder, with the skills as they are now: **old-move-submit** (a builder sends its committed work to Review: a
+`Submitted` fact, its summary the comment) and **old-move-review** (a reviewer starts a review and fails it with
+`review`: `ReviewStarted` and a failed `Verdict`, the card back in Doing with its builder).
+- **Fakes** (Claude Code's and Codex's): both pass, 6 of 6 checks each (`2026-10-21T08-52-37-fake`, `2026-10-21T08-53-52-fake-codex`).
+- **Codex**, 3 samples each (`2026-10-21T08-54-37-codex`, CLI 0.163.0, $0.37): 6 of 6 pass, every check. The builder
+  sent the card with `hive_update_task` twice and with `hive_submit` once; the reviewer used `hive_update_task`'s
+  `review` each time, its facts the runtime's.
+- **Claude Code**: not run (its test home is signed out, #1321/#1322).
+
 ## The card intents' tools: fakes, Codex (its default model), fixtures v72, 21 October 2026
 
 #1267 gives agents a hive tool per card intent (`hive_start_card`, `hive_put_back`, `hive_start_review`,

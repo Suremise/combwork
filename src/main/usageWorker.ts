@@ -59,7 +59,7 @@ export type WorkerRequest = { id: number } & (
   | { type: 'forgetStates'; file: string; before: string }
   | { type: 'attribute'; file: string; scope: string; sessions: { session: string; holds: SessionHold[]; holdsKey: string | null }[] }
   | { type: 'close'; file: string }
-  | { type: 'read'; path: string; session: string; provider: ProviderId; seed: ReadSeed | null }
+  | { type: 'read'; path: string; session: string; provider: ProviderId; seed: ReadSeed | null; noWait?: boolean }
   | { type: 'forgetReads' }
 )
 
@@ -250,7 +250,9 @@ const readResult = (c: ReadEntry): ReadResult => {
  * history (`seed`), so only what was added since is read; without one, it is read from the start, here, never in main.
  * Null when it can't be read, or for a provider this Hive can't read.
  */
-async function readUsage(path: string, session: string, provider: ProviderId, seed: ReadSeed | null): Promise<ReadResult | null> {
+async function readUsage(path: string, session: string, provider: ProviderId, seed: ReadSeed | null, noWait = false): Promise<ReadResult | null> {
+  // A start's read (#1177) never queues behind the file's turn (the import ingesting it): it gets nothing instead.
+  if (noWait && turns.has(readKey(path))) return null
   return inTurn(path, async () => {
     let st
     try {
@@ -471,7 +473,7 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
     }
     case 'read':
       // At once, not after the jobs: a running session's footer never waits for an import.
-      return readUsage(m.path, m.session, m.provider, m.seed)
+      return readUsage(m.path, m.session, m.provider, m.seed, m.noWait)
     case 'forgetReads':
       reads.clear()
       return true

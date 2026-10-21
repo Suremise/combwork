@@ -101,6 +101,8 @@ interface HiveMessageValues {
   'tips.cardWork.title': undefined
   'tips.cliOverrides.text': undefined
   'tips.cliOverrides.title': undefined
+  'tips.cliOwnMode.text': undefined
+  'tips.cliOwnMode.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
   'tips.commandName': { command: string | number }
@@ -136,6 +138,8 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.forYou.text': undefined
+  'tips.forYou.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
   'tips.gitInit.text': undefined

@@ -321,8 +321,10 @@ const prose = (seed, n) => {
   // (about 40 characters).
   const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7800)
   check('settings: a line each, id = value, read-only ones marked', /^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
-  const compactList = measure('hive_list_settings (query)', tool('hive_list_settings', { query: 'compact' }, 'assistant'), 1500)
-  check('query narrows it, saying what each does', compactList.split('\n').length < 10 && /^assistant\.compactSuggestTokens = 500000 · Highlight Compact over: Context size/m.test(compactList), compactList)
+  // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Hive's start view and Clear the CLI's
+  // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
+  const compactList = measure('hive_list_settings (query)', tool('hive_list_settings', { query: 'compact' }, 'assistant'), 1800)
+  check('query narrows it, saying what each does', compactList.split('\n').length <= 11 && /^assistant\.compactSuggestTokens = 500000 · Highlight Compact over: Context size/m.test(compactList), compactList)
   const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3000)
   check("a project's own settings, inheriting", /^project\.transcriptWarnMB = inherit · Warn when a transcript is over$/m.test(projectList), projectList.slice(0, 300))
   const one = measure('hive_read_setting', tool('hive_read_setting', { id: 'sessions.transcriptWarnMB' }, 'assistant'), 1500)

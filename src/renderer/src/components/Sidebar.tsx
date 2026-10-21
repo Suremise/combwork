@@ -3,12 +3,13 @@ import type { McpServerInfo, NoteFile, ProjectInfo, SkillInfo } from '@shared/ty
 import { AgentsTable, agentsText } from './AgentsTable'
 import { useLanes, type Lane } from '../laneSource'
 import { agentLaunchSettings, modeOption } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume } from '@shared/resumeAll'
 import { shownMergeSlot, shownStatusMessage } from '@shared/runtime'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
-import { get, notify, projectKeyOf, projectState, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
+import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
@@ -240,9 +241,12 @@ function projectLanes(lanes: readonly Lane[], p: ProjectInfo): Lane[] {
 /** Right-click menu for a project, shared by the full list and the compact rail. */
 function projectMenu(p: ProjectInfo): MenuEntry[] {
   const running = p.agents.filter((a) => a.live).length
+  // One of its agents starting or resuming already (#1177).
+  const starting = projectStarting(p.path)
+  const noStart = starting ? { disabled: true, detail: startingLabel(starting) } : {}
   return [
-    { label: tr(M.newSession), icon: 'add', action: 'start', onClick: () => void actions.newSession(p.path) },
-    { label: tr(M.resumeLast), icon: 'debug-continue', action: 'resume', onClick: () => void actions.resumeLast(p.path) },
+    { label: tr(M.newSession), icon: 'add', action: 'start', ...noStart, onClick: () => void actions.newSession(p.path) },
+    { label: tr(M.resumeLast), icon: 'debug-continue', action: 'resume', ...noStart, onClick: () => void actions.resumeLast(p.path) },
     ...(p.agents.length > 1 ? [{ label: tr(M.resumeAll), icon: 'blank', action: 'resume' as const, disabled: !agentsToResume(p.agents).length, onClick: () => void actions.resumeAllAgents(p.path) }] : []),
     running > 1
       ? { label: tr(M.stopAll), icon: 'debug-stop', action: 'stop', onClick: () => void actions.stopAllAgents(p.path) }
@@ -436,7 +440,8 @@ function ProjectsPanel() {
     // Marked when any agent starts (or runs) in its provider's no-guardrails mode.
     const bypass = !!settings && p.agents.some((a) => {
       const l = agentLaunchSettings(a, p.config, settings)
-      return !!modeOption(l.provider, a.live?.permissionMode ?? l.permissionMode)?.danger
+      // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
+      return !!modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)?.danger
     })
     // One dot per project: the most urgent of its agents.
     const state = projectState(p)

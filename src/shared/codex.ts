@@ -1,4 +1,5 @@
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 
@@ -58,7 +59,9 @@ export const CODEX_MODE_FLAGS: Record<string, string[]> = {
   ask: ['-s', 'workspace-write', '-a', 'on-request'],
   // It brings its own workspace-write sandbox; Codex refuses --sandbox alongside it.
   'approve-for-me': ['--approve-for-me'],
-  'full-access': ['-s', 'danger-full-access', '-a', 'never']
+  'full-access': ['-s', 'danger-full-access', '-a', 'never'],
+  // The CLI's own setting (#1284): no sandbox or approval flag, so Codex's own config decides.
+  'cli-own': []
 }
 
 /** "gpt-6-luna" → "GPT-6 Luna", "gpt-5.6-terra" → "GPT-5.6 Terra"; anything else as it is. */
@@ -95,7 +98,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   icon: 'codex',
   setupUrl: 'https://developers.openai.com/codex/cli',
   pricingUrl: 'https://openai.com/api/pricing/',
-  permissionModes: CODEX_PERMISSION_MODES,
+  permissionModes: withCliOwn(CODEX_PERMISSION_MODES),
   defaultPermissionMode: 'approve-for-me',
   assistantMode: 'approve-for-me',
   effortLevels: [
