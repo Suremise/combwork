@@ -35,6 +35,14 @@ interface WorkspaceState {
   actions: AssistantAction[]
   turnActions: number
   pending: Map<string, Pending>
+  /** The user's message the Assistant works on now (#1282): its changes are grouped by it for undo. */
+  turn: AssistantTurn | null
+}
+
+/** A message of the user's to the Assistant, as its changes are grouped (#1282): an id, and when it was sent. */
+export interface AssistantTurn {
+  id: string
+  at: string
 }
 
 const states = new Map<string, WorkspaceState>()
@@ -42,7 +50,7 @@ const states = new Map<string, WorkspaceState>()
 function stateOf(workspacePath: string): WorkspaceState {
   const k = workspacePath.toLowerCase()
   let s = states.get(k)
-  if (!s) states.set(k, (s = { token: '', actions: [], turnActions: 0, pending: new Map() }))
+  if (!s) states.set(k, (s = { token: '', actions: [], turnActions: 0, pending: new Map(), turn: null }))
   return s
 }
 
@@ -108,7 +116,9 @@ export function allows(need: AssistantControl): boolean {
 export function record(workspacePath: string, act: ActivityTarget, text: string, error?: string, more: { setting?: AssistantSettingChange; revertOf?: string; brief?: string; reason?: string } = {}): AssistantAction {
   const s = stateOf(workspacePath)
   const reason = error ? (more.reason ?? publicReason(undefined)) : undefined
-  const action: AssistantAction = { id: randomUUID(), at: new Date().toISOString(), text, ok: !error, ...(error ? { error } : {}), ...more, ...(reason ? { reason } : {}), ...activityFields(act) }
+  // The user's message it came from (#1283): the panel lists it with that message's changes.
+  const turn = currentTurn(workspacePath)
+  const action: AssistantAction = { id: randomUUID(), at: new Date().toISOString(), text, ok: !error, ...(error ? { error } : {}), ...more, ...(reason ? { reason } : {}), ...activityFields(act), group: turn.id, groupAt: turn.at }
   s.actions.push(action)
   if (s.actions.length > MAX_LISTED) s.actions.splice(0, s.actions.length - MAX_LISTED)
   log.info(`${userText(workspacePath)}: ${userText(text)}${error ? ` (refused: ${userText(error)})` : ''}`)
@@ -185,7 +195,18 @@ export function admit(workspacePath: string, token: string, need: AssistantContr
 
 /** The user sent the Assistant a message: a new turn, with a fresh limit. */
 export function newTurn(workspacePath: string): void {
-  stateOf(workspacePath).turnActions = 0
+  const s = stateOf(workspacePath)
+  s.turnActions = 0
+  s.turn = { id: randomUUID(), at: new Date().toISOString() }
+}
+
+/**
+ * The user's message the Assistant's changes now belong to (#1282): the latest it was sent, or, with none since Hive
+ * started (a change made before its first message here), one begun now.
+ */
+export function currentTurn(workspacePath: string): AssistantTurn {
+  const s = stateOf(workspacePath)
+  return (s.turn ??= { id: randomUUID(), at: new Date().toISOString() })
 }
 
 function emitQuestions(workspacePath: string): void {

@@ -779,22 +779,6 @@
     "defaultMessage": "Resume \"{name}\", {when}",
     "description": "Tooltip on Resume: the conversation and when it was last active ({when}: \"3 hours ago\")."
   },
-  "assistant.panel.revert": {
-    "defaultMessage": "Revert",
-    "description": "A button beside a setting the Assistant changed: puts the old value back."
-  },
-  "assistant.panel.revertFailed": {
-    "defaultMessage": "Could not revert the setting",
-    "description": "An error notice: a setting the Assistant changed couldn't be put back; the reason follows."
-  },
-  "assistant.panel.revertLabel": {
-    "defaultMessage": "Revert {setting} to {value}",
-    "description": "The Revert button, for screen readers ({setting}: the setting's path; {value}: its old value)."
-  },
-  "assistant.panel.reverted": {
-    "defaultMessage": "reverted",
-    "description": "Beside a setting the Assistant changed that was put back."
-  },
   "assistant.panel.reviewing": {
     "defaultMessage": "Reviewing {number} {title}",
     "description": "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)."
@@ -2426,6 +2410,218 @@
   "assistant.templates.workspace": {
     "defaultMessage": "Workspace",
     "description": "A badge, a group and a filter: the workspace's templates (for every project)."
+  },
+  "assistant.undo.askFinal": {
+    "defaultMessage": "{n, plural, one {# change can't be undone, such as a prompt that was sent: it is listed with why.} other {# changes can't be undone, such as prompts that were sent: they are listed with why.}}",
+    "description": "Under the question before a message's changes are undone, when some of them can't be."
+  },
+  "assistant.undo.askMessage": {
+    "defaultMessage": "Changes made since by you or an agent are kept.",
+    "description": "The question before the Assistant's changes for a message are undone: what someone changed afterwards isn't overwritten."
+  },
+  "assistant.undo.askTitle": {
+    "defaultMessage": "{n, plural, one {Undo # change?} other {Undo # changes?}}",
+    "description": "The question before every change the Assistant made for a message is undone."
+  },
+  "assistant.undo.card": {
+    "defaultMessage": "{card}: {fields}",
+    "description": "A change the Assistant made to a card ({card}: the card, \"#12 Fix the login\"; {fields}: what it changed, \"labels and column\")."
+  },
+  "assistant.undo.changed": {
+    "defaultMessage": "{fields} changed since",
+    "description": "Why undo left part of a change of the Assistant's as it is: someone (the user or an agent) changed it afterwards ({fields}: \"labels\", \"title and column\")."
+  },
+  "assistant.undo.dismiss": {
+    "defaultMessage": "Close what the undo did",
+    "description": "A button that closes the note under a message saying what its undo did."
+  },
+  "assistant.undo.ended": {
+    "defaultMessage": "the lane has ended",
+    "description": "Why undo left a change of the Assistant's to a lane (a card loop's record): the lane is over. Lower case."
+  },
+  "assistant.undo.error": {
+    "defaultMessage": "failed: {error}",
+    "description": "Why undo didn't put back part of a change of the Assistant's: it failed ({error}: Hive's reason, in English). Lower case; Undo is offered again."
+  },
+  "assistant.undo.failed": {
+    "defaultMessage": "Could not undo the Assistant's change",
+    "description": "An error notice: undoing a change the Assistant made failed; the reason follows."
+  },
+  "assistant.undo.field": {
+    "defaultMessage": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} other {{field}}}",
+    "description": "What part of something the Assistant changed (lower case, listed after a card or in why undo kept it): a card's title, labels, column…; a lane's cards, reviewer, rounds, wait; an agent's provider, model, effort…; a setting's value; run: an agent it started. Select keys: the field."
+  },
+  "assistant.undo.final": {
+    "defaultMessage": "Can't be undone",
+    "description": "Beside a change of the Assistant's that undo can't take back (a prompt sent, a comment); its tooltip says why."
+  },
+  "assistant.undo.gone": {
+    "defaultMessage": "it's gone",
+    "description": "Why undo left a change of the Assistant's: the card, lane or agent it was about no longer exists. Lower case."
+  },
+  "assistant.undo.kept": {
+    "defaultMessage": "Kept",
+    "description": "Beside a change of the Assistant's that undo left as it is (someone changed it since, or it is gone); its tooltip says why."
+  },
+  "assistant.undo.made": {
+    "defaultMessage": "Made {card}",
+    "description": "A card the Assistant made ({card}: \"#12 Fix the login\"); undo archives it."
+  },
+  "assistant.undo.message": {
+    "defaultMessage": "Your message at {time}: {n, plural, one {# change} other {# changes}}",
+    "description": "The heading of the Assistant's changes made for one message of the user's ({time}: when it was sent, a time, or a date and time before today; {n}: how many changes)."
+  },
+  "assistant.undo.messageNone": {
+    "defaultMessage": "Your message at {time}",
+    "description": "The heading of what the Assistant did for one message of the user's when it changed nothing ({time}: when it was sent)."
+  },
+  "assistant.undo.partly": {
+    "defaultMessage": "Partly undone",
+    "description": "Beside a change of the Assistant's when undo put back some of it and kept the rest (someone changed it since); its tooltip says what."
+  },
+  "assistant.undo.resultAlready": {
+    "defaultMessage": "{n, plural, one {# undone before} other {# undone before}}",
+    "description": "What an undo of a message's changes did: how many were undone already."
+  },
+  "assistant.undo.resultFinal": {
+    "defaultMessage": "{n, plural, one {# can't be undone:} other {# can't be undone:}}",
+    "description": "What an undo of a message's changes did: how many it couldn't take back, each listed after it with why."
+  },
+  "assistant.undo.resultKept": {
+    "defaultMessage": "{n, plural, one {# kept as it is:} other {# kept as they are:}}",
+    "description": "What an undo of a message's changes did: how many it left, each listed after it with why."
+  },
+  "assistant.undo.resultLine": {
+    "defaultMessage": "{change}: {why}",
+    "description": "A change in what an undo did ({change}: the change; {why}: why it was kept, or can't be undone)."
+  },
+  "assistant.undo.resultUndone": {
+    "defaultMessage": "{n, plural, one {# change undone} other {# changes undone}}",
+    "description": "What an undo of a message's changes did: how many it put back."
+  },
+  "assistant.undo.undo": {
+    "defaultMessage": "Undo",
+    "description": "A button: undoes a change the Assistant made (on its row), or every change it made for a message (on the message's heading)."
+  },
+  "assistant.undo.undoChange": {
+    "defaultMessage": "Undo: {change}",
+    "description": "A change's Undo button, for screen readers ({change}: the change, as its row says it)."
+  },
+  "assistant.undo.undoMessage": {
+    "defaultMessage": "Undo the changes for your message at {time}",
+    "description": "A message's Undo button, for screen readers ({time}: when the message was sent)."
+  },
+  "assistant.undo.undoneAt": {
+    "defaultMessage": "Undone {when}",
+    "description": "Beside a change of the Assistant's that was undone ({when}: \"5 minutes ago\", lower case)."
+  },
+  "assistant.undo.why.agentAdded": {
+    "defaultMessage": "An agent it added stays: remove it in the project's agents if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it added an agent to a project."
+  },
+  "assistant.undo.why.agentStopped": {
+    "defaultMessage": "An agent it stopped isn't started again by undo: start it if it should run.",
+    "description": "Why a change of the Assistant's can't be undone: it stopped an agent."
+  },
+  "assistant.undo.why.ask": {
+    "defaultMessage": "Its question stays under For you: answer or dismiss it there.",
+    "description": "What of a question the Assistant asked on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)."
+  },
+  "assistant.undo.why.cannot": {
+    "defaultMessage": "Its request stays under For you: answer or dismiss it there.",
+    "description": "What of a request the Assistant made on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)."
+  },
+  "assistant.undo.why.cardPlace": {
+    "defaultMessage": "The card's place in its column isn't put back.",
+    "description": "Why part of a change of the Assistant's can't be undone: it moved a card up or down its column."
+  },
+  "assistant.undo.why.cardsOrder": {
+    "defaultMessage": "The cards' order isn't put back.",
+    "description": "Why a change of the Assistant's can't be undone: it put cards in order in a column."
+  },
+  "assistant.undo.why.comment": {
+    "defaultMessage": "A comment stays: undo doesn't take back what was said.",
+    "description": "Why part of a change of the Assistant's can't be undone: a comment on a card."
+  },
+  "assistant.undo.why.context": {
+    "defaultMessage": "The doc sections to read first stay as set.",
+    "description": "Why part of a change of the Assistant's can't be undone: it set a card's doc sections to read first."
+  },
+  "assistant.undo.why.decision": {
+    "defaultMessage": "A decision it recorded stays: only you change or remove decisions.",
+    "description": "Why part of a change of the Assistant's can't be undone: it recorded the user's decision on a card."
+  },
+  "assistant.undo.why.declarePaths": {
+    "defaultMessage": "The paths it declared stay with the card.",
+    "description": "What of the Assistant declaring a card's paths stays when it is undone."
+  },
+  "assistant.undo.why.handOver": {
+    "defaultMessage": "A hand-over can't be undone: the work went to the other agent.",
+    "description": "Why a change of the Assistant's can't be undone: it handed an agent's work over to another."
+  },
+  "assistant.undo.why.laneEnded": {
+    "defaultMessage": "A lane that ended stays ended: start it again if it should go on.",
+    "description": "Why a change of the Assistant's can't be undone: it ended a lane (a card loop's record)."
+  },
+  "assistant.undo.why.message": {
+    "defaultMessage": "A message that was sent can't be taken back.",
+    "description": "Why a change of the Assistant's can't be undone: it sent an agent a message."
+  },
+  "assistant.undo.why.nothing": {
+    "defaultMessage": "It changed nothing undo puts back.",
+    "description": "Why a change of the Assistant's can't be undone: nothing it did is something undo puts back."
+  },
+  "assistant.undo.why.projectClosed": {
+    "defaultMessage": "A project it closed stays closed: open it again if it is wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it closed (deactivated) a project."
+  },
+  "assistant.undo.why.projectMade": {
+    "defaultMessage": "A project it made stays: remove it from Hive if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it created a project."
+  },
+  "assistant.undo.why.projectOpened": {
+    "defaultMessage": "A project it opened stays open: close it if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it opened (activated) a project."
+  },
+  "assistant.undo.why.prompt": {
+    "defaultMessage": "A prompt that was sent can't be taken back.",
+    "description": "Why a change of the Assistant's can't be undone: it prompted an agent."
+  },
+  "assistant.undo.why.putBack": {
+    "defaultMessage": "Its reason stays as a comment.",
+    "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
+  },
+  "assistant.undo.why.reportMerge": {
+    "defaultMessage": "The merge it reported stays in the card's work.",
+    "description": "What of a merge the Assistant reported stays when it is undone."
+  },
+  "assistant.undo.why.request": {
+    "defaultMessage": "Its request to the builder stays as a comment.",
+    "description": "What of a request the Assistant made to a card's builder stays when it is undone."
+  },
+  "assistant.undo.why.start": {
+    "defaultMessage": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
+    "description": "What of a card's start by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.startReview": {
+    "defaultMessage": "The review it started stays in the card's work.",
+    "description": "What of a review the Assistant started stays when it is undone."
+  },
+  "assistant.undo.why.submit": {
+    "defaultMessage": "Its submission stays in the card's work.",
+    "description": "What of a card's submission for review by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.verdict": {
+    "defaultMessage": "Its verdict stays in the card's work, and its round with it.",
+    "description": "What of a review verdict by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.withdrawn": {
+    "defaultMessage": "Messages it withdrew aren't sent again.",
+    "description": "Why a change of the Assistant's can't be undone: it withdrew messages waiting for an agent."
+  },
+  "assistant.undo.working": {
+    "defaultMessage": "Undoing…",
+    "description": "The Undo button of the question while the changes are being undone."
   },
   "assistant.view.allAttachments": {
     "defaultMessage": "All Attachments",

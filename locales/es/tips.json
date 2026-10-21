@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "El Asistente dirige tu equipo",
   "tips.assistantToldWaiting.text": "Mientras el Asistente vigila los carriles, un agente que muestra una solicitud de permiso o te pregunta algo lo despierta, y te dice qué agente es, su tarjeta y qué pregunta. Nunca responde por ti. Su vigilancia también puede seguir una tarjeta de versión fuera de los carriles.",
   "tips.assistantToldWaiting.title": "El Asistente te avisa cuando un agente te necesita",
+  "tips.assistantUndo.text": "Hecho por el Asistente lista sus cambios por tu mensaje. Deshacer en un cambio lo revierte, y Deshacer en un mensaje revierte todos sus cambios; se conserva lo que tú o un agente hayáis cambiado desde entonces.",
+  "tips.assistantUndo.title": "Deshacer los cambios del Asistente",
   "tips.assistantWaits.text": "Pide al Asistente que te avise cuando un agente termine una compilación o una ejecución de pruebas: espera sin ir comprobando, y Hive lo despierta cuando el agente termina, te necesita o se detiene.",
   "tips.assistantWaits.title": "Que el Asistente te avise cuando un agente termine",
   "tips.attachFiles.text": "Suelta un PDF, un registro o cualquier archivo en la terminal de un agente: Hive guarda una copia con la sesión y pega su ruta. Una etiqueta muestra lo adjunto, y avisa cuando la CLI del agente no lee ese tipo de archivo por sí misma, para que el agente lo abra por su ruta.",

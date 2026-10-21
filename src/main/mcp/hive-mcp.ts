@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
@@ -773,6 +773,23 @@ const tools: Tool[] = [
       required: ['id', 'value']
     },
     run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project })) as Parameters<typeof settingChangedText>[0])
+  },
+  {
+    name: 'hive_undo',
+    description:
+      "Undo changes of your own (kept 7 days, grouped by the user's message they came from): change (an id from list) or group (a message's id, or \"latest\": your newest message with a change left to undo). Each field goes back to what it was unless someone changed it since (left as it is, and said); a card you made is archived, a lane you started abandoned, an agent you started stopped (its work stays). Prompts, messages and comments can't be undone. list: your messages' changes, a line each; with group, its changes and their ids. Only your own changes: never the user's or agents'.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        list: { type: 'boolean' },
+        change: { type: 'string', description: 'A change\'s id, from list with its group.' },
+        group: { type: 'string', description: 'A message\'s id, from list, or "latest".' }
+      }
+    },
+    run: async (a) => {
+      if (a.list === true) return changeListText((await api('GET', '/v1/assistant/changes')) as ChangeGroupListed[], typeof a.group === 'string' && a.group !== 'latest' ? a.group : undefined)
+      return undoText(((await api('POST', '/v1/assistant/undo', { change: a.change, group: a.group })) as { results: UndoneListed[] }).results)
+    }
   },
   {
     name: 'hive_journal_write',

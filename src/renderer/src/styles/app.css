@@ -6276,14 +6276,28 @@ body.pane-resizing .monaco-editor {
 .assistant-action.failed .codicon {
   color: var(--fg-muted);
 }
-.assistant-action .assistant-revert {
+.assistant-action .assistant-undo,
+.assistant-change-head .assistant-undo-group {
   flex: none;
   height: 20px;
   padding: 0 6px;
   font-size: 11px;
 }
-.assistant-action .assistant-revert .codicon {
+.assistant-action .assistant-undo .codicon,
+.assistant-change-head .assistant-undo-group .codicon {
   color: inherit;
+}
+/* A change undone (#1283): struck through, with when; one that can't be undone, or kept, muted. */
+.assistant-action.undone .assistant-action-text {
+  text-decoration: line-through;
+  color: var(--fg-muted);
+}
+.assistant-action:is(.undone, .final, [data-status='kept'], [data-status='partly']) .codicon {
+  color: var(--fg-muted);
+}
+.assistant-change-status {
+  flex: none;
+  font-size: 11px;
 }
 .assistant-action-text {
   flex: 1;
@@ -7550,7 +7564,54 @@ body.pane-resizing-v .monaco-editor {
   border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 2px;
 }
-/* Every row the same height, a setting's with its Revert button too, so the list's 3 rows are its height unfolded. */
+/* The user's messages (#1283): a heading each, the newest open; a long list scrolls inside, the panel's other parts kept. */
+.assistant-actions {
+  max-block-size: 45vh;
+  overflow-y: auto;
+}
+.assistant-change-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-end: 12px;
+}
+.assistant-change-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 3px;
+  padding-inline: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+.assistant-change-toggle:hover .assistant-action-text {
+  text-decoration: underline;
+}
+.assistant-undo-result {
+  margin-block: 2px 4px;
+  margin-inline: 12px;
+  padding-block: 4px;
+  padding-inline: 8px;
+  border-inline-start: 2px solid var(--border);
+  font-size: 12px;
+}
+.assistant-undo-result > .flex {
+  justify-content: space-between;
+}
+.assistant-undo-result ul {
+  margin-block: 2px;
+  padding-inline-start: 16px;
+  color: var(--fg-muted);
+}
+/* Every row the same height, with its Undo button or without, so the list's 3 rows are its height unfolded. */
 .assistant-actions .assistant-action {
   box-sizing: border-box;
   height: 24px;

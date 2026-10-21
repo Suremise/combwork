@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "让助手管理你的团队",
   "tips.assistantToldWaiting.text": "助手监视通道时，若有智能体显示权限提示或向你提问，助手就会被唤醒，并告诉你是哪个智能体、它的卡片以及它问了什么。助手从不替你回答。它的监视也可以跟进通道之外的发布卡片。",
   "tips.assistantToldWaiting.title": "智能体需要你时，助手会告诉你",
+  "tips.assistantUndo.text": "“助手执行的操作”按你的消息列出它的更改。对某项更改点“撤销”会将其恢复，对某条消息点“撤销”会恢复它的全部更改；此后你或智能体所做的更改会保留。",
+  "tips.assistantUndo.title": "撤销助手的更改",
   "tips.assistantWaits.text": "让助手在智能体完成构建或测试运行时通知你：它会安静等待而不反复查看，智能体完成、需要你或停止时，Hive 会唤醒它。",
   "tips.assistantWaits.title": "让助手在智能体完成时告诉你",
   "tips.attachFiles.text": "把 PDF、日志或任何文件拖到智能体的终端上：Hive 会随会话保存一份副本并粘贴其路径。附件标签会显示附加了什么；如果智能体的 CLI 本身无法读取这类文件，标签也会说明，智能体会按路径打开它。",

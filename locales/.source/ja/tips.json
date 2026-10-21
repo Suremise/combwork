@@ -51,6 +51,8 @@
   "tips.assistantTeam.title": "The Assistant runs your team",
   "tips.assistantToldWaiting.text": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
   "tips.assistantToldWaiting.title": "The Assistant tells you when an agent needs you",
+  "tips.assistantUndo.text": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",
+  "tips.assistantUndo.title": "Undo the Assistant's changes",
   "tips.assistantWaits.text": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Hive wakes it when the agent finishes, needs you or stops.",
   "tips.assistantWaits.title": "Have the Assistant tell you when an agent is done",
   "tips.attachFiles.text": "Drop a PDF, a log or any file onto an agent's terminal: Hive keeps a copy with the session and pastes its path. A chip shows what's attached, and says when the agent's CLI doesn't read that kind of file itself, so the agent opens it by its path.",
