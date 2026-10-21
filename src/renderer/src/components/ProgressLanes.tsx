@@ -3,6 +3,8 @@ import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
+import type { ProgressRun } from '@shared/types'
+import { latestRunOf } from '@shared/progressTabs'
 import { useWorkBadges } from '../cardWork'
 import { OVERRIDE_NAMES } from './CardWork'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -54,12 +56,17 @@ const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.rev
 const waitsForYou = (l: Lane): boolean => laneRunning(l.state) && (l.status?.reason === 'you' || l.status?.reason === 'roundLimit')
 
 /** `lanes`: the lanes shown (the panel's filter applied); `all`: the workspace's, in the same order, to keep a move's order whole. */
-export function LanesSection({ lanes, all, width }: { lanes: Lane[]; all: Lane[]; width: number }) {
+/**
+ * `runs`: the runs shown, for the dot on each lane's row (its current card's latest run, #1309). `full`: the Lanes tab's
+ * (#1309): every lane at its full height, with no fold bar or edge (Pulse's lanes have them).
+ */
+export function LanesSection({ lanes, all, width, runs = [], full = false }: { lanes: Lane[]; all: Lane[]; width: number; runs?: ProgressRun[]; full?: boolean }) {
   useLanguage()
   const ws = useStore((s) => s.workspace?.path ?? null)
   // What each live card's facts say (#1225), once for every lane: read again whenever the board is.
   const badges = useWorkBadges()
-  const [folded, toggle] = usePanelFold(ws ? foldKey(ws) : null)
+  const [foldedKept, toggle] = usePanelFold(ws ? foldKey(ws) : null)
+  const folded = foldedKept && !full
   const key = ws ? rowsKey(ws) : null
   const kept = useStore((s) => (key ? s.panes[key] : undefined))
   // The lanes shown until the edge is dragged: Settings → Advanced's, or the workspace's own (#367).
@@ -215,40 +222,48 @@ export function LanesSection({ lanes, all, width }: { lanes: Lane[]; all: Lane[]
   }
   useLayoutEffect(() => {
     const el = list.current
-    const body = el?.closest('.progress-panel')?.querySelector<HTMLElement>('.progress-body')
-    if (!open || !el || !body) return
+    const panel = el?.closest<HTMLElement>('.progress-panel')
+    const body = panel?.querySelector<HTMLElement>('.progress-body')
+    const section = el?.closest<HTMLElement>('.progress-lanes')
+    if (full || !open || !el || !body || !panel || !section) return
     const row = el.querySelector<HTMLElement>('.progress-lane')
     const measure = (): void => {
       if (row) {
         const h = row.getBoundingClientRect().height + parseFloat(getComputedStyle(row).marginBottom || '0')
         if (h > 0) setPitch((was) => (Math.abs(was - h) < 0.1 ? was : h))
       }
-      const r = el.clientHeight + body.getBoundingClientRect().height - RUNS_KEEP_PX
+      // The lanes follow the runs (#1309: not pinned to the bottom), so the room left below them is theirs too.
+      const below = Math.max(0, panel.getBoundingClientRect().bottom - section.getBoundingClientRect().bottom)
+      const r = el.clientHeight + body.getBoundingClientRect().height + below - RUNS_KEEP_PX
       setRoom((was) => (was !== null && Math.abs(was - r) < 1 ? was : r))
     }
     measure()
     const watch = new ResizeObserver(measure)
     watch.observe(el)
     watch.observe(body)
+    watch.observe(panel)
     if (row) watch.observe(row)
     return () => watch.disconnect()
-  }, [open, lanes, width])
-  if (!lanes.length) return null
+  }, [open, lanes, width, full])
+  if (!lanes.length)
+    return full ? <div className="pane-empty progress-empty">{tr(msg({ id: 'board.lanes.none', defaultMessage: 'No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.', description: "The Progress panel's Lanes tab when there are no lanes. Glossary: lane." }))}</div> : null
   const { chosen, shown, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
   return (
-    <div className={cx('progress-lanes', folded && 'folded')} role="region" aria-label={tr(LANES)}>
-      {!folded && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
+    <div className={cx('progress-lanes', folded && 'folded', full && 'full')} role="region" aria-label={tr(LANES)}>
+      {!folded && !full && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
+      {!full && (
       <button type="button" className="progress-lanes-bar" aria-expanded={!folded} onClick={toggle} title={folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))}>
         <Icon name={folded ? 'chevron-up' : 'chevron-down'} />
         <span>{tr(LANES)}</span>
         <span className="progress-lanes-count">{lanes.length}</span>
         {lanes.some(waitsForYou) && <span className="progress-lanes-you">{tr(msg({ id: 'board.lanes.waitingForYou', defaultMessage: '{n, plural, one {# waiting for you} other {# waiting for you}}', description: "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane." }), { n: lanes.filter(waitsForYou).length })}</span>}
       </button>
+      )}
       {!folded && (
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
-        <div className="progress-lanes-list" ref={list} style={shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
+        <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
           {lanes.map((l) => (
-            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} />
+            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} />
           ))}
         </div>
       )}
@@ -354,7 +369,7 @@ interface LaneReorder {
   onContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
-function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge> }) {
+function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[] }) {
   const tasks = useStore((s) => s.tasks)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
@@ -428,6 +443,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
             </Tooltip>
           )}
           {current !== null && !l.frozen && <span className="progress-lane-current">{cardLabelOf({ tasks }, current)}</span>}
+          {current !== null && !l.frozen && <RunDot run={latestRunOf(runs, current)} card={cardLabelOf({ tasks }, current)} />}
           <span className="progress-lane-count faint">
             {unknown ? '–' : finished}/{total}
           </span>
@@ -503,6 +519,21 @@ function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; wo
         {marks.refused && <span className="lane-seg-mark refused" aria-hidden="true" />}
         {marks.override && <span className="lane-seg-mark override" aria-hidden="true" />}
       </button>
+    </Tooltip>
+  )
+}
+
+/**
+ * The latest run of a lane's current card (#1309), a dot after its name in the lane's header: by colour and shape,
+ * running (a ring), passed (filled), failed (a cross), stopped or stale (a dash); its title says which run and how.
+ */
+function RunDot({ run: r, card }: { run: ProgressRun | null; card: string }) {
+  if (!r) return null
+  const state = r.state === 'running' ? 'running' : r.state === 'passed' ? 'passed' : r.state === 'failed' ? 'failed' : 'other'
+  const text = tr(msg({ id: 'board.lanes.latestRun', defaultMessage: "{card}'s latest run: {run}, {state, select, running {running} passed {passed} failed {failed} other {stopped}}", description: "Tooltip and accessible name of the dot after a lane's current card (Progress panel): that card's latest run ({run}: its title) and how it is going or went. Keep the select keys." }), { card, run: r.title, state }) // i18n-ignore: select keys, never shown
+  return (
+    <Tooltip content={text}>
+      <span className={cx('lane-run-dot', state)} role="img" aria-label={text} data-run={r.id} />
     </Tooltip>
   )
 }

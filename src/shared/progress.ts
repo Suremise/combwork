@@ -29,8 +29,6 @@ export const MAX_STEP_NAME = 120
 export const MAX_COMMAND = 200
 export const MAX_SUMMARY = 500
 export const MAX_LOG_PATH = 400
-/** Recent shows this many ended runs at first; Show all shows the rest it keeps (RECENT_KEPT). */
-export const RECENT_RUNS = 10
 export const MAX_TOTAL = 100_000
 export const MAX_ESTIMATE_MS = 7 * 24 * 3_600_000
 
@@ -49,6 +47,17 @@ export function isListed(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedA
   if (r.state === 'running') return true
   if (r.state === 'passed' || r.state === 'stopped') return r.finishedAt !== null && now - r.finishedAt < PASSED_SHOWN_MS
   return r.seenAt === null || now - r.seenAt < PASSED_SHOWN_MS
+}
+
+/**
+ * Whether a run shows on Pulse (#1309, the Assistant's change): a run in progress (running, or stopped reporting and not
+ * yet ended), and one that just ended, failed or passed, for a few seconds; then only in Runs (Pulse's line counts the
+ * failures). A dismissed one never.
+ */
+export function onPulse(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedAt'>, now: number): boolean {
+  if (r.dismissed) return false
+  if (isOpenRun(r)) return true
+  return r.finishedAt !== null && now - r.finishedAt < PASSED_SHOWN_MS
 }
 
 /** Whether a run has a bar in the folded strip: listed, and not a failure (or stall) the user has already seen. */
@@ -328,6 +337,8 @@ export interface RunDetail {
   label: string
   text: string
   code?: boolean
+  /** A time (ms): the panel shows it relative ("12 minutes ago"), `text` (the date and time in full) on hover (#1309). */
+  at?: number
 }
 
 /**
@@ -390,8 +401,8 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   }
   out.push({ label: tr(msg({ id: 'board.details.agent', defaultMessage: 'Agent', description: "A label in a run's details (Progress panel): the agent that ran it (and its project) follows." })), text: `${runAgentName(r, tr)}${project ? ` · ${project}` : ''}` })
   if (r.provider) out.push({ label: tr(msg({ id: 'board.details.provider', defaultMessage: 'Provider', description: "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)." })), text: providerName(r.provider) })
-  out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt) })
-  if (r.finishedAt !== null) out.push({ label: tr(msg({ id: 'board.details.ended', defaultMessage: 'Ended', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.finishedAt) })
+  out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt), at: r.startedAt })
+  if (r.finishedAt !== null) out.push({ label: tr(msg({ id: 'board.details.ended', defaultMessage: 'Ended', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.finishedAt), at: r.finishedAt })
   out.push({ label: tr(msg({ id: 'board.details.took', defaultMessage: 'Took', description: "A label in a run's details (Progress panel): how long it ran follows." })), text: tookText })
   if (steps) out.push({ label: tr(msg({ id: 'board.details.stepsLabel', defaultMessage: 'Steps', description: "A label in a run's details (Progress panel): its steps follow (\"4 of 12 done\")." })), text: steps })
   out.push({ label: tr(msg({ id: 'board.details.stateLabel', defaultMessage: 'State', description: "A label in a run's details (Progress panel): its state follows (Running, Failed…)." })), text: state })

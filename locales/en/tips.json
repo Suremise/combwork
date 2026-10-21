@@ -964,8 +964,8 @@
     "description": "A tip's title."
   },
   "tips.progressHistory.text": {
-    "defaultMessage": "Recent in the Progress panel shows the last {recent, plural, one {# run} other {# runs}}; Show all scrolls through the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts. The project filter applies to them all.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {recent} is how many runs Recent shows (10), {kept} how many Show all keeps (200)."
+    "defaultMessage": "The Runs tab of the Progress panel keeps the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts: by day, a run and its retries in one line. Find them by their words, or show only failures, a lane’s or an agent’s.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Hive keeps (200)."
   },
   "tips.progressHistory.title": {
     "defaultMessage": "What ran this morning?",
@@ -1003,13 +1003,13 @@
     "defaultMessage": "How long until the tests finish?",
     "description": "A tip's title."
   },
-  "tips.progressRecentFold.text": {
-    "defaultMessage": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Recent is the Progress panel's section of runs that ended."
+  "tips.progressTabs.text": {
+    "defaultMessage": "The Progress panel has four tabs: Pulse for what is going on now, then Merges, Runs and Lanes. A red number on Runs counts the runs that failed with nothing passing since; Pulse has a line for them too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (the tabs: Pulse, Merges, Runs, Lanes)."
   },
-  "tips.progressRecentFold.title": {
-    "defaultMessage": "Fold Recent away",
-    "description": "A tip's title."
+  "tips.progressTabs.title": {
+    "defaultMessage": "Pulse, Merges, Runs, Lanes",
+    "description": "A tip's title: the Progress panel's tabs, named as the panel shows them."
   },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
