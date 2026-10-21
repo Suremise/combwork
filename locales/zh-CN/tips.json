@@ -236,6 +236,8 @@
   "tips.progressRecentFold.title": "收起“最近”",
   "tips.projectCards.text": "项目的“概览”最先显示它的卡片：每列各有多少张、多少张停滞或受阻。点击数字即可打开其“任务”标签页。",
   "tips.projectCards.title": "项目的卡片一目了然",
+  "tips.projectKeys.text": "每个项目都有一个 2 到 4 个字母的键，用于命名其卡片：AM-12。在看板或命令面板中搜索 AM-12，或用 AM- 查看该项目的所有卡片；旧的 #12 仍然有效。在“项目设置”中更改键。",
+  "tips.projectKeys.title": "卡片以其项目的键命名",
   "tips.projectTabs.text": "空间不足时，项目的标签页会缩成图标，当前标签页只要放得下就会保留名称。悬停在标签页上可查看其名称和快捷键。",
   "tips.projectTabs.title": "会自动腾出空间的标签页",
   "tips.projectTabsKeys.text": "Alt+1 到 Alt+8 按显示顺序打开项目的标签页，从“会话”到 Git。记忆、技能、模板和 MCP 在末尾的“更多 ▾”中，也在菜单栏的“项目”菜单里。",

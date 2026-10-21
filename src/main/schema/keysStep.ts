@@ -112,6 +112,15 @@ export function cardOfKey(db: Sql, key: string, number: number): number | null {
 }
 
 /**
+ * Every name a card moved to another project still has in a project it left (#1221): `HI-1` → its card, under each key
+ * that project holds or held, for the window, which resolves the other names from the board and the keys.
+ */
+export function movedCardNames(db: Sql): Record<string, number> {
+  const rows = db.prepare('SELECT k.key, a.number, a.card FROM card_aliases a JOIN project_keys k ON k.project_id = a.project_id').all() as { key: string; number: number; card: number }[] // i18n-ignore: SQL
+  return Object.fromEntries(rows.map((r) => [`${r.key}-${r.number}`, r.card]))
+}
+
+/**
  * The 1.0 step for keys (#1219): #1208's tables made; each project with cards given a suggested key (from its name, the
  * projects with the most cards choosing first), every card of a project its own number as its number there (HI-1061),
  * and each project's counter set past its highest. Projects with no card get theirs when the workspace opens. A board

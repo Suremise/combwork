@@ -591,6 +591,8 @@
   "settings.project.fileLocks.desc": "What happens when an agent tries to edit a file another agent in this project's folder is editing. Inherit uses Settings → Agents & Worktrees → File locks.",
   "settings.project.fileLocks.tip": "Applies to agents sharing a folder (agents in their own worktrees never collide). An agent claims a file when it edits it and releases it when its turn ends. Edits made through shell commands are not covered.",
   "settings.project.fileLocks.title": "File locks",
+  "settings.project.key.desc": "The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.",
+  "settings.project.key.title": "Project key",
   "settings.project.keybindings.desc": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.",
   "settings.project.keybindings.title": "Shortcuts",
   "settings.project.loopRounds.desc": "How many rounds a card gets in this project's card loops before its agents stop and ask you, when you don't say. Empty inherits Settings → Workspace → Card loop rounds.",

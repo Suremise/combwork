@@ -55,7 +55,7 @@ export async function runCheck(wf: Workflow, run: CheckRun): Promise<FactData['C
   const command = r.options.commands[run.name]
   const started = Date.now()
   const b = await wf.platform(r.options).checkRun(card, s, { command, revision: run.revision, isolated: run.isolated, exec: run.exec })
-  if (!('tested' in b)) return refusal(b.rule, b.values, b.rule === 'platform.unknown' ? 'the user' : null)
+  if (!('tested' in b)) return refusal(b.rule, b.values, b.rule === 'platform.unknown' ? 'the user' : null) // i18n-ignore: the override field, agent-facing (§16.8.3)
   const data: FactData['CheckRan'] = {
     name: run.name,
     command: command ?? '',

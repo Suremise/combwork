@@ -704,8 +704,8 @@
     "description": "Tooltip on Compact before anything was said."
   },
   "assistant.panel.openCard": {
-    "defaultMessage": "{known, select, yes {Open card #{number}, in {column}} other {Open card #{number}}}",
-    "description": "A card chip in the Assistant's status line, for screen readers ({column}: \"Review\")."
+    "defaultMessage": "{known, select, yes {Open card {number}, in {column}} other {Open card {number}}}",
+    "description": "A card chip in the Assistant's status line, for screen readers ({number}: the card's name, its key, such as AM-12, or #12 for a card with none; {column}: \"Review\")."
   },
   "assistant.panel.openNow": {
     "defaultMessage": "open now",
@@ -792,8 +792,8 @@
     "description": "Beside a setting the Assistant changed that was put back."
   },
   "assistant.panel.reviewing": {
-    "defaultMessage": "Reviewing #{number} {title}",
-    "description": "An agent's tooltip in the Assistant's overview: a card it reviews."
+    "defaultMessage": "Reviewing {number} {title}",
+    "description": "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)."
   },
   "assistant.panel.running": {
     "defaultMessage": "{count} running",
@@ -892,8 +892,8 @@
     "description": "The Assistant's panel before it starts. {name} is its mode (Overseer…) or The Assistant; <b> is bold."
   },
   "assistant.panel.workingOn": {
-    "defaultMessage": "Working on #{number} {title}",
-    "description": "An agent's tooltip in the Assistant's overview: a card it works on."
+    "defaultMessage": "Working on {number} {title}",
+    "description": "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)."
   },
   "assistant.panel.workspace": {
     "defaultMessage": "Workspace",

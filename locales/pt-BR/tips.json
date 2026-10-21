@@ -236,6 +236,8 @@
   "tips.progressRecentFold.title": "Recolha Recentes",
   "tips.projectCards.text": "A Visão geral de um projeto começa pelos cartões dele: quantos há em cada coluna, travados ou bloqueados. Clique em um número para abrir a aba Tarefas.",
   "tips.projectCards.title": "Os cartões de um projeto num relance",
+  "tips.projectKeys.text": "Cada projeto tem uma chave de 2 a 4 letras que dá nome aos cartões dele: AM-12. Pesquise AM-12 no quadro ou na paleta de comandos, ou AM- para todos os cartões do projeto; um #12 antigo ainda funciona. Mude uma chave em Configurações do projeto.",
+  "tips.projectKeys.title": "Os cartões levam a chave do projeto",
   "tips.projectTabs.text": "Quando falta espaço, as abas de um projeto encolhem para ícones, e a aba em que você está mantém o nome enquanto ele couber. Passe o mouse sobre uma aba para ver o nome e o atalho dela.",
   "tips.projectTabs.title": "Abas que abrem espaço",
   "tips.projectTabsKeys.text": "Alt+1 a Alt+8 abrem as abas de um projeto na ordem em que aparecem, de Sessão a Git. Memória, Skills, Modelos e MCP ficam em Mais ▾ no fim, e no menu Projeto da barra de menus.",

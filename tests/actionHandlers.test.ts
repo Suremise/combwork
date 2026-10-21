@@ -311,6 +311,19 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(JSON.stringify(st.notices[0])).toContain('waits for your review')
   })
 
+  it("a notify action with Hive's own message (#1264) shows it in the language shown, its English kept beside it", async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    own.tx((tx) => tx.action(c, 'notify', { text: 'AL-9 is approved: OK to merge?', shown: { id: 'workflow.forYou.okBefore', values: { card: 'AL-9' } } }, null))
+    own.close()
+    await worker.runActions(w)
+    expect(st.notices).toHaveLength(1)
+    expect(JSON.stringify(st.notices[0].body)).toContain('"shown":"AL-9 is approved: OK to merge?"')
+    expect(JSON.stringify(st.notices[0].body)).toContain('"english":"AL-9 is approved: OK to merge?"')
+  })
+
   it("a lane's failed review, a card blocked and its merge due are told, one notice per lane at a time; a lane already running starts from now", async () => {
     const { w, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })

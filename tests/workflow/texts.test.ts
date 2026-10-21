@@ -1,0 +1,149 @@
+// The workflow core's text in every language (#1264, SPEC §16.8.3): each refusal's three sentences render in each locale
+// with sample values (no placeholder left, no English where a translation exists), the names in their values (a stage,
+// a move, a rule) and what a platform couldn't read shown through their own messages, and Hive's For you requests kept
+// as data beside their English.
+import { afterEach, describe, expect, it } from 'vitest'
+import { fmt, setLanguage, tr } from '../../src/shared/i18n'
+import type { Msg } from '../../src/shared/i18n/msg'
+import { availableLanguages, loadCatalogue } from '../../src/shared/i18n/catalogues'
+import { REFUSALS, refusal, refusalLines, type RefusalFormat, type RefusalValues, type RuleId } from '../../src/shared/workflow/refusals'
+import { FOR_YOU, MOVE_NAMES, RULE_NAMES, STAGE_NAME, UNREADABLE, workflowEnglish, workflowLine, workflowText } from '../../src/shared/workflow/texts'
+import { unknown } from '../../src/main/platform/types'
+import { GUARDS } from '../../src/shared/workflow/pieces'
+import { B1, commit, moved, setup, type Env } from './harness'
+import { preset } from '../../src/shared/workflow/options'
+import en from '../../locales/en/workflow.json'
+
+const LOCALES = ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']
+
+const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items) => fmt.list(items), names: true }
+
+/** A value for every placeholder the refusals have. */
+const SAMPLE: RefusalValues = {
+  card: 'AM-12',
+  revision: 'a3f2c1d',
+  reason: 'waits for the design',
+  waitsFor: 'AM-3',
+  files: 'src/a.ts',
+  folder: 'D:\\work\\am',
+  commit: 'b4c5d6e',
+  command: 'npm test',
+  check: 'unit',
+  email: 'team@example.com',
+  runs: 'unit tests',
+  submission: 3,
+  latest: 4,
+  target: 'main',
+  stage: 'approved',
+  move: 'start review',
+  moves: 'submit, put back',
+  intent: 'report merge',
+  rules: 'submit.checksPassed, approval.given',
+  key: 'AM-12',
+  alias: '#1061',
+  what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
+  rule: 'submit.checksPassed',
+  cause: 'passes',
+  n: 1,
+  q: 2
+}
+
+const messages = (rule: RuleId): Msg[] => [REFUSALS[rule].message, REFUSALS[rule].next, ...(REFUSALS[rule].change ? [REFUSALS[rule].change!] : [])]
+
+afterEach(() => setLanguage('en', {}))
+
+describe('the workflow text in every locale', () => {
+  it('has every locale, each with every workflow message translated', async () => {
+    expect(availableLanguages()).toEqual(expect.arrayContaining(LOCALES))
+    for (const code of LOCALES) {
+      const cat = await loadCatalogue(code)
+      const missing = Object.keys(en).filter((id) => typeof cat[id] !== 'string')
+      expect(missing, code).toEqual([])
+    }
+  })
+
+  it('renders every refusal in each locale with sample values: no placeholder left, no English where a translation exists', async () => {
+    const english = Object.fromEntries((Object.keys(REFUSALS) as RuleId[]).map((rule) => [rule, refusalLines(rule, SAMPLE, WINDOW)]))
+    for (const code of LOCALES) {
+      const cat = await loadCatalogue(code)
+      setLanguage(code, cat, code)
+      for (const rule of Object.keys(REFUSALS) as RuleId[]) {
+        const shown = refusalLines(rule, SAMPLE, WINDOW)
+        const lines = [shown.message, shown.next, ...(shown.change !== null ? [shown.change] : [])]
+        const was = [english[rule].message, english[rule].next, ...(english[rule].change !== null ? [english[rule].change] : [])]
+        messages(rule).forEach((m, i) => {
+          expect(lines[i], `${code} ${m.id}`).not.toMatch(/[{}]/)
+          // A translation the same as the English (a name, a short word) may render the same; any other may not.
+          if (cat[m.id] !== (en as Record<string, { defaultMessage: string }>)[m.id].defaultMessage) expect(lines[i], `${code} ${m.id}`).not.toBe(was[i])
+        })
+      }
+    }
+  })
+
+  it('shows the names in a refusal through their messages in the window, and as they are to agents', async () => {
+    const agents = refusal('move.notFromHere', SAMPLE)
+    expect(agents.message).toBe("AM-12 is in approved: start review isn't possible from there.")
+    expect(agents.next).toBe('From approved, use: submit, put back.')
+    expect(refusalLines('move.notFromHere', SAMPLE, WINDOW)).toMatchObject({ message: "AM-12 is in Approved: Start review isn't possible from there.", next: 'From Approved, use: Submit for review and Put back.' })
+    expect(refusalLines('move.needsOverride', { ...SAMPLE, stage: 'merging' }, WINDOW).message).toBe('Moving AM-12 to Merging skips: Checks pass before review and Your OK before merging.')
+    // Nothing possible from there: the next step says so, never "use: ." (#1264).
+    expect(refusal('move.notFromHere', { ...SAMPLE, moves: '' }).next).toBe('Nothing waits to be done there now.')
+    const de = await loadCatalogue('de')
+    setLanguage('de', de, 'de')
+    const shown = refusalLines('move.notFromHere', SAMPLE, WINDOW)
+    expect(shown.message).toContain(tr(STAGE_NAME, { stage: 'approved' }))
+    expect(shown.message).toContain(tr(MOVE_NAMES['start review']))
+    expect(shown.next).toContain(tr(MOVE_NAMES.submit))
+    expect(refusalLines('move.needsOverride', SAMPLE, WINDOW).message).toContain(tr(RULE_NAMES['submit.checksPassed']))
+  })
+
+  it('names every guard, move and stage for the window', () => {
+    for (const id of Object.keys(GUARDS)) expect(RULE_NAMES[id], id).toBeDefined()
+    for (const stage of ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']) expect(tr(STAGE_NAME, { stage })).not.toBe(stage)
+  })
+})
+
+describe("what a platform couldn't read", () => {
+  it('keeps its English for agents and its message for the window', async () => {
+    const u = unknown(UNREADABLE.deliverables, { project: 'site', n: 20000 })
+    expect(u.what).toBe('the work in site: it has over 20,000 files')
+    expect(u.whatText).toEqual({ id: 'workflow.unreadable.deliverables', values: { project: 'site', n: 20000 } })
+    const r = refusal('platform.unknown', { card: 'AM-12', what: unknown(UNREADABLE.head, { where: 'D:\\work\\am' }).whatText!, rule: 'submit.checksPassed' })
+    expect(r.message).toBe("AM-12: Hive couldn't read the latest commit in D:\\work\\am, so the rule submit.checksPassed can't be checked.")
+    const fr = await loadCatalogue('fr')
+    setLanguage('fr', fr, 'fr')
+    const shown = refusalLines('platform.unknown', r.values, WINDOW)
+    expect(shown.message).toContain(tr(UNREADABLE.head, { where: 'D:\\work\\am' }))
+    expect(shown.message).toContain(tr(RULE_NAMES['submit.checksPassed']))
+    expect(shown.message).not.toContain('the latest commit')
+  })
+
+  it("an id this Hive doesn't know (a newer Hive's record) shows as nothing rather than failing", () => {
+    expect(workflowLine({ id: 'workflow.unreadable.fromTheFuture' }, (m) => tr(m))).toBeNull()
+    expect(workflowEnglish({ id: 'workflow.unreadable.fromTheFuture' })).toBe('workflow.unreadable.fromTheFuture')
+  })
+})
+
+describe('For you requests', () => {
+  let env: Env | null = null
+  afterEach(() => {
+    env?.close()
+    env = null
+  })
+
+  it('keep their English for agents and their message as data for the window, in the fact and the notice', async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], review: 'you', noSelfReview: false, finish: 'agentMerges' }))
+    const card = e.wf.createCard({ title: 'Yours' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'y.txt': 'y\n' }, 'Yours')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    const req = e.wf.state(card).requests[0]
+    expect(req).toMatchObject({ gate: 'review', text: `${card.key} waits for your review`, requestText: { id: FOR_YOU.review.id, values: { card: card.key } } })
+    expect(e.notes.at(-1)).toEqual({ card: card.key, text: `${card.key} waits for your review`, shown: { id: FOR_YOU.review.id, values: { card: card.key } } })
+    const ja = await loadCatalogue('ja')
+    setLanguage('ja', ja, 'ja')
+    expect(workflowLine(req.requestText, (m, values) => tr(m, values))).toBe(tr(FOR_YOU.review, { card: card.key }))
+    expect(workflowLine(req.requestText, (m, values) => tr(m, values))).not.toContain('waits for your review')
+  })
+})

@@ -20,7 +20,8 @@ const SHOWN_MS = 30000
 // Codex 0.163 calls MCP tools from one script (Hive's transcript: "Script"), whose result waits for every call in it:
 // its screen says each call done, with its reply ("Called", redrawn over "Calling" as its last letters).
 const LISTED = /ed hive\.hive_list_projects\s*└\s*demo \(on/
-const CREATED = /ed hive\.hive_create_task\s*└\s*#\d+ created in Todo/
+// Its reply names the card by its key with the number the tools take (#1219): "DE-1 (#1) created in Todo".
+const CREATED = /ed hive\.hive_create_task\s*└\s*([A-Z]{2,4}-\d+) \(#(\d+)\) created in Todo/
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -180,6 +181,8 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       const card = (await inv('tasks:list')).find((t) => t.title === 'MCP approval check')
       record.assistant.cardMade = card ? { number: card.number, project: card.project } : null
       check('Assistant: the card is on the board, in demo', card?.project === 'demo', JSON.stringify(record.assistant.cardMade))
+      const [, key, no] = CREATED.exec(shown) ?? []
+      check('Assistant: the reply named that card, by its key and number', !!card && key === card.key && Number(no) === card.number, JSON.stringify({ key, no, card: card && { key: card.key, number: card.number } }))
     })
     await inv('session:stop', home, 'assistant')
     await lib.until(async () => !(await live(home, 'assistant')), 30000, 500)

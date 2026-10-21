@@ -236,6 +236,8 @@
   "tips.progressRecentFold.title": "Pliega Recientes",
   "tips.projectCards.text": "El Resumen de un proyecto empieza con sus tarjetas: cuántas hay en cada columna, estancadas o bloqueadas. Haz clic en un número para abrir su pestaña Tareas.",
   "tips.projectCards.title": "Las tarjetas de un proyecto de un vistazo",
+  "tips.projectKeys.text": "Cada proyecto tiene una clave de 2 a 4 letras que da nombre a sus tarjetas: AM-12. Busca AM-12 en el tablero o en la paleta de comandos, o AM- para todas las tarjetas de ese proyecto; un #12 antiguo sigue funcionando. Cambia una clave en la configuración del proyecto.",
+  "tips.projectKeys.title": "Las tarjetas llevan la clave de su proyecto",
   "tips.projectTabs.text": "Cuando falta espacio, las pestañas de un proyecto se reducen a iconos, y la pestaña en la que estás conserva su nombre mientras quepa. Pasa el puntero por una pestaña para ver su nombre y su atajo.",
   "tips.projectTabs.title": "Pestañas que hacen sitio",
   "tips.projectTabsKeys.text": "Alt+1 a Alt+8 abren las pestañas de un proyecto en el orden en que aparecen, de Sesión a Git. Memoria, Habilidades, Plantillas y MCP están en Más ▾ al final, y en el menú Proyecto de la barra de menús.",

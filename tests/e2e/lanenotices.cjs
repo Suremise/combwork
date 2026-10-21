@@ -57,11 +57,13 @@ const check = (name, ok, extra = '') => {
       await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     }
     const idle = async (id) => ['ready', 'finished', 'watching'].includes((await live(id))?.status)
-    /** The lane notices recorded so far (Windows notifications a quiet copy records), cards by number (lib.unkey). */
+    /** The lane notices recorded so far (Windows notifications a quiet copy records); they name cards as the window does (#1221). */
     const notices = () =>
       (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
         .filter((n) => n.kind === 'notification' && (n.title ?? '').startsWith('Lane '))
-        .map((n) => ({ title: n.title, body: lib.unkey(n.body ?? '') }))
+        .map((n) => ({ title: n.title, body: n.body ?? '' }))
+    /** A card as the window names it: its key (AL-1). */
+    const label = async (n) => (await inv('tasks:list')).find((c) => c.number === n)?.key ?? `#${n}`
 
     await page.getByText('alpha', { exact: true }).first().click()
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -85,13 +87,16 @@ const check = (name, ok, extra = '') => {
     // The review fails: one notice naming the lane and the card.
     await until(() => idle(reviewer.id), HUNG_MS)
     await say(reviewer.id, `boardreview ${a} failed`)
-    const failedNotice = () => notices().find((n) => n.body.includes(`#${a} failed review`))
+    const keyA = await label(a)
+    const keyB = await label(b)
+    check('the cards have keys', /^[A-Z]{2,4}-\d+$/.test(keyA), keyA)
+    const failedNotice = () => notices().find((n) => n.body.includes(`${keyA} failed review`))
     check('a failed review is a notice naming the lane and the card', !!(await until(async () => !!failedNotice(), HUNG_MS)) && failedNotice().title === 'Lane Builder / Reviewer (greetings)', JSON.stringify(notices()))
     check('the move into Review alone told nothing', notices().length === 1, JSON.stringify(notices()))
 
     // A card blocked, with why.
     await inv('tasks:update', b, { blocked: 'Which greeting does the README show?' })
-    const blockedNotice = () => notices().find((n) => n.body.includes(`#${b} is blocked: Which greeting does the README show?`))
+    const blockedNotice = () => notices().find((n) => n.body.includes(`${keyB} is blocked: Which greeting does the README show?`))
     check('a card blocked is a notice with why', !!(await until(async () => !!blockedNotice(), HUNG_MS)), JSON.stringify(notices()))
 
     // Every card passed: its merge is due.

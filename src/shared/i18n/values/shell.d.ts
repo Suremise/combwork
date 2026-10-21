@@ -246,6 +246,7 @@ interface HiveMessageValues {
   'shell.palette.command': { category: string | number; command: string | number }
   'shell.palette.goToProject': { project: string | number }
   'shell.palette.noMatch': undefined
+  'shell.palette.openCard': { card: string | number; title: string | number }
   'shell.palette.placeholder': undefined
   'shell.palette.projectsPlaceholder': undefined
   'shell.providers.choose': undefined

@@ -70,17 +70,17 @@ const fits = (key: keyof WorkflowOptions, v: unknown): boolean => key !== 'platf
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {
   if (raw === undefined || raw === null) return { set: {} }
-  if (!isRecord(raw)) return { bad: 'not an object' }
+  if (!isRecord(raw)) return { bad: 'not an object' } // i18n-ignore: a log line's reason (resolveLogged)
   const set: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(raw)) {
     if (v === undefined) continue
     if (k === 'platform') {
       // A project's options name their platform: another one's don't apply here.
-      if (v !== platform) return { bad: `options for ${String(v)}, not ${platform}` }
+      if (v !== platform) return { bad: `options for ${String(v)}, not ${platform}` } // i18n-ignore: a log line's reason (resolveLogged)
       continue
     }
-    if (!known.has(k)) return { bad: `unknown option ${k}` }
-    if (!fits(k as keyof WorkflowOptions, v)) return { bad: `${k} has a value it doesn't take` }
+    if (!known.has(k)) return { bad: `unknown option ${k}` } // i18n-ignore: a log line's reason (resolveLogged)
+    if (!fits(k as keyof WorkflowOptions, v)) return { bad: `${k} has a value it doesn't take` } // i18n-ignore: a log line's reason (resolveLogged)
     set[k] = v
   }
   return { set: set as Partial<WorkflowOptions> }
@@ -113,9 +113,9 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
   try {
     compiled = compile(options)
   } catch (e) {
-    return fallBack(`options that don't compile (${e instanceof Error ? e.message : String(e)})`)
+    return fallBack(`options that don't compile (${e instanceof Error ? e.message : String(e)})`) // i18n-ignore: a log line's reason (resolveLogged)
   }
-  if (!compiled.ok) return fallBack(`options that contradict each other (${compiled.contradictions.join(', ')})`)
+  if (!compiled.ok) return fallBack(`options that contradict each other (${compiled.contradictions.join(', ')})`) // i18n-ignore: a log line's reason (resolveLogged)
   return { options, origins, invalid: null }
 }
 

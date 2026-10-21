@@ -75,6 +75,8 @@ interface HiveMessageValues {
   'actions.project.deactivateFailed': undefined
   'actions.project.deactivateMessage': { n: number; project: string | number }
   'actions.project.deactivateTitle': { n: number }
+  'actions.project.key': undefined
+  'actions.project.keyHint': { first: string | number; second: string | number }
   'actions.project.nameChars': { chars: string | number }
   'actions.project.nameDot': undefined
   'actions.project.nameEmpty': undefined

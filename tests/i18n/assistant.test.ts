@@ -207,7 +207,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('assistant.panel.namesTip'), { shown: 'yes' })).toBe("Show only the agents' state marks (names on hover)")
     expect(tr(m('assistant.panel.namesTip'), { shown: 'no' })).toBe("Show the agents' names beside their state marks")
     expect(tr(m('assistant.panel.attention'), { kind: 'question' })).toBe('has a question for you')
-    expect(tr(m('assistant.panel.openCard'), { number: 12, known: 'yes', column: 'Review' })).toBe('Open card #12, in Review')
+    expect(tr(m('assistant.panel.openCard'), { number: 'AM-12', known: 'yes', column: 'Review' })).toBe('Open card AM-12, in Review')
     expect(tr(m('assistant.panel.progress'), { run: 'e2e: 4/12', hasStep: 'yes', step: 'agents' })).toBe('Progress: e2e: 4/12 (agents)')
     expect(tr(m('assistant.sidebar.expandTip'), { hasKey: 'yes', key: 'Ctrl+Alt+B' })).toBe('Expand Sidebar (Ctrl+Alt+B)')
   })

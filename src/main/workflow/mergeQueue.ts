@@ -14,6 +14,7 @@ import { git } from '../git'
 import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { CardRecord } from './factStore'
@@ -217,12 +218,12 @@ export class MergeQueue {
   private async skip(card: CardRecord, entry: QueueEntry, cancelled: boolean): Promise<QueueOutcome> {
     if (!cancelled) {
       await this.write(card, (w) => {
-        w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' })
+        w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active', 'derived')
-        this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`)
+        this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`) // i18n-ignore: a wake, agent-facing
       })
     }
-    return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' }
+    return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
   }
 
   private async identity(): Promise<{ name: string; email: string } | null> {
@@ -244,7 +245,7 @@ export class MergeQueue {
     const r = this.wf.rulesetOf(card, s)
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
-    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}`
+    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
     const m = await git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision])
@@ -307,7 +308,7 @@ export class MergeQueue {
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
   private async moved(card: CardRecord, entry: QueueEntry, target: string): Promise<void> {
     await this.write(card, (w) => {
-      w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason: 'targetMoved', transient: true })
+      w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason: 'targetMoved', transient: true }) // i18n-ignore: a fact's kind and codes, not text
       const s = w.state()
       w.fact('IntegrationRequested', { entry: `${card.key}/e${s.lastSeq + 1}`, revision: entry.revision, key: s.latest?.key ?? null, target, style: w.ruleset!.options.style })
     })
@@ -367,12 +368,12 @@ export class MergeQueue {
       const st = w.state()
       if (st.integrated) return
       const startedAt = this.wf.store.facts(card.id).filter((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === entry.id).at(-1)?.seq ?? Infinity
-      const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'hive', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } })
+      const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'hive', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
       w.written.push(f)
       w.move('done', 'derived')
       w.action('releaseSlot', {})
       w.action('endLaneIfDone', {})
-      if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', `${card.key} was decided after it merged: does it need a follow-up?`) // i18n-ignore: the request's text in the spike (P4 makes it a message)
+      if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
     })
   }
 
@@ -381,7 +382,7 @@ export class MergeQueue {
     await this.write(card, (w) => {
       w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
       w.move('active', 'derived')
-      this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`)
+      this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`) // i18n-ignore: a wake, agent-facing
     })
     return { card: card.key, entry: entry.id, outcome: 'returned', reason, transient }
   }
@@ -402,7 +403,7 @@ export class MergeQueue {
       const ref = await G.lineHead(this.project, e.target)
       const done = async () => {
         await this.write(card, (w) => {
-          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method: 'merge', by: 'hive' } })
+          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method: 'merge', by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
           if (!f) return
           w.move('done', 'derived')
           w.action('releaseSlot', {})
@@ -420,7 +421,7 @@ export class MergeQueue {
           out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
         } else {
           // The target moved meanwhile: containment decides. Found → Done (observed); not found → tested again.
-          await this.write(card, (w) => w.fact('IntegrationFailed', { entry: e.id, revision: e.revision, target: e.target, reason: 'targetMoved', transient: true }))
+          await this.write(card, (w) => w.fact('IntegrationFailed', { entry: e.id, revision: e.revision, target: e.target, reason: 'targetMoved', transient: true })) // i18n-ignore: a fact's kind and codes, not text
           await reconcile(this.wf, card)
           if (this.wf.state(card).stage === 'merging') {
             await this.write(card, (w) => {

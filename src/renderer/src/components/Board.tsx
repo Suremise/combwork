@@ -7,7 +7,10 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, choose, confirm, get, loadTasks, notify, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { cardLabel, nameWithKey } from '@shared/projectKeys'
+import { cardNumberOf } from '../projectKeys'
+import { MARKDOWN_CARDS } from '../cardLinks'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -131,7 +134,7 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
 /** The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. */
 function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'project' | 'scope' | 'query'>): { shown: TaskCard[]; total: number } {
   const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && inProject(c, r.scope))
-  return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query)), total: there.length }
+  return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query, get().projectKeys, get().movedCardNames)), total: there.length }
 }
 
 /** The menu item that opens Archive All: a column's, or the board's (column null). Counted, and off with nothing shown. */
@@ -177,7 +180,7 @@ async function archive(c: TaskCard, archived: boolean): Promise<void> {
 /** Deletes a card after asking; the question stays open, with a spinner, until it's done. */
 function remove(c: TaskCard): Promise<boolean> {
   return confirm({
-    title: tr(msg({ id: 'board.delete.title', defaultMessage: 'Delete #{card}?', description: "Title of the confirmation before a card is deleted. {card} is its number (after #)." }), { card: c.number }),
+    title: tr(msg({ id: 'board.delete.title', defaultMessage: 'Delete {card}?', description: "Title of the confirmation before a card is deleted. {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(c) }),
     message: tr(msg({ id: 'board.delete.message', defaultMessage: '"{title}" goes to the Recycle Bin, with its comments and history. Archive it instead to keep it out of sight but searchable.', description: "The confirmation before a card is deleted. {title} is the card's title. Recycle Bin is Windows' name for it." }), { title: c.title }),
     confirmLabel: tr(msg({ id: 'board.delete.button', defaultMessage: 'Delete', description: 'Button: deletes the card (to the Recycle Bin).' })),
     busyLabel: tr(msg({ id: 'board.delete.busy', defaultMessage: 'Deleting…', description: 'The Delete button while the card is being deleted.' })),
@@ -390,7 +393,7 @@ function CardTile({
   const fold = (
     <IconButton
       icon={folded ? 'chevron-right' : 'chevron-down'}
-      title={folded ? tr(msg({ id: 'board.card.expand', defaultMessage: 'Expand #{card}', description: 'Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its number (after #).' }), { card: c.number }) : tr(msg({ id: 'board.card.collapse', defaultMessage: 'Collapse #{card} to one line', description: 'Tooltip on the chevron of a card: folds it to one line. {card} is its number (after #).' }), { card: c.number })}
+      title={folded ? tr(msg({ id: 'board.card.expand', defaultMessage: 'Expand {card}', description: 'Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its name: its key, such as AM-12, or #12 for a card with none.' }), { card: cardLabel(c) }) : tr(msg({ id: 'board.card.collapse', defaultMessage: 'Collapse {card} to one line', description: 'Tooltip on the chevron of a card: folds it to one line. {card} is its name: its key, such as AM-12, or #12 for a card with none.' }), { card: cardLabel(c) })}
       className="task-fold"
       expanded={!folded}
       onClick={() => foldCards([c.number], !folded)}
@@ -416,7 +419,7 @@ function CardTile({
         <div {...props}>
           <div className="task-card-line">
             {fold}
-            <span className="task-number">#{c.number}</span>
+            <span className="task-number">{cardLabel(c)}</span>
             <Tooltip content={c.title}>
               <span className="task-title">{c.title}</span>
             </Tooltip>
@@ -447,7 +450,7 @@ function CardTile({
       <div {...props}>
         <div className="task-card-top">
           {fold}
-          <span className="task-number">#{c.number}</span>
+          <span className="task-number">{cardLabel(c)}</span>
           {showProject && c.project && <span className="task-project">{c.project}</span>}
           {!c.project && <span className="task-project faint">{tr(WORKSPACE_CARD)}</span>}
         </div>
@@ -489,9 +492,9 @@ function CardTile({
               </span>
             ))}
             {c.blockedBy.length > 0 && (
-              <Tooltip content={tr(msg({ id: 'board.card.dependsOn', defaultMessage: 'Depends on {cards}', description: 'Tooltip on a card\'s dependencies: the cards to finish first ({cards}: "#3, #5").' }), { cards: fmt.list(c.blockedBy.map((n) => `#${n}`), 'unit') })}>
+              <Tooltip content={tr(msg({ id: 'board.card.dependsOn', defaultMessage: 'Depends on {cards}', description: 'Tooltip on a card\'s dependencies: the cards to finish first ({cards}: "#3, #5").' }), { cards: fmt.list(c.blockedBy.map((n) => cardLabelOf(get(), n)), 'unit') })}>
                 <span className="faint">
-                  <Icon name="link" /> {c.blockedBy.map((n) => `#${n}`).join(' ')}
+                  <Icon name="link" /> {c.blockedBy.map((n) => cardLabelOf(get(), n)).join(' ')}
                 </span>
               </Tooltip>
             )}
@@ -528,6 +531,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const all = useStore((s) => s.tasks)
+  const keys = useStore((s) => s.projectKeys)
+  const movedNames = useStore((s) => s.movedCardNames)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
@@ -544,8 +549,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
-    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query)),
-    [all, project, query, archived]
+    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query, keys, movedNames)),
+    [all, project, query, archived, keys, movedNames]
   )
   const boardRef = useRef<HTMLDivElement>(null)
 
@@ -743,7 +748,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
                   readOnly={readOnly}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', `#${c.number}`)
+                    e.dataTransfer.setData('text/plain', cardLabel(c))
                     setDrag({ n: c.number, column: c.column, before: c.number })
                   }}
                 />
@@ -787,7 +792,7 @@ const lastAgent = (c: TaskCard): string => (c.agent ? (c.agentName ?? c.agent) :
 
 /** The archived cards' table columns, in the window's language (made again when it changes). */
 const archivedColumns = (): DataColumn<TaskCard>[] => [
-  { key: 'number', header: '#', num: true, descFirst: true, cell: (c) => <span className="task-number">#{c.number}</span>, sortValue: (c) => c.number, filter: { kind: 'text', value: (c) => `#${c.number}` } },
+  { key: 'number', header: '#', num: true, descFirst: true, cell: (c) => <span className="task-number" data-task={c.number}>{cardLabel(c)}</span>, sortValue: (c) => c.number, filter: { kind: 'text', value: (c) => `${cardLabel(c)} #${c.number}` } },
   { key: 'title', header: tr(msg({ id: 'board.archived.title', defaultMessage: 'Title', description: "A column header of the archived cards' table: the card's title." })), cell: (c) => <span className="archive-title">{c.title}</span>, sortValue: (c) => c.title, filter: { kind: 'text', value: (c) => c.title } },
   { key: 'project', header: tr(msg({ id: 'board.archived.project', defaultMessage: 'Project', description: "A column header of the archived cards' table: the card's project." })), cell: (c) => (c.project ? <span className="task-project">{c.project}</span> : <span className="faint">{tr(WORKSPACE_CARD)}</span>), sortValue: (c) => c.project || null, filter: { kind: 'choice', value: (c) => c.project || tr(WORKSPACE_CARD) } },
   {
@@ -814,7 +819,7 @@ const archivedColumns = (): DataColumn<TaskCard>[] => [
     header: '',
     className: 'archive-actions',
     cell: (c) => (
-      <Tooltip content={tr(msg({ id: 'board.archived.unarchiveTip', defaultMessage: 'Bring #{card} back to the end of {column}', description: "Tooltip on an archived card's Unarchive button. {card} is its number (after #), {column} the board column it was archived from." }), { card: c.number, column: columnName(c.column, tr) })}>
+      <Tooltip content={tr(msg({ id: 'board.archived.unarchiveTip', defaultMessage: 'Bring {card} back to the end of {column}', description: "Tooltip on an archived card's Unarchive button. {card} is its name: its key, such as AM-12, or #12 for a card with none, {column} the board column it was archived from." }), { card: cardLabel(c), column: columnName(c.column, tr) })}>
         <button
           className="btn small subtle"
           onClick={(e) => {
@@ -934,8 +939,8 @@ function ArchivedTable({ cards: archivedCards, project, query }: { cards: TaskCa
         defaultPageSize={20}
         empty={tr(NO_ARCHIVED)}
         onRowClick={(c) => set({ taskOpen: c.number })}
-        rowLabel={(c) => tr(msg({ id: 'board.archived.openRow', defaultMessage: 'Open #{card} {title}', description: "Accessible name of a row of the archived cards' table: opens the card. {card} is its number (after #), {title} its title." }), { card: c.number, title: c.title })}
-        selection={{ selected, onChange: setSelected, label: (c) => tr(msg({ id: 'board.archived.selectRow', defaultMessage: 'Select #{card}', description: "Accessible name of a row's checkbox in the archived cards' table. {card} is the card's number (after #)." }), { card: c.number }) }}
+        rowLabel={(c) => tr(msg({ id: 'board.archived.openRow', defaultMessage: 'Open {card} {title}', description: "Accessible name of a row of the archived cards' table: opens the card. {card} is its name: its key, such as AM-12, or #12 for a card with none, {title} its title." }), { card: cardLabel(c), title: c.title })}
+        selection={{ selected, onChange: setSelected, label: (c) => tr(msg({ id: 'board.archived.selectRow', defaultMessage: 'Select {card}', description: "Accessible name of a row's checkbox in the archived cards' table. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(c) }) }}
       />
     </div>
   )
@@ -978,7 +983,7 @@ export function BoardToolbar({
     <div className="board-toolbar">
       <div className="board-search">
         <Icon name="search" />
-        <SearchInput placeholder={tr(msg({ id: 'board.toolbar.search', defaultMessage: 'Search cards (#12, words, labels)', description: "Placeholder of the board's search box: finds cards by number (#12), words or labels." }))} value={query} onChange={setQuery} />
+        <SearchInput placeholder={tr(msg({ id: 'board.toolbar.search', defaultMessage: 'Search cards (AM-12, words, labels)', description: "Placeholder of the board's search box: finds cards by name (AM-12: a project key, a hyphen and a number; AM- finds all of that project's; #12 works too), words or labels." }))} value={query} onChange={setQuery} />
       </div>
       <label className="flex muted" style={{ cursor: 'pointer' }}>
         <input type="checkbox" className="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.archived', defaultMessage: 'Archived ({n, number})', description: "A checkbox in the board's toolbar: shows the archived cards instead (how many there are: {n})." }), { n: count })}
@@ -1150,8 +1155,8 @@ export function ArchiveAllDialog() {
             <DialogList
               items={held.map((h) =>
                 include
-                  ? tr(msg({ id: 'board.archiveAll.heldRow', defaultMessage: '#{card} {title} · {why}', description: 'A card an agent is on, listed in the Archive All dialog: its number, title and who is on it ({why}: "Alfie is working on it").' }), { card: h.c.number, title: h.c.title, why: h.why })
-                  : tr(msg({ id: 'board.archiveAll.heldRowSkipped', defaultMessage: '#{card} {title} · {why} · skipped', description: 'A card an agent is on, listed in the Archive All dialog, which it leaves on the board: its number, title and who is on it ({why}: "Alfie is working on it").' }), { card: h.c.number, title: h.c.title, why: h.why })
+                  ? tr(msg({ id: 'board.archiveAll.heldRow', defaultMessage: '{card} {title} · {why}', description: 'A card an agent is on, listed in the Archive All dialog: its name (its key, such as AM-12, or #12 for a card with none), title and who is on it ({why}: "Alfie is working on it").' }), { card: cardLabel(h.c), title: h.c.title, why: h.why })
+                  : tr(msg({ id: 'board.archiveAll.heldRowSkipped', defaultMessage: '{card} {title} · {why} · skipped', description: 'A card an agent is on, listed in the Archive All dialog, which it leaves on the board: its name (its key, such as AM-12, or #12 for a card with none), title and who is on it ({why}: "Alfie is working on it").' }), { card: cardLabel(h.c), title: h.c.title, why: h.why })
               )}
             />
             <label className="flex dialog-check">
@@ -1216,7 +1221,7 @@ function Decisions({
   const removeDecision = (d: TaskDecision): void =>
     void confirm({
       title: tr(msg({ id: 'board.decision.removeTitle', defaultMessage: 'Remove this decision?', description: "Title of the confirmation before a card's decision is removed." })),
-      message: tr(msg({ id: 'board.decision.removeMessage', defaultMessage: '"{decision}" leaves #{card}. Its history keeps what it said.', description: "The confirmation before a decision is removed: {decision} is its text (cut short), {card} the card's number (after #)." }), { decision: d.text.length > 200 ? `${d.text.slice(0, 199)}…` : d.text, card: card.number }),
+      message: tr(msg({ id: 'board.decision.removeMessage', defaultMessage: '"{decision}" leaves {card}. Its history keeps what it said.', description: "The confirmation before a decision is removed: {decision} is its text (cut short), {card} the card’s name: its key, such as AM-12, or #12 for a card with none." }), { decision: d.text.length > 200 ? `${d.text.slice(0, 199)}…` : d.text, card: cardLabel(card) }),
       confirmLabel: tr(msg({ id: 'board.decision.remove', defaultMessage: 'Remove', description: 'Button: removes the decision from the card.' })),
       busyLabel: tr(msg({ id: 'board.decision.removing', defaultMessage: 'Removing…', description: 'The Remove button while the decision is being removed.' })),
       danger: true,
@@ -1368,7 +1373,7 @@ export function BoardPanel() {
             {stalled.map((c) => (
               <Tooltip key={c.number} block content={cardStalled(projects, c) ?? ''}>
                 <div className="row" onClick={() => set({ taskOpen: c.number })}>
-                  <span className="task-number">#{c.number}</span> <span className="label">{c.title}</span>
+                  <span className="task-number">{cardLabel(c)}</span> <span className="label">{c.title}</span>
                 </div>
               </Tooltip>
             ))}
@@ -1381,7 +1386,7 @@ export function BoardPanel() {
             </div>
             {review.map((c) => (
               <div key={c.number} className="row" onClick={() => set({ taskOpen: c.number })}>
-                <span className="task-number">#{c.number}</span> <span className="label">{c.title}</span>
+                <span className="task-number">{cardLabel(c)}</span> <span className="label">{c.title}</span>
               </div>
             ))}
           </>
@@ -1412,11 +1417,14 @@ const addedBy = (by: string): string => (Object.hasOwn(ADDED_BY, by) ? ADDED_BY[
 // The card dialog: a new card, or one card in full (its fields, description, comments and history).
 // ---------------------------------------------------------------------------
 
+/** The cards a Depends on or Related box names: keys (AM-12), #12 or 12 (#1221). */
 const refs = (v: string): number[] =>
   v
     .split(/[\s,]+/)
-    .map((x) => Number(x.replace('#', '')))
-    .filter((x) => Number.isInteger(x) && x > 0)
+    .map((x) => (x ? cardNumberOf(x) : null))
+    .filter((x): x is number => x !== null && x > 0)
+/** The cards a Depends on or Related box shows: by key where they have one. */
+const refsText = (ns: readonly number[]): string => ns.map((n) => cardLabelOf(get(), n)).join(' ')
 
 export function TaskDialog() {
   const open = useStore((s) => s.taskOpen)
@@ -1484,8 +1492,8 @@ export function TaskDialog() {
     setColumn(c?.column ?? 'todo')
     setLabels(c?.labels.join(', ') ?? '')
     setBlocked(c?.blocked ?? '')
-    setBlockedBy(c?.blockedBy.map((n) => `#${n}`).join(' ') ?? '')
-    setLinks(c?.links.map((n) => `#${n}`).join(' ') ?? '')
+    setBlockedBy(c ? refsText(c.blockedBy) : '')
+    setLinks(c ? refsText(c.links) : '')
     setContext(c?.context?.join('\n') ?? '')
     orig.current = {
       title: c?.title ?? '',
@@ -1495,8 +1503,8 @@ export function TaskDialog() {
       column: c?.column ?? 'todo',
       labels: c?.labels.join(', ') ?? '',
       blocked: c?.blocked ?? '',
-      blockedBy: c?.blockedBy.map((n) => `#${n}`).join(' ') ?? '',
-      links: c?.links.map((n) => `#${n}`).join(' ') ?? '',
+      blockedBy: c ? refsText(c.blockedBy) : '',
+      links: c ? refsText(c.links) : '',
       context: c?.context?.join('\n') ?? ''
     }
     setOpened((n) => n + 1)
@@ -1586,8 +1594,8 @@ export function TaskDialog() {
         column: card.column,
         labels: card.labels.join(', '),
         blocked: card.blocked ?? '',
-        blockedBy: card.blockedBy.map((n) => `#${n}`).join(' '),
-        links: card.links.map((n) => `#${n}`).join(' '),
+        blockedBy: refsText(card.blockedBy),
+        links: refsText(card.links),
         context: card.context?.join('\n') ?? ''
       }
       const clashed = Object.keys(patch).filter((k) => now[k] !== was[k])
@@ -1599,7 +1607,7 @@ export function TaskDialog() {
       if (clashed.length) {
         notify(
           'warning',
-          tr(msg({ id: 'board.clash.title', defaultMessage: '#{card} was also changed while you edited it', description: "A warning toast's title after saving the card dialog: someone (an agent, say) changed the same fields meanwhile. {card} is the card's number (after #)." }), { card: card.number }),
+          tr(msg({ id: 'board.clash.title', defaultMessage: '{card} was also changed while you edited it', description: "A warning toast's title after saving the card dialog: someone (an agent, say) changed the same fields meanwhile. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(card) }),
           tr(msg({ id: 'board.clash.message', defaultMessage: 'Your {fields} replaced the change made meanwhile (see its history).', description: "A warning toast after saving the card dialog: the user's values won over a change made meanwhile. {fields} lists the fields (\"title, labels\")." }), { fields: fmt.list(clashed.map((k) => tr(FIELD_NAMES[k] ?? FIELD_NAMES.title)), 'unit') })
         )
       }
@@ -1699,7 +1707,8 @@ export function TaskDialog() {
   return (
     <>
       <Modal
-        title={isNew ? tr(NEW_CARD) : `#${card!.number}`}
+        // Its key, and its old number beside it: what agents name it by until P8 ("HI-12 (#40)", #1221).
+        title={isNew ? tr(NEW_CARD) : nameWithKey(card!.number, card!.key)}
         icon="checklist"
         wide
         onClose={() => void tryClose()}
@@ -1817,9 +1826,9 @@ export function TaskDialog() {
             }}
           />
           <label>{tr(msg({ id: 'board.dialog.dependsOn', defaultMessage: 'Depends on', description: 'A field label in the card dialog: the cards to finish before this one.' }))}</label>
-          <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. #3 #5', description: "Placeholder of the card dialog's Depends on box: card numbers (#3 #5 are examples)." }))} value={blockedBy} readOnly={ro} onChange={(e) => setBlockedBy(e.target.value)} />
+          <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. AM-3 AM-5', description: "Placeholder of the card dialog's Depends on box: cards by name (AM-3 AM-5 are examples: a project key, a hyphen and a number; #3 works too)." }))} value={blockedBy} readOnly={ro} onChange={(e) => setBlockedBy(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.related', defaultMessage: 'Related', description: 'A field label in the card dialog: related cards.' }))}</label>
-          <input className="input" placeholder={tr(msg({ id: 'board.dialog.relatedPlaceholder', defaultMessage: 'Related cards, e.g. #7', description: "Placeholder of the card dialog's Related box: card numbers (#7 is an example)." }))} value={links} readOnly={ro} onChange={(e) => setLinks(e.target.value)} />
+          <input className="input" placeholder={tr(msg({ id: 'board.dialog.relatedPlaceholder', defaultMessage: 'Related cards, e.g. AM-7', description: "Placeholder of the card dialog's Related box: cards by name (AM-7 is an example: a project key, a hyphen and a number)." }))} value={links} readOnly={ro} onChange={(e) => setLinks(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.context', defaultMessage: 'Read first', description: "A field label in the card dialog (#818): doc sections the card's agent reads before starting, given in its start prompt." }))}</label>
           <div className="task-context">
             <textarea
@@ -1866,7 +1875,7 @@ export function TaskDialog() {
         </div>
         {preview ? (
           <div className="task-description" onDoubleClick={() => !ro && setPreview(false)}>
-            {description.trim() ? <Markdown source={description} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
+            {description.trim() ? <Markdown source={description} cards={MARKDOWN_CARDS} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
           <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} />
@@ -1880,7 +1889,7 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={storedLine(c.text, c.hiveText)} />
+                <Markdown source={storedLine(c.text, c.hiveText)} cards={MARKDOWN_CARDS} />
               </div>
             ))}
             {!card.archived && (
@@ -2036,7 +2045,7 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
 /** Starts a card (the Start and Move to Doing dialogs) and says so, with Show. */
 async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<void> {
   const r = await call('tasks:start', card.number, target)
-  notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '#{card} started on {agent}', description: "A toast's title after a card started: its number (after #) and the agent ({agent}, its name). The card's title follows." }), { card: card.number, agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
+  notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
 }
 
 export function TaskStartDialog() {
@@ -2060,7 +2069,7 @@ export function TaskStartDialog() {
   if (!project) {
     return (
       <Modal
-        title={tr(msg({ id: 'board.start.titleShort', defaultMessage: 'Start #{card}', description: "Title of the Start dialog when the card can't start: {card} is its number (after #)." }), { card: card.number })}
+        title={tr(msg({ id: 'board.start.titleShort', defaultMessage: 'Start {card}', description: "Title of the Start dialog when the card can't start: {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(card) })}
         icon="play"
         onClose={close}
         footer={
@@ -2088,7 +2097,7 @@ export function TaskStartDialog() {
 
   return (
     <Modal
-      title={tr(msg({ id: 'board.start.title', defaultMessage: 'Start #{card}: {title}', description: "Title of the Start dialog: the card's number (after #) and title." }), { card: card.number, title: card.title })}
+      title={tr(msg({ id: 'board.start.title', defaultMessage: 'Start {card}: {title}', description: "Title of the Start dialog: the card’s name: its key, such as AM-12, or #12 for a card with none and title." }), { card: cardLabel(card), title: card.title })}
       icon="play"
       onClose={close}
       busy={!!action.busy}
@@ -2200,7 +2209,7 @@ export function MoveToDoingDialog() {
 
   return (
     <Modal
-      title={tr(msg({ id: 'board.doing.title', defaultMessage: 'Move #{card} to Doing', description: 'Title of the Move to Doing dialog: {card} is the card\'s number (after #). Doing is a board column.' }), { card: card.number })}
+      title={tr(msg({ id: 'board.doing.title', defaultMessage: 'Move {card} to Doing', description: 'Title of the Move to Doing dialog: {card} is the card\'s name: its key, such as AM-12, or #12 for a card with none. Doing is a board column.' }), { card: cardLabel(card) })}
       icon="arrow-right"
       onClose={close}
       busy={!!action.busy}

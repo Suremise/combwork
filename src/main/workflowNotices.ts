@@ -1,15 +1,15 @@
 import { join } from 'path'
-import { withValues, type Text, type TextPart } from '../shared/advanced'
+import { shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { laneHits, newLaneBase, type LaneHit, type LaneMark } from '../shared/laneWatch'
-import { cardRef } from '../shared/projectKeys'
+import { cardLabel } from '../shared/projectKeys'
+import { workflowLine } from '../shared/workflow/texts'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
 import { createLogger } from './logger'
-import { scopeOfHost, withCardNames } from './projectKeys'
 import { sessions } from './sessions'
 import { listLanes } from './lanes'
-import { getTask } from './tasks'
+import { allTasks, getTask } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
@@ -53,20 +53,25 @@ function tell(projectPath: string, title: Text, lines: TextPart[]): void {
   sessions.notice(projectPath, title, lines.length === 1 ? lines[0] : { lines })
 }
 
-/** A `notify` action: the card's request for the user, its text as the runtime wrote it. */
+/**
+ * A `notify` action: the card's request for the user. Its text in the language Hive shows when the runtime kept its
+ * message (`shown`, #1264: Hive's own requests), else as written (an agent's own words), and in English for the Agent API.
+ */
 async function notifyFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
   if (!ws.path) return
   const card = await getTask(a.card, ws).catch(() => null)
   if (!card?.project || card.archived) return
   const projectPath = join(ws.path, card.project)
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
-  withCardNames(ws, () => tell(projectPath, withValues(M.forYou, { card: cardRef(card.number) }), text ? [text] : []), scopeOfHost(projectPath))
+  const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
+  const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [text] : []
+  tell(projectPath, withValues(M.forYou, { card: cardLabel(card) }), body)
 }
 
-/** A lane's events as the notice's lines. */
-function linesOf(hit: LaneHit): TextPart[] {
+/** A lane's events as the notice's lines, each card named as the window names it (`labels`: by number, #1221). */
+function linesOf(hit: LaneHit, labels: Map<number, string>): TextPart[] {
   return hit.parts.map((p) => {
-    const card = p.n !== null ? cardRef(p.n) : ''
+    const card = p.n !== null ? (labels.get(p.n) ?? `#${p.n}`) : ''
     switch (p.event) {
       case 'failed':
         return withValues(M.failed, { card })
@@ -102,8 +107,9 @@ async function check(ws: WorkspaceService): Promise<void> {
     marks[now.id] = now.mark
     const hit = laneHits(base, now, EVENTS, f.since)
     if (!hit || !lane) continue
-    const projectPath = join(path, lane.project)
-    withCardNames(ws, () => tell(projectPath, withValues(M.lane, { lane: hit.label }), linesOf(hit)), scopeOfHost(projectPath))
+    const numbers = hit.parts.flatMap((p) => (p.n !== null ? [p.n] : []))
+    const labels = new Map(numbers.length ? (await allTasks(ws, { numbers })).map((c) => [c.number, cardLabel(c)]) : [])
+    tell(join(path, lane.project), withValues(M.lane, { lane: hit.label }), linesOf(hit, labels))
   }
   // Only running lanes are followed on: one ended, abandoned or gone is dropped.
   f.marks = Object.fromEntries(Object.entries(marks).filter(([, m]) => m.state === 'active' || m.state === 'paused'))

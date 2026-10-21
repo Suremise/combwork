@@ -10,7 +10,7 @@ import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
-import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, numberCard } from './schema/keysStep'
+import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { ACTIONS_DELIVERED_STEP, CARDS_STEP, FACTS_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -1176,6 +1176,11 @@ export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; proje
     const r = key ? (db.prepare('SELECT project, project_id FROM cards WHERE number = ?').get(n) as { project: string; project_id: string | null } | undefined) : undefined // i18n-ignore: SQL
     return key && r ? { key, project: r.project, projectId: r.project_id } : null
   })
+}
+
+/** The names moved cards keep in the projects they left (`HI-1` → card), for the window (#1221). */
+export function movedNames(ws: WorkspaceService): Record<string, number> {
+  return readSnapshot(ws, (b, db) => (b.legacy ? {} : movedCardNames(db)))
 }
 
 /** The card a key names (`HI-12`, any case, an old key or a card's old number in another project too), or null. */

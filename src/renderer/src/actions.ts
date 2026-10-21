@@ -21,6 +21,8 @@ import { TemplateLoadNames } from './components/TemplateLoad'
 import { McpProjectPicker } from './components/McpProjectPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
 import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
+import { keyProblemText, keysHeld } from './projectKeys'
+import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
 
 /** Runs an async action and shows a toast if it fails. */
 /**
@@ -187,6 +189,9 @@ export async function closeWorkspace(): Promise<void> {
 
 export async function createProject(): Promise<void> {
   if (!get().workspace) return notify('warning', tr(msg({ id: 'actions.project.noWorkspace', defaultMessage: 'Open a workspace first', description: "A warning: a project can't be created without an open workspace." })))
+  // Its key (#1221): suggested from the name as it is typed, until the user types one; checked as it changes.
+  const held = keysHeld()
+  let key = ''
   const name = await prompt({
     title: tr(msg({ id: 'actions.project.newTitle', defaultMessage: 'New Project', description: 'Title of the New Project dialog.' })),
     message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Hive adds its .hive metadata folder automatically.', description: 'The New Project dialog. Keep .hive as it is.' })),
@@ -199,10 +204,18 @@ export async function createProject(): Promise<void> {
           ? tr(msg({ id: 'actions.project.nameChars', defaultMessage: 'Names cannot contain {chars}', description: "Why a new project's name can't be used: it has a character Windows doesn't allow in a folder name ({chars}: the characters)." }), { chars: '< > : " / \\ | ? *' })
           : v.trim().startsWith('.')
             ? tr(msg({ id: 'actions.project.nameDot', defaultMessage: 'Names cannot start with "."', description: "Why a new project's name can't be used: it starts with a dot." }))
-            : null
+            : null,
+    second: {
+      label: tr(msg({ id: 'actions.project.key', defaultMessage: 'Key', description: "The New Project dialog: the label of the project's key box (2–4 letters, such as AM, that its cards are named by: AM-12)." })),
+      hint: (k) => (normalKey(k) ? tr(msg({ id: 'actions.project.keyHint', defaultMessage: 'Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.', description: 'Under the key box of the New Project dialog. {first} and {second} are the first two card names with the key typed, such as AM-1 and AM-2.' }), { first: `${normalKey(k)}-1`, second: `${normalKey(k)}-2` }) : ''),
+      follow: (v) => (v.trim() ? suggestKey(v.trim(), '', held) : ''),
+      // Left empty, Hive suggests one, as for a folder opened.
+      validate: (k) => (k.trim() ? keyProblemText(k, '', held) : null),
+      set: (k) => (key = k)
+    }
   })
   if (!name) return
-  const ws = await attempt(tr(msg({ id: 'actions.project.createFailed', defaultMessage: 'Could not create project', description: "An error's title: creating a project failed." })), () => call('project:create', name.trim()))
+  const ws = await attempt(tr(msg({ id: 'actions.project.createFailed', defaultMessage: 'Could not create project', description: "An error's title: creating a project failed." })), () => call('project:create', name.trim(), normalKey(key) || null))
   if (!ws) return
   const created = ws.projects.find((p) => p.name === name.trim())
   set({ workspace: ws, selectedProject: created?.path ?? get().selectedProject })
@@ -912,7 +925,7 @@ async function cardsOfRemovedAgents(p: ProjectInfo, agents: readonly { id: strin
   const ids = new Set(agents.map((a) => a.id))
   const open = get().tasks.filter((c) => !c.archived && c.column !== 'done' && !!c.agent && ids.has(c.agent) && c.project.toLowerCase() === p.name.toLowerCase())
   if (!open.length) return false
-  const shown = fmt.list(open.slice(0, 5).map((c) => `#${c.number} ${c.title}`), 'unit')
+  const shown = fmt.list(open.slice(0, 5).map((c) => `${cardLabel(c)} ${c.title}`), 'unit')
   const list = open.length > 5 ? tr(msg({ id: 'actions.cards.andMore', defaultMessage: '{cards} and {n} more', description: "A removed agent's open cards, cut short: the first five ({cards}: \"#3 Title, #4 Title\") and how many more ({n})." }), { cards: shown, n: open.length - 5 }) : shown
   const one = agents.length === 1
   const values = { cards: open.length, agents: agents.length, agent: one ? agents[0].name : 'none' }

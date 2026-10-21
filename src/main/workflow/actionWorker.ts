@@ -140,8 +140,8 @@ async function drain(at: RunOf): Promise<void> {
     const mine = await change(at, () =>
       boardWriteOp(ws, (db) =>
         claimed
-          ? Number(db.prepare("UPDATE card_actions SET state = 'done', attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(a.id).changes) > 0
-          : !!db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id)
+          ? Number(db.prepare("UPDATE card_actions SET state = 'done', attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(a.id).changes) > 0 // i18n-ignore: SQL
+          : !!db.prepare("SELECT 1 FROM card_actions WHERE id = ? AND state = 'pending'").get(a.id) // i18n-ignore: SQL
       )
     )
     // Closed or switched while the claim committed (a listener of that commit may close it): no handler runs for it.
@@ -159,8 +159,8 @@ async function drain(at: RunOf): Promise<void> {
     await change(at, () =>
       boardWriteOp(ws, (db) =>
         claimed
-          ? failed && db.prepare("UPDATE card_actions SET state = 'failed' WHERE id = ? AND state = 'done'").run(a.id)
-          : db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(failed ? 'failed' : 'done', a.id)
+          ? failed && db.prepare("UPDATE card_actions SET state = 'failed' WHERE id = ? AND state = 'done'").run(a.id) // i18n-ignore: SQL
+          : db.prepare("UPDATE card_actions SET state = ?, attempts = attempts + 1 WHERE id = ? AND state = 'pending'").run(failed ? 'failed' : 'done', a.id) // i18n-ignore: SQL
       )
     )
   }
@@ -171,7 +171,7 @@ onBoardCommitted((ws) => {
   if (!ws.path) return
   let pending = false
   try {
-    pending = boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get())
+    pending = boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM card_actions WHERE state = 'pending' LIMIT 1").get()) // i18n-ignore: SQL
   } catch {
     // A board without the facts step's tables (not upgraded): no actions.
     return

@@ -25,7 +25,7 @@
   "performance.cards.heading": "Tarjetas",
   "performance.cards.lastHeld": "Última vez",
   "performance.cards.loadTarget": "el costo de las tarjetas",
-  "performance.cards.open": "Abrir #{number}",
+  "performance.cards.open": "Abrir {number}",
   "performance.cards.project": "Proyecto",
   "performance.cards.reviewer": "Revisor",
   "performance.cards.rounds": "Rondas",
