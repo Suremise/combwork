@@ -9,7 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`hive.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
 
-import { join } from 'path'
+import { join, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { boardSavepoint, boardWrite } from '../boardStore'
@@ -134,11 +134,15 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
 
 function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
+  const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   return new Workflow({
-    // The project's cards by their keys (a Hive-Card trailer): its name, as the adoption's store keys them.
-    store: FactStore.forBoard(ws, { project: project.name, key: project.name }),
+    // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for Hive-Card
+    // trailers written before, as the adoption's store keyed them).
+    store,
     project: project.path,
-    projectKey: project.name,
+    get projectKey() {
+      return store.projectKey()
+    },
     options,
     slots: join(ws.hiveDir, 'slots'),
     // Actions run by the actions worker after the commit, never here.
