@@ -101,7 +101,7 @@
   "tasks.history.movedBottom": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
   "tasks.history.movedTop": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
   "tasks.history.noDependencies": "No longer depends on other cards",
-  "tasks.history.notified": "Notified you: {event, select, failed {its review failed} blocked {it is blocked} stalled {it has stalled} mergeDue {every card of lane {lane} passed review, so its merge is due} mergeStalled {the merge of lane {lane} has stalled} other {it needs you}}{hasWhy, select, yes {: {why}} other {}}",
+  "tasks.history.notified": "Notified you {event, select, failed {that its review failed} blocked {that it's blocked} stalled {that it has stalled} mergeDue {that every card of lane {lane} passed review, so its merge is due} mergeStalled {that the merge of lane {lane} has stalled} other {that it needs you}}{hasWhy, select, yes {: {why}} other {}}",
   "tasks.history.placed": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
   "tasks.history.renamed": "Renamed to \"{title}\"",
   "tasks.history.repaired": "Project: {from} → {to} (renamed or moved)",

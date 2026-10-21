@@ -876,7 +876,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     }, HANG)
     // In the card's history in the user's language, said by Hive.
     const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
-    expect(line).toMatchObject({ by: 'Hive', what: 'Notified you: its review failed' })
+    expect(line).toMatchObject({ by: 'Hive', what: 'Notified you that its review failed' })
     // The failure resolved since (fixed, passed), and Hive restarted: the notice is still on the card, once.
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
@@ -946,7 +946,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     await again.open(ws)
     opened.push(again)
     const line = (await inWorkspace(again, () => tasks.getTask(c, again))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
-    expect(line.what).toBe('Notified you: it needs you: Which greeting should the offline installer show?')
+    expect(line.what).toBe('Notified you that it needs you: Which greeting should the offline installer show?')
   })
 
   it("Hive's own request (its message, #1264) is kept as that message within the line, shown in the window's language", async () => {
@@ -963,7 +963,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     })
     const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
     expect(line.whatText!.values!.why).toEqual({ id: 'workflow.forYou.okBefore', values: { card: 'AL-1' } })
-    expect(line.what).toBe('Notified you: it needs you: AL-1 is approved: OK to merge?')
+    expect(line.what).toBe('Notified you that it needs you: AL-1 is approved: OK to merge?')
   })
 
   it("a stall's detail is in its history line, kept after the stall has cleared and a restart", async () => {
@@ -994,6 +994,6 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     await again.open(ws)
     opened.push(again)
     const lines = (await inWorkspace(again, () => tasks.getTask(c, again))).history.filter((h) => h.whatText?.id === 'tasks.history.notified').map((h) => h.what)
-    expect(lines).toEqual([`Notified you: it has stalled: ${why}`])
+    expect(lines).toEqual([`Notified you that it has stalled: ${why}`])
   })
 })

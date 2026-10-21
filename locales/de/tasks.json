@@ -101,7 +101,7 @@
   "tasks.history.movedBottom": "Ans Ende von {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Geprüft} done {Erledigt} other {{column}}} verschoben",
   "tasks.history.movedTop": "An den Anfang von {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Geprüft} done {Erledigt} other {{column}}} verschoben",
   "tasks.history.noDependencies": "Hängt nicht mehr von anderen Karten ab",
-  "tasks.history.notified": "Dich benachrichtigt: {event, select, failed {Review nicht bestanden} blocked {die Karte ist blockiert} stalled {die Karte ist festgefahren} mergeDue {alle Karten der Lane {lane} haben das Review bestanden, der Merge steht an} mergeStalled {der Merge der Lane {lane} ist festgefahren} other {die Karte braucht dich}}{hasWhy, select, yes {: {why}} other {}}",
+  "tasks.history.notified": "Dich benachrichtigt, {event, select, failed {dass das Review nicht bestanden wurde} blocked {dass die Karte blockiert ist} stalled {dass die Karte festgefahren ist} mergeDue {dass alle Karten der Lane {lane} das Review bestanden haben und der Merge ansteht} mergeStalled {dass der Merge der Lane {lane} festgefahren ist} other {dass die Karte dich braucht}}{hasWhy, select, yes {: {why}} other {}}",
   "tasks.history.placed": "Auf Platz {place, selectordinal, one {#} two {#} few {#} other {#}} in {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Geprüft} done {Erledigt} other {{column}}} gesetzt",
   "tasks.history.renamed": "Umbenannt in „{title}“",
   "tasks.history.repaired": "Projekt: {from} → {to} (umbenannt oder verschoben)",
