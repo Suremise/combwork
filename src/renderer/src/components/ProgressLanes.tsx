@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
+import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
@@ -435,7 +435,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       </Tooltip>
       <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
-          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : {}} />
+          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES)} />
         ))}
       </div>
     </div>
@@ -446,15 +446,36 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:
  * what its facts say (#1225), a few lines in its hover after its label and notes, with a click for the rest.
  */
-function Segment({ segment: s, work, marks }: { segment: LaneSegment; work: string[]; marks: SegmentMarks }) {
-  if (s.kind !== 'card')
+function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; work: string[]; marks: SegmentMarks; folded: FoldedMarks | null }) {
+  if (s.kind !== 'card') {
+    // The marks of the cards folded into it (HR6's #1279 round 1): each kind once on it, a line per card under its label.
+    const lines = folded ? [...folded.refused, ...folded.stale, ...folded.override] : []
     return (
-      <Tooltip content={s.label} focus>
-        <span role="listitem" tabIndex={0} className={cx('lane-seg', s.kind)} aria-label={s.label}>
+      <Tooltip
+        content={
+          lines.length ? (
+            <div className="lane-seg-tip">
+              <div>{s.label}</div>
+              {lines.map((n) => (
+                <div key={n} className="lane-seg-note">
+                  {n}
+                </div>
+              ))}
+            </div>
+          ) : (
+            s.label
+          )
+        }
+        focus
+      >
+        <span role="listitem" tabIndex={0} className={cx('lane-seg', s.kind, !!folded?.stale.length && 'stale')} aria-label={[s.label, ...lines].join('. ')}>
           {s.kind === 'finished' ? `✓ ${s.numbers.length}` : `+${s.numbers.length}`}
+          {!!folded?.refused.length && <span className="lane-seg-mark refused" aria-hidden="true" />}
+          {!!folded?.override.length && <span className="lane-seg-mark override" aria-hidden="true" />}
         </span>
       </Tooltip>
     )
+  }
   // What its red underline or hatching means (#706), a line each under the card's own.
   const tip =
     s.notes.length || work.length ? (

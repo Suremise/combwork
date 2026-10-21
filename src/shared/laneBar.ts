@@ -237,6 +237,30 @@ export function laneWaitText(s: LaneStatus, name: (n: number) => string, tr: Tr)
   )
 }
 
+/**
+ * A folded segment's marks ("✓ n", "+n": HR6's #1279 round 1): every mark of the cards folded into it, so folding never
+ * hides one (an override is never invisible, a refusal never lost on a long lane). Each kind is shown once on the folded
+ * segment, its lines naming their card ("AL-1: You moved it past its rules…"), for its hover and accessible name.
+ * `cards`: the lane's card segments; `short`: a card's revisions as its project shows them.
+ */
+export interface FoldedMarks {
+  refused: string[]
+  stale: string[]
+  override: string[]
+}
+
+export function foldedMarks(lane: { frozen: unknown }, badges: ReadonlyMap<number, WorkBadge>, cards: readonly CardSegment[], numbers: readonly number[], short: (n: number) => (id: string) => string, tr: Tr, names: OverrideNames): FoldedMarks {
+  const out: FoldedMarks = { refused: [], stale: [], override: [] }
+  for (const n of numbers) {
+    const s = cards.find((c) => c.number === n)
+    if (!s) continue
+    const m = segmentMarks(lane, badges.get(n), s, short(n), tr, names)
+    const name = s.name ?? `#${n}`
+    for (const k of ['refused', 'stale', 'override'] as const) if (m[k]) out[k].push(tr(msg({ id: 'board.lane.foldedMark', defaultMessage: '{card}: {mark}', description: "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)." }), { card: name, mark: m[k]! }))
+  }
+  return out
+}
+
 /** A card segment's accessible name: its label and its notes (#706). */
 export function segmentName(s: CardSegment): string {
   return [s.label, ...s.notes].join('. ')

@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card} : bloquée",
   "board.lane.blockedReason": "{card} : bloquée : {reason}",
   "board.lane.finished": "{n, plural, one {# terminée : {cards}} many {# terminées : {cards}} other {# terminées : {cards}}}",
+  "board.lane.foldedMark": "{card} : {mark}",
   "board.lane.goneWhenEnded": "{card} · pas sur le tableau à la fin du couloir",
   "board.lane.holdReason": "{card} : Suspendu : {reason}",
   "board.lane.holdWaiting": "{card} : Suspendu : attend que tu la fasses avancer",

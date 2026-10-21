@@ -2,7 +2,7 @@
 // rounds), the hover text, folding a long lane's finished cards, and the header's numbers; an ended lane's segments as it
 // left them, the card being worked, and the panel's order of lanes (#512).
 import { describe, expect, it } from 'vitest'
-import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
+import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
 import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
@@ -416,6 +416,27 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(workNotes(b, 'done', null, short, tr, names, 'AL-7').some((l) => l.startsWith('Pass was for'))).toBe(false)
     expect(segmentMarks({ frozen: [] }, b, seg, short, tr, names)).toEqual({})
     expect(segmentMarks({ frozen: null }, undefined, seg, short, tr, names)).toEqual({})
+  })
+
+  it("folded segments keep their cards' marks (HR6's #1279 round 1): each mark of each folded card, named by its card", () => {
+    const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: 'Merged by hand', at: '' }
+    const segs = [
+      { kind: 'card', number: 1, name: 'AL-1', state: 'done', failed: false, round: 1, label: 'AL-1', notes: [] },
+      { kind: 'card', number: 2, name: 'AL-2', state: 'passed', failed: false, round: 1, label: 'AL-2', notes: [] },
+      { kind: 'card', number: 27, name: 'AL-27', state: 'todo', failed: false, round: null, label: 'AL-27', notes: [] }
+    ] as CardSegment[]
+    const badges = new Map([
+      [1, badge({ card: 1, override: o })],
+      [2, badge({ card: 2, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' } })],
+      [27, badge({ card: 27, revision: null, refused: { ...refused, values: { card: 'alpha-27' } } })]
+    ])
+    const marks = foldedMarks({ frozen: null }, badges, segs, [1, 2, 27], () => short, tr, names)
+    expect(marks).toEqual({
+      refused: ['AL-27: AL-27 has no change to review. Commit the work, then submit.'],
+      stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
+      override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand']
+    })
+    expect(foldedMarks({ frozen: [] }, badges, segs, [1, 2, 27], () => short, tr, names)).toEqual({ refused: [], stale: [], override: [] })
   })
 
   it('why a lane waits, in the window (#1279): each reason, the card by its key', () => {

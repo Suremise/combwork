@@ -1255,6 +1255,10 @@
     "defaultMessage": "{n, plural, one {# finished: {cards}} other {# finished: {cards}}}",
     "description": "A lane segment's label (Progress panel) for its finished cards folded into one: how many ({n}) and which ({cards}: \"#3, #4\")."
   },
+  "board.lane.foldedMark": {
+    "defaultMessage": "{card}: {mark}",
+    "description": "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)."
+  },
   "board.lane.goneWhenEnded": {
     "defaultMessage": "{card} · not on the board when the lane ended",
     "description": "A lane segment's label (Progress panel), in a lane that has ended: the card wasn't on the board then. {card} is its name: its key, such as AM-12, or #12 for a card with none."

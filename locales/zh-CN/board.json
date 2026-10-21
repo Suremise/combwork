@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card}：受阻",
   "board.lane.blockedReason": "{card}：受阻：{reason}",
   "board.lane.finished": "{n, plural, other {# 张已完结：{cards}}}",
+  "board.lane.foldedMark": "{card}：{mark}",
   "board.lane.goneWhenEnded": "{card} · 通道结束时不在看板上",
   "board.lane.holdReason": "{card}：搁置：{reason}",
   "board.lane.holdWaiting": "{card}：搁置：等你把它移走",

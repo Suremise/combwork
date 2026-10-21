@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card}: bloqueado",
   "board.lane.blockedReason": "{card}: bloqueado: {reason}",
   "board.lane.finished": "{n, plural, one {# concluído: {cards}} other {# concluídos: {cards}}}",
+  "board.lane.foldedMark": "{card}: {mark}",
   "board.lane.goneWhenEnded": "{card} · fora do quadro quando a raia terminou",
   "board.lane.holdReason": "{card}: Em espera: {reason}",
   "board.lane.holdWaiting": "{card}: Em espera: aguardando você movê-lo",

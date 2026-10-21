@@ -315,6 +315,7 @@ interface HiveMessageValues {
   'board.lane.blocked': { card: string | number }
   'board.lane.blockedReason': { card: string | number; reason: string | number }
   'board.lane.finished': { n: number; cards: string | number }
+  'board.lane.foldedMark': { card: string | number; mark: string | number }
   'board.lane.goneWhenEnded': { card: string | number }
   'board.lane.holdReason': { card: string | number; reason: string | number }
   'board.lane.holdWaiting': { card: string | number }

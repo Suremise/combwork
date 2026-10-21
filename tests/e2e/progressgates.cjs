@@ -198,6 +198,26 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     check('…its name saying who, past which rules and why', /You moved it past its rules: .+\. Reason: Merged by hand/.test(await name(a)), await name(a))
     check('…said in its hover too', !!(await hover(a, 'Reason: Merged by hand')))
     await shoot('override')
+    await page.mouse.move(5, 5)
+
+    // --- A long lane folds cards (HR6's round 1): the folded segments keep their cards' marks. 25 cards more (between
+    // cards, the list applies at once); A, Done, folds into "✓ 1", and the last, refused, into "+n".
+    const extra = []
+    for (let i = 1; i <= 25; i++) extra.push((await inv('tasks:create', { title: `More ${i}`, project: 'alpha' })).number)
+    const longer = await call(tokens.builder, '/v1/lanes', { cards: [a, b, ...extra], reviewer: 'R1', name: 'gates' })
+    check('the lane takes 25 cards more', longer.status === 200 && longer.body?.lane?.cards?.length === 27, JSON.stringify(longer.body?.lane?.cards?.length))
+    const last = extra.at(-1)
+    const lastKey = (await card(last)).key
+    const lateStart = await asBuilder(`/v1/tasks/${encodeURIComponent(lastKey)}/start`)
+    check('the last card started first is refused', lateStart.status === 409 && lateStart.body?.rule === 'lane.oneAtATime', JSON.stringify(lateStart.body))
+    const fin = row.locator('.lane-seg.finished')
+    const more = row.locator('.lane-seg.more')
+    const label = async (loc) => (await loc.getAttribute('aria-label').catch(() => null)) ?? ''
+    check('the done card folds into ✓ 1, keeping its override mark and saying it', !!(await until(async () => (await fin.count()) === 1 && (await fin.locator('.lane-seg-mark.override').count()) === 1 && /: You moved it past its rules: .+Reason: Merged by hand/.test(await label(fin)))), await label(fin))
+    check('the refused card folds into +n, keeping its notch and saying why', !!(await until(async () => (await more.count()) === 1 && (await more.locator('.lane-seg-mark.refused').count()) === 1 && (await label(more)).includes(`${lastKey}: ${lastKey} can't start yet`))), await label(more))
+    await more.hover()
+    check('…said in its hover too', !!(await until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(`${lastKey} can't start yet`))))
+    await shoot('folded')
 
   } finally {
     await app.close().catch(() => undefined)

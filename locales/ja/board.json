@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card}：ブロック中",
   "board.lane.blockedReason": "{card}：ブロック中：{reason}",
   "board.lane.finished": "{n, plural, other {終了済み#件：{cards}}}",
+  "board.lane.foldedMark": "{card}：{mark}",
   "board.lane.goneWhenEnded": "{card} · レーンの終了時にボードにありませんでした",
   "board.lane.holdReason": "{card}：保留：{reason}",
   "board.lane.holdWaiting": "{card}：保留：先へ進めるのを待っています",

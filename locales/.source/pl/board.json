@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card}: blocked",
   "board.lane.blockedReason": "{card}: blocked: {reason}",
   "board.lane.finished": "{n, plural, one {# finished: {cards}} other {# finished: {cards}}}",
+  "board.lane.foldedMark": "{card}: {mark}",
   "board.lane.goneWhenEnded": "{card} · not on the board when the lane ended",
   "board.lane.holdReason": "{card}: On Hold: {reason}",
   "board.lane.holdWaiting": "{card}: On Hold: waiting for you to move it on",

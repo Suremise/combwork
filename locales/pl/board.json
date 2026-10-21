@@ -313,6 +313,7 @@
   "board.lane.blocked": "{card}: zablokowana",
   "board.lane.blockedReason": "{card}: zablokowana: {reason}",
   "board.lane.finished": "{n, plural, one {# ukończona: {cards}} few {# ukończone: {cards}} many {# ukończonych: {cards}} other {# ukończonej: {cards}}}",
+  "board.lane.foldedMark": "{card}: {mark}",
   "board.lane.goneWhenEnded": "{card} · nie było jej na tablicy, gdy tor się skończył",
   "board.lane.holdReason": "{card}: Wstrzymane: {reason}",
   "board.lane.holdWaiting": "{card}: Wstrzymane: czeka, aż ją przeniesiesz",
