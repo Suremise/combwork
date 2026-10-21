@@ -245,7 +245,8 @@ export interface WorktreeNow {
 export async function worktreeNow(folder: string, o: { target?: string; gitPaths?: string[] } = {}): Promise<Maybe<WorktreeNow>> {
   const asked = [...MARKERS, ...(o.gitPaths ?? [])]
   const where = (target?: string) => git(folder, ['rev-parse', '--path-format=absolute', ...asked.flatMap((m) => ['--git-path', m]), ...(target ? ['--revs-only', `refs/heads/${target}`, '--'] : [])])
-  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all']), where(o.target)])
+  // --no-ahead-behind (#1377): `--branch` would otherwise count the upstream's ahead and behind, a walk nothing here reads.
+  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--no-ahead-behind', '--untracked-files=all']), where(o.target)])
   if (!r.ok) return unknown(U.uncommitted, { folder })
   let line: string | null = null
   let oid: string | null = null
