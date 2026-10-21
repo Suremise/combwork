@@ -71,18 +71,17 @@ export function decisionLine(cards: Map<number, { count: number }>): string {
 
 /**
  * A line's decisions less what the agent's own card watch tells it (#1272: one wake per event): a card whose watch
- * counts them is left out; one whose watch's line told some has only those made since counted, and is left out when
- * none is. What is left is the line's.
+ * counts them is left out; one whose watch's line told some has only those recorded or changed since counted (by their
+ * history entries' places, never their times), and is left out when none is. What is left is the line's. `self`: the
+ * agent's board name.
  */
-async function leftToWatches<T extends { count: number; latest: number }>(ws: WorkspaceService, projectPath: string, agentId: string, cards: Map<number, T>): Promise<Map<number, T>> {
+async function leftToWatches<T extends { count: number }>(ws: WorkspaceService, projectPath: string, agentId: string, self: string, cards: Map<number, T>): Promise<Map<number, T>> {
   for (const [n, d] of [...cards]) {
     const card = await getTask(n, ws).catch(() => null)
-    const byWatch = card ? watchToldDecisions(projectPath, agentId, card) : 0
-    if (byWatch === 0) continue
-    const since = byWatch === 'all' ? Infinity : byWatch
-    const left = (card!.decisions ?? []).filter((x) => Math.max(Date.parse(x.at) || 0, Date.parse(x.editedAt ?? '') || 0) > since).length
-    if (!left || d.latest <= since) cards.delete(n)
-    else cards.set(n, { ...d, count: Math.min(d.count, left) })
+    const byWatch = card ? watchToldDecisions(projectPath, agentId, card, self) : null
+    if (!byWatch) continue
+    if (byWatch === 'all' || !byWatch.untold) cards.delete(n)
+    else cards.set(n, { ...d, count: Math.min(d.count, byWatch.untold) })
   }
   return cards
 }
@@ -143,7 +142,7 @@ registerSource('decision', {
     const reads = cardReadsBy(agent)
     // A decision wake's line (#1266) also tells its cards where only their loop makes them the agent's (`loop`).
     const loop = loopOf(r)
-    const cards = fitting(await leftToWatches(ws, host, r.agentId, await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop)))
+    const cards = fitting(await leftToWatches(ws, host, r.agentId, self, await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop)))
     if (!cards.size) return { cancel: 'nothing new to tell' }
     // This version: its line, and what its receipt tells (saved with it), and what its holds compares with.
     const v = ++versions
@@ -204,7 +203,7 @@ async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: str
     if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && (r.state === 'offered' || (r.action !== undefined && isWaiting(r))))) return
     const self = await boardSelf(ws, projectPath, agentId)
     if (!self) return
-    const cards = fitting(await leftToWatches(ws, projectPath, agentId, await newDecisionsOn(ws, agent, self, told.get(key))))
+    const cards = fitting(await leftToWatches(ws, projectPath, agentId, self, await newDecisionsOn(ws, agent, self, told.get(key))))
     if (!cards.size) return
     // Made again from the decisions as they are when it is offered (one waiting is that one).
     await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
@@ -241,7 +240,7 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
       // replaced (cancelled, its action done) by this one, which carries its cards on.
       const loop = new Set([a.card, ...fromSource(projectPath, 'decision').filter((r) => r.agentId === to.id && r.action !== undefined && isWaiting(r)).flatMap((r) => [...loopOf(r)])])
       // Its own card watch's cards that tell it of their decisions (#1272) are left to that watch.
-      const cards = fitting(await leftToWatches(ws, projectPath, to.id, await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop)))
+      const cards = fitting(await leftToWatches(ws, projectPath, to.id, self, await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop)))
       if (!cards.size) return
       try {
         await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })

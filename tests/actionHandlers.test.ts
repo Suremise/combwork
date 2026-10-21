@@ -374,6 +374,68 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     }, HANG)
   })
 
+  // HR1's round 1 probes: what a watch told is by the entries' places, not their times, and stays told.
+  it('a decision made in the same millisecond as the one a watch told is still news: the decision line tells it, and only it', async () => {
+    const { w, alpha, c } = await byIntent()
+    const st = fake(alpha, { b1: 'watching', r1: 'working' })
+    await settled()
+    st.typed.length = 0
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['comment'] }) as WatchCondition)
+    // Two separate writes with the same time (a coarse or corrected clock): only Date is frozen.
+    const instant = new Date(Date.now() + 1000)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(instant)
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { decision: 'First decision' }, user))
+      await watches.evaluateWatches(w)
+      await typedUntil(st, 1)
+      expect(st.typed[0].text).toContain('a new decision from the user')
+      await watches.settled()
+      await settled()
+      vi.setSystemTime(instant)
+      await inWorkspace(w, () => tasks.updateTask(c, { decision: 'Second decision' }, user))
+      await settled()
+      expect(watches.watchToldDecisions(alpha, 'b1', await inWorkspace(w, () => tasks.getTask(c, w)), 'B1 (alpha)')).toEqual({ untold: 1 })
+      st.status.set('b1', 'ready')
+      await decisionWakes.tellNow(w, alpha, 'b1')
+      await typedUntil(st, 2)
+      expect(st.typed[1].text).toContain(`#${c} has 1 new decision from the user`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("a later watch that doesn't count decisions keeps what an earlier one told: the decision isn't told again", async () => {
+    const { w, alpha, c } = await byIntent()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    await settled()
+    // Blocked, so its builder may be told of decisions when idle (not only by a loop's decision wake).
+    await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Need a decision' }, b1))
+    await settled()
+    st.status.set('b1', 'watching')
+    st.typed.length = 0
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['comment'] }) as WatchCondition)
+    await inWorkspace(w, () => tasks.updateTask(c, { decision: 'Keep the name' }, user))
+    await watches.evaluateWatches(w)
+    await typedUntil(st, 1)
+    await watches.settled()
+    await settled()
+    // Then a watch only for Passed, which the user's move fires and its line tells.
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], column: 'passed' }) as WatchCondition)
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))
+    await watches.evaluateWatches(w)
+    await typedUntil(st, 2)
+    await watches.settled()
+    await settled()
+    expect(watches.watchToldDecisions(alpha, 'b1', await inWorkspace(w, () => tasks.getTask(c, w)), 'B1 (alpha)')).toEqual({ untold: 0 })
+    st.status.set('b1', 'ready')
+    await decisionWakes.tellNow(w, alpha, 'b1')
+    await deliveries.offerAllForTests()
+    await settled()
+    expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(2)
+  })
+
   it("a watch on its agent only doesn't count the request: its loop wake wakes the builder, once", async () => {
     const { w, alpha, c } = await byIntent()
     const st = fake(alpha, { b1: 'watching', r1: 'working' })

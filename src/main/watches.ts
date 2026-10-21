@@ -1602,14 +1602,18 @@ export function watchCovers(projectPath: string, agentId: string, n: number, kin
 }
 
 /**
- * What an agent's own card watch tells it of a card's decisions (#1272), so a decision line leaves that to it: all of
- * them (`all`), for a watch that counts them (watchCovers); else up to when (ms) the latest decision entry its typed line
- * had read was made (#578's boundary), also once the watch has ended; 0: none.
+ * What an agent's own card watch leaves untold of a card's decisions (#1272), so a decision line tells only that: none
+ * (`all` told), for a watch that counts them (watchCovers); else, once a line of a watch that counted them was typed (its
+ * handoff boundary, #578's, also once the watch has ended), how many decisions were recorded (by others than `self`) or
+ * changed after it, by their history entries: by place, never by time, so one made in the same millisecond is still
+ * new. Null: no watch has told it any.
  */
-export function watchToldDecisions(projectPath: string, agentId: string, card: TaskCard): 'all' | number {
+export function watchToldDecisions(projectPath: string, agentId: string, card: TaskCard, self: string): 'all' | { untold: number } | null {
   if (watchCovers(projectPath, agentId, card.number, 'decision', card.column)) return 'all'
-  const entry = card.history.findLast((h) => isDecisionEntry(h.what) && watchTold(projectPath, agentId, card, h, true))
-  return entry ? Date.parse(entry.at) || 0 : 0
+  const t = toldOf(projectPath, agentId, card.number)?.hand
+  if (!t) return null
+  const added = (h: TaskCard['history'][number]): boolean => isDecisionEntry(h.what) && !h.what.startsWith('Removed') && !(h.what.startsWith('Recorded') && h.by === self)
+  return { untold: card.history.filter((h) => added(h) && !entryWithin(card.history, h, t.h)).length }
 }
 
 /**
@@ -1617,19 +1621,27 @@ export function watchToldDecisions(projectPath: string, agentId: string, card: T
  * card (its `seen` boundary), by agent key and card. A loop wake for a change whose history entry is within that boundary
  * is one the watch already told, so it is dropped, even once the watch itself has ended; a change after it (the next
  * round's arrival, at any time, the same millisecond too) is news. In memory, as loop wakes are, and kept a day (a loop
- * wake waits at most that long). `handoffs`: the watch counted reviewers' requests and decisions (hearsHandoffs, #1272),
- * so its line told those within the boundary too.
+ * wake waits at most that long). `hand`: the same, from the last line of a watch that counted reviewers' requests and
+ * decisions (hearsHandoffs, #1272), the boundary of what it told of those: a later watch that doesn't count them leaves
+ * it as it was, so what was told stays told.
  */
-const toldByWatch = new Map<string, Map<number, { h: string | null; at: number; handoffs: boolean }>>()
+interface ToldBoundary {
+  h: string | null
+  at: number
+  hand?: { h: string | null; at: number }
+}
+const toldByWatch = new Map<string, Map<number, ToldBoundary>>()
 const TOLD_KEEP_MS = 24 * 60 * 60_000
 function noteToldByWatch(projectPath: string, agentId: string, told: Record<string, Baseline>, handoffs: boolean): void {
   const cards = Object.entries(told)
   if (!cards.length) return
   const key = agentKey(projectPath, agentId)
-  const known = toldByWatch.get(key) ?? new Map<number, { h: string | null; at: number; handoffs: boolean }>()
+  const known = toldByWatch.get(key) ?? new Map<number, ToldBoundary>()
   for (const [n, b] of cards) {
+    const had = known.get(Number(n))?.hand
     known.delete(Number(n))
-    known.set(Number(n), { h: b.seen.h, at: Date.now(), handoffs })
+    const now = { h: b.seen.h, at: Date.now() }
+    known.set(Number(n), { ...now, ...(handoffs ? { hand: now } : had ? { hand: had } : {}) })
   }
   while (known.size > WOKE_CARDS) known.delete(known.keys().next().value!)
   toldByWatch.delete(key)
@@ -1642,8 +1654,16 @@ function noteToldByWatch(projectPath: string, agentId: string, told: Record<stri
  * request or a decision (`handoff`), only a line of a watch that counted them (#1272).
  */
 export function watchTold(projectPath: string, agentId: string, card: TaskCard, entry: TaskCard['history'][number], handoff = false): boolean {
-  const t = toldByWatch.get(agentKey(projectPath, agentId))?.get(card.number)
-  return !!t && (!handoff || t.handoffs) && Date.now() - t.at < TOLD_KEEP_MS && entryWithin(card.history, entry, t.h)
+  const t = handoff ? toldOf(projectPath, agentId, card.number)?.hand : toldOf(projectPath, agentId, card.number)
+  return !!t && entryWithin(card.history, entry, t.h)
+}
+
+/** What watches' lines last told an agent of a card (toldByWatch), while kept: each boundary for a day. */
+function toldOf(projectPath: string, agentId: string, n: number): { h: string | null; hand?: { h: string | null } } | null {
+  const t = toldByWatch.get(agentKey(projectPath, agentId))?.get(n)
+  if (!t) return null
+  const fresh = (x: { at: number }): boolean => Date.now() - x.at < TOLD_KEEP_MS
+  return fresh(t) ? { h: t.h, ...(t.hand && fresh(t.hand) ? { hand: t.hand } : {}) } : t.hand && fresh(t.hand) ? { h: null, hand: t.hand } : null
 }
 
 /** Hive's own deliveries come from it. */
