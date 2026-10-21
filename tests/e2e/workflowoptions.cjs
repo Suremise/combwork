@@ -169,13 +169,18 @@ function board(sql, ...args) {
     await inv('advanced:set', 'hive.workflow.enforce', null)
 
     // --- Another language: Polish.
-    await inv('settings:update', { general: { language: 'pl' } })
+    // As main sends a change of language (i18nlive), with Polish's own catalogue.
+    const base = (await inv('app:info')).language
+    const dir = path.join(lib.ROOT, 'locales', 'pl')
+    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    await speak({ ...base, code: 'pl', locale: 'pl', messages })
     await page.locator('.settings-nav .row').nth(0).click()
     await page.locator('.settings-nav .row', { hasText: 'Przepływ pracy' }).click()
     check('the section shows in Polish', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Kto scala'), HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-form-pl.png') })
-    await inv('settings:update', { general: { language: 'en' } })
+    await speak(base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
   } finally {

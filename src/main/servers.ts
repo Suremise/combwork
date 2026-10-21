@@ -4,7 +4,7 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -460,9 +460,12 @@ async function projectSummary(p: string) {
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), on: mcpOn },
     // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
     workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
-    settings: info.config
+    // The project's configuration; its workflow options are `workflow`'s, resolved (not again here, raw).
+    settings: withoutWorkflow(info.config)
   }
 }
+
+const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<ProjectConfig, 'workflow'> => rest
 
 /** The agent an API call is for: an agent id or name, else the project's only agent (400 with several, 409 with none). */
 async function agentParam(p: string, value: unknown): Promise<string> {
