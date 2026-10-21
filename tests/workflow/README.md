@@ -43,13 +43,21 @@ than left out.
 | S41 | Just started isn't Done; part merged is a mark; a Review card merged by hand is Done outside the rules | — | `reconciler.test.ts` "S41: …"; `workflow/scenarios.git.test.ts` "S41: …" |
 | S43 | P4's form: one card at a time, the next waits for Done (P5: the queue) | `p4lane` (the next card refused until Done); `progressgates` | `laneOwnership.test.ts` "S43 (P4): …" |
 | S44 | Solo, the project folder, no trailers: start → commit → submit → Done | — | `workflow/scenarios.git.test.ts` "S44: …" |
-| S45 | None, two agents in one folder: staleness by paths, unclaimed changes | — | `workflow/scenarios.none.test.ts` "S45: …" |
+| S45 | None, two agents in one folder: staleness by paths, unclaimed changes (its hooks-free part superseded: below) | — | `workflow/scenarios.none.test.ts` "S45: …" |
 | S48 | An agent's plain number is refused, naming the key and `#N` | `intents` (S48) | `cardIntents.test.ts` "… (S48)"; `workflow/scenarios.git.test.ts` "S48: …" |
 | S49 | The round limit asks the user (Decide), the lane pauses | — | `forYouBoard.test.ts` (the round limit on the board); `workflow/forYou.test.ts` "S49, the round limit: …" |
 | S54 | P4's RC: Pair (the agent merges), agent worktrees, the Assistant off; squash merges bring the branch up to date | `p4lane` | `lineUpdates.test.ts` (between cards: squash, merge commit, waits, For you, git's refusal, the switch) |
 | S57 | Approvals aren't decisions; generations; distinct reviewers (P5: S57(e), the queue) | — | `workflow/scenarios.git.test.ts` "S57: …", "S57 (d)"; `workflow/forYou.test.ts` "S57 (a)"; `workflow/transitions.test.ts` "S57(d)", "S57(f) continued"; P5: `workflow/queue.test.ts` "S57 (e, f)" |
 | S58 | A shared folder: own-commit revisions, exclusions, isolated check runs | — | `workflow/sharedFolder.test.ts` "S58: …" |
-| S61 | None, Pair, hooks-free: declared paths, a counted check, edits uncount it | — | `workflow/scenarios.none.test.ts` "S61: …" |
+| S61 | None, Pair: declared paths, a counted check on them, a path added or edited after the run uncounts it (its hooks-free framing superseded: below) | — | `workflow/scenarios.none.test.ts` "S61: …" (the declared paths, the counted check and its uncounting, at core level) |
+
+**Hooks-free mode is superseded, not deferred** (Darren's decision on #1285, 21 Oct: no hooks-free mode and no "Hive's
+hooks" switch; SPEC §16.15 row 10). S45's last sentence (a hooks-free session's card: an empty pre-fill, its paths
+declared at submit) and S61's "hooks-free session" are out of scope for every phase. What stays valid of them is
+covered as above: S45's path-based staleness and unclaimed changes, and S61's declared paths, a counted check and a
+run uncounted by a later edit (the core's `declarePaths` and check runs in `scenarios.none.test.ts`; in the app, the
+declare-paths route's arguments in `cardIntents.test.ts` and counted runs in `progressgates`). No test exercises a
+hooks-free session, and none should.
 
 ## Later phases (named here so nothing is missed)
 
