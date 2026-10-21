@@ -280,7 +280,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // Done with no integration (the user's override, or Not checked's report): a later merge is observed and recorded,
     // without moving the card (§16.8.4). Its change: the submitted endpoints, else its line's head from its base.
     // (A Done card's head isn't observed any more, so an unsubmitted one is read from its line now, if it still exists.)
-    const lineNow = s.latest?.revision ? null : await G.lineHead(project, s.started!.line!)
+    // A submitted revision is the card's record (history: it keeps the names it had); an unsubmitted one is read from
+    // the line as it is now, so its write checks the card is still on that line (#1305: renamed since, it's dropped).
+    const read = s.latest?.revision ? null : s.started!.line!
+    const lineNow = read ? await G.lineHead(project, read) : null
     if (isUnknown(lineNow)) hooks.unknown?.(lineNow.what)
     const revision = s.latest?.revision ?? (lineNow && !isUnknown(lineNow) ? lineNow : s.head)
     const from = s.latest?.base ?? base
@@ -289,7 +292,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (!c) return
     const th = await G.lineHead(project, target)
-    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } })) // i18n-ignore: a fact's kind and codes, not text
+    await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && (!read || w.state().started?.line === read) && w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method: c.method, by: 'outside' } })) // i18n-ignore: a fact's kind and codes, not text
     return
   }
 
