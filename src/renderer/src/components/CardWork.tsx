@@ -8,7 +8,7 @@ import { checksOn, type WorkBadge, type WorkCheck, type WorkRevision, type WorkV
 import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
 import { notify, useStore } from '../store'
-import { cx } from '../util'
+import { cx, timeAgo } from '../util'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -203,14 +203,21 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, builder, sh
   return (
     <div className="card-work-rev" data-submission={r.submission}>
       <div className="card-work-rev-head">
+        {/* Its parts with middle dots between them; the time relative, the date and time in full on hover, as elsewhere. */}
         {r.revision ? <RevisionCode id={r.revision} short={short} /> : <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
-        <span className="faint">{tr(M.round, { round: r.round })}</span>
-        {r.by && <span className="faint">{agentName(r.by)}</span>}
-        <span className="faint">{formatDateTime(r.at)}</span>
+        <span className="faint card-work-dot">{tr(M.round, { round: r.round })}</span>
+        {r.by && <span className="faint card-work-dot">{agentName(r.by)}</span>}
+        <span className="faint card-work-dot" title={formatDateTime(r.at)}>
+          {timeAgo(r.at)}
+        </span>
         <span className="grow" />
-        <button type="button" className="btn small subtle" aria-expanded={files} disabled={!r.files.length} onClick={() => setFiles(!files)}>
-          <Icon name={files ? 'chevron-down' : 'chevron-right'} /> {tr(M.files, { n: r.files.length })}
-        </button>
+        {r.files.length ? (
+          <button type="button" className="btn small subtle" aria-expanded={files} onClick={() => setFiles(!files)}>
+            <Icon name={files ? 'chevron-down' : 'chevron-right'} /> {tr(M.files, { n: r.files.length })}
+          </button>
+        ) : (
+          <span className="faint">{tr(M.files, { n: 0 })}</span>
+        )}
       </div>
       {files && (
         <ul className="card-work-files">
