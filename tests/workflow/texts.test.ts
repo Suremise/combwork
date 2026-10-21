@@ -37,6 +37,7 @@ const SAMPLE: RefusalValues = {
   stage: 'approved',
   move: 'start review',
   moves: 'submit, put back',
+  stages: 'todo, active, done',
   intent: 'report merge',
   rules: 'submit.checksPassed, approval.given',
   key: 'AM-12',
