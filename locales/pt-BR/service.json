@@ -141,6 +141,7 @@
   "service.transcripts.noImage": "Essa imagem não existe",
   "service.transcripts.noTool": "Essa chamada de ferramenta não existe",
   "service.transcripts.none": "Esta sessão ainda não tem transcrição.",
+  "service.workflow.closed": "O espaço de trabalho deste cartão foi fechado",
   "service.workspace.advancedNotHere": "A configuração {setting} não pode ser definida para um espaço de trabalho.",
   "service.workspace.agentGone": "Esse agente não existe mais.",
   "service.workspace.badName": "Nomes de projeto não podem começar com “.” nem conter {chars}",

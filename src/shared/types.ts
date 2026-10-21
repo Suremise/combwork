@@ -137,6 +137,8 @@ export type KeybindingOverrides = Record<string, string | null>
 export interface AppSettings {
   /** The user's changes to the default keyboard shortcuts. */
   keybindings: KeybindingOverrides
+  /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
+  workflow?: WorkflowDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
@@ -589,6 +591,8 @@ export interface WorkspaceConfig {
   journal?: JournalSettings
   /** The Assistant suggested its journal once, writing a handover while it was off (#1032): never again. */
   journalSuggested?: boolean
+  /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
+  workflow?: WorkflowDefaults
 }
 
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
@@ -887,6 +891,12 @@ export interface RemovedData {
 }
 
 export type Inherit<T> = 'inherit' | T
+
+/**
+ * Workflow options a level sets for its projects (SPEC §16.6.6: global in config, the workspace's in workspace.json), per
+ * platform: an option unset inherits the level before (the platform's all-off at the bottom, the project's own on top).
+ */
+export type WorkflowDefaults = Partial<Record<PlatformId, Partial<Omit<WorkflowOptions, 'platform'>>>>
 
 /** A project's workflow options as project.json keeps them (SPEC §16.6.6). */
 export interface ProjectWorkflow {

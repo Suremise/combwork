@@ -23,8 +23,8 @@ export function detect(folder: string): Detection {
  */
 export function offer(current: PlatformId, found: Detection): PlatformOffer | null {
   if (current === found.platform) return null
-  if (current === 'none') return found.platform === 'git' ? { offer: 'git', why: 'gitFound' } : null
-  return { offer: 'none', why: found.other ? 'otherFound' : 'repositoryGone' }
+  if (current === 'none') return found.platform === 'git' ? { offer: 'git', why: 'gitFound' } : null // i18n-ignore: a reason's key, not text
+  return { offer: 'none', why: found.other ? 'otherFound' : 'repositoryGone' } // i18n-ignore: a reason's key, not text
 }
 
 /**

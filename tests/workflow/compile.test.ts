@@ -59,7 +59,7 @@ describe('compilation', () => {
     }
     const r = refusal('requeue.allowed', { card: 'AM-12', revision: 'a3f2c1d', cause: 'requeueLimit', n: 2 })
     expect(r.message).toBe("AM-12 at a3f2c1d can't go back into the merge queue unchanged: it was sent back unchanged 2 times already.")
-    expect(r.change).toBe('The user can retry the merge once from the queue.')
+    expect(r.change).toBe('Retry merge on the merge queue retries it once.')
   })
 })
 

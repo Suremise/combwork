@@ -12,6 +12,7 @@ import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/w
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { agentActor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
+import type { StoredText } from '../../src/shared/types'
 
 export const B1 = agentActor('B1')
 export const B2 = agentActor('B2')
@@ -61,7 +62,7 @@ export interface Env {
   home: string
   options: WorkflowOptions
   wakes: { agent: string; card: string; why: string }[]
-  notes: { card: string; text: string }[]
+  notes: { card: string; text: string; shown?: StoredText }[]
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
   /** Another Hive on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
@@ -100,7 +101,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
       autoRun: extra.autoRun,
       // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
       reconcileActs: true,
-      effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text) => notes.push({ card: card.key, text }) }
+      effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text, shown) => notes.push({ card: card.key, text, ...(shown ? { shown } : {}) }) }
     })
   const wf = make(store)
   const passing = async (): Promise<CheckResult> => ({ ok: true, output: '' })

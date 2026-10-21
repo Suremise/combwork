@@ -3,7 +3,9 @@
 // derived state"). Facts carry platform-neutral words (revision, line, target, result); anything only one platform
 // has goes in `data.platform`, which only its adapter reads.
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
+
+import type { StoredText } from '../types'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
@@ -118,7 +120,8 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; stage?: StageId; generation?: number }
+  /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number }
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
@@ -132,7 +135,8 @@ export interface FactData {
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
   Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' }
-  Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number> }
+  /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
+  Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
