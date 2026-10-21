@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import {
@@ -26,6 +26,7 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { samePath } from '@shared/movePaths'
 import type { HiveRequests } from '@shared/api'
 import { call, errorMessage } from '../api'
+import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
 import { bumpGit, choose, confirm, notify, prompt, set, showGit, showView, UNUSED_ROOT, useStore } from '../store'
 import { openGuideAt } from '../tips'
@@ -179,38 +180,10 @@ function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>(channe
   type T = Awaited<ReturnType<HiveRequests[C]>>
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)
-  const [state, setState] = useState<{ for: string; data: T | null; error: string | null; loading: boolean; at: number }>({ for: project.path, data: null, error: null, loading: true, at: 0 })
-  const loads = useRef(0)
-  /** The read under way, and whether another was asked for meanwhile. */
-  const running = useRef<{ path: string; again: boolean } | null>(null)
-  const reload = useCallback(function read(): void {
-    const path = project.path
-    // One read at a time: those asked meanwhile are one more after it, with no state set now (#1366: as agents' sessions
-    // end, a usage change each set state in this effect, and fifty in a row was React's update loop, error #185).
-    if (running.current?.path === path) {
-      running.current.again = true
-      return
-    }
-    const n = ++loads.current
-    running.current = { path, again: false }
-    setState((s) => (s.for === path ? (s.loading ? s : { ...s, loading: true }) : { for: path, data: null, error: null, loading: true, at: 0 }))
-    const settled = (): void => {
-      if (n !== loads.current) return
-      const again = running.current?.again
-      running.current = null
-      if (again) read()
-    }
-    void (call as (c: C, p: string) => Promise<T>)(channel, path).then(
-      (data) => {
-        if (n === loads.current) setState({ for: path, data, error: null, loading: false, at: Date.now() })
-        settled()
-      },
-      (e) => {
-        if (n === loads.current) setState((s) => ({ ...s, for: path, error: errorMessage(e), loading: false }))
-        settled()
-      }
-    )
-  }, [channel, project.path])
+  const [state, setState] = useState<GitReadState<T>>({ for: project.path, data: null, error: null, loading: true, at: 0 })
+  // One read at a time, those asked meanwhile one more after it (#1366, gitReads.ts).
+  const reader = useMemo(() => gitReader<T>((path) => (call as (c: C, p: string) => Promise<T>)(channel, path), setState, errorMessage), [channel])
+  const reload = useCallback(() => reader(project.path), [reader, project.path])
   useEffect(reload, [reload, version, usage, project.branch])
   // What the user did in a terminal meanwhile (a commit, git init) shows on coming back to the window.
   useEffect(() => {
