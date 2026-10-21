@@ -105,6 +105,8 @@
 //   and carries the failed turn on by itself, as Claude Code did: a tool call (PostToolUse), then the reply and Stop.
 //   With "atLaunch": true as well, it stops before its session starts, as Claude Code 2.1.296 did with an OAuth session
 //   it couldn't refresh: "Failed to authenticate: OAuth session expired and could not be refreshed", exit 1 (#577).
+//   With "late": true instead, nothing shows it until a prompt is sent: the prompt isn't taken (no turn, no hook) and
+//   "Not logged in · Run /login" shows under it, as Claude Code's status line did in #1321.
 // - `--model fail-start` makes it refuse to start, printing an error and exiting with 1, as Claude Code does for an
 //   argument it rejects.
 // - `-p --input-format stream-json` answers the Agent SDK's initialize control request with Claude Code 2.1.289's
@@ -134,6 +136,15 @@ if (args[0] === '--version') {
 function signedOut() {
   try {
     return JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-signin.json'), 'utf8')).expired === true
+  } catch {
+    return false
+  }
+}
+/** The expired sign-in shows only once a prompt is sent, which it doesn't take (fake-signin.json { "expired": true, "late": true }, #1321). */
+function expiredLate() {
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-signin.json'), 'utf8'))
+    return s.expired === true && s.late === true
   } catch {
     return false
   }
@@ -932,6 +943,11 @@ process.stdin.on('data', (data) => {
       // The Enter after such a paste is lost too (#597).
       if (lostEnters > 0 && line) {
         lostEnters--
+        continue
+      }
+      // Signed out, shown late (#1321): a prompt isn't sent; its status line says so under the line, which stays as typed.
+      if (!onEnter && line.trim() && !line.trim().startsWith('/') && expiredLate()) {
+        out(`\r\n  Not logged in · Run /login\r\n> ${line}`)
         continue
       }
       const text = line.trim()
