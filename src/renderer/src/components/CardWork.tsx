@@ -1,0 +1,312 @@
+import { useState } from 'react'
+import { fmt, msg, tr } from '@shared/i18n'
+import { formatDateTime } from '@shared/dates'
+import { columnName } from '@shared/tasks'
+import { revisionShort } from '@shared/platform/descriptors'
+import type { ProjectInfo, TaskCard } from '@shared/types'
+import { checksOn, type WorkBadge, type WorkCheck, type WorkRevision, type WorkVerdict, type WorkView } from '@shared/workflow/workView'
+import { useCardWork } from '../cardWork'
+import { openFileLink } from '../fileLinks'
+import { notify, useStore } from '../store'
+import { cx } from '../util'
+import { Icon, Tooltip } from './ui'
+
+// A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
+// card's facts say, in the glossary's words (revision, verdict, check, stale, outside Hive, before 1.0). Revisions are
+// shown through the card's project's platform (revisionShort), never by switching on its id.
+
+const M = {
+  title: msg({ id: 'board.work.title', defaultMessage: 'Work', description: "A heading in the card dialog (click to show or hide): what the card's facts say of its work (its branch, revisions, verdicts, checks, merge). Glossary: work." }),
+  reading: msg({ id: 'board.work.reading', defaultMessage: 'Reading its work…', description: "The card dialog's Work section while the card's work is being read." }),
+  failed: msg({ id: 'board.work.failed', defaultMessage: 'Couldn’t read the card’s work: {error}', description: "The card dialog's Work section when its work couldn't be read (the repository or the board). {error} is why, in the words of the error." }),
+  retry: msg({ id: 'board.work.retry', defaultMessage: 'Retry', description: "A button in the card dialog's Work section after its work couldn't be read: reads it again." }),
+  noRecord: msg({ id: 'board.work.noRecord', defaultMessage: 'No work record: its board isn’t upgraded to Hive 1.0, or the card has no project.', description: "The card dialog's Work section when there is no work to show: the board hasn't had the 1.0 upgrade, or the card is the workspace's (no project)." }),
+  preWorkflow: msg({ id: 'board.work.preWorkflow', defaultMessage: 'Before 1.0: this card has no work record.', description: "The card dialog's Work section for a card from before Hive 1.0: Hive records no work for it and invents none. Glossary: before 1.0." }),
+  adopted: msg({ id: 'board.work.adopted', defaultMessage: 'Adopted at the upgrade, from {column}: its work starts from what its folder showed then.', description: "The card dialog's Work section for a card Hive took on at the upgrade to 1.0 from what could be read. {column} is the board column it was in (Doing, Review, Passed)." }),
+  none: msg({ id: 'board.work.none', defaultMessage: 'No revision submitted yet.', description: "The card dialog's Work section for a card whose builder hasn't submitted a revision for review yet. Glossary: revision." }),
+  branch: msg({ id: 'board.work.branch', defaultMessage: 'Branch', description: "A label in the card dialog's Work section: the git branch the card's work is on follows." }),
+  base: msg({ id: 'board.work.base', defaultMessage: 'Base', description: "A label in the card dialog's Work section: the revision the card's work started from follows (a short commit id, a3f2c1d)." }),
+  folder: msg({ id: 'board.work.folder', defaultMessage: 'Folder', description: "A label in the card dialog's Work section: the folder the card's work is done in follows (the project folder, or its own folder)." }),
+  projectFolder: msg({ id: 'board.work.projectFolder', defaultMessage: 'The project folder', description: "The card dialog's Work section, after Folder: the card's work is done in the project's own folder (not a folder of its own)." }),
+  target: msg({ id: 'board.work.target', defaultMessage: 'Target', description: "A label in the card dialog's Work section: where the card's work goes once approved follows (the target branch, main). Glossary: target branch." }),
+  revisions: msg({ id: 'board.work.revisions', defaultMessage: 'Revisions, newest first', description: "A heading in the card dialog's Work section, above the revisions the builder submitted for review. Glossary: revision." }),
+  round: msg({ id: 'board.work.round', defaultMessage: 'Round {round, number}', description: "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)." }),
+  noCode: msg({ id: 'board.work.noCode', defaultMessage: 'Submitted without code', description: "In place of a revision in the card dialog's Work section: a no-code card's submission (design, investigation), which has no revision. Glossary: no-code card." }),
+  noRevision: msg({ id: 'board.work.noRevision', defaultMessage: 'No revision recorded', description: "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Hive reads its revisions). Glossary: revision." }),
+  files: msg({ id: 'board.work.files', defaultMessage: '{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}', description: "A button in the card dialog's Work section: how many files the revision changed; a click shows them." }),
+  openFile: msg({ id: 'board.work.openFile', defaultMessage: 'Open {path} in Files', description: "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path." }),
+  verdict: msg({ id: 'board.work.verdict', defaultMessage: '{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}', description: "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail." }),
+  check: msg({ id: 'board.work.check', defaultMessage: '{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}', description: "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check." }),
+  integrated: msg({ id: 'board.work.integrated', defaultMessage: '{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}', description: "The card dialog's Work section: how the card's work went into its target ({target}, a branch such as main) and the target's revision with it ({result}, a short commit id). Keep the select keys." }),
+  outsideHive: msg({ id: 'board.work.outsideHive', defaultMessage: 'Merged outside Hive.', description: "The card dialog's Work section, under how the card was merged: the merge was made outside Hive (in a terminal or another tool). Glossary: outside Hive." }),
+  accepted: msg({ id: 'board.work.accepted', defaultMessage: 'Accepted {when}.', description: "The card dialog's Work section: the card's work was accepted (a project without version control, or a no-code card) at {when}, a date and time." }),
+  staleChange: msg({ id: 'board.work.staleChange', defaultMessage: 'Stale: the pass was for {approved}; the card is now at {current}.', description: "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass." }),
+  staleDecision: msg({ id: 'board.work.staleDecision', defaultMessage: 'Stale: a decision was recorded since the pass.', description: "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass." }),
+  carriedOver: msg({ id: 'board.work.carriedOver', defaultMessage: 'The pass for {from} carries over to {to}: the same change.', description: "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change." }),
+  outsideRules: msg({ id: 'board.work.outsideRules', defaultMessage: 'Merged outside the rules: {rules}.', description: "A mark in the card dialog's Work section: the card was merged by hand before these rules passed ({rules}, the rules' names, joined). Glossary: rule." }),
+  mergedInPart: msg({ id: 'board.work.mergedInPart', defaultMessage: 'Merged in part: some of its work is already in {target}.', description: "A mark in the card dialog's Work section: part of the unfinished card's work was found in its target ({target}, a branch such as main)." }),
+  leftTarget: msg({ id: 'board.work.leftTarget', defaultMessage: 'No longer in {target}: its revision {revision} was taken out.', description: "A mark in the card dialog's Work section: a Done card's revision ({revision}, a short commit id) is no longer in its target ({target}, a branch such as main)." }),
+  overridden: msg({ id: 'board.work.overridden', defaultMessage: 'Moved past its review and approvals by an override.', description: "A mark in the card dialog's Work section: the card's latest revision was moved on by an override (the user's or the Assistant's exception to the rules). Glossary: override." }),
+  badgeStale: msg({ id: 'board.work.badgeStale', defaultMessage: 'Stale: its pass no longer counts for its revision', description: "Tooltip and accessible name of a mark on a board card: the card's pass is stale (for an older revision, or before a decision). Glossary: stale." }),
+  badgeOutside: msg({ id: 'board.work.badgeOutside', defaultMessage: 'Merged outside the rules', description: "Tooltip and accessible name of a mark on a board card: the card was merged by hand before its rules passed. Glossary: rule." })
+}
+// The lane hover's words for a card's revision, verdict and checks (#1225), the same on the board card.
+const LANE = {
+  revision: msg({ id: 'board.lane.workRevision', defaultMessage: "{review, select, yes {Under review: {revision}} other {Revision: {revision}}}", description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }),
+  verdict: msg({ id: 'board.lane.workVerdict', defaultMessage: "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}", description: "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are." }),
+  checks: msg({ id: 'board.lane.workChecks', defaultMessage: "Checks on it: {passed, number} passed, {failed, number} failed", description: "A line in a lane segment's hover (Progress panel): how many of the checks on the card's revision passed and failed (each check's latest run that counted)." })
+}
+const COPY = {
+  copy: msg({ id: 'board.progress.copyRevision', defaultMessage: "Copy revision {revision}", description: "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)." }),
+  copied: msg({ id: 'board.progress.revisionCopied', defaultMessage: "Revision {revision} copied", description: "A notification after copying a run's revision (a commit id) from the Progress panel. {revision} is its short form (a3f2c1d)." }),
+  failed: msg({ id: 'board.progress.revisionCopyFailed', defaultMessage: "Could not copy the revision", description: "A notification: copying a run's revision (a commit id) from the Progress panel failed." })
+}
+const NOT_COUNTED = msg({ id: 'board.details.notCounted', defaultMessage: "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}", description: "A run's details in the Progress panel: why the run doesn't count as the card's check named {name} (\"typecheck\", or the run's title when it wasn't a check). {why} picks the reason: keep each branch's key as it is." })
+
+/** A card's project, and its revisions as that project's platform shows them. */
+function useProjectOf(card: { project: string }): { project: ProjectInfo | null; short: (id: string) => string } {
+  const project = useStore((s) => s.workspace?.projects.find((p) => p.name === card.project) ?? null)
+  const platform = project?.platform?.id
+  return { project, short: (id) => (platform ? revisionShort(platform, id) : id.slice(0, 7)) }
+}
+
+/** A revision: short, a click copies it whole. */
+function RevisionCode({ id, short }: { id: string; short: (id: string) => string }) {
+  const s = short(id)
+  return (
+    <button
+      type="button"
+      className="card-work-rev-id"
+      title={tr(COPY.copy, { revision: s })}
+      onClick={() =>
+        void navigator.clipboard.writeText(id).then(
+          () => notify('success', tr(COPY.copied, { revision: s })),
+          () => notify('error', tr(COPY.failed))
+        )
+      }
+    >
+      <code>{s}</code>
+    </button>
+  )
+}
+
+/** The card dialog's Work section (#1224): its branch, base, folder and target, revisions newest first, marks and merge. */
+export function CardWork({ card }: { card: TaskCard }) {
+  const [open, setOpen] = useState(true)
+  const { view, error, loaded, retry } = useCardWork(card.number)
+  const { project, short } = useProjectOf(card)
+  const agentName = (id: string | null): string => (id ? (project?.agents.find((a) => a.id === id)?.name ?? id) : '')
+  return (
+    <>
+      <div className="task-section-h clickable" onClick={() => setOpen(!open)}>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} /> {tr(M.title)}
+      </div>
+      {open && (
+        <div className="card-work" data-work={view ? (view.preWorkflow ? 'before-1.0' : 'recorded') : error ? 'failed' : loaded ? 'none' : 'reading'}>
+          {error ? (
+            <div className="card-work-note">
+              <Icon name="warning" /> {tr(M.failed, { error })}{' '}
+              <button type="button" className="btn small" onClick={retry}>
+                {tr(M.retry)}
+              </button>
+            </div>
+          ) : !loaded ? (
+            <div className="faint">{tr(M.reading)}</div>
+          ) : !view ? (
+            <div className="faint">{tr(M.noRecord)}</div>
+          ) : view.preWorkflow ? (
+            <div className="faint">{tr(M.preWorkflow)}</div>
+          ) : (
+            <WorkDetails view={view} project={project} short={short} agentName={agentName} />
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+function WorkDetails({ view: v, project, short, agentName }: { view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+  const rows: [string, React.ReactNode][] = []
+  if (v.line) rows.push([tr(M.branch), <code key="line">{v.line}</code>])
+  if (v.base) rows.push([tr(M.base), <RevisionCode key="base" id={v.base} short={short} />])
+  if (v.folder) rows.push([tr(M.folder), v.folder === 'project' ? tr(M.projectFolder) : <code key="folder">{v.folder}</code>])
+  if (v.target) rows.push([tr(M.target), <code key="target">{v.target}</code>])
+  const marks = workMarks(v, short)
+  return (
+    <>
+      {v.adopted && <div className="faint card-work-adopted">{tr(M.adopted, { column: columnName(v.adoptedFrom ?? 'doing', tr) })}</div>}
+      {rows.length > 0 && (
+        <dl className="card-work-facts">
+          {rows.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {marks.length > 0 && (
+        <ul className="card-work-marks">
+          {marks.map((m) => (
+            <li key={m}>
+              <Icon name="warning" /> {m}
+            </li>
+          ))}
+        </ul>
+      )}
+      {v.integration && (
+        <div className="card-work-merged">
+          <Icon name="git-merge" /> {tr(M.integrated, { method: v.integration.method, target: v.integration.target, result: short(v.integration.result) })}
+          {v.integration.by === 'outside' && <> {tr(M.outsideHive)}</>}
+        </div>
+      )}
+      {v.accepted && (
+        <div className="card-work-merged">
+          <Icon name="pass" /> {tr(M.accepted, { when: formatDateTime(v.accepted.at) })}
+        </div>
+      )}
+      {v.revisions.length === 0 ? (
+        !v.integration && !v.accepted && <div className="faint">{tr(M.none)}</div>
+      ) : (
+        <>
+          <div className="card-work-sub">{tr(M.revisions)}</div>
+          {[...v.revisions].reverse().map((r) => (
+            <RevisionRow key={r.submission} r={r} noCode={v.kind === 'no-code'} verdicts={v.verdicts.filter((x) => x.submission === r.submission)} checks={r.revision ? checksOn(v, r.revision) : []} project={project} folder={v.folder} builder={v.builder} short={short} agentName={agentName} />
+          ))}
+        </>
+      )}
+    </>
+  )
+}
+
+/** What a card's marks say, a sentence each (stale, carried over, outside the rules, merged in part, left its target, an override). */
+function workMarks(v: WorkView, short: (id: string) => string): string[] {
+  const out: string[] = []
+  const st = v.marks.stale
+  if (st) out.push(st.why === 'decision' || !st.approved || !st.current ? tr(M.staleDecision) : tr(M.staleChange, { approved: short(st.approved), current: short(st.current) }))
+  for (const c of v.marks.carriedOver) out.push(tr(M.carriedOver, { from: short(c.from), to: short(c.to) }))
+  if (v.marks.outsideRules.length) out.push(tr(M.outsideRules, { rules: fmt.list(v.marks.outsideRules) }))
+  if (v.marks.mergedInPart) out.push(tr(M.mergedInPart, { target: v.marks.mergedInPart.target }))
+  if (v.marks.leftTarget) out.push(tr(M.leftTarget, { target: v.marks.leftTarget.target, revision: short(v.marks.leftTarget.revision) }))
+  if (v.marks.overridden) out.push(tr(M.overridden))
+  return out
+}
+
+function RevisionRow({ r, noCode, verdicts, checks, project, folder, builder, short, agentName }: { r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; builder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+  const [files, setFiles] = useState(false)
+  // Its files open in the project's Files tab: the builder's worktree when the card has a folder of its own.
+  const open = (path: string): void => {
+    if (!project) return
+    const own = folder && folder !== 'project' ? builder : null
+    openFileLink({ project: project.path, agentId: own, root: own && folder ? folder : project.path, rel: path })
+  }
+  return (
+    <div className="card-work-rev" data-submission={r.submission}>
+      <div className="card-work-rev-head">
+        {r.revision ? <RevisionCode id={r.revision} short={short} /> : <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
+        <span className="faint">{tr(M.round, { round: r.round })}</span>
+        {r.by && <span className="faint">{agentName(r.by)}</span>}
+        <span className="faint">{formatDateTime(r.at)}</span>
+        <span className="grow" />
+        <button type="button" className="btn small subtle" aria-expanded={files} disabled={!r.files.length} onClick={() => setFiles(!files)}>
+          <Icon name={files ? 'chevron-down' : 'chevron-right'} /> {tr(M.files, { n: r.files.length })}
+        </button>
+      </div>
+      {files && (
+        <ul className="card-work-files">
+          {r.files.map((f) => (
+            <li key={f.path}>
+              <span className="card-work-file-status">{f.status}</span>
+              <button type="button" className="link" title={tr(M.openFile, { path: f.path })} onClick={() => open(f.path)}>
+                {f.path}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(verdicts.length > 0 || checks.length > 0) && (
+        <ul className="card-work-results">
+          {verdicts.map((x, i) => (
+            <li key={`v${i}`} className={cx(x.pass ? 'pass' : 'fail', !x.current && 'old')}>
+              <Icon name={x.pass ? 'pass' : 'error'} /> {tr(M.verdict, { reviewer: agentName(x.reviewer), pass: x.pass ? 'yes' : 'no', current: x.current ? 'yes' : 'no' })}
+            </li>
+          ))}
+          {checks.map((c, i) => {
+            const line = (
+              <li key={`c${i}`} className={cx(c.result === 'passed' ? 'pass' : 'fail', !c.counted && 'old')}>
+                <Icon name={c.result === 'passed' ? 'check' : 'close'} /> {tr(M.check, { name: c.name, result: c.result, counted: c.counted ? 'yes' : 'no' })}
+              </li>
+            )
+            return c.counted ? line : (
+              <Tooltip key={`c${i}`} content={tr(NOT_COUNTED, { name: c.name, why: c.whyNot ?? 'other' /* i18n-ignore: a select's key, never shown */ })}>
+                {line}
+              </Tooltip>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A board card's work badges (#1224): the revision under review, the last verdict and on which revision, the checks on
+ * it, and a stale or outside-the-rules mark. Quiet, on one line, each with an icon and an accessible name (colour never
+ * alone). Nothing for a card with no work recorded, or from before 1.0.
+ */
+export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { project: string; column: string } }) {
+  const { short } = useProjectOf(card)
+  if (!b || b.preWorkflow) return null
+  const shown = b.revision || b.verdict || b.checks.passed + b.checks.failed > 0 || b.stale || b.outsideRules
+  if (!shown) return null
+  const revisionText = b.revision ? tr(LANE.revision, { review: card.column === 'review' ? 'yes' : 'no', revision: short(b.revision) }) : ''
+  const verdictText = b.verdict ? tr(LANE.verdict, { pass: b.verdict.pass ? 'yes' : 'no', revision: b.verdict.revision ? short(b.verdict.revision) : 'none', current: b.verdict.current ? 'yes' : 'no' }) : '' // i18n-ignore: select keys, never shown
+  const checksText = tr(LANE.checks, { passed: b.checks.passed, failed: b.checks.failed })
+  return (
+    <div className="task-work">
+      {b.revision && (
+        <Tooltip content={revisionText}>
+          <span className="task-work-badge" aria-label={revisionText}>
+            <Icon name="git-commit" />
+            <code>{short(b.revision)}</code>
+          </span>
+        </Tooltip>
+      )}
+      {b.verdict && (
+        <Tooltip content={verdictText}>
+          <span className={cx('task-work-badge', b.verdict.pass ? 'pass' : 'fail', !b.verdict.current && 'old')} aria-label={verdictText}>
+            <Icon name={b.verdict.pass ? 'pass' : 'error'} />
+          </span>
+        </Tooltip>
+      )}
+      {b.checks.passed + b.checks.failed > 0 && (
+        <Tooltip content={checksText}>
+          <span className={cx('task-work-badge', b.checks.failed ? 'fail' : 'pass')} aria-label={checksText}>
+            <Icon name="beaker" />
+            {b.checks.passed}
+            {b.checks.failed > 0 && (
+              <>
+                <Icon name="close" />
+                {b.checks.failed}
+              </>
+            )}
+          </span>
+        </Tooltip>
+      )}
+      {b.stale && (
+        <Tooltip content={tr(M.badgeStale)}>
+          <span className="task-work-badge warn" aria-label={tr(M.badgeStale)}>
+            <Icon name="history" />
+          </span>
+        </Tooltip>
+      )}
+      {b.outsideRules && (
+        <Tooltip content={tr(M.badgeOutside)}>
+          <span className="task-work-badge warn" aria-label={tr(M.badgeOutside)}>
+            <Icon name="shield" />
+          </span>
+        </Tooltip>
+      )}
+    </div>
+  )
+}

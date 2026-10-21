@@ -95,6 +95,8 @@
   "tips.cardReadFirst.title": "Aponte para um cartão os documentos de que ele precisa",
   "tips.cardSummaries.text": "Os agentes começam o relatório ou o veredito de revisão de um cartão com uma linha que diz o que está pronto ou o que foi encontrado, com os detalhes abaixo; eles e o Assistente leem só essas linhas quando isso basta.",
   "tips.cardSummaries.title": "Relatórios começam pelo essencial",
+  "tips.cardWork.text": "Abra um cartão: a seção Trabalho lista cada versão enviada para revisão, com rodada, arquivos, veredictos e verificações, e como foi mesclada. No quadro, um cartão mostra sua versão e o último veredito.",
+  "tips.cardWork.title": "Veja por onde passou o trabalho de um cartão",
   "tips.closeWindow.text": "Com várias janelas abertas, Arquivo → Fechar janela ({key}) fecha só esta, como o X dela. Sair do Hive (todas as janelas) fecha todas as janelas e para todos os agentes delas.",
   "tips.closeWindow.title": "Feche uma janela, ou todas",
   "tips.commandName": "“{command}”",

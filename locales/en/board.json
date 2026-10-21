@@ -2214,5 +2214,137 @@
   "board.view.workspaceCards": {
     "defaultMessage": "workspace cards",
     "description": "After the Task Board's title when the sidebar shows the cards of no project (about the whole workspace). Lower case."
+  },
+  "board.work.accepted": {
+    "defaultMessage": "Accepted {when}.",
+    "description": "The card dialog's Work section: the card's work was accepted (a project without version control, or a no-code card) at {when}, a date and time."
+  },
+  "board.work.adopted": {
+    "defaultMessage": "Adopted at the upgrade, from {column}: its work starts from what its folder showed then.",
+    "description": "The card dialog's Work section for a card Hive took on at the upgrade to 1.0 from what could be read. {column} is the board column it was in (Doing, Review, Passed)."
+  },
+  "board.work.badgeOutside": {
+    "defaultMessage": "Merged outside the rules",
+    "description": "Tooltip and accessible name of a mark on a board card: the card was merged by hand before its rules passed. Glossary: rule."
+  },
+  "board.work.badgeStale": {
+    "defaultMessage": "Stale: its pass no longer counts for its revision",
+    "description": "Tooltip and accessible name of a mark on a board card: the card's pass is stale (for an older revision, or before a decision). Glossary: stale."
+  },
+  "board.work.base": {
+    "defaultMessage": "Base",
+    "description": "A label in the card dialog's Work section: the revision the card's work started from follows (a short commit id, a3f2c1d)."
+  },
+  "board.work.branch": {
+    "defaultMessage": "Branch",
+    "description": "A label in the card dialog's Work section: the git branch the card's work is on follows."
+  },
+  "board.work.carriedOver": {
+    "defaultMessage": "The pass for {from} carries over to {to}: the same change.",
+    "description": "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change."
+  },
+  "board.work.check": {
+    "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
+    "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
+  },
+  "board.work.failed": {
+    "defaultMessage": "Couldn’t read the card’s work: {error}",
+    "description": "The card dialog's Work section when its work couldn't be read (the repository or the board). {error} is why, in the words of the error."
+  },
+  "board.work.files": {
+    "defaultMessage": "{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}",
+    "description": "A button in the card dialog's Work section: how many files the revision changed; a click shows them."
+  },
+  "board.work.folder": {
+    "defaultMessage": "Folder",
+    "description": "A label in the card dialog's Work section: the folder the card's work is done in follows (the project folder, or its own folder)."
+  },
+  "board.work.integrated": {
+    "defaultMessage": "{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}",
+    "description": "The card dialog's Work section: how the card's work went into its target ({target}, a branch such as main) and the target's revision with it ({result}, a short commit id). Keep the select keys."
+  },
+  "board.work.leftTarget": {
+    "defaultMessage": "No longer in {target}: its revision {revision} was taken out.",
+    "description": "A mark in the card dialog's Work section: a Done card's revision ({revision}, a short commit id) is no longer in its target ({target}, a branch such as main)."
+  },
+  "board.work.mergedInPart": {
+    "defaultMessage": "Merged in part: some of its work is already in {target}.",
+    "description": "A mark in the card dialog's Work section: part of the unfinished card's work was found in its target ({target}, a branch such as main)."
+  },
+  "board.work.noCode": {
+    "defaultMessage": "Submitted without code",
+    "description": "In place of a revision in the card dialog's Work section: a no-code card's submission (design, investigation), which has no revision. Glossary: no-code card."
+  },
+  "board.work.noRecord": {
+    "defaultMessage": "No work record: its board isn’t upgraded to Hive 1.0, or the card has no project.",
+    "description": "The card dialog's Work section when there is no work to show: the board hasn't had the 1.0 upgrade, or the card is the workspace's (no project)."
+  },
+  "board.work.noRevision": {
+    "defaultMessage": "No revision recorded",
+    "description": "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Hive reads its revisions). Glossary: revision."
+  },
+  "board.work.none": {
+    "defaultMessage": "No revision submitted yet.",
+    "description": "The card dialog's Work section for a card whose builder hasn't submitted a revision for review yet. Glossary: revision."
+  },
+  "board.work.openFile": {
+    "defaultMessage": "Open {path} in Files",
+    "description": "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path."
+  },
+  "board.work.outsideHive": {
+    "defaultMessage": "Merged outside Hive.",
+    "description": "The card dialog's Work section, under how the card was merged: the merge was made outside Hive (in a terminal or another tool). Glossary: outside Hive."
+  },
+  "board.work.outsideRules": {
+    "defaultMessage": "Merged outside the rules: {rules}.",
+    "description": "A mark in the card dialog's Work section: the card was merged by hand before these rules passed ({rules}, the rules' names, joined). Glossary: rule."
+  },
+  "board.work.overridden": {
+    "defaultMessage": "Moved past its review and approvals by an override.",
+    "description": "A mark in the card dialog's Work section: the card's latest revision was moved on by an override (the user's or the Assistant's exception to the rules). Glossary: override."
+  },
+  "board.work.preWorkflow": {
+    "defaultMessage": "Before 1.0: this card has no work record.",
+    "description": "The card dialog's Work section for a card from before Hive 1.0: Hive records no work for it and invents none. Glossary: before 1.0."
+  },
+  "board.work.projectFolder": {
+    "defaultMessage": "The project folder",
+    "description": "The card dialog's Work section, after Folder: the card's work is done in the project's own folder (not a folder of its own)."
+  },
+  "board.work.reading": {
+    "defaultMessage": "Reading its work…",
+    "description": "The card dialog's Work section while the card's work is being read."
+  },
+  "board.work.retry": {
+    "defaultMessage": "Retry",
+    "description": "A button in the card dialog's Work section after its work couldn't be read: reads it again."
+  },
+  "board.work.revisions": {
+    "defaultMessage": "Revisions, newest first",
+    "description": "A heading in the card dialog's Work section, above the revisions the builder submitted for review. Glossary: revision."
+  },
+  "board.work.round": {
+    "defaultMessage": "Round {round, number}",
+    "description": "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)."
+  },
+  "board.work.staleChange": {
+    "defaultMessage": "Stale: the pass was for {approved}; the card is now at {current}.",
+    "description": "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass."
+  },
+  "board.work.staleDecision": {
+    "defaultMessage": "Stale: a decision was recorded since the pass.",
+    "description": "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass."
+  },
+  "board.work.target": {
+    "defaultMessage": "Target",
+    "description": "A label in the card dialog's Work section: where the card's work goes once approved follows (the target branch, main). Glossary: target branch."
+  },
+  "board.work.title": {
+    "defaultMessage": "Work",
+    "description": "A heading in the card dialog (click to show or hide): what the card's facts say of its work (its branch, revisions, verdicts, checks, merge). Glossary: work."
+  },
+  "board.work.verdict": {
+    "defaultMessage": "{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}",
+    "description": "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail."
   }
 }

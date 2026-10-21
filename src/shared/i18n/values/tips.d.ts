@@ -97,6 +97,8 @@ interface HiveMessageValues {
   'tips.cardReadFirst.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
+  'tips.cardWork.text': undefined
+  'tips.cardWork.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
   'tips.commandName': { command: string | number }

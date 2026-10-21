@@ -383,6 +383,14 @@
     "defaultMessage": "Reports start with the gist",
     "description": "A tip's title."
   },
+  "tips.cardWork.text": {
+    "defaultMessage": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (Work): keep them as Hive shows them. Glossary: work, revision, verdict, check."
+  },
+  "tips.cardWork.title": {
+    "defaultMessage": "See what a card’s work went through",
+    "description": "A tip's title. Glossary: work (a card's Work section)."
+  },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

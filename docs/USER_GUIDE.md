@@ -650,6 +650,18 @@ The **Task Board** (in the activity bar, or **Ctrl+Shift+J**) is the workspace's
 - **One project.** The sidebar filters the board by project and lists the cards waiting for review; the badge on the activity bar counts them. Each project also has a **Tasks** tab with its own cards.
 - **With the Assistant.** Ask it to plan work as cards, start them on agents and follow them: *"split the login rework into cards for web and start the first two"*. Agents can add cards for follow-up work they find instead of doing it unasked.
 
+### The card's work
+
+From Hive 1.0, a card records its **work** as it goes: what its builder submitted for review, the verdicts and checks on it, and how it was merged. Open a card to see it in its **Work** section, below the decisions:
+
+- **Where it works:** its **Branch** (in a Git project), the **Base** revision it started from, its **Folder** (the project folder, or a folder of its own) and its **Target** (where it goes once approved, such as main).
+- **Revisions, newest first:** each revision submitted for review, with its round, the agent who submitted it and when. Click a revision to copy it whole; **1 file changed** lists its files, and a click on one opens it in the project's Files tab. Under it, each reviewer's verdict (*passed* or *failed*, and *no longer counts* once a newer revision or decision came since) and each check run on it (*not counted* when it doesn't count for that revision: hover it for why).
+- **Marks:** **Stale** when the pass was for an earlier revision that isn't the same change as the card's now, or a decision came after it; a pass that **carries over** to a later revision with the same changes; **merged outside the rules**, **merged in part**, **no longer in** its target, or moved on by an override.
+- **How it was merged:** merged, squashed or already in its target, with the target's revision; *merged outside Hive* when that happened in a terminal or another tool. A project without version control shows when its work was accepted.
+- A card from **before 1.0** says it has no work record: Hive invents none. A card Hive took on at the upgrade says it was **adopted**, from the column it was in. If its work can't be read, the section says why, with **Retry**.
+
+On the board, a card shows its work in one quiet line: the revision under review, the last verdict (an icon, dimmed when it no longer counts) and how many of its checks passed and failed, with a mark when its pass is stale or it was merged outside the rules. Hover any of them for what it says.
+
 ### Project keys
 
 Each project has a **key** of 2 to 4 letters (HI, AM, WEB), and its cards are named by it: **HI-12** is the hive project's twelfth card. The board, the card dialog, agents' card chips, the Progress panel, Performance and notifications all name a card this way; a card about the whole workspace, with no project, keeps its number (#12).

@@ -11,6 +11,9 @@ import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTa
 import { cardLabel, nameWithKey } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
+import { CardWork, WorkBadges } from './CardWork'
+import { useWorkBadges } from '../cardWork'
+import type { WorkBadge } from '@shared/workflow/workView'
 import { selectProject } from '../actions'
 import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
@@ -370,7 +373,8 @@ function CardTile({
   folded,
   onDragStart,
   dropHere,
-  readOnly
+  readOnly,
+  work
 }: {
   c: TaskCard
   projects: ProjectInfo[]
@@ -381,6 +385,8 @@ function CardTile({
   dropHere: boolean
   /** Why the board takes no changes (it can't be dragged then), or null. */
   readOnly: string | null
+  /** What its work's facts say, for its badges (#1224). */
+  work?: WorkBadge
 }) {
   const menu = useContextMenu()
   const { agent } = cardAgent(projects, c)
@@ -484,6 +490,7 @@ function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} projects={projects} />
+        <WorkBadges b={work} card={c} />
         {(c.labels.length > 0 || c.blockedBy.length > 0 || c.comments.length > 0 || !!c.decisions?.length) && (
           <div className="task-meta">
             {c.labels.map((l) => (
@@ -533,6 +540,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   const all = useStore((s) => s.tasks)
   const keys = useStore((s) => s.projectKeys)
   const movedNames = useStore((s) => s.movedCardNames)
+  // Each card's work badges (#1224), read with the board.
+  const workBadges = useWorkBadges()
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
@@ -746,6 +755,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
                   folded={folded.has(c.number)}
                   dropHere={!!drag && drag.column === col.id && drag.before === c.number && drag.n !== c.number}
                   readOnly={readOnly}
+                  work={workBadges.get(c.number)}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', cardLabel(c))
@@ -1883,6 +1893,7 @@ export function TaskDialog() {
         {card && (
           <>
             <Decisions card={card} draft={decision} setDraft={setDecision} editing={decisionEdit} setEditing={setDecisionEdit} setBusy={setDecisionBusy} readOnly={readOnly} />
+            <CardWork card={card} />
             <div className="task-section-h">{tr(msg({ id: 'board.dialog.comments', defaultMessage: 'Comments ({n})', description: "A heading in the card dialog: the card's comments, and how many ({n})." }), { n: card.comments.length })}</div>
             {card.comments.map((c, i) => (
               <div key={i} className="task-comment">

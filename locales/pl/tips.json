@@ -95,6 +95,8 @@
   "tips.cardReadFirst.title": "Wskaż karcie potrzebne dokumenty",
   "tips.cardSummaries.text": "Agenci zaczynają raport lub werdykt recenzji karty jednym wierszem mówiącym, co jest gotowe lub co znaleziono, a szczegóły dają niżej; oni i Asystent czytają tylko te wiersze, gdy to wystarcza.",
   "tips.cardSummaries.title": "Raporty zaczynają się od sedna",
+  "tips.cardWork.text": "Otwórz kartę: jej sekcja Praca pokazuje każdą rewizję przesłaną do recenzji, z rundą, plikami, werdyktami i sprawdzeniami, oraz to, jak ją scalono. Na tablicy karta pokazuje swoją rewizję i ostatni werdykt.",
+  "tips.cardWork.title": "Zobacz, przez co przeszła praca karty",
   "tips.closeWindow.text": "Gdy otwartych jest kilka okien, Plik → Zamknij okno ({key}) zamyka tylko to jedno, tak jak jego X. Zakończ Hive (wszystkie okna) zamyka wszystkie okna i zatrzymuje wszystkich ich agentów.",
   "tips.closeWindow.title": "Zamknij jedno okno albo wszystkie",
   "tips.commandName": "„{command}”",
