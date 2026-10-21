@@ -3,8 +3,9 @@
 // record (no second path), a decision waking the loop's builder and reviewer (S5), a reviewer's request waking the
 // builder at once (S23), a notice claimed before it is shown, and their off switches (the project's loop wakes; the
 // workflow rules switch, which they don't answer to: they aren't gates).
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -502,5 +503,144 @@ describe('notices (#1266, §16.11.4)', () => {
     noticeAction(ws, c, 'notify', { text: 'needs you, rules off' })
     await worker.runActions(w)
     expect(toldText(st)).toContain('needs you, rules off')
+  })
+})
+
+/**
+ * The actions worker as another Hive runs it: the same code, a module of its own (its runs, handlers and lease owner),
+ * copied into a temp folder with its imports pointing at this tree's modules, run only when the test asks (as HR1's
+ * #1266 probe did).
+ */
+async function anotherWorker(): Promise<typeof worker> {
+  const src = join(__dirname, '..', 'src', 'main', 'workflow')
+  const abs = (rel: string): string => join(src, rel).replace(/\\/g, '/')
+  const code = readFileSync(join(src, 'actionWorker.ts'), 'utf8')
+    .replace(/from '(\.\.?\/[^']+)'/g, (_m, rel: string) => `from '${abs(rel)}'`)
+    // Runs only when the test asks: no subscription of its own to the board's commits, which would outlive the test.
+    .replace(/\nonBoardCommitted\(\(ws\) => \{[\s\S]*$/, '\n')
+  const file = join(tempDir('hive-another-worker-'), 'actionWorker.ts')
+  writeFileSync(file, code)
+  return (await import(/* @vite-ignore */ pathToFileURL(file).href)) as typeof worker
+}
+
+// HR1's round 2 probes (#1266): three races between writers, each a regression test.
+describe('writers at once (#1266 round 3)', () => {
+  /** A connection of another process's to the workspace's database (another Hive). */
+  async function outside<T>(ws: string, fn: (db: import('node:sqlite').DatabaseSync) => T): Promise<T> {
+    const { DatabaseSync } = await import('node:sqlite')
+    const db = new DatabaseSync(store.boardFile(ws))
+    try {
+      return fn(db)
+    } finally {
+      db.close()
+    }
+  }
+
+  it("another Hive's receipt of a delivery this one holds survives this one's next, unrelated save", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    await inReview(w)
+    await settled()
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'action wake', action: 99999 })
+    const at = new Date().toISOString()
+    await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(at, own.id))
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'unrelated local' })
+    expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, received FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ state: 'received', received: at })
+  })
+
+  it("an overlapping change is planned again on the other Hive's: a cancel of a delivery it received meanwhile cancels nothing", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    await inReview(w)
+    await settled()
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received elsewhere' })
+    await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(new Date().toISOString(), own.id))
+    // Cancelling: from what this one read (queued), it would cancel it; read again, it was received, and isn't.
+    expect(await deliveries.cancelDeliveries(alpha, 'b1', 'a test')).toBe(0)
+    expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(own.id) as { state: string }).state).toBe('received')
+  })
+
+  it('two independent workers (two Hives) never run a repeatable action at once; one whose Hive ended runs once its lease passes', async () => {
+    const { w, ws } = await open()
+    const c = await newCard(w)
+    await settled()
+    const second = await anotherWorker()
+    let ran = 0
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const fn: Parameters<typeof worker.onAction>[1] = async (_a, _w, ctx) => {
+      if (!(await ctx.dispatch())) return
+      ran++
+      await held
+    }
+    worker.onAction('probeNotice', fn, 'repeatable')
+    second.onAction('probeNotice', fn, 'repeatable')
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    const id = own.tx((tx) => tx.action(c, 'probeNotice', {}, null))
+    own.close()
+    try {
+      const first = worker.runActions(w)
+      await vi.waitFor(() => expect(ran).toBe(1), HANG)
+      // The other Hive finds it leased, and leaves it.
+      await second.runActions(w)
+      expect(ran).toBe(1)
+      release()
+      await first
+      expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts, lease_owner FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 1, lease_owner: null })
+      // A Hive that took one and ended before its effect (its lease left, no dispatch counted): run once the lease has passed.
+      const own2 = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+      const left = own2.tx((tx) => tx.action(c, 'probeNotice', {}, null))
+      own2.close()
+      store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET lease_owner = 'a-hive-that-ended', lease_until = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), left)
+      await second.runActions(w)
+      expect(ran).toBe(2)
+      expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(left) as object) }).toEqual({ state: 'done', attempts: 1 })
+    } finally {
+      release()
+      // The other Hive's handlers go; this one's `probeNotice` stays (no other test writes one), its notices' and wakes' too.
+      second.clearActionHandlers()
+    }
+  })
+
+  it("a lane notice's older read never moves its marks back: one blocked event is told once", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await inReview(w)
+    await settled()
+    await notices.checkLanesNow(w)
+    await settled()
+    st.notices.length = 0
+    notices.noticeTestHooks.hold = true
+    let captured = false
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const real = watches.lanesNowIn
+    const spy = vi.spyOn(watches, 'lanesNowIn').mockImplementationOnce(async (...args) => {
+      const snapshot = await real(...args)
+      captured = true
+      await held
+      return snapshot
+    })
+    let older: Promise<void> | undefined
+    try {
+      // A look reads the lanes (the card not blocked yet) and is held; the card is blocked, and another look tells it.
+      older = notices.checkLanesNow(w)
+      await vi.waitFor(() => expect(captured).toBe(true), HANG)
+      await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Need a decision' }, b1))
+      await notices.checkLanesNow(w)
+      await settled()
+      expect(st.notices).toHaveLength(1)
+      // The older look goes on: its read is stale, so it reads again and finds nothing new.
+      release()
+      await older
+      await notices.checkLanesNow(w)
+      await settled()
+      expect(st.notices).toHaveLength(1)
+    } finally {
+      release()
+      await older
+      spy.mockRestore()
+      notices.noticeTestHooks.hold = false
+    }
   })
 })

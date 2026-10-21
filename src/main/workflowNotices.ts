@@ -15,7 +15,7 @@ import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
 import { allTasks, getTask } from './tasks'
 import { lanesNowIn } from './watches'
-import { onAction } from './workflow/actionWorker'
+import { onAction, type ActionHandler } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 
@@ -76,13 +76,14 @@ async function cardIn(ws: WorkspaceService, n: number): Promise<{ projectPath: s
  * A `notify` action: the card's request for the user. Its text in the language Hive shows when the runtime kept its
  * message (`shown`, #1264: Hive's own requests), else as written (an agent's own words), and in English for the Agent API.
  */
-async function notifyFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
+async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Parameters<ActionHandler>[2]): Promise<void> {
   const at = await cardIn(ws, a.card)
   if (!at) return
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
   const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
   const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [text] : []
-  tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body)
+  // Counted just before it is shown (its lease still this Hive's): uncertain until the action is marked.
+  if (await ctx.dispatch()) tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body)
 }
 
 /** A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why. */
@@ -93,7 +94,7 @@ interface Told {
 }
 
 /** A `laneNotice` action: a lane's events, one notice, each card named as the window names it (#1221). */
-async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
+async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Parameters<ActionHandler>[2]): Promise<void> {
   const at = await cardIn(ws, a.card)
   if (!at || !ws.path) return
   const events = (Array.isArray(a.payload.events) ? a.payload.events : []) as Told[]
@@ -106,7 +107,7 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService): Promise
     if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
     return M.mergeDue
   })
-  if (lines.length) tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines)
+  if (lines.length && (await ctx.dispatch())) tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines)
 }
 
 // --- What lane notices last told, with the board.
@@ -136,32 +137,59 @@ function writeMark(db: DatabaseSync, lane: string, m: LaneMark | null): void {
 
 const metaOf = (db: DatabaseSync, key: string): string | null => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null // i18n-ignore: SQL
 
+/** board_meta's count of the marks' writes: a look's stamp includes it, so another look written since makes it stale. */
+const SEQ = 'lane_notices_seq'
+
+/**
+ * What a look reads, as of now (#1266 round 2): the newest change to a card and to a lane (their `updated_at`: every
+ * change to either moves it on) and the marks' writes. The same stamp at the write as at the read: nothing a look reads
+ * changed between (a session's stall aside, which no write marks).
+ */
+function stampOf(db: DatabaseSync): string {
+  const card = (db.prepare('SELECT max(updated_at) AS u FROM cards').get() as { u: string | null }).u // i18n-ignore: SQL
+  const lane = (db.prepare('SELECT max(updated_at) AS u FROM lanes').get() as { u: string | null }).u // i18n-ignore: SQL
+  return `${card ?? ''}|${lane ?? ''}|${metaOf(db, SEQ) ?? '0'}`
+}
+
+/** How many times a look is made again, at most, while the board keeps changing under it (the next change or tick looks then). */
+const LOOKS = 4
+
 /**
  * Looks at a workspace's running lanes now: each one's events since it was last told, as a `laneNotice` action (one per
- * lane), and its mark moved on, in one board change against the marks as they are then (another Hive's included).
+ * lane), and its mark moved on, in one board change. What it read (the marks, the lanes and their cards) is the board's
+ * as it is at that change, or nothing is written (#1266 round 2): its stamp, taken before the read, is checked again
+ * under the board's lock, and a look the board changed under is made again. So marks never move back to an older read,
+ * and another Hive's look in between is never told again.
  */
 async function check(ws: WorkspaceService): Promise<void> {
+  for (let i = 0; i < LOOKS; i++) if (await look(ws)) return
+}
+
+/** One look (check): true once it is done (written, or nothing to do), false when the board changed under it. */
+async function look(ws: WorkspaceService): Promise<boolean> {
   const path = ws.path
-  if (!path || boardReadOnly(ws)) return
+  if (!path || boardReadOnly(ws)) return true
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path && openWorkspaces().includes(ws)
-  let told: { marks: Record<string, LaneMark>; since: string }
+  let told: { marks: Record<string, LaneMark>; since: string; stamp: string }
   try {
-    told = boardRead(ws, (db) => ({ marks: readMarks(db), since: metaOf(db, SINCE) ?? new Date().toISOString() }))
+    told = boardRead(ws, (db) => ({ marks: readMarks(db), since: metaOf(db, SINCE) ?? new Date().toISOString(), stamp: stampOf(db) }))
   } catch {
     // A board without the lane notices' tables (not upgraded): nothing to follow.
-    return
+    return true
   }
   const lanes = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l]))
   const nows = await lanesNowIn(ws, told.marks, told.since)
   // Whose loops tell anyone: a project with loop wakes off gets no notices, its lanes' marks still moving on.
   const quiet = new Set<string>()
   for (const p of new Set([...lanes.values()].map((l) => l.project))) if (!(await wakesOn(ws, join(path, p)))) quiet.add(p.toLowerCase())
-  if (!alive()) return
-  await boardWrite(
+  if (!alive()) return true
+  const written = await boardWrite(
     ws,
     async () =>
       boardWriteOp(ws, (db) => {
+        // Written since the read (another look, a change, another Hive): the read is stale, and nothing is written.
+        if (stampOf(db) !== told.stamp) return false
         const since = metaOf(db, SINCE) ?? told.since
         db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
         // As the marks are now: what another Hive told since this one read them isn't told again.
@@ -186,9 +214,13 @@ async function check(ws: WorkspaceService): Promise<void> {
         }
         // Lanes no longer running (ended, abandoned, gone) are followed no more.
         for (const id of Object.keys(marks)) if (!running.has(id)) writeMark(db, id, null)
+        db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)").run(SEQ) // i18n-ignore: SQL
+        return true
       }),
     { alive }
   )
+  // Its workspace closed or switched meanwhile: nothing more to look at.
+  return written !== false
 }
 
 /** For tests: `hold` keeps the lanes from being looked at on a change or the tick (a restart before the look, say). */

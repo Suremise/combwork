@@ -213,27 +213,12 @@ export const countDeliveries = (db: Db, host: string): number => (db.prepare('SE
 /**
  * Writes a host's deliveries as `records` has them, only the rows that changed. One not of Hive's form, or two with one
  * id, throw (deliveries.ts writes only what readDelivery reads back: a mistake; nothing is written).
- *
- * `known` (#1266): the ids the writer read and kept since (its published records). Another writer's rows (another Hive
- * on the workspace, which saved after this one read) are neither deleted nor overwritten: only a known row that
- * `records` no longer has goes, and a new record whose id another writer took meanwhile is given the next free one
- * (returned, old id → new id and seq, for the writer to follow). Left out, every row of the host is known.
  */
-export function writeDeliveries(db: Db, host: string, records: Rec[], known?: ReadonlySet<string>): Map<string, { id: string; seq: number }> {
-  const rows = db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[] // i18n-ignore: SQL
-  const had = new Map(rows.map((r) => [r.id as string, rowText(r)]))
+export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
+  const had = new Map((db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[]).map((r) => [r.id as string, rowText(r)])) // i18n-ignore: SQL
   const ids = new Set<string>()
-  const renamed = new Map<string, { id: string; seq: number }>()
-  let top = Math.max(0, ...rows.map((r) => Number(r.seq) || 0), ...records.map((d) => Number(d.seq) || 0))
   const del = db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?') // i18n-ignore: SQL
-  for (const rec of records) {
-    let d = rec
-    // New here, and its id another writer's since: the next free one.
-    if (known && !known.has(d.id as string) && had.has(d.id as string)) {
-      top++
-      renamed.set(d.id as string, { id: `m${top}`, seq: top })
-      d = { ...d, id: `m${top}`, seq: top }
-    }
+  for (const d of records) {
     const r = deliveryToRow(host, d)
     if (!r) throw new Error(`a delivery without the fields Hive keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
     const id = r.id as string
@@ -245,8 +230,59 @@ export function writeDeliveries(db: Db, host: string, records: Rec[], known?: Re
     // Changed: set in place, every column (those it doesn't fill null).
     else if (was !== rowText(withAllColumns(db, r))) update(db, 'deliveries', withAllColumns(db, r))
   }
-  for (const id of had.keys()) if (!ids.has(id) && (!known || known.has(id))) del.run(host, id)
-  return renamed
+  for (const id of had.keys()) if (!ids.has(id)) del.run(host, id)
+}
+
+/** A host's deliveries' rows as they are committed, each as its text (what a compare-and-set save checks against). */
+export function deliveryBases(db: Db, host: string): Map<string, string> {
+  return new Map((db.prepare('SELECT * FROM deliveries WHERE host = ?').all(host) as Row[]).map((r) => [r.id as string, rowText(r)])) // i18n-ignore: SQL
+}
+
+/** A save found a row another writer changed since this one read it: nothing was written; read again and plan again. */
+export class StaleDeliveries extends Error {}
+
+/**
+ * Saves only what a transaction changed of a host's deliveries, against the rows as they are committed (#1266: another
+ * Hive on the workspace saves its own): `put` the records it made or changed, `removed` the ids it dropped, `base` each
+ * known row's text as this writer last read or wrote it. A known row whose committed text isn't its base (another Hive
+ * received, acked or cancelled it meanwhile) is a conflict: StaleDeliveries, and nothing is written (the caller's
+ * transaction is undone). A new record whose id another writer took is given the next free one (`renamed`). Returns the
+ * rows' texts as now written (the writer's new bases) and the renames. In the caller's transaction, under the board's lock.
+ */
+export function saveDeliveryChanges(db: Db, host: string, change: { put: Rec[]; removed: string[]; base: ReadonlyMap<string, string> }): { written: Map<string, string>; renamed: Map<string, { id: string; seq: number }> } {
+  const now = deliveryBases(db, host)
+  const written = new Map<string, string>()
+  const renamed = new Map<string, { id: string; seq: number }>()
+  let top = Math.max(0, ...(db.prepare('SELECT seq FROM deliveries WHERE host = ?').all(host) as { seq: number }[]).map((r) => Number(r.seq) || 0), ...change.put.map((d) => Number(d.seq) || 0)) // i18n-ignore: SQL
+  const stale = (id: string): StaleDeliveries => new StaleDeliveries(`delivery ${id} was changed by another writer`) // i18n-ignore: a save retried, logged
+  for (const rec of change.put) {
+    let d = rec
+    const known = change.base.get(d.id as string)
+    if (known !== undefined) {
+      // Changed here: only from the row as this writer last had it.
+      if (now.get(d.id as string) !== known) throw stale(d.id as string)
+    } else if (now.has(d.id as string)) {
+      // New here, and its id another writer's since: the next free one.
+      top++
+      renamed.set(d.id as string, { id: `m${top}`, seq: top })
+      d = { ...d, id: `m${top}`, seq: top }
+    }
+    const r = deliveryToRow(host, d)
+    if (!r) throw new Error(`a delivery without the fields Hive keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+    const full = withAllColumns(db, r)
+    if (now.has(r.id as string)) update(db, 'deliveries', full)
+    else insert(db, 'deliveries', r)
+    written.set(r.id as string, rowText(full))
+  }
+  const del = db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?') // i18n-ignore: SQL
+  for (const id of change.removed) {
+    const was = now.get(id)
+    // Gone already: nothing to do. Changed by another writer since: not this one's to drop.
+    if (was === undefined) continue
+    if (was !== change.base.get(id)) throw stale(id)
+    del.run(host, id)
+  }
+  return { written, renamed }
 }
 
 /** A row with every column of `deliveries`, those it doesn't give null (as SELECT * reads it back). */

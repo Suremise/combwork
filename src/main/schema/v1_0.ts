@@ -507,16 +507,20 @@ const KEYS: SchemaStep = {
 
 /**
  * #1266 (P4): an action's delivery is recorded by the delivery itself, its row in `deliveries` with the action's id
- * (unique), so the transitional `card_actions.delivered` (#1215) goes; a notice, which makes no delivery, counts its
- * tries instead (`attempts`, actionWorker.ts). And what Hive has told the user of each running lane (its lane notices,
- * workflowNotices.ts, §16.11.4): each lane as last told and its cards, so a restart tells what it hadn't yet, and two
- * Hives on one workspace tell each event once.
+ * (unique), so the transitional `card_actions.delivered` (#1215) goes; a notice, which makes no delivery, is leased by
+ * one Hive and counts its uncertain dispatches instead (`lease_owner`, `lease_until`, `attempts`: actionWorker.ts).
+ * And what Hive has told the user of each running lane (its lane notices, workflowNotices.ts, §16.11.4): each lane as
+ * last told and its cards, so a restart tells what it hadn't yet, and two Hives on one workspace tell each event once.
  */
 export const ACTIONS_DELIVERED_STEP: SchemaStep = {
   name: 'actions delivered by deliveries, lane notices',
   ddl: [
     'DROP INDEX card_actions_delivered',
     'ALTER TABLE card_actions DROP COLUMN delivered',
+    // A repeatable action's lease (actionWorker.ts): the process running it (its id, per Hive) and until when; one
+    // writer at a time takes it by a conditional update, and one whose Hive ended runs again once it has passed.
+    'ALTER TABLE card_actions ADD COLUMN lease_owner TEXT',
+    'ALTER TABLE card_actions ADD COLUMN lease_until TEXT',
     // A lane as its notices last told it (laneWatch.ts' LaneMark): its state, whether its merge was due, and stalled.
     `CREATE TABLE lane_notice_lanes (
       lane          TEXT    PRIMARY KEY,

@@ -1323,12 +1323,17 @@ side effects touch git, processes and other agents), so they are tied by **durab
   before a crash) may repeat at most once, never more. **Built** (#1266): a wake's delivery carries the action's id
   (`deliveries.action`, unique), which is the record that it was made: the worker runs a delivering action until it is
   marked, and every run after the first finds its delivery. A notice, which leaves nothing to find once shown, is
-  **repeatable**: each try is counted (`attempts`) by the run that moves the count on, before it runs, and the action
-  stays pending until marked, so a crash or a close before it was shown never loses it, and one after it was shown
-  repeats it at most once (never a third try). A kind with no handler yet is marked done by the one run that finds it
-  pending. `card_actions.delivered` (#1215's stand-in) is gone (the 1.0 group's step 9). A host's deliveries are saved
-  against the rows another Hive saved since this one read them: those are never deleted or overwritten, and a new
-  delivery whose id that Hive took takes the next free one.
+  **repeatable**: one Hive at a time runs it, holding its **lease** (`lease_owner`, `lease_until`: taken by a conditional
+  update only one writer wins, while it is free, has passed, or is this Hive's own); its dispatch is counted
+  (`attempts`) under the lease just before it is shown, and a dispatch not followed by its mark is **uncertain**. The
+  action stays pending until marked, so a crash or a close before it was shown never loses it (it runs again once its
+  lease has passed), one after it repeats it at most once (never past two uncertain dispatches), and two Hives never
+  show it at once. A kind with no handler yet is marked done by the one run that finds it pending.
+  `card_actions.delivered` (#1215's stand-in) is gone (the 1.0 group's step 9). A host's deliveries are saved by
+  **compare-and-set**: a save writes only the deliveries its change made or changed, each from the row as this Hive
+  last read or wrote it; another Hive's receipt, ack or cancel since makes it read the rows again and plan the change
+  again on them (never written over), its rows are never deleted, and a new delivery whose id it took takes the next
+  free one.
 - **The target advance** is the one step that can't be repeated blindly. The queue writes `IntegrationStarted`
   (expected target revision, result revision) and commits it, **then** advances the target, **then** writes
   `Integrated`. After a restart, an entry with `IntegrationStarted` and no outcome is reconciled from the platform,
@@ -2128,7 +2133,9 @@ lane** and **Abandon lane** (with a confirmation), so ending one needs no tool [
   passed (its merge due) and the merge stalled: one notice per lane at a time, a banner or a Windows notification as
   **Settings → Notifications** says, with the Assistant on or off. What was told of each lane is kept with the board
   (`lane_notice_lanes`, `lane_notice_cards`): one board change moves it on and writes the lane's notice as a durable
-  `laneNotice` action, so a restart tells what it hadn't yet and two Hives tell each event once; a lane running when
+  `laneNotice` action, only when what the look read (the newest change to a card and a lane, and the marks' writes) is
+  still the board's under its lock, else it looks again, so marks never move back to an older look, a restart tells
+  what it hadn't yet and two Hives tell each event once; a lane running when
   Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
   runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
   (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's
