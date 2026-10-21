@@ -1,5 +1,5 @@
 import type { AgentLeftovers } from './agentProcesses'
-import type { AntivirusStatus, AvAction, AvChangeResult, AvSuggestionReply } from './antivirus'
+import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
@@ -260,6 +260,8 @@ export interface HiveRequests {
   'workspace:movePlan': (opts?: MoveOptions) => MovePlan | null
   /** Repairs it (refused while agents run): worktrees, session folders, the CLIs' per-path data (copied), Open Recent. */
   'workspace:moveRepair': (opts?: MoveOptions) => MoveReport
+  /** Defender and the moved workspace's old and new folders (#1302), for Repair's dialog; null when the workspace didn't move. */
+  'workspace:moveDefender': () => AvMovePlan | null
   /** Locate…: a folder picker for an agent's worktree that wasn't found; the folder, or null when cancelled. */
   'workspace:moveLocate': (projectPath: string, agentId: string) => string | null
 

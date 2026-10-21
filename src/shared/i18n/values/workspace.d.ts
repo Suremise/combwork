@@ -54,6 +54,8 @@ interface HiveMessageValues {
   'workspace.antivirus.kindWorktrees': undefined
   'workspace.antivirus.live': undefined
   'workspace.antivirus.loadTarget': undefined
+  'workspace.antivirus.moveNotApplied': { missing: number }
+  'workspace.antivirus.moved': { removed: number; added: number }
   'workspace.antivirus.noPrompt': { hasError: string; error: string | number }
   'workspace.antivirus.noReport': undefined
   'workspace.antivirus.noWorkspace': undefined
@@ -316,6 +318,7 @@ interface HiveMessageValues {
   'workspace.removal.with': { which: string; handovers: number; cards: number }
   'workspace.removal.worktree': { agent: string | number; branch: string | number; hasError: string; error: string | number; ahead: number; dirty: number }
   'workspace.removal.worktrees': { count: number; how: string }
+  'workspace.repair.addLater': undefined
   'workspace.repair.board': { from: string | number }
   'workspace.repair.branch': { agent: string | number }
   'workspace.repair.choose': { gone: string }
@@ -323,27 +326,37 @@ interface HiveMessageValues {
   'workspace.repair.conversations': { provider: string | number }
   'workspace.repair.copy': { count: number; stays: string }
   'workspace.repair.createShort': undefined
+  'workspace.repair.defender': undefined
   'workspace.repair.folders': { count: number }
   'workspace.repair.give': { what: string | number; hasCards: string; cards: string | number; to: string | number }
   'workspace.repair.hideFolders': undefined
   'workspace.repair.keptFiles': { count: number }
   'workspace.repair.keptTip': { count: number; files: string | number; more: number }
+  'workspace.repair.leaveExclusion': undefined
   'workspace.repair.listNew': undefined
   'workspace.repair.markAgain': { projects: string | number }
+  'workspace.repair.moveBox': { count: number }
+  'workspace.repair.moveExclusion': undefined
+  'workspace.repair.needsAdmin': undefined
   'workspace.repair.notFound': undefined
   'workspace.repair.nothingToCopy': undefined
+  'workspace.repair.nothingToDo': undefined
   'workspace.repair.now': undefined
   'workspace.repair.original': undefined
   'workspace.repair.point': { count: number }
+  'workspace.repair.readingDefender': undefined
   'workspace.repair.recent': undefined
   'workspace.repair.recreate': { exists: string; branch: string | number }
   'workspace.repair.recreateShort': undefined
   'workspace.repair.relink': { located: string }
   'workspace.repair.rename': { remote: string }
+  'workspace.repair.scanned': undefined
   'workspace.repair.sentence': { what: string | number; hasWas: string; was: string | number; hasNow: string; now: string | number; does: string | number }
   'workspace.repair.sessions': undefined
   'workspace.repair.showFolders': undefined
   'workspace.repair.taken': undefined
+  'workspace.repair.theirs': undefined
+  'workspace.repair.theirsNote': undefined
   'workspace.repair.unlink': undefined
   'workspace.repair.unlinkShort': undefined
   'workspace.repair.unreadableFiles': { count: number }

@@ -1846,6 +1846,11 @@ export interface MoveOptions {
   unlink?: string[]
   /** Missing worktrees to make again (on their branch, or new from their base). */
   recreate?: string[]
+  /**
+   * Move Hive's Defender exclusions from the moved workspace's old folders to its new ones (#1302): one administrator
+   * prompt, at the end. Only when true (the dialog's box): a Repair asked for otherwise never prompts.
+   */
+  defender?: boolean
 }
 
 /** What Repair did: each line a step, for the dialog and the log. */

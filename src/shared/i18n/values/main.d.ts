@@ -95,6 +95,7 @@ interface HiveMessageValues {
   'main.move.copied': { n: number; owner: string; host: string | number; provider: string | number; agent: string | number; of: string | number }
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.copyKept': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
+  'main.move.defenderFailed': { why: string | number }
   'main.move.gitFailed': { command: string | number }
   'main.move.lanes': { n: number }
   'main.move.madeNew': { host: string | number; agent: string | number; branch: string | number; path: string | number }

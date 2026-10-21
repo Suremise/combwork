@@ -17,6 +17,7 @@ import type { WorkspaceService } from './workspace'
 import { listWorktrees, localBranches } from './worktrees'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
+import { moveExclusions } from './antivirus'
 import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/hiveBranches'
 import { orphanNames } from '../shared/projectIds'
 import { legacyCards, moveOrphanCards, stampCardProjects } from './tasks'
@@ -727,6 +728,16 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       c.activeProjects[plan.to] = [...new Set([...(c.activeProjects[plan.to] ?? []), ...plan.working])]
     })
     report.done.push(tr(msg({ id: 'main.move.workingMoved', defaultMessage: 'Working on: {projects}, as before the move.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): the projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them." }), { projects: trimList(plan.working) }))
+  }
+  // Hive's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
+  // is done; only when the dialog's box asked for it. A declined prompt changes nothing and is said; a refusal too.
+  if (opts.defender && plan.from) {
+    try {
+      const r = await moveExclusions(ws, plan.from)
+      if (r) (r.outcome === 'done' ? report.done : r.outcome === 'refused' ? report.skipped : report.failed).push(r.message)
+    } catch (e) {
+      report.failed.push(tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Hive's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why: e instanceof Error ? e.message : String(e) }))
+    }
   }
   await recordDone(ws, repaired, repaired.length === plan.hosts.length)
   const after = await movePlan(ws)

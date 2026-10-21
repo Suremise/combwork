@@ -7,6 +7,8 @@ import { call } from '../api'
 import { cardLabelOf, get, set, useStore } from '../store'
 import { BusyButton, Icon, IconButton, Modal, Tooltip, useBusy } from './ui'
 import { ItemTable, ShortPath, type ItemGroup, type ItemRow } from './ItemTable'
+import { AV_STATE } from './Antivirus'
+import { KIND_LABEL, type AvMovePlan, type AvPath } from '@shared/antivirus'
 import { cx } from '../util'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
@@ -141,14 +143,33 @@ const T = {
   original: msg({ id: 'workspace.repair.original', defaultMessage: 'stays with the project at its old folder (a copy)', description: "Repair's plan, the Will do column: the old project folder is still there, so its worktree stays linked to it." }),
   copy: msg({ id: 'workspace.repair.copy', defaultMessage: '{count, plural, one {copy # file} other {copy # files}}{stays, select, yes {; the old ones stay} other {}}', description: "Repair's plan, the Will do column: files copied to the folder for the new path, the old ones kept." }),
   give: msg({ id: 'workspace.repair.give', defaultMessage: 'give {what}{hasCards, select, yes { ({cards})} other {}} to {to}', description: "Repair's plan, the Will do column of the board's row ({what}: \"9 cards and 1 lane\"; {cards}: their numbers; {to}: the project now)." }),
+  defender: msg({ id: 'workspace.repair.defender', defaultMessage: 'Microsoft Defender', description: "Repair's plan: the heading over the rows about Microsoft Defender's exclusions of the old and new folders (#1302). A product name." }),
+  moveExclusion: msg({ id: 'workspace.repair.moveExclusion', defaultMessage: "move Hive's exclusion", description: "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead." }),
+  leaveExclusion: msg({ id: 'workspace.repair.leaveExclusion', defaultMessage: "leave Hive's exclusion as it is", description: "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked." }),
+  theirs: msg({ id: 'workspace.repair.theirs', defaultMessage: 'yours: change it in Windows Security', description: "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown." }),
+  nothingToDo: msg({ id: 'workspace.repair.nothingToDo', defaultMessage: 'nothing to do', description: "Repair's plan, the Will do column of a Defender row: the new folder is already excluded." }),
+  scanned: msg({ id: 'workspace.repair.scanned', defaultMessage: 'nothing (Defender scans it)', description: "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder." }),
+  moveBox: msg({ id: 'workspace.repair.moveBox', defaultMessage: "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)", description: "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt." }),
+  addLater: msg({ id: 'workspace.repair.addLater', defaultMessage: 'Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.', description: "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown." }),
+  theirsNote: msg({ id: 'workspace.repair.theirsNote', defaultMessage: "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.", description: "Repair's plan, under the table: the user's own Defender exclusion of an old folder." }),
+  needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
+  readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders." }),
   sentence: msg({ id: 'workspace.repair.sentence', defaultMessage: '{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}', description: "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns." })
+}
+
+/** A place in a row: a path (ShortPath), or text; `note` after it, such as Defender's state there (#1302). */
+interface Spot {
+  path?: string
+  text?: string
+  other?: string
+  note?: { text: string; tone?: string; title?: string }
 }
 
 /** A plan row: its cells, and the sentence a screen reader reads for it (`presentation`). */
 interface Cells {
   what: string
-  was?: { path?: string; text?: string; other?: string }
-  now?: { path?: string; text?: string; other?: string; warn?: boolean }
+  was?: Spot
+  now?: Spot & { warn?: boolean }
   does: string
   /** What it will do in full, when the cell says it shorter (the tooltip and the sentence). */
   said?: string
@@ -160,17 +181,35 @@ interface Cells {
 }
 
 /** Where something was or is: a path as its part that differs (ShortPath), or a branch or a word, cut with an ellipsis. */
-function Place({ p }: { p?: Cells['was'] & { warn?: boolean } }) {
+function Place({ p }: { p?: Spot & { warn?: boolean } }) {
   if (!p) return null
-  if (p.path) return <ShortPath path={p.path} other={p.other} />
+  const note = p.note && (
+    <span className={p.note.tone} title={p.note.title}>
+      {' · '}
+      {p.note.text}
+    </span>
+  )
+  if (p.path)
+    return note ? (
+      <span className="short-path" title={p.path}>
+        <ShortPath path={p.path} other={p.other} />
+        {note}
+      </span>
+    ) : (
+      <ShortPath path={p.path} other={p.other} />
+    )
   return (
     <span className={cx('short-path', p.warn && 'warn-text')} title={p.text}>
       {p.text}
+      {note}
     </span>
   )
 }
 
-const said = (p?: Cells['was']): string => p?.path ?? p?.text ?? ''
+const said = (p?: Spot): string => {
+  const at = p?.path ?? p?.text ?? ''
+  return p?.note ? `${at} (${p.note.text})` : at
+}
 
 function planRow(k: string, c: Cells, className?: string): ItemRow {
   const sentence = tr(T.sentence, { what: c.what, hasWas: said(c.was) ? 'yes' : 'no', was: said(c.was), hasNow: said(c.now) ? 'yes' : 'no', now: said(c.now), does: c.doesNote ? `${c.said ?? c.does}, ${c.doesNote.text}` : (c.said ?? c.does) })
@@ -297,8 +336,36 @@ function workspaceRows(plan: MovePlan): ItemRow[] {
   return rows
 }
 
-/** The plan as one table (#1305), the project hover's agent table's look: a group a project, then the workspace's. */
-function PlanTable({ plan, onLocate, onChoose }: { plan: MovePlan; onLocate: (k: string, agentId: string) => void; onChoose: (k: string, choice: Choice | null) => void }) {
+/**
+ * Defender's rows (#1302), one a kind of folder (the workspace, its worktrees): where it was and is, with whether
+ * Defender skips each (as the Antivirus panel words it), and what Repair does about Hive's exclusion: moves it (the box
+ * under the table, ticked), leaves it, or nothing; an exclusion of the user's own is named, never changed.
+ */
+function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
+  if (d.scan !== 'defender') return []
+  const state = (p: AvPath): Spot['note'] => ({ text: tr(AV_STATE[p.state].label), tone: AV_STATE[p.state].tone, title: tr(AV_STATE[p.state].tip) })
+  const rows: ItemRow[] = []
+  for (const kind of ['workspace', 'worktrees'] as const) {
+    const was = d.old.find((p) => p.kind === kind)
+    const now = d.now.find((p) => p.kind === kind)
+    if (!was && !now) continue
+    const mine = !!was && d.remove.some((x) => x.toLowerCase() === was.path.toLowerCase())
+    const theirs = !!was && d.theirs.some((x) => x.toLowerCase() === was.path.toLowerCase())
+    const does = mine ? tr(moving ? T.moveExclusion : T.leaveExclusion) : theirs ? tr(T.theirs) : now?.state === 'excluded' || now?.state === 'added' ? tr(T.nothingToDo) : tr(T.scanned)
+    rows.push(
+      planRow(`defender#${kind}`, {
+        what: tr(KIND_LABEL[kind]),
+        ...(was ? { was: { path: was.path, other: now?.path, note: state(was) } } : {}),
+        ...(now ? { now: { path: now.path, other: was?.path, note: state(now) } } : {}),
+        does
+      })
+    )
+  }
+  return rows
+}
+
+/** The plan as one table (#1305), the project hover's agent table's look: a group a project, then the workspace's, then Defender's (#1302). */
+function PlanTable({ plan, defender, moving, onLocate, onChoose }: { plan: MovePlan; defender?: AvMovePlan | null; moving: boolean; onLocate: (k: string, agentId: string) => void; onChoose: (k: string, choice: Choice | null) => void }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
   const toggle = (k: string): void => setOpen((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))
   const rows: (ItemRow | ItemGroup)[] = []
@@ -308,6 +375,8 @@ function PlanTable({ plan, onLocate, onChoose }: { plan: MovePlan; onLocate: (k:
   }
   const ws = workspaceRows(plan)
   if (ws.length) rows.push({ key: 'group#ws', group: tr(T.workspace), text: tr(T.workspace) }, ...ws)
+  const av = defender ? defenderRows(defender, moving) : []
+  if (av.length) rows.push({ key: 'group#defender', group: tr(T.defender), text: tr(T.defender) }, ...av)
   const choices = plan.hosts.some((h) => h.worktrees.some((w) => w.how === 'missing' || w.how === 'recreate' || w.how === 'unlink'))
   return <ItemTable first={T.what} columns={[{ label: T.was }, { label: T.now }, { label: T.willDo }]} rows={rows} className={cx(/* i18n-ignore: class names */ 'fill repair-plan', choices && 'has-choices')} presentation />
 }
@@ -317,6 +386,8 @@ export function MoveRepairDialog() {
   const [plan, setPlan] = useState<MovePlan | null | undefined>(undefined)
   const [opts, setOpts] = useState<MoveOptions>({})
   const [report, setReport] = useState<MoveReport | null>(null)
+  // Defender and the old and new folders (#1302): asked for on its own, its probe too slow to hold up the plan.
+  const [defender, setDefender] = useState<AvMovePlan | null | undefined>(undefined)
   const action = useBusy()
   const { run, setError } = action
   const load = useCallback(
@@ -331,7 +402,21 @@ export function MoveRepairDialog() {
     setOpts({})
     setReport(null)
     setError(null)
+    setDefender(undefined)
     load({})
+    let live = true
+    void call('workspace:moveDefender').then(
+      (d) => {
+        if (!live) return
+        setDefender(d)
+        // Ticked when Hive made the old folders' exclusions: the one administrator prompt comes with Repair.
+        if (d?.scan === 'defender' && d.remove.length) setOpts((o) => (o.defender === undefined ? { ...o, defender: true } : o))
+      },
+      () => live && setDefender(null)
+    )
+    return () => {
+      live = false
+    }
   }, [open, load, setError])
   if (!open) return null
   const close = (): void => set({ moveRepairOpen: false })
@@ -388,7 +473,25 @@ export function MoveRepairDialog() {
         ) : (
           <>
             <p>{plan.from ? rich(M.movedFromTo, { from: shortPath(plan.from, plan.to), to: shortPath(plan.to, plan.from) }) : tr(plan.hosts.length ? M.projectsMoved : M.cardsOld)}</p>
-            <PlanTable plan={plan} onLocate={(k, id) => void locate(k, id)} onChoose={pick} />
+            <PlanTable plan={plan} defender={defender} moving={!!opts.defender} onLocate={(k, id) => void locate(k, id)} onChoose={pick} />
+            {plan.from && defender === undefined && (
+              <p className="faint">
+                <Icon name="loading" spin /> {tr(T.readingDefender)}
+              </p>
+            )}
+            {defender?.scan === 'defender' && (
+              <div className="repair-defender">
+                {defender.remove.length > 0 ? (
+                  <label className="checkbox">
+                    <input type="checkbox" checked={!!opts.defender} onChange={(e) => setOpts({ ...opts, defender: e.target.checked })} /> {tr(T.moveBox, { count: defender.remove.length })}
+                  </label>
+                ) : (
+                  defender.now.some((p) => p.state === 'not-excluded') && <p className="hint">{tr(T.addLater)}</p>
+                )}
+                {defender.theirs.length > 0 && <p className="hint">{tr(T.theirsNote)}</p>}
+                {!defender.exclusionsFrom && <p className="hint">{tr(T.needsAdmin)}</p>}
+              </div>
+            )}
             <p className="hint">{tr(M.untouched)}</p>
             {plan.running.length > 0 && (
               <p className="warn-text">

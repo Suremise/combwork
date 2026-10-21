@@ -211,6 +211,14 @@
     "defaultMessage": "the antivirus status",
     "description": "What could not be loaded: shown in \"Could not load {what}: {error}\", with Retry."
   },
+  "workspace.antivirus.moveNotApplied": {
+    "defaultMessage": "Defender accepted the change but {missing, plural, one {one folder isn't} other {# folders aren't}} as asked: your organisation's settings probably override local exclusions.",
+    "description": "After Repair moved Hive's Defender exclusions (#1302), when Defender doesn't show the change for some folders (an old one still listed, or a new one missing)."
+  },
+  "workspace.antivirus.moved": {
+    "defaultMessage": "Moved Hive's exclusions to the new folders: {removed, plural, =0 {none removed} one {# removed} other {# removed}}, {added, plural, =0 {none added (Defender already skips them)} one {# added} other {# added}}.",
+    "description": "After Repair moved Hive's Defender exclusions from a moved workspace's old folders to its new ones (#1302): how many old ones were removed and new ones added."
+  },
   "workspace.antivirus.noPrompt": {
     "defaultMessage": "Windows couldn't start the administrator prompt{hasError, select, yes {: {error}} other {.}}",
     "description": "After a change to Defender's exclusions: Windows' administrator (UAC) prompt didn't start; {error} is Windows' reason."
@@ -1259,6 +1267,10 @@
     "defaultMessage": "{count, plural, one {# worktree} other {# worktrees}}: {how, select, hide {left as they are.} remove {removed with their branches, once nothing in them is unmerged.} other {to the Recycle Bin.}}",
     "description": "Remove Project, what it touches: the agents' worktrees (each follows), for the choice made."
   },
+  "workspace.repair.addLater": {
+    "defaultMessage": "Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.",
+    "description": "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown."
+  },
   "workspace.repair.board": {
     "defaultMessage": "Board: {from}",
     "description": "Repair's plan, the What column: what the board saved under a project's old name ({from})."
@@ -1287,6 +1299,10 @@
     "defaultMessage": "Create",
     "description": "Repair's plan, a missing worktree's compact button when its branch is gone too (its tooltip: workspace.move.createButton)."
   },
+  "workspace.repair.defender": {
+    "defaultMessage": "Microsoft Defender",
+    "description": "Repair's plan: the heading over the rows about Microsoft Defender's exclusions of the old and new folders (#1302). A product name."
+  },
   "workspace.repair.folders": {
     "defaultMessage": "{count, plural, one {# folder} other {# folders}}",
     "description": "Repair's plan: how many of a coding agent's folders are copied (one per moved folder)."
@@ -1307,6 +1323,10 @@
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.",
     "description": "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)."
   },
+  "workspace.repair.leaveExclusion": {
+    "defaultMessage": "leave Hive's exclusion as it is",
+    "description": "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked."
+  },
   "workspace.repair.listNew": {
     "defaultMessage": "list the new folder",
     "description": "Repair's plan, the Will do column of Open Recent: the new folder replaces the old one."
@@ -1315,6 +1335,18 @@
     "defaultMessage": "mark {projects} again",
     "description": "Repair's plan, the Will do column of Working on ({projects}: the projects)."
   },
+  "workspace.repair.moveBox": {
+    "defaultMessage": "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)",
+    "description": "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt."
+  },
+  "workspace.repair.moveExclusion": {
+    "defaultMessage": "move Hive's exclusion",
+    "description": "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead."
+  },
+  "workspace.repair.needsAdmin": {
+    "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",
+    "description": "Repair's plan, under the table: Defender hides its exclusion list without administrator rights."
+  },
   "workspace.repair.notFound": {
     "defaultMessage": "not found",
     "description": "Repair's plan, the Now column: an agent's worktree wasn't found."
@@ -1322,6 +1354,10 @@
   "workspace.repair.nothingToCopy": {
     "defaultMessage": "nothing to copy",
     "description": "Repair's plan, the Will do column: a coding agent's folder with nothing to copy (some files kept or unreadable, said after)."
+  },
+  "workspace.repair.nothingToDo": {
+    "defaultMessage": "nothing to do",
+    "description": "Repair's plan, the Will do column of a Defender row: the new folder is already excluded."
   },
   "workspace.repair.now": {
     "defaultMessage": "Now",
@@ -1334,6 +1370,10 @@
   "workspace.repair.point": {
     "defaultMessage": "{count, plural, one {point # session} other {point # sessions}}",
     "description": "Repair's plan, the Will do column: the session records pointed to the new folder ({count}: how many)."
+  },
+  "workspace.repair.readingDefender": {
+    "defaultMessage": "Reading Defender's exclusions…",
+    "description": "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders."
   },
   "workspace.repair.recent": {
     "defaultMessage": "Open Recent",
@@ -1355,6 +1395,10 @@
     "defaultMessage": "{remote, select, none {rename} other {rename; {remote} keeps the old name}}",
     "description": "Repair's plan, the Will do column: an agent's branch named after the old place is renamed ({remote}: the remote it tracks, which keeps the old name, or none)."
   },
+  "workspace.repair.scanned": {
+    "defaultMessage": "nothing (Defender scans it)",
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder."
+  },
   "workspace.repair.sentence": {
     "defaultMessage": "{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}",
     "description": "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns."
@@ -1370,6 +1414,14 @@
   "workspace.repair.taken": {
     "defaultMessage": "kept: the new name is taken",
     "description": "Repair's plan, the Will do column: an agent's branch isn't renamed, because a branch with the new name exists."
+  },
+  "workspace.repair.theirs": {
+    "defaultMessage": "yours: change it in Windows Security",
+    "description": "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown."
+  },
+  "workspace.repair.theirsNote": {
+    "defaultMessage": "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.",
+    "description": "Repair's plan, under the table: the user's own Defender exclusion of an old folder."
   },
   "workspace.repair.unlink": {
     "defaultMessage": "remove the worktree link",

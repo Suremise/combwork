@@ -14,7 +14,8 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */
 
-const STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
+/** How a folder's scanning is worded and coloured, here and in Repair's Defender rows (#1302). */
+export const AV_STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
   excluded: { label: msg({ id: 'workspace.antivirus.stateExcluded', defaultMessage: 'Excluded', description: "A folder's scanning in Settings → Workspace's antivirus table: Defender skips it." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateExcludedTip', defaultMessage: 'Defender doesn’t scan it.', description: 'Tooltip on Excluded.' }) },
   'not-excluded': { label: msg({ id: 'workspace.antivirus.stateScanned', defaultMessage: 'Scanned', description: "A folder's scanning: Defender scans it." }), tone: 'warn-text', tip: msg({ id: 'workspace.antivirus.stateScannedTip', defaultMessage: 'Defender scans every file Hive’s work creates or opens here.', description: 'Tooltip on Scanned.' }) },
   unknown: { label: msg({ id: 'workspace.antivirus.stateUnknown', defaultMessage: 'Unknown', description: "A folder's scanning: Defender hides its exclusions without administrator rights." }), tone: 'faint', tip: msg({ id: 'workspace.antivirus.stateUnknownTip', defaultMessage: 'Defender shows its exclusions only to administrators: Check with administrator rights to see them.', description: 'Tooltip on Unknown. Check with administrator rights is a button below.' }) },
@@ -185,8 +186,8 @@ export function AntivirusPanel() {
                     {p.unsafe && <div className="warn-text small">{tr(M.notOffered, { why: p.unsafe })}</div>}
                   </td>
                   <td className="nowrap">
-                    <span className={STATE[p.state].tone} title={tr(STATE[p.state].tip)}>
-                      {tr(STATE[p.state].label)}
+                    <span className={AV_STATE[p.state].tone} title={tr(AV_STATE[p.state].tip)}>
+                      {tr(AV_STATE[p.state].label)}
                     </span>
                   </td>
                   <td className="nowrap faint" title={tr(DEV_DRIVE[p.devDrive].tip)}>
