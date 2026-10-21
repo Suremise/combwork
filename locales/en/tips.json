@@ -539,6 +539,14 @@
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
   },
+  "tips.forYou.text": {
+    "defaultMessage": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, approve."
+  },
+  "tips.forYou.title": {
+    "defaultMessage": "Answer what waits for you",
+    "description": "A tip's title (glossary: For you)."
+  },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Git tab need Git for Windows 2.38 or later.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

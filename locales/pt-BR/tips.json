@@ -134,6 +134,8 @@
   "tips.filesTab.title": "Edite arquivos sem sair do Hive",
   "tips.flightRecorder.text": "Ative um gatilho do gravador de voo em Configurações → Avançado (paradas de segurança, algo desconhecido vindo de uma CLI, uma mudança de versão da CLI, um agente em silêncio), e o Hive salva os eventos recentes do console do desenvolvedor do agente, com dados sensíveis ocultos, no momento em que acontece, com um aviso.",
   "tips.flightRecorder.title": "Capture eventos raros automaticamente",
+  "tips.forYou.text": "Um cartão com o selo Para você aguarda você: uma aprovação, uma decisão ou uma pergunta. O ícone do Quadro de tarefas conta esses cartões, e Para você no quadro mostra só eles. Abra o cartão para aprovar, recusar ou responder: o agente que aguarda fica sabendo na hora.",
+  "tips.forYou.title": "Responda ao que aguarda você",
   "tips.gitCheck.text": "Ajuda → Configuração de agentes… mostra o git que o Hive encontrou e a versão dele. Agentes em worktree, o merge e a aba Git precisam do Git for Windows 2.38 ou posterior.",
   "tips.gitCheck.title": "O git está pronto para worktrees?",
   "tips.gitInit.text": "Um projeto sem git? Inicializar repositório…, na aba Git dele, transforma o projeto em um repositório na main, mantém o .hive de fora, adiciona um .gitignore inicial se você quiser e faz o primeiro commit, para que os agentes possam trabalhar em worktrees na hora.",

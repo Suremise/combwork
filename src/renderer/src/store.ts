@@ -398,6 +398,8 @@ interface State {
   boardProject: string | null
   boardQuery: string
   boardArchived: boolean
+  /** The Task Board shows only the cards something waits on the user for (#1276). */
+  boardForYou: boolean
   /** The card open in the card dialog, or a new card (with the project it's for). */
   taskOpen: number | { project: string } | null
   /** The card whose Start dialog is open. */
@@ -549,6 +551,7 @@ export const useStore = create<State>(() => ({
   boardProject: null,
   boardQuery: '',
   boardArchived: false,
+  boardForYou: false,
   taskOpen: null,
   taskStartFor: null,
   boardArchiveAll: null,

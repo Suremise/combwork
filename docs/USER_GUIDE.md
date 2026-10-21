@@ -686,6 +686,12 @@ Moving a **Done** card back to Doing (or further) reopens it: its work starts ag
 
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
 
+### For you
+
+Some cards wait for you: a review or an OK that is yours to give, a question an agent asked (*"OK to push the release tag?"*), a rule an agent couldn't keep, or a card loop that reached its round limit. Each such card shows a **For you** chip with what it asks (Approve, Decide, Test, Sign in or Other; hover it to read the request), the **Task Board** icon on the activity bar counts them, and the **For you** box in the board's toolbar shows only those cards (with the search box, both apply).
+
+Open the card to answer in its **For you** section: **Approve** or **Decline…** for an approval (declining asks why, and the agent reads your reason; declining your own review sends the card back to its builder as a round), or for a question, type your answer and **Send Reply**, or **Record as Decision** to keep it as one of the card's decisions. At a card loop's round limit you choose how it goes on: carry on with more rounds, split it, accept it with follow-ups, or take it over. A Test request lists what to try. Answering clears the chip at once and wakes the agent waiting on it. Only you answer: agents and the Assistant can ask, never answer for you. If the request was answered or retired meanwhile (a new submission, the card moved on), your answer isn't taken and Hive says why.
+
 ### Exporting the board
 
 The board is kept in the workspace's database, `.hive/hive.db`, and so are the card loops' lanes, agents' card watches and every project's inbox (what Hive has for its agents to read): their `lanes.json`, `watches.json` and `deliveries.json` files are moved in the first time Hive 0.9 opens the workspace, and kept beside it as `….imported-<time>`. Every change to the board is saved whole or not at all, also when many cards change at once (Archive All, a batch move), and a board of a thousand cards stays quick. The database is this computer's: a workspace you commit to git leaves it out.

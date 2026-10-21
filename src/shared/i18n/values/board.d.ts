@@ -285,6 +285,22 @@ interface HiveMessageValues {
   'board.field.project': undefined
   'board.field.title': undefined
   'board.filter.noProject': undefined
+  'board.forYou.answering': undefined
+  'board.forYou.approve': undefined
+  'board.forYou.asDecision': undefined
+  'board.forYou.asked': { who: string; when: string | number }
+  'board.forYou.checklist': undefined
+  'board.forYou.chip': undefined
+  'board.forYou.chipTip': { n: number; requests: string | number }
+  'board.forYou.decline': undefined
+  'board.forYou.declineNeeds': undefined
+  'board.forYou.declineTitle': { request: string | number }
+  'board.forYou.declineWhy': undefined
+  'board.forYou.failed': undefined
+  'board.forYou.heading': undefined
+  'board.forYou.reply': undefined
+  'board.forYou.rounds': undefined
+  'board.forYou.send': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -547,6 +563,7 @@ interface HiveMessageValues {
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
   'board.toolbar.archived': { n: number }
+  'board.toolbar.forYou': { n: number }
   'board.toolbar.more': undefined
   'board.toolbar.search': undefined
   'board.upgrade.askDetail': undefined

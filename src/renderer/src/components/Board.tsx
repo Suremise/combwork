@@ -12,6 +12,9 @@ import { cardLabel, nameWithKey } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
+import { ForYouChip, ForYouSection } from './ForYou'
+import { useForYou } from '../forYou'
+import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { RULE_NAMES, workflowMessage } from '@shared/workflow/texts'
@@ -446,7 +449,8 @@ function CardTile({
   onDragStart,
   dropHere,
   readOnly,
-  work
+  work,
+  forYou
 }: {
   c: TaskCard
   projects: ProjectInfo[]
@@ -459,6 +463,8 @@ function CardTile({
   readOnly: string | null
   /** What its work's facts say, for its badges (#1224). */
   work?: WorkBadge
+  /** What on it waits for the user (#1276): its chip. */
+  forYou?: ForYouItem[]
 }) {
   const menu = useContextMenu()
   const { agent } = cardAgent(projects, c)
@@ -515,6 +521,7 @@ function CardTile({
                 </span>
               </Tooltip>
             )}
+            <ForYouChip items={forYou} />
             <FoldedAgent c={c} projects={projects} />
           </div>
         </div>
@@ -562,6 +569,11 @@ function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} projects={projects} />
+        {!!forYou?.length && (
+          <div className="task-for-you-row">
+            <ForYouChip items={forYou} />
+          </div>
+        )}
         <WorkBadges b={work} card={c} />
         {(c.labels.length > 0 || c.blockedBy.length > 0 || c.comments.length > 0 || !!c.decisions?.length) && (
           <div className="task-meta">
@@ -606,7 +618,7 @@ type DragState = { n: number; column: TaskColumn; before: number | null }
  * (#170), as the user leaves them for this workspace. With archived, the archived cards as a list instead. scope: the
  * board this is part of (a project's Tasks tab: its project), for Archive All's "the n shown (of m)" (#351).
  */
-export function Board({ project, scope = null, query, archived }: { project: string | null; scope?: string | null; query: string; archived: boolean }) {
+export function Board({ project, scope = null, query, archived, forYouOnly = false }: { project: string | null; scope?: string | null; query: string; archived: boolean; forYouOnly?: boolean }) {
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const all = useStore((s) => s.tasks)
@@ -614,6 +626,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   const movedNames = useStore((s) => s.movedCardNames)
   // Each card's work badges (#1224), read with the board.
   const workBadges = useWorkBadges()
+  // What waits for the user on each card (#1276): its chip, and the For you filter.
+  const forYou = useForYou().byCard
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const colored = useStore((s) => s.settings?.board.columnColors ?? true)
   const colors = useStore((s) => s.settings?.board.colors)
@@ -637,8 +651,8 @@ export function Board({ project, scope = null, query, archived }: { project: str
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
-    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && cardMatches(c, query, keys, movedNames)),
-    [all, project, query, archived, keys, movedNames]
+    () => all.filter((c) => c.archived === archived && (project === null || c.project.toLowerCase() === project.toLowerCase()) && (!forYouOnly || forYou.has(c.number)) && cardMatches(c, query, keys, movedNames)),
+    [all, project, query, archived, keys, movedNames, forYouOnly, forYou]
   )
   const boardRef = useRef<HTMLDivElement>(null)
 
@@ -840,6 +854,7 @@ export function Board({ project, scope = null, query, archived }: { project: str
                   dropHere={!!drag && drag.column === col.id && drag.before === c.number && drag.n !== c.number}
                   readOnly={readOnly}
                   work={workBadges.get(c.number)}
+                  forYou={forYou.get(c.number)}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', cardLabel(c))
@@ -1053,7 +1068,9 @@ export function BoardToolbar({
   query,
   setQuery,
   archived,
-  setArchived
+  setArchived,
+  forYouOnly,
+  setForYouOnly
 }: {
   project: string | null
   scope?: string | null
@@ -1061,6 +1078,9 @@ export function BoardToolbar({
   setQuery: (q: string) => void
   archived: boolean
   setArchived: (v: boolean) => void
+  /** Only the cards something waits on the user for (#1276); with the search, both apply. */
+  forYouOnly: boolean
+  setForYouOnly: (v: boolean) => void
 }) {
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
@@ -1079,12 +1099,17 @@ export function BoardToolbar({
     }
   }, [tasks])
   const menu = useContextMenu()
+  const waiting = useForYou().summary.items
+  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size
   return (
     <div className="board-toolbar">
       <div className="board-search">
         <Icon name="search" />
         <SearchInput placeholder={tr(msg({ id: 'board.toolbar.search', defaultMessage: 'Search cards (AM-12, words, labels)', description: "Placeholder of the board's search box: finds cards by name (AM-12: a project key, a hyphen and a number; AM- finds all of that project's; #12 works too), words or labels." }))} value={query} onChange={setQuery} />
       </div>
+      <label className="flex muted board-for-you-filter" style={{ cursor: 'pointer' }}>
+        <input type="checkbox" className="checkbox" checked={forYouOnly} onChange={(e) => setForYouOnly(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.forYou', defaultMessage: 'For you ({n, number})', description: "A checkbox in the board's toolbar: shows only the cards something waits on the user for (an approval, a decision, a question), and how many there are ({n}). Glossary: For you." }), { n: forYouCount })}
+      </label>
       <label className="flex muted" style={{ cursor: 'pointer' }}>
         <input type="checkbox" className="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.archived', defaultMessage: 'Archived ({n, number})', description: "A checkbox in the board's toolbar: shows the archived cards instead (how many there are: {n})." }), { n: count })}
       </label>
@@ -1394,6 +1419,7 @@ export function BoardView() {
   const project = useStore((s) => s.boardProject)
   const query = useStore((s) => s.boardQuery)
   const archived = useStore((s) => s.boardArchived)
+  const forYouOnly = useStore((s) => s.boardForYou)
   const workspace = useStore((s) => s.workspace)
   useLanguage()
   useEffect(() => {
@@ -1410,8 +1436,8 @@ export function BoardView() {
         </h1>
         <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.', description: 'Under the Task Board\'s title. Review and Passed are board columns.' }))}</span>
       </div>
-      <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} />
-      <Board project={project} query={query} archived={archived} />
+      <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
+      <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />
     </div>
   )
 }
@@ -1420,6 +1446,7 @@ export function BoardView() {
 export function ProjectTasksTab({ project }: { project: ProjectInfo }) {
   const [query, setQuery] = useState('')
   const [archived, setArchived] = useState(false)
+  const [forYouOnly, setForYouOnly] = useState(false)
   useLanguage()
   useEffect(() => {
     void loadTasks()
@@ -1427,8 +1454,8 @@ export function ProjectTasksTab({ project }: { project: ProjectInfo }) {
   }, [project.path])
   return (
     <div className="board-view in-tab">
-      <BoardToolbar project={project.name} scope={project.name} query={query} setQuery={setQuery} archived={archived} setArchived={setArchived} />
-      <Board project={project.name} scope={project.name} query={query} archived={archived} />
+      <BoardToolbar project={project.name} scope={project.name} query={query} setQuery={setQuery} archived={archived} setArchived={setArchived} forYouOnly={forYouOnly} setForYouOnly={setForYouOnly} />
+      <Board project={project.name} scope={project.name} query={query} archived={archived} forYouOnly={forYouOnly} />
     </div>
   )
 }
@@ -1533,6 +1560,8 @@ export function TaskDialog() {
   useLanguage()
   const card = useStore((s) => (typeof s.taskOpen === 'number' ? (s.tasks.find((c) => c.number === s.taskOpen) ?? null) : null))
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  // What on it waits for the user (#1276): answered in its For you section.
+  const forYouItems = useForYou().byCard.get(card?.number ?? -1)
   // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
@@ -1883,6 +1912,7 @@ export function TaskDialog() {
             {tr(msg({ id: 'board.dialog.archivedBanner', defaultMessage: '{cause, select, hidden {Archived when {project} was hidden.} removed {Archived when {project} was removed from Hive.} done {Archived automatically after its days in Done (Settings → Board).} other {Archived.}} Bring it back to change it.', description: "A banner in an archived card's dialog: why it was archived (its project {project} hidden or removed, or after its days in the Done column: Settings → Board is where that is set), and that it must be brought back to be changed." }), { cause: card.archivedFor === 'project-hidden' ? 'hidden' : card.archivedFor === 'project-removed' ? 'removed' : card.archivedFor === 'done' ? 'done' : 'user', project: card.project })}
           </div>
         )}
+        {card && !card.archived && <ForYouSection card={card} items={forYouItems} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
           <label>{tr(msg({ id: 'board.dialog.project', defaultMessage: 'Project', description: "A field label in the card dialog: the card's project." }))}</label>

@@ -134,6 +134,8 @@
   "tips.filesTab.title": "不离开 Hive 即可编辑文件",
   "tips.flightRecorder.text": "在“设置”→“高级”中打开一个飞行记录器触发条件（安全拦截、来自 CLI 的未知内容、CLI 版本变化、无响应的智能体），事情一发生，Hive 就会保存该智能体最近的开发者控制台事件（已脱敏），并显示通知。",
   "tips.flightRecorder.title": "自动捕获罕见事件",
+  "tips.forYou.text": "带有“待你处理”标签的卡片在等你：批准、决定或问题。任务看板图标会显示数量，看板上的“待你处理”只显示这些卡片。打开卡片即可批准、拒绝或回答：等待中的智能体会立即收到。",
+  "tips.forYou.title": "回答待你处理的事项",
   "tips.gitCheck.text": "“帮助”→“配置智能体…”会显示 Hive 找到的 git 及其版本。工作树智能体、合并和“Git”标签页需要 Git for Windows 2.38 或更高版本。",
   "tips.gitCheck.title": "git 能用于工作树吗？",
   "tips.gitInit.text": "项目没有 git？在其“Git”标签页中点击“初始化仓库…”，即可在 main 分支上把它变成仓库，排除 .hive，可选添加一个初始 .gitignore，并完成首次提交，智能体马上就能在工作树中工作。",

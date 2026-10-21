@@ -2,6 +2,7 @@
   "workspace.activity.assistant": "Hive Assistant",
   "workspace.activity.board": "Quadro de tarefas",
   "workspace.activity.docs": "Documentação",
+  "workspace.activity.forYou": "{n, plural, one {# cartão aguarda você} other {# cartões aguardam você}}",
   "workspace.activity.mcp": "Servidores MCP",
   "workspace.activity.notes": "Notas compartilhadas",
   "workspace.activity.notifications": "Notificações",

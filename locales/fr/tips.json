@@ -134,6 +134,8 @@
   "tips.filesTab.title": "Modifier des fichiers sans quitter Hive",
   "tips.flightRecorder.text": "Active un déclencheur de l’enregistreur de vol dans Paramètres → Avancé (arrêts de sécurité, quelque chose d’inconnu venant d’une CLI, un changement de version d’une CLI, un agent devenu silencieux), et Hive enregistre les événements récents de la console de développement de l’agent, masqués, au moment même où cela se produit, avec une notification.",
   "tips.flightRecorder.title": "Capturer automatiquement les événements rares",
+  "tips.forYou.text": "Une carte avec la pastille Pour toi t’attend : une approbation, une décision ou une question. L’icône du Tableau des tâches les compte, et Pour toi sur le tableau n’affiche que celles-là. Ouvre la carte pour approuver, refuser ou répondre : l’agent qui attend le sait aussitôt.",
+  "tips.forYou.title": "Répondre à ce qui t’attend",
   "tips.gitCheck.text": "Aide → Configuration des agents… montre le git trouvé par Hive et sa version. Les agents en worktree, la fusion et l’onglet Git nécessitent Git for Windows 2.38 ou ultérieur.",
   "tips.gitCheck.title": "Git est-il prêt pour les worktrees ?",
   "tips.gitInit.text": "Un projet sans git ? Initialiser le dépôt…, dans son onglet Git, en fait un dépôt sur main, garde .hive en dehors, ajoute un .gitignore de départ si tu veux et fait le premier commit, pour que les agents puissent tout de suite travailler dans des worktrees.",
