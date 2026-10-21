@@ -164,7 +164,7 @@
   "tips.inboxNotices.title": "Nachrichten erreichen beschäftigte Agenten zwischen zwei Schritten",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Hive den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
-  "tips.laneGates.text": "Im Fortschrittspanel sagt eine Lane unter ihrer Kopfzeile, worauf sie wartet, und eine rote Kerbe am Segment einer Karte bedeutet, dass ihre letzte Anfrage abgelehnt wurde: Zeige mit der Maus darauf, um zu sehen, warum und was als Nächstes.",
+  "tips.laneGates.text": "Im Fortschrittspanel sagt eine Lane in ihrer Kopfzeile, worauf sie wartet, und eine rote Kerbe am Segment einer Karte bedeutet, dass ihre letzte Anfrage abgelehnt wurde: Zeige mit der Maus darauf, um zu sehen, warum und was als Nächstes.",
   "tips.laneGates.title": "Sieh, warum eine Lane nicht weitergeht",
   "tips.laneNotices.text": "Hive benachrichtigt dich, wenn eine Karte einer Lane das Review nicht besteht, blockiert ist oder festfährt, oder wenn alle Karten bestanden haben und der Merge ansteht, mit einer Benachrichtigung pro Lane. Einstellungen → Benachrichtigungen legt fest, wo sie erscheinen.",
   "tips.laneNotices.title": "Erfahre, wie eine Lane läuft, auch ohne den Assistenten",

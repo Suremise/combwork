@@ -174,7 +174,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const pass = await asReviewer(`/v1/tasks/${encodeURIComponent(keyA)}/verdict`, { pass: true, comment: 'Round 1: PASSED.' })
     check('the reviewer passes it', review.status === 200 && pass.status === 200, JSON.stringify({ review: review.body, pass: pass.body }))
     const why = async () => (await row.locator('.progress-lane-why').textContent().catch(() => '')) ?? ''
-    check('…the lane pauses, saying why under its header', !!(await until(async () => (await header()).includes('paused') && (await why()) === `waiting: ${keyA} not merged`)), `${await header()} | ${await why()}`)
+    check('…the lane pauses, its header saying why', !!(await until(async () => (await why()) === `waiting: ${keyA} not merged` && (await row.locator('.progress-lane-why.paused').count()) === 1)), `${await header()} | ${await why()}`)
     check("…and its accessible name too", !!(await until(async () => ((await row.getAttribute('aria-label')) ?? '').includes(`paused, waiting: ${keyA} not merged`))), await row.getAttribute('aria-label'))
     await shoot('paused')
 

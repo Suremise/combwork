@@ -660,7 +660,7 @@
     "description": "A tip's title."
   },
   "tips.laneGates.text": {
-    "defaultMessage": "In the Progress panel, a lane says why it waits under its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
+    "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
   },
   "tips.laneGates.title": {

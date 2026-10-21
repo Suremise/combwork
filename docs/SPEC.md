@@ -2426,7 +2426,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   for a3f2c1d; now at b71e09a" (revisions through the project's descriptor), until it is submitted again or Done; the
   latest **override** since it was last Done is a ringed dot in the start corner, its hover who, which rules by name
   and why (§16.8.4's note); a **no-code card**'s hover says so and has no revision or merge lines. A lane with a status
-  (#1270) says why on a line under its header (paused in the paused colour, others faint) and in its accessible name:
+  (#1270) says why in its header, in the room the lane's name had (every lane keeps one height; paused in the paused colour, others faint; its whole text in its title), and in its accessible name:
   *waiting for you (approval): AM-12* (the open request's kind), *waiting: AM-11 not merged*, *waiting: AM-11
   merging*, *stale: AM-12 must be submitted again*, *waiting for a reviewer on AM-12*, *list changes after AM-12*, the
   round limit, a card blocked or On Hold; the Lanes bar counts the lanes waiting for you (an open request or the round

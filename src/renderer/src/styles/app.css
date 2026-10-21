@@ -10082,12 +10082,13 @@ button.progress-run-show:focus-visible {
 .progress-lane-state.abandoned {
   color: var(--error);
 }
-/* Why it waits (#1279): a line of its own under the header, cut short with its whole text in the tooltip. */
+/* Why it waits (#1279): in the header, in the room the lane's name had, cut short with its whole text in its title. */
 .progress-lane-why {
-  margin-top: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: var(--fg-muted);
-  font-size: 11px;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

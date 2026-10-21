@@ -409,9 +409,19 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       <Tooltip block content={<LaneCostTip cost={cost.cost} />}>
         <div className="progress-lane-top" onMouseEnter={cost.load}>
           <span className="progress-lane-pair">{pair}</span>
-          {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
-          <div className="grow" />
-          {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+          {/* Why it waits (#1279) takes the name's room (every lane keeps one height: the list shows whole lanes),
+              cut short with its whole text in its title; a paused lane's in the paused colour, another's faint. */}
+          {why ? (
+            <span className={cx('progress-lane-why', l.state === 'paused' && 'paused')} title={why}>
+              {why}
+            </span>
+          ) : (
+            <>
+              {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
+              <div className="grow" />
+              {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+            </>
+          )}
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
@@ -423,12 +433,6 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
           </span>
         </div>
       </Tooltip>
-      {/* Why it waits (#1279), a line of its own: a paused lane's in the paused colour, another's faint. */}
-      {why && (
-        <div className={cx('progress-lane-why', l.state === 'paused' && 'paused')} title={why}>
-          {why}
-        </div>
-      )}
       <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
           <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : {}} />
