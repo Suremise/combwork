@@ -69,6 +69,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
   'settings.advanced.codex.prompt.drawnSeconds.title': undefined
+  'settings.advanced.codex.promptInput.timeoutSeconds.desc': undefined
+  'settings.advanced.codex.promptInput.timeoutSeconds.title': undefined
   'settings.advanced.codex.queue.hint.desc': undefined
   'settings.advanced.codex.queue.hint.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined

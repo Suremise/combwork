@@ -67,6 +67,8 @@
   "settings.advanced.codex.override.terminalTitle.title": "Codexのターミナルのタイトルを設定",
   "settings.advanced.codex.prompt.drawnSeconds.desc": "Hive が入力した行（メッセージの通知、ウェイク）を Codex が入力欄に表示するまで、Enter を押す前に Hive が待つ時間です。Codex はビジーな間に行と一緒に読んだ Enter を捨ててしまうため、Hive は行が表示されてから Enter を押します。時間内に表示されなければ Hive はそのまま Enter を押し、行が送信されなければ 10 秒後にもう一度押します。",
   "settings.advanced.codex.prompt.drawnSeconds.title": "入力した行：表示されるまで待つ",
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": "Codexのエージェントが起動するとき、Codexがセッションのプロンプト（codex debug prompt-input、オフライン）を表示するまでHiveが待つ時間です。Hiveはそこからdeveloper_instructionsを読み取り、その後にガイダンスを加えます。遅いマシンで短すぎると、エージェントはあなたの指示をそのままにHiveのガイダンスなしで起動し、Hiveがそのことを伝えます。",
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": "セッションの指示の読み取り：タイムアウト",
   "settings.advanced.codex.queue.hint.desc": "Codexが処理中で、入力を順番待ちにしているときに最後の行に出すヒントです。Hiveはこれが消えるのを待ってからCodexに入力します（メッセージや、セットアップ時の/permissionsメニュー）。誤っていると、Hiveの入力が実行されずに順番待ちになることがあります。",
   "settings.advanced.codex.queue.hint.title": "画面：入力の順番待ち",
   "settings.advanced.codex.rateLimits.field.desc": "Codexのトークン数のうち、サブスクリプションの制限を持つフィールドです。誤っていると、HiveはCodexのプランの制限を表示しません。",

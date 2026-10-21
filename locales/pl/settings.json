@@ -67,6 +67,8 @@
   "settings.advanced.codex.override.terminalTitle.title": "Ustawiaj tytuł terminala Codex",
   "settings.advanced.codex.prompt.drawnSeconds.desc": "Jak długo Hive czeka, aż Codex pokaże w swoim polu wpisywania wiersz wpisany przez Hive (powiadomienie o wiadomości, wybudzenie), zanim naciśnie Enter. Zajęty Codex pomija Enter odczytany razem z wierszem, więc Hive naciska Enter, gdy wiersz się pojawi; jeśli nie pojawi się na czas, Hive i tak naciska Enter, a jeśli wiersz nie został wysłany, naciska go ponownie 10 sekund później.",
   "settings.advanced.codex.prompt.drawnSeconds.title": "Wpisany wiersz: czekaj, aż się pojawi",
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": "Jak długo Hive czeka przy starcie agenta Codex, aż Codex pokaże prompt sesji (codex debug prompt-input, offline), z którego odczytuje developer_instructions, po których dodaje swoje wskazówki. Zbyt krótki na wolnym komputerze sprawi, że agent wystartuje z Twoimi bez zmian i bez wskazówek Hive, a Hive Ci o tym powie.",
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": "Odczyt instrukcji sesji: limit czasu",
   "settings.advanced.codex.queue.hint.desc": "Podpowiedź Codex w ostatnim rysowanym wierszu, gdy jest zajęty i kolejkuje wpisany tekst. Hive czeka, aż zniknie, zanim coś wpisze w Codex (wiadomość, menu /permissions przy konfiguracji); jeśli ustawienie jest błędne, to, co wpisze Hive, może trafić do kolejki zamiast się wykonać.",
   "settings.advanced.codex.queue.hint.title": "Ekran: wstrzymanie wpisanego tekstu",
   "settings.advanced.codex.rateLimits.field.desc": "Pole liczników tokenów Codex z limitami subskrypcji. Jeśli jest błędne, Hive nie pokazuje limitów planu dla Codex.",

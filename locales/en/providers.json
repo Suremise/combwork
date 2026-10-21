@@ -111,6 +111,22 @@
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
   },
+  "providers.codex.developerUnread.agentMessage": {
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.",
+    "description": "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it."
+  },
+  "providers.codex.developerUnread.agentTitle": {
+    "defaultMessage": "Hive's guidance is missing for this agent",
+    "description": "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance."
+  },
+  "providers.codex.developerUnread.assistantMessage": {
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.",
+    "description": "The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it."
+  },
+  "providers.codex.developerUnread.assistantTitle": {
+    "defaultMessage": "The Assistant started with its role only",
+    "description": "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role."
+  },
   "providers.codex.hint.broken": {
     "defaultMessage": "Codex looks broken or not set up: check it in Agent Setup.",
     "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."

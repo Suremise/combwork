@@ -458,9 +458,11 @@ describe("Claude Code's status line (#1285, row 12)", () => {
 describe("Hive's guidance for agents (#1285, row 13)", () => {
   const codexArgs = (ctx: LaunchContext): string[] => codex.buildCommand('C:\\bin\\codex.exe', ctx).args
   const developer = (args: string[]): string | null => {
-    const a = args.find((x) => x.startsWith('developer_instructions='))
+    const a = args.findLast((x) => x.startsWith('developer_instructions='))
     return a ? (parseToml(a) as { developer_instructions: string }).developer_instructions : null
   }
+  /** Every developer_instructions given, in the command's order (Codex keeps the last). */
+  const developers = (args: string[]): string[] => args.filter((x) => x.startsWith('developer_instructions=')).map((x) => (parseToml(x) as { developer_instructions: string }).developer_instructions)
   afterEach(() => rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true }))
 
   // What Codex itself would give the session (#1285, the Assistant's design in round 4): its offline prompt rendered
@@ -491,41 +493,63 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     const said = join(home, 'fake-developer-instructions.txt')
     const runs = (): { args: string[] }[] => (existsSync(join(home, 'fake-prompt-input.jsonl')) ? readFileSync(join(home, 'fake-prompt-input.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
     const env = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }
-    const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => {
+    /** A launch as Hive makes it: the developer_instructions Codex keeps (the last given), every one given, and its notice. */
+    const launch = async (over: Partial<LaunchContext> = {}) => {
       const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env, ...over })
       await codex.prepareLaunch(ctx)
-      return developer(codexArgs(ctx))
+      const args = codexArgs(ctx)
+      return { kept: developer(args), all: developers(args), notice: codex.launchNotice!(ctx), args }
     }
-    /** A config file Codex reads changed: Hive asks again (its answers are kept by what they depend on). */
-    const touch = (): void => writeFileSync(join(home, 'config.toml'), `# ${Math.random()}\n`)
+    const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => (await launch(over)).kept
     try {
       // Codex renders none: Hive's alone.
       expect(await launched()).toBe('Hive guidance')
       // Codex renders some (whatever layer they came from): Hive's after them, the Assistant's role after that.
       writeFileSync(said, 'Codex says this.')
-      touch()
       expect(await launched()).toBe('Codex says this.\n\nHive guidance')
       expect(await launched({ instructions: 'You are the Assistant.' })).toBe('Codex says this.\n\nHive guidance\n\nYou are the Assistant.')
       // The agent's own arguments reach Codex untouched (it parses -pmine, -p=mine and the rest), with the cleared render.
       const before = runs().length
       expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
-      const asked = runs().slice(before).map((r) => r.args)
-      expect(asked).toEqual(expect.arrayContaining([['-pmine', '-m', 'gpt-x'], ['-pmine', '-m', 'gpt-x', '-c', 'developer_instructions=""']]))
-      expect(asked).toHaveLength(2)
-      // Asked once for the same arguments, folder and config files: the next launch takes the answer kept.
-      const kept = runs().length
-      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
-      expect(runs()).toHaveLength(kept)
+      expect(runs().slice(before).map((r) => r.args)).toEqual(expect.arrayContaining([['-pmine', '-m', 'gpt-x'], ['-pmine', '-m', 'gpt-x', '-c', 'developer_instructions=""']]))
+      expect(runs().slice(before)).toHaveLength(2)
+      // Asked again at every launch (HR4's round 4: no cache): only what Codex renders changed, and Hive takes it.
+      writeFileSync(said, 'SECOND-TARGET')
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('SECOND-TARGET\n\nHive guidance')
       // Set empty or blank where Codex takes them: the same renders, Hive's alone.
       for (const v of ['', '   ']) {
         writeFileSync(said, v)
-        touch()
         expect(await launched(), JSON.stringify(v)).toBe('Hive guidance')
       }
-      // Codex can't render it: Hive's alone, as before #1285, and the launch goes on.
+
+      // The user's own -c developer_instructions in Extra arguments (HR4's round 4): already in what Codex renders, and
+      // Hive's combined value comes after it, so it is the one Codex keeps. Its forms, with the Assistant's role too.
+      rmSync(said)
+      for (const flag of ['-c', '--config']) {
+        const extra = [flag, 'developer_instructions="EXTRA-ONLY"']
+        const agent = await launch({ extraArgs: extra })
+        expect(agent.kept, flag).toBe('EXTRA-ONLY\n\nHive guidance')
+        expect(agent.all, flag).toEqual(['EXTRA-ONLY', 'EXTRA-ONLY\n\nHive guidance'])
+        expect((await launch({ extraArgs: extra, instructions: 'You are the Assistant.' })).kept).toBe('EXTRA-ONLY\n\nHive guidance\n\nYou are the Assistant.')
+        // No guidance of Hive's: theirs alone, as they gave it.
+        expect((await launch({ extraArgs: extra, guidance: '' })).all).toEqual(['EXTRA-ONLY'])
+      }
+
+      // Codex can't say (a render failing): never anything in place of the user's own (HR4's round 4, the Assistant's
+      // decision). An agent: no override at all, its guidance missing, told once; the Assistant: its role alone, told.
       writeFileSync(said, '!fail')
-      touch()
-      expect(await launched()).toBe('Hive guidance')
+      const failed = await launch()
+      expect(failed.all).toEqual([])
+      expect(failed.notice?.title).toBe("Hive's guidance is missing for this agent")
+      expect(failed.notice?.message).toMatch(/leaves yours as they are and adds none of its guidance/)
+      const theirsKept = await launch({ extraArgs: ['-c', 'developer_instructions="EXTRA-ONLY"'] })
+      expect(theirsKept.all).toEqual(['EXTRA-ONLY'])
+      const assistant = await launch({ instructions: 'You are the Assistant.' })
+      expect(assistant.kept).toBe('You are the Assistant.')
+      expect(assistant.notice?.title).toBe('The Assistant started with its role only')
+      // A launch Codex could answer has no notice.
+      writeFileSync(said, 'Codex says this.')
+      expect((await launch()).notice).toBeNull()
       // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, and Codex isn't asked.
       const none = runs().length
       expect(await launched({ guidance: '' })).toBeNull()
@@ -534,6 +558,10 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
       process.env.CODEX_HOME = homeBefore
       rmSync(home, { recursive: true, force: true })
     }
+  })
+
+  it("reads Codex's render no longer than Settings → Advanced says (codex.promptInput.timeoutSeconds)", () => {
+    expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 15, unit: 's', applies: 'sessions' })
   })
 
   it('is a switch of its own under Hive, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {

@@ -271,6 +271,14 @@
     "defaultMessage": "Typed line: wait to be drawn",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": {
+    "defaultMessage": "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.",
+    "description": "What the advanced setting \"Reading a session's instructions: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them."
+  },
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": {
+    "defaultMessage": "Reading a session's instructions: timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.queue.hint.desc": {
     "defaultMessage": "Codex's hint on the last line it draws while it is busy and queues what is typed. Hive waits for it to go before typing into Codex (a message, its /permissions menu at setup); wrong, what Hive types can be queued rather than run.",
     "description": "What the advanced setting \"Screen: holding what was typed\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

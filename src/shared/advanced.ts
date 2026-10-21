@@ -815,6 +815,21 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
   },
+  // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
+  // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
+  {
+    id: 'codex.promptInput.timeoutSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.title', defaultMessage: "Reading a session's instructions: timeout", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.desc', defaultMessage: "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.", description: 'What the advanced setting "Reading a session\'s instructions: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them.' }),
+    kind: 'number',
+    default: 15,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/help-codex-0.163.0-prompt-input.txt`, version: '0.163.0', text: 'Render the model-visible prompt input list as JSON', shows: "Codex's help for the command Hive runs, offline, to read a session's developer_instructions" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'codex.mcp.toolTimeoutSeconds',
     group: 'codex',

@@ -67,6 +67,8 @@
   "settings.advanced.codex.override.terminalTitle.title": "设置 Codex 的终端标题",
   "settings.advanced.codex.prompt.drawnSeconds.desc": "Hive 在按 Enter 之前，等待 Codex 在输入框中显示 Hive 输入的一行（消息通知、唤醒）的时长。Codex 忙碌时会丢弃与该行一起读到的 Enter，因此 Hive 会在该行显示后再按 Enter；如果未能及时显示，Hive 仍会按 Enter，并在该行未发送时于 10 秒后再按一次。",
   "settings.advanced.codex.prompt.drawnSeconds.title": "输入的行：等待显示",
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": "Codex 智能体启动时，Hive 等待 Codex 显示会话提示（codex debug prompt-input，离线）的时长，Hive 从中读取 developer_instructions，并把它的指引放在其后。在较慢的电脑上设得太短，智能体会保留你的原样并在没有 Hive 指引的情况下启动，Hive 会告诉你。",
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": "读取会话的指令：超时",
   "settings.advanced.codex.queue.hint.desc": "Codex 忙碌并将输入排队时在最后一行显示的提示。Hive 会等它消失后再向 Codex 输入内容（消息、配置时的 /permissions 菜单）；若设置有误，Hive 输入的内容可能被排队而不是执行。",
   "settings.advanced.codex.queue.hint.title": "屏幕：输入已排队",
   "settings.advanced.codex.rateLimits.field.desc": "Codex Token 计数中包含套餐限额的字段。若设置有误，Hive 不会显示 Codex 的套餐限额。",

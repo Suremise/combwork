@@ -67,9 +67,10 @@ if (args[0] === 'app-server') {
 }
 
 // `[options] debug prompt-input` (#1285): the session's prompt as Codex renders it, offline. Its developer message is
-// fake-developer-instructions.txt in CODEX_HOME (standing for whatever layers Codex took them from) unless the options
-// clear them (-c developer_instructions=""), then Codex's own texts; "!fail" exits with an error. Each run's options
-// go in fake-prompt-input.jsonl, so a test sees Hive passed the agent's own arguments untouched.
+// fake-developer-instructions.txt in CODEX_HOME (standing for whatever layers Codex took them from), or the last
+// -c/--config developer_instructions=<TOML string> in the options (as Codex takes them: the last wins, "" clears
+// them), then Codex's own texts; "!fail" exits with an error. Each run's options go in fake-prompt-input.jsonl, so a
+// test sees Hive passed the agent's own arguments untouched.
 const debugAt = args.indexOf('debug')
 if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
   const opts = args.slice(0, debugAt)
@@ -81,8 +82,11 @@ if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
     process.stderr.write('Error: config unreadable\n')
     process.exit(1)
   }
-  const cleared = opts.some((a, i) => opts[i - 1] === '-c' && a === 'developer_instructions=""')
-  const content = [...(text !== null && text.trim() && !cleared ? [text] : []), '<skills_instructions>\n## Skills', '<permissions instructions>\nFilesystem sandboxing']
+  let value = text
+  for (let i = 1; i < opts.length; i++) {
+    if ((opts[i - 1] === '-c' || opts[i - 1] === '--config') && opts[i].startsWith('developer_instructions=')) value = JSON.parse(opts[i].slice('developer_instructions='.length))
+  }
+  const content = [...(value !== null && value.trim() ? [value] : []), '<skills_instructions>\n## Skills', '<permissions instructions>\nFilesystem sandboxing']
   process.stdout.write(JSON.stringify([{ type: 'message', role: 'developer', content: content.map((t) => ({ type: 'input_text', text: t })) }, { type: 'message', role: 'user', content: [] }]))
   return
 }

@@ -2531,14 +2531,19 @@ Rows 26, 27 and 30 (all-keys passthrough, the OSC 52 policy, raw prompt variants
   Codex renders the session's prompt offline with the agent's own Extra arguments in its folder (`debug prompt-input`,
   no sign-in or model), twice side by side, as is and with `-c developer_instructions=""` (an empty value clears every
   layer below it). What the first's developer message has in front of the second's is the value; the same renders mean
-  none (missing, empty or blank); anything else, or a render failing, means Hive can't tell, and its guidance goes alone,
-  as before #1285, logged, the launch unblocked (`developerInstructionsOf`). About 200 ms, only when Hive adds some, and
-  kept per CLI, arguments, folder and the modification times of the config files Codex reads (CODEX_HOME's `config.toml`
-  and profiles, every `.codex/config.toml` from the folder up). `codexownhooks` checks the reading against the installed
-  Codex at every layer (the user's, a selected profile in each form Codex takes, a trusted and an untrusted project),
-  each missing, empty, blank or set: Codex 0.163.0 gives a trusted project's over the profile's over the user's, an
-  empty one clearing those below it, and refuses two profiles. With none of Hive's, Hive passes nothing and Codex's own
-  apply. Hive never writes Codex's config.
+  none (missing, empty or blank); anything else, or a render failing or passing `codex.promptInput.timeoutSeconds`
+  (Advanced, 15 s), means Hive can't tell (`developerInstructionsOf`). It is read at every launch Hive adds some to,
+  with the launch's own Extra arguments, folder and environment, never cached (only Codex knows what it depends on:
+  `-C`, ancestors, managed layers), about 200 ms. Hive's combined value is the last `-c developer_instructions` on the
+  command, after the Extra arguments, so a user's own `-c`/`--config developer_instructions=…` there is in it and never
+  overrides it. **Never anything in place of an unread value** (the Assistant's decisions on #1285): Codex unable to say,
+  an agent gets no override at all (its own apply, without Hive's guidance) and the Assistant its role alone (without it
+  there is no Assistant), each with a notice once per agent and folder while Hive runs (`launchNotice`). What Hive keeps
+  between a launch's preparation and its command is bounded (the latest 16). `codexownhooks` checks the reading against
+  the installed Codex at every layer (the user's, a selected profile in each form Codex takes, a trusted and an untrusted
+  project), each missing, empty, blank or set: Codex 0.163.0 gives a trusted project's over the profile's over the
+  user's, an empty one clearing those below it, and refuses two profiles. With none of Hive's, Hive passes nothing and
+  Codex's own apply. Hive never writes Codex's config.
 - **Row 14, the Assistant's role and its guidance: no switch** (Darren, on #1120 point 4): the Assistant is its role and
   its Control; without them it is no Assistant, only an agent. `hive.guidance` doesn't reach it.
 
