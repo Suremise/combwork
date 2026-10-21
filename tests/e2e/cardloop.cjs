@@ -87,8 +87,9 @@ const check = (name, ok, extra = '') => {
   const c1 = (await inv('tasks:create', { title: 'First card', project: 'alpha', agent: builder.id })).number
   const c2 = (await inv('tasks:create', { title: 'Second card', project: 'alpha', agent: builder.id })).number
   const built = (n) => `boardmove ${n} doing then ${wait(n, { changes: ['verdict', 'column'], column: 'passed' })} then boardmove ${n} review then boardcomment ${n}`
-  // What each does when woken, in order: c1 passes first time; c2 fails once, then passes.
-  script('Builder', [built(c2), built(c2), 'work 1'])
+  // What each does when woken, in order: c1 passes first time; c2 fails once, then passes. A lane's next card starts once
+  // the one before it is Done (#1270, OP-36; agents' moves are intents, #1268): the builder reports c1 merged first.
+  script('Builder', [`boardmove ${c1} done then ${built(c2)}`, built(c2), 'work 1'])
   script('Reviewer', [
     `boardreview ${c1} start then boardreview ${c1} passed passed then ${wait(c2, { column: 'review' })}`,
     `boardreview ${c2} start then ${wait(c2, { column: 'review', fresh: true })} then boardreview ${c2} failed`,
@@ -175,8 +176,8 @@ const check = (name, ok, extra = '') => {
   await say(builder.id, `${lane({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', rounds: 3, waitMinutes: 240, name: 'two cards' })} then ${built(c1)}`)
   const registered = await until(async () => (await api('GET', '/v1/lanes')).body?.find((l) => l.rounds === 3), HUNG_MS)
   check("the builder's start updated that lane: one lane, its rounds, wait and name", (await api('GET', '/v1/lanes')).body?.length === 1 && registered?.id === joined?.id && registered?.waitMinutes === 240 && registered?.name === 'two cards' && registered?.startedBy === 'Reviewer (alpha)', JSON.stringify(registered))
-  const done = await until(async () => (await card(c1))?.column === 'passed' && (await card(c2))?.column === 'passed', 90000)
-  check('both cards end in Passed (#170)', !!done, JSON.stringify({ c1: (await card(c1))?.column, c2: (await card(c2))?.column }))
+  const done = await until(async () => (await card(c1))?.column === 'done' && (await card(c2))?.column === 'passed', 90000)
+  check('c1 ends in Done (reported merged before c2 began), c2 in Passed (#170)', !!done, JSON.stringify({ c1: (await card(c1))?.column, c2: (await card(c2))?.column }))
   await until(async () => wakes('Builder').length >= 3 && (await live(builder.id))?.status === 'finished', 20000)
   const bw = wakes('Builder').map((w) => w.text)
   const rw = wakes('Reviewer').map((w) => w.text)
@@ -205,9 +206,9 @@ const check = (name, ok, extra = '') => {
   check('in order: c1 passed before c2 was begun', !!passedAt && !!c2Doing && passedAt < c2Doing, JSON.stringify({ passedAt, c2Doing }))
   const end = await until(async () => (await live(builder.id))?.status === 'finished' && (await live(reviewer.id))?.status === 'finished', 15000)
   check('at the end neither is watching', !!end, JSON.stringify({ b: (await live(builder.id))?.status, r: (await live(reviewer.id))?.status }))
-  // The lane as the window has it: every card passed (c2 in two rounds), still running until they're merged.
+  // The lane as the window has it: c1 Done, c2 passed in two rounds, still running until it is merged.
   const passedLane = (await inv('lanes:list')).find((l) => l.id === joined?.id)
-  check('the lane: both cards Passed, c2 took two rounds, nothing current, still active', passedLane?.state === 'active' && passedLane?.current === null && passedLane?.cards.map((c) => `${c.column}:${c.round}`).join() === 'passed:1,passed:2', JSON.stringify(passedLane))
+  check('the lane: c1 Done, c2 Passed after two rounds, nothing current, still active', passedLane?.state === 'active' && passedLane?.current === null && passedLane?.cards.map((c) => `${c.column}:${c.round}`).join() === 'done:1,passed:2', JSON.stringify(passedLane))
   // Merged (Done): the lane ends by itself and stays listed for now, with when it ended.
   await inv('tasks:update', c1, { column: 'done' })
   await inv('tasks:update', c2, { column: 'done' })

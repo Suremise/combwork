@@ -33,7 +33,7 @@ describe('Copilot descriptor', () => {
     expect(isKnownProvider('copilot')).toBe(true)
     const d = providerDescriptor('copilot')
     expect(d.name).toBe('GitHub Copilot')
-    expect(d.permissionModes.map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all'])
+    expect(d.permissionModes.map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all', 'cli-own'])
     expect(d.defaultPermissionMode).toBe('accept-edits')
     // Only Autopilot is behind the opt-in: Allow all is Copilot's low-interaction mode, offered to all (#490).
     expect(d.permissionModes.filter((m) => m.danger).map((m) => m.value)).toEqual(['autopilot'])

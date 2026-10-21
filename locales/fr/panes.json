@@ -140,6 +140,7 @@
   "panes.session.renameFailed": "Impossible de renommer",
   "panes.session.renameItem": "Renommer la session…",
   "panes.session.renameTitle": "Renommer la session",
+  "panes.session.starting": "{kind, select, resume {Reprise…} other {Démarrage…}}",
   "panes.tab.failed": "échec du démarrage : {why}",
   "panes.tab.mcp": "Serveurs MCP : {servers}",
   "panes.tab.notRunning": "arrêté",

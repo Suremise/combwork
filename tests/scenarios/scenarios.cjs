@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 72
+const FIXTURES_VERSION = 73
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2278,6 +2278,55 @@ module.exports.SCENARIOS = [
         ['started the review with hive_start_review', ran(o, 'hive_start_review').length > 0, calls],
         ['asked with hive_request_builder', ran(o, 'hive_request_builder').length > 0, calls],
         ['gave the verdict with hive_verdict', ran(o, 'hive_verdict').length > 0, calls]
+      ]
+    }
+  },
+  {
+    id: 'old-move-submit',
+    title: "A builder's move to Review is its submission for now (#1268): today's skills, the card's rules (Pair in the project folder), its summary the comment",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('w', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
+      // Coder's work, started as the user moves it, and committed.
+      await c.inv('tasks:move', n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'greet trims the name')
+    },
+    prompt: (c) => `Your work on card #${c.cards.w} is done and committed: send it for review, as the work-on-card skill says.`,
+    fake: (c) => `skill work-on-card then hive hive_update_task {"number":${c.cards.w},"column":"review","comment":"Round 1 ready: greet.js trims the name."}`,
+    expect: (o) => {
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['the card is in Review', o.cards.w?.column === 'review', o.cards.w?.column],
+        ['submitted by the rules (a Submitted fact with its summary)', factsOf(o, 'w', 'Submitted').some((f) => /trims/.test(String(f.data.summary))), (o.facts?.w ?? []).map((f) => f.kind).join(',')],
+        ['sent it with hive_update_task or hive_submit', ran(o, 'hive_update_task').length + ran(o, 'hive_submit').length > 0, calls]
+      ]
+    }
+  },
+  {
+    id: 'old-move-review',
+    title: "A reviewer's review start and failed verdict are start review and a verdict for now (#1268): today's skills, the card back in Doing with its builder",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with a test.', agent: 'implementer' })
+      // Implementer's work, as the user moves it: started (Doing), a commit, submitted (Review).
+      await c.inv('tasks:move', n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+      await c.inv('tasks:move', n, 'review')
+    },
+    prompt: (c) => `Review card #${c.cards.r}, as the review-agent-work skill says. Fail it: greet.js has no test.`,
+    fake: (c) => `skill review-agent-work then boardreview ${c.cards.r} start then hive hive_update_task {"number":${c.cards.r},"review":"failed","comment":"Round 1: FAILED. 1. greet.js has no test."}`,
+    expect: (o) => {
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['it reviewed the submission (a ReviewStarted fact)', factsOf(o, 'r', 'ReviewStarted').length > 0, (o.facts?.r ?? []).map((f) => f.kind).join(',')],
+        ['failed it (a failed Verdict)', factsOf(o, 'r', 'Verdict').some((f) => f.data.pass === false), calls],
+        ["the card is back in Doing, still Implementer's", o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`]
       ]
     }
   },

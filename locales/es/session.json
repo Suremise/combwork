@@ -79,6 +79,7 @@
   "session.mergeSlot.waitingNext": "Esperando el turno de fusión (el agente {agent} es el siguiente en fusionar)",
   "session.mergeSlot.waitingNextCards": "Esperando el turno de fusión (el agente {agent} es el siguiente en fusionar {cards})",
   "session.mode.asking": "El agente te está preguntando algo. Respóndele primero y luego cambia el modo.",
+  "session.mode.assistantCliOwn": "El Asistente no puede usar el ajuste propio de la CLI: su ajuste Control depende de conocer el modo en que se ejecuta. Elige uno de los modos de la CLI.",
   "session.mode.ended": "La sesión terminó antes de que Hive pudiera cambiarla al modo {mode}.",
   "session.mode.endedUnconfirmed": "La sesión terminó antes de que {provider} confirmara el cambio al modo {mode}.",
   "session.mode.notFound": "Hive no encontró {what}, así que no cambió al modo {mode}. Revisa su terminal o cambia el modo allí.",

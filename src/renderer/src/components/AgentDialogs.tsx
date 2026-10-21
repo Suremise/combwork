@@ -116,8 +116,11 @@ export function Overrides({
   onPermission,
   onContext,
   inherit,
-  inheritIsDefault
+  inheritIsDefault,
+  assistant
 }: {
+  /** The Hive Assistant's: never the CLI's own setting (#1284). */
+  assistant?: boolean
   /** What an empty choice is called (the project's, by default): the caller's own words. */
   inherit?: string
   /** That name says it is the default ("Default"): the effort then names the level alone, not "High, default" (#916). */
@@ -150,7 +153,8 @@ export function Overrides({
   // not "Default (Opus 5.5 (default))" (#892).
   const projectModel = effectiveModelLabel(provider, (pc.model && pc.model !== 'inherit' ? pc.model : '') || g.defaultModel || cliDefault || undefined, '', info)
   const projectPermission = modeName(provider, pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode)
-  const modes = offeredModes(provider, settings)
+  // Never the CLI's own setting for the Assistant (#1284).
+  const modes = offeredModes(provider, settings, assistant)
   // What would run: the choice here, else what it inherits.
   const runModel = model || (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || cliDefault
   const runMode = permission || (pc.permissionMode !== 'inherit' ? pc.permissionMode : g.defaultPermissionMode)
