@@ -14,7 +14,7 @@ import type { CardRecord } from '../workflow/factStore'
 import { reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { slugOf, type Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -320,6 +320,30 @@ export class GitPlatform implements PlatformAdapter {
 
   targetHead(target: string): Promise<Maybe<string | null>> {
     return G.lineHead(this.project, target)
+  }
+
+  async lineNow(folder: string, target: string): Promise<Maybe<LineNow>> {
+    const line = await G.branch(folder)
+    if (isUnknown(line)) return line
+    const head = await G.head(folder)
+    if (isUnknown(head)) return head
+    const th = await G.lineHead(this.project, target)
+    if (isUnknown(th)) return th
+    if (!th) return unknown(UNREADABLE.head, { where: target })
+    const inTarget = await G.isAncestor(folder, head, th)
+    if (isUnknown(inTarget)) return inTarget
+    const dirty = await G.dirty(folder)
+    if (isUnknown(dirty)) return dirty
+    return { line, head, targetHead: th, inTarget, dirty }
+  }
+
+  moveLine(folder: string, to: string): Promise<true | string> {
+    return G.resetKeep(folder, to)
+  }
+
+  async commitsBetween(folder: string, from: string, to: string): Promise<Maybe<string[]>> {
+    const c = await G.commits(folder, `${from}..${to}`)
+    return isUnknown(c) ? c : c.map((x) => `${x.commit.slice(0, 7)} ${x.subject}`)
   }
 
   reconcile(card: CardRecord, hooks: ReconcileHooks): Promise<void> {

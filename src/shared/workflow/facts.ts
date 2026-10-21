@@ -112,6 +112,9 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 /** The gate of Hive's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
+/** The gate of Hive's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
+export const LINE_GATE = 'lineUpdate'
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'

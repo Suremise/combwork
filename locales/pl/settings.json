@@ -187,6 +187,8 @@
   "settings.advanced.hive.wait.cardMaxSeconds.title": "Oczekiwanie na karty: maksimum",
   "settings.advanced.hive.workflow.enforce.desc": "Hive pilnuje reguł przepływu pracy każdego projektu, gdy karty się przesuwają: tego, czego wymagają jego opcje Kontroli wersji, zanim karta trafi do Recenzji, Zatwierdzonych lub Gotowych, i tego, co następuje, gdy Hive zobaczy, że praca karty została scalona lub zmieniona poza Hive. Po wyłączeniu wszystkie reguły są wyłączone naraz we wszystkich projektach: karty trafiają tam, gdzie zostaną odłożone, nic nie jest odrzucane ani nie wymaga pytania, a Hive tylko zapisuje, co dzieje się z pracą każdej karty, nie przesuwając z tego powodu kart ani nie budząc agentów.",
   "settings.advanced.hive.workflow.enforce.title": "Reguły przepływu pracy są egzekwowane",
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": "Gdy karta z własnego worktree agenta została scalona do celu jako squash, gałąź agenta nadal ma jej commity, więc jego następna karta w torze by je zawierała. Gdy to jest włączone, Hive przesuwa gałąź na cel przed startem następnej karty, gdy agent jest bezczynny, jego uruchomienia się zakończyły, a worktree jest czysty, i tylko gdy wszystko na niej jest w celu: w innym razie pyta Cię w sekcji Dla Ciebie. Gdy jest wyłączone, Hive pyta Cię za każdym razem: zatwierdź, aby przesunął gałąź raz, albo odrzuć i zrób to sam. Przy wyłączonych regułach przepływu pracy Hive nigdy nie przesuwa gałęzi.",
+  "settings.advanced.hive.workflow.updateAgentBranch.title": "Aktualizuj gałąź agenta po scaleniu typu squash",
   "settings.advanced.logs.desc": "Otwórz folder z plikami logów Hive.",
   "settings.advanced.logs.tip": "Przydatne przy zgłaszaniu problemu.",
   "settings.advanced.logs.title": "Logi",

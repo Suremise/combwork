@@ -46,6 +46,15 @@ export interface HeadMove {
 }
 
 /** A check run's bracket: the card's revision, what was tested, the run's result, and why it doesn't count, if not. */
+/** An agent's worktree as a lane's next card finds it (lineNow). */
+export interface LineNow {
+  line: string | null
+  head: string
+  targetHead: string
+  inTarget: boolean
+  dirty: string[]
+}
+
 export interface CheckBracket {
   revision: string
   tested: string
@@ -88,6 +97,15 @@ export interface PlatformAdapter {
   contains(target: string, change: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>>
   /** A target's head now, for a recorded integration's result. */
   targetHead(target: string): Promise<Maybe<string | null>>
+  /**
+   * An agent's worktree between a lane's cards (§16.19.2, #1271; Git only): its line, its head, the target's head, whether
+   * the head is in the target (an ancestor of it), and its uncommitted files.
+   */
+  lineNow?(folder: string, target: string): Promise<Maybe<LineNow>>
+  /** Moves an agent's worktree's line to `to` (Git: `reset --keep`, which refuses to overwrite a local change): true, or why not. */
+  moveLine?(folder: string, to: string): Promise<true | string>
+  /** The commits on a line from `from` (exclusive) to `to`, oldest first, as short ids and subjects. */
+  commitsBetween?(folder: string, from: string, to: string): Promise<Maybe<string[]>>
   /** Reconciles a card with the platform (§16.4.4). */
   reconcile(card: CardRecord, hooks: ReconcileHooks): Promise<void>
   /** Runs a check and brackets it (§16.13). */

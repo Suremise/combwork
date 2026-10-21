@@ -292,6 +292,15 @@ export async function isolate(repo: string, folder: string, line: string, base: 
   return r.ok ? folder : unknown(U.folderFor, { branch: line })
 }
 
+/**
+ * Moves a worktree's branch to a revision with `git reset --keep` (§16.19.2, #1271): git refuses rather than overwrite a
+ * local change. True when moved, else git's reason.
+ */
+export async function resetKeep(folder: string, to: string): Promise<true | string> {
+  const r = await git(folder, ['reset', '--keep', to])
+  return r.ok ? true : (r.err || r.out || 'git reset --keep failed').trim() // i18n-ignore: git's own words, or the command
+}
+
 /** Pins a revision by a ref so a deleted line, a force push or garbage collection can't lose it (§16.9.3). */
 export async function pin(repo: string, ref: string, rev: string): Promise<boolean> {
   return (await git(repo, ['update-ref', ref, rev])).ok
