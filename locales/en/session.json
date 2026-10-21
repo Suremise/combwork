@@ -419,6 +419,10 @@
     "defaultMessage": "The agent has finished its task.",
     "description": "The notification that an agent finished, when it left no last message to show."
   },
+  "session.notice.hooksMissingTitle": {
+    "defaultMessage": "Hive isn't hearing from {agent}'s hooks",
+    "description": "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent."
+  },
   "session.notice.longConversation": {
     "defaultMessage": "{agent}: long conversation",
     "description": "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent."

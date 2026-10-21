@@ -373,6 +373,11 @@ export interface ProviderAdapter {
    */
   autoCompact?(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting
   /**
+   * Where the CLI's settings files turn its hooks off for a launch (#1336: why its hooks don't reach Hive), read now and
+   * never changed: the settings' name in the window's language, or null when none does (or Hive can't tell).
+   */
+  hooksOffIn?(ctx: LaunchContext): string | null
+  /**
    * Details from lines appended to the session's transcript (Codex: model, preset, Plan mode, plan limits). `memo` is
    * the launch's own, kept between reads (and emptied when the reading starts again), for what a later line completes.
    */

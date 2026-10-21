@@ -158,6 +158,8 @@
   "settings.advanced.hive.guidance.title": "エージェントへのHiveのガイダンス",
   "settings.advanced.hive.heapSnapshotNearLimit.desc": "Hiveのメインプロセスがメモリの上限に近づくと、終了する前にメモリのスナップショットをHiveのプロファイルのheapフォルダーに書き込み、何がメモリを使い切ったかを調べられるようにします。スナップショットは数ギガバイトになることがあり、Hiveがメモリに持っていたもの（カードのテキスト、トランスクリプト、場合によってはトークン）をすべて含み、このPCに保存されます。Hiveは新しいものを2つ残します。Hiveの再起動後に適用されます。",
   "settings.advanced.hive.heapSnapshotNearLimit.title": "Hiveのメモリが不足しそうなときにメモリスナップショットを保存",
+  "settings.advanced.hive.hooks.missingSeconds.desc": "エージェントの CLI が起動してから (起動時にフックを送る CLI の場合)、または作業を始めたプロンプトの後に、フックなしで過ごせる時間です。これを過ぎると Hive はフックが届いていないと伝え、状態を不明と表示します (#1336)。プロンプトのフックの後の長い思考は数えません。遅いマシンで問題のないエージェントにこの通知が出る場合は長くしてください。",
+  "settings.advanced.hive.hooks.missingSeconds.title": "フック未着: 待機時間",
   "settings.advanced.hive.mcp.connectSeconds.desc": "エージェントの準備ができてから、そのCLIがHiveのツールに接続するのをHiveが待つ時間です。この時間が過ぎると、接続を待たずに新しい作業を知らせます。再開したセッションはツールより先に準備ができることがあり、その時点のメッセージはツールなしのターンになります（#865）。CLIがHiveのツールに接続しないエージェントにメッセージが遅れて届く場合は、値を下げてください。",
   "settings.advanced.hive.mcp.connectSeconds.title": "hiveツール：接続の待機",
   "settings.advanced.hive.mcp.replySeconds.desc": "hive MCPサーバーが、ツールへのHiveの応答を待つ時間です（待機ツール自体の時間はこれに加わります）。遅いマシンや非常に忙しいマシンで、hiveツールが「Hive didn't reply within 300 s」で失敗する場合に増やしてください（#371）。",

@@ -635,6 +635,14 @@
     "defaultMessage": "Save a memory snapshot if Hive is about to run out of memory",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.hooks.missingSeconds.desc": {
+    "defaultMessage": "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Hive says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.",
+    "description": "What the advanced setting \"Hooks missing: wait\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.hooks.missingSeconds.title": {
+    "defaultMessage": "Hooks missing: wait",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

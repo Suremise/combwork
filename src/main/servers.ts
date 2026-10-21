@@ -14,7 +14,7 @@ import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } f
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { fallbackEfforts, modelGroups } from '../shared/models'
-import { agentRuntime, unknownStateText } from '../shared/runtime'
+import { agentRuntime, hooksMissingText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
@@ -421,9 +421,14 @@ function progressOf(projectPath: string, agentId: string) {
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
 }
 
-/** An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648). */
+/**
+ * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
+ * does one whose hooks aren't reaching Hive (#1336).
+ */
 const statusMessageOf = (live: LiveSessionState | null | undefined): string | null =>
-  live?.status === 'watching'
+  live?.hooksMissing
+    ? `${hooksMissingText(live)}: its CLI's hooks aren't reaching Hive, so its status may be wrong and it isn't given work; the user can restart its session`
+    : live?.status === 'watching'
     ? (live.watch?.label ?? null)
     : live?.status === 'signin'
       ? `Its CLI's sign-in has expired: the user must sign in again (${live.signIn?.message ?? 'not signed in'})`

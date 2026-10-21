@@ -160,6 +160,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.guidance.title': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.title': undefined
+  'settings.advanced.hive.hooks.missingSeconds.desc': undefined
+  'settings.advanced.hive.hooks.missingSeconds.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined

@@ -5,7 +5,7 @@ import { useLanes, type Lane } from '../laneSource'
 import { agentLaunchSettings, modeOption } from '@shared/providers'
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume } from '@shared/resumeAll'
-import { shownMergeSlot, shownStatusMessage } from '@shared/runtime'
+import { hooksMissingText, shownMergeSlot, shownStatusMessage } from '@shared/runtime'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
@@ -234,6 +234,9 @@ function compactKey(): { hasKey: 'yes' | 'no'; key: string } {
 }
 
 /** A project's lanes (its builders and reviewers, to pair them up in its agents table, #529). */
+/** An agent of the project whose hooks aren't arriving (#1336) speaks for its row: its status word would be a guess. */
+const deafStatus = (p: ProjectInfo): string | null => hooksMissingText(p.agents.find((a) => a.live?.hooksMissing)?.live, tr)
+
 function projectLanes(lanes: readonly Lane[], p: ProjectInfo): Lane[] {
   return lanes.filter((l) => l.project.toLowerCase() === p.path.toLowerCase())
 }
@@ -350,7 +353,7 @@ function ProjectsRail() {
 
   const item = (p: ProjectInfo) => {
     const state = projectState(p)
-    const status = state ? STATUS_TEXT[state.status] : tr(p.active ? M.noSession : M.inactive)
+    const status = deafStatus(p) ?? (state ? STATUS_TEXT[state.status] : tr(p.active ? M.noSession : M.inactive))
     // Its agents as a table (#529), whenever it has any.
     const table = p.agents.length > 0
     const lanesOf = projectLanes(lanes, p)
@@ -446,7 +449,7 @@ function ProjectsPanel() {
     // One dot per project: the most urgent of its agents.
     const state = projectState(p)
     const running = p.agents.filter((a) => a.live).length
-    const status = state ? STATUS_TEXT[state.status] : tr(p.active ? M.noSession : M.inactive)
+    const status = deafStatus(p) ?? (state ? STATUS_TEXT[state.status] : tr(p.active ? M.noSession : M.inactive))
     const lanesOf = projectLanes(lanes, p)
     return (
       <div

@@ -106,6 +106,7 @@ interface HiveMessageValues {
   'session.newConversation.pending': undefined
   'session.notice.finished': { agent: string | number }
   'session.notice.finishedBody': undefined
+  'session.notice.hooksMissingTitle': { agent: string | number }
   'session.notice.longConversation': { agent: string | number }
   'session.notice.needsInput': { agent: string | number }
   'session.notice.notWatching': { agent: string | number; cards: string | number }

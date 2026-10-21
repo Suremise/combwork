@@ -35,7 +35,7 @@ import { ModeBadge } from './PermissionMode'
 import { contextLines, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
-import { unknownStateText } from '@shared/runtime'
+import { hooksMissingNote, hooksMissingText, unknownStateText } from '@shared/runtime'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
 
@@ -1252,7 +1252,13 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       <Tooltip content={<AgentTabTip project={project} a={a} />}>
         <span className="agent-name">{a.name}</span>
       </Tooltip>
-      {live?.untakenLine ? (
+      {live?.hooksMissing ? (
+        // Its hooks aren't reaching Hive (#1336): its status may be wrong, so it says unknown; the project's banner over
+        // the panes has the whole note and Restart session for the focused agent.
+        <Tooltip content={hooksMissingNote(live, tr)}>
+          <span className="faint pane-status asks hooks-missing">{hooksMissingText(live, tr)}</span>
+        </Tooltip>
+      ) : live?.untakenLine ? (
         // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
         <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Hive typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Hive types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
           <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Hive typed wasn't taken", description: "A pane's status: a line Hive typed into the agent's CLI wasn't taken." }))}</span>
