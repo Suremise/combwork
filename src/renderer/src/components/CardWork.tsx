@@ -33,6 +33,10 @@ const M = {
   round: msg({ id: 'board.work.round', defaultMessage: 'Round {round, number}', description: "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)." }),
   noCode: msg({ id: 'board.work.noCode', defaultMessage: 'Submitted without code', description: "In place of a revision in the card dialog's Work section: a no-code card's submission (design, investigation), which has no revision. Glossary: no-code card." }),
   noRevision: msg({ id: 'board.work.noRevision', defaultMessage: 'No revision recorded', description: "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Hive reads its revisions). Glossary: revision." }),
+  notRead: msg({ id: 'board.work.notRead', defaultMessage: 'Not read: {why}', description: "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {why} is the reason as Hive recorded it (in English, as agents read it)." }),
+  revisionNotRead: msg({ id: 'board.work.revisionNotRead', defaultMessage: 'Revision not read when it was submitted: {why}. Its next submission reads it again.', description: "In place of a revision in the card dialog's Work section: Hive couldn't read the revision when the builder submitted it (the repository couldn't be read). {why} is the reason as Hive recorded it (in English, as agents read it). Glossary: revision." }),
+  filesNotRead: msg({ id: 'board.work.filesNotRead', defaultMessage: 'Files not read: {why}', description: "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {why} is the reason as Hive recorded it (in English, as agents read it)." }),
+  folderGone: msg({ id: 'board.work.folderGone', defaultMessage: 'Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.', description: "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead." }),
   files: msg({ id: 'board.work.files', defaultMessage: '{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}', description: "A button in the card dialog's Work section: how many files the revision changed; a click shows them." }),
   openFile: msg({ id: 'board.work.openFile', defaultMessage: 'Open {path} in Files', description: "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path." }),
   verdict: msg({ id: 'board.work.verdict', defaultMessage: '{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}', description: "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail." }),
@@ -69,6 +73,10 @@ function useProjectOf(card: { project: string }): { project: ProjectInfo | null;
   const platform = project?.platform?.id
   return { project, short: (id) => (platform ? revisionShort(platform, id) : id.slice(0, 7)) }
 }
+
+/** Two folder paths are the same folder (Windows: any case, either slash, no trailing one). */
+const folderKey = (p: string): string => p.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase()
+const samePath = (a: string, b: string): boolean => folderKey(a) === folderKey(b)
 
 /** A revision: short, a click copies it whole. */
 function RevisionCode({ id, short }: { id: string; short: (id: string) => string }) {
@@ -127,10 +135,15 @@ export function CardWork({ card }: { card: TaskCard }) {
 
 function WorkDetails({ view: v, project, short, agentName }: { view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
   const rows: [string, React.ReactNode][] = []
+  // A field that couldn't be read when the work started says so, with why (never shown as none).
+  const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, { why: v.unknown[field] })}</span>
   if (v.line) rows.push([tr(M.branch), <code key="line">{v.line}</code>])
+  else if (v.unknown.line) rows.push([tr(M.branch), notRead('line')])
   if (v.base) rows.push([tr(M.base), <RevisionCode key="base" id={v.base} short={short} />])
+  else if (v.unknown.base) rows.push([tr(M.base), notRead('base')])
   if (v.folder) rows.push([tr(M.folder), v.folder === 'project' ? tr(M.projectFolder) : <code key="folder">{v.folder}</code>])
   if (v.target) rows.push([tr(M.target), <code key="target">{v.target}</code>])
+  else if (v.unknown.target) rows.push([tr(M.target), notRead('target')])
   const marks = workMarks(v, short)
   return (
     <>
@@ -171,7 +184,7 @@ function WorkDetails({ view: v, project, short, agentName }: { view: WorkView; p
         <>
           <div className="card-work-sub">{tr(M.revisions)}</div>
           {[...v.revisions].reverse().map((r) => (
-            <RevisionRow key={r.submission} r={r} noCode={v.kind === 'no-code'} verdicts={v.verdicts.filter((x) => x.submission === r.submission)} checks={r.revision ? checksOn(v, r.revision) : []} project={project} folder={v.folder} builder={v.builder} short={short} agentName={agentName} />
+            <RevisionRow key={r.submission} r={r} noCode={v.kind === 'no-code'} verdicts={v.verdicts.filter((x) => x.submission === r.submission)} checks={r.revision ? checksOn(v, r.revision) : []} project={project} folder={v.folder} short={short} agentName={agentName} />
           ))}
         </>
       )}
@@ -192,19 +205,21 @@ function workMarks(v: WorkView, short: (id: string) => string): string[] {
   return out
 }
 
-function RevisionRow({ r, noCode, verdicts, checks, project, folder, builder, short, agentName }: { r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; builder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agentName }: { r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
   const [files, setFiles] = useState(false)
-  // Its files open in the project's Files tab: the builder's worktree when the card has a folder of its own.
+  // Its files open in the folder it was made in (#1224 round 1, finding 1): the project folder, or the worktree at the
+  // recorded path, whichever agent has it now; never another tree. A folder no agent has now: its files show as text.
+  const agentAt = folder && folder !== 'project' ? (project?.agents.find((a) => a.worktree && samePath(a.worktree.path, folder))?.id ?? null) : null
+  const openable = !!project && (folder === 'project' || folder === null || agentAt !== null)
   const open = (path: string): void => {
-    if (!project) return
-    const own = folder && folder !== 'project' ? builder : null
-    openFileLink({ project: project.path, agentId: own, root: own && folder ? folder : project.path, rel: path })
+    if (!project || !openable) return
+    openFileLink({ project: project.path, agentId: agentAt, root: agentAt && folder ? folder : project.path, rel: path })
   }
   return (
     <div className="card-work-rev" data-submission={r.submission}>
       <div className="card-work-rev-head">
         {/* Its parts with middle dots between them; the time relative, the date and time in full on hover, as elsewhere. */}
-        {r.revision ? <RevisionCode id={r.revision} short={short} /> : <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
+        {r.revision ? <RevisionCode id={r.revision} short={short} /> : r.unknown.revision ? <span className="card-work-unread">{tr(M.revisionNotRead, { why: r.unknown.revision })}</span> : <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
         <span className="faint card-work-dot">{tr(M.round, { round: r.round })}</span>
         {r.by && <span className="faint card-work-dot">{agentName(r.by)}</span>}
         <span className="faint card-work-dot" title={formatDateTime(r.at)}>
@@ -215,6 +230,9 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, builder, sh
           <button type="button" className="btn small subtle" aria-expanded={files} onClick={() => setFiles(!files)}>
             <Icon name={files ? 'chevron-down' : 'chevron-right'} /> {tr(M.files, { n: r.files.length })}
           </button>
+        ) : r.unknown.files ? (
+          // Never read: not "no files changed" (#1224 round 1, finding 2).
+          <span className="card-work-unread">{tr(M.filesNotRead, { why: r.unknown.files })}</span>
         ) : (
           <span className="faint">{tr(M.files, { n: 0 })}</span>
         )}
@@ -224,11 +242,16 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, builder, sh
           {r.files.map((f) => (
             <li key={f.path}>
               <span className="card-work-file-status">{f.status}</span>
-              <button type="button" className="link" title={tr(M.openFile, { path: f.path })} onClick={() => open(f.path)}>
-                {f.path}
-              </button>
+              {openable ? (
+                <button type="button" className="link" title={tr(M.openFile, { path: f.path })} onClick={() => open(f.path)}>
+                  {f.path}
+                </button>
+              ) : (
+                <span>{f.path}</span>
+              )}
             </li>
           ))}
+          {!openable && folder && <li className="faint card-work-gone">{tr(M.folderGone, { folder })}</li>}
         </ul>
       )}
       {(verdicts.length > 0 || checks.length > 0) && (

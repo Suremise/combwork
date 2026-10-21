@@ -8429,6 +8429,9 @@ textarea.input.task-blocked-input {
   content: '·';
   margin-inline-end: 8px;
 }
+.card-work-unread {
+  color: var(--warning);
+}
 .card-work-rev-id {
   background: none;
   border: none;

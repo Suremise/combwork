@@ -126,6 +126,71 @@ const commit = (dir, file, text, message) => {
   await file.click()
   check('a file opens in the project’s Files tab', !!(await lib.until(async () => (await page.locator('.tab-body').innerText().catch(() => '')).includes('greet.ts'), HUNG_MS)))
 
+  const closeDialogs = () =>
+    lib.until(async () => {
+      if (await page.locator('.dialog').count()) await page.keyboard.press('Escape')
+      return (await page.locator('.dialog').count()) === 0
+    }, HUNG_MS)
+  const openCard = async (n) => {
+    await closeDialogs()
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    await page.locator(`.task-card[data-task="${n}"]`).click()
+    const d = page.locator('.dialog', { hasText: `(#${n})` })
+    await d.waitFor({ timeout: HUNG_MS })
+    return d
+  }
+
+  // --- A submission whose repository couldn't be read (#1224 round 1, finding 2): its revision and files say they
+  // weren't read, and why, never "no files changed". HEAD is unreadable while it is submitted, then put back.
+  const u = (await inv('tasks:create', { title: 'Read failure', project: 'alpha', agent: builder.id, column: 'todo' })).number
+  await say(alpha, builder.id, `boardmove ${u} doing`)
+  await lib.until(async () => (await card(u))?.column === 'doing', HUNG_MS)
+  const headFile = path.join(alpha, '.git', 'HEAD')
+  const headWas = fs.readFileSync(headFile, 'utf8')
+  fs.writeFileSync(headFile, 'not a ref\n')
+  try {
+    await say(alpha, builder.id, `boardmove ${u} review`)
+    check('a card is submitted while its repository can’t be read', !!(await lib.until(async () => (await card(u))?.column === 'review', HUNG_MS)))
+  } finally {
+    fs.writeFileSync(headFile, headWas)
+  }
+  const uWork = await lib.until(async () => { const v = await inv('tasks:work', u); return v?.revisions.length === 1 && v }, HUNG_MS)
+  check('its work keeps what couldn’t be read, and why', !!uWork?.revisions[0]?.unknown?.revision && !!uWork.revisions[0].unknown.files, JSON.stringify(uWork?.revisions[0]))
+  const uSection = (await openCard(u)).locator('.card-work[data-work="recorded"]')
+  const uText = async () => (await uSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('the Work section says the revision and its files weren’t read, with why, not that none changed', !!(await lib.until(async () => { const t = await uText(); return t.includes('Revision not read when it was submitted: ') && t.includes('Its next submission reads it again.') && t.includes('Files not read: ') && !t.includes('No files changed') }, HUNG_MS)), await uText())
+  await uSection.screenshot({ path: path.join(lib.WORK, 'cardwork-unread-dark.png') })
+
+  // --- A builder in its own worktree: its files open there (#1224 round 1, finding 1); once no agent has that folder,
+  // its files are shown as text with why, never opened in another tree.
+  const tree = await lib.addAgent(inv, alpha, { name: 'Tree', location: 'new-worktree' })
+  const treePath = (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === alpha.toLowerCase()).agents.find((a) => a.id === tree.id).worktree.path
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), notes.toLowerCase(), treePath.toLowerCase()]))
+  await inv('session:start', alpha, { agentId: tree.id })
+  await lib.until(() => idle(alpha, tree.id), HUNG_MS)
+  const treeCard = (await inv('tasks:create', { title: 'In its own folder', project: 'alpha', agent: tree.id, column: 'todo' })).number
+  await say(alpha, tree.id, `boardmove ${treeCard} doing`)
+  await lib.until(async () => (await card(treeCard))?.column === 'doing', HUNG_MS)
+  commit(treePath, 'tree-only.ts', 'export const tree = true\n', 'Tree work')
+  await say(alpha, tree.id, `boardmove ${treeCard} review`)
+  check('the worktree builder submits its card', !!(await lib.until(async () => (await card(treeCard))?.column === 'review', HUNG_MS)))
+  let tDialog = await openCard(treeCard)
+  let tSection = tDialog.locator('.card-work[data-work="recorded"]')
+  check('its folder is the worktree’s', !!(await lib.until(async () => (await tSection.innerText().catch(() => '')).toLowerCase().includes(treePath.toLowerCase().replace(/\\/g, '/')) || (await tSection.innerText().catch(() => '')).toLowerCase().includes(treePath.toLowerCase()), HUNG_MS)), await tSection.innerText().catch(() => ''))
+  await tSection.getByRole('button', { name: '1 file changed' }).click()
+  await tSection.locator('.card-work-files button', { hasText: 'tree-only.ts' }).click()
+  // The file is only in the worktree: the Files tab shows it there.
+  check('a file opens in the worktree it was made in', !!(await lib.until(async () => (await page.locator('.tab-body').innerText().catch(() => '')).includes('tree-only.ts'), HUNG_MS)))
+  await inv('session:stop', alpha, tree.id)
+  await lib.until(async () => !(await live(alpha, tree.id)), HUNG_MS)
+  await inv('agents:remove', alpha, tree.id, { deleteWorktree: false, releaseCards: false })
+  tDialog = await openCard(treeCard)
+  tSection = tDialog.locator('.card-work[data-work="recorded"]')
+  await lib.until(async () => (await tSection.count()) === 1, HUNG_MS)
+  await tSection.getByRole('button', { name: '1 file changed' }).click()
+  check('once no agent has its folder, its files show as text, saying why', !!(await lib.until(async () => (await tSection.locator('.card-work-files button').count()) === 0 && (await tSection.locator('.card-work-files').innerText().catch(() => '')).includes('tree-only.ts') && (await tSection.locator('.card-work-gone').innerText().catch(() => '')).includes('is no longer an agent’s worktree'), HUNG_MS)), await tSection.innerText().catch(() => ''))
+  await closeDialogs()
+
   // --- A None card: no branch, its work in the project folder.
   const nn = (await inv('tasks:create', { title: 'Write the plan', project: 'notes', agent: writer.id, column: 'todo' })).number
   await say(notes, writer.id, `boardmove ${nn} doing`)

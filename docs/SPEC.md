@@ -1271,7 +1271,9 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   A card from before 1.0 says it has no work record; an adopted one says so; a work view that can't be read says why,
   with Retry. The board card shows, in one line, the revision, the last verdict, the checks on it and a stale or
   outside-the-rules mark, each an icon with its words as its accessible name. None's revisions show once P4 reads them
-  ("No revision recorded" until then).
+  ("No revision recorded" until then). What a fact names as not read (`platform.unknown`: a revision, its files, a
+  line or base) is shown as not read, with why, never as none; a revision's files open in the folder recorded for it
+  (the agent whose worktree it is now), else are listed as text, saying the folder is no longer an agent's [#1224 round 1].
 - **Restart** resumes from the log. The merge queue rebuilds from `IntegrationRequested` entries with no
   `IntegrationCancelled`, `IntegrationFailed` or `Integrated` for the same entry id; an entry with `IntegrationStarted`
   and no outcome is reconciled first (§16.4.5) [note §4; P1, answering HR2's round 1 finding 8].

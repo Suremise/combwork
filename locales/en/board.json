@@ -2255,9 +2255,17 @@
     "defaultMessage": "{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}",
     "description": "A button in the card dialog's Work section: how many files the revision changed; a click shows them."
   },
+  "board.work.filesNotRead": {
+    "defaultMessage": "Files not read: {why}",
+    "description": "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {why} is the reason as Hive recorded it (in English, as agents read it)."
+  },
   "board.work.folder": {
     "defaultMessage": "Folder",
     "description": "A label in the card dialog's Work section: the folder the card's work is done in follows (the project folder, or its own folder)."
+  },
+  "board.work.folderGone": {
+    "defaultMessage": "Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.",
+    "description": "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead."
   },
   "board.work.integrated": {
     "defaultMessage": "{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}",
@@ -2286,6 +2294,10 @@
   "board.work.none": {
     "defaultMessage": "No revision submitted yet.",
     "description": "The card dialog's Work section for a card whose builder hasn't submitted a revision for review yet. Glossary: revision."
+  },
+  "board.work.notRead": {
+    "defaultMessage": "Not read: {why}",
+    "description": "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {why} is the reason as Hive recorded it (in English, as agents read it)."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
@@ -2318,6 +2330,10 @@
   "board.work.retry": {
     "defaultMessage": "Retry",
     "description": "A button in the card dialog's Work section after its work couldn't be read: reads it again."
+  },
+  "board.work.revisionNotRead": {
+    "defaultMessage": "Revision not read when it was submitted: {why}. Its next submission reads it again.",
+    "description": "In place of a revision in the card dialog's Work section: Hive couldn't read the revision when the builder submitted it (the repository couldn't be read). {why} is the reason as Hive recorded it (in English, as agents read it). Glossary: revision."
   },
   "board.work.revisions": {
     "defaultMessage": "Revisions, newest first",
