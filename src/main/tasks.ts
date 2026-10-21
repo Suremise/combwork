@@ -3,13 +3,14 @@ import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { englishText, forAgents, withValues, type Text } from '../shared/advanced'
-import { msg, tr } from '../shared/i18n'
+import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, sortCards } from '../shared/tasks'
 import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
 import type { TaskMoveResult } from '../shared/types'
+import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
@@ -146,22 +147,6 @@ export async function cardBatch<T>(ws: WorkspaceService, fn: () => Promise<T>): 
   return boardWrite(ws, fn)
 }
 
-/** A card loop's handoff (#405): a card arrived in Review (moved or returned there), or its review gave a verdict. */
-export interface LoopEvent {
-  ws: WorkspaceService
-  card: TaskCard
-  kind: 'review' | 'verdict'
-  /** Who made the change. */
-  actor: TaskActor
-}
-let loopEvents: ((e: LoopEvent) => void) | null = null
-/** Told of each loop handoff once its change is saved (loopWakes.ts wakes the card's reviewer or builder). */
-export function onLoopEvent(fn: (e: LoopEvent) => void): void {
-  loopEvents = fn
-}
-/** History lines that bring a card into Review: moved there (to its top, bottom or before a card), or returned there for its next round. */
-const INTO_REVIEW = new Set<string>([HISTORY.moved.id, HISTORY.movedTop.id, HISTORY.movedBottom.id, HISTORY.movedBefore.id])
-const intoReview = (s: StoredText): boolean => s.id === HISTORY.returned.id || (INTO_REVIEW.has(s.id) && s.values?.column === 'review')
 
 /** A card as saved, with anything missing or of the wrong type made safe (a card from an older Hive or an export may lack fields). */
 function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?: ProjectIdIndex, key?: string): TaskCard {
@@ -874,9 +859,12 @@ const clip = (s: string, max = 80): string => {
   return one.length > max ? `${one.slice(0, max - 1)}…` : one
 }
 
+/** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
+const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
+
 /** A history line's English, from its message and values: what agents read and Hive's own code matches (`what`). */
 const englishSaid = (s: StoredText): string => {
-  const t = storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), providerMessage)
+  const t = storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), lineMessage)
   if (t === null) throw new Error(`No history line ${s.id}`) // i18n-ignore: a mistake in Hive's code, never shown
   return t
 }
@@ -1079,7 +1067,9 @@ export async function runIntent<R>(
           const extra = zero9(w, first)
           first = false
           const p: TaskPatch = { ...extra.patch, column: STAGE_CATEGORY[w.current] }
-          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }))
+          // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).
+          const moved = w.written.findLast((f) => f.kind === 'Moved')?.seq ?? null
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }), moved)
         }
       },
       () => call(wf)
@@ -1191,7 +1181,6 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
   const ws = workspace
   const by = actorName(actor)
   const comment = opts.comment === undefined ? null : commentText(opts.comment)
-  let handoff: LoopEvent['kind'] | null = null
   // Moved into Done: merged, a fact for the Assistant's journal (#1031) once it is saved.
   let intoDone = false
   const result = await (async () => {
@@ -1353,19 +1342,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // see the card as it was before this change.
     opts.commit?.()
     await saveCard(ws, n, card, before)
-    handoff = said.some((x) => x.id === HISTORY.reviewPassed.id || x.id === HISTORY.reviewFailed.id) ? 'verdict' : said.some(intoReview) ? 'review' : null
     return card
   })()
   changed(ws)
-  if (handoff) {
-    try {
-      // Once the change is saved (#1017: its transaction commits), outside it: its wake reads the card as saved.
-      const kind = handoff
-      afterBoardWrite(ws, () => loopEvents?.({ ws, card: result, kind, actor }))
-    } catch (e) {
-      log.warn('a loop handoff', e)
-    }
-  }
   if (intoDone) afterBoardWrite(ws, () => journalFact(ws, { summary: `#${n} "${result.title}" is Done (merged), moved there by ${by}`, project: result.project || null, links: [{ type: 'card', ref: String(n) }], tags: ['done'] })) // i18n-ignore: a journal fact (the Assistant's, English)
   return result
 }

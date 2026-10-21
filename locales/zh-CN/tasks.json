@@ -103,6 +103,7 @@
   "tasks.history.movedBottom": "移到“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”底部",
   "tasks.history.movedTop": "移到“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”顶部",
   "tasks.history.noDependencies": "不再依赖其他卡片",
+  "tasks.history.notified": "已通知你{event, select, failed {评审未通过} blocked {它已阻塞} stalled {它已停滞} mergeDue {通道 {lane} 的所有卡片均已通过评审，该合并了} mergeStalled {通道 {lane} 的合并已停滞} other {它需要你处理}}{hasWhy, select, yes {：{why}} other {}}",
   "tasks.history.placed": "在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”中排第 {place, selectordinal, other {#}} 位",
   "tasks.history.renamed": "重命名为“{title}”",
   "tasks.history.repaired": "项目：{from} → {to}（已重命名或移动）",

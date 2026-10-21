@@ -4,6 +4,7 @@ import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
+import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'
 import { initAssistantModes } from './assistantMode'
@@ -896,6 +897,7 @@ app.whenReady().then(async () => {
   initDeliveries()
   initInboxNotices()
   initDecisionWakes()
+  initWorkflowNotices()
   initDevConsole()
   initAssistantModes()
   // A watcher stops keeping a pending quit waiting when the card it waits on leaves another agent's work (no wake comes).

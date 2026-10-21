@@ -538,8 +538,45 @@ const LANE_RECORD: SchemaStep = {
   ddl: [...LANE_RECORD_ADD, ...LANE_RECORD_DROP]
 }
 
-/** P3's and P4's steps, in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD]
+/**
+ * #1266 (P4): an action's delivery is recorded by the delivery itself, its row in `deliveries` with the action's id
+ * (unique), so the transitional `card_actions.delivered` (#1215) goes; a notice, which makes no delivery, is leased by
+ * one Hive and counts its uncertain dispatches instead (`lease_owner`, `lease_until`, `attempts`: actionWorker.ts).
+ * And what Hive has told the user of each running lane (its lane notices, workflowNotices.ts, §16.11.4): each lane as
+ * last told and its cards, so a restart tells what it hadn't yet, and two Hives on one workspace tell each event once.
+ */
+export const ACTIONS_DELIVERED_STEP: SchemaStep = {
+  name: 'actions delivered by deliveries, lane notices',
+  ddl: [
+    'DROP INDEX card_actions_delivered',
+    'ALTER TABLE card_actions DROP COLUMN delivered',
+    // A repeatable action's lease (actionWorker.ts): the process running it (its id, per Hive) and until when; one
+    // writer at a time takes it by a conditional update, and one whose Hive ended runs again once it has passed.
+    'ALTER TABLE card_actions ADD COLUMN lease_owner TEXT',
+    'ALTER TABLE card_actions ADD COLUMN lease_until TEXT',
+    // A lane as its notices last told it (laneWatch.ts' LaneMark): its state, whether its merge was due, and stalled.
+    `CREATE TABLE lane_notice_lanes (
+      lane          TEXT    PRIMARY KEY,
+      state         TEXT    NOT NULL,
+      merge_due     INTEGER NOT NULL CHECK (merge_due IN (0, 1)),
+      merge_stalled INTEGER NOT NULL CHECK (merge_stalled IN (0, 1))
+    ) STRICT, WITHOUT ROWID`,
+    // Its cards as last told (LaneCardMark): the column, blocked and stalled, its latest failed and passed verdicts' times.
+    `CREATE TABLE lane_notice_cards (
+      lane    TEXT    NOT NULL REFERENCES lane_notice_lanes (lane) ON DELETE CASCADE,
+      card    INTEGER NOT NULL,
+      col     TEXT    NOT NULL,
+      blocked INTEGER NOT NULL CHECK (blocked IN (0, 1)),
+      stalled INTEGER NOT NULL CHECK (stalled IN (0, 1)),
+      failed  TEXT    NOT NULL,
+      passed  TEXT    NOT NULL,
+      PRIMARY KEY (lane, card)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
+/** The 1.0 group's steps (P3's, then P4's), in the order they are registered. */
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -622,7 +659,6 @@ export const QUERIES: Record<string, SchemaQuery> = {
     index: ['lane_cards_card', 'lane_pending_card']
   },
   'queuePauses.of': { sql: 'SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
-  'actions.delivered': { sql: 'SELECT id, delivered FROM card_actions WHERE delivered IS NOT NULL ORDER BY id', args: [], index: 'card_actions_delivered' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },

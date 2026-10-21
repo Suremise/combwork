@@ -103,6 +103,7 @@
   "tasks.history.movedBottom": "Przeniesiono na koniec kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.history.movedTop": "Przeniesiono na początek kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.history.noDependencies": "Nie zależy już od innych kart",
+  "tasks.history.notified": "Powiadomiono Cię, {event, select, failed {że recenzja jest niezaliczona} blocked {że karta jest zablokowana} stalled {że karta utknęła} mergeDue {że wszystkie karty toru {lane} zaliczyły recenzję i czas na scalenie} mergeStalled {że scalanie toru {lane} utknęło} other {że karta czeka na Ciebie}}{hasWhy, select, yes {: {why}} other {}}",
   "tasks.history.placed": "Ustawiono na {place, selectordinal, other {#.}} miejscu w kolumnie {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.history.renamed": "Zmieniono tytuł na „{title}”",
   "tasks.history.repaired": "Projekt: {from} → {to} (zmiana nazwy lub przeniesienie)",

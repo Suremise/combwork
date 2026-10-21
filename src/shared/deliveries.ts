@@ -96,6 +96,11 @@ export interface DeliveryRecord {
   need?: 'free' | 'stalled'
   /** Only for this launch of its agent (a mode notice, a lock's go-ahead): it expires once that launch has ended. */
   forRun?: string
+  /**
+   * The durable action that made it (`card_actions.id`, SPEC §16.4.5): one delivery per action, never two (the unique
+   * `deliveries.action`), so an action run again (a restart, another Hive) finds it and makes nothing.
+   */
+  action?: number
 }
 
 /**
@@ -312,6 +317,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.detail !== undefined && !str(r.detail, DELIVERY_DETAIL_MAX_CHARS)) return null
   if (r.agentName !== undefined && !str(r.agentName, 300)) return null
   if (r.offerRun !== undefined && !str(r.offerRun, 200)) return null
+  if (r.action !== undefined && !(Number.isInteger(r.action) && (r.action as number) > 0)) return null
   const out: DeliveryRecord = { id: r.id, seq: r.seq as number, agentId: r.agentId, conversation: (r.conversation as string | null) || null, kind: r.kind as DeliveryKind, from, body: r.body, state: r.state as DeliveryState, created: r.created, expires: r.expires }
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
@@ -323,6 +329,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   for (const k of ['again', 'source', 'ref', 'forRun'] as const) if (r[k]) out[k] = r[k] as string
   if (r.need) out.need = r.need as 'free' | 'stalled'
   if (r.meta) out.meta = { ...(r.meta as Record<string, string | number | boolean>) }
+  if (r.action) out.action = r.action as number
   return out
 }
 
