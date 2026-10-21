@@ -497,7 +497,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
-  const r = await mutate(ws, async (lanes) => {
+  // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
+  // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
+  const decide = () => mutate(ws, async (lanes, checks) => {
     const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     const t = now()
     // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
@@ -510,6 +512,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         queuedAfter = flying
         was.pending = [...s.cards]
       } else {
+        if (on && !sameList(was.cards, s.cards)) checks.push(stillBetweenCards(ws, was, [...was.cards]))
         was.cards = s.cards
         delete was.pending
       }
@@ -550,6 +553,17 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     lanes.push(rec)
     return { rec, did: 'started' as const, replaced }
   })
+  let r: Awaited<ReturnType<typeof decide>> | null = null
+  for (let attempt = 0; !r; attempt++) {
+    queuedAfter = null
+    ended.length = 0
+    try {
+      r = await decide()
+    } catch (e) {
+      // A card of the lane started between the read and the save: decided again from the board as it is now.
+      if (!(e instanceof StaleLane) || attempt >= 4) throw e instanceof StaleLane ? new LaneError(409, 'The lane kept changing: try again') : e // i18n-ignore: hive_lane's refusal (agents)
+    }
+  }
   const [lane, replaced] = await views(ws, [r.rec, ...(r.replaced ? [r.replaced] : [])])
   log.info(`Lane ${r.rec.id} ${r.did} for ${userText(builder.name)} in ${userText(s.project)}: ${s.cards.map((n) => `#${n}`).join(', ')}`)
   if (r.replaced) laneFact(ws, r.replaced)

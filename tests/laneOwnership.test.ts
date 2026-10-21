@@ -264,6 +264,31 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     await lanes.endLane(w, l.id, { abandoned: true })
   })
 
+  it("a card started while a list change is decided: the change is queued, the card stays the lane's (HR6 round 2)", async () => {
+    const [a, b] = [await make('Started a'), await make('Started b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
+    // The change reads A in Todo (between cards); at its names lookup A starts.
+    const real = w.projectConfig.bind(w)
+    let started = false
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
+      if (!started && (new Error().stack ?? '').includes('namesOf')) {
+        started = true
+        await move(a, 'doing')
+      }
+      return real(p)
+    })
+    let r: Awaited<ReturnType<typeof lanes.startLane>>
+    try {
+      r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b], by: 'B1 (alpha)' })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(started).toBe(true)
+    expect([r.lane.id, r.lane.cards.map((c) => c.number), r.lane.cards[0].column, r.lane.queued]).toEqual([l.id, [a], 'doing', [b]])
+    expect(r.note).toMatch(new RegExp(`queued: it applies once #${a} is Done`))
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
   it("with rules off an agent ends a lane as before: its merge commit as given, unverified", async () => {
     await advanced.set(ENFORCE, false)
     const a = await make('Off a')
