@@ -1,7 +1,7 @@
 // The piece library (SPEC §16.5.3): the only rules a ruleset can hold, each implemented and unit-tested in code. A
 // piece declares the capability it needs; options pick pieces, and nothing else can run (§16.5.4).
 //
-// P2 spike (#1118): not wired into the app yet.
+// In the app (#1263): compiled into the rulesets the runtime (main/workflow/service.ts) works under.
 
 import type { Capability } from '../platform/descriptors'
 

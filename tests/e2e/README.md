@@ -399,6 +399,12 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   project, not per agent, so until it can give a server to chosen agents only (#537), the server is on only in a
   release-testing project that holds just the release-testing agent (the mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
+- **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
+  Sandbox against two installs, with `HIVE_E2E_HIVE09` a copy of the installed 0.9 and `HIVE_EXE` a copy of the new
+  build installed over it (copies, as `lib.cjs` never starts a Hive from `Programs\Hive`). With `HIVE_EXE` set,
+  `lib.launch` starts that packaged Hive.exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
+  step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
+  read-only as tool folders; #1227's card has the script.
 
 ## What they need
 

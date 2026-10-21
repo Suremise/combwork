@@ -159,6 +159,8 @@
   "settings.advanced.hive.wait.agentsMaxSeconds.title": "Agent waits: longest",
   "settings.advanced.hive.wait.cardMaxSeconds.desc": "The longest an agent's hive_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Hive keeps it a minute below Codex's hive tool timeout whatever is set here.",
   "settings.advanced.hive.wait.cardMaxSeconds.title": "Card waits: longest",
+  "settings.advanced.hive.workflow.enforce.desc": "Hive keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Hive sees a card's work merged or changed outside Hive. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Hive only records what happens to each card's work, without moving cards or waking agents for it.",
+  "settings.advanced.hive.workflow.enforce.title": "Workflow rules are enforced",
   "settings.advanced.logs.desc": "Open the folder containing Hive's log files.",
   "settings.advanced.logs.tip": "Useful when reporting a problem.",
   "settings.advanced.logs.title": "Logs",

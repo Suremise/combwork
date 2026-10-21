@@ -159,6 +159,8 @@
   "settings.advanced.hive.wait.agentsMaxSeconds.title": "Esperas por agentes: máximo",
   "settings.advanced.hive.wait.cardMaxSeconds.desc": "O tempo máximo que uma chamada hive_wait_for_tasks de um agente (sem wake) espera antes de responder. Precisa ficar abaixo dos tempos limite das próprias CLIs para ferramentas, então o Hive o mantém um minuto abaixo do tempo limite das ferramentas hive no Codex, seja qual for o valor aqui.",
   "settings.advanced.hive.wait.cardMaxSeconds.title": "Esperas por cartões: máximo",
+  "settings.advanced.hive.workflow.enforce.desc": "O Hive aplica as regras do fluxo de trabalho de cada projeto conforme os cartões se movem: o que as opções de Controle de versão pedem antes de um cartão chegar a Revisão, Aprovado ou Concluído, e o que acontece quando o Hive vê o trabalho de um cartão mesclado ou alterado fora do Hive. Desligado, todas as regras ficam desligadas de uma vez em todos os projetos: os cartões vão para onde forem colocados, nada é recusado nem perguntado, e o Hive apenas registra o que acontece com o trabalho de cada cartão, sem mover cartões nem acordar agentes por isso.",
+  "settings.advanced.hive.workflow.enforce.title": "As regras do fluxo de trabalho são aplicadas",
   "settings.advanced.logs.desc": "Abrir a pasta com os arquivos de log do Hive.",
   "settings.advanced.logs.tip": "Útil para relatar um problema.",
   "settings.advanced.logs.title": "Logs",

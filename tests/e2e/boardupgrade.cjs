@@ -33,6 +33,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
+/** The run ends early on purpose (step 8 with a packaged build), its checks so far its result. */
+class StopHere extends Error {}
 /** What the suite records for the RC notes and OP-41, not a check. */
 const record = (what, text) => console.log(`RECORD ${what}: ${text}`)
 
@@ -252,6 +254,8 @@ async function themes(dev, name) {
     await close(old3)
 
     // 8. A 0.9 Hive started during the upgrade: the dev build holds the lock (its main thread waits) while it starts.
+    // The hold is for unpackaged builds only: a packaged one (HIVE_EXE, the Sandbox checks) ends here.
+    if (process.env.HIVE_EXE) throw new StopHere('step 8 (a 0.9 Hive started during the upgrade) needs an unpackaged build: not run with HIVE_EXE')
     const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { ...claude, HIVE_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
     open.add(dev2)
     await lib.openWorkspace(dev2.inv, dev2.page, ws)
@@ -282,6 +286,9 @@ async function themes(dev, name) {
     check('nothing 0.9 tried meanwhile reached the board', !(await dev2.inv('tasks:list')).some((c) => c.title === 'During' || c.title === 'After'))
     await close(old4)
     await close(dev2)
+  } catch (e) {
+    if (!(e instanceof StopHere)) throw e
+    console.log(`NOT RUN ${e.message}`)
   } finally {
     for (const h of [...open]) await close(h)
   }

@@ -143,6 +143,7 @@ interface HiveMessageValues {
   'service.transcripts.noImage': undefined
   'service.transcripts.noTool': undefined
   'service.transcripts.none': undefined
+  'service.workflow.closed': undefined
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }

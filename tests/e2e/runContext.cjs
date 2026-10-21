@@ -73,7 +73,7 @@ const PASS_ENV = {
   HIVE_TEST_QUIET: '0 shows the test copies of Hive (taking focus, notifying), to watch a run',
   HIVE_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   HIVE_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's hive-progress",
-  HIVE_EXE: 'plan runs this Hive executable instead of the dev build',
+  HIVE_EXE: 'plan and lib.launch run this packaged Hive executable instead of the dev build (the Sandbox upgrade checks, #1227)',
   HIVE_E2E_HIVE09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }

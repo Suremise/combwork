@@ -28,8 +28,7 @@ import { snapshot } from './checks'
 import { cardFacts } from './cardWork'
 import { FactStore } from './factStore'
 import { folderHead, LINK_TTL_MS, type RunLink } from './runLink'
-import { projectOptionsOf } from './reconciler'
-import { Workflow } from './runtime'
+import { workflowFor } from './service'
 import type { RunRevision } from '../platform/adapter'
 import type { ProgressRun, ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -232,12 +231,10 @@ export async function cardRunRevision(ws: WorkspaceService, n: number, folder: s
   if (!workspacePath || !s?.started) return null
   const c = await getTask(n, ws).catch(() => null)
   if (!c || c.archived || !c.project) return null
-  const project = join(workspacePath, c.project)
-  const cfg = await ws.projectConfig(project).catch(() => null)
-  const platform = projectPlatform(project, cfg?.platform).id
-  const options = await projectOptionsOf(ws, project, platform).catch(() => allOff(platform))
-  // Reads only: no write, so no lock and no actions.
-  const wf = new Workflow({ store: FactStore.forBoard(ws, { project: c.project, key: c.project }), project, projectKey: c.project, options: () => options, slots: join(ws.hiveDir, 'slots'), autoRun: false, reconcileActs: false })
+  // The project's runtime (#1263), read only here: no write, so no lock and no actions. None: not one of the
+  // workspace's projects with a platform (or the workspace closed meanwhile), whose run reads its folder with git.
+  const wf = await workflowFor(ws, join(workspacePath, c.project)).catch(() => null)
+  if (!wf) return null
   const card = wf.store.card(n)
   return wf.platformOf(card, s).runRevision(card, s, folder, named)
 }
