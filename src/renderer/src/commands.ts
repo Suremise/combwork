@@ -732,6 +732,13 @@ export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId, allKeysTo
   if (e.type !== 'keydown') return false
   const key = eventToKey(e)
   if (!key) return false
-  // Every key to the CLI (#1292, Settings → Advanced) but the command palette's, so every command stays in reach.
-  return appTakesTerminalKey(key, { allKeysToCli, palette: commandKeybinding('palette.show'), reserved: terminalReserved(provider), bound: bound().map((b) => b.key) })
+  // Every key to the CLI (#1292, Settings → Advanced) but the command palette's, so every command stays in reach. A
+  // two-step palette shortcut: its first key starts the window's chord (matchKeybinding), its second completes it; any
+  // other key goes to the CLI, and the chord its first key began is over.
+  const takes = appTakesTerminalKey(key, { allKeysToCli, palette: commandKeybinding('palette.show'), reserved: terminalReserved(provider), bound: bound().map((b) => b.key), pending: chordPrefix })
+  if (allKeysToCli && !takes && chordPrefix) {
+    chordPrefix = null
+    window.clearTimeout(chordTimer)
+  }
+  return takes
 }

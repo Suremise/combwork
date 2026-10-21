@@ -2509,7 +2509,9 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 **Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
 - `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
   shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in
-  `shared/terminalInput.ts`). Ctrl+C and Ctrl+V keep their own switch (row 24).
+  `shared/terminalInput.ts`). A two-step palette shortcut: its first key starts the window's chord (so it no longer
+  reaches the CLI alone), its second completes it while the chord is pending; any other key then goes to the CLI and
+  ends the chord (HR4's round 1). Ctrl+C and Ctrl+V keep their own switch (row 24).
 - `hive.terminal.osc52` (a choice: `allow` as before, `ask`, `block`): what a CLI's OSC 52 clipboard write gets, of those
   the gate takes (the pane in use, a valid payload of at most 1 MiB): written; shown to the user first, one question
   at a time, a write meanwhile refused; or refused (`osc52Decision`). A read is never answered, whatever the policy.

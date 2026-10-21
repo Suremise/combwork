@@ -72,4 +72,21 @@ describe('appTakesTerminalKey (#1292)', () => {
     // The palette unbound: nothing of Hive's (it is still in the menus).
     expect(appTakesTerminalKey('Ctrl+Shift+P', { ...on, palette: null })).toBe(false)
   })
+  // A two-step palette shortcut (HR4's round 1): its first key starts Hive's chord, its second completes it while that
+  // chord is pending; any other key (another chord's second step, the second step alone) goes to the CLI.
+  it('on, with the palette rebound to two steps: its first key, then its second while pending; nothing else', () => {
+    const chord = { ...o, allKeysToCli: true, palette: 'Mod+K Mod+P', bound: ['MOD+K MOD+P', 'MOD+K MOD+N'] }
+    expect(appTakesTerminalKey('Mod+K', chord)).toBe(true)
+    expect(appTakesTerminalKey('Mod+P', { ...chord, pending: 'Mod+K' })).toBe(true)
+    expect(appTakesTerminalKey('mod+p', { ...chord, pending: 'mod+k' })).toBe(true)
+    // A chord of another command sharing its first key: its second step goes to the CLI.
+    expect(appTakesTerminalKey('Mod+N', { ...chord, pending: 'Mod+K' })).toBe(false)
+    // The second step alone, or after another prefix: the CLI's.
+    expect(appTakesTerminalKey('Mod+P', chord)).toBe(false)
+    expect(appTakesTerminalKey('Mod+P', { ...chord, pending: 'Mod+J' })).toBe(false)
+    // While pending, its first key again isn't a second step.
+    expect(appTakesTerminalKey('Mod+K', { ...chord, pending: 'Mod+K' })).toBe(false)
+    // Off, chords are never begun from a pane (as before): neither key is Hive's alone.
+    expect(appTakesTerminalKey('Mod+K', { ...chord, allKeysToCli: false })).toBe(false)
+  })
 })

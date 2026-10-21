@@ -204,6 +204,22 @@ const check = (name, ok, extra = '') => {
     check("…while the command palette's Ctrl+Shift+P still opens it", !!(await lib.until(async () => (await palette.count()) === 1, HUNG_MS, 100)))
     await page.screenshot({ path: path.join(lib.WORK, 'terminalinput-3-all-keys.png') })
     await closePalette()
+    // The palette rebound to two steps (HR4's round 1): its first key starts Hive's chord, its second opens the palette,
+    // neither reaching the CLI; another command's second step after that first key goes to the CLI.
+    await inv('settings:update', { keybindings: { 'palette.show': 'Mod+K Mod+P' } })
+    check('rebound, the pane has the focus again', !!(await focusPane()))
+    from = readsOfInput().length
+    await page.keyboard.press('Control+K')
+    await page.keyboard.press('Control+P')
+    check('the two-step palette shortcut opens the palette from the pane', !!(await lib.until(async () => (await palette.count()) === 1, HUNG_MS, 100)))
+    check('…and the CLI gets neither step', !inputSince(from).includes('\x0b') && !inputSince(from).includes('\x10'), JSON.stringify(inputSince(from)))
+    await closePalette()
+    check('the pane has the focus once more', !!(await focusPane()))
+    from = readsOfInput().length
+    await page.keyboard.press('Control+K')
+    await page.keyboard.press('Control+G')
+    check("after its first key, another key goes to the CLI (^G), and the palette doesn't open", !!(await lib.until(async () => inputSince(from).includes('\x07'), HUNG_MS, 100)) && (await palette.count()) === 0, JSON.stringify(inputSince(from)))
+    await inv('settings:update', { keybindings: {} })
     await inv('advanced:set', ALL_KEYS, false)
 
     // ---- 4. A card's start in its own words (#1292, #966 row 30): its title and description, nothing of Hive's.
