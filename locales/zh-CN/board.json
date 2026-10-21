@@ -426,7 +426,7 @@
   "board.lanes.usualOrderDetail": "运行中的通道按从新到旧排列，已暂停的排在其后",
   "board.lanes.usualOrderSaid": "通道已恢复默认顺序",
   "board.lanes.waitingForYou": "{n, plural, other {# 个等待你}}",
-  "board.lanes.waits": "{reason, select, blocked {{card} 受阻} hold {{card} 已搁置} you {等待你（{ask, select, approve {批准} decide {决定} test {测试} signIn {登录} other {回复}}）：{card}} roundLimit {等待你：{card} 已达到轮次上限} notMerged {等待中：{card} 尚未合并} merging {等待中：{card} 正在合并} stale {已失效：{card} 需要重新提交} reviewer {等待评审者评审 {card}} hooks {已暂停：未收到 {agent} 的钩子} other {{card} 之后更改列表}}",
+  "board.lanes.waits": "{reason, select, blocked {{card} 受阻} hold {{card} 已搁置} you {等待你（{ask, select, approve {批准} decide {决定} test {测试} signIn {登录} other {回复}}）：{card}} roundLimit {等待你：{card} 已达到轮次上限} notMerged {等待中：{card} 尚未合并} merging {等待中：{card} 正在合并} stale {已失效：{card} 需要重新提交} reviewer {等待评审者评审 {card}} lineUpdate {等待中：在 {card} 之前更新构建者的分支} hooks {已暂停：未收到 {agent} 的钩子} other {{card} 之后更改列表}}",
   "board.links.archivedTitle": "{card} {title} · 已归档（来自“{column}”）· Ctrl+单击打开",
   "board.links.title": "{card} {title} · {column} · Ctrl+单击打开",
   "board.menu.delete": "删除…",

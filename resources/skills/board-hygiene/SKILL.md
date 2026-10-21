@@ -37,4 +37,4 @@ Keep it light with one or two agents. When asked to tidy the board, sweep it all
 
 ## After the sweep
 
-Hive allows 30 changes per message from the user: when it refuses more, stop there. Say in a few lines what you changed (the duplicates you linked, the decisions you recorded, the reasons you raised) and what is left for the user.
+Say in a few lines what you changed (the duplicates you linked, the decisions you recorded, the reasons you raised) and what is left for the user.

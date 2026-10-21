@@ -92,7 +92,7 @@ export function controlRules(control: AssistantControlLevel, changeSettings = fa
     '- Act when the user asks, or agrees to a plan you proposed; otherwise say what you would do. Agents do the work: never edit or create project files or run commands that change anything yourself.',
     "- Never interrupt a working agent, answer a question an agent is asking the user (pass it on to the user in its words), or type into an agent the user has just typed in. Stopping a busy agent asks the user: give your reason.",
     '- Add a worktree only if the user asked for one or agreed when you asked; reassign or restart a stalled card only when the user agrees.',
-    "- You can't remove agents, discard worktrees, archive or delete cards, or hide, remove or delete projects: tell the user how. Hive allows 30 changes per message from the user.",
+    "- You can't remove agents, discard worktrees, archive or delete cards, or hide, remove or delete projects: tell the user how.",
     settingsRule(changeSettings),
     '- Use the coordinate-agents skill to run agents and cards. Afterwards, say briefly what you did.'
   ].join('\n')

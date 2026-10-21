@@ -21,7 +21,7 @@
   "tips.archiveNew.title": "Archivieren und neu beginnen",
   "tips.assistant.text": "Das Panel rechts hat den Arbeitsbereich im Blick: Frag, was die Agenten gerade tun, was etwas kostet, oder nach einem Plan. {key}",
   "tips.assistant.title": "Den Hive Assistant fragen",
-  "tips.assistantBatch.text": "Der Assistent kann bis zu {cards, plural, one {# Karte} other {# Karten}} in einem Schritt verschieben oder mit Labels versehen, jede Karte weiterhin einzeln aufgeführt. Der Schritt zählt als eine seiner {changes, plural, one {# Änderung} other {# Änderungen}} pro Nachricht, er hört also nie mittendrin auf.",
+  "tips.assistantBatch.text": "Der Assistent kann bis zu {cards, plural, one {# Karte} other {# Karten}} in einem Schritt verschieben oder mit Labels versehen, jede Karte weiterhin einzeln aufgeführt.",
   "tips.assistantBatch.title": "Viele Karten in einem Schritt",
   "tips.assistantCompact.text": "Der Assistent arbeitet meist mit einem größeren Kontext als deine Agenten, daher wird seine Schaltfläche „Komprimieren“ später orange: standardmäßig ab {tokens, plural, one {# Token} other {# Tokens}}. Einstellungen → Assistent → „Komprimieren“ hervorheben ab ändert das, „Nie“ schaltet es aus.",
   "tips.assistantCompact.title": "Wann der Assistent zum Komprimieren rät",

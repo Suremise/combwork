@@ -264,7 +264,7 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     return n
   }
 
-  // #1131: tagging 50 cards took two messages' limit, card by card with each one's labels typed again; a bulk labels
+  // #1131: tagging 50 cards took two messages, card by card with each one's labels typed again; a bulk labels
   // wiped the cards' other labels.
   it('tags 50 cards in one change with addLabels, each keeping its own labels, and takes one off them all with removeLabels (#1131)', async () => {
     await fresh()
@@ -272,19 +272,16 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     const numbers = cards.map((c) => c.number)
     const items = await run(() => assistantBatch(wsPath, token, numbers, { addLabels: ['0.9.4'] }, assistant))
     expect(items.every((i, k) => i.error === null && JSON.stringify(i.card?.labels) === JSON.stringify([`own-${k}`, '0.9.4']) && i.said.join() === 'Labels: added 0.9.4')).toBe(true)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
     const off = await run(() => assistantBatch(wsPath, token, numbers, { removeLabels: ['0.9.4'] }, assistant))
     expect(off.every((i, k) => JSON.stringify(i.card?.labels) === JSON.stringify([`own-${k}`]) && i.said.join() === 'Labels: removed 0.9.4')).toBe(true)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 2)
   })
 
-  it('applies a 27-card batch as one change, and lists each card once', async () => {
+  it('applies a 27-card batch, and lists each card once', async () => {
     await fresh()
     const cards = await Promise.all(Array.from({ length: 27 }, (_, i) => make(`Asst ${i + 1}`, 'hold')))
     const numbers = cards.map((c) => c.number)
     const items = await run(() => assistantBatch(wsPath, token, numbers, { column: 'todo' }, assistant))
     expect(items.every((i) => i.card?.column === 'todo')).toBe(true)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
     numbers.forEach((n, i) => {
       const lines = linesFor(n)
       expect(lines).toHaveLength(1)
@@ -295,38 +292,20 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     })
   })
 
-  it('a 40-card batch is one change of the message: 29 single changes still fit, and the 31st change is refused (#488)', async () => {
+  // #1170: no count of the Assistant's changes for a message (it stopped at 30 and asked to go on); undo protects the board.
+  it('more than 30 changes in one message all apply: 40 single changes, then three 12-card batches at once (#1170)', async () => {
     await fresh()
-    const forty = await Promise.all(Array.from({ length: 40 }, (_, i) => make(`Forty ${i + 1}`, 'hold')))
-    const items = await run(() => assistantBatch(wsPath, token, forty.map((c) => c.number), { column: 'todo' }, assistant))
-    expect(items.filter((i) => i.card?.column === 'todo')).toHaveLength(40)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
-    expect(singles(control.MAX_ACTIONS_PER_TURN)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
-    expect(control.actions(wsPath).at(-1)).toMatchObject({ ok: false, text: `Activate the project batch (${control.MAX_ACTIONS_PER_TURN})` })
-    // A new message: a fresh limit.
-    control.newTurn(wsPath)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN)
+    expect(singles(40)).toBe(40)
+    expect(control.actions(wsPath).filter((a) => !a.ok)).toEqual([])
+    const cards = await Promise.all(Array.from({ length: 36 }, (_, i) => make(`Many ${i + 1}`, 'hold')))
+    const groups = [0, 12, 24].map((s) => cards.slice(s, s + 12).map((c) => c.number))
+    const settled = await run(() => Promise.all(groups.map((g) => assistantBatch(wsPath, token, g, { column: 'todo' }, assistant))))
+    expect(settled.flat().every((i) => i.error === null && i.card?.column === 'todo')).toBe(true)
+    const now = await Promise.all(cards.map((c) => cardOf(c.number)))
+    expect(now.every((c) => c.column === 'todo')).toBe(true)
   })
 
-  it('with no change left, a batch applies none of its cards and says none fit; a new message lets it through', async () => {
-    await fresh()
-    expect(singles(control.MAX_ACTIONS_PER_TURN)).toBe(control.MAX_ACTIONS_PER_TURN)
-    const five = await Promise.all(Array.from({ length: 5 }, (_, i) => make(`Five ${i + 1}`, 'hold')))
-    const refusal = await run(() => assistantBatch(wsPath, token, five.map((c) => c.number), { column: 'todo' }, assistant)).catch((e) => e)
-    expect(refusal).toBeInstanceOf(ChangeRefused)
-    expect(refusal.status).toBe(429)
-    expect(refusal.extra).toEqual({ fits: 0 })
-    for (const c of five) expect((await cardOf(c.number)).column).toBe('hold')
-    const summary = control.actions(wsPath).filter((a) => a.text === 'Change 5 cards on the board')
-    expect(summary).toHaveLength(1)
-    expect(summary[0].ok).toBe(false)
-    control.newTurn(wsPath)
-    const items = await run(() => assistantBatch(wsPath, token, five.map((c) => c.number), { column: 'todo' }, assistant))
-    expect(items.every((i) => i.card?.column === 'todo')).toBe(true)
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
-  })
-
-  it('a batch with a refused card is still one change, each card listed once beside the cards that changed', async () => {
+  it('a batch with a refused card lists each card once beside the cards that changed', async () => {
     await fresh()
     const done = await run(() => tasks.createTask({ title: 'Already done', project: 'batch', column: 'done' }, user))
     const a = await make('Open one')
@@ -336,7 +315,6 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     expect(items[0].card).not.toBeNull()
     expect(items[1].error).toMatch(/Only the user puts the cards in Done in order/)
     expect(items[2].card).not.toBeNull()
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN - 1)
     for (const c of [a, done, b]) expect(linesFor(c.number)).toHaveLength(1)
     expect(linesFor(done.number)[0].ok).toBe(false)
     // The refused card has the kind tried, its number and project, and Hive's own reason for the stream (#763).
@@ -348,22 +326,6 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     const cards = await Promise.all(['Desk one', 'Desk two'].map((t) => run(() => tasks.createTask({ title: t, project: 'alpha' }, user))))
     await run(() => assistantBatch(wsPath, token, cards.map((c) => c.number), { agent: 'Agent 1' }, assistant))
     for (const c of cards) expect(linesFor(c.number)[0]).toMatchObject({ ok: true, kind: 'update-tasks', card: c.number, project: 'alpha', agent: { id: 'a1', name: 'Agent 1' } })
-  })
-
-  it("batches at once don't exceed the message's limit: with two changes left, two of three apply", async () => {
-    await fresh()
-    expect(singles(control.MAX_ACTIONS_PER_TURN - 2)).toBe(control.MAX_ACTIONS_PER_TURN - 2)
-    const cards = await Promise.all(Array.from({ length: 36 }, (_, i) => make(`Race ${i + 1}`, 'hold')))
-    const groups = [0, 12, 24].map((s) => cards.slice(s, s + 12).map((c) => c.number))
-    const settled = await run(() => Promise.allSettled(groups.map((g) => assistantBatch(wsPath, token, g, { column: 'todo' }, assistant))))
-    const ok = settled.filter((s) => s.status === 'fulfilled')
-    const refused = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected')
-    expect(ok).toHaveLength(2)
-    expect(refused).toHaveLength(1)
-    expect((refused[0].reason as InstanceType<typeof ChangeRefused>).extra).toEqual({ fits: 0 })
-    expect(control.actionsLeft(wsPath)).toBe(0)
-    const now = await Promise.all(cards.map((c) => cardOf(c.number)))
-    expect(now.filter((c) => c.column === 'todo')).toHaveLength(24)
   })
 
   it('a card a batch reaches after the user turns the control level down is left as it was', async () => {
@@ -464,21 +426,7 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     expect((await cardOf(c.number)).labels).toEqual([])
   })
 
-  it('a one-card batch refused for the allowance says how many fit (none), and changes nothing', async () => {
-    await fresh()
-    // The message's allowance is used up on other changes.
-    expect(singles(control.MAX_ACTIONS_PER_TURN)).toBe(control.MAX_ACTIONS_PER_TURN)
-    expect(control.actionsLeft(wsPath)).toBe(0)
-    const one = await make('One card, none left')
-    const refusal = await run(() => assistantBatch(wsPath, token, [one.number], { column: 'todo' }, assistant)).catch((e) => e)
-    expect(refusal).toBeInstanceOf(ChangeRefused)
-    expect(refusal.status).toBe(429)
-    expect(refusal.extra).toEqual({ fits: 0 })
-    expect((await cardOf(one.number)).column).toBe('todo')
-    expect(control.actionsLeft(wsPath)).toBe(0)
-  })
-
-  it('at Look and advise, a batch is refused as a whole and changes nothing, counting nothing', async () => {
+  it('at Look and advise, a batch is refused as a whole and changes nothing', async () => {
     await fresh()
     setControl('look')
     const c = await make('Look only')
@@ -487,7 +435,6 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     expect(refusal).toBeInstanceOf(ChangeRefused)
     expect(refusal.status).toBe(403)
     expect((await cardOf(c.number)).column).toBe('todo')
-    expect(control.actionsLeft(wsPath)).toBe(control.MAX_ACTIONS_PER_TURN)
   })
 })
 

@@ -21,7 +21,7 @@
   "tips.archiveNew.title": "Archivar y empezar de nuevo",
   "tips.assistant.text": "El panel de la derecha supervisa el espacio de trabajo: pregúntale qué hacen los agentes, cuánto cuestan las cosas o pídele un plan. {key}",
   "tips.assistant.title": "Pregunta al Hive Assistant",
-  "tips.assistantBatch.text": "El Asistente puede mover o etiquetar hasta {cards, plural, one {# tarjeta} many {# tarjetas} other {# tarjetas}} en un solo paso, y cada tarjeta sigue apareciendo por separado. El paso cuenta como uno de sus {changes, plural, one {# cambio} many {# cambios} other {# cambios}} por mensaje, así que nunca se detiene a mitad de ellos.",
+  "tips.assistantBatch.text": "El Asistente puede mover o etiquetar hasta {cards, plural, one {# tarjeta} many {# tarjetas} other {# tarjetas}} en un solo paso, y cada tarjeta sigue apareciendo por separado.",
   "tips.assistantBatch.title": "Muchas tarjetas en un paso",
   "tips.assistantCompact.text": "El Asistente suele trabajar con un contexto más grande que tus agentes, así que su botón Compactar se pone naranja más tarde: a partir de {tokens, plural, one {# token} many {# tokens} other {# tokens}} de forma predeterminada. Configuración → Asistente → Destacar Compactar por encima de lo cambia, o Nunca lo desactiva.",
   "tips.assistantCompact.title": "Cuándo sugiere compactar el Asistente",
