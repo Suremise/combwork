@@ -415,9 +415,10 @@ describe('the move checked again at its boundary (#1271 round 2)', () => {
 
     it('the rules turned off as the move takes its lock: asked at that boundary, nothing moves', async () => {
       const { wt, cards, w, head } = await squashed()
-      // The move's first git command (where its index is): the rules turned off just as it runs.
-      gitTestHooks.started = (_cwd, args) => {
-        if (args.includes('--git-path')) void advanced.set(ENFORCE, false)
+      // The move's first git command once it holds the index's lock: the rules turned off just as it runs.
+      const lock = join(G.gitDirSync(wt)!, 'index.lock')
+      gitTestHooks.started = () => {
+        if (existsSync(lock)) void advanced.set(ENFORCE, false)
       }
       await update(w)
       expect(git(wt, 'rev-parse', 'HEAD')).toBe(head)

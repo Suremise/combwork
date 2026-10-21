@@ -6,11 +6,27 @@ import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { commit, gitRepo, sh } from './harness'
 import * as G from '../../src/main/platform/git'
+import { isUnknown } from '../../src/main/platform/types'
+import { gitTestHooks } from '../../src/main/git'
 
 let repo = ''
 afterEach(() => {
   repo = ''
+  gitTestHooks.started = undefined
 })
+
+/** The git commands `fn` starts, each as its words. */
+async function counted<T>(fn: () => Promise<T>): Promise<{ value: T; ran: string[] }> {
+  const ran: string[] = []
+  gitTestHooks.started = (_cwd, args) => {
+    ran.push(args.join(' '))
+  }
+  try {
+    return { value: await fn(), ran }
+  } finally {
+    gitTestHooks.started = undefined
+  }
+}
 
 /** A change on a branch from main's head: [base, revision]. */
 function branchWith(name: string, files: Record<string, string>): [string, string] {
@@ -127,6 +143,103 @@ describe('Git adapter', () => {
     sh(repo, 'commit', '-q', '-m', 'squash three')
     sh(repo, 'branch', '-q', '-D', 'three')
     expect(await G.contains(repo, 'main', { base: b3, revision: r3 })).toMatchObject({ method: 'squash' })
+  })
+
+  it("containment asked at a head already read looks there, not again at the target; an empty change's key lists no commits (#1376)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [b1, r1] = branchWith('one', { 'one.txt': '1\n' })
+    const before = sh(repo, 'rev-parse', 'main')
+    sh(repo, 'merge', '-q', '--squash', 'one')
+    sh(repo, 'commit', '-q', '-m', 'squash one')
+    const after = sh(repo, 'rev-parse', 'main')
+    // At main's earlier head the squash isn't there yet, though main has it now; no git reads main itself.
+    const at = await counted(() => G.contains(repo, 'main', { base: b1, revision: r1 }, before))
+    expect(at.value).toBeNull()
+    expect(at.ran.filter((c) => c.includes('main'))).toEqual([])
+    expect(await G.contains(repo, 'main', { base: b1, revision: r1 }, after)).toMatchObject({ method: 'squash' })
+    // With no key (an empty change), no target commit can have it: the squash search isn't run, the whole target still is.
+    const none = await counted(() => G.contains(repo, 'main', { base: b1, revision: r1, key: null }, after))
+    expect(none.value).toEqual({ method: 'sameTree' })
+    expect(none.ran.filter((c) => c.startsWith('log ') || c.startsWith('patch-id '))).toEqual([])
+  })
+
+  it("heads answers the branch, head and a line's head in one git, as branch, head and lineHead do; each on its own where it can't (#1376)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [, side] = branchWith('side', { 's.txt': 's\n' })
+    const main = sh(repo, 'rev-parse', 'main')
+    const one = await counted(() => G.heads(repo, 'side'))
+    expect(one.value).toEqual({ line: 'main', head: main, target: side })
+    expect(one.ran).toHaveLength(1)
+    // Detached: no branch.
+    sh(repo, 'checkout', '-q', '--detach', 'side')
+    expect(await G.heads(repo, 'main')).toEqual({ line: null, head: side, target: main })
+    sh(repo, 'checkout', '-q', 'main')
+    // No such line: asked on its own, null as lineHead says.
+    expect(await G.heads(repo, 'gone')).toEqual({ line: 'main', head: main, target: null })
+    // A branch with a slash, in a linked worktree (its lines are the project's).
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'side')
+    expect(await G.heads(wt, 'main')).toEqual({ line: 'hive/card', head: side, target: main })
+    // No commit yet: head unknown, as head() says.
+    const empty = join(tempDir('git-'), 'e')
+    execFileSync('git', ['init', '-q', '-b', 'main', empty])
+    const e = await G.heads(empty, 'main')
+    expect(e.line).toBe('main')
+    expect(e.target).toBeNull()
+    expect(isUnknown(e.head)).toBe(true)
+  })
+
+  it('in one git step an answer about fixed commits is asked once; refs are read again; outside a step, and after one, always asked (#1376)', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
+    const ancestors = (ran: string[]) => ran.filter((c) => c.startsWith('merge-base --is-ancestor')).length
+    const twice = async () => [await G.isAncestor(repo, base, rev), await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev), await G.mergeBase(repo, base, rev), await G.lineHead(repo, 'one'), await G.lineHead(repo, 'one')]
+    const outside = await counted(twice)
+    expect(ancestors(outside.ran)).toBe(2)
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'one')
+    let leaked: (() => Promise<unknown>) | null = null
+    const inside = await counted(() =>
+      G.gitStep(async () => {
+        leaked = () => G.isAncestor(repo, base, rev)
+        // A linked worktree of the project asks about the same commits (in a step inside the step): the same answer.
+        return [...(await twice()), await G.gitStep(() => G.isAncestor(wt, base, rev))]
+      })
+    )
+    expect(inside.value).toEqual([...outside.value, true])
+    expect(ancestors(inside.ran)).toBe(1)
+    // A subfolder, whose repository its own `.git` doesn't say: asked each time.
+    const sub = await counted(() => G.gitStep(async () => [await G.isAncestor(join(repo, 'src'), base, rev), await G.isAncestor(join(repo, 'src'), base, rev)]))
+    expect(sub.value).toEqual([true, true])
+    expect(ancestors(sub.ran)).toBe(2)
+    expect(inside.ran.filter((c) => c === `merge-base ${base} ${rev}`)).toHaveLength(1)
+    expect(inside.ran.filter((c) => c.startsWith('rev-parse --verify'))).toHaveLength(2)
+    // Something the step set off, asking once it has ended: asked again.
+    expect(ancestors((await counted(() => leaked!())).ran)).toBe(1)
+    // Names, not ids, are never kept; nor an unknown answer.
+    const names = await counted(() => G.gitStep(async () => [await G.isAncestor(repo, 'main', 'one'), await G.isAncestor(repo, 'main', 'one')]))
+    expect(ancestors(names.ran)).toBe(2)
+    const missing = 'f'.repeat(40)
+    const unknowns = await counted(() => G.gitStep(async () => [await G.isAncestor(repo, missing, rev), await G.isAncestor(repo, missing, rev)]))
+    expect(unknowns.value.every((v) => isUnknown(v))).toBe(true)
+    expect(ancestors(unknowns.ran)).toBe(2)
+  })
+
+  it("a step's answers are its repository's: another repository, without those commits, is asked and answers unknown (HR2's #1376 round 1)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
+    // Another repository with the same base commit (a clone of main) but not the card's.
+    const other = join(repo, '..', 'other')
+    execFileSync('git', ['clone', '-q', '--no-local', '--single-branch', '-b', 'main', repo, other])
+    expect(isUnknown(await G.isAncestor(other, base, rev))).toBe(true)
+    const answers = await G.gitStep(async () => {
+      const here = [await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev)]
+      // A step inside the step (another workspace's work it set off), on the other repository: its own answers.
+      const there = await G.gitStep(async () => [await G.isAncestor(other, base, rev), await G.mergeBase(other, base, rev)])
+      return { here, there }
+    })
+    expect(answers.here).toEqual([true, base])
+    expect(answers.there.every((v) => isUnknown(v))).toBe(true)
   })
 
   it('dirty lists tracked and untracked changes and a merge under way, only the paths asked for', async () => {

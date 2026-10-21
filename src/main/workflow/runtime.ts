@@ -1168,16 +1168,17 @@ export class Workflow {
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
     let contained: Maybe<boolean> | undefined
     let method: FactData['Integrated']['method'] = 'merge'
+    // The target's head, read once (#1376): what containment is asked of, and the integration's result.
+    const th = await this.platform(r.options).targetHead(target)
     if (r.guards.reportMerge.includes('done.contained')) {
       // Integration needs a non-empty change (§16.4.4).
       if (!rev || !s.approved?.base || rev === s.approved.base) contained = false
       else {
-        const c = await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key })
+        const c = await this.platform(r.options).contains(target, { base: s.approved.base, revision: rev, key: s.latest?.key }, !isUnknown(th) && th ? th : undefined)
         contained = isUnknown(c) ? c : !!c
         if (!isUnknown(c) && c) method = c.method === 'sameTree' ? 'sameTree' : c.method
       }
     }
-    const th = await this.platform(r.options).targetHead(target)
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -1740,7 +1741,8 @@ export class Workflow {
     const p = this.platform(this.rulesetOf(b.prev, s).options)
     const base = s.approved?.base ?? s.latest?.base ?? s.started?.base
     if (!base) return unknown(UNREADABLE.branchedOffTarget)
-    const c = await p.contains(b.target, { base, revision: b.head, key: null })
+    // In the target's head the line was compared with (#1376: not read again).
+    const c = await p.contains(b.target, { base, revision: b.head, key: null }, b.targetHead)
     if (isUnknown(c)) return c
     if (c) return []
     const from = s.approved?.revision ?? base
