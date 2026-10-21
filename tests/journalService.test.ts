@@ -3,7 +3,7 @@
 // off or outside its scope while the entries are kept, the Assistant told when they change, and deleting it.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { DEFAULT_JOURNAL } from '../src/shared/journal'
@@ -16,6 +16,11 @@ const base = tempDir('hive-journal-service-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+afterEach(async () => {
+  await advanced.set(ENFORCE, true)
+})
 const journal = await import('../src/main/journal')
 const service = await import('../src/main/journalService')
 const deliveries = await import('../src/main/deliveries')
@@ -78,6 +83,8 @@ describe('the journal in a workspace', () => {
   })
 
   it("records Hive's facts: a lane started and ended with its merge, a card into Done", async () => {
+    // A merge commit given at the end, as with workflow rules off: with them on, Hive takes it from the cards' facts (#1270).
+    await advanced.set(ENFORCE, false)
     const [c1, c2] = [await run(() => tasks.createTask({ title: 'One', project: 'alpha' }, user)), await run(() => tasks.createTask({ title: 'Two', project: 'alpha' }, user))]
     const l = await run(() => lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], name: 'storage', by: 'B1 (alpha)' }))
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))

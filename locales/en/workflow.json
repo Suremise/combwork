@@ -615,6 +615,18 @@
     "defaultMessage": "The merge queue brings it up to date itself.",
     "description": "What happens next after the strict up-to-date rule refuses."
   },
+  "workflow.refused.lane.oneAtATime.change": {
+    "defaultMessage": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
+    "description": "Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Hive shows it)."
+  },
+  "workflow.refused.lane.oneAtATime.message": {
+    "defaultMessage": "{card} can't start yet: {earlier}, before it in its lane, isn't Done.",
+    "description": "A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12."
+  },
+  "workflow.refused.lane.oneAtATime.next": {
+    "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
+    "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."

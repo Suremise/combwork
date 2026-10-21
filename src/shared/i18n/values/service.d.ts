@@ -151,6 +151,8 @@ interface HiveMessageValues {
   'service.workflowNotice.lane': { lane: string | number }
   'service.workflowNotice.mergeDue': undefined
   'service.workflowNotice.mergeStalled': undefined
+  'service.workflowNotice.merging': { card: string | number }
+  'service.workflowNotice.notMerged': { card: string | number }
   'service.workflowNotice.stalled': { card: string | number }
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined

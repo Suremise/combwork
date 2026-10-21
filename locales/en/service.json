@@ -599,6 +599,14 @@
     "defaultMessage": "Its merge has stalled",
     "description": "A line of a lane's notification: every card passed review, but nobody has started merging the work for a while (its builder is idle or stopped)."
   },
+  "service.workflowNotice.merging": {
+    "defaultMessage": "{card} is being merged: the lane waits for it",
+    "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) is in the merge queue, so the next card can't start."
+  },
+  "service.workflowNotice.notMerged": {
+    "defaultMessage": "{card} passed review: the lane waits for it to be merged",
+    "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start."
+  },
   "service.workflowNotice.stalled": {
     "defaultMessage": "{card} has stalled",
     "description": "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped."

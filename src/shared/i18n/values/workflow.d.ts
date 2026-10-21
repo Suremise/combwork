@@ -155,6 +155,9 @@ interface HiveMessageValues {
   'workflow.refused.integrate.upToDate.change': undefined
   'workflow.refused.integrate.upToDate.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.integrate.upToDate.next': undefined
+  'workflow.refused.lane.oneAtATime.change': undefined
+  'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
+  'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined

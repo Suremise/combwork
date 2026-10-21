@@ -4,7 +4,7 @@
 // abandoned lane keeps its cards as it left them, and a lane is on the card being worked (#512).
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
 import { allDone, keptLanes, laneLine, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
@@ -19,6 +19,14 @@ const base = tempDir('hive-lanes-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
+
+/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+afterEach(async () => {
+  await advanced.set(ENFORCE, true)
+})
 const { onHiveEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
@@ -297,6 +305,8 @@ describe('the lanes service', () => {
   })
 
   it('only its builder or reviewer ends it, among agents; the user and the Assistant may', async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     const c = await make('E1')
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'B1 (alpha)' })).lane
     await expect(lanes.endLane(w, l.id, { project: 'alpha', agent: 'b2' })).rejects.toThrow(/builder or reviewer/)

@@ -122,6 +122,21 @@ export async function gatherReads(ws: WorkspaceService, planned: Planned[]): Pro
 /** For tests: told of each card's reads as they begin (whether that is inside a board change: it never should be). */
 export const recorderTestHooks: { onRead: ((n: number) => void) | null } = { onRead: null }
 
+/** The ruleset of the running lane a card is in, as stored when the lane started; null when it has none (or can't be read). */
+function laneRulesetOf(ws: WorkspaceService, p: Planned): Ruleset | null {
+  // A card being made has no number yet: no lane has it.
+  if (!(p.number > 0)) return null
+  try {
+    const store = FactStore.forBoard(ws, { project: p.project!, key: p.project! })
+    const lane = store.card(p.number).lane
+    const l = lane ? store.lane(lane) : null
+    return l && !l.ended && l.ruleset ? store.ruleset(l.ruleset) : null
+  } catch (e) {
+    log.warn(`reading the lane ruleset of #${p.number}`, e)
+    return null
+  }
+}
+
 async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   recorderTestHooks.onRead?.(p.number)
   const projectPath = join(ws.path!, p.project)
@@ -130,7 +145,10 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const folder = def?.worktree?.path ?? projectPath
   const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {} }
   // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
-  if (p.why === 'start') {
+  // A card of a running lane starts under the lane's ruleset, the one in force when the lane started (#1270, §16.11.1).
+  const laneRuleset = p.why === 'start' ? laneRulesetOf(ws, p) : null
+  if (laneRuleset) r.ruleset = laneRuleset
+  else if (p.why === 'start') {
     // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
     const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {

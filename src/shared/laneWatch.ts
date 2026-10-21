@@ -1,4 +1,5 @@
-import type { LaneState, SessionStatus, TaskCard, TaskColumn } from './types'
+import type { LaneState, LaneStatus, SessionStatus, TaskCard, TaskColumn } from './types'
+import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
 import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
@@ -15,7 +16,7 @@ import { cardRef } from './projectKeys'
  */
 
 /** What a lane watch counts. The default is all but `passed` and `moved`. */
-export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved'] as const
+export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused'] as const
 export type LaneEvent = (typeof LANE_EVENTS)[number]
 export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting']
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
@@ -58,6 +59,8 @@ export interface LaneNow {
   cards: { number: number; blocked: string | null; stalled: string | null; failedBy: string | null; passedBy: string | null }[]
   /** Why its merge has stalled (#869), when it has. */
   mergeStall?: string | null
+  /** Why it waits (#1270), as main worked it out: a pause the other events don't tell (a card not merged, merging). */
+  status?: LaneStatus | null
 }
 
 /** One lane's events since its mark: what the wake line tells. */
@@ -150,6 +153,10 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
   }
   if (on.has('merge-due') && now.mark.mergeDue && !before.mergeDue && now.mark.state !== 'ended' && now.mark.state !== 'abandoned') parts.push({ n: null, event: 'merge-due', text: 'all its cards passed: its merge is due' })
   if (on.has('stalled') && now.mark.ms && !before.ms) parts.push({ n: null, event: 'stalled', text: 'its merge is stalled', ...(now.mergeStall ? { detail: now.mergeStall } : {}) })
+  // Paused for a reason the events above don't tell (#1270): a blocked or held card, a request for you and the round
+  // limit are told as themselves (blocked, For you); one card at a time waiting for a merge isn't.
+  const s = now.status
+  if (on.has('paused') && now.mark.state === 'paused' && before.state !== 'paused' && s && (s.reason === 'notMerged' || s.reason === 'merging')) parts.push({ n: s.card, event: 'paused', text: `paused: ${laneStatusText(s)}`, detail: s.reason })
   if (on.has('ended') && now.mark.state === 'ended' && before.state !== 'ended') parts.push({ n: null, event: 'ended', text: 'ended (merged)' })
   if (on.has('abandoned') && now.mark.state === 'abandoned' && before.state !== 'abandoned') parts.push({ n: null, event: 'abandoned', text: 'was abandoned' })
   return parts.length ? { id: now.id, label: now.label, parts } : null

@@ -149,6 +149,8 @@
   "service.workflowNotice.lane": "Couloir {lane}",
   "service.workflowNotice.mergeDue": "Toutes les cartes ont été validées en relecture : la fusion peut commencer",
   "service.workflowNotice.mergeStalled": "La fusion est à l’arrêt",
+  "service.workflowNotice.merging": "{card} est en cours de fusion : le couloir attend",
+  "service.workflowNotice.notMerged": "{card} a passé la relecture : le couloir attend sa fusion",
   "service.workflowNotice.stalled": "{card} est à l’arrêt",
   "service.workspace.advancedNotHere": "Le paramètre {setting} ne peut pas être défini pour un espace de travail.",
   "service.workspace.agentGone": "Cet agent n’existe plus.",

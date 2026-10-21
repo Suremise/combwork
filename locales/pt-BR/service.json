@@ -149,6 +149,8 @@
   "service.workflowNotice.lane": "Raia {lane}",
   "service.workflowNotice.mergeDue": "Todos os cartões tiveram revisão bem-sucedida: hora do merge",
   "service.workflowNotice.mergeStalled": "O merge está travado",
+  "service.workflowNotice.merging": "{card} está em merge: a raia espera",
+  "service.workflowNotice.notMerged": "{card} passou na revisão: a raia espera o merge",
   "service.workflowNotice.stalled": "{card} está travado",
   "service.workspace.advancedNotHere": "A configuração {setting} não pode ser definida para um espaço de trabalho.",
   "service.workspace.agentGone": "Esse agente não existe mais.",

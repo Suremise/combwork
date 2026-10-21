@@ -431,6 +431,10 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     if (s.stage !== 'todo') return this.notFrom(card, actor, s, 'start')
+    // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
+    // user's own drag is theirs to make.
+    const earlier = this.enforced() && !opts.drag ? this.laneWaits(card) : null
+    if (earlier) return this.refuse(card, actor, 'start', { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } })
     const g = await this.gatherStart(card, s, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     // Its ruleset is stored by the write that names it (write()), under the store's lock.
@@ -1442,6 +1446,17 @@ export class Workflow {
     const next = changeList({ ...l, current }, cards)
     this.saveLane(next)
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
+  }
+
+  /** The first card before this one in its running lane (its list, or the queued one it is in) that isn't Done, or null. */
+  laneWaits(card: CardRecord): CardRecord | null {
+    if (!card.lane) return null
+    const l = this.lane(card.lane)
+    if (!l || l.ended) return null
+    const list = l.cards.includes(card.id) ? l.cards : (l.pending ?? [])
+    const before = list.slice(0, Math.max(0, list.indexOf(card.id)))
+    const open = before.find((c) => !this.laneDone(c))
+    return open === undefined ? null : this.store.card(open)
   }
 
   /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */

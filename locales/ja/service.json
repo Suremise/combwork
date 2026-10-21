@@ -149,6 +149,8 @@
   "service.workflowNotice.lane": "レーン {lane}",
   "service.workflowNotice.mergeDue": "すべてのカードがレビューに合格しました：マージの時です",
   "service.workflowNotice.mergeStalled": "マージが停滞しています",
+  "service.workflowNotice.merging": "{card} をマージ中です: レーンは待っています",
+  "service.workflowNotice.notMerged": "{card} はレビューに合格しました: レーンはマージを待っています",
   "service.workflowNotice.stalled": "{card}は停滞しています",
   "service.workspace.advancedNotHere": "{setting}はワークスペースごとには設定できません。",
   "service.workspace.agentGone": "そのエージェントはもう存在しません。",

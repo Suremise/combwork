@@ -2522,6 +2522,8 @@ export type HiveEvent =
   | { type: 'merge-slots-changed'; workspacePath: string; slots: MergeSlotInfo[] }
   /** A workspace's lanes changed, or one of their cards did (the lanes it lists, as lanes:list gives them). */
   | { type: 'lanes-changed'; workspacePath: string; lanes: LaneInfo[] }
+  /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
+  | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */
   /** A window's developer console recording got further, or stopped (#638). */
   | { type: 'console-recording'; recording: ConsoleRecordingInfo }
@@ -2578,6 +2580,28 @@ export interface LaneInfo {
   updatedAt: string
   endedAt: string | null
   mergeCommit: string | null
+  /**
+   * Why a running lane waits, or what it waits on (#1270, SPEC §16.11.4), worked out in main from the board and its
+   * cards' facts; null when it goes on as it is (or has ended). With workflow rules off, only a blocked or held card.
+   */
+  status: LaneStatus | null
+  /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
+  queued: number[] | null
+}
+
+/**
+ * Why a lane waits (#1270): its card blocked or On Hold, a request for you (For you), the round limit reached, a card
+ * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
+ * Review, or a list change queued after the card in flight. The first four and the merge pause the lane.
+ */
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges'
+
+export interface LaneStatus {
+  reason: LaneWaitReason
+  /** The card it is about. */
+  card: number | null
+  /** blocked: the card's reason, as the board has it. */
+  blocked?: string
 }
 
 /** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */

@@ -41,6 +41,7 @@ const SAMPLE: RefusalValues = {
   intent: 'report merge',
   rules: 'submit.checksPassed, approval.given',
   key: 'AM-12',
+  earlier: 'AM-11',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
