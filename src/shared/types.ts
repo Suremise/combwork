@@ -3,7 +3,7 @@
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
-import type { ActivityTarget } from './assistantActivity'
+import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
@@ -314,6 +314,66 @@ export type AssistantControl = 'look' | 'agents' | 'projects'
 
 /** Something the Hive Assistant did (or tried), for the list in its panel and hive.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
+/**
+ * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane
+ * record, an agent's settings, a Hive setting, an agent it started (stopped by undo), or one that can't be undone
+ * (`final`: a prompt or comment sent, a project made), which says why.
+ */
+export type AssistantChangeKind = 'card' | 'lane' | 'agent' | 'setting' | 'started' | 'final'
+
+/** One of the Assistant's changes as kept for undo: its line, what it was about, the fields it set, and whether undone. */
+export interface AssistantChangeRow {
+  id: string
+  /** The user's message it came from. */
+  group: string
+  at: string
+  kind: AssistantChangeKind
+  /** The Assistant's action it came from (its activity kind: `update-task`, `prompt-agent`…), for the window's words. */
+  act: ActivityKind
+  /** The Assistant's change as it said it ("change #12 on the board"), in English. */
+  what: string
+  card?: number
+  project?: string
+  /** The fields it set (a card's `labels`, `column`…; a lane's `cards`; a setting's `value`; `created` for a card it made). */
+  fields: string[]
+  /** Why it can't be undone (a `final` change), in English. */
+  final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
+  undoneAt?: string
+  /**
+   * Once undone, what undo did with its fields (#1283): those put back, and those left as they were, with why (someone
+   * changed it since, it is gone, the lane ended). Absent for a change undone before outcomes were kept.
+   */
+  outcome?: { undone: string[]; skipped: { field: string; why: 'changed' | 'gone' | 'ended' }[] }
+}
+
+/** The Assistant's changes for one message of the user's (#1282): when it was sent, and its changes, newest first. */
+export interface AssistantChangeGroup {
+  id: string
+  at: string
+  changes: AssistantChangeRow[]
+}
+
+/**
+ * What undoing one change did: the fields put back (`running`: an agent it started, stopped), and those left as they are,
+ * with why: someone changed it since, the card, lane or agent is gone, the lane has ended, or the change failed (`error`).
+ */
+export interface AssistantUndoResult {
+  change: string
+  act: ActivityKind
+  what: string
+  card?: number
+  undone: string[]
+  skipped: { field: string; why: 'changed' | 'gone' | 'ended' | 'failed'; error?: string }[]
+  /** Why nothing of it can be undone (a `final` change), in English. */
+  final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
+  /** It was undone before: nothing more was done. */
+  already?: true
+}
+
 export interface AssistantAction extends Partial<ActivityTarget> {
   id: string
   at: string
@@ -330,6 +390,9 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   revertOf?: string
   /** The line without what it quotes (a prompt, a message): what the Agent API's event stream gives (#620). */
   brief?: string
+  /** The user's message it came from, and when it was sent (#1283: the panel lists it with that message's changes). */
+  group?: string
+  groupAt?: string
 }
 
 /** A setting the Hive Assistant changed, as its activity list shows it and Revert undoes it. */
@@ -1447,6 +1510,16 @@ export interface InboxSummary {
   overdue: number
 }
 
+/** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Hive can tell. */
+export interface HooksMissing {
+  since: string
+  /** start: no hook since its start; prompt: none after a prompt its CLI took. */
+  after: 'start' | 'prompt'
+  why?: 'refused' | 'off' | 'newer'
+  /** off: the settings that turn them off, as the CLI's adapter names them. */
+  offIn?: string
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -1530,6 +1603,13 @@ export interface LiveSessionState {
    * Shown in its pane until the CLI takes it or the user types there; nothing more is typed into it meanwhile.
    */
   untakenLine?: { since: string; text: string }
+  /**
+   * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
+   * then), or none after a prompt its CLI went to work on (its screen or its records show it). Hive's status for it may be
+   * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Hive can tell: Hive
+   * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Hive was tested with.
+   */
+  hooksMissing?: HooksMissing
   /**
    * Its deliveries (#647: messages left for it, main/deliveries.ts) not received yet, and how many are overdue; shown in
    * its pane ("✉ 2 unread"), where the user can cancel those waiting. Absent when there are none.
@@ -2594,9 +2674,10 @@ export interface LaneInfo {
 /**
  * Why a lane waits (#1270): its card blocked or On Hold, a request for you (For you), the round limit reached, a card
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
- * Review, or a list change queued after the card in flight. The first four and the merge pause the lane.
+ * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
+ * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks'
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -2621,6 +2702,8 @@ export interface LaneStatus {
   blocked?: string
   /** you: what the user is asked for (the open request's kind, #1279). */
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
+  /** hooks: the agent whose hooks aren't arriving, by name. */
+  agent?: string
 }
 
 /** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */

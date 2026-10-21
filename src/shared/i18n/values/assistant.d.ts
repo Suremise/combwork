@@ -196,10 +196,6 @@ interface HiveMessageValues {
   'assistant.panel.resumeMenu': undefined
   'assistant.panel.resumeOne': undefined
   'assistant.panel.resumeTip': { name: string | number; when: string | number }
-  'assistant.panel.revert': undefined
-  'assistant.panel.revertFailed': undefined
-  'assistant.panel.revertLabel': { setting: string | number; value: string | number }
-  'assistant.panel.reverted': undefined
   'assistant.panel.reviewing': { number: string | number; title: string | number }
   'assistant.panel.running': { count: string | number }
   'assistant.panel.save': undefined
@@ -608,6 +604,59 @@ interface HiveMessageValues {
   'assistant.templates.unsavedTip': undefined
   'assistant.templates.where': { name: string | number; scope: string; project: string | number }
   'assistant.templates.workspace': undefined
+  'assistant.undo.askFinal': { n: number }
+  'assistant.undo.askMessage': undefined
+  'assistant.undo.askTitle': { n: number }
+  'assistant.undo.card': { card: string | number; fields: string | number }
+  'assistant.undo.changed': { fields: string | number }
+  'assistant.undo.dismiss': undefined
+  'assistant.undo.ended': undefined
+  'assistant.undo.error': { error: string | number }
+  'assistant.undo.failed': undefined
+  'assistant.undo.field': { field: string }
+  'assistant.undo.final': undefined
+  'assistant.undo.gone': undefined
+  'assistant.undo.kept': undefined
+  'assistant.undo.made': { card: string | number }
+  'assistant.undo.message': { time: string | number; n: number }
+  'assistant.undo.messageNone': { time: string | number }
+  'assistant.undo.partly': undefined
+  'assistant.undo.resultAlready': { n: number }
+  'assistant.undo.resultFinal': { n: number }
+  'assistant.undo.resultKept': { n: number }
+  'assistant.undo.resultLine': { change: string | number; why: string | number }
+  'assistant.undo.resultUndone': { n: number }
+  'assistant.undo.undo': undefined
+  'assistant.undo.undoChange': { change: string | number }
+  'assistant.undo.undoMessage': { time: string | number }
+  'assistant.undo.undoneAt': { when: string | number }
+  'assistant.undo.why.agentAdded': undefined
+  'assistant.undo.why.agentStopped': undefined
+  'assistant.undo.why.ask': undefined
+  'assistant.undo.why.cannot': undefined
+  'assistant.undo.why.cardPlace': undefined
+  'assistant.undo.why.cardsOrder': undefined
+  'assistant.undo.why.comment': undefined
+  'assistant.undo.why.context': undefined
+  'assistant.undo.why.decision': undefined
+  'assistant.undo.why.declarePaths': undefined
+  'assistant.undo.why.handOver': undefined
+  'assistant.undo.why.laneEnded': undefined
+  'assistant.undo.why.message': undefined
+  'assistant.undo.why.nothing': undefined
+  'assistant.undo.why.projectClosed': undefined
+  'assistant.undo.why.projectMade': undefined
+  'assistant.undo.why.projectOpened': undefined
+  'assistant.undo.why.prompt': undefined
+  'assistant.undo.why.putBack': undefined
+  'assistant.undo.why.reportMerge': undefined
+  'assistant.undo.why.request': undefined
+  'assistant.undo.why.start': undefined
+  'assistant.undo.why.startReview': undefined
+  'assistant.undo.why.submit': undefined
+  'assistant.undo.why.verdict': undefined
+  'assistant.undo.why.withdrawn': undefined
+  'assistant.undo.working': undefined
   'assistant.view.allAttachments': undefined
   'assistant.view.allConversations': undefined
   'assistant.view.attachments': undefined

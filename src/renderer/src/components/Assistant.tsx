@@ -3,27 +3,28 @@ import { ASSISTANT_AGENT_ID, DEFAULT_MODE, NEW_MODE_DESCRIPTION, assistantModeId
 import { assistantStatusLine } from '@shared/assistantStatus'
 import { AGENT_STATE_LABEL, agentState, boardExtras, type AgentState } from '@shared/agentState'
 import { compactThreshold, isCompacting } from '@shared/defaults'
-import { formatDateTime, formatTime } from '@shared/dates'
+import { formatTime } from '@shared/dates'
 import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
 import { agentProvider, providerDescriptor } from '@shared/providers'
-import type { AgentInfo, AgentPatch, AssistantAction, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import type { AgentInfo, AgentPatch, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
+import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
 import { Overrides, ProviderChoice, contextChoice, contextValue, type ContextChoice } from './AgentDialogs'
 import { PaneFooter, RESUME_TINT } from './AgentPanes'
+import { AssistantChanges, useDoneCount } from './AssistantChanges'
 import { AssistantMark } from './AssistantMark'
 import { TaskChip, useAgentCards, useAgentReviews } from './CardChip'
 import { confirmDangerousMode } from './PermissionMode'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
-import { ShowAllList } from './ShowAllList'
 import { TerminalView } from './TerminalView'
 import { Icon, IconButton, Modal, ReviewMark, statusText, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -105,11 +106,6 @@ const M = {
   more: msg({ id: 'assistant.panel.more', defaultMessage: 'More', description: "The Assistant panel's ⋯ button, which opens its More menu." }),
   status: msg({ id: 'assistant.panel.status', defaultMessage: 'Status: {text}', description: "The Assistant's status line under its header ({text}: \"Working\", \"Waiting for #12 → Review\")." }),
   openCard: msg({ id: 'assistant.panel.openCard', defaultMessage: '{known, select, yes {Open card {number}, in {column}} other {Open card {number}}}', description: 'A card chip in the Assistant\'s status line, for screen readers ({number}: the card\'s name, its key, such as AM-12, or #12 for a card with none; {column}: "Review").' }),
-  revertFailed: msg({ id: 'assistant.panel.revertFailed', defaultMessage: 'Could not revert the setting', description: "An error notice: a setting the Assistant changed couldn't be put back; the reason follows." }),
-  notDone: msg({ id: 'assistant.panel.notDone', defaultMessage: 'Not done: {error}', description: "Tooltip on something the Assistant was refused, after when: why ({error}, from Hive's Agent API, in English)." }),
-  reverted: msg({ id: 'assistant.panel.reverted', defaultMessage: 'reverted', description: 'Beside a setting the Assistant changed that was put back.' }),
-  revertLabel: msg({ id: 'assistant.panel.revertLabel', defaultMessage: 'Revert {setting} to {value}', description: 'The Revert button, for screen readers ({setting}: the setting\'s path; {value}: its old value).' }),
-  revert: msg({ id: 'assistant.panel.revert', defaultMessage: 'Revert', description: 'A button beside a setting the Assistant changed: puts the old value back.' }),
   doneBy: msg({ id: 'assistant.panel.doneBy', defaultMessage: 'Done by the Assistant', description: "The heading of the list of what the Assistant did (a count follows)." }),
   markLabel: msg({ id: 'assistant.panel.markLabel', defaultMessage: '{name}: {state}{running, select, yes {{hasDetail, select, yes { · {detail}} other {}}} other { · not running}}', description: "An agent's state mark in the Assistant's workspace section: its name for screen readers and the first line of its tooltip. {state}: the state its mark draws (Working, Idle, Waiting for you, Stalled); {detail}: what it is doing, when that says more (\"e2e: 12 suites 4/12\"); \"not running\" while its session isn't. Lower case after the dot." }),
   workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
@@ -290,6 +286,8 @@ export function AssistantPanel() {
     // Another workspace opened before this loaded: its own load is on the way.
     let current = true
     void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([assistantActions, assistantQuestions]) => current && set({ assistantActions, assistantQuestions }))
+    // Its changes kept for undo (#1283), by message.
+    void loadAssistantChanges()
     return () => {
       current = false
     }
@@ -654,7 +652,7 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
   // Hive's own questions its actions wait on (the cards under this line): the user is wanted first.
   const approvals = useStore((s) => s.assistantQuestions)
   const tasks = useStore((s) => s.tasks)
-  const done = useStore((s) => s.assistantActions.length)
+  const done = useDoneCount()
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
   const line = assistantStatusLine(live, (iso) => formatTime(iso), approvals.map((q) => q.title))
@@ -701,47 +699,9 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
  * open (#979): the last 3, Show all scrolls every one inside the same height.
  */
 function AssistantActions() {
-  const list = useStore((s) => s.assistantActions)
-  const reverting = useStore((s) => s.running)
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
-  useDateStyle()
-  if (!list.length || !open) return null
-  const newest = [...list].reverse()
-  const reverted = new Set(list.map((a) => a.revertOf).filter(Boolean))
-  // A setting it changed (#186): Revert puts the old value back, through the same checks.
-  const revert = (x: AssistantAction): void => void runOnce(`revert:${x.id}`, () => actions.attempt(tr(M.revertFailed), () => call('assistant:revertSetting', x.id)))
-  const row = (x: AssistantAction) => (
-    <Tooltip block content={[formatDateTime(x.at), ...(x.error ? [tr(M.notDone, { error: x.error })] : []), ...(x.setting ? [`${x.setting.path}: ${x.setting.oldText} → ${x.setting.newText}`] : [])].join('\n')}>
-      <div className={cx('assistant-action', !x.ok && 'failed')}>
-        <Icon name={x.ok ? 'check' : 'circle-slash'} />
-        <span className="assistant-action-text">{x.text}</span>
-        {x.setting &&
-          x.ok &&
-          (reverted.has(x.id) ? (
-            <span className="faint">{tr(M.reverted)}</span>
-          ) : (
-            <button
-              className="btn small subtle assistant-revert"
-              disabled={!!reverting[`revert:${x.id}`]}
-              aria-label={tr(M.revertLabel, { setting: x.setting.path, value: x.setting.oldText })}
-              onClick={(e) => {
-                e.stopPropagation()
-                revert(x)
-              }}
-            >
-              <Icon name="discard" /> {tr(M.revert)}
-            </button>
-          ))}
-        <span className="faint">{timeAgo(x.at)}</span>
-      </div>
-    </Tooltip>
-  )
-  return (
-    <div className="assistant-actions" id="assistant-done-list">
-      <ShowAllList items={newest} few={3} keyOf={(x) => x.id} renderItem={row} label={tr(M.doneBy)} className="assistant-actions-list" />
-    </div>
-  )
+  return open ? <AssistantChanges /> : null
 }
 
 /**

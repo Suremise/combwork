@@ -61,7 +61,7 @@ import { emit, emitTo, tellListeners, toast } from './events'
 import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT } from '../shared/runtime'
+import { COMPACTING_TEXT, HOOKS_MISSING_NOTE } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, hookStep, idleAfter, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { admit, describe as describeTurn, endRunning, expectInjected, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
@@ -102,7 +102,8 @@ import { inWorkspace, workspace, workspaceFor, workspaceOf, type SessionsFile } 
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
-import { endHookToken, newHookToken } from './hookTokens'
+import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
+import { hookSeen, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
 import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
@@ -279,6 +280,11 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
+  /** Whether its hooks are reaching Hive (#1336, hooksHealth.ts): what the check reads of the launch. */
+  hooksWatch?: HooksWatch
+  /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Hive was tested with. */
+  hooksOffIn?: () => string | null
+  newerThanTested?: boolean
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
   costAt?: number
   /** The cost the CLI last reported for this launch, kept while the user's prices are shown instead (#436). */
@@ -1442,6 +1448,7 @@ class SessionManager {
     if (l && basename(l.state.projectPath) === ASSISTANT_DIR) this.onAssistantExit(l.state.projectPath)
     else if (l) endAgentToken(l.state.projectPath, l.state.agentId, l.state.runId)
     if (l) this.launchEnded(l.state.projectPath, l.state.agentId, l.state.runId)
+    if (l?.state.hooksMissing) noteHooksMissing(l.state.projectPath, l.state.agentId, false)
     this.live.delete(id)
     this.recheckTools(id)
     // A start given up before its process spawned has no exit to wait for.
@@ -1625,6 +1632,10 @@ class SessionManager {
     l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
+    // Whether its hooks reach Hive (#1336), and what can say why they don't.
+    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook)
+    l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
+    l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Hive's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
     // i18n-ignore: what the Agent API's project status says of a skill (agent-facing text stays English)
@@ -1694,13 +1705,19 @@ class SessionManager {
         void this.onExit(projectPath, agent.id, state.runId, code, output)
       }
     })
+    // A task on its command line is its first prompt (#1336: a hook should follow it), though it is still starting: no
+    // turn of its own runs yet.
+    if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
-    // After each look at the transcript, the silence check: what the CLI recorded (a turn's end) comes first (#648).
+    // After each look at the transcript, the silence check: what the CLI recorded (a turn's end) comes first (#648); then
+    // whether its hooks are arriving (#1336).
     l.backupTimer = setInterval(() => {
       void this.backup(projectPath, agent.id)
         .catch((e) => log.warn('transcript look failed', e))
         .then(() => this.checkSilence(projectPath, agent.id))
+        .then(() => this.checkHooks(projectPath, agent.id))
+        .catch((e) => log.warn('hooks check failed', e))
     }, 5000)
     // The process runs now: failing to record it (a full disk) must not leave it untracked.
     if (state.sessionId) await this.recordSession(projectPath, agent, l).catch((e) => log.warn(`${userText(this.label(state))}: could not record session ${state.sessionId}`, e))
@@ -2272,8 +2289,80 @@ class SessionManager {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
     if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r') })
-    if (typed?.includes('\r')) this.userEnter.set(key, Date.now())
+    if (typed?.includes('\r')) {
+      this.userEnter.set(key, Date.now())
+      // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
+      const l = [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key)
+      if (l) this.notePrompt(l)
+    }
   }
+
+  /** A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it. */
+  private notePrompt(l: LiveSession, launch = false): void {
+    const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
+    if (l.hooksWatch) promptSent(l.hooksWatch, Date.now(), idle)
+  }
+
+  /**
+   * Whether an agent's hooks are arriving (#1336, hooksHealth.ts), at each look at its transcript, in the launch's hook
+   * order (a hook that came first is taken first, and nothing waits on a read): missing, its state is unknown, nothing is
+   * typed into it, its lanes pause, and the user is told once a conversation.
+   */
+  private checkHooks(projectPath: string, agentId: string): Promise<void> {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    if (!l?.hooksWatch) return Promise.resolve()
+    return this.inHookOrder(l.state.runId, () => {
+      const w = l.hooksWatch
+      const st = l.state
+      if (this.live.get(id) !== l || !w || st.hooksMissing || st.runtime?.lifecycle === 'stopped' || st.runtime?.lifecycle === 'signin') return
+      // A question at its start (its folder's trust) waits for the user while it is on its screen.
+      const text = l.screen?.text() ?? null
+      const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
+      const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l) }, Date.now(), advanced.number('hive.hooks.missingSeconds') * 1000)
+      if (after) this.hooksGone(l, after)
+    })
+  }
+
+  /** Its hooks aren't arriving (#1336): why if Hive can tell, its state unknown, its lanes paused, the user told once. */
+  private hooksGone(l: LiveSession, after: 'start' | 'prompt'): void {
+    const st = l.state
+    const offIn = (() => {
+      try {
+        return l.hooksOffIn?.() ?? null
+      } catch {
+        return null
+      }
+    })()
+    const why = hooksRefused(st.runId) ? 'refused' : offIn ? 'off' : l.newerThanTested ? 'newer' : undefined
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
+    this.emitState(st)
+    noteHooksMissing(st.projectPath, st.agentId, true)
+    const label = this.label(st)
+    log.warn(`${userText(label)}: no hooks from ${st.provider} ${after === 'start' ? 'since it started' : 'after a prompt it went to work on'}${why ? ` (${why})` : ''}: its status may be wrong, and nothing is typed into it until they come`)
+    hookJournal(`run=${st.runId} (no hook) hooks missing after ${after}${why ? ` (${why})` : ''}`)
+    // Once a conversation (a restart with the same hooks problem says it again only in its pane).
+    const told = `${st.agentId}\n${st.sessionId || st.runId}`
+    if (this.hooksTold.has(told)) return
+    this.hooksTold.add(told)
+    // A bounded few: the oldest go first.
+    if (this.hooksTold.size > 500) this.hooksTold.delete(this.hooksTold.values().next().value!)
+    // A toast, kept in Notifications.
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath) // i18n-ignore: select keys, never shown
+  }
+
+  /** Its hooks came again (#1336): its status is Hive's to tell again, and its lanes go on. */
+  private hooksBack(l: LiveSession): void {
+    const st = l.state
+    const was = st.hooksMissing
+    st.hooksMissing = undefined
+    this.emitState(st)
+    noteHooksMissing(st.projectPath, st.agentId, false)
+    log.info(`${userText(this.label(st))}: its hooks are arriving again${was ? ` (missing since ${was.since})` : ''}`)
+  }
+
+  /** Agents and conversations told their hooks went missing (#1336): once each while Hive runs. */
+  private hooksTold = new Set<string>()
 
   /**
    * A line Hive typed into an agent wasn't taken, even after Enter again (#430: its CLI wasn't reading its input). It is
@@ -2461,6 +2550,8 @@ class SessionManager {
       // Waiting to be taken from here (#430), for whatever Hive types next: recorded once this call is done with it (its
       // own Enter again below is no line over it; nothing else types meanwhile, it holds `delivering`).
       sent = { at: Date.now(), prompts: before, from: since }
+      // A hook should follow it (#1336), unless it is a command of the CLI's own.
+      if (l && !line.startsWith('/')) this.notePrompt(l)
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'input', name: 'Hive typed a line', provider: l?.state.provider, raw: { text: line }, made: { bracketedPaste: !!l?.screen?.bracketedPaste(), confirm: !!opts.confirm }, summary: `Hive typed a line (${line.length} chars) and Enter` }))
       // confirm: until the CLI reports the prompt submitted. One just resumed and still drawing its conversation can
@@ -2816,6 +2907,8 @@ class SessionManager {
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
       this.recheckTools(id)
+      // Its hooks missing were this launch's (#1336): its lanes go on (a stopped agent is the lane's own business).
+      if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
     }
     this.runs.delete(runId)
     // Its hook token ends with it: hooks of an ended launch were ignored anyway (findLaunch).
@@ -3986,6 +4079,8 @@ class SessionManager {
     // The launch's hooks before this one: what the old conversation had seen, if this one switches conversations.
     const before = launch?.hooksSeen ?? 0
     if (launch) launch.hooksSeen = before + 1
+    // Its start is heard (#1336); whether it answers a prompt is the turn ledger's to say, in the launch's order.
+    if (launch?.hooksWatch) hookSeen(launch.hooksWatch, at)
     return this.inHookOrder(runId ?? `session:${String(body.session_id ?? '')}`, () => this.handleHookNow(runId, body, arrived, before, reply, at))
   }
 
@@ -4073,6 +4168,12 @@ class SessionManager {
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
+    // A current turn's hook (#1336): the prompt watched is answered, and missing hooks are back. A late hook of a turn
+    // that is over says nothing of a prompt sent since.
+    if (took.verdict !== 'stale' && l.hooksWatch) {
+      turnHeard(l.hooksWatch)
+      if (st.hooksMissing) this.hooksBack(l)
+    }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
     // A prompt about a safeguard stop says why (#606): told so now if the screen shows it, else when it draws it.
     const guard = this.guardCandidate(l, hook.event)

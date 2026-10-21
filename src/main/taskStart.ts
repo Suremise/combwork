@@ -63,7 +63,7 @@ const MAX_NOTE = 4000
  * can't be started, the card goes back where it was and a new agent is removed again. note: what to do now (such as
  * "address the latest review comment"), added to the prompt.
  */
-export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
+export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   if (note && note.length > MAX_NOTE) throw hiveError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
   if (starting.has(key)) throw hiveError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '#{n} is already being started.', description: 'An error: card #{n} (a number) is being started already; a second Start of it is refused.' }), { n })
@@ -99,7 +99,7 @@ function startable(card: TaskCard): void {
   if (!card.project) throw hiveError(msg({ id: 'tasks.start.noProject', defaultMessage: '#{n} has no project. Give it one first: the agent works in that project.', description: 'An error: card #{n} (a number) belongs to no project (only the workspace), so no agent can start it; give it a project first.' }), { n: card.number }, { kind: 'invalid' })
 }
 
-async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean }> {
+async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   const before = await getTask(n)
   startable(before)
   const p = workspace.assertProject(join(workspace.path!, before.project))
@@ -185,6 +185,8 @@ async function giveCard(
       }
     })
   let live = false
+  // The launch this start made, when it started the agent (#1282: undo stops only that one).
+  let run: string | undefined
   try {
     // Its doc sections to read first (#818), with their sizes: in the project's folder or the shared notes, never the
     // agent's own folder (the references are the project's; the agent reads them where it works).
@@ -217,7 +219,7 @@ async function giveCard(
       await deliverNow(p, { ...nd, conversation: sessions.liveFor(p, agentId)?.sessionId || null }, holds).catch((e: Error) => {
         throw e instanceof NotGiven ? hiveError(msg({ id: 'tasks.start.notGiven', defaultMessage: "{agent} wasn't given #{n}: {why}.", description: "An error: the card #{n} (a number) could not be typed into the terminal of the agent {agent} (its name); {why} says why." }), { agent: agentName, n, why: errorText(e) }, { cause: e }) : e
       })
-    else await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))
+    else run = (await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))).launched?.runId
   } catch (e) {
     await back(before.agent)
       .catch(() => back(null))
@@ -227,7 +229,7 @@ async function giveCard(
   }
   // The view stays where the user has it; the new agent is marked for them.
   if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
-  return { card, agentId, agentName, added, typed: live }
+  return { card, agentId, agentName, added, typed: live, ...(run ? { run } : {}) }
 }
 
 /** A card's context references (#818) with each section's size, or why it doesn't resolve now (#819). */

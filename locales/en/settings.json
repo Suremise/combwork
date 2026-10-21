@@ -635,6 +635,14 @@
     "defaultMessage": "Save a memory snapshot if Hive is about to run out of memory",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.hooks.missingSeconds.desc": {
+    "defaultMessage": "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Hive says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.",
+    "description": "What the advanced setting \"Hooks missing: wait\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.hooks.missingSeconds.title": {
+    "defaultMessage": "Hooks missing: wait",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1352,7 +1360,7 @@
     "description": "What the setting \"Change settings\" does, under its title (Settings → Assistant)."
   },
   "settings.assistant.changeSettings.tip": {
-    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and a Revert button, and counts towards its 30 changes per message. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
+    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and an Undo button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
     "description": "The info tip of the setting \"Change settings\" (Settings → Assistant): more on what it does and when it applies."
   },
   "settings.assistant.changeSettings.title": {
@@ -1392,7 +1400,7 @@
     "description": "A choice of the setting \"Control\" (Settings → Assistant)."
   },
   "settings.assistant.control.tip": {
-    "defaultMessage": "It never removes agents, discards worktrees or deletes projects, never types into an agent that is working, asking you something or that you just typed in (see Pause after you type), and makes at most 30 changes per message. What it does is listed in its panel. A running Assistant takes a change after a restart.",
+    "defaultMessage": "It never removes agents, discards worktrees or deletes projects, and never types into an agent that is working, asking you something or that you just typed in (see Pause after you type). What it does is listed in its panel, where you can undo its changes. A running Assistant takes a change after a restart.",
     "description": "The info tip of the setting \"Control\" (Settings → Assistant): its last paragraph. Pause after you type is another setting: keep its name as Hive shows it."
   },
   "settings.assistant.control.tip.agents": {

@@ -61,6 +61,7 @@ export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNe
   const st = sessions.liveFor(projectPath, agentId)
   if (!st) return "it isn't running" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (writing.has(agentKey(projectPath, agentId))) return 'Hive is already typing a line into it' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (st.hooksMissing) return "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (!readyFor(st, need)) return st.status === 'watching' ? 'it is waiting on cards, and takes no new work until it is woken' : `it is ${st.status}` // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (sessions.userMayBeTyping(projectPath, agentId)) return 'the user has just typed in its terminal and may still be writing there' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (sessions.lineWaiting(projectPath, agentId)) return "its CLI hasn't taken the line Hive typed before" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)

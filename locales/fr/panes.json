@@ -122,6 +122,8 @@
   "panes.resume.recache": "cache expiré, ~{tokens} à remettre en cache",
   "panes.resume.sessionsTab": "Onglet Sessions…",
   "panes.resume.tip": "Reprendre « {session} », dernière activité {when}",
+  "panes.runtime.hooksMissing": "Statut inconnu : aucun hook de {provider}",
+  "panes.runtime.hooksMissingNote": "Hive ne reçoit pas les hooks de {provider} : le statut de l’agent peut donc être faux. {why, select, refused {Hive a refusé ses hooks : ils ne portaient pas le jeton de cette session.} off {{where} désactive les hooks (disableAllHooks).} newer {Ce {provider} est plus récent que la version avec laquelle Hive a été testé, et une mise à jour a pu changer ses hooks.} other {{after, select, start {Aucun n’est arrivé depuis son démarrage.} other {Aucun n’est arrivé après un prompt sur lequel il s’est mis au travail.}}}} Tant que ses hooks n’arrivent pas, Hive n’y tape rien. Redémarre la session ; si cela se reproduit, mets Hive à jour, ou vérifie si les paramètres de {provider} désactivent les hooks.",
   "panes.runtime.needsInput": "Attend ta réponse",
   "panes.runtime.signin": "Connexion requise",
   "panes.runtime.silent": "Silence :{known, select, yes { {minutes, number}} other { ?}} min · état inconnu",

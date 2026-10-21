@@ -4,6 +4,7 @@ import { agentLaunchSettings, defaultProviderWarning, isProviderEnabled, modeOpt
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
+import { hooksMissingNote } from '@shared/runtime'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
 import { mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -565,6 +566,15 @@ export function ProjectView({ visible }: { visible: boolean }) {
         </div>
       </div>
 
+      {/* Its hooks aren't reaching Hive (#1336): its status may be wrong; a restart with working hooks clears it. */}
+      {live?.hooksMissing && (
+        <div className="banner warn hooks-missing">
+          <Icon name="warning" /> {hooksMissingNote(live, tr)}
+          <button className="btn small primary" onClick={() => void restart()}>
+            {tr(M.restart)}
+          </button>
+        </div>
+      )}
       {focusedAgent?.restartNeeded && live && (
         <div className="banner warn">
           <Icon name="refresh" /> {tr(M.restartNeeded, { many: yes, agent: focusedAgent.name })}

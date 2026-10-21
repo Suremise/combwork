@@ -23,7 +23,7 @@ interface HiveMessageValues {
   'tips.archiveNew.title': undefined
   'tips.assistant.text': { key: string | number }
   'tips.assistant.title': undefined
-  'tips.assistantBatch.text': { cards: number; changes: number }
+  'tips.assistantBatch.text': { cards: number }
   'tips.assistantBatch.title': undefined
   'tips.assistantCompact.text': { tokens: number }
   'tips.assistantCompact.title': undefined
@@ -53,6 +53,8 @@ interface HiveMessageValues {
   'tips.assistantTeam.title': undefined
   'tips.assistantToldWaiting.text': undefined
   'tips.assistantToldWaiting.title': undefined
+  'tips.assistantUndo.text': undefined
+  'tips.assistantUndo.title': undefined
   'tips.assistantWaits.text': undefined
   'tips.assistantWaits.title': undefined
   'tips.attachFiles.text': undefined
@@ -166,6 +168,8 @@ interface HiveMessageValues {
   'tips.hiveFolder.title': undefined
   'tips.hiveSkills.text': undefined
   'tips.hiveSkills.title': undefined
+  'tips.hooksMissing.text': undefined
+  'tips.hooksMissing.title': undefined
   'tips.imagesTab.text': undefined
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined

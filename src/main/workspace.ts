@@ -830,11 +830,13 @@ export class WorkspaceService {
   }
 
   /** Changes one agent's definition. */
-  async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>): Promise<AgentDef> {
+  /** `check`: sees the agent as saved, under the project's lock, before the change; throwing refuses it (#1282's undo). */
+  async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void): Promise<AgentDef> {
     let next: AgentDef | undefined
     await this.mutateProjectConfig(projectPath, (cfg) => {
       const current = projectAgents(cfg).find((a) => a.id === agentId)
       if (!current) throw hiveError(msg({ id: 'service.workspace.agentGone', defaultMessage: 'That agent no longer exists.', description: "An error changing an agent's settings: it was removed meanwhile." }), undefined, { kind: 'notFound' })
+      check?.(current)
       const def: AgentDef = { ...current, ...patch, id: agentId }
       next = def
       return { agents: projectAgents(cfg).map((a) => (a.id === agentId ? def : a)) }

@@ -90,10 +90,13 @@ async function cardMenu(ctx) {
   return (await shown(ctx, page.locator('.menu[role="menu"]'), "the card's menu")).first()
 }
 
+/** The toolbar's Archived checkbox: the one that isn't For you's (#1276's filter, which comes first). */
+const archivedBox = (page) => page.locator('.board-view .board-toolbar label:not(.board-for-you-filter) input.checkbox').first()
+
 /** The archive: the board's archived cards (the toolbar's checkbox). */
 async function archive(ctx) {
   const { page } = ctx
-  const box = page.locator('.board-view .board-toolbar input.checkbox').first()
+  const box = archivedBox(page)
   await shown(ctx, box, "the board's archived checkbox")
   await box.check()
   await shown(ctx, page.locator('.board-view .archived-cards tbody tr'), 'the archived cards')
@@ -105,7 +108,7 @@ async function archive(ctx) {
 
 async function closeArchive(ctx) {
   await ctx.page.locator('.board-view .archive-batch select').first().selectOption({ index: 0 })
-  await ctx.page.locator('.board-view .board-toolbar input.checkbox').first().uncheck()
+  await archivedBox(ctx.page).uncheck()
 }
 
 /** The attention inbox: Two finishes a turn nobody has looked at (the window shows the board, not its pane). */

@@ -1,5 +1,6 @@
 import { shownText } from './advanced'
 import { msg, tr as trNow } from './i18n'
+import { providerDescriptor } from './providers'
 import type { Tr } from './tasks'
 import type { LiveSessionState, RuntimeFacts } from './types'
 
@@ -51,6 +52,36 @@ export function unknownStateText(st: Pick<LiveSessionState, 'turn'> | null | und
 }
 
 /**
+ * "Status unknown: no hooks from Claude Code" for an agent whose hooks aren't reaching Hive (#1336); null otherwise. In
+ * the window's language with tr, else English (the Agent API's).
+ */
+export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr?: Tr): string | null {
+  if (!st?.hooksMissing) return null
+  const provider = providerDescriptor(st.provider).name
+  if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so Hive can't tell what it is doing. Keep it short." }), { provider })
+  return `Status unknown: no hooks from ${provider}` // i18n-ignore: agent-facing (the Agent API's agent state)
+}
+
+/**
+ * What the window says of an agent whose hooks aren't reaching Hive (#1336): that its status may be wrong, why when
+ * Hive can tell, and what to do. Null otherwise.
+ */
+export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr: Tr): string | null {
+  const h = st?.hooksMissing
+  if (!h) return null
+  return tr(HOOKS_MISSING_NOTE, { provider: providerDescriptor(st!.provider).name, why: h.why ?? 'other', where: h.offIn ?? '', after: h.after }) // i18n-ignore: select keys, never shown
+}
+
+/** hooksMissingNote's message (main's notification says it too). */
+export const HOOKS_MISSING_NOTE = msg({
+  id: 'panes.runtime.hooksMissingNote',
+  defaultMessage:
+    "Hive isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Hive refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Hive was tested with, and an update may have changed its hooks.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Hive types nothing into it. Restart the session; if this happens again, update Hive, or check {provider}'s settings for hooks turned off.",
+  description:
+    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing). why: Hive refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Hive was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
+})
+
+/**
  * The status of an agent compacting its conversation, as the window shows it (#847); COMPACTING_MESSAGE (defaults.ts) is
  * its English, the status message agents read and isCompacting() compares.
  */
@@ -68,10 +99,12 @@ export const shownMergeSlot = (st: Pick<LiveSessionState, 'mergeSlot' | 'mergeSl
  * Null when its facts say no turn runs: then Hive's policy words apply (watching, finished, ready, its background tasks:
  * ui.statusText).
  */
-export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'backgroundTasks' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText'>, now = Date.now()): string | null {
+export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'backgroundTasks' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText'> & Partial<Pick<LiveSessionState, 'hooksMissing' | 'provider'>>, now = Date.now()): string | null {
   const tr = trNow
   const rt = agentRuntime(st, now)
   if (rt.lifecycle === 'stopped') return tr(msg({ id: 'panes.runtime.stopped', defaultMessage: 'Stopped', description: "An agent's status: its session isn't running." }))
+  // Its hooks aren't arriving (#1336): what Hive has of it may be wrong, so it says so rather than guess.
+  if (st.hooksMissing && st.provider) return hooksMissingText({ hooksMissing: st.hooksMissing, provider: st.provider }, tr)
   if (rt.attention === 'waiting') return shownStatusMessage(st) || tr(msg({ id: 'panes.runtime.needsInput', defaultMessage: 'Needs your input', description: "An agent's status: its CLI waits for the user's answer." }))
   if (rt.lifecycle === 'starting') return shownStatusMessage(st) || tr(msg({ id: 'panes.runtime.starting', defaultMessage: 'Starting…', description: "An agent's status: its CLI is starting." }))
   if (rt.lifecycle === 'signin') return tr(msg({ id: 'panes.runtime.signin', defaultMessage: 'Needs sign-in', description: "An agent's status: its CLI waits for the user to sign in." }))

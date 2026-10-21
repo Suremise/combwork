@@ -130,12 +130,15 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
     else if (p.startsWith('? ')) files.push(p.slice(2))
   }
-  for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) {
-    const g = await git(folder, ['rev-parse', '--git-path', marker])
-    if (!g.ok) return unknown(U.state, { folder })
-    const at = g.out.trim()
+  // One git for all the markers, a line each in their order.
+  const markers = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
+  const g = await git(folder, ['rev-parse', ...markers.flatMap((m) => ['--git-path', m])])
+  const where = g.ok ? g.out.split(/\r?\n/).filter(Boolean) : []
+  if (where.length !== markers.length) return unknown(U.state, { folder })
+  markers.forEach((marker, i) => {
+    const at = where[i].trim()
     if (existsSync(isAbsolute(at) ? at : join(folder, at))) files.push(`(${marker})`)
-  }
+  })
   if (!paths) return files
   const mine = (f: string) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`))
   return files.filter((f) => f.startsWith('(') || mine(f))

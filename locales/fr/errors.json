@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "Cette modification de l’Assistant n’est plus conservée : les modifications sont conservées 7 jours.",
+  "errors.assistantUndo.which": "Choisis une modification de l’Assistant à annuler, ou les modifications d’un message.",
   "errors.changes.notFile": "{file} n’est pas un fichier du dossier {folder}.",
   "errors.console.hidden": "La console de développement est masquée : active Paramètres → Avancé → Afficher les fonctions pour développeurs.",
   "errors.console.notRecording": "Pas un enregistrement de la console de développement",

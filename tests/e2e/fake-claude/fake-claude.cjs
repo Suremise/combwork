@@ -66,7 +66,8 @@
 //   cache expires: PreCompact (auto), a compaction boundary, and once the test makes fake-idle-compact-done-<agent>,
 //   SessionStart (compact), PostCompact (auto) and "Compacted while idle, before the prompt cache expired";
 //   fake-recap-<agent> makes it write a recap (an away_summary), which sends no hook of Hive's. Each file is taken
-//   (removed) when acted on.
+//   (removed) when acted on. While fake-nohooks-<agent> is in its home it sends no hook and no status line at all, as
+//   when a CLI update broke them or a policy turned them off (#1336); it works on as before.
 // - Turns, as Claude Code 2.1.296 has them (#648): each prompt (and each turn it begins by itself) has its own id, which
 //   its hooks carry (prompt_id); its screen shows a spinner with "esc to interrupt" while it works and "✻ Worked for Ns ·
 //   done H:MM" above its input once done. "latetool": a Read whose PostToolUse reaches Hive after the turn's Stop.
@@ -332,8 +333,14 @@ const hookFailed = (event, entry) => {
   }
 }
 
+/**
+ * Its hooks are off (#1336: a CLI update that broke them, a managed policy that turned them off): while fake-nohooks-<agent>
+ * is in its home (read at each hook, so a test can turn them off mid-session), no hook is sent, nor its status line.
+ */
+const hooksOff = () => fs.existsSync(path.join(home, `fake-nohooks-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+
 async function hook(event, extra = {}) {
-  if (!hookUrl) return null
+  if (!hookUrl || hooksOff()) return null
   try {
     const res = await fetch(hookUrl, {
       method: 'POST',
@@ -575,7 +582,7 @@ async function runPrompt(text, enter = null) {
 
 /** Posts a status line, as Claude Code's statusLine command does (Hive's curl command, with the launch's auth file). */
 async function statusLine(body) {
-  if (!hookUrl) return
+  if (!hookUrl || hooksOff()) return
   await fetch(`${hookUrl}&statusline`, {
     method: 'POST',
     headers: { Authorization: commandAuth(), 'Content-Type': 'application/json' },

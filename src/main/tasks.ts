@@ -16,6 +16,7 @@ import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
@@ -398,7 +399,10 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
   // starts as the kind it was made).
   withRow?.()
   // Its facts, in the same transaction (#1216): what this change moved, started, submitted, reviewed, blocked or decided.
-  recordChange(ws, before !== undefined ? before : was ? clean(was, n, ids) : null, { ...card, project: saved })
+  const prior = before !== undefined ? before : was ? clean(was, n, ids) : null
+  recordChange(ws, prior, { ...card, project: saved })
+  // The Assistant's change of it, for undo (#1282): what it replaced, in the same transaction.
+  noteCard(ws, prior, card)
   // Its key now (#1219: a card moved to another project has that project's): what callers return of it.
   const key = cardKeys(ws, [n]).get(n)
   if (key) card.key = key
@@ -1240,6 +1244,9 @@ export async function runIntent<R>(
     alongside(
       {
         written: async (w) => {
+          // Only this intent's own card's writes: another card's write made under its context (something it set off,
+          // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
+          if (w.card.id !== n) return
           const extra = zero9(w, first)
           first = false
           // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).
@@ -1943,21 +1950,26 @@ export async function editDecision(n: number, id: string, newText: string | null
 }
 
 /** Archives a card (hidden from the board, kept) or brings it back. The user's alone. */
-export function archiveTask(n: number, archived: boolean): Promise<TaskCard> {
-  return boardLock(workspace, () => archiveTaskLocked(n, archived))
+/**
+ * Archives a card or brings it back, as the user (or `opts.actor`); `opts.check` sees the card as saved, under the board's
+ * lock, and refuses by throwing (#1282: an undo archives a card only while no one has changed it since).
+ */
+export function archiveTask(n: number, archived: boolean, opts: { check?: (card: TaskCard) => void; actor?: TaskActor } = {}): Promise<TaskCard> {
+  return boardLock(workspace, () => archiveTaskLocked(n, archived, opts))
 }
 
-async function archiveTaskLocked(n: number, archived: boolean): Promise<TaskCard> {
+async function archiveTaskLocked(n: number, archived: boolean, opts: { check?: (card: TaskCard) => void; actor?: TaskActor } = {}): Promise<TaskCard> {
   const ws = workspace
   return (async () => {
     const c = await getTask(n, ws)
     if (c.archived === archived) return c
+    opts.check?.(c)
     c.archived = archived
     if (archived) c.archivedFor = 'user'
     else delete c.archivedFor
     // Brought back on its own, it leaves its batch: that batch's Undo no longer moves it.
     delete c.archivedBatch
-    note(c, BY.you, storedText(archived ? HISTORY.archived : HISTORY.unarchived))
+    note(c, opts.actor ? actorName(opts.actor) : BY.you, storedText(archived ? HISTORY.archived : HISTORY.unarchived))
     // Back at the end of its column.
     if (!archived) c.order = orderIn(await boardPlaces(ws), c.column, n, null)
     await saveCard(ws, n, c)
