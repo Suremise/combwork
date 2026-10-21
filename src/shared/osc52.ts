@@ -51,3 +51,30 @@ export function osc52(data: string, inUse: boolean): Osc52 {
   if (bytes.length > OSC52_MAX_BYTES) return { kind: 'refused', reason: 'too-large' }
   return { kind: 'write', text: new TextDecoder().decode(bytes) }
 }
+
+/** The most of a clipboard write the question shows (#1292, Ask each time): the rest is counted, not shown. */
+export const OSC52_PREVIEW = 500
+/** The most lines of it the question shows. */
+export const OSC52_PREVIEW_LINES = 6
+
+/** What the question shows of a clipboard write: its first lines, at most OSC52_PREVIEW characters, and how many it leaves out. */
+export function clipboardPreview(text: string): { lines: string[]; more: number } {
+  const out: string[] = []
+  let shown = 0
+  // How far into the text the preview reaches: each line shown and the line break before it (\n or \r\n).
+  let reached = 0
+  const re = /\r?\n/g
+  let start = 0
+  while (out.length < OSC52_PREVIEW_LINES && shown < OSC52_PREVIEW) {
+    const m = re.exec(text)
+    const end = m ? m.index : text.length
+    const part = text.slice(start, end).slice(0, OSC52_PREVIEW - shown)
+    out.push(part)
+    shown += part.length
+    reached = start + part.length
+    if (!m) break
+    start = m.index + m[0].length
+  }
+  // Every character not shown, line breaks included.
+  return { lines: out, more: text.length - reached }
+}

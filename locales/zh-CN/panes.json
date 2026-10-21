@@ -180,6 +180,7 @@
   "panes.terminal.osc52.askCopy": "复制",
   "panes.terminal.osc52.askDont": "不复制",
   "panes.terminal.osc52.askMessage": "智能体的 CLI 请求把{n, plural, other {# 个字符}}放到剪贴板：",
+  "panes.terminal.osc52.askMore": "……以及另外{n, plural, other {# 个字符}}",
   "panes.terminal.osc52.askTitle": "复制到剪贴板？",
   "panes.terminal.pasteFailed": "无法粘贴图片",
   "panes.tiles.back": "磁贴",

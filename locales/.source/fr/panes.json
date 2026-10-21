@@ -198,6 +198,7 @@
   "panes.terminal.osc52.askCopy": "Copy",
   "panes.terminal.osc52.askDont": "Don't Copy",
   "panes.terminal.osc52.askMessage": "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:",
+  "panes.terminal.osc52.askMore": "…and {n, plural, one {# more character} other {# more characters}}",
   "panes.terminal.osc52.askTitle": "Copy to the clipboard?",
   "panes.terminal.pasteFailed": "Could not paste image",
   "panes.tiles.back": "Tiles",

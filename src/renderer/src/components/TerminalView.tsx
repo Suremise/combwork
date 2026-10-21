@@ -15,7 +15,7 @@ import { confirm, useStore } from '../store'
 import { offerTip } from '../tips'
 import type { ProviderId } from '@shared/types'
 import { ALL_KEYS_TO_CLI, CTRL_CV_TO_CLI, OSC52_POLICY } from '@shared/advanced'
-import { osc52, osc52Decision, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
+import { clipboardPreview, osc52, osc52Decision, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
 import { copyPasteKey } from '@shared/terminalInput'
 import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
@@ -222,20 +222,19 @@ const USER_SCROLL_MS = 500
 /** A terminal logs each kind of refused OSC 52 request at most this often: a program may repeat one. */
 const OSC52_LOG_MS = 60_000
 
-/** The most of a clipboard write the question shows (#1292): the rest is counted, not shown. */
-const OSC52_PREVIEW = 500
 
 /**
  * Asks the user whether a CLI's clipboard write goes on the clipboard (#1292, Settings → Advanced: Ask each time),
- * showing what it would put there.
+ * showing what it would put there: in the dialog's monospace box (as Move Anyway's rules), cut after a few lines.
  */
 function askClipboardWrite(text: string): Promise<boolean> {
-  const shown = text.length > OSC52_PREVIEW ? `${text.slice(0, OSC52_PREVIEW)}…` : text
+  const { lines, more } = clipboardPreview(text)
   return confirm({
     title: tr(msg({ id: 'panes.terminal.osc52.askTitle', defaultMessage: 'Copy to the clipboard?', description: "Title of the question when an agent's CLI asks to put text on the clipboard (OSC 52) and Settings → Advanced says to ask first." })),
     message: tr(msg({ id: 'panes.terminal.osc52.askMessage', defaultMessage: "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:", description: "The question when an agent's CLI asks to put text on the clipboard; the text follows it. {n} is how many characters." }), { n: text.length }),
-    detail: shown,
-    scrollDetail: true,
+    list: lines.map((l) => l || ' '),
+    listOnly: true,
+    detail: more > 0 ? tr(msg({ id: 'panes.terminal.osc52.askMore', defaultMessage: '…and {n, plural, one {# more character} other {# more characters}}', description: "Under the text an agent's CLI asks to put on the clipboard, when the question shows only its start. {n} is how many characters it leaves out." }), { n: more }) : undefined,
     confirmLabel: tr(msg({ id: 'panes.terminal.osc52.askCopy', defaultMessage: 'Copy', description: "Button of the question when an agent's CLI asks to put text on the clipboard: puts it there." })),
     cancelLabel: tr(msg({ id: 'panes.terminal.osc52.askDont', defaultMessage: "Don't Copy", description: "Button of the question when an agent's CLI asks to put text on the clipboard: leaves the clipboard as it is." }))
   })

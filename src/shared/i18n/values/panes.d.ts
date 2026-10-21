@@ -182,6 +182,7 @@ interface HiveMessageValues {
   'panes.terminal.osc52.askCopy': undefined
   'panes.terminal.osc52.askDont': undefined
   'panes.terminal.osc52.askMessage': { n: number }
+  'panes.terminal.osc52.askMore': { n: number }
   'panes.terminal.osc52.askTitle': undefined
   'panes.terminal.pasteFailed': undefined
   'panes.tiles.back': undefined

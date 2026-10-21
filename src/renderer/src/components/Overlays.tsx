@@ -167,7 +167,7 @@ export function Dialogs() {
         }
       >
         <div>{dialog.message}</div>
-        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
+        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} />}
         {dialog.content ? <div className={cx('detail rich' /* i18n-ignore: class names */, dialog.scrollDetail && 'scroll')}>{dialog.content}</div> : dialog.detail && <div className={cx('detail', dialog.scrollDetail && 'scroll')}>{dialog.detail}</div>}
         {dialog.check && (
           <label className="flex dialog-check">
