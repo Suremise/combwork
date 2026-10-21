@@ -10211,7 +10211,9 @@ button.progress-run-show:focus-visible {
   background: var(--fg-strong);
   box-shadow: 0 0 0 1px var(--bg);
 }
-.lane-seg.stale {
+/* Over a folded "✓ n" segment's fill too (HR6's #1279 round 2: .finished, later, set its whole background). */
+.lane-seg.stale,
+.lane-seg.finished.stale {
   background:
     repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) top / 100% 3px no-repeat,
     repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) bottom / 100% 3px no-repeat,

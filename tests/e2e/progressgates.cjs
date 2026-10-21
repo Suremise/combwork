@@ -103,8 +103,12 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const a = (await inv('tasks:create', { title: 'Lane data', project: 'alpha' })).number
     const b = (await inv('tasks:create', { title: 'Lane hover', project: 'alpha' })).number
     const [keyA, keyB] = [(await card(a)).key, (await card(b)).key]
-    const lane = await call(tokens.builder, '/v1/lanes', { cards: [a, b], reviewer: 'R1', name: 'gates' })
-    check('the builder starts its lane', lane.status === 200 && !!lane.body?.lane?.id, JSON.stringify(lane))
+    // A long lane (HR6's rounds 1 and 2): 25 cards more, so once A is finished it folds into "✓ 1" (its stale pass and
+    // its override are read there) and the last cards into "+n".
+    const extra = []
+    for (let i = 1; i <= 25; i++) extra.push((await inv('tasks:create', { title: `More ${i}`, project: 'alpha' })).number)
+    const lane = await call(tokens.builder, '/v1/lanes', { cards: [a, b, ...extra], reviewer: 'R1', name: 'gates' })
+    check('the builder starts its lane', lane.status === 200 && !!lane.body?.lane?.id && lane.body.lane.cards?.length === 27, JSON.stringify(lane.body?.lane?.cards?.length))
     const laneId = lane.body?.lane?.id
 
     const panel = page.locator('.progress-panel')
@@ -123,11 +127,14 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       }
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
-    /** A segment's hover shown, for a screenshot: its tooltip holds every line. */
+    /** A segment's hover shown (a card's number, or a locator), for a screenshot: its tooltip holds every line. */
     const hover = async (n, has) => {
-      await seg(n).hover()
+      await (typeof n === 'number' ? seg(n) : n).hover()
       return until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(has))
     }
+    const fin = row.locator('.lane-seg.finished')
+    const more = row.locator('.lane-seg.more')
+    const label = async (loc) => (await loc.getAttribute('aria-label').catch(() => null)) ?? ''
 
     // --- One card at a time: B before A is Done is refused, and its segment says so.
     const early = await asBuilder(`/v1/tasks/${encodeURIComponent(keyB)}/start`)
@@ -178,42 +185,38 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     check("…and its accessible name too", !!(await until(async () => ((await row.getAttribute('aria-label')) ?? '').includes(`paused, waiting: ${keyA} not merged`))), await row.getAttribute('aria-label'))
     await shoot('paused')
 
-    // --- A new revision after the pass: stale, with both revisions.
+    check('the passed card folds into ✓ 1', !!(await until(async () => (await fin.count()) === 1 && (await seg(a).count()) === 0)), await label(fin))
+
+    // --- A new revision after the pass: stale, with both revisions, on the folded segment (HR6's round 2: drawn, not
+    // only named).
     fs.writeFileSync(path.join(slot, 'b.ts'), 'export const b = 3\n')
     gitIn(slot, 'commit', '-qam', 'Another change')
     const second = gitIn(slot, 'rev-parse', 'HEAD')
     // Its Work section read once (as the card dialog does): Hive looks at its folder soon, once events settle. Asked
     // again on every poll, that "soon" would keep moving.
     await inv('tasks:work', a)
-    check('a new revision after the pass marks the segment stale', !!(await until(async () => (await seg(a).getAttribute('class'))?.includes('stale'))), await seg(a).getAttribute('class'))
-    check('…its name naming the revision it was for and the one now', (await name(a)).includes(`Pass was for ${first.slice(0, 7)}; now at ${second.slice(0, 7)}`), await name(a))
-    check('…said in its hover too', !!(await hover(a, `Pass was for ${first.slice(0, 7)}`)))
+    check('a new revision after the pass marks the folded segment stale', !!(await until(async () => (await fin.getAttribute('class'))?.includes('stale'))), await fin.getAttribute('class'))
+    const drawn = await fin.evaluate((el) => getComputedStyle(el).backgroundImage)
+    check('…drawn: its amber dashed edges over the finished fill', /repeating-linear-gradient/.test(drawn), drawn)
+    check('…its name naming the card, the revision it was for and the one now', (await label(fin)).includes(`${keyA}: Pass was for ${first.slice(0, 7)}; now at ${second.slice(0, 7)}`), await label(fin))
+    check('…said in its hover too', !!(await hover(fin, `Pass was for ${first.slice(0, 7)}`)))
     await shoot('stale')
     await page.mouse.move(5, 5)
 
     // --- The user moves it past its rules: the override's mark, with who, which rule and why.
     const moved = await inv('tasks:move', a, 'done', { confirm: true, reason: 'Merged by hand' })
     check('the user moves it to Done past its rules', !!(await until(async () => (await card(a))?.column === 'done')), JSON.stringify(moved))
-    check('…its segment shows the override mark', !!(await until(async () => (await seg(a).locator('.lane-seg-mark.override').count()) === 1)))
-    check('…its name saying who, past which rules and why', /You moved it past its rules: .+\. Reason: Merged by hand/.test(await name(a)), await name(a))
-    check('…said in its hover too', !!(await hover(a, 'Reason: Merged by hand')))
+    check('…its folded segment shows the override mark, and no longer the stale one', !!(await until(async () => (await fin.locator('.lane-seg-mark.override').count()) === 1 && !(await fin.getAttribute('class'))?.includes('stale'))), await fin.getAttribute('class'))
+    check('…its name saying who, past which rules and why', /: You moved it past its rules: .+\. Reason: Merged by hand/.test(await label(fin)), await label(fin))
+    check('…said in its hover too', !!(await hover(fin, 'Reason: Merged by hand')))
     await shoot('override')
     await page.mouse.move(5, 5)
 
-    // --- A long lane folds cards (HR6's round 1): the folded segments keep their cards' marks. 25 cards more (between
-    // cards, the list applies at once); A, Done, folds into "✓ 1", and the last, refused, into "+n".
-    const extra = []
-    for (let i = 1; i <= 25; i++) extra.push((await inv('tasks:create', { title: `More ${i}`, project: 'alpha' })).number)
-    const longer = await call(tokens.builder, '/v1/lanes', { cards: [a, b, ...extra], reviewer: 'R1', name: 'gates' })
-    check('the lane takes 25 cards more', longer.status === 200 && longer.body?.lane?.cards?.length === 27, JSON.stringify(longer.body?.lane?.cards?.length))
+    // --- The last card, refused, folded into "+n" (HR6's round 1): it keeps its notch and says why.
     const last = extra.at(-1)
     const lastKey = (await card(last)).key
     const lateStart = await asBuilder(`/v1/tasks/${encodeURIComponent(lastKey)}/start`)
     check('the last card started first is refused', lateStart.status === 409 && lateStart.body?.rule === 'lane.oneAtATime', JSON.stringify(lateStart.body))
-    const fin = row.locator('.lane-seg.finished')
-    const more = row.locator('.lane-seg.more')
-    const label = async (loc) => (await loc.getAttribute('aria-label').catch(() => null)) ?? ''
-    check('the done card folds into ✓ 1, keeping its override mark and saying it', !!(await until(async () => (await fin.count()) === 1 && (await fin.locator('.lane-seg-mark.override').count()) === 1 && /: You moved it past its rules: .+Reason: Merged by hand/.test(await label(fin)))), await label(fin))
     check('the refused card folds into +n, keeping its notch and saying why', !!(await until(async () => (await more.count()) === 1 && (await more.locator('.lane-seg-mark.refused').count()) === 1 && (await label(more)).includes(`${lastKey}: ${lastKey} can't start yet`))), await label(more))
     await more.hover()
     check('…said in its hover too', !!(await until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(`${lastKey} can't start yet`))))
