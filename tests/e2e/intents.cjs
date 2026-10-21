@@ -1,10 +1,11 @@
 // A card's intents over the Agent API (#1267, SPEC §16.8.1), each caller with its own token: a builder and a reviewer
 // (fake Claude Code agents, their own tokens as their hive tools use them) and the Hive Assistant through Settings →
 // Assistant → Control. An agent's plain number is refused naming the card's key and #N (S48); start, submit, start
-// review, the reviewer's request and a failed verdict move the card by its workflow (the card stays its builder's); the
-// builder can't review its own card; ask the user leaves it where it is; missing arguments are 400; the Assistant's
-// intent is refused at Look and advise and runs at Control agents; and an agent's hive tool (hive_start_card) runs the
-// start intent. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
+// card by its workflow (the card stays its builder's); the builder can't review its own card; ask the user leaves it
+// where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
+// agents; and an agent's hive tool (hive_start_card) runs the start intent. Dev build, throwaway profile, workspace and
+// CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { createHash } = require('crypto')
@@ -118,8 +119,14 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("the builder can't start reviewing its own card (409, review.notAuthor)", own.status === 409 && own.body?.rule === 'review.notAuthor', JSON.stringify(own.body))
     const review = await asReviewer(`/v1/tasks/${ref}/start-review`)
     check('the reviewer starts reviewing: the revision to review', review.status === 200 && review.body?.to === 'review' && !!review.body.data?.revision, JSON.stringify(review.body))
+    // The builder waits for its verdict or Passed (#912's case: not comments), from a point taken before the request.
+    const mark = await asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 1 })
+    const waiting = asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 30, since: mark.body?.since })
     const asked = await asReviewer(`/v1/tasks/${ref}/request`, { text: 'Commit the test too.' })
     check("the reviewer's request is a comment on the card", asked.status === 200 && (await card(n))?.comments.at(-1)?.text === 'Commit the test too.', JSON.stringify(asked.body))
+    check('…and a line of its history, by the reviewer', (await card(n))?.history.some((h) => h.what === 'Asked the builder: "Commit the test too."' && h.by.startsWith('Reviewer')), JSON.stringify((await card(n))?.history.slice(-3)))
+    const heard = await waiting
+    check("…which ends the builder's wait for its verdict, as a request (#1272)", heard.status === 200 && !heard.body?.timedOut && heard.body?.changes?.[0]?.changes.includes('request'), JSON.stringify(heard.body))
     check('a verdict without pass is 400', (await asReviewer(`/v1/tasks/${ref}/verdict`, { comment: 'x' })).status === 400)
     const verdict = await asReviewer(`/v1/tasks/${ref}/verdict`, { pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1. Add a test.' })
     const after = await card(n)

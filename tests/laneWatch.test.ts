@@ -47,6 +47,22 @@ describe('what a lane watch counts (#531)', () => {
     expect(laneHits(passed, now({ ...passed, state: 'abandoned' }), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.text)).toEqual(['was abandoned'])
   })
 
+  it('a block lifted is told by default (#922, #1272); a lane ended with its merge commit names it (#1270), else as before', () => {
+    const now = (mark: LaneMark, mergeCommit?: string | null): LaneNow => ({ id: 'lane-1', label: 'B1 / R1', mark, cards: Object.keys(mark.cards).map((n) => ({ number: Number(n), blocked: mark.cards[n].b ? 'Push refused' : null, stalled: null, failedBy: null, passedBy: null })), ...(mergeCommit !== undefined ? { mergeCommit } : {}) })
+    const blocked: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ b: true }), 2: card() } }
+    const lifted: LaneMark = { ...blocked, cards: { 1: card(), 2: card() } }
+    expect(LANE_DEFAULT_EVENTS).toContain('unblocked')
+    expect(laneHits(blocked, now(lifted), LANE_DEFAULT_EVENTS)!.parts).toEqual([{ n: 1, event: 'unblocked', text: '#1 is no longer blocked' }])
+    expect(laneHits(blocked, now(lifted), ['blocked', 'failed'])).toBeNull()
+    // Blocked again: a block, not an unblock; a card new to the lane starts unblocked, so nothing is lifted.
+    expect(laneHits(lifted, now(blocked), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.event)).toEqual(['blocked'])
+    expect(laneHits({ ...blocked, cards: { 2: card() } }, now(lifted), LANE_DEFAULT_EVENTS, '2026-10-01T00:00:00.000Z')).toBeNull()
+    const passed: LaneMark = { state: 'active', mergeDue: true, cards: { 1: card({ c: 'passed' }) } }
+    const ended: LaneMark = { ...passed, state: 'ended', mergeDue: false }
+    expect(laneHits(passed, now(ended, 'dd4ed990c0ffee1234567890'), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.text)).toEqual(['ended: merged at dd4ed990c0ff'])
+    expect(laneHits(passed, now(ended, null), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.text)).toEqual(['ended (merged)'])
+  })
+
   // #869: lane G's cards all passed, its builder's commit was refused and it ended its turn after telling the user; merge-due
   // had been told and nothing else woke the Assistant for two hours.
   describe('a merge that stalls (#869)', () => {
@@ -268,6 +284,35 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
     expect(st.told[3]).toMatch(/^\[Hive\] Lane B1 \/ R1 \(greetings\): ended \(merged\)\./)
+    await disposeWorkspaceService(w)
+  })
+
+  // #922: HB3's push was refused, the Assistant asked the user to OK it in HB3's pane, the user did and HB3 cleared the
+  // block, and the Assistant's lane watch heard of neither.
+  it("#922: a pane reply to a lane's builder reaches the Assistant with its first line while its lane watch goes on; the block lifted wakes the lane watch; the lane's end names its merge commit", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const lane = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(a, { blocked: 'git push origin main was refused: OK it in my pane' }, agent('b1')))
+    await watchAll(w, home, st)
+    // The user's reply in B1's pane: told on its own, at once, with its first line; the lane watch carries on.
+    watches.noteUserReply(alpha, 'b1', 'B1', 'OK, push it\nand then merge')
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toBe('[Hive] User replied to B1 (alpha): "OK, push it".')
+    expect(watches.watchFor(home, 'assistant')?.lanes).toEqual(['all'])
+    // B1 clears the block: the lane watch wakes.
+    st.status = 'watching'
+    await inWorkspace(w, () => tasks.updateTask(a, { blocked: '' }, agent('b1')))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} is no longer blocked\\. Your lane watch has ended`))
+    // The user ends it with its merge commit (its card merged by hand, with no facts): the end says it.
+    await watchAll(w, home, st)
+    await lanes.endLane(w, lane.lane.id, { mergeCommit: 'dd4ed990c0ffee1234567890abcdef1234567890' })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/^\[Hive\] Lane B1 \/ R1: ended: merged at dd4ed990c0ff\./)
     await disposeWorkspaceService(w)
   })
 

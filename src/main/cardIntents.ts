@@ -1,8 +1,8 @@
 import { join } from 'path'
-import type { TaskCard, TaskPatch } from '../shared/types'
+import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
 import type { ForYouKind } from '../shared/workflow/facts'
-import { boardLock, readTask, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
+import { boardLock, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
 import { refusal } from '../shared/workflow/refusals'
@@ -95,7 +95,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // Every write keeps the card's agent as it is then, under the board's lock (an agent moving a card into Doing would take
   // it: a reviewer's failed verdict), but the start's, which gives the card to the agent that starts it. What else each
   // intent changes of the card's 0.9 fields (its review, a comment) goes with its first write.
-  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean } } => {
+  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean; note?: StoredText[] } } => {
     if (intent.kind === 'start') return first && self ? { patch: { agent: self.agentId } } : {}
     const keepAgent = true
     if (!first) return { opts: { keepAgent } }
@@ -110,7 +110,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'verdict':
         return { ...(self ? { patch: { review: intent.pass ? 'passed' : 'failed' } } : {}), opts: { keepAgent, comment: intent.comment } }
       case 'request':
-        return { opts: { keepAgent, comment: intent.text } }
+        // Its history line too, which the builder's watch counts (#1272).
+        return { opts: { keepAgent, comment: intent.text, note: [requestNote(intent.text)] } }
       default:
         return { opts: { keepAgent } }
     }
