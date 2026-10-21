@@ -354,6 +354,27 @@ describe('planning edges (#1265 round 3)', () => {
   })
 })
 
+describe("the runtime's moves and #1266's loop wakes", () => {
+  it("a loop card the user moves to Done through the rules wakes its builder (the runtime's Moved, the recorder's wake)", async () => {
+    const { w, wt } = await workspace(PAIR)
+    const reviewer = { kind: 'agent', name: 'Reviewer (p)', self: { project: 'p', agentId: 'a2' } } as const
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    writeFileSync(join(wt, 'b.txt'), 'b\n')
+    git(wt, 'add', '-A')
+    git(wt, 'commit', '-qm', 'b')
+    await update(w, card, { column: 'review' })
+    // A reviewer started on it: a loop's card (its builder is woken by its handoffs).
+    await update(w, card, { review: 'start' }, reviewer)
+    await update(w, card, { column: 'done' })
+    const moved = facts(w, card).findLast((f) => f.kind === 'Moved')!
+    expect(moved.data).toMatchObject({ to: 'done' })
+    const wakes = store.boardRead(w, (db) => db.prepare("SELECT fact, payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { fact: number; payload: string }[])
+    expect(wakes.find((x) => x.fact === moved.seq)).toBeTruthy()
+    expect(JSON.parse(wakes.find((x) => x.fact === moved.seq)!.payload)).toMatchObject({ agent: 'builder', about: 'done' })
+  })
+})
+
 describe('with nothing to enforce (#1265)', () => {
   it('S39: all off (Git and None): the user and the Assistant move any card anywhere, nothing asked, refused or overridden', async () => {
     for (const platform of ['git', 'none'] as const) {
