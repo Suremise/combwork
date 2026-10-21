@@ -1172,6 +1172,18 @@ Hive's developer console shows what each coding agent's CLI sends Hive (its hook
 - **Help → Copy Diagnostics** lists which values you changed (their names, not what you changed them to).
 - The Hive Assistant can explain them and, if you let it change settings, change them when you ask.
 
+#### Hive's changes to the CLIs
+
+Hive changes some of what each CLI does in the sessions it starts, never by editing the CLI's own config files. Each such change can be turned off in **Settings → Advanced**, under its CLI. All are on by default, as Hive has always done; turning one off applies to sessions started afterwards, and its description says what Hive can no longer do without it.
+
+- **Claude Code → Resume the Assistant with its current instructions** (`claude-code.override.promptSnapshotOff`): when the Assistant's conversation resumes, Hive passes `--system-prompt-snapshot off`, so the Assistant follows its role and Control settings as they are now. Off, Claude Code keeps the instructions it recorded when the conversation began, until it compacts. `--system-prompt-snapshot` in **Extra arguments** wins either way.
+- **Codex → Set Codex's terminal title** (`codex.override.terminalTitle`): Hive gives Codex's sessions their title items (**Terminal title items**) and tells from the title when Codex needs you. Off, your own `[tui].terminal_title` applies and Hive tells when Codex needs you from its hooks instead, as for Codex versions before 0.160. Codex's setup in Agent Setup keeps Hive's title, which it waits on.
+- **GitHub Copilot → Don't let Copilot update itself** (`copilot.override.noAutoUpdate`): Hive passes `--no-auto-update` and sets `COPILOT_AUTO_UPDATE=false` for its sessions and when it checks Copilot's sign-in and models, so a download never changes Copilot between a session's restarts; **Update** in Agent Setup updates it when you choose. Off, Hive sets neither, and Copilot updates itself as it would outside Hive (your own `COPILOT_AUTO_UPDATE` still applies).
+- **GitHub Copilot → Include every MCP server's instructions** (`copilot.override.allMcpInstructions`): Hive passes `--allow-all-mcp-server-instructions`, without which Copilot leaves the hive server's instructions (Hive's guidance for agents) out of its system prompt, and those of the other servers its agents get. Off, Copilot includes only the servers it allows by itself, and Hive gives its guidance as custom instructions instead.
+- **Pass right-click to Claude Code**, **to Codex** and **to Copilot** (`<cli>.mouse.rightClickToCli`, off by default): right-click in a pane is Hive's copy and paste. Turned on, right-clicks go to the CLI instead, at once. Codex and Copilot track the mouse themselves; Claude Code doesn't at its prompt, so there a right-click then does nothing (Ctrl+C and Ctrl+V still copy and paste).
+- **Codex runs without its shared background server** (`--no-daemon`), with no switch: Codex uses that server only when it is given no configuration on its command line, and Hive gives every session its own (its hooks, MCP servers and guidance). A session on that server would also keep working after **Stop**.
+- **The model and effort** Hive passes (`--model`, `--effort` and each CLI's equivalents) are already yours to leave out: when no model or effort is chosen for the agent, its project or the CLI's settings page, Hive passes neither and the CLI uses its own.
+
 ## Updating Hive
 
 Hive keeps itself up to date from its GitHub releases. By default it checks shortly after starting and every six hours, downloads a new version in the background, and installs it the next time you quit Hive — it never restarts on its own, so your agents are never interrupted.

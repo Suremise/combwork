@@ -383,6 +383,14 @@
     "defaultMessage": "Reports start with the gist",
     "description": "A tip's title."
   },
+  "tips.cliOverrides.text": {
+    "defaultMessage": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cliOverrides.title": {
+    "defaultMessage": "Keep a CLI as it is outside Hive",
+    "description": "A tip's title."
+  },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

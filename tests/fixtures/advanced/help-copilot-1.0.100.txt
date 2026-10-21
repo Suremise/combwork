@@ -1,0 +1,11 @@
+$ copilot --help (excerpt)
+      --allow-all-mcp-server-instructions
+          Include initialization instructions from all MCP servers in
+          the system prompt instead of only allowlisted servers
+      --no-auto-update
+          Disable downloading CLI updates automatically. Copilot then
+          runs the version bundled in the executable you launched
+          rather than a newer previously downloaded one
+
+$ copilot help environment (excerpt)
+  `COPILOT_AUTO_UPDATE`: set to "false" to disable downloading updated CLI versions automatically. Can also be disabled with the --no-auto-update flag. Auto-update is enabled by default, except in CI environments (detected via `CI`, `BUILD_NUMBER`, `RUN_ID`, or `SYSTEM_COLLECTIONURI` environment variables), where it is disabled by default. Standalone development builds run their bundled package by default and do not offer or install CLI updates unless release-style package behavior is selected with a canonical semantic version in `COPILOT_CLI_VERSION`. `COPILOT_CLI_DIST_DIR` and `--prefer-version` select an explicit package but do not enable updates for a development-identity package. On other standalone-binary installations, disabling it this way or with --no-auto-update also makes launches ignore any newer version already in the package cache and run the version built into the installed binary.

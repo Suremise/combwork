@@ -1,0 +1,12 @@
+{
+  "about": "Codex 0.163.0's start in the Codex test home, in a folder it trusts, in a 120x40 pty, up to its prompt: the private modes it set or reset (DECSET/DECRST, in order), and the mouse tracking among them (#1167). Recorded by #1167's probe.",
+  "cli": "Codex",
+  "version": "0.163.0",
+  "runs": [
+    {
+      "args": "--no-daemon -m gpt-5.6-luna -c model_reasoning_effort=\"low\" -s workspace-write -a on-request -c mcp_servers.userfake.enabled=false",
+      "mouseTracking": "?1003h ?1006h",
+      "privateModes": "?9001h ?1004h ?2004h ?25l ?25h ?2026h ?25l ?1049h ?1003h ?1006h ?2026h ?2026l ?2026l ?2026h ?2026l ?25h ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?25l ?25h ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?25l ?25h ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?2026h ?2026l ?25l ?25h"
+    }
+  ]
+}
