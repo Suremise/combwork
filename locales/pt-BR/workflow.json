@@ -44,7 +44,7 @@
   "workflow.refused.integrate.upToDate.next": "A própria fila de merge o atualiza.",
   "workflow.refused.move.needsOverride.change": "Essas regras são definidas em Controle de versão, onde o usuário pode alterá-las.",
   "workflow.refused.move.needsOverride.message": "Mover o cartão {card} para {stage} pula estas regras: {rules}.",
-  "workflow.refused.move.needsOverride.next": "Dê um motivo para movê-lo mesmo assim, ou cumpra os passos que as regras pedem.",
+  "workflow.refused.move.needsOverride.next": "Mova-o mesmo assim só com o motivo do usuário: um que ele deu, ou um que ele dê depois de saber quais regras isso pula.",
   "workflow.refused.move.notFromHere.message": "O cartão {card} está em {stage}: “{move}” não é possível a partir daí.",
   "workflow.refused.move.notFromHere.next": "A partir de {stage}, use: {moves}.",
   "workflow.refused.move.notFromHere.nextNone": "Não há nada esperando para ser feito aí agora.",

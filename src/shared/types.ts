@@ -867,10 +867,11 @@ export interface TaskPatch {
 }
 
 /**
- * What the window's move of a card came to (`tasks:move`, #1265): moved (the card as saved), or a question first (the
- * rules the move would skip: nothing written; move again with `confirm`), or refused (a step no override makes true).
+ * What the window's move of a card came to (`tasks:move`, #1265): moved (the card as saved; `stopped`: it went only as
+ * far as it could, the step after refused for what no override makes true, such as nothing to submit, §16.8.4), or a
+ * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused.
  */
-export type TaskMoveResult = { moved: TaskCard } | { ask: string[] } | { refused: Refusal }
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
 /** Which agent Start gives a card to. */
 export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree: boolean; name?: string; provider?: ProviderId }

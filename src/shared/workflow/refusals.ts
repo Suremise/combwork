@@ -131,7 +131,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'move.needsOverride': r(
     msg({ id: 'workflow.refused.move.needsOverride.message', defaultMessage: 'Moving {card} to {stage} skips: {rules}.', description: 'A move that skips rules: {rules} lists the rule names.' }),
-    msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: 'Give a reason to move it anyway, or take the steps the rules need.', description: 'The next step for a move that skips rules: an override with a reason.' }),
+    msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.", description: "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips." }),
     msg({ id: 'workflow.refused.move.needsOverride.change', defaultMessage: 'These rules are set in Version Control, where the user can change them.', description: 'Where the rules a move would skip are changed: the project\'s Version Control tab (a tab name: use it as Hive shows it).' })
   ),
   'card.plainNumber': r(

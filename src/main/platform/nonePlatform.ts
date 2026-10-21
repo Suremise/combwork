@@ -72,7 +72,8 @@ export class NonePlatform implements PlatformAdapter {
 
   async finishInputs(card: CardRecord): Promise<FinishInputs> {
     if (card.kind === 'no-code') return {}
-    const now = this.hashing.revision(this.wf.store.card(card.id).paths ?? [])
+    // The paths the submission sets (a drag's, not written yet), else the card's as stored.
+    const now = this.hashing.revision(card.paths ?? this.wf.store.card(card.id).paths ?? [])
     return { currentRevision: isUnknown(now) ? now : now.revision }
   }
 

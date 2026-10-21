@@ -283,6 +283,77 @@ describe('a move is decided whole, and a refused one leaves nothing (#1265 round
   })
 })
 
+// HR2's round 2: a drag planned from Todo into the shared project folder; G13 for the card's builder, read again at the write.
+describe('planning edges (#1265 round 3)', () => {
+  it('a Todo card starting in the shared project folder (no builder, or one without a worktree) stops after its start: nothing to submit', async () => {
+    for (const agent of [undefined, 'a2']) {
+      const { w } = await workspace(PAIR)
+      const card = await create(w)
+      if (agent) await update(w, card, { agent })
+      const r = await inWorkspace(w, () => tasks.moveTask(card, 'review', { confirm: true }))
+      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
+      expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { folder: 'project' } })
+      expect(kinds(w, card)).not.toContain('Submitted')
+    }
+  })
+
+  it("G13: the card's builder's running work counts for the user's, the Assistant's and an agent's submission, read again at the write", async () => {
+    const service = await import('../src/main/workflow/service')
+    const { w, wt, repo } = await workspace({ ...PAIR, stopOwnRuns: true })
+    const commitWork = (file: string): void => {
+      writeFileSync(join(wt, file), `${file}\n`)
+      git(wt, 'add', '-A')
+      git(wt, 'commit', '-qm', file)
+    }
+    let running: string[] = []
+    service.setRunsGoing((_project, agent) => (agent === 'a1' ? running : []))
+    try {
+      const card = await create(w)
+      await update(w, card, { column: 'doing', agent: 'a1' })
+      commitWork('b.txt')
+      running = ['unit tests (a1)']
+      // The Assistant: refused, naming it.
+      const err = await update(w, card, { column: 'review' }, assistant).catch((e) => e)
+      expect(err).toBeInstanceOf(tasks.WorkflowRefusedError)
+      expect(err.refusal.values.rules).toMatch(/submit\.ownRunsStopped/)
+      // The window asks about it, naming only that rule.
+      expect(await inWorkspace(w, () => tasks.moveTask(card, 'review'))).toEqual({ ask: ['submit.ownRunsStopped'] })
+      // An agent's own submission: work started after it was gathered still refuses it, at the write.
+      running = []
+      const wf = (await workflowFor(w, repo))!
+      wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'submit' && (running = ['a run started meanwhile'])) }
+      try {
+        const out = await inWorkspace(w, () => tasks.runIntent(wf, card, builder, (x) => x.submit(`#${card}`, 'agent:a1', { summary: 'ready' })))
+        expect(out).toMatchObject({ reply: { refused: true, rule: 'submit.ownRunsStopped' }, saved: null })
+      } finally {
+        wf.cfg.hooks = undefined
+      }
+      // The rules not enforced: nothing refused.
+      await advanced.set(ENFORCE, false)
+      expect((await inWorkspace(w, () => tasks.runIntent(wf, card, builder, (x) => x.submit(`#${card}`, 'agent:a1', { summary: 'ready' })))).reply).toMatchObject({ ok: true, to: 'review' })
+    } finally {
+      service.setRunsGoing(null)
+    }
+  })
+
+  it('G13 off (its option): the builder running work refuses nothing', async () => {
+    const service = await import('../src/main/workflow/service')
+    const { w, wt } = await workspace(PAIR)
+    service.setRunsGoing(() => ['unit tests (a1)'])
+    try {
+      const card = await create(w)
+      await update(w, card, { column: 'doing', agent: 'a1' })
+      writeFileSync(join(wt, 'b.txt'), 'b\n')
+      git(wt, 'add', '-A')
+      git(wt, 'commit', '-qm', 'b')
+      expect((await update(w, card, { column: 'review' }, assistant)).column).toBe('review')
+      expect(kinds(w, card)).not.toContain('Override')
+    } finally {
+      service.setRunsGoing(null)
+    }
+  })
+})
+
 describe('with nothing to enforce (#1265)', () => {
   it('S39: all off (Git and None): the user and the Assistant move any card anywhere, nothing asked, refused or overridden', async () => {
     for (const platform of ['git', 'none'] as const) {

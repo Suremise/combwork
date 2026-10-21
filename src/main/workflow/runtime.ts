@@ -203,6 +203,8 @@ interface SubmitGathered {
   s: CardState
   from: StageId
   agent: string | null
+  /** Whose own running work the submission waits for (G13): the submitting agent, else the card's builder. */
+  runner: string | null
   setPaths: string[] | null
   revision: string | null
   base: string | null
@@ -772,7 +774,8 @@ export class Workflow {
       if (changed) return changed
       // Every refusal before anything is written: an override never commits without its move.
       if (from === 'review' && !g.s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
-      const bad = args.drag ? this.across(w, 'submit', 'review', g.inputs, args.drag, g.only) : this.check(w, 'submit', g.inputs, g.only)
+      const ins = this.submitInputs(g)
+      const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
       if (bad) return bad
       this.applySubmit(w, g, args, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
       return null
@@ -806,7 +809,7 @@ export class Workflow {
     if (setPaths) card = { ...card, paths: setPaths }
     const before = await this.evidenceOf(card, s, o)
     if (card.kind === 'code') {
-      const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit })
+      const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit, predicted })
       if (!plan.ok) return plan.refusal
       ;({ revision, base, key, files, commits, paths } = plan)
       Object.assign(inputs, plan.inputs)
@@ -819,11 +822,19 @@ export class Workflow {
     }
     inputs.revision = revision
     if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
-    if (agent && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(agent)
+    // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
+    // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
+    const runner = agent ?? (s.started?.builder && s.started.builder !== 'user' ? s.started.builder : null)
+    if (runner && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(runner)
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
-    return { r, o, card, s, from, agent, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}) }
+    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}) }
+  }
+
+  /** A submission's guard inputs in its write: as gathered, its builder's running work read again (HR2's #1265 round 2). */
+  private submitInputs(g: SubmitGathered): Omit<GuardInputs, 'card' | 'state' | 'ruleset'> {
+    return g.runner && this.cfg.runsOf ? { ...g.inputs, runsGoing: this.cfg.runsOf(g.runner) } : g.inputs
   }
 
   /** A submission's facts and actions, in its write: `Submitted`, its pin, then Review (its reviewer woken or the user asked) or Finish. */
@@ -1255,7 +1266,7 @@ export class Workflow {
           // After the start, the submission's evidence as it was gathered on the state the start leaves.
           const shifted = gs ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
           if (shifted) throw new DragUndone(shifted)
-          decided(this.failingIn(w, 'submit', gsub.inputs, gsub.only))
+          decided(this.failingIn(w, 'submit', this.submitInputs(gsub), gsub.only))
           this.applySubmit(w, gsub, { summary: '' }, cause)
           if (approves) override()
         }

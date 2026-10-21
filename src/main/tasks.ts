@@ -1108,7 +1108,8 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
       return { patch: { ...(first ? rest : {}), ...placed }, opts: first ? opts : {} }
     }
   )
-  if (isRefusal(reply)) return { refused: reply }
+  // A drag that went as far as it could (its start written, its submission refused for what no override makes true).
+  if (isRefusal(reply)) return saved ? { moved: saved, stopped: reply } : { refused: reply }
   if ('ask' in reply) return saved ? { moved: saved } : { ask: reply.rules }
   if (saved) return { moved: saved }
   // Nothing moved (the card was already there): the rest of the change, as any other.
@@ -1120,6 +1121,8 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
   // Interim (#1290, #1275): the user's moves don't ask yet, so a move that skips a rule records its Override.
   const r = await moveThroughRules(g, n, patch, actor, opts, true)
   if ('refused' in r) throw new WorkflowRefusedError(r.refused)
+  // Stopped part way: the user sees where the card is; the Assistant is told why it stopped there (its start kept).
+  if ('moved' in r && r.stopped && actor.kind !== 'user') throw new WorkflowRefusedError(r.stopped)
   if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: `#${n}`, stage: g.to, rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
   return r.moved
 }

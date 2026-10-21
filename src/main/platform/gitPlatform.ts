@@ -203,7 +203,7 @@ export class GitPlatform implements PlatformAdapter {
     return { revision, tested, testedIs: 'checkout', ...(named !== null ? { named: folder ? known(await G.resolve(folder, named)) : null } : {}) }
   }
 
-  async submission(card: CardRecord, s0: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[] }): Promise<SubmitPlan> {
+  async submission(card: CardRecord, s0: CardState, o: WorkflowOptions, args: { revision?: string; agent: string | null; guards: readonly string[]; predicted?: boolean }): Promise<SubmitPlan> {
     let s = s0
     const folder = this.wf.folderOf(s)
     let revision: string | null
@@ -220,9 +220,12 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb
     } else {
-      // A shared folder: the card's change is its own attributed commits (§16.3.2).
-      await reconcileGit(this.wf, card, {})
-      s = this.wf.state(card)
+      // A shared folder: the card's change is its own attributed commits (§16.3.2), attributed by reconciling first; a
+      // start not written yet (a drag planning, #1265) has none yet, and nothing is written for it.
+      if (!args.predicted) {
+        await reconcileGit(this.wf, card, {})
+        s = this.wf.state(card)
+      }
       commits = s.attributed
       revision = commits.at(-1) ?? s.started!.base
       base = s.started!.base
