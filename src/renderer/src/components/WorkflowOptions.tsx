@@ -68,7 +68,8 @@ const T = {
   cantSave: msg({ id: 'workflow.form.cantSave', defaultMessage: 'These options can’t be saved:', description: 'Above the reasons the workflow options can’t be saved, each a sentence of its own.' }),
   confirmTitle: msg({ id: 'workflow.form.confirmTitle', defaultMessage: 'Save Workflow Options', description: 'The title of the dialog before saving workflow options.' }),
   confirmMessage: msg({ id: 'workflow.form.confirmMessage', defaultMessage: 'The new options apply from the next card that starts.', description: 'The message of the dialog before saving workflow options.' }),
-  changes: msg({ id: 'workflow.form.changes', defaultMessage: 'What changes: {options}.', description: 'In the dialog before saving workflow options: the options that change. {options} is a list of their names.' }),
+  changesHead: msg({ id: 'workflow.form.changesHead', defaultMessage: 'What changes:', description: 'In the dialog before saving workflow options: above the list of options that change, each with its old and new value.' }),
+  changeLine: msg({ id: 'workflow.form.changeLine', defaultMessage: '{option}: {from} → {to}', description: 'A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value.' }),
   noChanges: msg({ id: 'workflow.form.noChanges', defaultMessage: 'No option changes: only the preset they started from.', description: 'In the dialog before saving workflow options, when no option’s value changes.' }),
   lanes: msg({ id: 'workflow.form.lanes', defaultMessage: '{n, plural, one {This running lane keeps the old rules until it ends:} other {These running lanes keep the old rules until they end:}}', description: 'In the dialog before saving workflow options, above a list of lanes (glossary 2.1: old rules).' }),
   lane: msg({ id: 'workflow.form.lane', defaultMessage: 'Builder {builder}: {name}', description: 'A running lane in the dialog before saving workflow options: its builder agent and its name.' }),
@@ -147,13 +148,17 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     const check = await call('workflow:check', project.path, draft)
     setProblems(check.problems)
     if (check.problems.length) return
-    const names = check.changed.flatMap((k) => (k === 'platform' ? [] : [optionTitle(k, form.platform) ?? OPTION_TEXT[k]?.title].filter((m) => !!m).map((m) => tr(m!))))
+    // Each option that changes, its value now and its new one (the Assistant for Darren: a list, never one sentence).
+    const changes = check.changed.flatMap((k) => {
+      const title = k === 'platform' ? null : (optionTitle(k, form.platform) ?? OPTION_TEXT[k]?.title)
+      return title && k !== 'platform' ? [tr(T.changeLine, { option: tr(title), from: valueText(k, form.options[k]), to: valueText(k, effective[k]) })] : []
+    })
     const picked = new Set<number>()
     const ok = await confirm({
       title: tr(T.confirmTitle),
       message: tr(T.confirmMessage),
       wide: true,
-      content: <SaveDetails names={names} check={check} picked={picked} />,
+      content: <SaveDetails changes={changes} check={check} picked={picked} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
         const f = await call('workflow:setOptions', project.path, draft, { applyTo: [...picked] })
@@ -232,6 +237,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     if (values && typeof v === 'string' && values[v]) return tr(values[v])
     if (key === 'okBefore') return tr(VALUE_TEXT.okBefore[(v as OkBefore).mode])
     if (key === 'identity') return tr(v ? T.on : T.off)
+    if (key === 'reviewers') return fmt.number(v as number)
+    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noChecks) // i18n-ignore: a check's name and command, shown as they are
     if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noChecks)
     if (key === 'target') return (v as string) || tr(T.defaultBranch)
     return String(v)
@@ -467,12 +474,23 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
 }
 
 /** What a save changes, the lanes keeping the old rules, and the cards in flight to apply the change to (OP-38). */
-function SaveDetails({ names, check, picked }: { names: string[]; check: { lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; title: string }[] }; picked: Set<number> }) {
+function SaveDetails({ changes, check, picked }: { changes: string[]; check: { lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; title: string }[] }; picked: Set<number> }) {
   const [, redraw] = useState(0)
   const tasks = useStore((s) => s.tasks)
   return (
     <div className="workflow-save">
-      <p>{names.length ? tr(T.changes, { options: fmt.list(names) }) : tr(T.noChanges)}</p>
+      {changes.length ? (
+        <>
+          <p>{tr(T.changesHead)}</p>
+          <ul className="workflow-changes">
+            {changes.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p>{tr(T.noChanges)}</p>
+      )}
       {check.lanes.length > 0 && (
         <>
           <p>{tr(T.lanes, { n: check.lanes.length })}</p>

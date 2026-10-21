@@ -16,7 +16,8 @@ interface HiveMessageValues {
   'workflow.form.addCheck': undefined
   'workflow.form.agentsSection': undefined
   'workflow.form.cantSave': undefined
-  'workflow.form.changes': { options: string | number }
+  'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
+  'workflow.form.changesHead': undefined
   'workflow.form.checkCommand': undefined
   'workflow.form.checkName': undefined
   'workflow.form.choose': undefined

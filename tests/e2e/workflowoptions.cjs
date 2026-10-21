@@ -108,7 +108,7 @@ function board(sql, ...args) {
     const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await dialog.waitFor({ timeout: HUNG_MS })
     const said = await dialog.innerText()
-    check('the warning says what changes', said.includes('Who merges') && said.includes('Where cards are built'), said)
+    check('the warning lists what changes, each option old → new', said.includes('Who merges: Not checked → The agent merges, Hive checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
     check('…and lists the running lane, which keeps the old rules', said.includes('keeps the old rules') && said.includes('Builder B1'), said)
     await themes('save', dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -121,6 +121,8 @@ function board(sql, ...args) {
     await section.getByRole('button', { name: 'Save…' }).click()
     const problems = section.locator('.workflow-problems')
     check('a contradiction is refused with its reason', !!(await lib.until(async () => (await problems.count()) > 0 && (await problems.innerText()).includes('“Committed is done” needs everyone in the project folder.'), HUNG_MS)), await problems.innerText().catch(() => ''))
+    // Shot once the earlier save's toast has gone (a refused save says nothing of a save; the Assistant's note).
+    check('the earlier save’s toast has gone before the shot', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'saved' }).count()) === 0, HUNG_MS)))
     await themes('refused', null, section.locator('.workflow-problems'))
     check('…and nothing was saved', projectJson().workflow.options.finish === 'agentMerges')
     await section.getByRole('button', { name: 'Discard Changes' }).click()

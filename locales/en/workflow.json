@@ -59,9 +59,13 @@
     "defaultMessage": "These options can’t be saved:",
     "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
   },
-  "workflow.form.changes": {
-    "defaultMessage": "What changes: {options}.",
-    "description": "In the dialog before saving workflow options: the options that change. {options} is a list of their names."
+  "workflow.form.changeLine": {
+    "defaultMessage": "{option}: {from} → {to}",
+    "description": "A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value."
+  },
+  "workflow.form.changesHead": {
+    "defaultMessage": "What changes:",
+    "description": "In the dialog before saving workflow options: above the list of options that change, each with its old and new value."
   },
   "workflow.form.checkCommand": {
     "defaultMessage": "Command",
