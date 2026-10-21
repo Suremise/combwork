@@ -83,6 +83,24 @@ export function hiveBranch(home: BranchHome, agent: string): string {
   return `hive/${home.space ?? workspacePart(home)}/${projectPart(home)}/${agentPart(agent)}`
 }
 
+/**
+ * The name an agent's branch takes here (#1305, Darren's decision on #1303: renamed at Repair, never offered): a branch
+ * in the full form whose workspace part isn't one of this project's own (`ownSpaces`) or whose project part isn't this
+ * project's, named after where the workspace or project was, moves to `home`: its workspace part becomes `home.space`
+ * (the one its new branches take, `chooseSpace`) when it was another, its project part this project's; its agent part,
+ * numbered or not, stays (renaming an agent is its own step). Null when it is already named for here, or isn't Hive's
+ * full form (hive/<agent> from before #703 names no place).
+ */
+export function branchHere(branch: string, home: BranchHome): string | null {
+  const full = /^hive\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(branch)
+  if (!full) return null
+  const spaces = ownSpaces(home)
+  const spaceHere = spaces.some((s) => s.toLowerCase() === full[1].toLowerCase())
+  const projectHere = full[2].toLowerCase() === projectPart(home).toLowerCase()
+  if (spaceHere && projectHere) return null
+  return `hive/${spaceHere ? full[1] : (home.space ?? spaces[0])}/${projectPart(home)}/${full[3]}`
+}
+
 /** The branch Hive made before #703 for an agent of that name, exactly: hive/<its slug> (B--1: hive/b--1). */
 export const oldHiveBranch = (agent: string): string => `hive/${slugify(agent)}`
 

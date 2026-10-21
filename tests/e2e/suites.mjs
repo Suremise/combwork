@@ -181,6 +181,7 @@ export const SUITES = [
   { name: 'removeall' },
   { name: 'rendercrash' },
   { name: 'reorder' },
+  { name: 'repairbranches' },
   { name: 'replysize' },
   { name: 'replytell' },
   { name: 'resize' },

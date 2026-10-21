@@ -2088,6 +2088,80 @@ textarea.input {
 .move-repair .mono {
   overflow-wrap: anywhere;
 }
+/* Repair's plan as a table (#1305, the project hover's agent table's look: ItemTable): What · Was · Now · Will do,
+   each row's choices at its right edge; the dialog as wide as is comfortable, so paths show their part that differs. */
+.dialog.wide:has(.repair-plan) {
+  width: min(1180px, calc(100vw - 48px));
+}
+/* The actions' column: an expander's room, or the missing worktrees' three choices when any row has them. */
+.table.item-table.repair-plan {
+  margin: 8px 0 10px;
+  --item-actions: 36px;
+}
+.table.item-table.repair-plan.has-choices {
+  --item-actions: 312px;
+}
+.repair-plan th:nth-child(1) {
+  width: 24%;
+}
+.repair-plan th:nth-child(2),
+.repair-plan th:nth-child(3) {
+  width: 18%;
+}
+.repair-plan td {
+  white-space: nowrap;
+}
+.repair-plan td > span[aria-hidden] {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repair-plan td:first-child .short-path {
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.repair-plan tr.repair-sub td:first-child .short-path {
+  padding-left: 14px;
+  font-weight: normal;
+  color: var(--fg);
+}
+.repair-plan tr.faint td {
+  color: var(--fg-muted);
+}
+.repair-plan tr.item-table-group td {
+  padding-top: 10px;
+}
+.repair-plan tbody tr.item-table-group:first-child td {
+  padding-top: 2px;
+}
+/* A folded row's expander, before its name (a coding agent's folders, #1305): the name beside it, both on one line. */
+.repair-plan .repair-expand {
+  width: 18px;
+  height: 18px;
+  margin: 0 2px 0 -4px;
+  vertical-align: top;
+}
+.repair-plan tr.repair-folded td:first-child .short-path {
+  display: inline-block;
+  max-width: calc(100% - 20px);
+  line-height: 18px;
+  vertical-align: top;
+}
+.repair-plan tr.repair-sub td:first-child .short-path {
+  padding-left: 18px;
+}
+.repair-choice {
+  height: 22px;
+  padding: 0 6px;
+  gap: 4px;
+}
+.repair-choice + .repair-choice,
+.item-table-actions .tip-wrap + .tip-wrap {
+  margin-left: 4px;
+}
+.repair-choice .codicon {
+  font-size: 13px;
+}
 .move-repair ul.move-report {
   list-style: none;
   padding-left: 0;

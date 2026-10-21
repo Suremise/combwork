@@ -327,6 +327,26 @@
     "defaultMessage": "Hive Assistant",
     "description": "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running."
   },
+  "main.move.branchCard": {
+    "defaultMessage": "{host}: {agent}'s branch {from} keeps its name until {cards} {n, plural, one {is} other {are}} Done; the Repair after renames it.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed yet, because an unfinished card works on it. {host} is the project; {agent} an agent; {from} a branch; {cards} lists the cards (#12); {n} how many."
+  },
+  "main.move.branchFailed": {
+    "defaultMessage": "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's message."
+  },
+  "main.move.branchRenamed": {
+    "defaultMessage": "{host}: {agent}'s branch {from} is now {to}.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names."
+  },
+  "main.move.branchRenamedRemote": {
+    "defaultMessage": "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin)."
+  },
+  "main.move.branchTaken": {
+    "defaultMessage": "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names."
+  },
   "main.move.cards": {
     "defaultMessage": "{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {n} is how many cards."

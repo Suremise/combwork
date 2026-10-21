@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
-import type { MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveWorktree, PathDataCopy, WorkspaceMoved } from '../shared/types'
+import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveWorktree, PathDataCopy, WorkspaceMoved } from '../shared/types'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
@@ -14,7 +14,9 @@ import { allProviders } from './providers'
 import { recentChanged } from './recentWorkspaces'
 import { sessions } from './sessions'
 import type { WorkspaceService } from './workspace'
-import { listWorktrees } from './worktrees'
+import { listWorktrees, localBranches } from './worktrees'
+import { openLines } from './workflow/cardWork'
+import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/hiveBranches'
 import { orphanNames } from '../shared/projectIds'
 import { legacyCards, moveOrphanCards, stampCardProjects } from './tasks'
 import { legacyLanes, moveOrphanLanes } from './lanes'
@@ -139,6 +141,31 @@ async function worktreesOf(ws: WorkspaceService, host: Host, wsMove: PathMove, o
     // Still at its old place while the project is at its old folder too: a copy, and the original keeps its worktree.
     else if (samePath(found, a.worktree.path) && copied) out.push({ ...base, to: null, how: 'original' })
     else out.push({ ...base, to: found, how: samePath(found, a.worktree.path) ? 'stayed' : 'moved' })
+  }
+  return out
+}
+
+/**
+ * Agents' branches named after where the workspace or project was (#1305, `branchHere`), and the name each takes here:
+ * every worktree agent of the project whose recorded branch is in the repository, except those whose worktree this plan
+ * still has to find or make (their branch is renamed by the Repair after). A name already taken is kept, and said.
+ */
+async function branchesOf(ws: WorkspaceService, project: string, worktrees: readonly MoveWorktree[], open: readonly { card: number; line: string }[]): Promise<MoveBranch[]> {
+  const cfg = await ws.projectConfig(project)
+  const agents = projectAgents(cfg).filter((a) => a.worktree?.branch && !worktrees.some((w) => w.agentId === a.id && (w.how === 'missing' || w.how === 'recreate' || w.how === 'unlink' || w.how === 'original')))
+  if (!agents.length) return []
+  const branches = await localBranches(project)
+  const has = (b: string): boolean => branches.some((x) => x.toLowerCase() === b.toLowerCase())
+  const place: BranchHome = { workspace: basename(ws.path ?? ''), project: basename(project), spaces: Array.isArray(cfg.branchSpaces) ? cfg.branchSpaces : [] }
+  const home = { ...place, space: chooseSpace(place, branches).space }
+  const out: MoveBranch[] = []
+  for (const a of agents) {
+    const from = a.worktree!.branch
+    const to = branchHere(from, home)
+    if (!to || !has(from)) continue
+    const remote = (await git(project, ['config', '--get', `branch.${from}.remote`])).out.trim()
+    const cards = open.filter((o) => o.line.toLowerCase() === from.toLowerCase()).map((o) => o.card)
+    out.push({ agentId: a.id, agentName: a.name, from, to, ...(remote ? { remote } : {}), ...(has(to) ? { kept: 'exists' as const } : cards.length ? { kept: 'card' as const, cards } : {}) })
   }
   return out
 }
@@ -323,14 +350,30 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
   const here = ws.path
   const { from, hosts } = await movedHosts(ws)
   const cards = await cardMoves(ws, hosts, from)
-  if (!hosts.length && !from && !cards.length) return null
   const wsMove = { from: from ?? here, to: here }
   const planned: MoveHostPlan[] = []
+  // The lines unfinished cards work on (#1305): their branches keep their names until those cards are Done.
+  let open: { card: number; line: string }[] = []
+  try {
+    open = openLines(ws)
+  } catch (e) {
+    log.warn('reading the lines cards work on', e)
+  }
   for (const h of hosts) {
     const worktrees = await worktreesOf(ws, h, wsMove, opts)
     const moves = movesOf(h, worktrees, await pendingOf(ws, h.path))
-    planned.push({ path: h.path, name: h.name, from: h.from, folder: h.folder, worktrees, sessions: await sessionCwds(ws, h.path, moves, false), folders: await pathData(moves, false) })
+    const branches = h.assistant ? [] : await branchesOf(ws, h.path, worktrees, open)
+    planned.push({ path: h.path, name: h.name, from: h.from, folder: h.folder, worktrees, sessions: await sessionCwds(ws, h.path, moves, false), folders: await pathData(moves, false), ...(branches.length ? { branches } : {}) })
   }
+  // Branches still named after an old place in projects that didn't move (#1305): a move repaired before, or one made
+  // outside Hive. Each such project is listed for its branches alone.
+  for (const p of await projectFolders(ws)) {
+    if (hosts.some((h) => samePath(h.path, p))) continue
+    const branches = await branchesOf(ws, p, [], open)
+    if (branches.length) planned.push({ path: p, name: basename(p), from: p, folder: p, worktrees: [], sessions: 0, folders: [], branches })
+  }
+  const renames = planned.reduce((n, h) => n + (h.branches ?? []).filter((b) => !b.kept).length, 0)
+  if (!hosts.length && !from && !cards.length && !renames) return null
   return {
     from,
     to: here,
@@ -340,13 +383,14 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     hosts: planned,
     recent: !!from && config.get().recentWorkspaces.some((p) => samePath(p, from)),
     working: from ? workingAt(from).filter((n) => !workingAt(here).includes(n)) : [],
-    ...(cards.length ? { cards } : {})
+    ...(cards.length ? { cards } : {}),
+    ...(renames ? { branches: renames } : {})
   }
 }
 
 /** The plan's headline for the banner, or null when there's nothing to repair. */
 export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
-  plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}) } : null
+  plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}), ...(plan.branches ? { branches: plan.branches } : {}) } : null
 
 /**
  * On opening a workspace: records the folders of those opened for the first time, and works out whether anything
@@ -494,6 +538,34 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       } else if (w.how === 'original') {
         report.skipped.push(tr(msg({ id: 'main.move.original', defaultMessage: "{host}: {agent}'s worktree at {path} stays linked to the project at {project}, which is still there.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {project} the project folder it was made from (a copy was moved, not that one)." }), { host: h.name, agent: w.agentName, path: w.from, project: h.from }))
       }
+    }
+    // Branches named after the old place (#1305): renamed in the repository (git moves its upstream and updates the
+    // worktree that has it out), then the agent's record of it, in one locked change.
+    for (const b of h.branches ?? []) {
+      if (b.kept === 'card') {
+        report.skipped.push(tr(msg({ id: 'main.move.branchCard', defaultMessage: "{host}: {agent}'s branch {from} keeps its name until {cards} {n, plural, one {is} other {are}} Done; the Repair after renames it.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed yet, because an unfinished card works on it. {host} is the project; {agent} an agent; {from} a branch; {cards} lists the cards (#12); {n} how many." }), { host: h.name, agent: b.agentName, from: b.from, cards: fmt.list((b.cards ?? []).map((c) => `#${c}`), 'unit'), n: b.cards?.length ?? 0 }))
+        continue
+      }
+      if (b.kept) {
+        report.skipped.push(tr(msg({ id: 'main.move.branchTaken', defaultMessage: "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }))
+        continue
+      }
+      const r = await git(h.path, ['branch', '-m', b.from, b.to])
+      if (!r.ok) {
+        report.failed.push(tr(msg({ id: 'main.move.branchFailed', defaultMessage: "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's message." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, why: (r.err || 'git branch -m').trim() })) // i18n-ignore: a git command's name
+        continue
+      }
+      const space = b.to.split('/')[1]
+      await ws.mutateProjectConfig(h.path, (cfg) => ({
+        agents: projectAgents(cfg).map((a) => (a.id === b.agentId && a.worktree?.branch === b.from ? { ...a, worktree: { ...a.worktree, branch: b.to } } : a)),
+        // A workspace part this project's branches hadn't had is recorded, so it stays this project's (#703 round 3).
+        ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})
+      }))
+      report.done.push(
+        b.remote
+          ? tr(msg({ id: 'main.move.branchRenamedRemote', defaultMessage: "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, remote: b.remote })
+          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: "{host}: {agent}'s branch {from} is now {to}.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to })
+      )
     }
     // Sessions and the CLIs' per-path data follow the project and the worktrees now at new places: those are kept in
     // project.json (pendingCopies) until their data is copied, so a copy that fails is tried again, after a restart too.

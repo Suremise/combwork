@@ -51,6 +51,26 @@ export function workBadges(ws: WorkspaceService): WorkBadge[] {
 }
 
 /**
+ * The lines live cards' unfinished work is on (#1305), by card: a branch Repair would rename under such a card would
+ * read as gone to its reconciliation (Gone: line), so Repair keeps it until the card is Done. One snapshot.
+ */
+export function openLines(ws: WorkspaceService): { card: number; line: string }[] {
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return []
+    const facts = new Map<number, Fact[]>()
+    for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
+      const f = factOf(r)
+      facts.set(f.card, [...(facts.get(f.card) ?? []), f])
+    }
+    const cards = db.prepare('SELECT number, col, stage, pre_workflow FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    return cards.flatMap((r) => {
+      const v = workView(cardOf(r), facts.get(r.number as number) ?? [])
+      return v.line && v.stage !== 'done' ? [{ card: v.card, line: v.line }] : []
+    })
+  })
+}
+
+/**
  * What waits for the user (IPC `tasks:forYou`, §16.8.5): every live card's open requests, of one project (its folder
  * name) or the whole workspace, oldest first, and their count. Read on one snapshot; the window reads it again on
  * `tasks-changed` (a request or an answer is a board change).

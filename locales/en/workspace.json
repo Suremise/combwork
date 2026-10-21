@@ -567,9 +567,9 @@
     "defaultMessage": "What it runs",
     "description": "An MCP server's view: the command it runs, for screen readers."
   },
-  "workspace.move.board": {
-    "defaultMessage": "Board",
-    "description": "Repair's plan: the heading over the board's lines."
+  "workspace.move.branchesBanner": {
+    "defaultMessage": "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}",
+    "description": "The banner when agents' git branches are named after where the workspace or project was (hive/<workspace>/<project>/<agent>)."
   },
   "workspace.move.cancel": {
     "defaultMessage": "Cancel",
@@ -595,41 +595,17 @@
     "defaultMessage": "Close",
     "description": "Repair's button after it ran."
   },
-  "workspace.move.copy": {
-    "defaultMessage": "Copy {count, plural, one {# file} other {# files}} of {provider}'s conversations and memory for {hasOf, select, yes {{of}} other {the folder}} to its folder for the new path (<mono>{to}</mono>); the old one stays.",
-    "description": "Repair's plan, a line: a coding agent's ({provider}: Claude Code) own folder for a project. <mono> is a folder."
-  },
-  "workspace.move.copyNone": {
-    "defaultMessage": "{provider}'s conversations and memory for {hasOf, select, yes {{of}} other {the folder}}:",
-    "description": "Repair's plan, a line: a coding agent's own folder, when nothing is copied (why follows)."
-  },
   "workspace.move.createButton": {
     "defaultMessage": "Create a new worktree",
     "description": "Repair's plan: a missing worktree's choice when its branch is gone too."
-  },
-  "workspace.move.createNew": {
-    "defaultMessage": "Create a new worktree for <b>{agent}</b> on <mono>{branch}</mono> (its branch is gone too), at <mono>{to}</mono>; its setup command runs at its next start.",
-    "description": "Repair's plan, a line. <b> is bold; <mono> a branch or folder."
-  },
-  "workspace.move.found": {
-    "defaultMessage": "<b>{agent}</b>'s worktree: {how, select, stayed {relink <mono>{to}</mono> to the moved project} other {now at <mono>{to}</mono>}}{located, select, yes { (located)} other {}} — <faint>git worktree repair</faint>",
-    "description": "Repair's plan, a line. <b> is bold; <mono> a folder; <faint> is the git command Repair runs (keep it as it is)."
   },
   "workspace.move.fromWorkspace": {
     "defaultMessage": "This workspace was moved from <mono>{from}</mono>.",
     "description": "The banner over a moved workspace. <mono> is the old folder, in a fixed-width font."
   },
-  "workspace.move.give": {
-    "defaultMessage": "Give the {what} saved under <b>{from}</b>{hasCards, select, yes { ({cards})} other {}} to <b>{to}</b>, where cards show with their agents, archived ones too.",
-    "description": "Repair's plan, a line ({what}: \"9 cards and 1 lane\"; {cards}: their numbers). <b> is bold."
-  },
   "workspace.move.hide": {
     "defaultMessage": "Hide for now (Repair Moved Workspace… stays in the command palette)",
     "description": "The banner's close button. Repair Moved Workspace… is the command's name."
-  },
-  "workspace.move.kept": {
-    "defaultMessage": "{count, plural, one {# file is} other {# files are}} already in <mono>{to}</mono> with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.",
-    "description": "Repair's plan: files left as they are ({files}: up to five names)."
   },
   "workspace.move.lanes": {
     "defaultMessage": "{count, plural, one {# lane} other {# lanes}}",
@@ -643,10 +619,6 @@
     "defaultMessage": "Locate…",
     "description": "Repair's plan: a missing worktree's choice (pick its folder)."
   },
-  "workspace.move.missing": {
-    "defaultMessage": "<b>{agent}</b>'s worktree wasn't found (it was at <mono>{from}</mono>){gone, select, yes {, and its branch is gone too} other {}}.",
-    "description": "Repair's plan, a line; choices follow. <b> is bold; <mono> a folder."
-  },
   "workspace.move.movedFromTo": {
     "defaultMessage": "The workspace moved from <mono>{from}</mono> to <mono>{to}</mono>. Repair will:",
     "description": "Repair's plan, at the top; what it does follows. <mono> is a folder."
@@ -654,10 +626,6 @@
   "workspace.move.nothing": {
     "defaultMessage": "Nothing to repair: everything already points to where the workspace is now.",
     "description": "Repair with nothing to do."
-  },
-  "workspace.move.original": {
-    "defaultMessage": "<b>{agent}</b>'s worktree stays with the project at its old folder, which is still there (this looks like a copy).",
-    "description": "Repair's plan, a line. <b> is bold."
   },
   "workspace.move.owner": {
     "defaultMessage": "{owner, select, project {the project} assistant {the Assistant} other {{agent}'s worktree}}",
@@ -679,14 +647,6 @@
     "defaultMessage": "Projects moved to another folder. Repair will:",
     "description": "Repair's plan, at the top; what it does follows."
   },
-  "workspace.move.recent": {
-    "defaultMessage": "Open Recent: list <mono>{to}</mono> instead of the old folder.",
-    "description": "Repair's plan: File → Open Recent's entry. <mono> is a folder."
-  },
-  "workspace.move.recreate": {
-    "defaultMessage": "Recreate <b>{agent}</b>'s worktree on its branch <mono>{branch}</mono>, with its commits, at <mono>{to}</mono>; its setup command runs at its next start.",
-    "description": "Repair's plan, a line. <b> is bold; <mono> a branch or folder."
-  },
   "workspace.move.recreateButton": {
     "defaultMessage": "Recreate worktree",
     "description": "Repair's plan: a missing worktree's choice."
@@ -706,10 +666,6 @@
   "workspace.move.repairing": {
     "defaultMessage": "Repairing…",
     "description": "Repair's button while it works."
-  },
-  "workspace.move.sessions": {
-    "defaultMessage": "{count, plural, one {Point # session to the new folder, so it resumes where it ran.} other {Point # sessions to the new folders, so they resume where they ran.}}",
-    "description": "Repair's plan, a line."
   },
   "workspace.move.stays": {
     "defaultMessage": "Repair… stays in the banner until it's done; running it again repeats nothing already done.",
@@ -731,10 +687,6 @@
     "defaultMessage": "Undo",
     "description": "Repair's plan: takes back a choice made for a missing worktree."
   },
-  "workspace.move.unlink": {
-    "defaultMessage": "Remove <b>{agent}</b>'s worktree link (its folder, if it turns up, is left as it is).",
-    "description": "Repair's plan, a line. <b> is bold."
-  },
   "workspace.move.unlinkButton": {
     "defaultMessage": "Remove the agent's worktree link",
     "description": "Repair's plan: a missing worktree's choice."
@@ -754,10 +706,6 @@
   "workspace.move.working": {
     "defaultMessage": "Working out what moved…",
     "description": "Repair while it reads what moved."
-  },
-  "workspace.move.workingOn": {
-    "defaultMessage": "Working on: mark {projects} again, as at the old folder.",
-    "description": "Repair's plan: the projects marked as being worked on."
   },
   "workspace.notes.delete": {
     "defaultMessage": "Delete note",
@@ -1310,6 +1258,158 @@
   "workspace.removal.worktrees": {
     "defaultMessage": "{count, plural, one {# worktree} other {# worktrees}}: {how, select, hide {left as they are.} remove {removed with their branches, once nothing in them is unmerged.} other {to the Recycle Bin.}}",
     "description": "Remove Project, what it touches: the agents' worktrees (each follows), for the choice made."
+  },
+  "workspace.repair.board": {
+    "defaultMessage": "Board: {from}",
+    "description": "Repair's plan, the What column: what the board saved under a project's old name ({from})."
+  },
+  "workspace.repair.branch": {
+    "defaultMessage": "{agent}'s branch",
+    "description": "Repair's plan, the What column: an agent's git branch ({agent}: its name)."
+  },
+  "workspace.repair.choose": {
+    "defaultMessage": "{gone, select, yes {its branch is gone too: create, locate or remove its link} other {recreate, locate or remove its link}}",
+    "description": "Repair's plan, the Will do column, in the warning colour: a missing worktree waits for a choice (the row's buttons)."
+  },
+  "workspace.repair.chooseShort": {
+    "defaultMessage": "choose",
+    "description": "Repair's plan, the Will do column, in the warning colour: a missing worktree waits for one of the row's buttons (Recreate, Locate…, Remove link; its tooltip says so in full)."
+  },
+  "workspace.repair.conversations": {
+    "defaultMessage": "{provider}'s conversations and memory",
+    "description": "Repair's plan, the What column: what a coding agent ({provider}: Claude Code) keeps per folder."
+  },
+  "workspace.repair.copy": {
+    "defaultMessage": "{count, plural, one {copy # file} other {copy # files}}{stays, select, yes {; the old ones stay} other {}}",
+    "description": "Repair's plan, the Will do column: files copied to the folder for the new path, the old ones kept."
+  },
+  "workspace.repair.createShort": {
+    "defaultMessage": "Create",
+    "description": "Repair's plan, a missing worktree's compact button when its branch is gone too (its tooltip: workspace.move.createButton)."
+  },
+  "workspace.repair.folders": {
+    "defaultMessage": "{count, plural, one {# folder} other {# folders}}",
+    "description": "Repair's plan: how many of a coding agent's folders are copied (one per moved folder)."
+  },
+  "workspace.repair.give": {
+    "defaultMessage": "give {what}{hasCards, select, yes { ({cards})} other {}} to {to}",
+    "description": "Repair's plan, the Will do column of the board's row ({what}: \"9 cards and 1 lane\"; {cards}: their numbers; {to}: the project now)."
+  },
+  "workspace.repair.hideFolders": {
+    "defaultMessage": "Hide the folders",
+    "description": "Repair's plan: the button that folds a coding agent's folders back into one row."
+  },
+  "workspace.repair.keptFiles": {
+    "defaultMessage": "{count, plural, one {# file kept} other {# files kept}}",
+    "description": "Repair's plan, after the Will do column's copy: files already there with other content, never overwritten (the full list in its tooltip)."
+  },
+  "workspace.repair.keptTip": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.",
+    "description": "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)."
+  },
+  "workspace.repair.listNew": {
+    "defaultMessage": "list the new folder",
+    "description": "Repair's plan, the Will do column of Open Recent: the new folder replaces the old one."
+  },
+  "workspace.repair.markAgain": {
+    "defaultMessage": "mark {projects} again",
+    "description": "Repair's plan, the Will do column of Working on ({projects}: the projects)."
+  },
+  "workspace.repair.notFound": {
+    "defaultMessage": "not found",
+    "description": "Repair's plan, the Now column: an agent's worktree wasn't found."
+  },
+  "workspace.repair.nothingToCopy": {
+    "defaultMessage": "nothing to copy",
+    "description": "Repair's plan, the Will do column: a coding agent's folder with nothing to copy (some files kept or unreadable, said after)."
+  },
+  "workspace.repair.now": {
+    "defaultMessage": "Now",
+    "description": "Repair's plan, a column heading: where it is now (a folder or a branch)."
+  },
+  "workspace.repair.original": {
+    "defaultMessage": "stays with the project at its old folder (a copy)",
+    "description": "Repair's plan, the Will do column: the old project folder is still there, so its worktree stays linked to it."
+  },
+  "workspace.repair.point": {
+    "defaultMessage": "{count, plural, one {point # session} other {point # sessions}}",
+    "description": "Repair's plan, the Will do column: the session records pointed to the new folder ({count}: how many)."
+  },
+  "workspace.repair.recent": {
+    "defaultMessage": "Open Recent",
+    "description": "Repair's plan, the What column: File → Open Recent's entry for the workspace. Use the menu's name as shown."
+  },
+  "workspace.repair.recreate": {
+    "defaultMessage": "{exists, select, yes {recreate on {branch}} other {create new on {branch}}}",
+    "description": "Repair's plan, the Will do column: the worktree is made again on its branch, or new ({branch}: the branch)."
+  },
+  "workspace.repair.recreateShort": {
+    "defaultMessage": "Recreate",
+    "description": "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.recreateButton)."
+  },
+  "workspace.repair.relink": {
+    "defaultMessage": "{located, select, yes {located · } other {}}git worktree repair",
+    "description": "Repair's plan, the Will do column: Repair links a worktree with git's command (keep \"git worktree repair\" as it is); \"located\" when the user picked its folder."
+  },
+  "workspace.repair.rename": {
+    "defaultMessage": "{remote, select, none {rename} other {rename; {remote} keeps the old name}}",
+    "description": "Repair's plan, the Will do column: an agent's branch named after the old place is renamed ({remote}: the remote it tracks, which keeps the old name, or none)."
+  },
+  "workspace.repair.sentence": {
+    "defaultMessage": "{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}",
+    "description": "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns."
+  },
+  "workspace.repair.sessions": {
+    "defaultMessage": "Sessions",
+    "description": "Repair's plan, the What column: the project's session records (each remembers the folder it ran in)."
+  },
+  "workspace.repair.showFolders": {
+    "defaultMessage": "Show the folders",
+    "description": "Repair's plan: the button that lists a coding agent's folders one by one under its row."
+  },
+  "workspace.repair.taken": {
+    "defaultMessage": "kept: the new name is taken",
+    "description": "Repair's plan, the Will do column: an agent's branch isn't renamed, because a branch with the new name exists."
+  },
+  "workspace.repair.unlink": {
+    "defaultMessage": "remove the worktree link",
+    "description": "Repair's plan, the Will do column: the agent's link to its worktree is removed (its folder, if it turns up, stays)."
+  },
+  "workspace.repair.unlinkShort": {
+    "defaultMessage": "Remove link",
+    "description": "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.unlinkButton)."
+  },
+  "workspace.repair.unreadableFiles": {
+    "defaultMessage": "{count, plural, one {# can't be read} other {# can't be read}}",
+    "description": "Repair's plan, after the Will do column's copy: files that couldn't be read (Repair tries them again; the list in its tooltip)."
+  },
+  "workspace.repair.untilDone": {
+    "defaultMessage": "{n, plural, one {kept until {cards} is Done} other {kept until {cards} are Done}}",
+    "description": "Repair's plan, the Will do column: an agent's branch isn't renamed yet, because an unfinished card works on it ({cards}: the cards, #12; {n}: how many); the Repair after renames it."
+  },
+  "workspace.repair.was": {
+    "defaultMessage": "Was",
+    "description": "Repair's plan, a column heading: where it was before the move (a folder or a branch)."
+  },
+  "workspace.repair.what": {
+    "defaultMessage": "What",
+    "description": "Repair's plan, a column heading: what a row is about (an agent's worktree, the sessions, Claude Code's conversations)."
+  },
+  "workspace.repair.willDo": {
+    "defaultMessage": "Will do",
+    "description": "Repair's plan, a column heading: what Repair will do about the row."
+  },
+  "workspace.repair.workingOn": {
+    "defaultMessage": "Working on",
+    "description": "Repair's plan, the What column: the projects marked as being worked on in the sidebar. Use its name as shown."
+  },
+  "workspace.repair.workspaceGroup": {
+    "defaultMessage": "Workspace",
+    "description": "Repair's plan: the heading over the rows about the whole workspace (Open Recent, Working on, the board)."
+  },
+  "workspace.repair.worktree": {
+    "defaultMessage": "{agent}'s worktree",
+    "description": "Repair's plan, the What column: an agent's worktree ({agent}: its name)."
   },
   "workspace.reuse.alreadyAt": {
     "defaultMessage": "reused {branch}, already at {base}",
