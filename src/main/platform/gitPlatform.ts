@@ -60,15 +60,14 @@ export class GitPlatform implements PlatformAdapter {
     if (own) {
       const target = card.target || o.target || own.base || (await G.defaultBranch(this.project))
       if (isUnknown(target)) return target
-      const line = await G.branch(own.path)
-      const head = await G.head(own.path)
-      const th = await G.lineHead(this.project, target)
+      // In one git (#1376); the target read in the worktree, whose branches are the project's.
+      const { line, head, target: th } = await G.heads(own.path, target)
       if (isUnknown(line)) return line
       if (isUnknown(head)) return head
       if (isUnknown(th)) return th
       if (!head) return unknown(UNREADABLE.head, { where: own.path })
       if (!th) return unknown(UNREADABLE.head, { where: target })
-      const base = await G.mergeBase(own.path, head, th)
+      const base = head === th ? head : await G.mergeBase(own.path, head, th)
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
       return { folder: own.path, line, base, target, existing: true }
@@ -222,14 +221,23 @@ export class GitPlatform implements PlatformAdapter {
     let revision: string | null
     let base: string | null
     let commits: string[] | undefined
+    let dirty: Maybe<string[]> | undefined
     if (this.wf.ownLine(s)) {
-      const h = await G.head(folder)
+      // Its head and the target's, with its uncommitted state when a guard asks for it, read together (#1376): the target
+      // read in the folder, whose branches are the project's.
+      const target = s.started!.target ?? ''
+      const now = args.guards.includes('submit.clean') && target ? await G.worktreeNow(folder, { target }) : null
+      // Unreadable that way (or no commit yet): each read on its own, as before.
+      const got = now && !isUnknown(now) && now.head ? now : null
+      const read = got ? null : await G.heads(folder, target)
+      const h = got ? got.head! : read!.head
       if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
       if (args.revision && args.revision !== h) return { ok: false, refusal: { rule: 'check.revisionMismatch', values: { revision: args.revision.slice(0, 7) } } }
       revision = h
+      dirty = got?.dirty
       // The change's base: the merge base with the target at this moment, fixed with the submission.
-      const th = await G.lineHead(this.project, s.started!.target ?? '')
-      const mb = !isUnknown(th) && th ? await G.mergeBase(this.project, th, h) : th
+      const th = got ? (got.target ?? null) : read!.target
+      const mb = !isUnknown(th) && th ? (th === h ? h : await G.mergeBase(this.project, th, h)) : th
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb
     } else {
@@ -255,7 +263,7 @@ export class GitPlatform implements PlatformAdapter {
     // The guards' platform inputs, gathered only for the guards the ruleset holds.
     const inputs: Partial<GuardInputs> = {}
     const shared = !this.wf.ownLine(s)
-    if (args.guards.includes('submit.clean')) inputs.dirty = await G.dirty(folder, !shared || !args.agent || !this.wf.cfg.locksOf ? undefined : this.wf.cfg.locksOf(args.agent))
+    if (args.guards.includes('submit.clean')) inputs.dirty = dirty ?? await G.dirty(folder,!shared || !args.agent || !this.wf.cfg.locksOf ? undefined : this.wf.cfg.locksOf(args.agent))
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
@@ -327,8 +335,8 @@ export class GitPlatform implements PlatformAdapter {
     return { to: h, base, same }
   }
 
-  contains(target: string, change: { base: string; revision: string; key?: string | null }): Promise<Maybe<Containment | null>> {
-    return G.contains(this.project, target, change)
+  contains(target: string, change: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
+    return G.contains(this.project, target, change, at)
   }
 
   targetHead(target: string): Promise<Maybe<string | null>> {
