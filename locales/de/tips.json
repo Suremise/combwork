@@ -134,6 +134,8 @@
   "tips.filesTab.title": "Dateien bearbeiten, ohne Hive zu verlassen",
   "tips.flightRecorder.text": "Schalte in Einstellungen → Erweitert einen Auslöser des Flugschreibers ein (Sicherheitsstopps, Unbekanntes von einer CLI, ein Wechsel der CLI-Version, ein still gewordener Agent), und Hive speichert die letzten Ereignisse der Entwicklerkonsole des Agenten in dem Moment, in dem es passiert, geschwärzt und mit einer Meldung.",
   "tips.flightRecorder.title": "Seltene Ereignisse von selbst festhalten",
+  "tips.forYou.text": "Eine Karte mit dem Chip „Für dich“ wartet auf dich: eine Zustimmung, eine Entscheidung oder eine Frage. Das Symbol „Aufgabenboard“ zählt sie, und „Für dich“ auf dem Board zeigt nur diese. Öffne die Karte, um zuzustimmen, abzulehnen oder zu antworten: Der wartende Agent erfährt es sofort.",
+  "tips.forYou.title": "Beantworte, was auf dich wartet",
   "tips.gitCheck.text": "Hilfe → Agent-Einrichtung… zeigt, welches Git Hive gefunden hat, und dessen Version. Worktree-Agenten, Mergen und der Tab „Git“ brauchen Git for Windows 2.38 oder neuer.",
   "tips.gitCheck.title": "Ist Git bereit für Worktrees?",
   "tips.gitInit.text": "Ein Projekt ohne Git? „Repository initialisieren…“ im Tab „Git“ macht daraus ein Repository auf main, hält .hive heraus, legt auf Wunsch eine erste .gitignore an und erstellt den ersten Commit, damit Agenten sofort in Worktrees arbeiten können.",

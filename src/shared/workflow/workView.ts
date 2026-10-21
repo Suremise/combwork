@@ -27,6 +27,8 @@ export interface ForYouItem {
   asker: string | null
   /** Whom it waits on: the user (a person later, #439). */
   for: 'user'
+  /** A Test request's checklist: what to try (#1267). */
+  checklist?: string[]
 }
 
 /** What waits for the user, in a workspace or one project: each request, oldest first, and their count. */
@@ -59,7 +61,8 @@ export function forYouItems(card: { card: number; project: string; stage: StageI
     ...(r.requestText ? { shown: r.requestText } : {}),
     since: r.at,
     asker: r.asker ?? null,
-    for: r.for ?? 'user'
+    for: r.for ?? 'user',
+    ...(r.checklist?.length ? { checklist: r.checklist } : {})
   }))
 }
 

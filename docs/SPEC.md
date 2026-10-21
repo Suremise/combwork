@@ -1955,8 +1955,15 @@ no loop: it reaches an agent working on its own, with no lane or reviewer (*"…
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
-`tasks-changed`; the list in the window and its answers are #1276's. Until that window side lands, a dev build of
-1.0.0 can't answer from the window: turning the rules off (Settings → Advanced) un-pauses a lane at its round limit.
+`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind, each
+request in its tooltip and accessible name; the accent colour, pill-shaped) on its tile, folded or not; the Task Board
+icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
+sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
+the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
+the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
+reason, required) for an approval, a reply (**Send Reply**) or **Record as Decision** for a question, and the four
+ways on (carry on with its rounds) at the round limit. A refused answer (answered or retired meanwhile) is said in a
+toast and the board read again; an answer clears the chip at once (`tasks-changed`).
 
 #### 16.8.6 A refused commit (#907)
 
