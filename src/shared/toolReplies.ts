@@ -142,6 +142,75 @@ export function intentText(d: IntentDone): string {
   return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
 }
 
+/** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */
+export interface ChangeListed {
+  id: string
+  what: string
+  card?: number
+  fields: string[]
+  final?: string
+  undone?: true
+}
+
+/** A message's changes as GET /v1/assistant/changes lists them, newest first. */
+export interface ChangeGroupListed {
+  group: string
+  at: string
+  changes: ChangeListed[]
+}
+
+/** The most changes of one message hive_undo lists before counting the rest. */
+const UNDO_LIST_MAX = 40
+
+/**
+ * The Assistant's changes kept for undo (#1282): a line per message (its group id, when, how many changes and how many
+ * are left to undo, and its cards); with `group`, that message's changes, a line each with its id.
+ */
+export function changeListText(groups: readonly ChangeGroupListed[], group?: string): string {
+  if (group) {
+    const g = groups.find((x) => x.group === group)
+    if (!g) return `No changes of yours are kept for message ${group}.`
+    const line = (c: ChangeListed): string => `${c.id}: ${c.card !== undefined ? `${cardRef(c.card)} ` : ''}${c.what}${c.fields.length ? ` (${c.fields.join(', ')})` : ''}${c.undone ? ' [undone]' : c.final ? ` [can't be undone: ${c.final}]` : ''}`
+    const shown = g.changes.slice(0, UNDO_LIST_MAX).map(line)
+    return [...shown, ...(g.changes.length > UNDO_LIST_MAX ? [`and ${g.changes.length - UNDO_LIST_MAX} more: undo the group to undo them all.`] : [])].join('\n')
+  }
+  if (!groups.length) return 'No changes of yours are kept (they are kept 7 days).'
+  return groups
+    .map((g) => {
+      const left = g.changes.filter((c) => !c.undone && !c.final).length
+      const cards = [...new Set(g.changes.flatMap((c) => (c.card !== undefined ? [c.card] : [])))]
+      return `${g.group} (your message at ${g.at}): ${g.changes.length} change${g.changes.length === 1 ? '' : 's'}, ${left} to undo${cards.length ? `; cards ${cards.slice(0, 12).map((n) => cardRef(n)).join(', ')}${cards.length > 12 ? ` and ${cards.length - 12} more` : ''}` : ''}`
+    })
+    .join('\n')
+}
+
+/** What undoing one change did (POST /v1/assistant/undo's `results`). */
+export interface UndoneListed {
+  change: string
+  what: string
+  card?: number
+  undone: string[]
+  skipped: { field: string; why: string; error?: string }[]
+  final?: string
+  already?: true
+}
+
+const SKIPPED_WHY: Record<string, string> = { changed: 'changed since', gone: 'gone', ended: 'it has ended', failed: 'refused' }
+
+/** An undo's reply: how many changes were undone, then what of each was left and why (put back in full says nothing more). */
+export function undoText(results: readonly UndoneListed[]): string {
+  const done = results.filter((r) => r.undone.length && !r.skipped.length).length
+  const head = `Undid ${done} of ${results.length} change${results.length === 1 ? '' : 's'} in full.`
+  const name = (r: UndoneListed): string => (r.card !== undefined ? cardRef(r.card) : r.what)
+  const notes = results.flatMap((r) => {
+    if (r.already) return [`${name(r)}: undone before.`]
+    if (r.final !== undefined) return [`${name(r)}: can't be undone: ${r.final}`]
+    if (!r.skipped.length) return []
+    return [`${name(r)}: ${r.undone.length ? `${r.undone.join(', ')} put back; ` : ''}${r.skipped.map((s) => `${s.field} left (${SKIPPED_WHY[s.why] ?? s.why}${s.error ? `: ${s.error}` : ''})`).join(', ')}.`]
+  })
+  return [head, ...notes.slice(0, UNDO_LIST_MAX), ...(notes.length > UNDO_LIST_MAX ? [`and ${notes.length - UNDO_LIST_MAX} more left as they were.`] : [])].join('\n')
+}
+
 /** What a reorder did (reply: "short"). */
 export interface TaskReorder {
   column: TaskColumn
@@ -477,7 +546,7 @@ export function settingText(d: SettingDetail): string {
 /** hive_update_setting's reply: what changed, old → new, and when it applies. */
 export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string }): string {
   if (c.changed === false || (c.changed === undefined && c.old === c.new)) return `${c.path}${c.project ? ` (${c.project})` : ''} was already ${c.new}: nothing changed.`
-  return `Changed ${c.path}${c.project ? ` in ${c.project}` : ''} (${c.id}): ${c.old} → ${c.new}. ${c.restart ? `It applies ${c.restart}.` : 'It applies now.'} The user can revert it in your panel's list.`
+  return `Changed ${c.path}${c.project ? ` in ${c.project}` : ''} (${c.id}): ${c.old} → ${c.new}. ${c.restart ? `It applies ${c.restart}.` : 'It applies now.'} The user can undo it in your panel's list.`
 }
 
 // The Assistant's journal (#1031): a recall is a line an entry; an entry in full on request.

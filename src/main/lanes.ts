@@ -26,6 +26,10 @@ import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
 import { roundLimitCards } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
+import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
+import type { workspaceDb } from './boardStore'
+import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
+import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 
 const log = createLogger('lanes')
 
@@ -169,7 +173,7 @@ export function onLanesWritten(fn: () => void): () => void {
   return () => writtenListeners.delete(fn)
 }
 
-async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void): Promise<void> {
+async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => void, also?: (db: Writer) => void): Promise<void> {
   const ids = await ws.projectIds()
   const stamped = keptLanes(lanes, Date.now()).map((l) => {
     const saved = savedProjectName(l.project)
@@ -187,7 +191,7 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
     if (seen !== undefined && boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== seen) throw new StaleRead('the lanes changed since they were read') // i18n-ignore: internal, caught and retried (never shown)
     // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.
     check?.()
-  })
+  }, also)
   for (const fn of writtenListeners) fn()
 }
 
@@ -253,13 +257,15 @@ export async function legacyLanes(ws: WorkspaceService): Promise<{ name: string;
 }
 
 /** Changes a workspace's lanes under its lock: fn changes the list it is given (or throws), and says whether it did. */
-async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[]) => T | Promise<T>): Promise<T> {
+async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[], also: ((db: Writer) => void)[]) => T | Promise<T>): Promise<T> {
   if (!ws.path) throw new LaneError(409, M.noWorkspace)
   const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
     const lanes = await read(ws)
     const checks: (() => void)[] = []
-    const r = await fn(lanes, checks)
-    await write(ws, lanes, () => checks.forEach((c) => c()))
+    // Writes that belong with the save, in its transaction (the Assistant's change for undo, #1282).
+    const also: ((db: Writer) => void)[] = []
+    const r = await fn(lanes, checks, also)
+    await write(ws, lanes, () => checks.forEach((c) => c()), (db) => also.forEach((w) => w(db)))
     return r
   }))
   changed(ws)
@@ -387,7 +393,9 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // The running lanes' cards waiting for the user at their round limit (§16.11.4): from their facts, while the rules
   // are enforced (turned off, nothing pauses a lane for a rule).
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit))
+  // Their agents whose hooks aren't arriving (#1336): such a lane pauses.
+  const deaf = (l: LaneRecord): Set<string> => new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && hooksMissingFor(join(ws.path, l.project), a.id)).map((a) => a.id))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
@@ -533,10 +541,12 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   let queuedAfter: number | null = null
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
-  const decide = () => mutate(ws, async (lanes, checks) => {
+  const decide = () => mutate(ws, async (lanes, checks, also) => {
     queuedAfter = null
     ended.length = 0
     const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
+    const before = was ? laneValues(was) : null
     const t = now()
     // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
     // in flight is never left behind; with them off, a list sharing no card is another loop, as before 1.0.
@@ -560,6 +570,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         ...(s.name !== undefined && s.name !== null ? { name: s.name } : {}),
         updatedAt: t
       })
+      also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
     }
     let replaced: LaneRecord | null = null
@@ -587,6 +598,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       ...(ruleset ? { ruleset } : {})
     }
     lanes.push(rec)
+    also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }
   })
   let r: Awaited<ReturnType<typeof decide>> | null = null
@@ -620,11 +632,13 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   const builder = await agentIn(ws, j.project, j.builder)
   if (!reviewer || !builder) throw new LaneError(404, 'Unknown agent: the builder and reviewer must be agents of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
-  const found = await mutate(ws, (lanes) => {
+  const found = await mutate(ws, (lanes, _checks, also) => {
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
     if (!l || (j.cards?.length && !l.cards.some((n) => j.cards!.includes(n)))) return null
+    const before = laneValues(l)
     l.reviewer = reviewer
     l.updatedAt = now()
+    also.push((db) => noteLaneIn(db, ws.path!, before, l))
     return l
   })
   if (found) {
@@ -634,6 +648,84 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   if (!j.cards?.length) throw new LaneError(404, `${builder.name} has no lane running yet: give the cards too, and the lane starts with you as its reviewer`) // i18n-ignore: hive_lane's refusal, which only agents get
   const r = await startLane(ws, { project: j.project, builder: builder.id, reviewer: reviewer.id, cards: j.cards, by: j.by })
   return { ...r, did: 'joined', note: `${builder.name} hadn't registered it yet: its own start updates it.` } // i18n-ignore: hive_lane's reply (agents)
+}
+
+/** A database writer, as a lane's save gives one to the writes that go with it. */
+type Writer = ReturnType<typeof workspaceDb>['writer']
+
+/** An undo found a lane's fields changed since (or the lane ended or gone), checked under the lanes' lock: nothing saved. */
+export class LaneChangedSince extends Error {
+  constructor(
+    public fields: string[],
+    public why: 'changed' | 'ended' | 'gone'
+  ) {
+    super(`lane ${why}: ${fields.join(', ')}`) // i18n-ignore: an internal signal, never shown
+  }
+}
+
+/**
+ * Undo of the Assistant's change of a running lane (#1282): each field back to what it was, only while every one still
+ * holds what the change wrote, checked under the lanes' lock (with `guard`, the undo's own permission, just before the
+ * save). A list goes back as any list change does (queued while a card is in flight); a reviewer or name back to none
+ * too. Throws LaneChangedSince (nothing saved) otherwise. Returns its record's values as saved.
+ */
+export async function restoreLane(ws: WorkspaceService, id: string, back: readonly FieldChange[], by: string, guard?: () => void): Promise<Record<string, unknown>> {
+  const on = await enforced()
+  const saved = await mutate(ws, async (lanes, checks) => {
+    const l = lanes.find((x) => x.id === id)
+    if (!l) throw new LaneChangedSince(back.map((v) => v.field), 'gone')
+    if (!running(l)) throw new LaneChangedSince(back.map((v) => v.field), 'ended')
+    const cur = laneValues(l)
+    const moved = back.filter((v) => !sameValue(cur[v.field], v.new)).map((v) => v.field)
+    if (moved.length) throw new LaneChangedSince(moved, 'changed')
+    for (const v of back) {
+      if (v.field === 'cards') {
+        const cards = v.old as number[]
+        if (sameList(l.cards, cards)) delete l.pending
+        else {
+          const flying = on ? inFlight((await views(ws, [l]))[0]) : null
+          if (flying !== null) l.pending = [...cards]
+          else {
+            if (on) checks.push(stillBetweenCards(ws, l, [...l.cards]))
+            l.cards = [...cards]
+            delete l.pending
+          }
+        }
+      } else if (v.field === 'reviewer') {
+        const reviewer = typeof v.old === 'string' ? await agentIn(ws, l.project, v.old) : null
+        if (typeof v.old === 'string' && !reviewer) throw new LaneChangedSince(['reviewer'], 'gone')
+        l.reviewer = reviewer
+      } else if (v.field === 'rounds' && typeof v.old === 'number') l.rounds = v.old
+      else if (v.field === 'waitMinutes' && typeof v.old === 'number') l.waitMinutes = v.old
+      else if (v.field === 'name') l.name = typeof v.old === 'string' ? v.old : null
+    }
+    l.updatedAt = now()
+    if (guard) checks.push(guard)
+    // What it saves, as read here under the lock: what the undo reports.
+    return laneValues(l)
+  })
+  log.info(`Lane ${id}: ${back.map((v) => v.field).join(', ')} set back (${userText(by)}'s undo)`)
+  return saved
+}
+
+/**
+ * Undo of a lane the Assistant started (#1282): abandoned while it runs with its record as the start left it (`expect`,
+ * field by field), checked under the lanes' lock with `guard` just before the save. Throws LaneChangedSince otherwise.
+ */
+export async function abandonLaneIf(ws: WorkspaceService, id: string, expect: Record<string, unknown>, guard?: () => void): Promise<void> {
+  const rec = await mutate(ws, async (lanes, checks) => {
+    const l = lanes.find((x) => x.id === id)
+    if (!l) throw new LaneChangedSince(['created'], 'gone')
+    if (!running(l)) throw new LaneChangedSince(['created'], 'ended')
+    const cur = laneValues(l)
+    const moved = Object.keys(expect).filter((k) => !sameValue(cur[k], expect[k]))
+    if (moved.length) throw new LaneChangedSince(moved, 'changed')
+    close(l, 'abandoned', (await views(ws, [l]))[0].cards)
+    if (guard) checks.push(guard)
+    return l
+  })
+  log.info(`Lane ${id} abandoned (an undo)`)
+  laneFact(ws, rec)
 }
 
 /**
@@ -859,6 +951,10 @@ export function startLanes(): void {
     const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
     if (ws) changed(ws)
   })
+  // A lane starting or stopping to wait for its builder's branch (#1271): read again.
+  onLineWaitChanged((ws) => changed(ws))
+  // An agent's hooks going missing or coming back (#1336) pauses or resumes its lanes.
+  onHooksHealthChanged(() => openWorkspaces().forEach((ws) => changed(ws)))
   // The runtime's `endLaneIfDone` (a card Done, #1270): the lanes are read again, and one whose cards are all Done ends.
   onAction('endLaneIfDone', (_a, ws) => changed(ws), 'repeatable')
   // An ended lane leaves the list after an hour: looked at again each minute (only workspaces whose window was told some).

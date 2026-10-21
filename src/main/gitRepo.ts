@@ -28,7 +28,8 @@ import {
 } from '../shared/gitRepo'
 import { samePath } from '../shared/movePaths'
 import { checkProject } from './branchWatch'
-import { samePlace, withFileLock } from './fsutil'
+import { samePlace } from './fsutil'
+import { withRepoLock } from './repoLock'
 import { git, type GitResult } from './git'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
@@ -341,7 +342,7 @@ function folderSlots(projectPath: string): FolderSlot[] {
 /**
  * Switching branch or pulling moves the ground under the agents working in the folder and under a merge into its
  * branch: refused while one works there or the merge slot is held or waited for, saying why. The change itself runs
- * holding the slot of the branch it leaves and Hive's merge lock, so a merge can't start in the middle. An agent may
+ * holding the slot of the branch it leaves and the repository lock (repoLock.ts, across Hives), so a merge can't start in the middle. An agent may
  * start working while it waits for them, so it is checked again once they are held, right before git runs (nothing is
  * awaited between that check and starting git).
  */
@@ -349,7 +350,7 @@ async function changeFolder<T>(projectPath: string, action: GitFolderAction, bra
   const why = folderBusyData(await folderAgents(projectPath), folderSlots(projectPath), action)
   if (why) throw new HiveError(why)
   const locked = (): Promise<T> =>
-    withFileLock(join(projectPath, '.git', 'hive-merge'), () =>
+    withRepoLock(projectPath, () =>
       // The folder is fenced from here to git's end (#646): no line of Hive's is typed into its agents and none starts
       // there meanwhile, so no turn of Hive's begins between this last check and git changing the files.
       // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
@@ -359,7 +360,7 @@ async function changeFolder<T>(projectPath: string, action: GitFolderAction, bra
         const now = folderBusyData(await folderAgents(projectPath), branch ? [] : folderSlots(projectPath), action)
         if (now) throw new HiveError(now)
         return fn()
-      })
+      }), { project: projectPath }
     )
   return branch ? mergeSlots.asUser(projectPath, branch, locked) : locked()
 }

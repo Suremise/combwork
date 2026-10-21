@@ -26,6 +26,8 @@ import type {
   AddAgentOptions,
   AddedAgent,
   AssistantAction,
+  AssistantChangeGroup,
+  AssistantUndoResult,
   AssistantQuestion,
   AgentApiInfo,
   AgentBranchStatus,
@@ -62,6 +64,8 @@ import type {
   MergeResult,
   MergeSlotInfo,
   LaneInfo,
+  LaneStartRequest,
+  LaneStartResult,
   ModelPrice,
   MemorySource,
   NoteFile,
@@ -328,7 +332,11 @@ export interface HiveRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[] }) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code' }) => TaskCard
+  /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
+  'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
+  /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
+  'tasks:confirmKind': (n: number, accept: boolean) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   'tasks:update': (n: number, patch: TaskPatch) => TaskCard
@@ -593,6 +601,10 @@ export interface HiveRequests {
   'assistant:answer': (id: string, yes: boolean) => void
   /** Revert on a setting the Assistant changed (its activity list): sets it back, and lists that too (#186). */
   'assistant:revertSetting': (actionId: string) => void
+  /** The Assistant's changes kept for undo (#1282), by the user's message they came from, newest first (7 days). */
+  'assistant:changes': () => AssistantChangeGroup[]
+  /** The user undoes one of the Assistant's changes, or a message's: what each put back, and what it left and why. */
+  'assistant:undo': (sel: { change?: string; group?: string }) => AssistantUndoResult[]
   /** Switches this workspace's Assistant to a mode (a file in .hive/modes): told at once if it runs, else when it starts (#259). */
   'assistant:switchMode': (modeId: string, save?: boolean) => 'told' | 'later' | 'saved'
   /** This window's workspace's merge slots: those held or waited for (#350). */
@@ -603,6 +615,11 @@ export interface HiveRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /**
+   * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
+   * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.
+   */
+  'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

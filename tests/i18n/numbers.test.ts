@@ -60,7 +60,7 @@ const CASES: [id: string, values: Record<string, string | number>, numbers: numb
   ['settings.agents.backgroundTaskMinutes.tip', { min: N, max: N }, 2],
   ['tips.ui.counter', { n: N, total: N }, 2],
   ['tips.assistantCompact.text', { tokens: N }, 1],
-  ['tips.progressHistory.text', { recent: N, kept: N }, 2],
+  ['tips.progressHistory.text', { kept: N }, 1],
   ['sessions.bulk.andMore', { n: N }, 1],
   ['sessions.bulk.doneSkipped', { action: 'archive', n: N, skipped: N, why: 'x' }, 2],
   ['git.tags.older', { count: N }, 1],

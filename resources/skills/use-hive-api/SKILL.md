@@ -43,7 +43,7 @@ Errors come as `{ "error": "message" }`. Each message says what to do.
 - `403`: not allowed for you. Don't look for another way in.
 - `404`: not found, or outside your scope (another project's card looks missing to you).
 - `409`: conflicts with the current state (busy, already running, changed meanwhile): read the state again before deciding.
-- `429`: the Assistant's limit of changes for one message.
+- `429`: too many at once (such as card waits running): let them end first.
 
 Don't repeat a change whose result you didn't see (a timeout, a dropped connection) until you have read the state and know it didn't happen.
 

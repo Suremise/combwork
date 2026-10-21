@@ -9,6 +9,10 @@ interface HiveMessageValues {
   'workflow.contradiction.quorumNeedsAgent': undefined
   'workflow.contradiction.selfReview': undefined
   'workflow.forYou.decidedAfterMerge': { card: string | number }
+  'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
+  'workflow.forYou.lineRefused': { line: string | number; target: string | number; reason: string | number; next: string | number }
+  'workflow.forYou.lineUnfinished': { line: string | number; to: string | number; target: string | number; next: string | number }
+  'workflow.forYou.lineWork': { line: string | number; target: string | number; commits: string | number; next: string | number }
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
@@ -157,6 +161,9 @@ interface HiveMessageValues {
   'workflow.refused.integrate.upToDate.change': undefined
   'workflow.refused.integrate.upToDate.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.integrate.upToDate.next': undefined
+  'workflow.refused.lane.lineBehind.change': undefined
+  'workflow.refused.lane.lineBehind.message': { card: string | number; line: string | number; earlier: string | number; target: string | number }
+  'workflow.refused.lane.lineBehind.next': { line: string | number; target: string | number; card: string | number }
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
@@ -230,6 +237,7 @@ interface HiveMessageValues {
   'workflow.refused.why.userOk': undefined
   'workflow.roundChoice': { choice: string }
   'workflow.rule.approval.given': undefined
+  'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined

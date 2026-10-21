@@ -493,6 +493,15 @@ const PROMPT_COMMENT_MAX = 4000
  * tools the prompt only points there; without them the card is all the agent has. from: the column it was started
  * from; note: what to do now.
  */
+/**
+ * A card's start in its own words (#1292, #966 row 30; Settings → Advanced, "A card's start in its own words"): its
+ * title, what the user wrote as they started it, and its description, without Hive's wrapper (which card it is on the
+ * board, its dependencies and docs to read first, the skill to follow). Hive's wakes and messages stay wrapped.
+ */
+export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, note?: string): string {
+  return [card.title.trim(), note?.trim() ?? '', card.description.trim()].filter(Boolean).join('\n\n')
+}
+
 export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[] } = {}): string {
   const parts = [`Work on task ${cardName(card)} from the Hive task board: ${card.title}`] // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const again = opts.from === 'review' || opts.from === 'passed' || opts.from === 'done'

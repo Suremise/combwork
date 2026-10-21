@@ -1,0 +1,269 @@
+// The Progress panel's tabs (#1309), on fake Claude Code agents: Pulse · Merges · Runs · Lanes, a segmented control in
+// its header whose words go below about 360 px (icons, each with its name), a tablist the arrow keys move through, the
+// tab kept per workspace. Badges: agents waiting for the merge slot, failures nothing has passed since (red), lanes.
+// Pulse: the merge, the runs going on, a line for the failures (it opens Runs on them), then the lanes right after,
+// each with a dot for its current card's latest run. Runs: what runs, then every kept run by day (Today, Yesterday), a
+// run tried several times the same day one line ("×3 · 2 failed, then passed"), found by words, filtered to failures,
+// a lane's cards or an agent. Merges and Lanes: theirs alone. A first launch makes the agents and cards; yesterday's runs
+// are written into the workspace's kept runs before the second. Screenshots of each tab, wide and narrow, both themes.
+// Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+const lib = require('./lib.cjs')
+const { _electron } = require('playwright-core')
+const { createHash } = require('crypto')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 30000
+
+const PORT = Number(lib.port(47842))
+const userData = path.join(lib.WORK, 'progresstabs-profile')
+const ws = path.join(lib.WORK, 'progresstabs-ws')
+const claudeHome = path.join(lib.WORK, 'progresstabs-claude-home')
+const shots = path.join(lib.WORK, 'progresstabs-shots')
+const alpha = path.join(ws, 'alpha')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
+
+;(async () => {
+  for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  lib.gitProject(alpha)
+  lib.git(alpha, ['branch', '-M', 'main'])
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
+  lib.enableProviders(userData)
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
+  cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
+  cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+
+  // --- First launch: the agents and the cards.
+  let builder, reviewer
+  const cards = []
+  let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    await lib.appReady(page)
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await lib.openWorkspace(inv, page, ws)
+    await page.getByText('alpha', { exact: true }).first().click()
+    builder = await lib.addAgent(inv, alpha, { name: 'B1' })
+    reviewer = await lib.addAgent(inv, alpha, { name: 'R1' })
+    for (const title of ['Lane data', 'Lane hover', 'Docs']) cards.push(await inv('tasks:create', { title, project: 'alpha' }))
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+  check('the agents and cards are made', !!builder?.id && !!reviewer?.id && cards.length === 3, JSON.stringify({ builder, cards: cards.map((c) => c.key) }))
+  const [a, b, c] = cards
+
+  // --- Kept runs (the workspace's history): yesterday B1's typecheck of A tried three times (failed, failed, passed) and
+  // a script's nightly build that failed; earlier today B1's unit run of B, passed.
+  const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+  const yesterday = startOfToday - 6 * 3600_000
+  const kept = (id, at, o) => ({ id, title: o.title, command: o.command ?? null, startedAt: at, finishedAt: at + 40_000, updatedAt: at + 40_000, state: o.state, source: o.source ?? 'agent', agentName: o.agentName ?? 'B1', ...(o.source === 'api' ? {} : { projectPath: alpha, agentId: builder.id, provider: 'claude-code' }), ...(o.card ? { card: o.card } : {}), ...(o.check ? { check: o.check } : {}) })
+  const history = [
+    kept('k-today-unit', Date.now() - 600_000, { title: 'unit', command: 'npm test', state: 'passed', card: b.number }),
+    kept('k-nightly', yesterday + 3 * 600_000, { title: 'nightly build', command: 'npm run build:nightly', state: 'failed', source: 'api', agentName: 'Script' }),
+    kept('k-tc-3', yesterday + 2 * 600_000, { title: 'typecheck', command: 'npm run typecheck', state: 'passed', card: a.number, check: 'typecheck' }),
+    kept('k-tc-2', yesterday + 600_000, { title: 'typecheck', command: 'npm run typecheck', state: 'failed', card: a.number, check: 'typecheck' }),
+    kept('k-tc-1', yesterday, { title: 'typecheck', command: 'npm run typecheck', state: 'failed', card: a.number, check: 'typecheck' })
+  ]
+  const historyDir = path.join(userData, 'progress-history')
+  fs.mkdirSync(historyDir, { recursive: true })
+  fs.writeFileSync(path.join(historyDir, `${createHash('sha256').update(path.resolve(ws).toLowerCase()).digest('hex').slice(0, 16)}.json`), JSON.stringify({ version: 1, runs: history }))
+
+  // --- Second launch: the agents run; a lane, a merge held and one waiting, runs going on and failing.
+  app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    await lib.appReady(page)
+    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.hive.invoke(ch2, ...y), [ch, x])
+    if ((await inv('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv, page, ws)
+    await page.getByText('alpha', { exact: true }).first().click()
+    const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    for (const x of [builder, reviewer]) await inv('session:start', alpha, { agentId: x.id })
+    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
+    const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
+    const launches = () => {
+      const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
+      return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
+    }
+    const tokenOf = async (id) => {
+      const sessionId = (await live(id))?.sessionId
+      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+    }
+    const [t1, tr] = [await tokenOf(builder.id), await tokenOf(reviewer.id)]
+    const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+    const api = async (token, method, route, body) => {
+      const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      return { status: r.status, body: await r.json().catch(() => null) }
+    }
+    check('each agent has its own token', !!t1 && !!tr && t1 !== tr)
+    const lane = await api(t1, 'POST', '/v1/lanes', { cards: [a.number, b.number, c.number], reviewer: 'R1', name: 'tabs' })
+    check('B1 starts a lane of three cards', lane.status === 200, JSON.stringify(lane.body))
+    await inv('tasks:update', a.number, { column: 'doing', agent: builder.id })
+    const held = await api(t1, 'POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', cards: [a.number], timeoutSeconds: 0 })
+    const waits = await api(tr, 'POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', cards: [b.number], timeoutSeconds: 0 })
+    check('B1 holds the merge slot, R1 waits for it', held.body?.held === true && waits.body?.held !== true, JSON.stringify({ held: held.body, waits: waits.body }))
+    const e2e = (await api(t1, 'POST', '/v1/progress', { title: 'e2e', command: 'npm run e2e', total: 12, card: a.key })).body?.id
+    await api(t1, 'PATCH', `/v1/progress/${e2e}`, { step: 4, stepName: 'carddialog' })
+    for (let i = 0; i < 2; i++) {
+      const id = (await api(workspaceToken, 'POST', '/v1/progress', { title: 'lint', command: 'npm run lint' })).body?.id
+      await api(workspaceToken, 'POST', `/v1/progress/${id}/finish`, { ok: false, summary: '3 warnings', exitCode: 1 })
+    }
+    check('B1 runs e2e for its card', !!e2e)
+
+    const panel = page.locator('.progress-panel')
+    await page.locator('.progress-rail').click()
+    check('the panel opens', !!(await until(async () => (await panel.count()) === 1, HUNG_MS)))
+    const tab = (name) => panel.locator(`.progress-tab[data-tab="${name}"]`)
+    const showTab = async (name) => {
+      await tab(name).click()
+      return until(async () => (await panel.locator(`.progress-tab-${name}`).count()) === 1, HUNG_MS)
+    }
+    const setWidth = async (px) => {
+      await panel.evaluate((el, w) => (el.style.width = `${w}px`), px)
+      await until(async () => Math.round((await panel.boundingBox()).width) === px, HUNG_MS)
+    }
+    const shoot = async (name) => {
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+    }
+
+    // --- The tabs: a tablist of four, Pulse chosen; badges with what they mean in each tab's name.
+    check('four tabs in a tablist, Pulse chosen', (await panel.locator('[role="tablist"] [role="tab"]').count()) === 4 && (await tab('pulse').getAttribute('aria-selected')) === 'true')
+    check('Merges: one merge waiting', !!(await until(async () => (await tab('merges').getAttribute('aria-label')) === 'Merges, 1 merge waiting', HUNG_MS)), await tab('merges').getAttribute('aria-label'))
+    check('Runs, red: three failures nothing has passed since (the nightly build and two lints; the typecheck passed after)', !!(await until(async () => (await tab('runs').getAttribute('aria-label')) === 'Runs, 3 failures nothing has passed since' && (await tab('runs').locator('.progress-tab-badge.failed').textContent()) === '3', HUNG_MS)), await tab('runs').getAttribute('aria-label'))
+    check('Lanes: one lane', !!(await until(async () => (await tab('lanes').getAttribute('aria-label')) === 'Lanes, 1 lane', HUNG_MS)), await tab('lanes').getAttribute('aria-label'))
+    // Words when there's room: below about 360 px only the icons.
+    const labelShown = () => tab('runs').locator('.progress-tab-label').evaluate((el) => getComputedStyle(el).display !== 'none')
+    await setWidth(300)
+    check('narrow (300 px), the tabs are icons', !!(await until(async () => !(await labelShown()), HUNG_MS)))
+    await setWidth(440)
+    check('wide (440 px), their words show', !!(await until(async () => labelShown(), HUNG_MS)))
+
+    // --- Pulse: the merge, the run going on, the failures' line, the lane right after with its card's dot.
+    check('Pulse shows the merge', (await panel.locator('.progress-tab-pulse .progress-merge-card').count()) === 1)
+    check('…and the run going on', !!(await until(async () => (await panel.locator(`.progress-tab-pulse .progress-run[data-run="${e2e}"]`).count()) === 1, HUNG_MS)))
+    const attention = panel.locator('.progress-attention')
+    check('…and a line: 3 runs failed', !!(await until(async () => ((await attention.textContent()) ?? '').includes('3 runs failed'), HUNG_MS)), await attention.textContent().catch(() => ''))
+    // Finished runs live in Runs (#1309, the Assistant's change): the failed lints leave Pulse after a few seconds, the
+    // line counting them; only the run going on stays.
+    const pulseRuns = () => panel.locator('.progress-tab-pulse .progress-run').evaluateAll((els) => els.map((e) => e.getAttribute('data-run')))
+    check('…and the failed runs leave Pulse: only the run going on is a card there', !!(await until(async () => JSON.stringify(await pulseRuns()) === JSON.stringify([e2e]), HUNG_MS)), JSON.stringify(await pulseRuns()))
+    const dot = panel.locator('.progress-tab-pulse .lane-run-dot')
+    check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'), HUNG_MS)) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
+    const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
+    const lanesBox = await panel.locator('.progress-tab-pulse .progress-lanes').boundingBox()
+    check('…right after the runs: no gap', Math.abs(lanesBox.y - (runsBox.y + runsBox.height)) <= 2, JSON.stringify({ runsBox, lanesBox }))
+    await shoot('pulse-wide')
+    await setWidth(280)
+    await shoot('pulse-narrow')
+
+    // --- The failures' line opens Runs on them.
+    await attention.click()
+    check('the line opens Runs, failures only', !!(await until(async () => (await tab('runs').getAttribute('aria-selected')) === 'true' && (await panel.locator('.progress-runs-failed').getAttribute('aria-pressed')) === 'true', HUNG_MS)))
+    const text = async () => ((await panel.locator('.progress-tab-runs').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    check('…the nightly build and the lints, nothing that passed', !!(await until(async () => /nightly build/.test(await text()) && /lint/.test(await text()) && !/unit/.test(await text()), HUNG_MS)), await text())
+    await panel.locator('.progress-runs-clear').click()
+
+    // --- Runs: by day, retries folded, found, filtered.
+    const days = async () => panel.locator('.progress-runs-day > .progress-section').allTextContents()
+    check('the runs by day: Today, then Yesterday', !!(await until(async () => JSON.stringify(await days()) === JSON.stringify(['Today', 'Yesterday']), HUNG_MS)), JSON.stringify(await days()))
+    check('what runs is on top', (await panel.locator('.progress-tab-runs .progress-runs-body > .progress-run').first().getAttribute('data-run')) === e2e)
+    const tc = panel.locator('.progress-runs-day').nth(1).locator('.progress-run-group')
+    check(`yesterday's typecheck, tried three times, is one line: B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, ((await tc.locator('.progress-group-head').textContent()) ?? '').trim() === `B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, await tc.locator('.progress-group-head').textContent().catch(() => ''))
+    const lints = panel.locator('.progress-runs-day').first().locator('.progress-run-group')
+    check("today's lint, failed twice, is one line too", ((await lints.locator('.progress-group-head').textContent()) ?? '').trim() === 'Script · lint ×2 · 2 failed', await lints.locator('.progress-group-head').textContent().catch(() => ''))
+    await tc.locator('.progress-group-head').click()
+    check('…opened, each of its runs, newest first', !!(await until(async () => (await tc.locator('.progress-recent-item').count()) === 3, HUNG_MS)) && (await tc.locator('.progress-recent-item').first().getAttribute('data-run')) === 'k-tc-3')
+    await setWidth(440)
+    await shoot('runs-wide')
+    await setWidth(280)
+    await shoot('runs-narrow')
+    await panel.locator('.progress-runs-search').fill('nightly')
+    check('words find runs: "nightly" shows the nightly build only', !!(await until(async () => /nightly build/.test(await text()) && !/typecheck/.test(await text()) && !/lint/.test(await text()), HUNG_MS)), await text())
+    await panel.locator('.progress-runs-clear').click()
+    await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
+    check("a lane's cards: its runs only (e2e, unit, typecheck), not the scripts'", !!(await until(async () => /e2e/.test(await text()) && /unit/.test(await text()) && /typecheck/.test(await text()) && !/nightly/.test(await text()) && !/lint/.test(await text()), HUNG_MS)), await text())
+    await panel.locator('.progress-runs-clear').click()
+    check('Clear shows every run again', !!(await until(async () => /nightly/.test(await text()) && /lint/.test(await text()), HUNG_MS)))
+
+    // --- Merges and Lanes: theirs alone.
+    await showTab('merges')
+    check('Merges shows the merge, B1 holding, R1 waiting', !!(await until(async () => (await panel.locator('.progress-tab-merges .progress-merge-card').count()) === 1, HUNG_MS)) && /R1/.test((await panel.locator('.progress-tab-merges').innerText()) ?? ''))
+    await setWidth(440)
+    await shoot('merges-wide')
+    await setWidth(280)
+    await shoot('merges-narrow')
+    await showTab('lanes')
+    check('Lanes shows the lane, with no fold bar or edge', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane').count()) === 1, HUNG_MS)) && (await panel.locator('.progress-tab-lanes .progress-lanes-bar, .progress-tab-lanes .progress-lanes-edge').count()) === 0)
+    await setWidth(440)
+    await shoot('lanes-wide')
+    await setWidth(280)
+    await shoot('lanes-narrow')
+
+    // --- The keyboard: arrow keys, Home and End move through the tabs, choosing as they go; the tab kept.
+    await tab('lanes').focus()
+    await page.keyboard.press('ArrowRight')
+    check('Right from the last tab is Pulse, with the keyboard on it', !!(await until(async () => (await tab('pulse').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-tab'))) === 'pulse', HUNG_MS)))
+    await page.keyboard.press('ArrowLeft')
+    check('Left from it is Lanes', !!(await until(async () => (await tab('lanes').getAttribute('aria-selected')) === 'true', HUNG_MS)))
+    await page.keyboard.press('Home')
+    await page.keyboard.press('ArrowRight')
+    check('Home, then Right: Merges', !!(await until(async () => (await tab('merges').getAttribute('aria-selected')) === 'true', HUNG_MS)))
+    const key = `progress-tab:${ws.toLowerCase()}`
+    check('the tab is kept for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[key] === 1, HUNG_MS)))
+
+    // --- HR6's round 1: a card is part of what a run is a run of. The same command fails for A, then passes for B:
+    // A's failure stays unresolved (the badge up by one, and stays), and the two are lines of their own.
+    const custom = async (card, ok) => {
+      const id = (await api(t1, 'POST', '/v1/progress', { title: 'custom verification', command: 'node custom-verification.cjs', card: card.key })).body?.id
+      await api(t1, 'POST', `/v1/progress/${id}/finish`, { ok })
+      return id
+    }
+    const badgeNow = async () => Number((await tab('runs').locator('.progress-tab-badge').textContent().catch(() => '0')) ?? 0)
+    const before = await badgeNow()
+    await custom(a, false)
+    check("a card's run failing raises the badge by one", !!(await until(async () => (await badgeNow()) === before + 1, HUNG_MS)), String(await badgeNow()))
+    await custom(b, true)
+    await showTab('runs')
+    check("…another card's run of the same command passing doesn't resolve it, nor fold with it", !!(await until(async () => /custom verification/.test(await text()), HUNG_MS)) && (await badgeNow()) === before + 1 && !/custom verification ×2/.test(await text()), `${await badgeNow()} ${await text()}`)
+
+    // --- HR6's round 1: the lane filter reads the lane as it is now. Chosen with [A, B, C]; A Done and the list
+    // changed between cards to [A, C]: B's runs leave the filtered list, the choice stays the lane.
+    await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
+    check("the lane's filter shows B's unit run while B is in the lane", !!(await until(async () => /unit/.test(await text()), HUNG_MS)), await text())
+    await inv('tasks:move', a.number, 'done', { confirm: true, reason: 'Merged by hand' })
+    await until(async () => (await inv('tasks:list')).find((x) => x.number === a.number)?.column === 'done', HUNG_MS)
+    const changed = await api(t1, 'POST', '/v1/lanes', { cards: [a.number, c.number], reviewer: 'R1', name: 'tabs' })
+    check('between cards, the lane becomes [A, C]', changed.status === 200 && JSON.stringify(changed.body?.lane?.cards?.map((x) => x.number)) === JSON.stringify([a.number, c.number]), JSON.stringify(changed.body?.lane?.cards))
+    check("…the filter follows it: B's runs leave, A's stay, the lane still chosen", !!(await until(async () => !/unit/.test(await text()) && /e2e/.test(await text()), HUNG_MS)) && (await panel.locator('.progress-runs-choices select[aria-label="Lane"]').inputValue()) !== '', await text())
+    await panel.locator('.progress-runs-clear').click()
+    await api(t1, 'POST', `/v1/progress/${e2e}/finish`, { ok: true })
+    await api(t1, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+  console.log(failed ? `\n${failed} FAILED` : '\nAll passed')
+  process.exit(failed ? 1 : 0)
+})().catch((e) => {
+  console.log(`FAIL ${e.stack ?? e}`)
+  process.exit(1)
+})

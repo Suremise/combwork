@@ -21,6 +21,9 @@ const log = createLogger('worktrees')
  * own words stay as git said them, in either.
  */
 const M = {
+  noTarget: msg({ id: 'worktrees.merge.noTarget', defaultMessage: 'There is no branch {branch} to merge into.', description: 'Why nothing was merged: the branch to merge into ({branch}) does not exist.' }),
+  caseAlias: msg({ id: 'worktrees.merge.caseAlias', defaultMessage: "The branches {branch} and {other} differ only in case, which Windows can't tell apart, so nothing was merged. Rename one of them, then merge.", description: 'Why nothing was merged: two branches ({branch}, {other}) have names that differ only in upper and lower case, and Windows treats them as one.' }),
+  nothingMerged: msg({ id: 'worktrees.merge.nothing', defaultMessage: 'Nothing was merged: {why}.', description: "Why nothing was merged: git couldn't read the project folder's branch, or failed while merging. {why} says why (git's message)." }),
   gitFailed: msg({ id: 'worktrees.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when git said nothing itself. {command} is the git command (\"git rev-parse\"): keep it as it is." }),
   gitProblem: msg({ id: 'worktrees.gitProblem', defaultMessage: '{problem}.', description: 'An error: git cannot run. {problem} says why (git is missing, or too old), without its full stop.' }),
   readBranch: msg({ id: 'worktrees.readBranch', defaultMessage: "git couldn't read the branch checked out in {folder} ({why})", description: "An error: git couldn't say which branch the folder {folder} has checked out; {why} is git's reason." }),
@@ -424,28 +427,38 @@ async function alreadyMerged(projectPath: string, into: string, branch: string):
 }
 
 /**
- * Merges a worktree agent's branch into the project folder's current branch. Uncommitted work in
- * the worktree is committed first. Conflicts are detected before anything in the project folder
- * changes (git merge-tree); if there are any, nothing is merged and the files are returned.
+ * Merges a worktree's branch into `target` (default: the project folder's checked-out branch), returning the commit the
+ * target is at afterwards (`mergeCommit`). A worktree with uncommitted files is refused, never committed for it (#1347,
+ * SPEC §16.9.3): what is merged is what was committed. Conflicts are detected before anything changes (git merge-tree);
+ * if there are any, nothing is merged and the files are returned. A target the project folder has checked out is merged
+ * there (git merge, its hooks run); one checked out nowhere is merged without touching any folder (the merged tree
+ * committed, the branch moved only from where it was); one checked out in another folder is refused. The caller holds
+ * the repository lock (repoLock.ts).
  */
-export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean }): Promise<MergeResult> {
+export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
   const message = opts.message.trim() || `Merge ${wt.branch}` // i18n-ignore: a git commit message, kept in the repository
   const dirty = existsSync(wt.path) ? await dirtyCount(wt.path) : 0
   // Git can't say what is uncommitted there: merging (and removing the worktree afterwards) could lose it.
   if (dirty === null) return { ok: false, error: tr(msg({ id: 'worktrees.merge.cantCheck', defaultMessage: "Git couldn't check the worktree for uncommitted changes (git status failed in {folder}). Fix it, then merge again.", description: "Why nothing was merged: git couldn't say what is uncommitted in the worktree's folder {folder}." }), { folder: wt.path }) }
-  if (dirty > 0) {
-    const add = await git(wt.path, ['add', '-A'])
-    const commit = add.ok ? await git(wt.path, ['commit', '-m', message]) : add
-    if (!commit.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.commitFailed', defaultMessage: "Could not commit the agent's changes: {why}", description: "Why nothing was merged: the worktree's uncommitted changes couldn't be committed first. {why} is git's message." }), { why: commit.err || commit.out }) }
-  }
-  let into: string | null
+  if (dirty > 0) return { ok: false, uncommitted: dirty, error: tr(msg({ id: 'worktrees.merge.uncommitted', defaultMessage: "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Hive merges only committed work; stash is git's word (git stash)." }), { files: dirty }) }
+  let checkedOut: string | null
   try {
-    into = await checkedOutBranch(projectPath)
+    checkedOut = await checkedOutBranch(projectPath)
   } catch (e) {
-    return { ok: false, error: tr(msg({ id: 'worktrees.merge.nothing', defaultMessage: 'Nothing was merged: {why}.', description: "Why nothing was merged: git couldn't read the project folder's branch. {why} says why." }), { why: shownError(e) }) }
+    return { ok: false, error: tr(M.nothingMerged, { why: shownError(e) }) }
+  }
+  let into = checkedOut
+  if (opts.target !== undefined) {
+    // The branch as git keeps it: on Windows a ref named in another case (MAIN) is the same branch (main), and must be
+    // routed as that one, never moved as if it were checked out nowhere (HR6's round 1).
+    const named = await branchNamed(projectPath, opts.target)
+    if (typeof named !== 'string') return named
+    into = named
+    if (sameRef(into, wt.branch)) return { ok: false, error: tr(msg({ id: 'worktrees.merge.intoItself', defaultMessage: "{branch} can't be merged into itself.", description: "Why nothing was merged: the branch to merge into is the worktree's own branch {branch}." }), { branch: wt.branch }) }
   }
   if (!into) return { ok: false, error: tr(msg({ id: 'worktrees.merge.detached', defaultMessage: 'The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.', description: "Why nothing was merged: the project folder has no branch checked out. detached HEAD is git's term." })) }
-  if (into === wt.branch) return { ok: false, error: tr(msg({ id: 'worktrees.merge.sameBranch', defaultMessage: 'The project folder has {branch} checked out.', description: "Why nothing was merged: the project folder is on the worktree's own branch {branch}." }), { branch: wt.branch }) }
+  if (sameRef(into, wt.branch)) return { ok: false, error: tr(msg({ id: 'worktrees.merge.sameBranch', defaultMessage: 'The project folder has {branch} checked out.', description: "Why nothing was merged: the project folder is on the worktree's own branch {branch}." }), { branch: wt.branch }) }
+  if (into !== checkedOut) return mergeElsewhere(projectPath, wt, into, opts.squash, message, opts.moveBranch)
   // With nothing staged in the project folder, undoing a failed merge (reset --merge) can't touch the user's own work.
   if ((await git(projectPath, ['diff', '--cached', '--quiet'])).code === 1) {
     return { ok: false, error: tr(msg({ id: 'worktrees.merge.staged', defaultMessage: 'The project folder has staged changes. Commit or unstage them before merging.', description: 'Why nothing was merged: changes are staged (git add) in the project folder.' })) }
@@ -477,9 +490,82 @@ export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts
     }
   }
   log.info(`Merged ${userText(wt.branch)} into ${userText(into)}${opts.squash ? ' (squash)' : ''}`)
-  if (!opts.squash || !opts.moveBranch) return { ok: true }
+  const head = await git(projectPath, ['rev-parse', 'HEAD'])
+  return afterMerge(projectPath, wt, into, head.ok ? head.out.trim() : undefined, opts.squash && !!opts.moveBranch)
+}
+
+/** A merge's result once the target has moved: its commit, and the agent's branch moved after a squash when asked. */
+async function afterMerge(projectPath: string, wt: AgentWorktree, into: string, mergeCommit: string | undefined, move: boolean): Promise<MergeResult> {
+  const done: MergeResult = { ok: true, ...(mergeCommit ? { mergeCommit } : {}) }
+  if (!move) return done
   const moved = await moveBranchTo(projectPath, wt, into)
-  return moved === true ? { ok: true, branchMoved: true } : { ok: true, moveError: moved }
+  return moved === true ? { ...done, branchMoved: true } : { ...done, moveError: moved }
+}
+
+/** A worktree's branch line in `git worktree list --porcelain`. */
+const ON_BRANCH = 'branch refs/heads/' // i18n-ignore: git's porcelain output, as it is
+
+/** Whether two branch names are one ref on Windows, whose ref store (NTFS) doesn't tell case apart. */
+const sameRef = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
+
+/**
+ * A local branch's name as git keeps it, for a name the caller may have written in another case: the branch of that
+ * exact name, else the one branch whose name differs only in case. A refusal when there is none, when git can't list
+ * them, or when several differ only in case from the name given (which is meant can't be told).
+ */
+async function branchNamed(projectPath: string, name: string): Promise<string | MergeResult> {
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/heads/'])
+  if (!r.ok) return { ok: false, error: tr(M.nothingMerged, { why: r.err || 'git for-each-ref' }) } // i18n-ignore: a git command, as it is
+  const names = r.out.split(/\r?\n/).filter(Boolean).map((l) => l.replace(/^refs\/heads\//, ''))
+  if (names.includes(name)) {
+    const aliases = names.filter((n) => n !== name && sameRef(n, name))
+    return aliases.length ? { ok: false, error: tr(M.caseAlias, { branch: name, other: aliases[0] }) } : name
+  }
+  const alike = names.filter((n) => sameRef(n, name))
+  if (alike.length === 1) return alike[0]
+  if (alike.length > 1) return { ok: false, error: tr(M.caseAlias, { branch: alike[0], other: alike[1] }) }
+  return { ok: false, error: tr(M.noTarget, { branch: name }) }
+}
+
+/**
+ * Merges into a branch the project folder hasn't checked out: the merged tree (git merge-tree) committed on the target's
+ * tip (and the branch's, unless squashed), and the target moved to it only from that tip (update-ref's compare and swap).
+ * No folder's files change, so a target checked out in another worktree is refused: its files would no longer match.
+ */
+async function mergeElsewhere(projectPath: string, wt: AgentWorktree, into: string, squash: boolean, message: string, moveBranch?: boolean): Promise<MergeResult> {
+  const fail = (why: string): MergeResult => ({ ok: false, error: tr(M.nothingMerged, { why }) })
+  const listed = await git(projectPath, ['worktree', 'list', '--porcelain'])
+  if (!listed.ok) return fail(listed.err || 'git worktree list') // i18n-ignore: a git command, as it is
+  // Checked out in any folder under any case of its name (one ref on Windows): its files would no longer match.
+  const checkedOutAt = listed.out
+    .split(/\r?\n\r?\n/)
+    .map((b) => b.split(/\r?\n/))
+    .find((lines) => lines.some((l) => l.startsWith(ON_BRANCH) && sameRef(l.slice(ON_BRANCH.length), into)))
+  if (checkedOutAt) {
+    const folder = checkedOutAt[0].replace(/^worktree /, '')
+    return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetElsewhere', defaultMessage: '{branch} is checked out in {folder}. Merge there, or check out another branch in that folder first.', description: "Why nothing was merged: the branch to merge into ({branch}) is checked out in another folder ({folder}) than the project folder." }), { branch: into, folder }) }
+  }
+  const [old, tip] = await Promise.all([git(projectPath, ['rev-parse', '--verify', '--quiet', `refs/heads/${into}^{commit}`]), git(projectPath, ['rev-parse', '--verify', `refs/heads/${wt.branch}^{commit}`])])
+  if (!old.ok) return { ok: false, error: tr(M.noTarget, { branch: into }) }
+  if (!tip.ok) return fail(tip.err || 'git rev-parse') // i18n-ignore: a git command, as it is
+  const from = old.out.trim()
+  const merged = await git(projectPath, ['merge-tree', '--write-tree', '--name-only', '--no-messages', from, tip.out.trim()])
+  if (merged.code === 1) {
+    const conflicts = merged.out.split(/\r?\n/).slice(1).map((l) => l.trim()).filter(Boolean)
+    return { ok: false, conflicts: conflicts.length ? conflicts : [tr(msg({ id: 'worktrees.merge.unknownFiles', defaultMessage: '(unknown files)', description: "The list of a merge's conflicting files, when git didn't name them." }))] }
+  }
+  if (!merged.ok) return fail(merged.err || 'git merge-tree') // i18n-ignore: a git command, as it is
+  const tree = merged.out.split(/\r?\n/)[0].trim()
+  const oldTree = await git(projectPath, ['rev-parse', `${from}^{tree}`])
+  // A squash that changes nothing (its work is in the target already) makes no commit, as git merge --squash doesn't.
+  if (squash && oldTree.ok && oldTree.out.trim() === tree) return afterMerge(projectPath, wt, into, from, !!moveBranch)
+  const commit = await git(projectPath, ['commit-tree', tree, '-p', from, ...(squash ? [] : ['-p', tip.out.trim()]), '-m', message])
+  if (!commit.ok) return fail(commit.err || 'git commit-tree') // i18n-ignore: a git command, as it is
+  const made = commit.out.trim()
+  const moved = await git(projectPath, ['update-ref', '-m', `hive: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) // i18n-ignore: a reflog line, git's
+  if (!moved.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Hive was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) }
+  log.info(`Merged ${userText(wt.branch)} into ${userText(into)} (not checked out)${squash ? ' (squash)' : ''}`)
+  return afterMerge(projectPath, wt, into, made, squash && !!moveBranch)
 }
 
 /**

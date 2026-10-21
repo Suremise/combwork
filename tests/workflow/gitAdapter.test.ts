@@ -139,4 +139,23 @@ describe('Git adapter', () => {
     expect((await G.dirty(repo)) as string[]).toEqual(expect.arrayContaining(['b.txt', 'new.txt']))
     expect(await G.dirty(repo, ['new.txt'])).toEqual(['new.txt'])
   })
+
+  it('dirty marks a merge or a rebase under way, in a linked worktree too, whatever the paths asked for', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    commit(repo, { 'b.txt': 'b\n' }, 'b')
+    const [, other] = branchWith('other', { 'b.txt': 'theirs\n' })
+    commit(repo, { 'b.txt': 'ours\n' }, 'ours')
+    // A conflicted merge: MERGE_HEAD in the repository's git folder.
+    expect(() => sh(repo, 'merge', '-q', 'other')).toThrow()
+    expect((await G.dirty(repo)) as string[]).toContain('(MERGE_HEAD)')
+    expect(await G.dirty(repo, ['elsewhere.txt'])).toEqual(['(MERGE_HEAD)'])
+    sh(repo, 'merge', '--abort')
+    expect(await G.dirty(repo)).toEqual([])
+    // A linked worktree's markers are in its own git folder, outside the folder itself.
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, other)
+    expect(() => sh(wt, 'rebase', '-q', 'main')).toThrow()
+    expect((await G.dirty(wt)) as string[]).toContain('(rebase-merge)')
+    expect((await G.dirty(repo)) as string[]).not.toContain('(rebase-merge)')
+  })
 })

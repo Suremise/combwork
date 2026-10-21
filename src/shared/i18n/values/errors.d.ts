@@ -1,6 +1,8 @@
 // Generated from locales/en/errors.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'errors.assistantUndo.gone': undefined
+  'errors.assistantUndo.which': undefined
   'errors.changes.notFile': { file: string | number; folder: string | number }
   'errors.console.hidden': undefined
   'errors.console.notRecording': undefined
@@ -30,6 +32,7 @@ interface HiveMessageValues {
   'errors.hive.noRepo': undefined
   'errors.hive.notIgnored': undefined
   'errors.image.not': undefined
+  'errors.lane.builderRequired': undefined
   'errors.lane.required': undefined
   'errors.log.gone': { path: string | number }
   'errors.log.none': undefined

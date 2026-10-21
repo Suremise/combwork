@@ -24,7 +24,7 @@ A project agent is known by its own token, never by what a request says. Every r
 - events (filtered per client);
 - skills listings.
 
-The Assistant's changes go through `assistantChange()` (control level, 30 per message, recorded). A rejected request reveals nothing about what it couldn't reach: a 404 looks the same as a missing item.
+The Assistant's changes go through `assistantChange()` (control level, recorded for undo). A rejected request reveals nothing about what it couldn't reach: a 404 looks the same as a missing item.
 
 ## Locks and races
 

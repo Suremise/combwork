@@ -142,6 +142,11 @@ export class WorkspaceService {
   static onIdsRead: ((ws: WorkspaceService, seen: ProjectSeen[]) => void) | null = null
   /** Told when a workspace starts closing (its path still set), so services drop what they keep for it. */
   static readonly closingListeners = new Set<(path: string) => void>()
+  /**
+   * Awaited as a workspace starts closing, its board still open: what must end and be written down first (the merge
+   * queue's runners give up their leases, #1360). A failure is logged and the close goes on.
+   */
+  static readonly closingTasks = new Set<(path: string) => Promise<void>>()
   /** The window showing this workspace: its events go there. */
   window: BrowserWindow | null = null
   /** Agents' worktree folders (lower-cased) and the project each belongs to. */
@@ -311,6 +316,10 @@ export class WorkspaceService {
   }
 
   async close(): Promise<void> {
+    if (this.path) {
+      const was = this.path
+      for (const t of WorkspaceService.closingTasks) await t(was).catch((e) => log.warn('closing the workspace', e))
+    }
     this.generation++
     // What was said of the projects' platforms is this workspace's.
     this.platformOffers.clear()
@@ -821,11 +830,13 @@ export class WorkspaceService {
   }
 
   /** Changes one agent's definition. */
-  async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>): Promise<AgentDef> {
+  /** `check`: sees the agent as saved, under the project's lock, before the change; throwing refuses it (#1282's undo). */
+  async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void): Promise<AgentDef> {
     let next: AgentDef | undefined
     await this.mutateProjectConfig(projectPath, (cfg) => {
       const current = projectAgents(cfg).find((a) => a.id === agentId)
       if (!current) throw hiveError(msg({ id: 'service.workspace.agentGone', defaultMessage: 'That agent no longer exists.', description: "An error changing an agent's settings: it was removed meanwhile." }), undefined, { kind: 'notFound' })
+      check?.(current)
       const def: AgentDef = { ...current, ...patch, id: agentId }
       next = def
       return { agents: projectAgents(cfg).map((a) => (a.id === agentId ? def : a)) }

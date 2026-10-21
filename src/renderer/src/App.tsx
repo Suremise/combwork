@@ -10,6 +10,7 @@ import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, Compa
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
+import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
 import { RemoveProjectDialog } from './components/ProjectRemoval'
@@ -26,6 +27,7 @@ import { startupReplay } from './startupReplay'
 import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { AssistantMain } from './components/AssistantView'
+import { loadAssistantChanges } from './assistantUndo'
 import { agentOnScreen, applyLeftovers, applyLiveState, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
@@ -85,7 +87,7 @@ function handleEvent(e: HiveEvent): void {
       const ws = e.workspace
       // Another workspace in this window: its Assistant panel shows as that workspace left it, and its board.
       const other = ws?.path !== get().workspace?.path
-      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, taskDoing: null })
+      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
       // Drop warnings about projects that belong to a workspace that is no longer open.
@@ -218,6 +220,8 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'assistant-activity':
       set((s) => ({ assistantActions: [...s.assistantActions, e.action].slice(-200) }))
+      // What it changed is kept for undo as it is made (#1283): the panel's list follows.
+      void loadAssistantChanges()
       break
     case 'language-changed':
       // i18n.ts has switched the text; the language setting's notes read the rest.
@@ -487,6 +491,7 @@ export function App() {
       <TaskDialog />
       <ArchiveAllDialog />
       <TaskStartDialog />
+      <LaneStartDialog />
       <MoveToDoingDialog />
       <RemoveProjectDialog />
       <AboutDialog />

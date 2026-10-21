@@ -5,8 +5,8 @@
 import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
-import { CATEGORY_STAGE, foldCard, ROUND_LIMIT_GATE, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { forYouItems, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
+import { CATEGORY_STAGE, foldCard, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { forYouItems, kindProposed, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 
@@ -15,13 +15,13 @@ type Row = Record<string, string | number | null>
 /** Whether the board has the fact log (a board waiting for its 1.0 upgrade hasn't). */
 const hasFacts = (db: Db['reader']): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_facts'").get()
 
-const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stage as StageId | null) ?? CATEGORY_STAGE[r.col as Category] ?? 'todo', preWorkflow: !!r.pre_workflow })
+const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stage as StageId | null) ?? CATEGORY_STAGE[r.col as Category] ?? 'todo', preWorkflow: !!r.pre_workflow, ...(r.kind === 'no-code' || r.kind === 'code' ? { kind: r.kind } : {}) })
 
 /** A card's view, and its facts; null when there is no such card or the board has no facts yet. */
 export function cardFacts(ws: WorkspaceService, n: number): { card: WorkCard; facts: Fact[] } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
-    const r = db.prepare('SELECT number, col, stage, pre_workflow FROM cards WHERE number = ?').get(n) as Row | undefined
+    const r = db.prepare('SELECT number, col, stage, pre_workflow, kind FROM cards WHERE number = ?').get(n) as Row | undefined
     if (!r) return null
     return { card: cardOf(r), facts: (db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf) }
   })
@@ -40,7 +40,7 @@ export function cardWork(ws: WorkspaceService, n: number): WorkView | null {
 export function workBadges(ws: WorkspaceService): WorkBadge[] {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
-    const cards = db.prepare('SELECT number, col, stage, pre_workflow FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    const cards = db.prepare('SELECT number, col, stage, pre_workflow, kind FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
     const facts = new Map<number, Fact[]>()
     for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
       const f = factOf(r)
@@ -85,6 +85,20 @@ export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]
     }
   })
   return out
+}
+
+/**
+ * A card's kind (#1277, §16.7.3: the `kind` column) and a kind an agent proposed, not answered yet: what the Agent API's
+ * card adds after its document's fields, as it does `stage`. Null on a board waiting for its 1.0 upgrade (no column).
+ */
+export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kindProposed: CardKind | null } | null {
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return null
+    const r = db.prepare('SELECT kind FROM cards WHERE number = ?').get(n) as { kind: CardKind } | undefined
+    if (!r) return null
+    const facts = (db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided')
+    return { kind: r.kind, kindProposed: kindProposed(facts) }
+  })
 }
 
 /** A fact as the Agent API's short row gives it (`GET /v1/tasks/:n/facts`). */

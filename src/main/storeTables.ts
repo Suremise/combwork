@@ -89,9 +89,10 @@ function readOld(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore
  * Saves a store's entries (all of them, in order) and the values given (null removes one), in one transaction: entries
  * whose JSON or place changed are written again, those gone removed. All of it or none. `guard` runs just before the
  * transaction, with nothing awaited between them: a store whose owner went away meanwhile (a closed workspace, a database
- * replaced) throws there, and nothing is written.
+ * replaced) throws there, and nothing is written. `also`: writes of the caller's that belong with the save, in its
+ * transaction (the Assistant's lane change for undo, #1282).
  */
-export async function saveTable(workspacePath: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
+export async function saveTable(workspacePath: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null> = {}, guard?: () => void, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): Promise<void> {
   const path = resolve(workspacePath)
   // Its lock is the board's: inside a board change it would wait for itself.
   if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
@@ -101,7 +102,7 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
     // A workspace closed meanwhile (a store's last save as it closes): its database is opened for the save, then closed again.
     const wasOpen = boardOpen(path)
     try {
-      saveEntries(path, store, docs, meta, wasOpen)
+      saveEntries(path, store, docs, meta, wasOpen, also)
       // The lanes are part of what the board's revision covers (#1266, boardRevision).
       if (store === 'lanes') noteLanesSaved(path)
     } finally {
@@ -111,7 +112,7 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
 }
 
 /** saveTable's transaction. */
-function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, keep: boolean): void {
+function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, keep: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
   const db = workspaceDb(path).writer
   const def = TABLE_DEFS[store]
   const gen = dbGeneration(path)
@@ -159,6 +160,7 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
       log.warn(`${aside.length} ${store} entr${aside.length === 1 ? 'y' : 'ies'} had a key another has: kept aside, not used`)
       keepAside(db, store, aside)
     }
+    also?.(db)
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
   // A closed workspace's last save keeps nothing (its database is closed again at once).

@@ -47,6 +47,14 @@
     "defaultMessage": "Read your agents at a glance",
     "description": "A tip's title."
   },
+  "tips.allKeysToCli.text": {
+    "defaultMessage": "In an agent's pane, Hive's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.allKeysToCli.title": {
+    "defaultMessage": "Give every key to the agent's CLI",
+    "description": "A tip's title."
+  },
   "tips.alwaysOnTop.text": {
     "defaultMessage": "The pin in the title bar (or Ctrl+Alt+O) keeps the window above your other apps, so a test run or an emulator can work underneath. Each window has its own, remembered for its workspace.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -80,8 +88,8 @@
     "description": "A tip's title."
   },
   "tips.assistantBatch.text": {
-    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own. The step counts as one of its {changes, plural, one {# change} other {# changes}} for a message, so it never stops part-way through them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100), {changes} how many changes the Assistant may make for one message (30)."
+    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."
   },
   "tips.assistantBatch.title": {
     "defaultMessage": "Many cards in one step",
@@ -198,6 +206,14 @@
   "tips.assistantToldWaiting.title": {
     "defaultMessage": "The Assistant tells you when an agent needs you",
     "description": "A tip's title."
+  },
+  "tips.assistantUndo.text": {
+    "defaultMessage": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: undo, changed since."
+  },
+  "tips.assistantUndo.title": {
+    "defaultMessage": "Undo the Assistant's changes",
+    "description": "A tip's title (glossary: undo)."
   },
   "tips.assistantWaits.text": {
     "defaultMessage": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Hive wakes it when the agent finishes, needs you or stops.",
@@ -651,6 +667,14 @@
     "defaultMessage": "Skills for working with Hive",
     "description": "A tip's title."
   },
+  "tips.hooksMissing.text": {
+    "defaultMessage": "If a CLI update or a policy stops an agent’s hooks reaching Hive, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Hive can tell.",
+    "description": "A tip. Hooks: the calls an agent's coding agent makes to Hive as it works. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.hooksMissing.title": {
+    "defaultMessage": "When an agent’s hooks stop arriving",
+    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -683,6 +707,14 @@
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
   },
+  "tips.laneBranchSquash.text": {
+    "defaultMessage": "After an agent's card is squash-merged, Hive brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.laneBranchSquash.title": {
+    "defaultMessage": "An agent's branch kept up to date between cards",
+    "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
   "tips.laneGates.text": {
     "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
@@ -698,6 +730,14 @@
   "tips.laneNotices.title": {
     "defaultMessage": "Hear how a lane goes, without the Assistant",
     "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
+  "tips.laneStart.text": {
+    "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
+  },
+  "tips.laneStart.title": {
+    "defaultMessage": "Start a lane yourself",
+    "description": "A tip's title. A lane: a builder and a reviewer agent working through cards in turn (glossary 2.5: lane)."
   },
   "tips.language.text": {
     "defaultMessage": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
@@ -843,6 +883,14 @@
     "defaultMessage": "Jot down a card",
     "description": "A tip's title."
   },
+  "tips.noCodeCards.text": {
+    "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
+  },
+  "tips.noCodeCards.title": {
+    "defaultMessage": "Cards with no code",
+    "description": "A tip's title (glossary: no-code card)."
+  },
   "tips.off.message": {
     "defaultMessage": "Help → Tips… still has them, and Settings → General turns them back on.",
     "description": "More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Hive: keep them as Hive shows them."
@@ -956,8 +1004,8 @@
     "description": "A tip's title."
   },
   "tips.progressHistory.text": {
-    "defaultMessage": "Recent in the Progress panel shows the last {recent, plural, one {# run} other {# runs}}; Show all scrolls through the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts. The project filter applies to them all.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {recent} is how many runs Recent shows (10), {kept} how many Show all keeps (200)."
+    "defaultMessage": "The Runs tab of the Progress panel keeps the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts: by day, a run and its retries in one line. Find them by their words, or show only failures, a lane’s or an agent’s.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Hive keeps (200)."
   },
   "tips.progressHistory.title": {
     "defaultMessage": "What ran this morning?",
@@ -995,13 +1043,13 @@
     "defaultMessage": "How long until the tests finish?",
     "description": "A tip's title."
   },
-  "tips.progressRecentFold.text": {
-    "defaultMessage": "Click the Recent heading in the Progress panel to fold its runs down to that one line, with how many there are beside it; click it again to show them. Each workspace remembers it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Recent is the Progress panel's section of runs that ended."
+  "tips.progressTabs.text": {
+    "defaultMessage": "The Progress panel has four tabs: Pulse for what is going on now, then Merges, Runs and Lanes. A red number on Runs counts the runs that failed with nothing passing since; Pulse has a line for them too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (the tabs: Pulse, Merges, Runs, Lanes)."
   },
-  "tips.progressRecentFold.title": {
-    "defaultMessage": "Fold Recent away",
-    "description": "A tip's title."
+  "tips.progressTabs.title": {
+    "defaultMessage": "Pulse, Merges, Runs, Lanes",
+    "description": "A tip's title: the Progress panel's tabs, named as the panel shows them."
   },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",

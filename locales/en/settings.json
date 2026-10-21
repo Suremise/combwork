@@ -547,6 +547,10 @@
     "defaultMessage": "{title} takes true or false.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them."
   },
+  "settings.advanced.error.choice": {
+    "defaultMessage": "{title} takes one of {choices}.",
+    "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them."
+  },
   "settings.advanced.error.field": {
     "defaultMessage": "{title} takes a field name: letters, digits and _ (not starting with a digit).",
     "description": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title."
@@ -631,6 +635,14 @@
     "defaultMessage": "Save a memory snapshot if Hive is about to run out of memory",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.hooks.missingSeconds.desc": {
+    "defaultMessage": "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Hive says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.",
+    "description": "What the advanced setting \"Hooks missing: wait\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.hooks.missingSeconds.title": {
+    "defaultMessage": "Hooks missing: wait",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -646,6 +658,14 @@
   "settings.advanced.hive.mcp.replySeconds.title": {
     "defaultMessage": "hive tools: reply timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.merge.lockWaitSeconds.desc": {
+    "defaultMessage": "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Hive on this computer is merging into the same repository. After it, nothing is changed and Hive says which Hive holds the repository: try again once it has finished. Hive never takes the repository from a Hive that is still running.",
+    "description": "What the advanced setting \"Merges: wait for another Hive\" is for, and what happens when the wait ends (Settings → Advanced)."
+  },
+  "settings.advanced.hive.merge.lockWaitSeconds.title": {
+    "defaultMessage": "Merges: wait for another Hive",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine."
   },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
@@ -670,6 +690,22 @@
   "settings.advanced.hive.prompt.clearDraft.title": {
     "defaultMessage": "Clear the CLI's draft before Hive types",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The draft is text left in the input of an agent's CLI, not sent yet."
+  },
+  "settings.advanced.hive.prompt.rawCardStart.desc": {
+    "defaultMessage": "When a card is started on an agent, Hive gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Hive's other prompts (its wakes and messages) stay as they are: they are how Hive and its agents talk.",
+    "description": "What the advanced setting \"A card's start in its own words\" does (Settings → Advanced, under Hive)."
+  },
+  "settings.advanced.hive.prompt.rawCardStart.title": {
+    "defaultMessage": "A card's start in its own words",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive types into an agent when a card is started on it."
+  },
+  "settings.advanced.hive.queue.checkMinutes.desc": {
+    "defaultMessage": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
+    "description": "What the advanced setting \"Merge queue: longest a merge check runs\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.checkMinutes.title": {
+    "defaultMessage": "Merge queue: longest a merge check runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target."
   },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
@@ -743,6 +779,14 @@
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.terminal.allKeysToCli.desc": {
+    "defaultMessage": "In an agent's pane, Hive's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Hive's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",
+    "description": "What the advanced setting \"All keys go to the CLI\" does (Settings → Advanced, under Hive). Show All Commands is a command's name and Settings → Keyboard Shortcuts a place in Hive: use them as Hive shows them. Ctrl+C and Ctrl+V name keys."
+  },
+  "settings.advanced.hive.terminal.allKeysToCli.title": {
+    "defaultMessage": "All keys go to the CLI",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: every key pressed in an agent's pane goes to its CLI."
+  },
   "settings.advanced.hive.terminal.ctrlCVToCli.desc": {
     "defaultMessage": "In an agent's pane, Ctrl+C copies the terminal's selection (with nothing selected it goes to the CLI, which stops what it is doing), and Ctrl+V pastes the clipboard's text, or a screenshot as an attachment. Turned on, both keys go to the CLI, as in any other terminal: copy and paste with right-click instead, unless right-click goes to the CLI too (a setting under each CLI).",
     "description": "What the advanced setting \"Ctrl+C and Ctrl+V go to the CLI\" does (Settings → Advanced, under Hive). Ctrl+C and Ctrl+V name keys: use the key names your language uses."
@@ -750,6 +794,26 @@
   "settings.advanced.hive.terminal.ctrlCVToCli.title": {
     "defaultMessage": "Ctrl+C and Ctrl+V go to the CLI",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
+  "settings.advanced.hive.terminal.osc52.allow": {
+    "defaultMessage": "Allow",
+    "description": "A choice of the advanced setting \"A CLI putting text on the clipboard\": take the text at once."
+  },
+  "settings.advanced.hive.terminal.osc52.ask": {
+    "defaultMessage": "Ask each time",
+    "description": "A choice of the advanced setting \"A CLI putting text on the clipboard\": show the user the text and ask first."
+  },
+  "settings.advanced.hive.terminal.osc52.block": {
+    "defaultMessage": "Block",
+    "description": "A choice of the advanced setting \"A CLI putting text on the clipboard\": take none."
+  },
+  "settings.advanced.hive.terminal.osc52.desc": {
+    "defaultMessage": "An agent's CLI can put text on the clipboard (OSC 52) just after you press a key or click in its pane, as Copilot does when you copy its own selection. Allow takes it at once; Ask each time shows you the text first, to copy or not; Block takes none. A CLI can never read the clipboard, whatever this says.",
+    "description": "What the advanced setting \"A CLI putting text on the clipboard\" does (Settings → Advanced, under Hive). OSC 52 is the name of a terminal feature: keep it. Allow, Ask each time and Block are the setting's choices: use the words its list shows."
+  },
+  "settings.advanced.hive.terminal.osc52.title": {
+    "defaultMessage": "A CLI putting text on the clipboard",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)."
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
     "defaultMessage": "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
@@ -774,6 +838,14 @@
   "settings.advanced.hive.workflow.enforce.title": {
     "defaultMessage": "Workflow rules are enforced",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The workflow rules are the checks a card passes as it moves across the board (review, checks, merging), set per project in its Version Control options."
+  },
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": {
+    "defaultMessage": "When a card from an agent's own worktree was squashed into its target, the agent's branch still has its commits, so its next card in the lane would include them. On, Hive moves the branch to the target before the next card starts, once the agent is idle, its runs have ended and its worktree is clean, and only when everything on it is in the target: anything else, it asks you under For you. Off, Hive asks you every time: approve to let it move the branch once, or decline and do it yourself. Hive never moves a branch with workflow rules turned off.",
+    "description": "What the advanced setting \"Bring an agent's branch up to date after a squash merge\" does (Settings → Advanced). For you is the board's list of what waits for the user: use it as Hive shows it."
+  },
+  "settings.advanced.hive.workflow.updateAgentBranch.title": {
+    "defaultMessage": "Bring an agent's branch up to date after a squash merge",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Hive can move the branch to the target before the agent's next card."
   },
   "settings.advanced.logs.desc": {
     "defaultMessage": "Open the folder containing Hive's log files.",
@@ -830,6 +902,10 @@
   "settings.advanced.takes.boolean": {
     "defaultMessage": "On or off (true or false).",
     "description": "What an advanced setting takes (Settings → Advanced). true and false are the values as written in advanced.json: keep them."
+  },
+  "settings.advanced.takes.choice": {
+    "defaultMessage": "One of {choices}.",
+    "description": "What an advanced setting takes (Settings → Advanced): one of a few values. {choices} lists them as advanced.json writes them (allow, ask, block): keep them."
   },
   "settings.advanced.takes.field": {
     "defaultMessage": "A field name.",
@@ -1300,7 +1376,7 @@
     "description": "What the setting \"Change settings\" does, under its title (Settings → Assistant)."
   },
   "settings.assistant.changeSettings.tip": {
-    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and a Revert button, and counts towards its 30 changes per message. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
+    "defaultMessage": "It suggests a setting first and changes one only when you agree. Each change is listed in its panel with the old and new value and an Undo button. It can never change its own Control, permission modes, the Agent API or what Hive runs (CLI paths, extra arguments, setup commands): it tells you where to change those. A running Assistant takes a change after a restart.",
     "description": "The info tip of the setting \"Change settings\" (Settings → Assistant): more on what it does and when it applies."
   },
   "settings.assistant.changeSettings.title": {
@@ -1340,7 +1416,7 @@
     "description": "A choice of the setting \"Control\" (Settings → Assistant)."
   },
   "settings.assistant.control.tip": {
-    "defaultMessage": "It never removes agents, discards worktrees or deletes projects, never types into an agent that is working, asking you something or that you just typed in (see Pause after you type), and makes at most 30 changes per message. What it does is listed in its panel. A running Assistant takes a change after a restart.",
+    "defaultMessage": "It never removes agents, discards worktrees or deletes projects, and never types into an agent that is working, asking you something or that you just typed in (see Pause after you type). What it does is listed in its panel, where you can undo its changes. A running Assistant takes a change after a restart.",
     "description": "The info tip of the setting \"Control\" (Settings → Assistant): its last paragraph. Pause after you type is another setting: keep its name as Hive shows it."
   },
   "settings.assistant.control.tip.agents": {

@@ -50,13 +50,15 @@ export const EXCLUDED = [
   [/^src\/main\/mcp\//, 'agent-facing: the hive MCP server'],
   [/^src\/main\/progressReporters\//, 'agent-facing: hive-progress output'],
   [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|startView|taskBatch|viewerTokens|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
-  [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|deliveries|doorbell|hiveGuidance|instructions|journal|lanes|laneWatch|mergeSlot|startView|toolReplies|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
+  [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|deliveries|doorbell|hiveGuidance|instructions|journal|laneBrief|lanes|laneWatch|mergeSlot|startView|toolReplies|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
   // The 1.0 workflow core's files with no text the window shows (#1264): the rest of src/main/workflow and platform is
   // checked, its window text messages in src/shared/workflow (refusals.ts, texts.ts) kept as data beside the English.
   [/^src\/main\/workflow\/factStore\.ts$/, "the fact log's SQL, no text"],
   [/^src\/main\/workflow\/cardWork\.ts$/, "SQL, and the Agent API's rows of a card's facts (agent-facing)"],
   [/^src\/main\/workflow\/runLink\.ts$/, "agent-facing: hive-progress's card, revision and check, and its refusals"],
+  [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
+  [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],
   [/^src\/main\/freshPath\.ts$/, 'a registry key, not text'],

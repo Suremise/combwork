@@ -112,6 +112,9 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 /** The gate of Hive's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
+/** The gate of Hive's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
+export const LINE_GATE = 'lineUpdate'
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
@@ -148,6 +151,13 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
   LineRenamed: { from: string; to: string; why: 'repair' }
+  /**
+   * A line's move begun (#1271): written before it, so a move with no outcome after it (`LineMoved`, or
+   * `LineMoveUndone`) holds the next card until it is settled.
+   */
+  LineMoving: { line: string; from: string; to: string }
+  /** A line's move begun and not made: everything as it was (put back, or found so), the move's outcome (#1271). */
+  LineMoveUndone: { line: string; at: string }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
@@ -170,6 +180,10 @@ export interface FactData {
   /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
   Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
+  /** A project agent proposed the card's kind when it made it (§16.7.3, OP-6/OP-7, #1277): no code, until confirmed. */
+  KindProposed: { kind: CardKind }
+  /** The user or the Assistant answered a proposed kind (#1277): `kind` is the card's kind from now on. */
+  KindDecided: { kind: CardKind; proposed: CardKind }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */

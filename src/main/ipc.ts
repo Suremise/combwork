@@ -8,7 +8,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { HiveChannel, HiveRequests } from '../shared/api'
 import * as updater from './updater'
-import type { ProviderId, QuitChoice } from '../shared/types'
+import type { LaneStartRequest, ProviderId, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
 import { extraArgsProblem, isKnownProvider, projectProviderConfig, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
@@ -39,6 +39,7 @@ import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
+import { startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
@@ -52,6 +53,9 @@ import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
 import { revertSetting } from './settingsTools'
+import { finalWhys } from '../shared/assistantActivity'
+import { changeGroups } from './assistantChanges'
+import { UndoNotFound, userUndo } from './assistantUndo'
 import { advanced, updateSettingsChecked } from './advanced'
 import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
@@ -118,6 +122,8 @@ const M = {
   notPrefValue: msg({ id: 'errors.pref.notValue', defaultMessage: 'Not a {pref} value.', description: "Refusal of a per-project view setting's value. {pref} is the setting's internal name." }),
   notTipsChange: msg({ id: 'errors.tips.notChange', defaultMessage: 'Not a tips change.', description: 'Refusal of a call to change which tips were seen (a programming error, rarely seen).' }),
   workspaceNotFound: msg({ id: 'errors.workspace.notFound', defaultMessage: "The workspace folder {path} can't be found. It may have been moved or deleted, or be on a drive that isn't connected.", description: "Opening a workspace whose folder isn't there. {path} is the folder." }),
+  undoWhich: msg({ id: 'errors.assistantUndo.which', defaultMessage: "Choose one change of the Assistant's to undo, or one message's changes.", description: "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages." }),
+  undoGone: msg({ id: 'errors.assistantUndo.gone', defaultMessage: "That change of the Assistant's is no longer kept: changes are kept for 7 days.", description: "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more." }),
   noWorkspace: msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'An action needs an open workspace and this window has none.' }),
   notWorktree: msg({ id: 'errors.worktree.notGit', defaultMessage: "{path} isn't a git worktree (it has no .git file). Choose the folder the worktree was moved to.", description: "Repair: the folder chosen as an agent's moved worktree isn't one. {path} is that folder. Keep \".git\" as it is." }),
   removeHow: msg({ id: 'errors.project.removeHow', defaultMessage: 'Unknown way to remove a project: {how}', description: "Refusal of a call to remove a project in a way that doesn't exist (a programming error, rarely seen). {how} is what it asked for." }),
@@ -128,6 +134,7 @@ const M = {
   notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Hive can read." }),
   holdRequired: msg({ id: 'errors.mergeSlot.holdRequired', defaultMessage: 'Which hold to release is required', description: 'Releasing a merge slot without saying which (a programming error, rarely seen).' }),
   laneRequired: msg({ id: 'errors.lane.required', defaultMessage: 'Which lane to end is required', description: 'Ending a card loop without saying which (a programming error, rarely seen).' }),
+  laneBuilderRequired: msg({ id: 'errors.lane.builderRequired', defaultMessage: "A lane's builder is required", description: 'Starting a lane (a card loop) without saying which agent builds it (a programming error, rarely seen).' }),
   consoleHidden: msg({ id: 'errors.console.hidden', defaultMessage: 'The developer console is hidden: turn on Settings → Advanced → Show developer features.', description: 'Opening the developer console while it is turned off. "Settings → Advanced → Show developer features" is the way to the setting: translate it as Settings shows it.' }),
   sourcesList: msg({ id: 'errors.console.sourcesList', defaultMessage: 'The sources to watch must be a list.', description: "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)." }),
   notSource: msg({ id: 'errors.console.notSource', defaultMessage: 'Not a developer console source this window can record', description: "Recording a developer console source this window can't read." }),
@@ -628,6 +635,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { dir, cards: await exportBoard(ws, dir) }
     },
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
+    'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
+    'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
@@ -1043,6 +1052,20 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
       await revertSetting(workspace.path, String(actionId))
     },
+    // The window words what can't be undone in its language, from the reasons' codes (#1283).
+    'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()).map((g) => ({ ...g, changes: g.changes.map((c) => (c.final ? { ...c, finalWhy: finalWhys(c.final) } : c)) })) : []),
+    'assistant:undo': async (sel) => {
+      if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      const s = sel && typeof sel === 'object' ? sel : {}
+      const change = typeof s.change === 'string' && s.change ? s.change : undefined
+      const group = typeof s.group === 'string' && s.group ? s.group : undefined
+      if (!change === !group) throw hiveError(M.undoWhich, undefined, { kind: 'invalid' })
+      try {
+        return (await userUndo(currentWorkspace(), change ? { change } : { group })).map((r) => (r.final ? { ...r, finalWhy: finalWhys(r.final) } : r))
+      } catch (e) {
+        throw e instanceof UndoNotFound ? hiveError(M.undoGone, undefined, { kind: 'conflict' }) : e
+      }
+    },
     'mergeSlots:list': () => (workspace.path ? workspaceSlots(workspace.path) : []),
     'mergeSlots:release': (p, branch, holdId) => {
       if (typeof holdId !== 'string' || !holdId) throw hiveError(M.holdRequired, undefined, { kind: 'invalid' })
@@ -1052,6 +1075,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'lanes:end': (id, abandoned) => {
       if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
+    },
+    'lanes:start': (p, req) => {
+      const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
+      const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
+      if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
     },
     'costs:cards': (q) => {
       if (!workspace.path) return []

@@ -166,9 +166,12 @@ const t = setInterval(() => {
   check('…never "stopped reporting" meanwhile, nor failed', gone?.staleReason === null && gone?.summary === null)
   check('…its row says so', !!(await until(async () => /Ended without a report after/.test(await textOf(srv?.id)), 5000)) && !/Stopped reporting/i.test(await textOf(srv?.id)), await textOf(srv?.id))
   await shoot('ended')
-  // Under Recent, the stopped one is marked stopped (muted), not with a warning.
+  // In the Runs tab (#1309), the stopped one is marked stopped (muted), not with a warning; a group of retries opened.
+  await panel.locator('.progress-tab[data-tab="runs"]').click()
+  await until(async () => (await panel.locator('.progress-tab-runs').count()) === 1, 5000)
+  for (const head of await panel.locator('.progress-group-head[aria-expanded="false"]').all()) await head.click()
   const recentIcon = await until(async () => (await panel.locator(`.progress-recent-item[data-run="${stopped?.id}"] .progress-recent .codicon`).first().getAttribute('class', { timeout: 500 }).catch(() => '')) || '', 5000)
-  check('under Recent, the interrupted run is marked stopped, not with a warning', /codicon-circle-slash/.test(recentIcon ?? ''), recentIcon)
+  check('in the Runs tab, the interrupted run is marked stopped, not with a warning', /codicon-circle-slash/.test(recentIcon ?? ''), recentIcon)
 
   await app.close()
   console.log(failed ? `\n${failed} failed` : '\nAll passed')

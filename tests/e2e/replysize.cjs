@@ -340,7 +340,7 @@ const prose = (seed, n) => {
   check("no change while Change settings is off: the tool isn't offered", !offered && !toolDescription('hive_update_setting', 'assistant') && (await inv('settings:get')).sessions.transcriptWarnMB === 20)
   await inv('settings:update', { assistant: { changeSettings: true } })
   const changed = measure('hive_update_setting', tool('hive_update_setting', { id: 'sessions.transcriptWarnMB', value: 50 }, 'assistant+settings'), 400)
-  check('a change: old → new, and that the user can revert it', changed.startsWith('Changed Settings → Sessions → Warn when a transcript is over (sessions.transcriptWarnMB): 20 → 50. It applies now.'), changed)
+  check('a change: old → new, and that the user can undo it', changed.startsWith('Changed Settings → Sessions → Warn when a transcript is over (sessions.transcriptWarnMB): 20 → 50. It applies now.'), changed)
   // A table keeping its size: the reply says what changed in it, not "nothing changed".
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)
@@ -436,6 +436,13 @@ const prose = (seed, n) => {
   measure('hive_create_task (as Assistant)', tool('hive_create_task', { title: 'Assistant card', project: 'alpha', description: prose(600, 1800) }, 'assistant'), 400)
   measure('hive_update_task (as Assistant)', tool('hive_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
   measure('hive_reorder_tasks (as Assistant)', tool('hive_reorder_tasks', { column: 'todo', cards: [todo[31], todo[32]] }, 'assistant'), 300)
+  // Undo (#1282): its messages' changes, a line each; one message's changes with their ids; what an undo did.
+  tool('hive_update_tasks', { numbers: [todo[33], todo[34]], addLabels: ['undo-me'] }, 'assistant')
+  const changeGroups = measure('hive_undo (list)', tool('hive_undo', { list: true }, 'assistant'), 10 * 300)
+  const changeLines = measure('hive_undo (list, a message)', tool('hive_undo', { list: true, group: changeGroups.split(' ')[0] }, 'assistant'), 40 * 200)
+  const relabel = changeLines.split('\n').find((l) => new RegExp(`#${todo[33]}\\b`).test(l) && /\(labels\)/.test(l))
+  const undone = measure('hive_undo', tool('hive_undo', { change: relabel?.split(':')[0] ?? '' }, 'assistant'), 300)
+  check('an undo says what it did, in a line', undone === 'Undid 1 of 1 change in full.', `${relabel} → ${undone}`)
 
   console.log('\n--- Agent API routes not behind a tool')
   const route = async (label, method, p, body) => measure(`API ${label}`, (await api(method, p, body)).text)

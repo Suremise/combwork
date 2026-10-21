@@ -96,8 +96,14 @@ export const englishText = (t: TextPart): string => formatText(t, IN_ENGLISH)
 /** Text in the language Hive shows now (call it when the text is rendered, never when a module loads). */
 export const shownText = (t: TextPart): string => formatText(t, AS_SHOWN)
 
-/** What a value is: a regular expression's source (its flags are fixed), a piece of text, a field name, a list of names, a whole number, on or off. */
-export type AdvancedKind = 'pattern' | 'text' | 'field' | 'list' | 'number' | 'boolean'
+/** What a value is: a regular expression's source (its flags are fixed), a piece of text, a field name, a list of names, a whole number, on or off, one of a few choices. */
+export type AdvancedKind = 'pattern' | 'text' | 'field' | 'list' | 'number' | 'boolean' | 'choice'
+
+/** One of a `choice` value's choices: as advanced.json and the tools write it, and its name as Settings shows it. */
+export interface AdvancedChoice {
+  value: string
+  label: Text
+}
 
 /** Where a value is listed: Hive's own, or one CLI's. */
 export type AdvancedGroup = 'hive' | ProviderId
@@ -138,6 +144,8 @@ export interface AdvancedDef {
   default: string | number | string[] | boolean
   /** A pattern's flags: part of the default, not of the value. */
   flags?: string
+  /** A `choice` value's choices, in the order Settings lists them. */
+  choices?: readonly AdvancedChoice[]
   min?: number
   max?: number
   /** A number's unit, for the list. */
@@ -159,6 +167,9 @@ export const HARDWARE_ACCELERATION_OFF = 'hive.disableHardwareAcceleration'
 /** Hive writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
 export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
 
+/** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
+export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
+
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
@@ -170,6 +181,18 @@ export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
 
 /** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
 export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
+
+/**
+ * Every key in an agent's pane goes to its CLI, but the command palette's shortcut, so every command stays reachable
+ * (#1292, #966 row 26): read by TerminalView, through isAppShortcut.
+ */
+export const ALL_KEYS_TO_CLI = 'hive.terminal.allKeysToCli'
+
+/** What Hive does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
+export const OSC52_POLICY = 'hive.terminal.osc52'
+
+/** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
+export const RAW_CARD_START = 'hive.prompt.rawCardStart'
 
 /** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
@@ -381,6 +404,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.hooks.missingSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works." }),
+    desc: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.desc', defaultMessage: "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Hive says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.", description: 'What the advanced setting "Hooks missing: wait" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 60,
+    min: 1,
+    max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
     id: 'hive.wait.cardMaxSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -451,6 +486,50 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
+  // An agent's branch after a squash merge (#1271, SPEC §16.19.2): Hive moves it between a lane's cards, or asks first.
+  {
+    id: 'hive.workflow.updateAgentBranch',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.workflow.updateAgentBranch.title', defaultMessage: "Bring an agent's branch up to date after a squash merge", description: "An advanced setting's title (Settings → Advanced), listed under Hive. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Hive can move the branch to the target before the agent's next card." }),
+    desc: msg({
+      id: 'settings.advanced.hive.workflow.updateAgentBranch.desc',
+      defaultMessage: "When a card from an agent's own worktree was squashed into its target, the agent's branch still has its commits, so its next card in the lane would include them. On, Hive moves the branch to the target before the next card starts, once the agent is idle, its runs have ended and its worktree is clean, and only when everything on it is in the target: anything else, it asks you under For you. Off, Hive asks you every time: approve to let it move the branch once, or decline and do it yourself. Hive never moves a branch with workflow rules turned off.",
+      description: 'What the advanced setting "Bring an agent\'s branch up to date after a squash merge" does (Settings → Advanced). For you is the board\'s list of what waits for the user: use it as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  // The repository lock (#1347, SPEC §16.9.3): how long a merge waits for another Hive's. A live holder is never taken over.
+  {
+    id: 'hive.merge.lockWaitSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.title', defaultMessage: 'Merges: wait for another Hive', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine." }),
+    desc: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.desc', defaultMessage: "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Hive on this computer is merging into the same repository. After it, nothing is changed and Hive says which Hive holds the repository: try again once it has finished. Hive never takes the repository from a Hive that is still running.", description: 'What the advanced setting "Merges: wait for another Hive" is for, and what happens when the wait ends (Settings → Advanced).' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  // How long one of the merge queue's checks may run (#1349, SPEC §16.9.1 step 8): past it, Hive ends it and counts it as transient.
+  {
+    id: QUEUE_CHECK_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.checkMinutes.title', defaultMessage: 'Merge queue: longest a merge check runs', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target." }),
+    desc: msg({
+      id: 'settings.advanced.hive.queue.checkMinutes.desc',
+      defaultMessage: 'How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.',
+      description: 'What the advanced setting "Merge queue: longest a merge check runs" does, and what goes wrong when it is wrong (Settings → Advanced).'
+    }),
+    kind: 'number',
+    default: 90,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    applies: 'now'
+  },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
   // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
   {
@@ -504,6 +583,51 @@ const SOURCES: readonly AdvancedSource[] = [
     }),
     kind: 'boolean',
     default: true,
+    applies: 'now'
+  },
+  // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Hive did by default.
+  {
+    id: ALL_KEYS_TO_CLI,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.terminal.allKeysToCli.title', defaultMessage: 'All keys go to the CLI', description: "An advanced setting's title (Settings → Advanced), listed under Hive: every key pressed in an agent's pane goes to its CLI." }),
+    desc: msg({
+      id: 'settings.advanced.hive.terminal.allKeysToCli.desc',
+      defaultMessage: "In an agent's pane, Hive's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Hive's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",
+      description: 'What the advanced setting "All keys go to the CLI" does (Settings → Advanced, under Hive). Show All Commands is a command\'s name and Settings → Keyboard Shortcuts a place in Hive: use them as Hive shows them. Ctrl+C and Ctrl+V name keys.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: OSC52_POLICY,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.terminal.osc52.title', defaultMessage: 'A CLI putting text on the clipboard', description: "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)." }),
+    desc: msg({
+      id: 'settings.advanced.hive.terminal.osc52.desc',
+      defaultMessage: "An agent's CLI can put text on the clipboard (OSC 52) just after you press a key or click in its pane, as Copilot does when you copy its own selection. Allow takes it at once; Ask each time shows you the text first, to copy or not; Block takes none. A CLI can never read the clipboard, whatever this says.",
+      description: 'What the advanced setting "A CLI putting text on the clipboard" does (Settings → Advanced, under Hive). OSC 52 is the name of a terminal feature: keep it. Allow, Ask each time and Block are the setting\'s choices: use the words its list shows.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'allow', label: msg({ id: 'settings.advanced.hive.terminal.osc52.allow', defaultMessage: 'Allow', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": take the text at once.' }) },
+      { value: 'ask', label: msg({ id: 'settings.advanced.hive.terminal.osc52.ask', defaultMessage: 'Ask each time', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": show the user the text and ask first.' }) },
+      { value: 'block', label: msg({ id: 'settings.advanced.hive.terminal.osc52.block', defaultMessage: 'Block', description: 'A choice of the advanced setting "A CLI putting text on the clipboard": take none.' }) }
+    ],
+    default: 'allow',
+    applies: 'now'
+  },
+  {
+    id: RAW_CARD_START,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.prompt.rawCardStart.title', defaultMessage: "A card's start in its own words", description: "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive types into an agent when a card is started on it." }),
+    desc: msg({
+      id: 'settings.advanced.hive.prompt.rawCardStart.desc',
+      defaultMessage: "When a card is started on an agent, Hive gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Hive's other prompts (its wakes and messages) stay as they are: they are how Hive and its agents talk.",
+      description: 'What the advanced setting "A card\'s start in its own words" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'boolean',
+    default: false,
     applies: 'now'
   },
   // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
@@ -1417,6 +1541,7 @@ const NOT_TAKEN = {
   text: msg({ id: 'settings.advanced.error.text', defaultMessage: '{title} takes text.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
   field: msg({ id: 'settings.advanced.error.field', defaultMessage: '{title} takes a field name: letters, digits and _ (not starting with a digit).', description: "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title." }),
   list: msg({ id: 'settings.advanced.error.list', defaultMessage: '{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
+  choice: msg({ id: 'settings.advanced.error.choice', defaultMessage: '{title} takes one of {choices}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them." }),
   boolean: msg({ id: 'settings.advanced.error.boolean', defaultMessage: '{title} takes true or false.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them." }),
   number: msg({ id: 'settings.advanced.error.number', defaultMessage: '{title} takes a whole number from {min} to {max}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {min} and {max} are numbers." })
 }
@@ -1460,6 +1585,12 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
       if (raw === 'true' || raw === 'on') return { value: true }
       if (raw === 'false' || raw === 'off') return { value: false }
       return refused(withValues(NOT_TAKEN.boolean, { title }))
+    }
+    case 'choice': {
+      const v = typeof raw === 'string' ? raw.trim().toLowerCase() : null
+      const found = def.choices?.find((c) => c.value === v)
+      if (!found) return refused(withValues(NOT_TAKEN.choice, { title, choices: (def.choices ?? []).map((c) => c.value).join(', ') }))
+      return { value: found.value }
     }
     case 'number': {
       const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim()) : NaN
@@ -1632,6 +1763,8 @@ export function advancedShown(def: AdvancedDef, v: unknown): string {
       ? tr(msg({ id: 'settings.advanced.on', defaultMessage: 'on', description: "An advanced setting's value when it is on (Settings → Advanced)." }))
       : tr(msg({ id: 'settings.advanced.off', defaultMessage: 'off', description: "An advanced setting's value when it is off (Settings → Advanced)." }))
   if (def.kind === 'number' && typeof v === 'number' && def.unit && UNITS[def.unit]) return tr(UNITS[def.unit], { n: v })
+  const choice = def.kind === 'choice' ? def.choices?.find((c) => c.value === v) : undefined
+  if (choice) return shownText(choice.label)
   return advancedText(def, v)
 }
 
@@ -1695,5 +1828,7 @@ export function advancedTakesText(d: AdvancedDef): Text {
       return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Hive looks for on a CLI's screen, as it is." })
     case 'boolean':
       return msg({ id: 'settings.advanced.takes.boolean', defaultMessage: 'On or off (true or false).', description: 'What an advanced setting takes (Settings → Advanced). true and false are the values as written in advanced.json: keep them.' })
+    case 'choice':
+      return withValues(msg({ id: 'settings.advanced.takes.choice', defaultMessage: 'One of {choices}.', description: 'What an advanced setting takes (Settings → Advanced): one of a few values. {choices} lists them as advanced.json writes them (allow, ask, block): keep them.' }), { choices: (d.choices ?? []).map((c) => c.value).join(', ') })
   }
 }

@@ -25,6 +25,8 @@ import type {
   AgentApiInfo,
   AgentInfo,
   AssistantAction,
+  AssistantChangeGroup,
+  AssistantUndoResult,
   AssistantQuestion,
   ProgressRun,
   MergeSlotInfo,
@@ -92,6 +94,10 @@ export interface ConfirmRequest {
   message: string
   /** Items (paths) under the message, one per line, with a Copy button (#347): never lines joined into message. */
   list?: readonly string[]
+  /** The list is to read, not to copy (a CLI's clipboard text Hive asks about, #1292): no Copy button. */
+  listOnly?: boolean
+  /** The list is text as it was written (a CLI's clipboard text, #1292): monospace, its spacing kept, even with listOnly. */
+  listMono?: boolean
   detail?: string
   /** A long detail scrolls in its own box, the dialog's buttons staying in view (a template's agents, #268). */
   scrollDetail?: boolean
@@ -265,6 +271,9 @@ interface State {
   /** What the Hive Assistant did in this window's workspace (oldest first), and what it is asking the user. */
   assistantActions: AssistantAction[]
   assistantQuestions: AssistantQuestion[]
+  /** The Assistant's changes kept for undo, by the user's message (#1283), and what each undo in this window did. */
+  assistantChanges: AssistantChangeGroup[]
+  assistantUndone: Record<string, AssistantUndoResult>
   /** Agents the Assistant added that the user hasn't looked at yet, by project path (their page's button shows a dot). */
   newAgents: Record<string, string[]>
   modesVersion: number
@@ -406,6 +415,8 @@ interface State {
   taskOpen: number | { project: string } | null
   /** The card whose Start dialog is open. */
   taskStartFor: number | null
+  /** Start lane… (#1280): open for a project (its path; null: the first with agents), with these cards chosen first. */
+  laneStartFor: { project: string | null; cards: number[] } | null
   /** The Archive All dialog (#351): a column's (or the whole board's, column null) cards as the board shows them. */
   boardArchiveAll: ArchiveAllRequest | null
   /** A card being moved to Doing: the Move to Doing dialog asks who has it. */
@@ -481,6 +492,8 @@ export const useStore = create<State>(() => ({
   assistantSettingsOpen: false,
   assistantActions: [],
   assistantQuestions: [],
+  assistantChanges: [],
+  assistantUndone: {},
   newAgents: {},
   modesVersion: 0,
   docsPage: 'guide',
@@ -557,6 +570,7 @@ export const useStore = create<State>(() => ({
   boardForYou: false,
   taskOpen: null,
   taskStartFor: null,
+  laneStartFor: null,
   boardArchiveAll: null,
   taskDoing: null,
   removeProjectFor: null,

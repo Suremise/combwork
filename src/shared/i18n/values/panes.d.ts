@@ -124,6 +124,8 @@ interface HiveMessageValues {
   'panes.resume.recache': { tokens: string | number }
   'panes.resume.sessionsTab': undefined
   'panes.resume.tip': { session: string | number; when: string | number }
+  'panes.runtime.hooksMissing': { provider: string | number }
+  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; after: string }
   'panes.runtime.needsInput': undefined
   'panes.runtime.signin': undefined
   'panes.runtime.silent': { known: string; minutes: number }
@@ -179,6 +181,11 @@ interface HiveMessageValues {
   'panes.template.save': undefined
   'panes.template.scopeHeading': { scope: string }
   'panes.terminal.exited': { code: string | number }
+  'panes.terminal.osc52.askCopy': undefined
+  'panes.terminal.osc52.askDont': undefined
+  'panes.terminal.osc52.askMessage': { n: number }
+  'panes.terminal.osc52.askMore': { n: number }
+  'panes.terminal.osc52.askTitle': undefined
   'panes.terminal.pasteFailed': undefined
   'panes.tiles.back': undefined
   'panes.tiles.backTip': { key: string }

@@ -28,3 +28,21 @@ export function copyPasteKey(e: { key: string; ctrlKey: boolean; metaKey: boolea
   if (k === 'v') return 'paste'
   return hasSelection ? 'copy' : null
 }
+
+/**
+ * Whether a key pressed in an agent's pane (`key`, as shortcuts write it: "Ctrl+Shift+P") is one of Hive's shortcuts
+ * rather than the CLI's: one bound in Hive (`bound`) that the CLI doesn't use itself (`reserved`). With every key going
+ * to the CLI (#1292, Settings → Advanced: All keys go to the CLI), only the command palette's shortcut (`palette`)
+ * stays Hive's, so every command is still in reach: a two-step one ("Ctrl+K Ctrl+P") by its first key, which starts
+ * Hive's chord, then its second while that chord is pending (`pending`: its first key); any other key goes to the CLI.
+ */
+export function appTakesTerminalKey(key: string, o: { allKeysToCli: boolean; palette: string | null | undefined; reserved: ReadonlySet<string>; bound: readonly string[]; pending?: string | null }): boolean {
+  const norm = key.toUpperCase()
+  if (o.allKeysToCli) {
+    const steps = o.palette ? o.palette.toUpperCase().split(' ') : []
+    if (steps.length === 2) return o.pending ? o.pending.toUpperCase() === steps[0] && norm === steps[1] : norm === steps[0]
+    return steps.length === 1 && norm === steps[0]
+  }
+  if (o.reserved.has(norm)) return false
+  return o.bound.includes(norm)
+}

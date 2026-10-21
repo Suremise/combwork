@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "Ese cambio del Asistente ya no se conserva: los cambios se conservan 7 días.",
+  "errors.assistantUndo.which": "Elige un cambio del Asistente para deshacer, o los cambios de un mensaje.",
   "errors.changes.notFile": "{file} no es un archivo de la carpeta {folder}.",
   "errors.console.hidden": "La consola de desarrollador está oculta: activa Configuración → Avanzado → Mostrar funciones para desarrolladores.",
   "errors.console.notRecording": "No es una grabación de la consola de desarrollador",
@@ -28,6 +30,7 @@
   "errors.hive.noRepo": "Ningún repositorio git contiene este proyecto: excluye .hive en el control de versiones o el servicio de sincronización que uses.",
   "errors.hive.notIgnored": "Git aún no ignora .hive aquí: puede que una regla de un .gitignore (una línea que empieza por !) lo vuelva a incluir. Hive no edita los archivos .gitignore.",
   "errors.image.not": "No es una imagen",
+  "errors.lane.builderRequired": "Se necesita el autor del carril",
   "errors.lane.required": "Hay que indicar qué carril terminar",
   "errors.log.gone": "El registro ya no está: {path}",
   "errors.log.none": "Esa ejecución no indicó ningún registro.",

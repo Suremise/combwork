@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "助手的这项变更已不再保留：变更只保留 7 天。",
+  "errors.assistantUndo.which": "请选择要撤销的一项助手变更，或一条消息的全部变更。",
   "errors.changes.notFile": "{file} 不是 {folder} 中的文件。",
   "errors.console.hidden": "开发者控制台已隐藏：请打开“设置”→“高级”→“显示开发者功能”。",
   "errors.console.notRecording": "不是开发者控制台的录制内容",
@@ -28,6 +30,7 @@
   "errors.hive.noRepo": "此项目不在任何 git 仓库中：请在你使用的版本控制或同步服务中排除 .hive。",
   "errors.hive.notIgnored": "Git 在此处仍未忽略 .hive：某个 .gitignore 中的规则（以 ! 开头的行）可能把它重新包含了进来。Hive 不会编辑 .gitignore 文件。",
   "errors.image.not": "不是图片",
+  "errors.lane.builderRequired": "需要指定通道的构建者",
   "errors.lane.required": "必须指定要结束的通道",
   "errors.log.gone": "日志已不存在：{path}",
   "errors.log.none": "该运行没有报告日志。",

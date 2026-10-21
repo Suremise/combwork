@@ -4,15 +4,17 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AssistantControl, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
-import { publicReason, type ActivityAgent, type ActivityTarget } from '../shared/assistantActivity'
+import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
+import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
+import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { fallbackEfforts, modelGroups } from '../shared/models'
-import { agentRuntime, unknownStateText } from '../shared/runtime'
+import { agentRuntime, hooksMissingText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
@@ -68,7 +70,7 @@ import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { cardStages } from './boardStore'
-import { cardFacts, factRow } from './workflow/cardWork'
+import { cardFacts, cardKind, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
@@ -419,9 +421,14 @@ function progressOf(projectPath: string, agentId: string) {
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
 }
 
-/** An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648). */
+/**
+ * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
+ * does one whose hooks aren't reaching Hive (#1336).
+ */
 const statusMessageOf = (live: LiveSessionState | null | undefined): string | null =>
-  live?.status === 'watching'
+  live?.hooksMissing
+    ? `${hooksMissingText(live)}: its CLI's hooks aren't reaching Hive, so its status may be wrong and it isn't given work; the user can restart its session`
+    : live?.status === 'watching'
     ? (live.watch?.label ?? null)
     : live?.status === 'signin'
       ? `Its CLI's sign-in has expired: the user must sign in again (${live.signIn?.message ?? 'not signed in'})`
@@ -512,7 +519,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
  */
-async function assistantChange<T>(need: AssistantControl, what: string, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: string; said?: string; brief?: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+async function assistantChange<T>(need: AssistantControl, what: string, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: string; said?: string; brief?: string; act?: Partial<ActivityTarget>; result: T } & UndoNotes>): Promise<T> {
   const ws = assistantCaller()
   if (!ws) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API.`)
   const line = what.charAt(0).toUpperCase() + what.slice(1)
@@ -520,7 +527,12 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
-    const { done, said, brief, act: more, result } = await fn(guard)
+    // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
+    const { done, said, brief, act: more, result } = await recordingChanges(ws, act.kind, what, async () => {
+      const out = await fn(guard)
+      await noteDone(requireWorkspace(), { ...act, ...out.act }, out)
+      return out
+    })
     const pub = brief ?? (said ? done : undefined)
     assistant.record(ws, { ...act, ...more }, done + (said ?? ''), undefined, pub !== undefined ? { brief: pub } : {})
     return result
@@ -530,8 +542,53 @@ async function assistantChange<T>(need: AssistantControl, what: string, act: Act
   }
 }
 
+/**
+ * Why each kind of the Assistant's change that undo can't take back can't be (#1282, SPEC §16.14), as the window and the
+ * undo tool say it. Card changes, lanes, agents' settings and settings are recorded by what made them; an agent it started
+ * here, so undo can stop it.
+ */
+const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
+  'prompt-agent': UNDO_FINAL.prompt,
+  'message-agent': UNDO_FINAL.message,
+  'comment-task': UNDO_FINAL.comment,
+  'hand-over': UNDO_FINAL.handOver,
+  'create-project': UNDO_FINAL.projectMade,
+  'activate-project': UNDO_FINAL.projectOpened,
+  'deactivate-project': UNDO_FINAL.projectClosed,
+  'add-agent': UNDO_FINAL.agentAdded,
+  'stop-agent': UNDO_FINAL.agentStopped,
+  'reorder-tasks': UNDO_FINAL.cardsOrder,
+  'cancel-messages': UNDO_FINAL.withdrawn,
+  'lane-end': UNDO_FINAL.laneEnded
+}
+
+/**
+ * What a change of the Assistant's tells its recorder for undo (#1282): the launch it started, as the start returned it
+ * (undo stops only that one, while it runs), and what of it stays whatever undo does (an intent's facts: its
+ * submission, verdict, question), said beside what can be undone.
+ */
+interface UndoNotes {
+  started?: { project: string; agentId: string; run: string }
+  stays?: string
+}
+
+/** Said of a change that changed nothing undo puts back, when its kind has no words of its own. */
+const NOTHING_TO_UNDO = UNDO_FINAL.nothing
+
+/**
+ * What the change running here leaves for undo once done (#1282 round 3): an agent it started (the launch the start
+ * returned), what of it stays, and, for any change that recorded nothing else, why it can't be undone: every change is
+ * listed, none left out. Undo itself is never recorded (it is deliberately not undoable).
+ */
+async function noteDone(ws: WorkspaceService, act: ActivityTarget, notes: UndoNotes): Promise<void> {
+  if (act.kind === 'undo') return
+  if (notes.started) await noteChange(ws, { kind: 'started', project: notes.started.project, target: notes.started.agentId, card: act.card ?? null, fields: [{ field: 'run', old: null, new: notes.started.run }] })
+  if (notes.stays) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: notes.stays })
+  if (!recordedHere()) await noteChange(ws, { kind: 'final', project: act.project ?? null, card: act.card ?? null, final: FINAL_WHY[act.kind] ?? NOTHING_TO_UNDO })
+}
+
 /** An agent as an action names it (#763). */
-const actAgent = (a: { id: string; name: string }): ActivityAgent => ({ id: a.id, name: a.name })
+const actAgent =(a: { id: string; name: string }): ActivityAgent => ({ id: a.id, name: a.name })
 /** A lane as an action names it: its id, project, cards and builder. */
 const laneAct = (l: Pick<LaneInfo, 'id' | 'project' | 'cards' | 'builder'>): Partial<ActivityTarget> => ({ lane: l.id, project: l.project, cards: l.cards.map((c) => c.number), agent: actAgent(l.builder) })
 
@@ -555,7 +612,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 7
+export const API_VERSION = 8
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -817,7 +874,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
 
 /**
  * A setting the Hive Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
- * within this turn's limit of changes, and listed in its panel with old → new for Revert. Other callers can't.
+ * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
   const path = settingPath(e)
@@ -835,12 +892,8 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     assistant.record(ws, act, line, 'only the user can change it', { reason: 'Only the user can change it' })
     throw new HttpError(403, `${e.readOnly} Tell the user how, instead.`)
   }
-  // Checked before it counts as a change: a value it can't take is the Assistant's to fix, not one of its 30.
+  // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
-  if (!assistant.countAction(ws)) {
-    assistant.record(ws, act, line, `limit of ${assistant.MAX_ACTIONS_PER_TURN} changes for one message`, { reason: publicReason(429) })
-    throw new HttpError(429, `You have made ${assistant.MAX_ACTIONS_PER_TURN} changes for this message, the most Hive allows for one. Tell the user what is done and ask whether to go on.`)
-  }
   // Asked again at the moment of the change (a project's under its lock, after any wait for it): Change settings may have
   // been turned off, or the Assistant stopped, meanwhile.
   // The same session, too: one started since (a restart) mustn't carry out this one's pending change.
@@ -858,6 +911,9 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     if (changed) {
       // The event stream says which setting, not its values (`brief`).
       assistant.record(ws, act, `Changed ${path}${where}: ${oldText} → ${newText}`, undefined, { brief: `Changed ${path}${where}`, setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
+      // For undo (#1282): its value (and a provider's removed models) as it was and as set.
+      const fields = [{ field: 'value', old: r.old, new: r.new }, ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])]
+      await recordingChanges(ws, 'setting', `change ${path}${where}`, () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
     return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}) }
@@ -866,6 +922,50 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     throw err instanceof SettingRefused ? new HttpError(err.status, err.message) : err
   }
 }
+
+/** How many of its messages' changes the Assistant's list gives (its newest; GET /v1/assistant/changes). */
+const CHANGE_GROUPS_LISTED = 10
+
+/**
+ * The Assistant's own changes, kept for undo (#1282, SPEC §16.14): its newest messages' groups, each change with its id,
+ * its line, its card, the fields it set, whether it was undone, and why one can't be (`final`). Only the Assistant's.
+ */
+route('GET', '/v1/assistant/changes', async () => {
+  if (!assistantCaller()) throw new HttpError(403, 'Only the Hive Assistant has changes to undo: they are its own.')
+  return changeGroups(requireWorkspace())
+    .slice(0, CHANGE_GROUPS_LISTED)
+    .map((g) => ({ group: g.id, at: g.at, changes: g.changes.map((c) => ({ id: c.id, what: c.what, ...(c.card !== undefined ? { card: c.card } : {}), fields: c.fields, ...(c.final ? { final: c.final } : {}), ...(c.undoneAt ? { undone: true } : {}) })) }))
+})
+
+/**
+ * The Assistant undoes changes of its own (#1282): `change` (an id from GET /v1/assistant/changes), or `group` (a message's,
+ * or "latest": its newest message with a change not undone). Never another's: only its own are kept. A change of its
+ * own, listed in its panel; what was skipped (changed since, gone) is said.
+ */
+route('POST', '/v1/assistant/undo', async ({ body }) => {
+  const ws = requireWorkspace()
+  const change = typeof body?.change === 'string' && body.change ? body.change : undefined
+  let group = typeof body?.group === 'string' && body.group ? body.group : undefined
+  if (!change === !group) throw new HttpError(400, 'Name one change (change: its id) or one message\'s changes (group: its id, or "latest").')
+  if (group === 'latest') {
+    group = changeGroups(ws).find((g) => g.changes.some((c) => !c.undoneAt && !c.final))?.id
+    if (!group) throw new HttpError(404, 'None of your changes of the last 7 days is left to undo.')
+  }
+  return assistantChange('agents', change ? `undo a change of yours` : `undo your changes for a message`, { kind: 'undo' }, async (guard) => {
+    let results: AssistantUndoResult[]
+    try {
+      // Its control level and its launch, checked again at each change's write (#1282 round 1): turned down or ended
+      // meanwhile, the rest isn't undone.
+      results = await undoChanges(ws, change ? { change } : { group }, 'assistant', guard)
+    } catch (e) {
+      throw e instanceof UndoNotFound ? new HttpError(404, e.message) : e
+    }
+    const undone = results.filter((r) => r.undone.length).length
+    const skipped = results.reduce((n, r) => n + r.skipped.length, 0)
+    const cards = [...new Set(results.flatMap((r) => (r.card !== undefined ? [r.card] : [])))]
+    return { done: `Undid ${undone} of ${results.length} change${results.length === 1 ? '' : 's'} of its own${skipped ? ` (${skipped} field${skipped === 1 ? '' : 's'} left: changed since or gone)` : ''}`, act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
+  })
+})
 
 route('POST', '/v1/projects', async ({ body }) => {
   const name = String(body?.name ?? '').trim()
@@ -963,10 +1063,11 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     let started = ''
     let didStart: boolean | null = null
+    // The launch it started, for undo (#1282): stopped only while that one runs.
+    let launched: string | null = null
     if (body?.start || prompt) {
       try {
-        if (prompt) await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line }))
-        else await sessions.start(p, { agentId: def.id })
+        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line })) : await sessions.start(p, { agentId: def.id }))?.runId ?? null
         started = ' and started it'
         didStart = true
       } catch (e) {
@@ -978,7 +1079,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     const said = prompt && didStart ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined
     // The stream's line is Hive's own words: neither why it didn't start nor the reuse note (git's words) goes there.
     const brief = `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch})` : ''}${didStart === true ? ' and started it' : didStart === false ? "; it didn't start" : ''}`
-    return { done: `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch}${reuse ? `: ${reuse}` : ''})` : ''}${started}`, said, brief, act: { agent: actAgent(def) }, result: { agent: addedForAgents(def), project: await projectSummary(p), ...(reuse ? { reuse } : {}) } }
+    return { done: `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch}${reuse ? `: ${reuse}` : ''})` : ''}${started}`, said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p), ...(reuse ? { reuse } : {}) } }
   })
 })
 
@@ -987,7 +1088,10 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   const agentId = await agentParam(p, params[1] && decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async () => {
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) })
+    // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
+    let was: AgentDef | undefined
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) }, { check: (current) => void (was = structuredClone(current)) })
+    if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }
   })
@@ -1007,7 +1111,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line })) : await sessions.start(p, { agentId, resumeId })
-    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st }
+    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
 
@@ -1568,6 +1672,7 @@ route('POST', '/v1/lanes', async ({ body }) =>
     if (!assistantCaller()) return start()
     const builderAct = await knownAgent(basename(p), builder)
     return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
+      // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
       const r = await start()
       // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
       // lane watch (#531) on every running lane, or on this one, follows it.
@@ -1856,7 +1961,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const elsewhere = await tasks.refsOutside([...new Set([...c.blockedBy, ...c.links])], scope)
   // Its 1.0 stage (#1223, SPEC §16.4.3) from the card's row, after the document's fields: additive.
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), stage }
+  // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
+  const k = cardKind(workspace, c.number)
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2003,7 +2110,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, 'title is required')
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}) }
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, []) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.createTask(input, actor))
@@ -2022,12 +2129,30 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const comment = typeof body?.comment === 'string' ? body.comment.trim() : ''
   const actor = await taskActor()
   const changes: string[] = []
-  const apply = async (commit?: () => void): Promise<TaskCard> => {
+  // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
+  const kind = body?.kind
+  const confirmKind = body?.confirmKind
+  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, 'confirmKind is true (make it no-code, as proposed) or false (keep it as code).')
+  // Checked before anything is written (HR3's #1277 round 1): a kind no card has is refused whole.
+  if (kind !== undefined) tasks.kindOf(kind)
+  // The override's reason is the kind change's when no column moves with it.
+  if (kind !== undefined && patch.column === undefined) delete patch.override
+  const write = async (commit?: () => void): Promise<TaskCard> => {
+    if (confirmKind !== undefined) {
+      await tasks.confirmKind(n, confirmKind, actor, { commit })
+      changes.push(confirmKind ? 'Confirmed as no code' : 'Kept as code')
+    }
+    if (kind !== undefined) {
+      await tasks.setKind(n, kind, actor, { commit, reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
+      changes.push(`Kind: ${kind}`)
+    }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor) : await tasks.readTask(n, actor)
     if (comment) changes.push('Commented')
     return c
   }
+  // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
+  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await apply())
   const was = await tasks.getTask(n).catch(() => null)
@@ -2047,6 +2172,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
             : '',
       comment ? 'commented' : '',
       patch.decision !== undefined ? 'recorded a decision' : '',
+      confirmKind !== undefined ? (confirmKind ? 'confirmed it as no code' : 'kept it as code') : '',
+      kind !== undefined ? `made it ${kind}` : '',
       Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? 'changed it' : ''
     ]
       .filter(Boolean)
@@ -2387,8 +2514,25 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
     const { done, card } = await runCardIntent(ref, actor, intent)
     const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
-    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done }
+    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
   })
+}
+
+/**
+ * What of an intent stays whatever undo does (#1282 round 3): its facts in the card's work. A column or agent it changed
+ * is undone as any card field; this is said beside it, so nothing of it is left out.
+ */
+const INTENT_STAYS: Partial<Record<CardIntent['kind'], string>> = {
+  start: UNDO_FINAL.start,
+  putBack: UNDO_FINAL.putBack,
+  submit: UNDO_FINAL.submit,
+  declarePaths: UNDO_FINAL.declarePaths,
+  startReview: UNDO_FINAL.startReview,
+  verdict: UNDO_FINAL.verdict,
+  reportMerge: UNDO_FINAL.reportMerge,
+  ask: UNDO_FINAL.ask,
+  cannot: UNDO_FINAL.cannot,
+  request: UNDO_FINAL.request
 }
 
 /** A body's text field, trimmed; required ones refused when missing or empty. */
@@ -2479,6 +2623,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     return {
       done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },
+      ...(r.run && card.project ? { started: { project: card.project, agentId: r.agentId, run: r.run } } : {}),
       result: { ok: true, agent: r.agentName, added: r.added, card: shortReply(body) ? taskRow(await taskView(r.card)) : await taskView(r.card) }
     }
   })

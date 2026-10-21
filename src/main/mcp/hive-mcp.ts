@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
@@ -624,11 +624,12 @@ const tools: Tool[] = [
         blocked: { type: 'string', description: "Why it can't go on yet." },
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
-        context: contextArg
+        context: contextArg,
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' }
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, reply: 'short' })) as TaskChange)
+    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), reply: 'short' })) as TaskChange)
   },
   {
     name: 'hive_update_task',
@@ -655,20 +656,26 @@ const tools: Tool[] = [
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
         decision: { type: 'string', description: "Records a decision the user made about the card (scope, wording, a default), in a sentence; it is attributed to the user. Only what the user decided, never your own choice. Only the user changes or removes decisions." },
-        ...(ASSISTANT ? { override: overrideArg } : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
+        ...(ASSISTANT
+          ? {
+              override: overrideArg,
+              kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
+              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' }
+            }
+          : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
       },
       required: ['number']
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind']) if (a[k] !== undefined) body[k] = a[k]
       return changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
     }
   },
   {
     name: 'hive_update_tasks',
     description: ASSISTANT
-      ? "Change up to 100 cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (unknown, archived, in Doing with another agent...) is left as it was and the rest still change. The call counts as one change toward this message's limit, however many cards it has. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. A move that skips a card's workflow rules is refused for that card, naming them; override (the user's own reason) applies to every card. Replies with each card's change and any refused."
+      ? "Change up to 100 cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (unknown, archived, in Doing with another agent...) is left as it was and the rest still change. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. A move that skips a card's workflow rules is refused for that card, naming them; override (the user's own reason) applies to every card. Replies with each card's change and any refused."
       : "Change up to 100 of your project's cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (another project's or unknown, archived, in Doing with another agent...) is left as it was and the rest still change. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. Replies with each card's change and any refused.",
     inputSchema: {
       type: 'object',
@@ -759,13 +766,30 @@ const tools: Tool[] = [
   {
     name: 'hive_update_setting',
     description:
-      "Change one of Hive's settings to value, as Settings would: only when the user asked or agreed. project: the project, for a project's setting (null inherits Hive's). Refused for [read-only] settings (permission modes, the Agent API, what Hive runs, your own Control): tell the user where to change those. It shows in your panel's list with old → new, where the user can revert it, and counts towards your 30 changes per message. Replies with old → new and when it applies.",
+      "Change one of Hive's settings to value, as Settings would: only when the user asked or agreed. project: the project, for a project's setting (null inherits Hive's). Refused for [read-only] settings (permission modes, the Agent API, what Hive runs, your own Control): tell the user where to change those. It shows in your panel's list with old → new, where the user can undo it. Replies with old → new and when it applies.",
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: 'What hive_read_setting says it takes (a table is an object or a list).' }, project: { type: 'string' } },
       required: ['id', 'value']
     },
     run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project })) as Parameters<typeof settingChangedText>[0])
+  },
+  {
+    name: 'hive_undo',
+    description:
+      "Undo changes of your own (kept 7 days, grouped by the user's message they came from): change (an id from list) or group (a message's id, or \"latest\": your newest message with a change left to undo). Each field goes back to what it was unless someone changed it since (left as it is, and said); a card you made is archived, a lane you started abandoned, an agent you started stopped (its work stays). Prompts, messages and comments can't be undone. list: your messages' changes, a line each; with group, its changes and their ids. Only your own changes: never the user's or agents'.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        list: { type: 'boolean' },
+        change: { type: 'string', description: 'A change\'s id, from list with its group.' },
+        group: { type: 'string', description: 'A message\'s id, from list, or "latest".' }
+      }
+    },
+    run: async (a) => {
+      if (a.list === true) return changeListText((await api('GET', '/v1/assistant/changes')) as ChangeGroupListed[], typeof a.group === 'string' && a.group !== 'latest' ? a.group : undefined)
+      return undoText(((await api('POST', '/v1/assistant/undo', { change: a.change, group: a.group })) as { results: UndoneListed[] }).results)
+    }
   },
   {
     name: 'hive_journal_write',

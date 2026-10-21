@@ -2004,6 +2004,16 @@ describe('removal and board under faults', () => {
 
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
+  // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
+  it("in its own words: the card's title, the user's note and its description, nothing of Hive's", async () => {
+    const { rawTaskPrompt } = await import('../src/shared/tasks')
+    expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')
+    expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
+    expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
+    const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
+    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|hive_read_task/)
+  })
+
   it('says when a card is back for more work, and puts the note before the card', async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
     expect(taskPrompt(card, false)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')

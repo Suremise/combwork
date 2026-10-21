@@ -269,6 +269,7 @@ const check = (name, ok, extra = '') => {
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
+
   // The list names cards by key with the number the tools take (#1219): each card's own key, from the board.
   const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key} (#${n})`
   const cardName = await named(cardNo)
@@ -286,7 +287,7 @@ const check = (name, ok, extra = '') => {
   check('both are listed in Done by the Assistant, by key', listed.includes(`Put ${o2Name}, ${o1Name} at the top of Todo`) && listed.some((t) => t && t.startsWith(`${o1Name} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify({ o1Name, o2Name, listed: listed.slice(-3) }))
   const doneTop = await api('PATCH', `/v1/tasks/${cardNo}`, { position: 'top' })
   check("the Assistant can't put Done in order, and the user isn't asked", doneTop.status === 403 && (await page.locator('.assistant-question').count()) === 0, JSON.stringify(doneTop))
-  // A lane the Assistant starts unwatched (#402; its changes count towards the limit below): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
+  // A lane the Assistant starts unwatched (#402): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
@@ -295,19 +296,36 @@ const check = (name, ok, extra = '') => {
   await api('POST', '/v1/tasks/wait', { cancel: true })
   await api('POST', `/v1/lanes/${encodeURIComponent(rewatched.body?.lane?.id ?? unwatched.body?.lane?.id)}/end`, { abandoned: true })
 
-  // At most 30 changes for one message.
-  let status = 200
-  let n = 0
-  while (status === 200 && n < 40) {
-    status = (await api('POST', '/v1/projects/alpha/activate')).status
-    n++
-  }
-  check('at most 30 changes for one message', status === 429, `${status} after ${n}`)
-  // A batch is one change, however many cards (#488): none is left, so it changes none of its cards and says none fit.
-  const batch = await api('POST', '/v1/tasks/batch', { numbers: [o1, o2], column: 'doing' })
-  const columns = [(await api('GET', `/v1/tasks/${o1}`)).body.column, (await api('GET', `/v1/tasks/${o2}`)).body.column]
-  check('a batch over the limit changes none of its cards and says how many fit', batch.status === 429 && batch.body?.fits === 0 && columns.every((c) => c === 'todo'), JSON.stringify({ status: batch.status, body: batch.body, columns }))
-  check('and lists the batch as refused, not as changes', (await inv('assistant:actions')).some((x) => !x.ok && x.text === 'Change 2 cards on the board'))
+  // No limit on its changes for one message (#1170; it stopped at 30): 40 more changes, then a batch, all apply.
+  const statuses = []
+  for (let n = 0; n < 40; n++) statuses.push((await api('POST', '/v1/projects/alpha/activate')).status)
+  check('more than 30 changes for one message all apply', statuses.every((s) => s === 200), JSON.stringify(statuses))
+  const batch = await api('POST', '/v1/tasks/batch', { numbers: [o1, o2], addLabels: ['many'] })
+  const labelled = [(await api('GET', `/v1/tasks/${o1}`)).body.labels, (await api('GET', `/v1/tasks/${o2}`)).body.labels]
+  check('…and a batch after them changes its cards', batch.status === 200 && labelled.every((l) => l?.includes('many')), JSON.stringify({ status: batch.status, body: batch.body, labelled }))
+
+  // Undo (#1282): the user's next message starts a new group of the Assistant's changes. Its own
+  // change, listed by that message and undone with its tool: what it changed comes back, and the undo is listed in Done
+  // by the Assistant. An id that isn't one of its own changes is refused.
+  const before = (await api('GET', '/v1/assistant/changes')).body?.[0]?.group
+  const sinceBefore = (await live(home, 'assistant'))?.statusSince
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+  await until(async () => (async (s) => !!s && ['finished', 'ready'].includes(s.status) && s.statusSince !== sinceBefore)(await live(home, 'assistant')), HUNG_MS)
+  await api('PATCH', `/v1/tasks/${cardNo}`, { labels: ['undo-me'] })
+  const kept = (await api('GET', '/v1/assistant/changes')).body
+  const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === cardNo && c.fields.includes('labels'))
+  check('its change is kept for undo, by its message, with the field it set', !!relabel && kept[0]?.group !== before && kept[0].changes.includes(relabel), JSON.stringify(kept).slice(0, 400))
+  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, HIVE_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
+  const undoneReply = undoTool({ change: relabel?.id })
+  check('hive_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
+  check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
+  check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
+  check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
+  // A change undo can't take back is still listed, with why (#1282 round 3): withdrawn messages aren't sent again.
+  const cancelled = await api('POST', '/v1/projects/alpha/agents/Builder/message', { cancel: true })
+  const finals = ((await api('GET', '/v1/assistant/changes')).body?.[0]?.changes ?? []).filter((c) => c.final)
+  check("a change it can't undo is listed with why", cancelled.status === 200 && finals.some((c) => /withdrew/.test(c.final)), JSON.stringify({ status: cancelled.status, finals }))
 
   // The tools its hive MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {

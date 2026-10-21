@@ -1,4 +1,6 @@
 {
+  "errors.assistantUndo.gone": "Ta zmiana Asystenta nie jest już przechowywana: zmiany są przechowywane przez 7 dni.",
+  "errors.assistantUndo.which": "Wybierz jedną zmianę Asystenta do cofnięcia albo zmiany jednej wiadomości.",
   "errors.changes.notFile": "{file} nie jest plikiem folderu {folder}.",
   "errors.console.hidden": "Konsola deweloperska jest ukryta: włącz Ustawienia → Zaawansowane → Pokazuj funkcje deweloperskie.",
   "errors.console.notRecording": "To nie jest nagranie konsoli deweloperskiej",
@@ -28,6 +30,7 @@
   "errors.hive.noRepo": "Ten projekt nie jest w żadnym repozytorium git: wyklucz .hive w używanym systemie kontroli wersji lub usłudze synchronizacji.",
   "errors.hive.notIgnored": "Git nadal nie ignoruje tu .hive: reguła w pliku .gitignore (wiersz zaczynający się od !) może go przywracać. Hive nie edytuje plików .gitignore.",
   "errors.image.not": "To nie jest obraz",
+  "errors.lane.builderRequired": "Wymagany jest wykonawca toru",
   "errors.lane.required": "Trzeba podać, który tor zakończyć",
   "errors.log.gone": "Logu już nie ma: {path}",
   "errors.log.none": "To uruchomienie nie zgłosiło logu.",
