@@ -991,6 +991,18 @@
     "defaultMessage": "Go to project",
     "description": "The command palette's placeholder when it lists projects (Go to Project…)."
   },
+  "shell.path.copied": {
+    "defaultMessage": "Path copied",
+    "description": "A notification: a path (a folder or a worktree in a list) was copied to the clipboard in full."
+  },
+  "shell.path.copy": {
+    "defaultMessage": "Copy path",
+    "description": "A list's per-row button: copies the row's full path (a folder or a worktree) to the clipboard."
+  },
+  "shell.path.copyFailed": {
+    "defaultMessage": "Couldn't copy the path",
+    "description": "A notification: copying a path to the clipboard failed."
+  },
   "shell.providers.choose": {
     "defaultMessage": "Choose providers",
     "description": "The banner's button: opens Settings → Providers."
