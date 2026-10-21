@@ -9,11 +9,17 @@ import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
+import type { TaskMoveResult } from '../shared/types'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
-import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, type Planned } from './workflow/recorder'
+import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
+import { workflowEnforced, workflowFor } from './workflow/service'
+import { alongside, isRefusal, type Workflow } from './workflow/runtime'
+import { hasStage } from '../shared/workflow/compile'
+import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
+import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
 import { afterBoardWrite, archiveBatchDocs, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -89,6 +95,16 @@ export class TaskPermissionError extends HiveError {
 export class TaskConflictError extends HiveError {
   constructor(text: Text) {
     super(text, { kind: 'conflict' })
+  }
+}
+
+/**
+ * A move the card's workflow rules refused (#1265, SPEC §16.8.3): its message for the window and the log, and the whole
+ * refusal (rule, the three English sentences, who can override) for the Agent API's 409.
+ */
+export class WorkflowRefusedError extends TaskConflictError {
+  constructor(readonly refusal: Refusal) {
+    super(withValues(REFUSALS[refusal.rule].message, refusal.values as Record<string, string | number>))
   }
 }
 
@@ -972,10 +988,120 @@ async function createTaskLocked(
  * so nothing that reads the card meanwhile (a card watch waking its agent, the board) sees the move without it.
  */
 export async function updateTask(...args: Parameters<typeof updateTaskLocked>): Promise<TaskCard> {
-  const [n, patch, actor] = args
+  const [n, patch, actor, opts = {}] = args
   const ws = workspace
+  checkOverride(patch, actor)
+  // The user's or the Assistant's column move, through the card's workflow rules (#1265): its reads made by the runtime,
+  // before its own lock; the rest of the change saved with the move, in its transaction.
+  const gate = await gateOf(ws, n, patch, actor)
+  if (gate) return moveThrough(gate, n, patch, actor, opts)
   const reads = await gatherReads(ws, await planned(ws, [n], patch, actor))
   return recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+}
+
+/** An override is the user's or the Assistant's (SPEC §16.8.4): agents never override a rule. */
+function checkOverride(patch: TaskPatch, actor: TaskActor): void {
+  if (patch.override === undefined) return
+  if (actor.kind === 'agent') throw new TaskPermissionError(msg({ id: 'tasks.error.overrideNotAgents', defaultMessage: "Agents can't override workflow rules: only the user or the Assistant can.", description: 'An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can.' }))
+  if (!patch.override || typeof patch.override !== 'object' || typeof patch.override.reason !== 'string') throw hiveError(msg({ id: 'tasks.error.overrideShape', defaultMessage: 'An override is { "reason": "<why>" }.', description: 'An error: an override was passed in another shape. Keep the JSON as it is.' }), undefined, { kind: 'invalid' })
+}
+
+/** A column move the workflow runtime makes: the card's runtime, the stage it goes to, by whom, and the agent a start gives it to. */
+interface Gate {
+  wf: Workflow
+  to: StageId
+  by: 'user' | 'assistant'
+  builder?: string
+}
+
+/**
+ * Whether a change is a column move through the card's workflow rules (#1265, SPEC §16.7.1): the user's or the
+ * Assistant's (agents' moves are #1268's), with the rules enforced (Settings → Advanced), of a card from 1.0 (one from
+ * before keeps P3's path until it starts) in a project with a platform, to a stage its ruleset has. A column its
+ * ruleset doesn't have (Review with no review, say) keeps P3's recorded move until the board asks about it (#1290).
+ */
+async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<Gate | null> {
+  if (patch.column === undefined || !isTaskColumn(patch.column) || (actor.kind !== 'user' && actor.kind !== 'assistant')) return null
+  if (!ws.path || !workflowEnforced()) return null
+  const head = cardHeads(ws, [n])[0]
+  if (!head || typeof head.project !== 'string' || !head.project || head.column === patch.column) return null
+  const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
+  if (!wf) return null
+  const rec = (() => {
+    try {
+      return wf.store.card(n)
+    } catch {
+      return null
+    }
+  })()
+  if (!rec || rec.preWorkflow) return null
+  const to = CATEGORY_STAGE[patch.column]
+  const s = wf.state(rec)
+  if (s.stage === to || !hasStage(wf.rulesetOf(rec, s), to)) return null
+  const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : typeof head.agent === 'string' && head.agent ? head.agent : null
+  return { wf, to, by: actor.kind, ...(agent ? { builder: agent } : {}) }
+}
+
+/** What a move through the rules came to: moved (the card as saved), asked (the rules it would skip), or refused. */
+export type MoveResult = TaskMoveResult
+
+/**
+ * A column move through the card's runtime (#1265): the runtime's intents and facts, and in each of its writes the
+ * card's 0.9 fields (column, place, history, agent, review), so the board, watches, lanes and the Agent API's card follow
+ * it in the same transaction; the rest of the change (`patch`'s other fields, the comment) is saved with the first
+ * write, its place with the write that reaches the column asked for. The user's move with `confirm` skips what it must
+ * and records an `Override`; the Assistant's needs `override.reason` for that.
+ */
+async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}, confirm = true): Promise<MoveResult> {
+  const ws = workspace
+  const target = patch.column!
+  const { column: _column, before, position, override, ...rest } = patch
+  let saved: TaskCard | null = null
+  let first = true
+  const reply = await recording(actor, null, () =>
+    alongside(
+      {
+        written: async (w) => {
+          const column = STAGE_CATEGORY[w.current]
+          const placed = column === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
+          const p: TaskPatch = { ...(first ? rest : {}), column, ...placed }
+          const o = first ? opts : {}
+          first = false
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...o, was: STAGE_CATEGORY[w.was] }))
+        }
+      },
+      () => g.wf.move(n, g.to, g.by, { confirm, ...(override?.reason.trim() ? { reason: override.reason.trim() } : {}), ...(g.builder ? { builder: g.builder } : {}) })
+    )
+  )
+  if (isRefusal(reply)) return { refused: reply }
+  if ('ask' in reply) return saved ? { moved: saved } : { ask: reply.rules }
+  if (saved) return { moved: saved }
+  // Nothing moved (the card was already there): the rest of the change, as any other.
+  const others: TaskPatch = { ...rest, ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) }
+  return { moved: Object.keys(others).length || opts.comment ? await updateTask(n, others, actor, opts) : await getTask(n, ws) }
+}
+
+async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
+  // Interim (#1290, #1275): the user's moves don't ask yet, so a move that skips a rule records its Override.
+  const r = await moveThroughRules(g, n, patch, actor, opts, true)
+  if ('refused' in r) throw new WorkflowRefusedError(r.refused)
+  if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: `#${n}`, stage: g.to, rules: r.ask.join(', ') }, 'the user'))
+  return r.moved
+}
+
+/**
+ * The window's move (`tasks:move`, #1265): through the card's rules when they apply, asking first unless `confirm`
+ * (the rules it would skip, nothing written), else a plain move. Never refused for a rule: the user overrides.
+ */
+export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string } = {}): Promise<MoveResult> {
+  const actor: TaskActor = { kind: 'user' }
+  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
+  const gate = await gateOf(workspace, n, patch, actor)
+  if (!gate) {
+    const { override: _o, ...plain } = patch
+    return { moved: await updateTask(n, plain, actor) }
+  }
+  return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm)
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */
@@ -1017,12 +1143,12 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -1032,6 +1158,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
   let intoDone = false
   const result = await (async () => {
     const card = await getTask(n, ws)
+    // A move the runtime made in this transaction (#1265) has saved the card's column already: its 0.9 fields (history,
+    // place, review) are worked out from where it was.
+    if (opts.was) card.column = opts.was
     // As it was, for the change's facts (#1216): the change edits `card` in place.
     const before = structuredClone(card)
     const scope = scopeOf(actor)
@@ -1207,7 +1336,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
 export const MAX_CHANGE_BATCH = 100
 
 /** The fields a batch sets on every card it names (hive_update_tasks): comments, decisions and titles stay on the single call. */
-export type BatchPatch = Pick<TaskPatch, 'column' | 'position' | 'blocked' | 'labels' | 'addLabels' | 'removeLabels' | 'agent'>
+export type BatchPatch = Pick<TaskPatch, 'column' | 'position' | 'blocked' | 'labels' | 'addLabels' | 'removeLabels' | 'agent' | 'override'>
 
 /** What a batch did with one card: its change's history lines, or why it was refused (the card left as it was). */
 export interface BatchItem {
@@ -1232,6 +1361,7 @@ export function batchNumbers(numbers: unknown): number[] {
  * Position applies to each card in turn, so the last listed ends at the top (or bottom): hive_reorder_tasks sets an order.
  */
 export async function updateTasks(numbers: number[], patch: BatchPatch, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<BatchItem[]> {
+  checkOverride(patch, actor)
   const ws = workspace
   const reads = await gatherReads(ws, await planned(ws, Array.isArray(numbers) ? numbers.filter((x) => Number.isInteger(x)).slice(0, MAX_CHANGE_BATCH) : [], patch, actor))
   return recording(actor, reads, () => cardBatch(ws, () => updateTasksUnbatched(numbers, patch, actor, opts)))
@@ -1242,8 +1372,10 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
   for (const n of numbers) {
     const said: string[] = []
     try {
+      // A move through the card's rules (#1265): the runtime's reads are made in the batch's change (a batch is one).
+      const gate = await gateOf(workspace, n, patch, actor)
       // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
-      const card = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+      const card = gate ? await moveThrough(gate, n, patch, actor, { said, commit: opts.commit }) : await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
       items.push({ number: n, card, said, error: null })
     } catch (e) {
       // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.

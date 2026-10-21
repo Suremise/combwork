@@ -30,6 +30,7 @@ import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
 import { providerService } from './providerService'
 import { config } from './config'
+import type { Refusal } from '../shared/workflow/refusals'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
 import { journalSettingsOf, journalSuggestion } from './journalService'
 import type { JournalSettings } from '../shared/journal'
@@ -1927,7 +1928,15 @@ function taskPatch(body: any): TaskPatch {
     if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, `Unknown review "${String(body.review)}": start, passed or failed.`)
     out.review = body.review
   }
+  if (body?.override !== undefined && body.override !== null) out.override = overrideParam(body.override)
   return out
+}
+
+/** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
+export function overrideParam(v: unknown): { reason: string } {
+  const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
+  if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, 'override is { "reason": "<why>" }, the reason not empty.')
+  return { reason: reason.trim() }
 }
 
 route('GET', '/v1/tasks', async ({ query }) => {
@@ -2904,7 +2913,12 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
 
 /** The Agent API's answer to an error: its status, and its English whatever language Hive shows (#845). */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
-  return { status: errorStatus(e), body: { error: englishError(e), ...(e instanceof HttpError ? e.extra : undefined) } }
+  return { status: errorStatus(e), body: { error: englishError(e), ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
+}
+
+/** A workflow refusal as the Agent API gives it (SPEC §16.8.3): its rule, three English sentences and who can override. */
+function refusalBody(r: Refusal): Record<string, unknown> {
+  return { refused: true, rule: r.rule, message: r.message, next: r.next, ...(r.change ? { change: r.change } : {}), override: r.override }
 }
 
 /**

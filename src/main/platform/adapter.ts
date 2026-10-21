@@ -19,6 +19,8 @@ export interface StartPlan {
   line: string | null
   base: string | null
   target: string | null
+  /** The folder is there already (an agent's own worktree standing in for a slot): nothing to prepare. */
+  existing?: boolean
   manifest?: Manifest
   deliverables?: Manifest
 }
@@ -66,7 +68,8 @@ export interface RunRevision {
 export interface PlatformAdapter {
   readonly id: PlatformId
   /** Start (§16.7.2): where the card works and what its change starts from. */
-  start(card: CardRecord, o: WorkflowOptions): Promise<Maybe<StartPlan>>
+  /** `builder`: the agent the card starts with (an agent's worktree stands in for a slot before P7, SPEC §16.19.1). */
+  start(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<StartPlan>>
   /** The card's revision now (Git: its folder's head, or its newest attributed commit; None: its paths' hash). */
   revisionNow(card: CardRecord, s: CardState): Promise<Maybe<string | null>>
   /** A progress run's revisions for the card, run in `folder` (null: none given), resolving `named` if given (§16.13). */

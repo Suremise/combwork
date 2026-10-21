@@ -8,6 +8,7 @@
 // writes changes of the board and its actions run by the actions worker; reconciliation uses it. P4 routes `tasks.ts`'s
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
+import { AsyncLocalStorage } from 'async_hooks'
 import { agentOf, approvedByUser, foldCard, openEntry, passingReviewers, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
@@ -57,6 +58,21 @@ export interface Drag {
   ask: boolean
 }
 
+/**
+ * What runs inside each write of an intent that changes the card, in its transaction, after the runtime's own facts
+ * (#1265): the board's 0.9 fields (tasks.ts) follow the stage the write left, so a reader never sees one without the
+ * other. Set per call (`alongside`), for every write the intent makes (a drag's start, then its submit).
+ */
+export interface Alongside {
+  written: (w: Write) => Promise<void>
+}
+const alongsideOf = new AsyncLocalStorage<Alongside>()
+
+/** Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card. */
+export function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
+  return alongsideOf.run(a, fn)
+}
+
 export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'object' && (r as Refusal).refused === true
 
 /** What happens outside the store: a delivery per action, deduplicated by the action's id (§16.4.5). */
@@ -77,6 +93,11 @@ export interface WorkflowConfig {
   slots: string
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
+  /**
+   * An agent's own worktree (SPEC §16.19.1: before P7's slots, it stands in for a card's slot): its folder, and the line
+   * its project.json names as its base. Null for an agent without one.
+   */
+  agentFolder?: (agent: string) => Promise<{ path: string; base: string | null } | null>
   /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
   locksOf?: (agent: string) => string[]
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
@@ -113,13 +134,17 @@ const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'do
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
   readonly written: Fact[] = []
+  /** The card's stage when the write began. */
+  readonly was: StageId
   constructor(
     readonly tx: Tx,
     readonly card: CardRecord,
     readonly ruleset: Ruleset | null,
     readonly actor: Actor,
     private stage: StageId
-  ) {}
+  ) {
+    this.was = stage
+  }
 
   fact<K extends FactKind>(kind: K, data: FactData[K], actor: Actor = this.actor): Fact<K> {
     const f = this.tx.append(this.card.id, { kind, actor, source: 'recorded', ...(this.ruleset ? { ruleset: this.ruleset.id } : {}), data })
@@ -226,13 +251,19 @@ export class Workflow {
 
   /** One write for a card, in one transaction; then the actions run (unless left pending). */
   async write<T>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write) => T): Promise<T> {
-    const out = await this.locked(() =>
-      this.store.tx((tx) => {
+    const also = alongsideOf.getStore()
+    const out = await this.locked(async () => {
+      let w: Write | null = null
+      const r = this.store.tx((tx) => {
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
-        return fn(new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage))
+        w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
+        return fn(w)
       })
-    )
+      // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
+      if (also && w && (w as Write).written.length) await also.written(w)
+      return r
+    })
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
   }
@@ -246,7 +277,8 @@ export class Workflow {
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> {
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
-      this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))
+      // Under the store's lock, as every write (in the app, a change of the board).
+      await this.locked(() => this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } })))
     }
     return out
   }
@@ -317,12 +349,13 @@ export class Workflow {
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
     const before = await this.evidenceOf(card, s, o)
-    const plan = await this.platform(o).start(card, o)
+    const plan = await this.platform(o).start(card, o, builder)
     if (isUnknown(plan)) return this.refuse(card, actor, 'start', { rule: 'platform.unknown', values: { card: card.key, what: plan.what, rule: 'start' } })
-    const data: FactData['Started'] = { ...plan, builder, cardKind: card.kind }
+    const { existing, ...planned } = plan
+    const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    this.store.saveRuleset(r)
+    // Its ruleset is stored by the write that names it (write()), under the store's lock.
     await this.cfg.hooks?.beforeWrite?.('start')
     if (await this.revalidate(card, s, o, before)) return this.regather(card, () => this.start(ref, actor, opts))
     const out = await this.write(card, r, actor, (w) => {
@@ -335,7 +368,7 @@ export class Workflow {
       const overridden = w.written.some((f) => f.kind === 'Override')
       w.fact('Started', data)
       w.move('active', overridden ? 'override' : actor === 'user' ? 'user' : 'intent')
-      if (data.folder !== 'project') w.action('prepareSlot', { folder: data.folder, line: data.line, base: data.base })
+      if (data.folder !== 'project' && !existing) w.action('prepareSlot', { folder: data.folder, line: data.line, base: data.base })
       return null
     })
     if (out) return this.refuse(card, actor, 'start', out)
@@ -453,13 +486,16 @@ export class Workflow {
   async waitingFor(card: CardRecord, target: string | null, o: WorkflowOptions): Promise<Maybe<string[]>> {
     const out: string[] = []
     for (const id of card.blockedBy) {
-      const d = this.state(id)
-      const key = this.store.card(id).key
+      const dep = this.store.card(id)
+      // From its cached stage (#1265): a card from before 1.0 has no facts, only where it is.
+      const d = foldCard(this.store.facts(id), dep.stage)
+      const key = dep.key
       if (d.stage !== 'done') {
         out.push(key)
         continue
       }
-      if (d.accepted) continue
+      // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target.
+      if (d.accepted || dep.preWorkflow || !d.started) continue
       const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
       const base = d.approved?.base ?? d.latest?.base ?? d.started?.base
       if (!revision || !base || !target || revision === base) {
@@ -633,8 +669,9 @@ export class Workflow {
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder }
     const warnings: string[] = []
     // The card's declared paths (None) are its data: set before the evidence is taken (args, else the pre-fill).
-    if (args.paths) card = this.store.updateCard(card.id, { paths: args.paths })
-    else if (card.kind === 'code' && o.platform === 'none' && !card.paths) card = this.store.updateCard(card.id, { paths: this.prefill(card) })
+    // Under the store's lock, as every write (in the app, a change of the board).
+    if (args.paths) card = await this.locked(() => this.store.updateCard(card.id, { paths: args.paths! }))
+    else if (card.kind === 'code' && o.platform === 'none' && !card.paths) card = await this.locked(() => this.store.updateCard(card.id, { paths: this.prefill(card) }))
     const before = await this.evidenceOf(card, s, o)
     if (card.kind === 'code') {
       const plan = await this.platform(o).submission(card, s, o, { revision: args.revision, agent, guards: r.guards.submit })
@@ -1167,7 +1204,7 @@ export class Workflow {
   async declarePaths(ref: unknown, actor: Actor, paths: string[]): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
-    const card = this.store.updateCard(card0.id, { paths })
+    const card = await this.locked(() => this.store.updateCard(card0.id, { paths }))
     const rev = this.none.revision(paths)
     return { prefill: this.prefill(card), unclaimed: this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }

@@ -10,7 +10,7 @@ import { cardAgent, knownAgent } from './activityTargets'
  * The fields a batch takes besides its card numbers and reply. A title, comment, decision or link is one card's: a batch
  * never archives, edits a decision or deletes (those stay the user's, on one card).
  */
-const BATCH_FIELDS = ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent', 'reply']
+const BATCH_FIELDS = ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent', 'override', 'reply']
 
 /** The card numbers and the fields of a batch request, checked before anything changes or is counted. */
 export function batchRequest(body: any): { numbers: number[]; patch: tasks.BatchPatch } {
@@ -42,6 +42,13 @@ export function batchRequest(body: any): { numbers: number[]; patch: tasks.Batch
     patch[k] = body[k]
   }
   if (body.agent !== undefined) patch.agent = body.agent ? String(body.agent) : null
+  // The Assistant's reason for moving the cards across their workflow rules (#1265): one, for every card of the batch.
+  if (body.override !== undefined && body.override !== null) {
+    const reason = typeof body.override === 'object' ? body.override.reason : undefined
+    if (typeof reason !== 'string' || !reason.trim()) throw new ChangeRefused(400, 'override is { "reason": "<why>" }, the reason not empty.')
+    if (body.column === undefined) throw new ChangeRefused(400, 'override goes with column: it is the reason for moving the cards across their rules.')
+    patch.override = { reason: reason.trim() }
+  }
   if (!Object.keys(patch).length) throw new ChangeRefused(400, 'Give what to change on the cards: column, position, blocked, labels, addLabels, removeLabels or agent.')
   return { numbers, patch }
 }
