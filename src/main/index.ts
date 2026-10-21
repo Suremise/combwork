@@ -30,7 +30,7 @@ import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
 import { config } from './config'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
-import { allTasks, archiveOldDone, endReviews } from './tasks'
+import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
 import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
@@ -1074,9 +1074,7 @@ app.whenReady().then(async () => {
     // A card moved to Doing (or was given to a running agent): its session records it.
     if (e.type === 'tasks-changed') void recordLiveCardsSoon(e.workspacePath, () => sessions.liveStates())
     // A reviewer whose session ended isn't reviewing any more: its cards stop showing it.
-    if (e.type === 'session-exit' && !workspaceOf(e.projectPath).isAssistantHome(e.projectPath)) {
-      void endReviews(basename(e.projectPath), e.agentId, 'its session ended', workspaceOf(e.projectPath)).catch(() => undefined) // i18n-ignore: card history, kept in English (E10b)
-    }
+    if (e.type === 'session-exit') void endExitedReviews(e.projectPath, e.agentId)?.catch((err) => log.warn('ending the reviews of a session that ended', err))
   })
   initUpdater({
     restart: () => {

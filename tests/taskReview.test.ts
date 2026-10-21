@@ -14,6 +14,7 @@ const base = tempDir('hive-review-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const { recordCards } = await import('../src/main/cardSessions')
+const { boardOpen } = await import('../src/main/boardStore')
 type WS = ReturnType<typeof createWorkspaceService>
 
 const user = { kind: 'user' } as const
@@ -272,5 +273,36 @@ describe('reviewing a card', () => {
     const cards = (await w.sessionsFile(alpha)).sessions.find((s) => s.id === sid)?.cards ?? []
     expect(cards.filter((x) => x.number === c.number)).toEqual([{ number: c.number, title: 'Recorded', review: true }])
     expect(cards.filter((x) => x.number === own.number)).toEqual([{ number: own.number, title: 'Its own work' }])
+  })
+})
+
+describe("a session's end ends its reviews on its own workspace's board (#1381)", () => {
+  let w: WS
+  const closedWs = join(base, 'closed')
+  const otherWs = join(base, 'other')
+  beforeAll(async () => {
+    // The same project name and agent ids in both: workspaceOf's fallback would end the other's reviews.
+    for (const ws of [closedWs, otherWs]) project(ws, 'alpha', [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }])
+    w = createWorkspaceService()
+  })
+  afterAll(async () => disposeWorkspaceService(w))
+  const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
+  const reviewed = async (): Promise<number> => {
+    const c = await run(() => tasks.createTask({ title: 'Reviewed', project: 'alpha', agent: 'c1', column: 'review' }, user))
+    await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
+    return c.number
+  }
+
+  it("leaves another window's cards alone, and the closed workspace's board closed, once its window switched away", async () => {
+    await w.open(closedWs)
+    await reviewed()
+    await w.open(otherWs)
+    const theirs = await reviewed()
+    expect(tasks.endExitedReviews(join(closedWs, 'alpha'), 'r1')).toBeNull()
+    expect((await run(() => tasks.getTask(theirs))).review?.agent).toBe('r1')
+    expect(boardOpen(closedWs)).toBe(false)
+    // Its own workspace's: ended.
+    await expect(tasks.endExitedReviews(join(otherWs, 'alpha'), 'r1')).resolves.toEqual([theirs])
+    expect((await run(() => tasks.getTask(theirs))).review).toBeUndefined()
   })
 })

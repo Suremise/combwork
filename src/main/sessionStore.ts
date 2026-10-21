@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
-import { onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
@@ -212,7 +212,16 @@ export async function readSession(place: SessionsPlace, id: string): Promise<Ses
  * isn't read. It throws, and nothing is written.
  */
 export async function changeSessions<T>(place: SessionsPlace, fn: (f: SessionsFile) => T): Promise<T> {
-  await opening(place)
+  // A save, which lands as its workspace closes too (#1379): its lease keeps the database open for the move-in it may
+  // need first (#1381: that read was fenced, losing a session's last change), and closes it after if it opened it.
+  return withLeasedDb(resolve(place.workspace), async () => {
+    await opening(place)
+    return saveSessions(place, fn)
+  })
+}
+
+/** changeSessions' save, its host opened. */
+function saveSessions<T>(place: SessionsPlace, fn: (f: SessionsFile) => T): Promise<T> {
   return writeStore(place.workspace, 'sessions', place.scope, (db) => {
     const f = fromTables(db, place.scope)
     const result = fn(f)

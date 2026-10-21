@@ -13,9 +13,21 @@ import { placeKey } from './fsutil'
  */
 const closed = new Map<string, Error>()
 
+/**
+ * How many closed workspaces are kept (#1381), the most recently closed: the map would otherwise grow with every workspace
+ * closed and not opened again in a session. Dropping the oldest is safe: what the fence stops is work still under way for
+ * a workspace as it closes (a request, a queued job, a timer, a session's end), which ends within seconds or minutes; by
+ * the time this many other workspaces have closed after it, none of it is left to open the files again.
+ */
+export const MAX_CLOSED = 64
+
 /** A window starts closing the workspace: from now on its databases aren't opened, `reason` saying why. */
 export function markClosed(path: string, reason: Error): void {
-  closed.set(placeKey(path), reason)
+  const key = placeKey(path)
+  // The newest last: closed again, it moves to the end.
+  closed.delete(key)
+  closed.set(key, reason)
+  while (closed.size > MAX_CLOSED) closed.delete(closed.keys().next().value!)
 }
 
 /** A window opens the workspace (again): its databases open as they're used. */

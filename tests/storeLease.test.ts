@@ -2,7 +2,7 @@
 // the workspace while the save waits keeps the board the save opened (it used to close the window's live board), a window
 // closing it leaves the save's writer open until the save ends (it used to close it under the save), and either way the
 // save leaves nothing open that isn't a window's.
-import { mkdirSync, renameSync, rmSync } from 'fs'
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -17,6 +17,7 @@ const board = await import('../src/main/boardStore')
 const { withStoreLock, storeValue } = await import('../src/main/storeRows')
 const { readTable, saveTable } = await import('../src/main/storeTables')
 
+const at = '2026-10-22T00:00:00.000Z'
 let n = 0
 /** A new workspace folder with a project. */
 function workspace(): string {
@@ -192,6 +193,24 @@ describe("a store's save holds its own connection (#1383)", () => {
       lease.release()
     }
     expect(board.boardOpen(ws)).toBe(false)
+  })
+
+  it("a session's last change after its window closed the workspace lands, its host not read this run, and leaves nothing open (#1381)", async () => {
+    const ws = workspace()
+    const proj = join(ws, 'proj')
+    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-lease', agents: [] }))
+    await w.open(ws)
+    await w.open(elsewhere)
+    expect(board.boardOpen(ws)).toBe(false)
+    // As a session ending as its agents stop (sessions.ts: lastActiveAt), its host's records never read this run.
+    await w.mutateSessions(proj, (f) => {
+      f.sessions.push({ id: 's-last', agent: 'claude-code', name: 'Last', createdAt: at, lastActiveAt: at, archived: false })
+    })
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+    await w.open(ws)
+    expect((await w.sessionsFile(proj)).sessions.map((s) => s.id)).toEqual(['s-last'])
+    await w.open(elsewhere)
   })
 
   it("a lease on a window's board leaves it open, and ends once however often it is released", () => {

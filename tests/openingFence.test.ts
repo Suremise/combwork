@@ -4,7 +4,7 @@
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { assertNotFencedOut, fencedOut, markClosed, markOpen } from '../src/main/openingFence'
+import { assertNotFencedOut, fencedOut, markClosed, markOpen, MAX_CLOSED } from '../src/main/openingFence'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
@@ -70,5 +70,23 @@ describe('the opening fence', () => {
     expect(fencedOut(join(p.via, '.hive', 'hive.db'))).toBe(reason)
     markOpen(p.short ?? p.via)
     expect(fencedOut(join(p.real, '.hive', 'hive.db'))).toBeNull()
+  })
+
+  it('keeps the most recently closed workspaces, MAX_CLOSED of them (#1381); one closed again counts as newest', () => {
+    const many = Array.from({ length: MAX_CLOSED + 2 }, (_, i) => join('C:\\', 'fence', 'many', `ws-${i}`))
+    const fileOf = (at: string): string => join(at, '.hive', 'hive.db')
+    try {
+      for (const at of many.slice(0, MAX_CLOSED)) markClosed(at, new Error(at))
+      // The first closed again: the second is now the oldest.
+      markClosed(many[0], new Error('again'))
+      markClosed(many[MAX_CLOSED], new Error('one more'))
+      expect(fencedOut(fileOf(many[1]))).toBeNull()
+      expect(fencedOut(fileOf(many[0]))?.message).toBe('again')
+      markClosed(many[MAX_CLOSED + 1], new Error('and another'))
+      expect(fencedOut(fileOf(many[2]))).toBeNull()
+      for (const at of [many[0], ...many.slice(3)]) expect(fencedOut(fileOf(at))).not.toBeNull()
+    } finally {
+      for (const at of many) markOpen(at)
+    }
   })
 })
