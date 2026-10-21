@@ -238,6 +238,7 @@
   "main.update.readyAuto": "Elle s’installera quand tu quitteras Hive. Tu peux aussi redémarrer maintenant.",
   "main.update.readyManual": "Redémarre Hive pour l’installer.",
   "main.update.restart": "Redémarrer et mettre à jour",
+  "main.update.testCopy": "Une copie de test de Hive ne recherche pas de mises à jour.",
   "main.update.updated": "{app} est passé à la version {version}",
   "main.update.updatedBody": "Découvre ce qui a changé dans cette version.",
   "main.update.whatsNew": "Nouveautés",

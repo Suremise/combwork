@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
@@ -1305,7 +1305,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     // #869: a merge due with its builder idle and no merge slot claimed (a step it stopped on for the user) is a stall.
     const builder = ws.path ? (sessions.liveFor(join(ws.path, l.project), l.builder.id) ?? null) : null
     const mergeStall = mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
-    out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status })
+    out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
   }
   return out
 }
@@ -1584,14 +1584,16 @@ const settling = new Set<string>()
  * the card being in `column` now: a watch on the card that counts a move into Review (`review`); one that counts a
  * verdict, or a move into the card's column now (`verdict`: a passing one that moved it to Passed; a failed one leaves
  * it in Review, which a watch for Passed doesn't count); one that counts a move into the card's column now (`moved`: a
- * move into Passed or Done with no verdict, #1266); or one that has fired and tells the card. Its watches not loaded
- * yet: false.
+ * move into Passed or Done with no verdict, #1266); one that counts a reviewer's request or a decision (`request`,
+ * `decision`: hearsHandoffs, #1272); or one that has fired and tells the card. Its watches not loaded yet: false.
  */
-export function watchCovers(projectPath: string, agentId: string, n: number, kind: 'review' | 'verdict' | 'moved', column: TaskColumn): boolean {
+export function watchCovers(projectPath: string, agentId: string, n: number, kind: 'review' | 'verdict' | 'moved' | 'request' | 'decision', column: TaskColumn): boolean {
   const store = storeFor(projectPath)
   const rec = store && recordOf(store, projectPath, agentId)
   // A lane watch's cards beside its lanes (#726) are its cards like any other.
   if (!rec || rec.agents || !rec.cond.cards.includes(n)) return false
+  // A request or a decision only by a watch that counts them, fired or not: another's line doesn't tell them.
+  if (kind === 'request' || kind === 'decision') return hearsHandoffs(rec.cond) && (!rec.fired || rec.fired.cards.includes(n))
   if (rec.fired) return rec.fired.cards.includes(n)
   const into = (c: TaskColumn): boolean => rec.cond.changes.includes('column') && (!rec.cond.column || rec.cond.column === c)
   if (kind === 'verdict') return rec.cond.changes.includes('verdict') || (column !== 'review' && into(column))
@@ -1600,22 +1602,46 @@ export function watchCovers(projectPath: string, agentId: string, n: number, kin
 }
 
 /**
+ * What an agent's own card watch leaves untold of a card's decisions (#1272), so a decision line tells only that: none
+ * (`all` told), for a watch that counts them (watchCovers); else, once a line of a watch that counted them was typed (its
+ * handoff boundary, #578's, also once the watch has ended), how many decisions were recorded (by others than `self`) or
+ * changed after it, by their history entries: by place, never by time, so one made in the same millisecond is still
+ * new. Null: no watch has told it any.
+ */
+export function watchToldDecisions(projectPath: string, agentId: string, card: TaskCard, self: string): 'all' | { untold: number } | null {
+  if (watchCovers(projectPath, agentId, card.number, 'decision', card.column)) return 'all'
+  const t = toldOf(projectPath, agentId, card.number)?.hand
+  if (!t) return null
+  const added = (h: TaskCard['history'][number]): boolean => isDecisionEntry(h.what) && !h.what.startsWith('Removed') && !(h.what.startsWith('Recorded') && h.by === self)
+  return { untold: card.history.filter((h) => added(h) && !entryWithin(card.history, h, t.h)).length }
+}
+
+/**
  * What a watch's typed line last told each agent about each card (#578): the last history entry the line had read of the
  * card (its `seen` boundary), by agent key and card. A loop wake for a change whose history entry is within that boundary
  * is one the watch already told, so it is dropped, even once the watch itself has ended; a change after it (the next
  * round's arrival, at any time, the same millisecond too) is news. In memory, as loop wakes are, and kept a day (a loop
- * wake waits at most that long).
+ * wake waits at most that long). `hand`: the same, from the last line of a watch that counted reviewers' requests and
+ * decisions (hearsHandoffs, #1272), the boundary of what it told of those: a later watch that doesn't count them leaves
+ * it as it was, so what was told stays told.
  */
-const toldByWatch = new Map<string, Map<number, { h: string | null; at: number }>>()
+interface ToldBoundary {
+  h: string | null
+  at: number
+  hand?: { h: string | null; at: number }
+}
+const toldByWatch = new Map<string, Map<number, ToldBoundary>>()
 const TOLD_KEEP_MS = 24 * 60 * 60_000
-function noteToldByWatch(projectPath: string, agentId: string, told: Record<string, Baseline>): void {
+function noteToldByWatch(projectPath: string, agentId: string, told: Record<string, Baseline>, handoffs: boolean): void {
   const cards = Object.entries(told)
   if (!cards.length) return
   const key = agentKey(projectPath, agentId)
-  const known = toldByWatch.get(key) ?? new Map<number, { h: string | null; at: number }>()
+  const known = toldByWatch.get(key) ?? new Map<number, ToldBoundary>()
   for (const [n, b] of cards) {
+    const had = known.get(Number(n))?.hand
     known.delete(Number(n))
-    known.set(Number(n), { h: b.seen.h, at: Date.now() })
+    const now = { h: b.seen.h, at: Date.now() }
+    known.set(Number(n), { ...now, ...(handoffs ? { hand: now } : had ? { hand: had } : {}) })
   }
   while (known.size > WOKE_CARDS) known.delete(known.keys().next().value!)
   toldByWatch.delete(key)
@@ -1623,10 +1649,21 @@ function noteToldByWatch(projectPath: string, agentId: string, told: Record<stri
   while (toldByWatch.size > MAX_WATCHES) toldByWatch.delete(toldByWatch.keys().next().value!)
 }
 
-/** Whether a watch's line typed into the agent has told it of card `card`'s history entry `entry` (#578). */
-export function watchTold(projectPath: string, agentId: string, card: TaskCard, entry: TaskCard['history'][number]): boolean {
-  const t = toldByWatch.get(agentKey(projectPath, agentId))?.get(card.number)
-  return !!t && Date.now() - t.at < TOLD_KEEP_MS && entryWithin(card.history, entry, t.h)
+/**
+ * Whether a watch's line typed into the agent has told it of card `card`'s history entry `entry` (#578); for a reviewer's
+ * request or a decision (`handoff`), only a line of a watch that counted them (#1272).
+ */
+export function watchTold(projectPath: string, agentId: string, card: TaskCard, entry: TaskCard['history'][number], handoff = false): boolean {
+  const t = handoff ? toldOf(projectPath, agentId, card.number)?.hand : toldOf(projectPath, agentId, card.number)
+  return !!t && entryWithin(card.history, entry, t.h)
+}
+
+/** What watches' lines last told an agent of a card (toldByWatch), while kept: each boundary for a day. */
+function toldOf(projectPath: string, agentId: string, n: number): { h: string | null; hand?: { h: string | null } } | null {
+  const t = toldByWatch.get(agentKey(projectPath, agentId))?.get(n)
+  if (!t) return null
+  const fresh = (x: { at: number }): boolean => Date.now() - x.at < TOLD_KEEP_MS
+  return fresh(t) ? { h: t.h, ...(t.hand && fresh(t.hand) ? { hand: t.hand } : {}) } : t.hand && fresh(t.hand) ? { h: null, hand: t.hand } : null
 }
 
 /** Hive's own deliveries come from it. */
@@ -1747,7 +1784,7 @@ function toldBy(store: Store, rec: WatchRecord, told: Told): void {
     const what = rec.agents ? `${rec.agents.agents.length} agent(s)` : rec.lanes ? 'lanes' : rec.cond.cards.map((n) => `#${n}`).join(', ')
     return { kind: 'watch', name: 'wake', raw: { cards: rec.cond.cards, agents: rec.agents?.agents.length ?? 0, lanes: !!rec.lanes, firedAt: rec.fired?.at ?? null }, made: { typed: true, replies: told.replies }, safe: { raw: { firedAt: true } }, summary: `watch woke ${rec.agentId} (${what})` }
   })
-  noteToldByWatch(rec.projectPath, rec.agentId, told.ofCards)
+  noteToldByWatch(rec.projectPath, rec.agentId, told.ofCards, !rec.agents && hearsHandoffs(rec.cond))
   for (const x of told.endedAt) inBackground(`noting on #${x.n} that a watch ended`, noteOnCard(x.n, x.what, store.ws))
   // What earlier wakes told about cards this one didn't stays: it is still all the agent was told about them.
   const known = new Map(store.woke.get(key))
@@ -2001,6 +2038,7 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads): Promise
       // A watch saved before #224: a move into the column by its history since the watch began.
       const into = !!rec.cond.moveInto && !!rec.cond.column && (movedIntoSince(card, rec.cond.column, rec.since) || intoAsSeen)
       kinds = changesBetween(rec.marks[n], after, rec.cond, into)
+      if (kinds !== 'gone') kinds.push(...handoffsSince(card, rec.since, rec.cond, rec.watcherName))
     }
     if (kinds === 'gone' || kinds.length) hits.push({ ...cardChange(n, card, kinds), about: wakeAbout(card, kinds, rec.agentId) })
     if (card?.project && rec.scope === null && rec.replySeq !== undefined) {

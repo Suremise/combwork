@@ -74,7 +74,8 @@ export function as09(file: string): void {
     db.exec('BEGIN IMMEDIATE')
     // The 1.0 card tables (`cards` among them), and every other table of a later step (#1212's on).
     for (const t of cardTables.reverse()) db.exec(`DROP TABLE ${t}`)
-    for (const t of tablesOf(db)) if (!keep.has(t)) db.exec(`DROP TABLE "${t}"`)
+    // A virtual table's own tables (card_search's, #1237) go with it: each is looked for again before it is dropped.
+    for (const t of tablesOf(db)) if (!keep.has(t) && tablesOf(db).includes(t)) db.exec(`DROP TABLE "${t}"`)
     for (const sql of ddl) db.exec(sql)
     for (const sql of missing) db.exec(sql)
     const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)')

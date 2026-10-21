@@ -238,6 +238,7 @@
   "main.update.readyAuto": "退出 Hive 时会自动安装，也可以立即重启。",
   "main.update.readyManual": "重启 Hive 以安装更新。",
   "main.update.restart": "重启并更新",
+  "main.update.testCopy": "Hive 的测试副本不检查更新。",
   "main.update.updated": "{app} 已更新到 {version}",
   "main.update.updatedBody": "查看此版本的更新内容。",
   "main.update.whatsNew": "新功能",

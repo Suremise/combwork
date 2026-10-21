@@ -383,9 +383,15 @@ kbd {
   color: var(--accent-ink);
 }
 
+/* Its natural width wherever it opens (#1329): a fixed box with only `left` set is as wide as the room between its left
+   edge and the window's right (shrink-to-fit), so one opened near that edge wrapped its descriptions into a narrow
+   column, and ContextMenu, measuring it there, moved it left by that narrow width. Narrower only in a window narrower
+   than the menu, where it wraps (.menu-text). */
 .menu {
   position: fixed;
   z-index: 1000;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   min-width: 240px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -9524,6 +9530,13 @@ button.progress-run-show:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A failed check that blocks its card's Review (#1279). */
+.progress-run-blocks {
+  margin-top: 2px;
+  color: var(--error);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
 .progress-run-card,
 .progress-run-revision {
   padding: 0;
@@ -10139,6 +10152,25 @@ button.progress-run-show:focus-visible {
 .progress-lane-state.abandoned {
   color: var(--error);
 }
+/* Why it waits (#1279): in the header, in the room the lane's name had, cut short with its whole text in its title. */
+.progress-lane-why {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-muted);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-lane-why.paused {
+  color: var(--warning);
+}
+/* The lanes waiting for your answer, after the Lanes bar's count. */
+.progress-lanes-you {
+  margin-inline-start: 6px;
+  color: var(--warning);
+  font-size: 11px;
+}
 
 /* The lane's bar: one segment per card, equal widths; each state has its own colour AND pattern (colour-blind safe):
    todo an empty track, doing striped and moving, review an amber outline, passed filled with a light edge, done
@@ -10221,6 +10253,41 @@ button.progress-run-show:focus-visible {
   height: 4px;
   border-radius: 0 0 2px 2px;
   background: var(--error);
+}
+/* Its facts' marks (#1279), each its own shape as well as colour: a refused request's red notch in the end corner (it
+   clears with the card's next move), a move past its rules' ringed dot in the start corner, a stale pass's amber dashed
+   top and bottom edges over a paler fill until it is submitted again. */
+.lane-seg-mark {
+  position: absolute;
+  pointer-events: none;
+}
+.lane-seg-mark.refused {
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--error);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.lane-seg-mark.refused:dir(rtl) {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.lane-seg-mark.override {
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg-strong);
+  box-shadow: 0 0 0 1px var(--bg);
+}
+/* Over a folded "✓ n" segment's fill too (HR6's #1279 round 2: .finished, later, set its whole background). */
+.lane-seg.stale,
+.lane-seg.finished.stale {
+  background:
+    repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) top / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) bottom / 100% 3px no-repeat,
+    color-mix(in srgb, var(--success) 60%, var(--bg));
 }
 /* A segment's hover with what its marks mean (#706): a line each under the card's. */
 .lane-seg-note {

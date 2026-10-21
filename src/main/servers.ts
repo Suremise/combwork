@@ -39,7 +39,7 @@ import { msg, tr } from '../shared/i18n'
 import { cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
-import { alreadyThere, cardChange, changesBetween, decodeSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
+import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
 import { waitMaxSeconds } from './advanced'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
 import { listWorktrees } from './worktrees'
@@ -555,7 +555,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 6
+export const API_VERSION = 7
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1968,7 +1968,8 @@ route('GET', '/v1/tasks', async ({ query }) => {
   requireWorkspace()
   const project = query.get('project') ?? undefined
   // A project agent's list is its project's cards; it can't ask for another project's.
-  const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope() })
+  // ?q= (#1237): the board's search, through its full-text index.
+  const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope(), query: query.get('q') ?? undefined })
   const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
   const views = await Promise.all(cards.map((c) => taskView(c, agents)))
   // ?view=short: a row per card, without its description, comments and history.
@@ -2277,6 +2278,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       for (const n of cond.cards) {
         const card = await read(n)
         const kinds = changesBetween(from.get(n)!, now.get(n)!, cond, !!cond.moveInto && !!cond.column && movedIntoSince(card, cond.column, sinceIso))
+        // A reviewer's request and a decision since the wait began (#1272), which marks don't keep; a project agent's own aren't news.
+        if (kinds !== 'gone') kinds.push(...handoffsSince(card, sinceIso, cond, actor.kind === 'agent' && actor.self ? actor.name : undefined))
         const reached = alreadyThere(now.get(n)!, cond) && !alreadyThere(from.get(n)!, cond)
         // A card gone (or out of the caller's view) is told as gone: nothing of its state but whether it was archived.
         if (kinds === 'gone') changes.push({ ...cardChange(n, null, 'gone'), ...(card?.archived ? { archived: true } : {}) })
@@ -2874,7 +2877,7 @@ route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
 async function recordCheck(run: ProgressRun): Promise<void> {
   try {
     const c = await bracketFinished(run)
-    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}) })
+    if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.blocks ? { blocks: c.blocks } : {}) })
   } catch (e) {
     log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
   }

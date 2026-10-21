@@ -11,7 +11,7 @@ You are the reviewer: find what's wrong, don't fix it. Leave the code, the branc
 
 ## 1. Find exactly what to review
 
-- **A card** (#n): read it with `hive_read_task`. Its description says what was meant, and its comments say what was done and where. Start the review on the board: `hive_update_task` with `review: "start"`. The card stays in Review with the agent that did the work. You are recorded as its reviewer, separately. In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit, not a verdict (card-loop, Reviewer).
+- **A card** (#n): read it with `hive_read_task`. Its description says what was meant, and its comments say what was done and where. Start the review with `hive_start_review`: its reply names the revision, base and files to review (the latest submission; `submission` names an earlier one). The card stays in Review with the agent that did the work. You are recorded as its reviewer, separately. In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit (`hive_request_builder`), not a verdict (card-loop, Reviewer). A card an intent says has no workflow is reviewed on the board instead: `hive_update_task` with `review: "start"`, and the verdict as `review: "passed"` (with `column: "passed"`) or `"failed"`.
 - **A worktree branch**: `git worktree list`, then `git diff <base>...<branch>` and `git log <base>..<branch>`.
 - **Commits**: `git show` for the range named.
 - **Uncommitted changes**: `git status`, `git diff` and `git diff --staged` in that folder.
@@ -52,12 +52,12 @@ Say how sure you are when you aren't certain. Then give the verdict, with what y
 
 ## 5. Verdict on the board
 
-For a card, end your review with `hive_update_task`:
+For a card, end your review with `hive_verdict` on the submission you reviewed:
 
-- `review: "passed"` or `"failed"`, with the report as `comment`. Its **first line is the verdict in one line**: "Round 1: PASSED" (with the gist), or "Round 1: FAILED: 2 findings: <their titles>". The findings and the evidence follow below it.
-- **Passed**: move it to `passed` in the same change (`column: "passed"`): reviewed, waiting to be merged. Not to `done`, which means merged.
-- **Failed**: it stays in Review. Leave its fixes to whoever the user asks to make them.
-- **A question only the user can answer** (scope, a choice the card doesn't settle) comes before a verdict: set `blocked` on the card (`hive_update_task`) to the question and `hive_notify` the user; a comment alone reaches no one, and the card stays in Review. Hive tells you of the decision they record: clear `blocked` (empty) and finish the review.
+- `pass: true` or `false`, with the report as `comment`. Its **first line is the verdict in one line**: "Round 1: PASSED" (with the gist), or "Round 1: FAILED: 2 findings: <their titles>". The findings and the evidence follow below it.
+- **Passed**: Hive moves it on (to Passed, or to its merge): reviewed, waiting to be merged. Done means merged, never yours to move.
+- **Failed**: it goes back to Doing for its builder, a round counted. `failKind: "content"` when the work itself falls short, `"explanation"` when only how it was explained does. Leave its fixes to whoever the user asks to make them.
+- **A question only the user can answer** (scope, a choice the card doesn't settle) comes before a verdict: ask it with `hive_ask_user` (`kind: "decide"`); it shows under For you with the card, which stays in Review, and the answer comes to your inbox. A comment alone reaches no one. Finish the review once it comes.
 
 If the card leaves Review while you review it (taken back to Doing for more work), your review is over. Leave the card where it is: don't move it back to Review or on to Passed, start another review or give a verdict: tell the user what you found, so the newer work is reviewed when it's ready. Only if your own session ended mid-review, with the card still in Review, start the review again.
 

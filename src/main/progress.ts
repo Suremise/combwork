@@ -183,8 +183,9 @@ function keptCounts(v: unknown): Pick<ProgressRun, 'counts'> {
   const c = v as Record<string, unknown>
   const name = keptText(c.name, MAX_TITLE)
   if (!name || typeof c.counted !== 'boolean') return {}
-  if (c.counted) return { counts: { name, counted: true } }
-  return typeof c.whyNot === 'string' && WHY_NOT.has(c.whyNot) ? { counts: { name, counted: false, whyNot: c.whyNot as CheckWhyNot } } : {}
+  const gate = c.blocks === 'review' ? { blocks: 'review' as const } : {}
+  if (c.counted) return { counts: { name, counted: true, ...gate } }
+  return typeof c.whyNot === 'string' && WHY_NOT.has(c.whyNot) ? { counts: { name, counted: false, whyNot: c.whyNot as CheckWhyNot, ...gate } } : {}
 }
 
 const COMMIT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
@@ -448,7 +449,7 @@ export class ProgressStore {
   noteCheck(workspacePath: string, id: string, c: RunCheck): void {
     const run = this.runs.get(key(workspacePath))?.find((r) => r.id === id)
     if (!run || run.finishedAt === null) return
-    run.counts = c.counted ? { name: c.name, counted: true } : { name: c.name, counted: false, ...(c.whyNot ? { whyNot: c.whyNot } : {}) }
+    run.counts = { ...(c.counted ? { name: c.name, counted: true } : { name: c.name, counted: false, ...(c.whyNot ? { whyNot: c.whyNot } : {}) }), ...(c.blocks ? { blocks: c.blocks } : {}) }
     this.mark(key(workspacePath), [id])
     this.ended(workspacePath)
   }

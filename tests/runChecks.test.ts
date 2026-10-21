@@ -255,6 +255,31 @@ describe("a run's bracket in the app (#1222)", () => {
     expect(await bracketFinished({ ...(run as object), id: 'run-2', command: 'echo skipped' } as never)).toMatchObject({ name: 'typecheck', command: 'echo skipped', counted: false, whyNot: 'notCheck' })
   })
 
+  it('a failed run of a check its card needs before Review says it blocks review; one it needs no more, or that passed, says nothing (#1279)', async () => {
+    const ws = join(base, 'ws-blocks')
+    const p = join(ws, 'p')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    git(ws, 'init', '-q', '-b', 'main', p)
+    for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS, preChecks: ['typecheck'] } } }))
+    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    const head = commit(p, 'a.txt', 'a\n')
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Blocked by its check', project: 'p' }, { kind: 'user' }))).number
+    const link = { card, revision: head, testedCheckout: head, check: { name: 'typecheck', command: 'npm run typecheck' }, folder: p }
+    const run = (id: string, state: string, check = link.check) => {
+      return bracketFor(w, { ...link, check }).then((b) => {
+        bracketStarted(id, b!)
+        return bracketFinished({ id, finishedAt: Date.now(), state, source: 'agent', agentId: 'a1', agentName: 'Agent 1', title: check.name, command: check.command } as never)
+      })
+    }
+    expect(await run('run-b1', 'failed')).toMatchObject({ name: 'typecheck', result: 'failed', blocks: 'review' })
+    expect(await run('run-b2', 'passed')).not.toHaveProperty('blocks')
+    expect(await run('run-b3', 'failed', { name: 'unit', command: 'npm test' })).not.toHaveProperty('blocks')
+  })
+
   it("None: the options' exclusions and the card's declared paths as they are at the end (HR5's round 1 findings 3 and 4)", async () => {
     const ws = join(base, 'ws-none')
     const p = join(ws, 'n')

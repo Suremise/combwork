@@ -36,6 +36,28 @@ describe("a card's work view (#1223)", () => {
     expect(workBadge(v)).toMatchObject({ card: 3, preWorkflow: true, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, decisionSince: false })
   })
 
+  it('a refused request since it last moved (#1279): the latest, repeats of it counted; cleared by its next move', () => {
+    const { facts } = reviewed()
+    const refusedFact = (rule: string, move = 'merge'): Fact => fact('Refused', { move, rule, message: 'm', next: 'n', values: { card: 'alpha-7' } }, 'agent:B1')
+    const once = [...facts, refusedFact('integrate.approved')]
+    expect(workBadge(workView(card, once)).refused).toMatchObject({ move: 'merge', rule: 'integrate.approved', values: { card: 'alpha-7' }, times: 1 })
+    const thrice = [...once, refusedFact('integrate.approved'), refusedFact('integrate.approved')]
+    expect(workBadge(workView(card, thrice)).refused).toMatchObject({ times: 3 })
+    // Another rule after them: that one, once.
+    expect(workBadge(workView(card, [...thrice, refusedFact('integrate.checks')])).refused).toMatchObject({ rule: 'integrate.checks', times: 1 })
+    expect(workBadge(workView(card, [...thrice, fact('Moved', moved('review', 'approved'))])).refused).toBeNull()
+    expect(workBadge(workView(card, facts)).refused).toBeNull()
+  })
+
+  it("a stale pass's revisions and a no-code card, for the badges (#1279)", () => {
+    const { facts } = reviewed()
+    const stale = [...facts, fact('Stale', { approved: 'rev2222bbbb', current: 'rev3333cccc', why: 'change' })]
+    expect(workBadge(workView(card, stale))).toMatchObject({ stale: true, stalePass: { approved: 'rev2222bbbb', current: 'rev3333cccc' }, noCode: false })
+    expect(workBadge(workView(card, facts)).stalePass).toBeNull()
+    seq = 0
+    expect(workBadge(workView({ ...card, stage: 'active' }, [fact('Started', start({ cardKind: 'no-code' }), 'agent:B1')])).noCode).toBe(true)
+  })
+
   it('the line, base, folder and target of its start; each revision with its round, files, time and builder', () => {
     const { facts, s1, s2 } = reviewed()
     const v = workView(card, facts)

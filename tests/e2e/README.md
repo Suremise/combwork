@@ -82,6 +82,14 @@ cancelled. A window already shown when it is reached fails the launch, saying so
 `packaged-progress` and `packaged-mcp` run Hive.exe as Node and show nothing. Checked in Windows Sandbox (0.9.3, a
 watcher of on-screen windows and the foreground: none from Hive) and on the host for these suites (the card says how).
 
+**No update checks** (#1332): a packaged Hive checks GitHub 30 s after it starts and every 6 hours, and each check
+fetches the release's `latest.yml`, which GitHub counts as a download. A packaged test Hive never does: 1.0 with
+`HIVE_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
+at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Hive `HIVE_UPDATE_DELAY` at its maximum (about
+24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
+The guard: when a suite ends, each packaged Hive's `hive.log` must show no `[updates] Checking for update` since it
+was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
+
 Nor does a test ever start the installed Hive (`%LOCALAPPDATA%\Programs\Hive`): `lib.cjs` refuses it and any Hive.exe
 outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `HIVE_E2E_HIVE09` and `HIVE_EXE`. And
 children of the run context get no `%APPDATA%\Hive\bin` or `Hive-Dev\bin` on their PATH (an agent session has them):

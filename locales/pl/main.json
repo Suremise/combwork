@@ -238,6 +238,7 @@
   "main.update.readyAuto": "Zainstaluje się, gdy zamkniesz Hive. Możesz też uruchomić ponownie teraz.",
   "main.update.readyManual": "Uruchom Hive ponownie, aby ją zainstalować.",
   "main.update.restart": "Uruchom ponownie i zaktualizuj",
+  "main.update.testCopy": "Testowa kopia Hive nie sprawdza aktualizacji.",
   "main.update.updated": "Zaktualizowano {app} do wersji {version}",
   "main.update.updatedBody": "Zobacz, co zmieniło się w tej wersji.",
   "main.update.whatsNew": "Co nowego",

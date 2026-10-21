@@ -1,10 +1,12 @@
 // The task board (.hive/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
 // Remove from Hive and Delete do with a project's cards, handovers and folder (and what restoring brings back).
+// The board's own rules, with the workflow rules off (Settings → Advanced): enforced, agents' moves are intents (#1268,
+// tests/agentMoves.test.ts) and the user's and the Assistant's go through the card's rules (#1265, tests/gates.test.ts).
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { rm } from 'fs/promises'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutside } from './boardDb'
@@ -23,6 +25,11 @@ const { decisionNotice, newDecisionsOn, noteCardRead } = await import('../src/ma
 const decisionWakes = await import('../src/main/decisionWakes')
 const removal = await import('../src/main/projectRemoval')
 const { sessions } = await import('../src/main/sessions')
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+advanced.load(join(base, 'profile'))
+await advanced.set(ENFORCE, false)
+afterAll(() => advanced.stop())
 type WS = ReturnType<typeof createWorkspaceService>
 
 const user = { kind: 'user' } as const
