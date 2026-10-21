@@ -95,6 +95,8 @@ interface Child {
   order: string
   /** Rows made from the entry only to be queried (watch_cards): not read back. */
   derived?: boolean
+  /** Made by a later step of the 1.0 group (a lane's run, #1291): a file before that step has none to read. */
+  later?: boolean
 }
 
 export interface TableDef {
@@ -113,16 +115,22 @@ export interface TableDef {
   /** An entry's row key in memory (lanes and watches: their id, made unique; metrics: span and start). */
   keyOf: (main: Row) => string
   /**
-   * Rows another module keeps under an entry's key, removed when the entry leaves the store (not when it is written
-   * again): the runtime's part of a lane (#1291), kept beside lanes.ts's rows.
+   * Child rows with no foreign key to the main row, removed whenever the entry's rows are (it leaves the store, or is
+   * written again): a lane's run (#1291, #1270), which the runtime writes beside lanes.ts.
    */
   onRemove?: (db: DatabaseSync, key: string) => void
   /** Others write the store's rows too (the runtime, a lane's cards and state): a save compares with the table, never its own last save. */
   shared?: boolean
 }
 
-const LANE_KNOWN = new Set(['id', 'project', 'projectId', 'name', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'state', 'startedBy', 'startedAt', 'updatedAt', 'endedAt', 'mergeCommit', 'frozen'])
+const LANE_KNOWN = new Set(['id', 'project', 'projectId', 'name', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'state', 'startedBy', 'startedAt', 'updatedAt', 'endedAt', 'mergeCommit', 'frozen', 'ruleset', 'pending', 'inFlight'])
 const LANE_STATES = new Set(['active', 'ended', 'abandoned'])
+
+/** A lane's run as LaneRecord's fields: each only when set (an entry reads back as it was written). */
+function runOf(run: Row | undefined, pending: Row[]): Record<string, unknown> {
+  if (!run) return {}
+  return { ...(run.ruleset !== null ? { ruleset: run.ruleset } : {}), ...(run.has_pending ? { pending: pending.map((r) => r.card) } : {}), ...(run.current_card !== null ? { inFlight: run.current_card } : {}) }
+}
 
 const LANES: TableDef = {
   store: 'lanes',
@@ -132,14 +140,18 @@ const LANES: TableDef = {
   cols: ['id', 'ord', 'project', 'project_id', 'name', 'builder_id', 'builder_name', 'reviewer_id', 'reviewer_name', 'rounds', 'wait_minutes', 'state', 'started_by', 'started_at', 'updated_at', 'ended_at', 'merge_commit', 'extra'],
   children: [
     { table: 'lane_cards', cols: ['lane', 'ord', 'card'], parent: ['lane'], order: 'ord' },
-    { table: 'lane_frozen', cols: ['lane', 'ord', 'card', 'title', 'col', 'blocked', 'round', 'reviewing'], parent: ['lane'], order: 'ord' }
+    { table: 'lane_frozen', cols: ['lane', 'ord', 'card', 'title', 'col', 'blocked', 'round', 'reviewing'], parent: ['lane'], order: 'ord' },
+    // Its run (#1270: Hive owns the lane): the ruleset it started with, the card in flight, a list change queued.
+    { table: 'lane_runs', cols: ['lane', 'ruleset', 'current_card', 'has_pending'], parent: ['lane'], order: 'lane', later: true },
+    { table: 'lane_pending', cols: ['lane', 'ord', 'card'], parent: ['lane'], order: 'ord', later: true }
   ],
   encode: (doc, key, ord) => {
     const l = obj(doc)
     const builder = obj(l.builder)
     const reviewer = l.reviewer === null ? null : obj(l.reviewer)
     const state = str(l.state)
-    if (!LANE_STATES.has(state) || !Array.isArray(l.cards) || (l.frozen !== undefined && !Array.isArray(l.frozen))) throw new Unfit()
+    if (!LANE_STATES.has(state) || !Array.isArray(l.cards) || (l.frozen !== undefined && !Array.isArray(l.frozen)) || (l.pending !== undefined && !Array.isArray(l.pending))) throw new Unfit()
+    const run = l.ruleset !== undefined || l.pending !== undefined || l.inFlight !== undefined
     return {
       main: {
         id: key,
@@ -167,7 +179,9 @@ const LANES: TableDef = {
           const c = obj(v)
           if (typeof c.reviewing !== 'boolean') throw new Unfit()
           return { lane: key, ord: i, card: int(c.number), title: str(c.title), col: str(c.column), blocked: strOrNull(c.blocked), round: int(c.round), reviewing: c.reviewing ? 1 : 0 }
-        })
+        }),
+        lane_runs: run ? [{ lane: key, ruleset: l.ruleset === undefined ? null : str(l.ruleset), current_card: l.inFlight === undefined ? null : int(l.inFlight), has_pending: l.pending === undefined ? 0 : 1 }] : [],
+        lane_pending: ((l.pending as unknown[] | undefined) ?? []).map((card, i) => ({ lane: key, ord: i, card: int(card) }))
       }
     }
   },
@@ -194,7 +208,8 @@ const LANES: TableDef = {
       updatedAt: m.updated_at,
       endedAt: m.ended_at,
       mergeCommit: m.merge_commit,
-      ...(frozen.length ? { frozen: frozen.map((r) => ({ number: r.card, title: r.title, column: r.col, blocked: r.blocked, round: r.round, reviewing: r.reviewing === 1 })) } : {})
+      ...(frozen.length ? { frozen: frozen.map((r) => ({ number: r.card, title: r.title, column: r.col, blocked: r.blocked, round: r.round, reviewing: r.reviewing === 1 })) } : {}),
+      ...runOf(c.lane_runs?.[0], c.lane_pending ?? [])
     }
     return withExtra(lane, parseExtra(m.extra))
   },
@@ -390,6 +405,7 @@ export function readEntries(db: DatabaseSync, store: TableStore): { key: string;
   const kids = new Map<string, Record<string, Row[]>>()
   for (const child of def.children) {
     if (child.derived) continue
+    if (child.later && !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(child.table)) continue // i18n-ignore: SQL
     const rows = db.prepare(`SELECT ${child.cols.join(', ')} FROM ${child.table} ORDER BY ${child.parent.join(', ')}, ${child.order}`).all() as Row[] // i18n-ignore: SQL
     for (const r of rows) {
       const k = child.parent.map((c) => String(r[c])).join('\0')

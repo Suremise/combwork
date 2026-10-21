@@ -125,11 +125,7 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
     const before = had.docs
     // Those no longer in the list go first: a new entry may take what one of them held (an agent's one watch).
     const kept = new Set(keys)
-    for (const key of before.keys())
-      if (!kept.has(key)) {
-        deleteByKey(db, store, key)
-        def.onRemove?.(db, key)
-      }
+    for (const key of before.keys()) if (!kept.has(key)) deleteByKey(db, store, key)
     // A place is part of a lane's or watch's row: one that moved is written again, as one that changed.
     const placeOf = new Map<string, number>()
     if (store !== 'metrics') readPlaces(db, def.main).forEach((ord, k) => placeOf.set(k, ord))
@@ -178,6 +174,8 @@ function readPlaces(db: ReturnType<typeof workspaceDb>['writer'], table: string)
 /** Removes an entry by its row key (a lane's or watch's id; a bucket's `span:start`). */
 function deleteByKey(db: ReturnType<typeof workspaceDb>['writer'], store: TableStore, key: string): void {
   const def = TABLE_DEFS[store]
+  // Its rows with no foreign key go with it, whether it leaves or is written again (a lane's run).
+  def.onRemove?.(db, key)
   if (store !== 'metrics') return deleteEntry(db, def, { id: key })
   const at = key.indexOf(':')
   deleteEntry(db, def, { span: key.slice(0, at), start: Number(key.slice(at + 1)) })

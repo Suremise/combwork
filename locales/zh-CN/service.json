@@ -150,6 +150,8 @@
   "service.workflowNotice.lane": "通道 {lane}",
   "service.workflowNotice.mergeDue": "所有卡片均已通过评审：该合并了",
   "service.workflowNotice.mergeStalled": "合并已停滞",
+  "service.workflowNotice.merging": "{card} 正在合并：通道正在等待",
+  "service.workflowNotice.notMerged": "{card} 已通过评审：通道正在等待合并",
   "service.workflowNotice.stalled": "{card} 已停滞",
   "service.workspace.advancedNotHere": "{setting} 不能针对工作区设置。",
   "service.workspace.agentGone": "该智能体已不存在。",

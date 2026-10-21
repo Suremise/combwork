@@ -2239,6 +2239,43 @@ picked up in a clean slot, by the builder that knows it, and the next card alway
 the previous one. The cost is idle builder time during merge checks; the alternative (go on with the next card, and
 a returned card gets its own slot and a fresh conversation) is put to Darren as OP-36.
 
+#### 16.11.2a Built [#1270]: Hive owns the lane
+
+- **One record:** a lane is `lanes.ts`'s (#1291), with what Hive keeps of its run beside it (`lane_runs`,
+  `lane_pending`): the ruleset in force when it started (stored as it starts, while rules are enforced), and a queued
+  list. `lanes.ts` is its one writer.
+- **List changes:** `hive_lane start` (or `POST /v1/lanes`) with a changed list for the builder's running lane, while
+  one of its cards is in flight (in Doing, Review or Passed), queues the list (`LaneInfo.queued`; status "list changes
+  after AM-12"; the reply says so). Once no card of the lane is in flight, the queued list applies and the builder gets
+  a message naming the lane's cards now. Between cards a change applies at once. A queued list keeps every card named
+  (none dropped); a queued empty list leaves the lane as it was. Any new list for the builder's running lane is an edit
+  of it, one sharing no card too (never a new lane abandoning it); a card only in a queued list waits for the card in
+  flight. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
+  that moved on meanwhile (reopened) leaves the lane as it was, to be read again.
+- **The lane's ruleset:** a card of a running lane (its list or its queued list) starts under the ruleset stored when
+  the lane started (the recorder's start and the runtime's `rulesetOf`); a Todo card outside a lane under the current
+  one (S19).
+- **One card at a time:** the runtime refuses to start a lane's card while a card before it in the lane isn't Done
+  (`lane.oneAtATime`, a refusal in all 7 locales; no option of its own: `workflow.enforce` off turns it off; the user's
+  own drag isn't refused). `hive_lane next` (`GET /v1/lanes/next`) names the card to start or carry on, or why the lane
+  waits.
+- **The verified end:** a lane ends by itself once every card is Done (the board's column, which follows the fold), with
+  each card's result revision from its `Integrated` fact (none under Not checked, or a card from before 1.0), the last
+  of them its merge commit. The runtime's `endLaneIfDone` action reads the lanes again. An agent's `hive_lane end`
+  ends a lane only when every card is Done (else refused, 409), never abandons one (403: the user's and the
+  Assistant's), and a `mergeCommit` it gives is ignored with a note; one the user, the Assistant or a script gives is
+  kept only where the cards' facts name no merge. A **`lane-ended`** event (once per lane: its
+  project, lane and each card's result) goes to code that follows lanes and to the Agent API's event stream.
+- **Why a lane waits, as data:** each running lane carries `status` (`LaneStatus`: a reason and its card) worked out in
+  main from the board and its cards' facts: blocked (with why), On Hold, waiting for you (a For you request), the round
+  limit, a card passed and not merged (merging: in the queue), a stale pass (submit again), no reviewer on a card in
+  Review, list changes after a card. The first six pause the lane (`state: paused`, `pausedOn` the card). The Progress
+  panel renders it (#1279); lane notices tell a lane paused for a merge (`paused`, a lane event; the others are told as
+  themselves).
+- **With `workflow.enforce` off** a lane is as before 1.0: list changes apply at once, nothing waits for Done, an
+  agent's `end` records its `mergeCommit` unverified, and the only status is a blocked or held card. The verified end
+  and its event still fire when every card is Done.
+
 #### 16.11.3 Starting and ending a lane from the window
 
 [#1117 c "Without the Assistant", #1117 solo] **Start lane…** on the board and in the Progress panel: pick the
