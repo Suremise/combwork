@@ -2561,7 +2561,7 @@ verdict moves it. Each on the board's one intent path (`runIntent`), so the runt
 §16.8.3's, the Agent API's `409`) and the card's 0.9 fields follow; the change's other fields go with its first write,
 its comment with the write recording the intent. The short reply adds "As submit: next time call hive_submit". A batch
 translates each card's; a card an agent creates in Doing, Review or Passed is made in Todo and moved by its intent in
-one change. **Every new cycle is a start, through Start's guards** [HR2's #1268 round 1]: from Todo, a Done card moved
+one change (in a column its rules lack, made there as before: HR2's round 2). **Every new cycle is a start, through Start's guards** [HR2's #1268 round 1]: from Todo, a Done card moved
 back to Doing (reopened: back to Todo and started in one write), a card On Hold never started, and a start naming
 another agent (started for it: its builder). **Each translation is one write** (a verdict with the review it starts),
 undone whole when refused or failing part way, the comment checked before anything is read or written. P3's path

@@ -909,14 +909,16 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
   // Made in Doing or Review with an agent, its work starts or is submitted: the platform's reads, before the change (#1216).
   const column = input.column ?? 'todo'
   // A project agent's card made in Doing, Review or Passed, with the rules enforced (#1268): made in Todo, then moved by
-  // the intent that column stands for, in one change, refused whole as the intent is.
-  if (actor.kind === 'agent' && actor.self && (column === 'doing' || column === 'review' || column === 'passed') && (await agentTranslates(ws, actor, input))) {
+  // the intent that column stands for, in one change, refused whole as the intent is. A column the project's rules
+  // don't have (Review with no review) is made there as before (HR2's #1268 round 2), as a move to it is.
+  if (actor.kind === 'agent' && actor.self && (column === 'doing' || column === 'review' || column === 'passed') && (await agentTranslates(ws, actor, input, column))) {
     return cardBatch(ws, async () => {
       const card = await recording(actor, null, () => createTaskLocked({ ...input, column: 'todo' }, actor))
       // Given to another agent: started for it (its builder), the card staying its.
       const move: TaskPatch = { column, ...(card.agent && card.agent !== actor.self?.agentId ? { agent: card.agent } : {}) }
       const g = await agentGateOf(ws, card.number, move, actor)
-      return g ? moveAsAgent(g, card.number, move, actor) : card
+      // Never left in Todo: with no intent to run after all, P3's move to the column asked for.
+      return g ? moveAsAgent(g, card.number, move, actor) : recordingAs(actor, () => updateTaskAs(card.number, move, actor, {}))
     })
   }
   const project = (column === 'doing' || column === 'review') && ws.path ? await projectName(scopeOf(actor) !== null && input.project === undefined ? scopeOf(actor)! : input.project).catch(() => '') : ''
@@ -1125,14 +1127,19 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
   return builder ? { wf, column: 'doing', builder } : null
 }
 
-/** Whether a project agent's new card would have its column translated (#1268): the rules enforced, its project's runtime (another agent named: started for it). */
-async function agentTranslates(ws: WorkspaceService, actor: TaskActor & { kind: 'agent' }, input: { project?: string; agent?: string | null }): Promise<boolean> {
+/**
+ * Whether a project agent's new card would have its column translated (#1268): the rules enforced, its project's runtime,
+ * the column's stage in its rules (another agent named: started for it).
+ */
+async function agentTranslates(ws: WorkspaceService, actor: TaskActor & { kind: 'agent' }, input: { project?: string; agent?: string | null }, column: TaskColumn): Promise<boolean> {
   const { workflowEnforced, workflowFor } = await import('./workflow/service')
   if (!ws.path || !workflowEnforced() || !actor.self) return false
   const scope = scopeOf(actor)
   const project = await projectName(scope !== null && input.project === undefined ? scope : input.project).catch(() => '')
   if (!project || (input.agent && !(await agentIdIn(ws, project, input.agent)))) return false
-  return !!(await workflowFor(ws, join(ws.path, project)).catch(() => null))
+  const wf = await workflowFor(ws, join(ws.path, project)).catch(() => null)
+  // The column's stage in the rules a new card starts under (no lane yet: the current ones).
+  return !!wf && hasStage(wf.currentRuleset(false), CATEGORY_STAGE[column])
 }
 
 /**

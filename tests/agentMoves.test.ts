@@ -332,6 +332,15 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(review.said.some((l) => l.startsWith('As '))).toBe(false)
     expect((await update(w, card, reviewer, { review: 'start' })).card.review?.agent).toBe('a2')
     expect((await update(w, card, reviewer, { review: 'passed', column: 'passed' }, 'PASSED')).card.column).toBe('passed')
+    // Made by an agent in a column its rules lack: made there, as a move there is (HR2's round 2); in Doing, started.
+    for (const column of ['review', 'passed'] as const) {
+      const made = await inWorkspace(w, () => tasks.createTask({ title: `Made in ${column}`, column }, builder))
+      expect(made.column).toBe(column)
+      expect((await inWorkspace(w, () => tasks.getTask(made.number, w))).column).toBe(column)
+    }
+    const doing = await inWorkspace(w, () => tasks.createTask({ title: 'Made in Doing', column: 'doing' }, builder))
+    expect(doing.column).toBe('doing')
+    expect(kinds(w, doing.number)).toContain('Started')
     // On Hold is the user's; an agent the user asked takes the card out. Held while being worked on, it goes back to it by
     // P3's move; never started, its move to Doing is its start.
     const working = await started(w, wt, 'w.txt')
@@ -354,6 +363,9 @@ describe("an agent's old moves as intents (#1268)", () => {
     const start = await update(w, card, builder, { column: 'doing' })
     expect(start.card).toMatchObject({ column: 'doing', agent: 'a1' })
     expect(start.said.some((l) => l.startsWith('As '))).toBe(false)
+    // A card made in Review is made there, nothing submitted by the rules.
+    const made = await inWorkspace(w, () => tasks.createTask({ title: 'Made in Review', column: 'review' }, builder))
+    expect(made.column).toBe('review')
     // P3 records its facts still.
     expect(kinds(w, card)).toContain('Started')
     writeFileSync(join(wt, 'dirty.txt'), 'uncommitted\n')
