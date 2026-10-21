@@ -6,6 +6,7 @@
   "tasks.error.archiveNone": "cards: list the cards to archive.",
   "tasks.error.archiveNumbers": "cards: card numbers only.",
   "tasks.error.archived": "#{n} is archived. Only the user can bring it back.",
+  "tasks.error.badAnswer": "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).",
   "tasks.error.batchGone": "That batch is no longer kept: unarchive its cards from Archived.",
   "tasks.error.beforeArchived": "#{before} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: #{n} can only go before a card in the column it's in.",
   "tasks.error.beforeElsewhere": "#{before} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: #{n} can only go before a card in the column it's in.",

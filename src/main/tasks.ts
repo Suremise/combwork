@@ -18,7 +18,9 @@ import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectNam
 import { decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { alongside, isRefusal, type Workflow } from './workflow/runtime'
 import { hasStage } from '../shared/workflow/compile'
-import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
+import { CATEGORY_STAGE, ROUND_CHOICES, ROUND_LIMIT_GATE, STAGE_CATEGORY, type StageId } from '../shared/workflow/facts'
+import type { ForYouAnswer } from '../shared/workflow/workView'
+import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
 import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
@@ -1131,6 +1133,56 @@ export async function moveTask(n: number, column: TaskColumn, o: { before?: numb
     return { moved: await updateTask(n, plain, actor) }
   }
   return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm)
+}
+
+/** An answer the window sent that can't be one (the request's kind decides which fields it takes). */
+const BAD_ANSWER = msg({ id: 'tasks.error.badAnswer', defaultMessage: "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).", description: "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)." })
+
+/**
+ * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (Darren's point 7: never
+ * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
+ * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
+ * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
+ * reply is kept with the answer and relayed to the waiting agent. Refused with the rule's text when the request was
+ * answered or retired meanwhile.
+ */
+export async function answerTask(n: number, request: string, a: ForYouAnswer): Promise<TaskCard> {
+  const ws = workspace
+  const actor: TaskActor = { kind: 'user' }
+  const bad = (): HiveError => hiveError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
+  if (!a || !['approved', 'declined', 'answered'].includes(a.outcome) || typeof request !== 'string' || !request) throw bad()
+  const reply = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
+  const decision = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
+  const head = ws.path ? cardHeads(ws, [n])[0] : undefined
+  if (!head) throw unknownTask(n)
+  const { workflowFor } = await import('./workflow/service')
+  const wf = typeof head.project === 'string' && head.project && ws.path ? await workflowFor(ws, join(ws.path, head.project)).catch(() => null) : null
+  const rec = (() => {
+    try {
+      return wf?.store.card(n) ?? null
+    } catch {
+      return null
+    }
+  })()
+  const req = wf && rec ? wf.state(rec).requests.find((r) => r.request === request) : undefined
+  if (!wf || !req) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+  // What each kind takes: an approval is approved or declined; at the round limit, a choice (a carry on with its rounds);
+  // any other question, a reply or a decision.
+  const limit = req.gate === ROUND_LIMIT_GATE
+  const choice = a.choice && ROUND_CHOICES.includes(a.choice) ? a.choice : undefined
+  if (a.choice !== undefined && !choice) throw bad()
+  if (limit ? a.outcome !== 'answered' || !choice || (choice === 'carryOn' && !(Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= LANE_MAX_ROUNDS)) : choice) throw bad()
+  if (a.outcome === 'answered' && !limit && !reply && !decision) throw bad()
+  if (a.outcome !== 'answered' && (req.kind !== 'approve' || decision)) throw bad()
+  const { reply: r } = await runIntent(
+    wf,
+    n,
+    actor,
+    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
+    (_w, first) => ({ patch: first && decision ? { decision } : {} })
+  )
+  if (isRefusal(r)) throw new WorkflowRefusedError(r)
+  return getTask(n, ws)
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */

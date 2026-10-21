@@ -6,6 +6,7 @@
   "tasks.error.archiveNone": "cards：请列出要归档的卡片。",
   "tasks.error.archiveNumbers": "cards：只能填写卡片编号。",
   "tasks.error.archived": "#{n} 已归档。只有用户能恢复它。",
+  "tasks.error.badAnswer": "该回答与请求不符：批准请求应批准或拒绝，问题应以回复或决定作答，达到轮次上限时应选择后续方式（继续时追加 1 到 {max} 轮）。",
   "tasks.error.batchGone": "该批次已不再保留：请在“已归档”中逐张取消归档其卡片。",
   "tasks.error.beforeArchived": "#{before} 已归档，不在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”中：#{n} 只能放在所在列中某张卡片的前面。",
   "tasks.error.beforeElsewhere": "#{before} 在“{other, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{other}}}”中，不在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”中：#{n} 只能放在所在列中某张卡片的前面。",

@@ -6,6 +6,7 @@
   "tasks.error.archiveNone": "cards: indica las tarjetas que quieres archivar.",
   "tasks.error.archiveNumbers": "cards: solo números de tarjeta.",
   "tasks.error.archived": "La tarjeta #{n} está archivada. Solo el usuario puede devolverla.",
+  "tasks.error.badAnswer": "Esa respuesta no encaja con la solicitud: una aprobación se aprueba o se rechaza, una pregunta se responde con una respuesta o una decisión, y en el límite de rondas se elige cómo seguir (continuar con 1 a {max} rondas más).",
   "tasks.error.batchGone": "Ese lote ya no se guarda: desarchiva sus tarjetas desde Archivadas.",
   "tasks.error.beforeArchived": "La tarjeta #{before} está archivada, no en la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}: la tarjeta #{n} solo puede ir antes de una tarjeta de su misma columna.",
   "tasks.error.beforeElsewhere": "La tarjeta #{before} está en la columna {other, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{other}}}, no en {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}: la tarjeta #{n} solo puede ir antes de una tarjeta de su misma columna.",

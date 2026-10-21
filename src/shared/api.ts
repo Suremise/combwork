@@ -114,7 +114,7 @@ import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
-import type { WorkBadge, WorkView } from './workflow/workView'
+import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -325,6 +325,10 @@ export interface HiveRequests {
   'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string }) => TaskMoveResult
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
   'tasks:facts': (n: number) => Fact[]
+  /** What waits for the user (For you, #1269, SPEC §16.8.5): every live card's open requests, of one project (its folder name) or the workspace, oldest first, and their count. */
+  'tasks:forYou': (project?: string | null) => ForYouSummary
+  /** The user answers a card's request (For you): only the user. Refused when it was answered or retired meanwhile. */
+  'tasks:answer': (n: number, request: string, answer: ForYouAnswer) => TaskCard
   'tasks:comment': (n: number, text: string) => TaskCard
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
   'tasks:editDecision': (n: number, id: string, text: string | null) => TaskCard

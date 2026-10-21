@@ -101,6 +101,7 @@ export const SUITES = [
   { name: 'files' },
   { name: 'flightrecorder' },
   { name: 'footerfit' },
+  { name: 'foryou' },
   { name: 'freshpath' },
   { name: 'gitinit' },
   { name: 'gitmissing' },

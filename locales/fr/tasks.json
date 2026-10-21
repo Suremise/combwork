@@ -6,6 +6,7 @@
   "tasks.error.archiveNone": "cards : indique les cartes à archiver.",
   "tasks.error.archiveNumbers": "cards : numéros de cartes uniquement.",
   "tasks.error.archived": "La carte #{n} est archivée. Seul l’utilisateur peut la restaurer.",
+  "tasks.error.badAnswer": "Cette réponse ne correspond pas à la demande : une validation s’accorde ou se refuse, une question se règle par une réponse ou une décision, et à la limite de tours on choisit la suite (continuer avec 1 à {max} tours de plus).",
   "tasks.error.batchGone": "Ce lot n’est plus conservé : désarchive ses cartes depuis Archivées.",
   "tasks.error.beforeArchived": "La carte #{before} est archivée, elle n’est pas dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}} : la carte #{n} ne peut aller qu’avant une carte de sa propre colonne.",
   "tasks.error.beforeElsewhere": "La carte #{before} est dans {other, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{other}}}, pas dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}} : la carte #{n} ne peut aller qu’avant une carte de sa propre colonne.",

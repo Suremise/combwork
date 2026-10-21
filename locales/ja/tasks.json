@@ -6,6 +6,7 @@
   "tasks.error.archiveNone": "cards: アーカイブするカードを指定してください。",
   "tasks.error.archiveNumbers": "cards: カード番号だけを指定してください。",
   "tasks.error.archived": "#{n}はアーカイブされています。戻せるのはユーザーだけです。",
+  "tasks.error.badAnswer": "その回答はリクエストに合いません。承認は承認または却下し、質問には返信か決定事項で答え、ラウンド上限では続け方を選んでください（続ける場合は1～{max}ラウンドを追加）。",
   "tasks.error.batchGone": "その一括アーカイブの記録はもう残っていません。「アーカイブ済み」からカードを1件ずつ戻してください。",
   "tasks.error.beforeArchived": "#{before}はアーカイブされていて、「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」にはありません。#{n}は同じ列にあるカードの前にしか移動できません。",
   "tasks.error.beforeElsewhere": "#{before}は「{other, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{other}}}」にあり、「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」にはありません。#{n}は同じ列にあるカードの前にしか移動できません。",

@@ -47,6 +47,14 @@
     "defaultMessage": "{card} waits for your review",
     "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
   },
+  "workflow.forYou.roundLimit": {
+    "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
+    "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
+  },
+  "workflow.forYouKind": {
+    "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
+    "description": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces."
+  },
   "workflow.move.answer": {
     "defaultMessage": "Answer",
     "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
@@ -422,6 +430,10 @@
   "workflow.refused.why.userOk": {
     "defaultMessage": "it waits for the OK before merging.",
     "description": "The {why} of a refused merge: the user's approval is missing."
+  },
+  "workflow.roundChoice": {
+    "defaultMessage": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
+    "description": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces."
   },
   "workflow.rule.approval.given": {
     "defaultMessage": "Your OK before merging",

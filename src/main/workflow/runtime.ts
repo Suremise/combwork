@@ -9,7 +9,7 @@
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
 import { AsyncLocalStorage } from 'async_hooks'
-import { agentOf, approvedByUser, foldCard, openEntry, passingReviewers, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type StageId } from '../../shared/workflow/facts'
+import { agentOf, approvedByUser, atRoundLimit, foldCard, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -139,6 +139,9 @@ export function slugOf(title: string): string {
 }
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
+
+/** The user's choice at the round limit, as an agent's wake says it (English). */
+const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
 
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
@@ -620,14 +623,14 @@ export class Workflow {
   }
 
   /** Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, asker?: string | null): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(asker ? { asker } : {}), stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -643,9 +646,20 @@ export class Workflow {
     const o = r.options
     if (w.current === 'review' && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
       this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: w.card.key }))
-    } else if (w.current === 'approved' && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
+    } else if (w.current === 'approved' && this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
       this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
     }
+  }
+
+  /**
+   * At the round limit (§16.11.4): Hive asks the user (Decide: carry on, split, accept with follow-ups, take it over), and
+   * the card's lane pauses until they answer. Only for a card in a running lane (its rounds: the Card loops settings it
+   * started with) and while the rules are enforced (Settings → Advanced).
+   */
+  askAtLimit(w: Write): void {
+    const s = w.state()
+    if (!this.enforced() || !atRoundLimit(s, w.card.rounds)) return
+    this.askUser(w, 'decide', ROUND_LIMIT_GATE, workflowText(FOR_YOU.roundLimit, { card: w.card.key, rounds: s.rounds }))
   }
 
   /** Wakes an agent: a durable action delivered once (§16.4.5). */
@@ -692,7 +706,8 @@ export class Workflow {
       }
       return
     }
-    const needOk = okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')
+    // G10 asks only while the rules are enforced (Settings → Advanced): off, the card goes on as if it were never set.
+    const needOk = this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')
     switch (o.finish) {
       case 'hiveMerges':
         if (needOk) {
@@ -910,6 +925,7 @@ export class Workflow {
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing
+        this.askAtLimit(w)
         return null
       }
       if (moved && !moved.same) {
@@ -932,8 +948,14 @@ export class Workflow {
     return this.ok(card, 'review', this.state(card).stage)
   }
 
-  /** The user answers a request (§16.8.5): an approval satisfies its gate; a decline is a round. Never a decision. */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', note?: string): Promise<Reply> {
+  /**
+   * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
+   * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
+   * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. Never a decision (the
+   * board records those). The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
+   * at the round limit the builder and the reviewer, whose lane paused for it.
+   */
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -943,23 +965,37 @@ export class Workflow {
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
     const from = s.stage
+    const { note, choice } = opts
+    const rounds = choice === 'carryOn' && opts.rounds && opts.rounds > 0 ? Math.floor(opts.rounds) : undefined
     await this.cfg.hooks?.beforeWrite?.('answer')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, note))
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
     const out = await this.write(card, r, 'user', (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
       const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
       if (changed) return changed
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
-      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
-      if (answer === 'declined') {
-        w.move('active', 'user')
-        this.wake(w, builder, `${card.key}: the user declined it`) // i18n-ignore: a wake, agent-facing
+      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${req.text}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      if (req.gate === ROUND_LIMIT_GATE) {
+        this.wake(w, builder, said)
+        this.wake(w, this.reviewerOf(card), said)
         return null
       }
-      if (answer !== 'approved' || req.kind !== 'approve') {
-        this.wake(w, builder, `${card.key}: the user answered`) // i18n-ignore: a wake, agent-facing
+      if (req.gate !== 'review' && req.gate !== 'okBefore') {
+        // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.
+        this.wake(w, req.asker ?? builder, said)
+        return null
+      }
+      if (answer === 'declined') {
+        w.move('active', 'user')
+        this.wake(w, builder, said)
+        this.askAtLimit(w)
+        return null
+      }
+      if (answer !== 'approved') {
+        this.wake(w, builder, said)
         return null
       }
       // The gate is evaluated before anything moves on: passes and approvals at the current generation, not stale.
@@ -967,7 +1003,7 @@ export class Workflow {
       const missing = notApproved(now, r, card.labels)
       if (req.gate === 'review') {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
-      } else if (req.gate === 'okBefore' && !missing && st.stage === 'approved') {
+      } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
         else this.wake(w, builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
       }
@@ -1020,7 +1056,7 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
-      this.askUser(w, args.kind, 'ask', args.text)
+      this.askUser(w, args.kind, 'ask', args.text, agentOf(actor))
     })
     return this.ok(card, s.stage, s.stage)
   }
@@ -1033,7 +1069,7 @@ export class Workflow {
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
       const request = `${card.key}/r${s.lastSeq + 1}`
       w.fact('CannotWithinRules', { rule: args.rule, why: args.why, request })
-      w.fact('ApprovalRequested', { request, kind: 'decide', gate: args.rule, text: args.why })
+      w.fact('ApprovalRequested', { request, kind: 'decide', gate: args.rule, text: args.why, for: 'user', ...(agentOf(actor) ? { asker: agentOf(actor)! } : {}) })
       w.action('notify', { text: args.why })
     })
     return this.ok(card, s.stage, s.stage)
@@ -1416,8 +1452,8 @@ export class Workflow {
   }
 
   /** Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends. */
-  startLane(id: string, cards: number[], reviewer?: string): LaneList {
-    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer)
+  startLane(id: string, cards: number[], reviewer?: string, rounds?: number): LaneList {
+    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer, rounds)
   }
 
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */

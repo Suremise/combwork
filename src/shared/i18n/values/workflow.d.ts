@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
   'workflow.forYou.review': { card: string | number }
+  'workflow.forYou.roundLimit': { card: string | number; rounds: number }
+  'workflow.forYouKind': { kind: string }
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
   'workflow.move.move': undefined
@@ -107,6 +109,7 @@ interface HiveMessageValues {
   'workflow.refused.why.requeueNotTransient': undefined
   'workflow.refused.why.stale': undefined
   'workflow.refused.why.userOk': undefined
+  'workflow.roundChoice': { choice: string }
   'workflow.rule.approval.given': undefined
   'workflow.rule.done.contained': undefined
   'workflow.rule.integrate.approved': undefined

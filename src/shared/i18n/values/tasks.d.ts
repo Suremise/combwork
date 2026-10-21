@@ -8,6 +8,7 @@ interface HiveMessageValues {
   'tasks.error.archiveNone': undefined
   'tasks.error.archiveNumbers': undefined
   'tasks.error.archived': { n: string | number }
+  'tasks.error.badAnswer': { max: string | number }
   'tasks.error.batchGone': undefined
   'tasks.error.beforeArchived': { before: string | number; column: string; n: string | number }
   'tasks.error.beforeElsewhere': { before: string | number; other: string; column: string; n: string | number }

@@ -27,6 +27,10 @@
     "defaultMessage": "#{n} is archived. Only the user can bring it back.",
     "description": "An error: card #{n} (a number) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive."
   },
+  "tasks.error.badAnswer": {
+    "defaultMessage": "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).",
+    "description": "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)."
+  },
   "tasks.error.batchGone": {
     "defaultMessage": "That batch is no longer kept: unarchive its cards from Archived.",
     "description": "An error: the Archive All batch to bring back is no longer kept (Hive keeps the latest 50); its cards can still be brought back one by one from the board's Archived list."

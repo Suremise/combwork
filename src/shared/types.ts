@@ -2505,6 +2505,8 @@ export interface LaneCard {
   round: number
   /** A review is under way now. */
   reviewing: boolean
+  /** At its round limit, waiting for the user's answer (For you, §16.11.4): its lane pauses on it. */
+  roundLimit?: boolean
 }
 
 export interface LaneInfo {

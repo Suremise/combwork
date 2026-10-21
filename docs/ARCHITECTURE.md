@@ -410,7 +410,13 @@ loop events), inside `recordingByRuntime`, so the recorder writes no `Started`/`
 take it when `gateOf` says so (the rules enforced, a card from 1.0, a project with a platform, a stage its ruleset has;
 a batch's cards too, in the batch's change): `Workflow.move` with `confirm` for the user (interim until #1290/#1275),
 `override.reason` for the Assistant. A refusal is `WorkflowRefusedError` (its `refusal`), which `apiErrorReply` turns
-into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. Runtime writes outside an intent's write (a
+into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. For you (#1269): `tasks:answer` is
+`answerTask` (the user's only), `Workflow.answer` on the same path, its checks of what the answer may be (the request's
+kind and gate) made first, a Decide answer's decision added with its first write (`zero9`); `tasks:forYou` is
+`cardWork.forYou`, every live card's open requests folded from its facts on one snapshot. The round limit is asked by the
+runtime's `askAtLimit` (a verdict's fail, the user's decline) and by the recorder's `roundLimit` for a failed review given
+on the board (until #1268), from the card's lane's rounds (`CardRecord.rounds`); `lanes.ts` reads `roundLimitCards` to
+pause a lane on a card waiting for that answer (`LaneCard.roundLimit`), while the rules are enforced. Runtime writes outside an intent's write (a
 refusal's `Refused`, None's declared paths) go through `locked` too, and `start` stores its ruleset only in its write.
 Before P7 a builder's own worktree is its card's folder (`cfg.agentFolder`, from project.json; `StartPlan.existing`:
 no `prepareSlot`); `cfg.runsOf` is the agent's open Progress runs and background tasks (`setRunsGoing`, from index.ts).

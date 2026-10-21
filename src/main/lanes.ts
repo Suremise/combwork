@@ -20,6 +20,8 @@ import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
+import { roundLimitCards } from './workflow/cardWork'
+import { rulesEnforced } from './workflow/recorder'
 
 const log = createLogger('lanes')
 
@@ -310,7 +312,10 @@ async function namesOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
 async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<LaneInfo[]> {
   const cards = await cardsOf(ws, lanes)
   const names = await namesOf(ws, lanes)
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined))
+  // The running lanes' cards waiting for the user at their round limit (§16.11.4): from their facts, while the rules
+  // are enforced (turned off, nothing pauses a lane for a rule).
+  const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, atLimit))
 }
 
 /** A project agent of the lane's project, by id: its name now. */
