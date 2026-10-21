@@ -3,7 +3,7 @@
 // tested again and then pauses, installs from scratch when the manifests changed (or always), transient vs red, the
 // environment a check gets, and S4's and S13's cores.
 import { afterEach, describe, expect, it } from 'vitest'
-import { closeSync, mkdirSync, openSync, readFileSync, symlinkSync, writeFileSync } from 'fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
@@ -129,6 +129,12 @@ describe('the install from scratch', () => {
     expect(installPlan('yarn', dir)).toEqual(clean('yarn install --frozen-lockfile'))
     expect(installPlan('yarn --silent', dir)).toEqual(clean('yarn install --frozen-lockfile --silent'))
     // Packages named, a compound command, another tool: run as written, never called clean.
+    // A flag that changes where it installs, or whether it installs at all, isn't a clean install's.
+    for (const f of ['--dry-run', '--package-lock-only', '--prefix=../elsewhere', '-g', '--global', '--help', '-h', '--version', '--no-package-lock', '--install-links=false']) {
+      expect(installPlan(`npm install --no-audit ${f}`, dir)).toEqual(written(`npm install --no-audit ${f}`))
+    }
+    expect(installPlan('pnpm install --lockfile-only', dir)).toEqual(written('pnpm install --lockfile-only'))
+    expect(installPlan('yarn install --check-files --dry-run', dir)).toEqual(written('yarn install --check-files --dry-run'))
     expect(installPlan('npm install left-pad', dir)).toEqual(written('npm install left-pad'))
     expect(installPlan('npm install && npm run build:deps', dir)).toEqual(written('npm install && npm run build:deps'))
     expect(installPlan('npm i > install.log', dir)).toEqual(written('npm i > install.log'))
@@ -259,6 +265,41 @@ describe("the runner's own runs, outside the queue", () => {
   })
 })
 
+describe('the install from scratch with real npm (offline, a local tarball)', () => {
+  const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
+
+  it('no warm package survives: a dry run leaves none (as written), and npm install with flags is npm ci and installs it fresh', async () => {
+    const root = tempDir('qc-npm-')
+    const npmEnv = (): Record<string, string> => ({ ...base(), npm_config_cache: join(root, 'cache'), npm_config_userconfig: join(root, 'empty.npmrc'), npm_config_update_notifier: 'false' })
+    writeFileSync(join(root, 'empty.npmrc'), '')
+    mkdirSync(join(root, 'dep'))
+    writeFileSync(join(root, 'dep', 'package.json'), '{"name":"dep","version":"1.0.0","main":"index.js"}')
+    writeFileSync(join(root, 'dep', 'index.js'), "module.exports = 'fresh'\n")
+    const prep = runner({ env: npmEnv, setupCommand: () => 'npm install --no-audit --no-fund --offline' })
+    expect(await prep.runCheck('pack', 'npm pack --silent', join(root, 'dep'), ctx)).toMatchObject({ ok: true })
+    const app = join(root, 'app')
+    mkdirSync(app)
+    writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0', dependencies: { dep: `file:${join(root, 'dep', 'dep-1.0.0.tgz').split('\\').join('/')}` } }))
+    // The worktree warm: installed, then its package changed in place (ignored by git, invisible to the bracket).
+    expect(await prep.runCheck('warm', 'npm install --no-audit --no-fund --offline', app, ctx)).toMatchObject({ ok: true })
+    const installed = join(app, 'node_modules', 'dep', 'index.js')
+    expect(readFileSync(installed, 'utf8')).toContain('fresh')
+    writeFileSync(installed, "module.exports = 'stale warm file'\n")
+    // A dry run installs nothing: called as written, and the warm package is gone with node_modules.
+    const dry = runner({ env: npmEnv, setupCommand: () => 'npm install --dry-run --no-audit --no-fund --offline' })
+    expect(await dry.install(app, true, ctx)).toMatchObject({ ok: true })
+    expect(dry.started[0]).toMatchObject({ installAsWritten: true })
+    expect(existsSync(installed)).toBe(false)
+    // npm install with known flags: its clean form, npm ci with them, installs it fresh.
+    mkdirSync(join(app, 'node_modules', 'dep'), { recursive: true })
+    writeFileSync(installed, "module.exports = 'stale warm file'\n")
+    const clean = runner({ env: npmEnv, setupCommand: () => 'npm install --no-audit --no-fund --offline' })
+    expect(await clean.install(app, true, ctx)).toMatchObject({ ok: true, command: 'npm ci --no-audit --no-fund --offline' })
+    expect(clean.started[0].installAsWritten).toBeUndefined()
+    expect(readFileSync(installed, 'utf8')).toContain('fresh')
+  })
+})
+
 describe('merge checks as Hive\'s runs (temporary repositories)', () => {
   it('a green check runs in the queue\'s folder as "Hive (merge queue)" for the result revision, counted; the target advances', async () => {
     const out = join(tempDir('qc-env-'), 'env.json')
@@ -373,11 +414,11 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
   }
 
   it('onManifestChange: installs for the first entry, not again while the manifests are unchanged, again when they change', async () => {
-    expect(await installs('onManifestChange', [null, null, '{"dependencies":{}}\n', null])).toEqual([1, 1, 2, 2])
+    expect(await installs('onManifestChange', [null, null, '{"dependencies":{}}\n'])).toEqual([1, 1, 2])
   })
 
   it('always: installs before every entry\'s checks', async () => {
-    expect(await installs('always', [null, null, null])).toEqual([1, 2, 3])
+    expect(await installs('always', [null, null])).toEqual([1, 2])
   })
 
   it("the install is one of Hive's runs, the setup command with its clean state; it fails → the card returns", async () => {

@@ -14,9 +14,10 @@
 //   by its time limit, or one killed from outside (a signal, or Windows' interrupt status) is transient; everything
 //   else is red.
 // - The install (S13, #187, `installPlan`) is the project's worktree setup command in its clean form where Hive knows
-//   one (npm install and its flags → npm ci with them; pnpm and yarn's frozen lock file), else as written after the
-//   folder's node_modules is removed (its run says so); `npm ci` for a lock file with no setup command; with neither
-//   there is nothing to install, which the next check's run says once. Its title is its command line, which can hold
+//   one (npm install and known flags → npm ci with them; pnpm and yarn's frozen lock file), else as written (its run
+//   says so); `npm ci` for a lock file with no setup command; with neither there is nothing to install, which the next
+//   check's run says once. The folder's node_modules is removed before every install (a link as a link), so a warm
+//   package never outlives an install that installed nothing. Its title is its command line, which can hold
 //   a token: withheld from the Agent API (`titleFromCommand`, #620).
 // - A log that can't be written never stops a run: it is closed and given as no log, and every run started is finished.
 
@@ -170,7 +171,8 @@ export interface InstallPlan {
   command: string
   /**
    * `clean`: the package manager's own clean install (npm ci; pnpm and yarn's frozen lock file). `asWritten`: a setup
-   * command Hive has no clean form of, run as written after its folder's node_modules is removed (its run says so).
+   * command Hive has no clean form of, run as written (its run says so). Either way the folder's node_modules is
+   * removed first.
    */
   how: 'clean' | 'asWritten'
 }
@@ -179,10 +181,18 @@ export interface InstallPlan {
 const COMPOUND = /[&|;<>()^`\r\n]/
 
 /**
- * The install a clean state takes (S13, #187): a package manager's install with only flags after it (`npm install
- * --no-audit`, `npm i`, `pnpm install --prefer-offline`, `yarn`) becomes its clean form with the same flags; anything
- * else (a compound command, packages named, another tool) runs as written (`asWritten`); with no setup command, a lock
- * file means `npm ci`; with neither there's nothing to install.
+ * The flags a clean install keeps: only those that change what it prints, how it fetches or which scripts run, never
+ * where it installs or whether it installs at all (`--dry-run`, `--package-lock-only`, `--prefix`, `-g`, `--help`…).
+ * Any other flag makes the setup command one Hive has no clean form of (round 2 of #1349's review).
+ */
+const CLEAN_FLAGS = /^(?:--(?:no-)?(?:audit|fund|progress|color|update-notifier|optional)|--ignore-scripts|--foreground-scripts|--legacy-peer-deps|--strict-peer-deps|--prefer-offline|--offline|--force|--silent|--quiet|-s|-q|--loglevel=[\w-]+|--cache=\S+|--registry=\S+|--(?:omit|include)=(?:dev|optional|peer)|--network-concurrency=\d+|--(?:no-)?frozen-lockfile)$/
+
+/**
+ * The install a clean state takes (S13, #187): a package manager's install with only known flags after it (CLEAN_FLAGS:
+ * `npm install --no-audit`, `npm i`, `pnpm install --prefer-offline`, `yarn`) becomes its clean form with the same
+ * flags; anything else (a compound command, packages named, another flag, another tool) runs as written (`asWritten`);
+ * with no setup command, a lock file means `npm ci`; with neither there's nothing to install. Whichever it is, the
+ * folder's node_modules is removed first (`queueChecks`' install), so an install that installs nothing leaves nothing.
  */
 export function installPlan(setup: string, folder: string): InstallPlan | null {
   const s = setup.trim()
@@ -191,7 +201,7 @@ export function installPlan(setup: string, folder: string): InstallPlan | null {
   const [tool, ...rest] = s.split(/\s+/)
   const pm = tool.toLowerCase().replace(/\.(cmd|exe)$/, '')
   const sub = rest[0]?.toLowerCase()
-  const flags = (from: number): string[] | null => (rest.slice(from).every((a) => a.startsWith('-')) ? rest.slice(from) : null)
+  const flags = (from: number): string[] | null => (rest.slice(from).every((a) => CLEAN_FLAGS.test(a)) ? rest.slice(from) : null)
   const line = (...parts: string[]): string => parts.filter(Boolean).join(' ')
   if (pm === 'npm' && (sub === 'install' || sub === 'i' || sub === 'ci')) {
     const f = flags(1)
@@ -209,8 +219,8 @@ export function installPlan(setup: string, folder: string): InstallPlan | null {
 }
 
 /**
- * Removes the queue's folder's node_modules before a setup command run as written, so what it installs is what the
- * result's manifests say. A link (a junction to another checkout's packages) is removed as a link, never through.
+ * Removes the queue's folder's node_modules before every install, so what is there after it is only what it installed
+ * from the result's manifests. A link (a junction to another checkout's packages) is removed as a link, never through.
  */
 function removeNodeModules(folder: string): void {
   const p = join(folder, 'node_modules')
@@ -485,7 +495,9 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
       const plan = installPlan(await deps.setupCommand(), folder)
       if (!plan) return { ok: true, output: '', skipped: true }
       const asWritten = plan.how === 'asWritten'
-      return run(plan.command, plan.command, folder, ctx, { titleFromCommand: true, asWritten, ...(asWritten ? { before: () => removeNodeModules(folder) } : {}) })
+      // From scratch whatever the command: node_modules goes first, so no warm package outlives an install that
+      // installed nothing (a dry run) and the checks fail on what's missing rather than pass on what was there.
+      return run(plan.command, plan.command, folder, ctx, { titleFromCommand: true, asWritten, before: () => removeNodeModules(folder) })
     }
   }
 }
