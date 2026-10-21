@@ -94,6 +94,8 @@ export interface ConfirmRequest {
   list?: readonly string[]
   /** The list is to read, not to copy (a CLI's clipboard text Hive asks about, #1292): no Copy button. */
   listOnly?: boolean
+  /** The list is text as it was written (a CLI's clipboard text, #1292): monospace, its spacing kept, even with listOnly. */
+  listMono?: boolean
   detail?: string
   /** A long detail scrolls in its own box, the dialog's buttons staying in view (a template's agents, #268). */
   scrollDetail?: boolean

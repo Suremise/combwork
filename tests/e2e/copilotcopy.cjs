@@ -202,6 +202,7 @@ const check = (name, ok, extra = '') => {
     await writeB64('asked write')
     check('Ask each time: the question shows the text', !!(await lib.until(async () => (await question.count()) === 1 && (await question.innerText()).includes('asked write'), HUNG_MS, 100)), await question.innerText().catch(() => 'no question'))
     check("…in the dialog's box, as the text to copy", ((await question.locator('.dialog-list').innerText().catch(() => '')).trim()) === 'asked write' && (await question.locator('.dialog-list button').count()) === 0, await question.innerHTML().catch(() => ''))
+    check('…in monospace, as written (HR4: the plain list had lost it)', /Cascadia Mono|Consolas|monospace/.test(await question.locator('.dialog-list ul').evaluate((el) => getComputedStyle(el).fontFamily)), await question.locator('.dialog-list ul').evaluate((el) => getComputedStyle(el).fontFamily).catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'copilotcopy-ask.png') })
     check('…and nothing is copied while it waits', JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
     await question.getByRole('button', { name: "Don't Copy" }).click()

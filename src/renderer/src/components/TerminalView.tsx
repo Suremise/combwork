@@ -234,6 +234,7 @@ function askClipboardWrite(text: string): Promise<boolean> {
     message: tr(msg({ id: 'panes.terminal.osc52.askMessage', defaultMessage: "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:", description: "The question when an agent's CLI asks to put text on the clipboard; the text follows it. {n} is how many characters." }), { n: text.length }),
     list: lines.map((l) => l || ' '),
     listOnly: true,
+    listMono: true,
     detail: more > 0 ? tr(msg({ id: 'panes.terminal.osc52.askMore', defaultMessage: '…and {n, plural, one {# more character} other {# more characters}}', description: "Under the text an agent's CLI asks to put on the clipboard, when the question shows only its start. {n} is how many characters it leaves out." }), { n: more }) : undefined,
     confirmLabel: tr(msg({ id: 'panes.terminal.osc52.askCopy', defaultMessage: 'Copy', description: "Button of the question when an agent's CLI asks to put text on the clipboard: puts it there." })),
     cancelLabel: tr(msg({ id: 'panes.terminal.osc52.askDont', defaultMessage: "Don't Copy", description: "Button of the question when an agent's CLI asks to put text on the clipboard: leaves the clipboard as it is." }))

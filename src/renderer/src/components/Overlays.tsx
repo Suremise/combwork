@@ -167,7 +167,7 @@ export function Dialogs() {
         }
       >
         <div>{dialog.message}</div>
-        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} />}
+        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} mono={dialog.listMono} />}
         {dialog.content ? <div className={cx('detail rich' /* i18n-ignore: class names */, dialog.scrollDetail && 'scroll')}>{dialog.content}</div> : dialog.detail && <div className={cx('detail', dialog.scrollDetail && 'scroll')}>{dialog.detail}</div>}
         {dialog.check && (
           <label className="flex dialog-check">
@@ -264,13 +264,13 @@ function DialogSelect({ select, picked, setPicked }: { select: { label: string; 
 }
 
 /** A confirm's list (paths): one per line, a long one wrapping inside itself, and a Copy button for them all (#347). */
-export function DialogList({ items, copy = true }: { items: readonly string[]; copy?: boolean }) {
+export function DialogList({ items, copy = true, mono = false }: { items: readonly string[]; copy?: boolean; mono?: boolean }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className={cx('dialog-list', !copy && 'plain')}>
+    <div className={cx('dialog-list', !copy && 'plain', mono && 'mono')}>
       <ul>
-        {items.map((item) => (
-          <li key={item}>{item}</li>
+        {items.map((item, i) => (
+          <li key={`${i}:${item}`}>{item}</li>
         ))}
       </ul>
       {copy && <IconButton

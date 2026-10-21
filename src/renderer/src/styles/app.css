@@ -2799,6 +2799,13 @@ p.hint {
   font-family: inherit;
   font-size: inherit;
 }
+/* Text as it was written (a CLI's clipboard text, #1292): monospace again, its spacing and long lines kept. */
+.dialog-list.plain.mono ul {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .dialog-field-label {
   display: block;
   margin-block-end: 4px;
