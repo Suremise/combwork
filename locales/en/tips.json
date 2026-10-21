@@ -675,6 +675,14 @@
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
   },
+  "tips.laneGates.text": {
+    "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
+  },
+  "tips.laneGates.title": {
+    "defaultMessage": "See why a lane isn’t moving",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

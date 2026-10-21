@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, segmentName, segmentsThatFit, laneSegmentWork, type LaneSegment } from '@shared/laneBar'
+import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
@@ -49,6 +49,9 @@ const stateWord = (state: Lane['state']): string | null =>
   state === 'active' ? null : tr(msg({ id: 'board.lanes.state', defaultMessage: '{state, select, paused {paused} ended {merged} other {abandoned}}', description: "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned." }), { state })
 
 const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.builder.name)
+
+/** Waits for the user's answer (#1279): counted in the Lanes bar. */
+const waitsForYou = (l: Lane): boolean => laneRunning(l.state) && (l.status?.reason === 'you' || l.status?.reason === 'roundLimit')
 
 /** `lanes`: the lanes shown (the panel's filter applied); `all`: the workspace's, in the same order, to keep a move's order whole. */
 export function LanesSection({ lanes, all, width }: { lanes: Lane[]; all: Lane[]; width: number }) {
@@ -239,6 +242,7 @@ export function LanesSection({ lanes, all, width }: { lanes: Lane[]; all: Lane[]
         <Icon name={folded ? 'chevron-up' : 'chevron-down'} />
         <span>{tr(LANES)}</span>
         <span className="progress-lanes-count">{lanes.length}</span>
+        {lanes.some(waitsForYou) && <span className="progress-lanes-you">{tr(msg({ id: 'board.lanes.waitingForYou', defaultMessage: '{n, plural, one {# waiting for you} other {# waiting for you}}', description: "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane." }), { n: lanes.filter(waitsForYou).length })}</span>}
       </button>
       {!folded && (
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
@@ -370,6 +374,8 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
   const unknown = cards.some((c) => c.state === 'unrecorded')
   const segments = fitSegments(cards, max, tr, fmt.list)
   const pair = lanePair(l)
+  // Why it waits (#1279, from #1270's status): said in its header instead of just "paused", and in its accessible name.
+  const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr) : null
   const word = stateWord(l.state)
   // Its cost on the hover of its top line (#602), read when the hover first shows.
   const cost = useLaneCost(l.id)
@@ -387,7 +393,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       {...(r
         ? {
             role: 'group',
-            'aria-label': `${pair}${l.name ? `, ${l.name}` : ''}`,
+            'aria-label': [`${pair}${l.name ? `, ${l.name}` : ''}`, word, why].filter(Boolean).join(', '),
             'aria-keyshortcuts': r.movable ? 'Alt+ArrowUp Alt+ArrowDown' : undefined,
             tabIndex: 0,
             draggable: r.movable,
@@ -403,9 +409,19 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       <Tooltip block content={<LaneCostTip cost={cost.cost} />}>
         <div className="progress-lane-top" onMouseEnter={cost.load}>
           <span className="progress-lane-pair">{pair}</span>
-          {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
-          <div className="grow" />
-          {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+          {/* Why it waits (#1279) takes the name's room (every lane keeps one height: the list shows whole lanes),
+              cut short with its whole text in its title; a paused lane's in the paused colour, another's faint. */}
+          {why ? (
+            <span className={cx('progress-lane-why', l.state === 'paused' && 'paused')} title={why}>
+              {why}
+            </span>
+          ) : (
+            <>
+              {l.name && <span className="progress-lane-name faint">· {l.name}</span>}
+              <div className="grow" />
+              {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
+            </>
+          )}
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
@@ -419,7 +435,7 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
       </Tooltip>
       <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
-          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} />
+          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES)} />
         ))}
       </div>
     </div>
@@ -430,15 +446,36 @@ function LaneRow({ lane: l, max, reorder: r, badges }: { lane: Lane; max: number
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:
  * what its facts say (#1225), a few lines in its hover after its label and notes, with a click for the rest.
  */
-function Segment({ segment: s, work }: { segment: LaneSegment; work: string[] }) {
-  if (s.kind !== 'card')
+function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; work: string[]; marks: SegmentMarks; folded: FoldedMarks | null }) {
+  if (s.kind !== 'card') {
+    // The marks of the cards folded into it (HR6's #1279 round 1): each kind once on it, a line per card under its label.
+    const lines = folded ? [...folded.refused, ...folded.stale, ...folded.override] : []
     return (
-      <Tooltip content={s.label} focus>
-        <span role="listitem" tabIndex={0} className={cx('lane-seg', s.kind)} aria-label={s.label}>
+      <Tooltip
+        content={
+          lines.length ? (
+            <div className="lane-seg-tip">
+              <div>{s.label}</div>
+              {lines.map((n) => (
+                <div key={n} className="lane-seg-note">
+                  {n}
+                </div>
+              ))}
+            </div>
+          ) : (
+            s.label
+          )
+        }
+        focus
+      >
+        <span role="listitem" tabIndex={0} className={cx('lane-seg', s.kind, !!folded?.stale.length && 'stale')} aria-label={[s.label, ...lines].join('. ')}>
           {s.kind === 'finished' ? `✓ ${s.numbers.length}` : `+${s.numbers.length}`}
+          {!!folded?.refused.length && <span className="lane-seg-mark refused" aria-hidden="true" />}
+          {!!folded?.override.length && <span className="lane-seg-mark override" aria-hidden="true" />}
         </span>
       </Tooltip>
     )
+  }
   // What its red underline or hatching means (#706), a line each under the card's own.
   const tip =
     s.notes.length || work.length ? (
@@ -461,7 +498,11 @@ function Segment({ segment: s, work }: { segment: LaneSegment; work: string[] })
     )
   return (
     <Tooltip content={tip} focus>
-      <button type="button" role="listitem" className={cx('lane-seg', s.state, s.failed && 'failed')} data-card={s.number} aria-label={segmentName(s)} onClick={() => set({ taskOpen: s.number })} />
+      <button type="button" role="listitem" className={cx('lane-seg', s.state, s.failed && 'failed', marks.stale && 'stale')} data-card={s.number} aria-label={[segmentName(s), marks.refused, marks.stale, marks.override].filter(Boolean).join('. ')} onClick={() => set({ taskOpen: s.number })}>
+        {/* Its facts' marks (#1279), each a shape of its own: a refused request's notch, an override's corner. */}
+        {marks.refused && <span className="lane-seg-mark refused" aria-hidden="true" />}
+        {marks.override && <span className="lane-seg-mark override" aria-hidden="true" />}
+      </button>
     </Tooltip>
   )
 }
