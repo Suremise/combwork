@@ -10436,6 +10436,18 @@ button.progress-run-show:focus-visible {
 .workflow-form .workflow-platform {
   color: var(--fg-strong);
 }
+.workflow-form .workflow-readonly .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.workflow-form .workflow-readonly .link:hover,
+.workflow-form .workflow-readonly .link:focus-visible {
+  text-decoration: underline;
+}
 .workflow-form .workflow-unavailable {
   font-style: italic;
 }

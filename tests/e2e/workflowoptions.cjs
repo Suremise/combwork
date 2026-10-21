@@ -34,6 +34,8 @@ function board(sql, ...args) {
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(project, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'web', scripts: { typecheck: 'tsc', lint: 'oxlint', test: 'vitest' } }) })
+  // Its own commit identity: G12 shows it (never the machine's global one).
+  for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.invalid']]) lib.git(project, ['config', k, v])
   // As the upgrade leaves a project: today's way of working (Not checked, a reviewer agent: it has one), no preset.
   fs.mkdirSync(path.join(project, '.hive'), { recursive: true })
   const upgraded = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'notChecked', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: false, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
@@ -99,6 +101,7 @@ function board(sql, ...args) {
     const checkNames = await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))
     check('…the quick checks from its scripts, with their commands', JSON.stringify(checkNames) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(checkNames))
     check('…each from the preset', (await row('review').innerText()).includes('From the preset'))
+    check('…commits as the project’s own identity, shown', (await row('identity').innerText()).includes('Pat Builder <pat@example.invalid>'), await row('identity').innerText())
 
     // --- Save…: what changes, the running lane that keeps the old rules; saved.
     await section.getByRole('button', { name: 'Save…' }).click()
