@@ -161,9 +161,9 @@ export class Write {
     return f
   }
 
-  move(to: StageId, cause: FactData['Moved']['cause']): void {
+  move(to: StageId, cause: FactData['Moved']['cause'], why?: string): void {
     if (to === this.stage) return
-    this.fact('Moved', { from: this.stage, to, cause }) // i18n-ignore: a fact's kind and codes, not text
+    this.fact('Moved', { from: this.stage, to, cause, ...(why ? { why } : {}) }) // i18n-ignore: a fact's kind and codes, not text
     this.tx.setStage(this.card.id, to)
     this.stage = to
   }
@@ -476,7 +476,7 @@ export class Workflow {
   }
 
   /** put back: Active → Todo; its folder is released. */
-  async putBack(ref: unknown, actor: Actor): Promise<Reply> {
+  async putBack(ref: unknown, actor: Actor, args: { why?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -484,7 +484,7 @@ export class Workflow {
     const out = await this.write(card, this.rulesetOf(card, s), actor, (w) => {
       const changed = this.stillAt(w, s, 'put back') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
-      w.move('todo', 'intent')
+      w.move('todo', 'intent', args.why)
       w.action('releaseSlot', {})
       return null
     })
@@ -620,14 +620,14 @@ export class Workflow {
   }
 
   /** Asks the user (For you, §16.8.5): `ApprovalRequested` and a notification. */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, about: { revision?: string; checklist?: string[] } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, stage: w.current, generation: s.generation, ...(s.latest ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(about.revision ? { revision: about.revision } : {}), ...(about.checklist ? { checklist: about.checklist } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -1015,14 +1015,15 @@ export class Workflow {
   }
 
   /** ask the user (§16.8.1): For you of a kind. */
-  async askTheUser(ref: unknown, actor: Actor, args: { kind: ForYouKind; text: string }): Promise<Reply> {
+  async askTheUser(ref: unknown, actor: Actor, args: { kind: ForYouKind; text: string; revision?: string; checklist?: string[] }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
+    let request = ''
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
-      this.askUser(w, args.kind, 'ask', args.text)
+      request = this.askUser(w, args.kind, 'ask', args.text, { ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}) })
     })
-    return this.ok(card, s.stage, s.stage)
+    return this.ok(card, s.stage, s.stage, { request })
   }
 
   /** couldn't within the rules (#686): For you (Decide), never a failed round, never a stall. */

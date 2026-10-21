@@ -1804,9 +1804,12 @@ decide, its facts are written once, and the card's board fields follow in each w
 that starts it; a reviewer's verdict, request and the rest keep it its builder's; submit's summary, a verdict's and a
 request's text are comments. Replies are a line (`intentText`): the card, the stage it left and the one it is in, what
 the intent says (start: folder, line, base, target; start review: revision, base, files) and submit's warnings (G16:
-another agent's files in a shared folder, never a refusal; the card's work view shows them with the submission). Not
-yet taken: put back's why, and ask's revision and Test checklist (the runtime has no place for them before P5's For
-you).
+another agent's files in a shared folder, never a refusal; the card's work view shows them with the submission). Put
+back's why is a comment and the `Moved` fact's `why`; ask's revision (default the latest submission's) and Test
+checklist are the `ApprovalRequested` fact's `revision` and `checklist`, for For you to show (P5). Every write of an
+intent but start keeps the card's agent as it is then, under the board's lock (`keepAgent`): a reviewer's verdict
+never takes the card, nor undoes a reassignment made while the intent read its platform. The Agent API's contract
+version is 6.
 
 The `review` parameter of `hive_update_task` maps onto the intents for one release (P4): `start` onto **start review**
 (of the latest submission), `passed`/`failed` onto **verdict** on that submission; it is retired in P8 with the skills

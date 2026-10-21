@@ -8,7 +8,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -21,7 +21,8 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
-const { ENFORCE } = await import('../src/main/workflow/service')
+const service = await import('../src/main/workflow/service')
+const { ENFORCE } = service
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
@@ -169,6 +170,51 @@ describe('a card by intent (#1267)', () => {
     expect(facts(w, card).filter((f) => f.kind === 'ApprovalRequested').map((f) => (f.data as { kind: string }).kind)).toEqual(['decide', 'decide'])
   })
 
+  it("ask's revision and Test checklist are its request's; put back's why is a comment and its move's", async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    const head = commit(wt, 'e.txt')
+    const asked = await act(w, card, builder, { kind: 'ask', askKind: 'test', text: 'Does it install?', revision: head, checklist: ['Install it', 'Open the app'] })
+    expect(asked.done.data).toMatchObject({ request: expect.any(String) })
+    expect(facts(w, card).find((f) => f.kind === 'ApprovalRequested')?.data).toMatchObject({ kind: 'test', text: 'Does it install?', revision: head, checklist: ['Install it', 'Open the app'] })
+    const back = await act(w, card, builder, { kind: 'putBack', why: 'Waiting for #9 first.' })
+    expect(back.done).toMatchObject({ from: 'active', to: 'todo' })
+    expect(back.card.comments.at(-1)?.text).toBe('Waiting for #9 first.')
+    expect(facts(w, card).findLast((f) => f.kind === 'Moved')?.data).toMatchObject({ to: 'todo', cause: 'intent', why: 'Waiting for #9 first.' })
+  })
+
+  // HR1's round 1 finding 1: a card given to another agent while an intent reads its platform stays with that agent.
+  it('an intent never undoes a reassignment made while it ran: ask, request and a failed verdict', async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    const wf = await service.workflowFor(w, repo)
+    /** Runs an intent, the user giving the card to `to` just after the intent's first read. */
+    const reassignedDuring = async (actor: Parameters<typeof runCardIntent>[1], intent: Intent, to: string) => {
+      const spy = vi.spyOn(service, 'workflowFor').mockImplementationOnce(async () => {
+        await inWorkspace(w, () => tasks.updateTask(card, { agent: to }, user))
+        return wf
+      })
+      try {
+        return await act(w, card, actor, intent)
+      } finally {
+        spy.mockRestore()
+      }
+    }
+    expect((await reassignedDuring(reviewer, { kind: 'ask', askKind: 'decide', text: 'Which greeting?' }, 'a2')).card.agent).toBe('a2')
+    await inWorkspace(w, () => tasks.updateTask(card, { agent: 'a1' }, user))
+    commit(wt, 'f.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    expect((await reassignedDuring(reviewer, { kind: 'request', text: 'Run it once more.' }, 'a2')).card.agent).toBe('a2')
+    await inWorkspace(w, () => tasks.updateTask(card, { agent: 'a1' }, user))
+    // The failed verdict moves the card back into Doing: it stays with whoever has it then (the user gave it to a2), never
+    // the builder it had when the verdict began.
+    const failed = await reassignedDuring(reviewer, { kind: 'verdict', pass: false, failKind: 'content', comment: 'Round 1: FAILED.' }, 'a2')
+    expect(failed.card).toMatchObject({ column: 'doing', agent: 'a2' })
+  })
+
   it("the reviewer's request to the builder: a fact, the request a comment, the builder's wake written", async () => {
     const { w, wt } = await workspace()
     const card = await create(w)
@@ -204,7 +250,7 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, builder, { kind: 'startReview' }))).toBeNull()
     let rule: string | null = null
     try {
-      await inWorkspace(w, () => runCardIntent({ n: card, plain: true }, builder, { kind: 'putBack' }))
+      await inWorkspace(w, () => runCardIntent({ n: card, plain: true }, builder, { kind: 'putBack', why: 'Not now' }))
     } catch (e) {
       rule = (e as { refusal: { rule: string } }).refusal.rule
     }
@@ -224,7 +270,8 @@ describe("the intents' routes and tools (#1267)", () => {
 
   it("each route takes its intent's arguments and refuses missing or wrong ones (400)", () => {
     expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
-    expect(parse('put-back', undefined)).toEqual({ kind: 'putBack' })
+    expect(parse('put-back', undefined)).toBe(400)
+    expect(parse('put-back', { why: ' Blocked by #3 ' })).toEqual({ kind: 'putBack', why: 'Blocked by #3' })
     expect(parse('submit', { summary: ' Done ', paths: ['a.ts'] })).toEqual({ kind: 'submit', summary: 'Done', revision: undefined, note: undefined, paths: ['a.ts'] })
     expect(parse('submit', {})).toBe(400)
     expect(parse('submit', { summary: 'x', paths: [''] })).toBe(400)
@@ -237,6 +284,10 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'explanation' })).toEqual({ kind: 'verdict', pass: false, comment: 'No', submission: undefined, failKind: 'explanation' })
     expect(parse('ask', { text: 'Which name?' })).toEqual({ kind: 'ask', askKind: 'other', text: 'Which name?' })
     expect(parse('ask', { kind: 'sign-in', text: 'x' })).toBe(400)
+    // HR1's round 1 probe: the revision and the Test checklist are kept.
+    expect(parse('ask', { kind: 'test', text: 'Verify this revision', revision: 'abc123', checklist: ['Install', ' Open app '] })).toEqual({ kind: 'ask', askKind: 'test', text: 'Verify this revision', revision: 'abc123', checklist: ['Install', 'Open app'] })
+    expect(parse('ask', { text: 'x', revision: 'abc 123' })).toBe(400)
+    for (const checklist of [[], [''], 'Install', [7], Array.from({ length: 21 }, () => 'step'), ['x'.repeat(501)]]) expect(parse('ask', { text: 'x', checklist })).toBe(400)
     expect(parse('cannot', { rule: 'review.notAuthor' })).toBe(400)
     expect(parse('request', { text: 7 })).toBe(400)
   })

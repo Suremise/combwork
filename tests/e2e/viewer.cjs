@@ -110,7 +110,7 @@ function stream(token) {
 
   // --- Discovery: the address, never a token.
   const found = await lib.until(readDiscovery, HUNG_MS)
-  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === 5 && typeof found.pid === 'number', JSON.stringify(found))
+  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === 6 && typeof found.pid === 'number', JSON.stringify(found))
   const discoveryText = fs.readFileSync(discovery, 'utf8')
   check('…and holds no token', !/token"\s*:/i.test(discoveryText) && !discoveryText.includes(apiToken), discoveryText)
   check('its health check answers', (await fetch(`${found.url}/v1/health`).then((r) => r.json())).ok === true)
@@ -131,7 +131,7 @@ function stream(token) {
   const viewer = made.token
   const as = (method, route, body) => api(method, route, body, viewer)
   const status = await as('GET', '/v1/status')
-  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 5, JSON.stringify(status.body?.caller))
+  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 6, JSON.stringify(status.body?.caller))
 
   // --- An agent, for the merge slot, its activity and its own token's stream.
   await page.keyboard.press('Escape')

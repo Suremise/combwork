@@ -566,8 +566,8 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   }
   const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
-  measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}` }), 200)
-  const plainRefused = intent('hive_put_back', { card: String(todo[40]) })
+  measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))
   const reported = (after.providers ?? []).find((x) => x.provider === 'claude-code' && x.role === 'agent')

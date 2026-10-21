@@ -126,10 +126,13 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("a failed verdict: back in Doing, still the builder's", verdict.status === 200 && verdict.body?.to === 'active' && after?.column === 'doing' && after.agent === builder.id, JSON.stringify({ verdict: verdict.body, column: after?.column, agent: after?.agent }))
 
     // Ask the user: nothing moves.
-    const question = await asBuilder(`/v1/tasks/${ref}/ask`, { kind: 'decide', text: 'Hi or Hello?' })
-    check('asking the user leaves it in Doing', question.status === 200 && question.body?.from === 'active' && question.body.to === 'active' && (await card(n))?.column === 'doing', JSON.stringify(question.body))
-    const facts = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}/facts`, { headers: { Authorization: `Bearer ${tokens.builder}` } }).then((r) => r.json())
-    check('…and is a request for the user in its facts', facts.facts?.some((f) => f.kind === 'ApprovalRequested'), JSON.stringify(facts.facts?.map((f) => f.kind)))
+    const head = git('rev-parse', 'HEAD')
+    const question = await asBuilder(`/v1/tasks/${ref}/ask`, { kind: 'test', text: 'Does it say Hi?', revision: head, checklist: ['Open the app', 'Read the greeting'] })
+    check('asking the user leaves it in Doing', question.status === 200 && question.body?.from === 'active' && question.body.to === 'active' && !!question.body.data?.request && (await card(n))?.column === 'doing', JSON.stringify(question.body))
+    const facts = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}/facts?view=full`, { headers: { Authorization: `Bearer ${tokens.builder}` } }).then((r) => r.json())
+    const request = facts.facts?.find((f) => f.kind === 'ApprovalRequested')?.data
+    check('…and is a request for the user in its facts, with its revision and Test checklist', request?.kind === 'test' && request.revision === head && JSON.stringify(request.checklist) === JSON.stringify(['Open the app', 'Read the greeting']), JSON.stringify(request))
+    check('an ask with a checklist that is not a list is 400', (await asBuilder(`/v1/tasks/${ref}/ask`, { text: 'x', checklist: 'Open the app' })).status === 400)
 
     // The Assistant, with its own token: refused at Look and advise, runs at Control agents.
     const home = (await inv('workspace:refresh')).assistant.path
@@ -144,11 +147,11 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const assistantToken = (await until(() => fs.existsSync(tokenFile), HUNG_MS)) ? JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token : null
     check("the Assistant has its token", !!assistantToken)
     await inv('settings:update', { assistant: { control: 'look' } })
-    const looked = await call(assistantToken, `/v1/tasks/${n}/put-back`)
+    const looked = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
     check("at Look and advise the Assistant's intent is refused (403)", looked.status === 403 && (await card(n))?.column === 'doing', JSON.stringify(looked.body))
     await inv('settings:update', { assistant: { control: 'agents' } })
-    const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`)
-    check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo', JSON.stringify(putBack.body))
+    const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
+    check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo' && (await card(n))?.comments.at(-1)?.text === 'The user wants it later.', JSON.stringify(putBack.body))
     check("…listed in what it did", (await inv('assistant:actions')).some((x) => x.ok && x.text.includes('put back')), JSON.stringify((await inv('assistant:actions')).map((x) => x.text)))
     await inv('session:stop', home, 'assistant')
 

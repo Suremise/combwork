@@ -153,7 +153,7 @@ function intentTools(): Tool[] {
   const submission = { type: 'number', description: 'The submission it is about; default: the latest.' }
   return [
     intent('hive_start_card', 'start', "Start work on a card in Todo yourself: it moves to Doing and is yours. Replies with its folder, line, base and target.", {}, []),
-    intent('hive_put_back', 'put-back', 'Put a card in Doing back in Todo, unstarted.', {}, []),
+    intent('hive_put_back', 'put-back', 'Put a card in Doing back in Todo, unstarted. why is written as a comment.', { why: { type: 'string', description: 'Why it goes back.' } }, ['why'], (a) => ({ why: a.why })),
     intent(
       'hive_submit',
       'submit',
@@ -177,9 +177,14 @@ function intentTools(): Tool[] {
       'hive_ask_user',
       'ask',
       'Ask the user something about a card: it shows under For you with the card; no round is counted and it is not a stall. The answer comes to your inbox.',
-      { kind: { type: 'string', enum: ['approve', 'decide', 'test', 'signIn', 'other'] }, text: { type: 'string', description: 'The question, in full.' } },
+      {
+        kind: { type: 'string', enum: ['approve', 'decide', 'test', 'signIn', 'other'] },
+        text: { type: 'string', description: 'The question, in full.' },
+        revision: { type: 'string', description: 'The revision it is about (a commit); default: the card\'s latest submission.' },
+        checklist: { type: 'array', items: { type: 'string' }, description: 'For test: the steps to try, in order (at most 20).' }
+      },
       ['text'],
-      (a) => ({ kind: a.kind, text: a.text })
+      (a) => ({ kind: a.kind, text: a.text, revision: a.revision, checklist: a.checklist })
     ),
     intent(
       'hive_cannot_within_rules',

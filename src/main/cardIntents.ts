@@ -24,13 +24,13 @@ import { msg } from '../shared/i18n'
 
 export type CardIntent =
   | { kind: 'start' }
-  | { kind: 'putBack' }
+  | { kind: 'putBack'; why: string }
   | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[] }
   | { kind: 'declarePaths'; paths: string[] }
   | { kind: 'startReview'; submission?: number }
   | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
   | { kind: 'reportMerge'; result?: string }
-  | { kind: 'ask'; askKind: ForYouKind; text: string }
+  | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
 
@@ -64,7 +64,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'start':
         return w.start(named, who)
       case 'putBack':
-        return w.putBack(named, who)
+        return w.putBack(named, who, { why: intent.why })
       case 'submit':
         return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}) })
       case 'startReview':
@@ -74,7 +74,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'reportMerge':
         return w.reportMerge(named, who, { ...(intent.result ? { result: intent.result } : {}) })
       case 'ask':
-        return w.askTheUser(named, who, { kind: intent.askKind, text: intent.text })
+        return w.askTheUser(named, who, { kind: intent.askKind, text: intent.text, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.checklist?.length ? { checklist: intent.checklist } : {}) })
       case 'cannot':
         return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
       case 'request':
@@ -92,31 +92,27 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
     return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: '', to: '', data: { prefill: r.prefill, unclaimed: r.unclaimed, revision: r.revision } }, card }
   }
 
-  // The card stays its builder's (the board gives a card moved into Doing by an agent to that agent: a reviewer's failed
-  // verdict would take it). Not with a start review, which changes nothing but the review.
-  const keep: { patch?: TaskPatch } = before.agent && self?.agentId !== before.agent ? { patch: { agent: before.agent } } : {}
-  // What each write changes of the card's 0.9 fields besides its column (the stage it leaves): with the first write.
-  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string } } => {
-    if (!first) return {}
+  // Every write keeps the card's agent as it is then, under the board's lock (an agent moving a card into Doing would take
+  // it: a reviewer's failed verdict), but the start's, which gives the card to the agent that starts it. What else each
+  // intent changes of the card's 0.9 fields (its review, a comment) goes with its first write.
+  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean } } => {
+    if (intent.kind === 'start') return first && self ? { patch: { agent: self.agentId } } : {}
+    const keepAgent = true
+    if (!first) return { opts: { keepAgent } }
     switch (intent.kind) {
-      case 'start':
-        return self ? { patch: { agent: self.agentId } } : {}
       case 'putBack':
-      case 'reportMerge':
-      case 'ask':
-      case 'cannot':
-        return keep
+        return { opts: { keepAgent, comment: intent.why } }
       case 'submit':
-        return { ...keep, opts: { comment: intent.summary } }
+        return { opts: { keepAgent, comment: intent.summary } }
       case 'startReview':
         // The card marked as this reviewer's (an agent's own review; the Assistant and scripts don't review).
-        return self ? { patch: { review: 'start' } } : keep
+        return { ...(self ? { patch: { review: 'start' } } : {}), opts: { keepAgent } }
       case 'verdict':
-        return { patch: { ...keep.patch, ...(self ? { review: intent.pass ? 'passed' : 'failed' } : {}) }, opts: { comment: intent.comment } }
+        return { ...(self ? { patch: { review: intent.pass ? 'passed' : 'failed' } } : {}), opts: { keepAgent, comment: intent.comment } }
       case 'request':
-        return { ...keep, opts: { comment: intent.text } }
+        return { opts: { keepAgent, comment: intent.text } }
       default:
-        return {}
+        return { opts: { keepAgent } }
     }
   }
   const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9)

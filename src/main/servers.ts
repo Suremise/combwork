@@ -542,7 +542,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 5
+export const API_VERSION = 6
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -2396,11 +2396,23 @@ function submissionField(body: any): number | undefined {
   return v
 }
 
+/** The most steps an ask's Test checklist has, and the longest a step is. */
+const CHECKLIST_MAX = 20
+const CHECKLIST_STEP_MAX = 500
+
+/** An ask's Test checklist (#1267): the steps the user is asked to try, text each, none empty. */
+function checklistField(body: any): { checklist?: string[] } {
+  const v = body?.checklist
+  if (v === undefined || v === null) return {}
+  if (!Array.isArray(v) || !v.length || v.length > CHECKLIST_MAX || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > CHECKLIST_STEP_MAX)) throw new HttpError(400, `checklist is a list of 1 to ${CHECKLIST_MAX} steps, each text of at most ${CHECKLIST_STEP_MAX} characters.`)
+  return { checklist: v.map((x: string) => x.trim()) }
+}
+
 const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn', 'other']
 
 /** Each intent's route (POST /v1/tasks/:n/<route>) and its arguments from the body; start is /start's (below). */
 export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
-  'put-back': () => ({ kind: 'putBack' }),
+  'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => ({ kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false) }),
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
@@ -2414,7 +2426,9 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
     if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)
-    return { kind: 'ask', askKind, text: textField(body, 'text', true) }
+    const revision = textField(body, 'revision')
+    if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, 'revision is one revision (a commit id), with no spaces.')
+    return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
   request: (body) => ({ kind: 'request', text: textField(body, 'text', true) })
