@@ -91,7 +91,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     await page.getByText('alpha', { exact: true }).first().click()
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
     for (const x of [builder, reviewer]) await inv('session:start', alpha, { agentId: x.id })
-    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready')))
+    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
@@ -99,7 +99,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     }
     const tokenOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
-      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']))
+      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
       const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
       return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
     }
@@ -126,20 +126,20 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
 
     const panel = page.locator('.progress-panel')
     await page.locator('.progress-rail').click()
-    check('the panel opens', !!(await until(async () => (await panel.count()) === 1)))
+    check('the panel opens', !!(await until(async () => (await panel.count()) === 1, HUNG_MS)))
     const tab = (name) => panel.locator(`.progress-tab[data-tab="${name}"]`)
     const showTab = async (name) => {
       await tab(name).click()
-      return until(async () => (await panel.locator(`.progress-tab-${name}`).count()) === 1)
+      return until(async () => (await panel.locator(`.progress-tab-${name}`).count()) === 1, HUNG_MS)
     }
     const setWidth = async (px) => {
       await panel.evaluate((el, w) => (el.style.width = `${w}px`), px)
-      await until(async () => Math.round((await panel.boundingBox()).width) === px)
+      await until(async () => Math.round((await panel.boundingBox()).width) === px, HUNG_MS)
     }
     const shoot = async (name) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
-        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
         await page.mouse.move(5, 5)
         await page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
       }
@@ -148,23 +148,23 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
 
     // --- The tabs: a tablist of four, Pulse chosen; badges with what they mean in each tab's name.
     check('four tabs in a tablist, Pulse chosen', (await panel.locator('[role="tablist"] [role="tab"]').count()) === 4 && (await tab('pulse').getAttribute('aria-selected')) === 'true')
-    check('Merges: one merge waiting', !!(await until(async () => (await tab('merges').getAttribute('aria-label')) === 'Merges, 1 merge waiting')), await tab('merges').getAttribute('aria-label'))
-    check('Runs, red: three failures nothing has passed since (the nightly build and two lints; the typecheck passed after)', !!(await until(async () => (await tab('runs').getAttribute('aria-label')) === 'Runs, 3 failures nothing has passed since' && (await tab('runs').locator('.progress-tab-badge.failed').textContent()) === '3')), await tab('runs').getAttribute('aria-label'))
-    check('Lanes: one lane', (await tab('lanes').getAttribute('aria-label')) === 'Lanes, 1 lane')
+    check('Merges: one merge waiting', !!(await until(async () => (await tab('merges').getAttribute('aria-label')) === 'Merges, 1 merge waiting', HUNG_MS)), await tab('merges').getAttribute('aria-label'))
+    check('Runs, red: three failures nothing has passed since (the nightly build and two lints; the typecheck passed after)', !!(await until(async () => (await tab('runs').getAttribute('aria-label')) === 'Runs, 3 failures nothing has passed since' && (await tab('runs').locator('.progress-tab-badge.failed').textContent()) === '3', HUNG_MS)), await tab('runs').getAttribute('aria-label'))
+    check('Lanes: one lane', !!(await until(async () => (await tab('lanes').getAttribute('aria-label')) === 'Lanes, 1 lane', HUNG_MS)), await tab('lanes').getAttribute('aria-label'))
     // Words when there's room: below about 360 px only the icons.
     const labelShown = () => tab('runs').locator('.progress-tab-label').evaluate((el) => getComputedStyle(el).display !== 'none')
     await setWidth(300)
-    check('narrow (300 px), the tabs are icons', !!(await until(async () => !(await labelShown()))))
+    check('narrow (300 px), the tabs are icons', !!(await until(async () => !(await labelShown()), HUNG_MS)))
     await setWidth(440)
-    check('wide (440 px), their words show', !!(await until(async () => labelShown())))
+    check('wide (440 px), their words show', !!(await until(async () => labelShown(), HUNG_MS)))
 
     // --- Pulse: the merge, the run going on, the failures' line, the lane right after with its card's dot.
     check('Pulse shows the merge', (await panel.locator('.progress-tab-pulse .progress-merge-card').count()) === 1)
-    check('…and the run going on', !!(await until(async () => (await panel.locator(`.progress-tab-pulse .progress-run[data-run="${e2e}"]`).count()) === 1)))
+    check('…and the run going on', !!(await until(async () => (await panel.locator(`.progress-tab-pulse .progress-run[data-run="${e2e}"]`).count()) === 1, HUNG_MS)))
     const attention = panel.locator('.progress-attention')
-    check('…and a line: 3 runs failed', !!(await until(async () => ((await attention.textContent()) ?? '').includes('3 runs failed'))), await attention.textContent().catch(() => ''))
+    check('…and a line: 3 runs failed', !!(await until(async () => ((await attention.textContent()) ?? '').includes('3 runs failed'), HUNG_MS)), await attention.textContent().catch(() => ''))
     const dot = panel.locator('.progress-tab-pulse .lane-run-dot')
-    check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'))) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
+    check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'), HUNG_MS)) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
     const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
     const lanesBox = await panel.locator('.progress-tab-pulse .progress-lanes').boundingBox()
     check('…right after the runs: no gap', Math.abs(lanesBox.y - (runsBox.y + runsBox.height)) <= 2, JSON.stringify({ runsBox, lanesBox }))
@@ -174,42 +174,42 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
 
     // --- The failures' line opens Runs on them.
     await attention.click()
-    check('the line opens Runs, failures only', !!(await until(async () => (await tab('runs').getAttribute('aria-selected')) === 'true' && (await panel.locator('.progress-runs-failed').getAttribute('aria-pressed')) === 'true')))
+    check('the line opens Runs, failures only', !!(await until(async () => (await tab('runs').getAttribute('aria-selected')) === 'true' && (await panel.locator('.progress-runs-failed').getAttribute('aria-pressed')) === 'true', HUNG_MS)))
     const text = async () => ((await panel.locator('.progress-tab-runs').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-    check('…the nightly build and the lints, nothing that passed', !!(await until(async () => /nightly build/.test(await text()) && /lint/.test(await text()) && !/unit/.test(await text()))), await text())
+    check('…the nightly build and the lints, nothing that passed', !!(await until(async () => /nightly build/.test(await text()) && /lint/.test(await text()) && !/unit/.test(await text()), HUNG_MS)), await text())
     await panel.locator('.progress-runs-clear').click()
 
     // --- Runs: by day, retries folded, found, filtered.
     const days = async () => panel.locator('.progress-runs-day > .progress-section').allTextContents()
-    check('the runs by day: Today, then Yesterday', !!(await until(async () => JSON.stringify(await days()) === JSON.stringify(['Today', 'Yesterday']))), JSON.stringify(await days()))
+    check('the runs by day: Today, then Yesterday', !!(await until(async () => JSON.stringify(await days()) === JSON.stringify(['Today', 'Yesterday']), HUNG_MS)), JSON.stringify(await days()))
     check('what runs is on top', (await panel.locator('.progress-tab-runs .progress-runs-body > .progress-run').first().getAttribute('data-run')) === e2e)
     const tc = panel.locator('.progress-runs-day').nth(1).locator('.progress-run-group')
     check(`yesterday's typecheck, tried three times, is one line: B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, ((await tc.locator('.progress-group-head').textContent()) ?? '').trim() === `B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, await tc.locator('.progress-group-head').textContent().catch(() => ''))
     const lints = panel.locator('.progress-runs-day').first().locator('.progress-run-group')
     check("today's lint, failed twice, is one line too", ((await lints.locator('.progress-group-head').textContent()) ?? '').trim() === 'Script · lint ×2 · 2 failed', await lints.locator('.progress-group-head').textContent().catch(() => ''))
     await tc.locator('.progress-group-head').click()
-    check('…opened, each of its runs, newest first', !!(await until(async () => (await tc.locator('.progress-recent-item').count()) === 3)) && (await tc.locator('.progress-recent-item').first().getAttribute('data-run')) === 'k-tc-3')
+    check('…opened, each of its runs, newest first', !!(await until(async () => (await tc.locator('.progress-recent-item').count()) === 3, HUNG_MS)) && (await tc.locator('.progress-recent-item').first().getAttribute('data-run')) === 'k-tc-3')
     await setWidth(440)
     await shoot('runs-wide')
     await setWidth(280)
     await shoot('runs-narrow')
     await panel.locator('.progress-runs-search').fill('nightly')
-    check('words find runs: "nightly" shows the nightly build only', !!(await until(async () => /nightly build/.test(await text()) && !/typecheck/.test(await text()) && !/lint/.test(await text()))), await text())
+    check('words find runs: "nightly" shows the nightly build only', !!(await until(async () => /nightly build/.test(await text()) && !/typecheck/.test(await text()) && !/lint/.test(await text()), HUNG_MS)), await text())
     await panel.locator('.progress-runs-clear').click()
     await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
-    check("a lane's cards: its runs only (e2e, unit, typecheck), not the scripts'", !!(await until(async () => /e2e/.test(await text()) && /unit/.test(await text()) && /typecheck/.test(await text()) && !/nightly/.test(await text()) && !/lint/.test(await text()))), await text())
+    check("a lane's cards: its runs only (e2e, unit, typecheck), not the scripts'", !!(await until(async () => /e2e/.test(await text()) && /unit/.test(await text()) && /typecheck/.test(await text()) && !/nightly/.test(await text()) && !/lint/.test(await text()), HUNG_MS)), await text())
     await panel.locator('.progress-runs-clear').click()
-    check('Clear shows every run again', !!(await until(async () => /nightly/.test(await text()) && /lint/.test(await text()))))
+    check('Clear shows every run again', !!(await until(async () => /nightly/.test(await text()) && /lint/.test(await text()), HUNG_MS)))
 
     // --- Merges and Lanes: theirs alone.
     await showTab('merges')
-    check('Merges shows the merge, B1 holding, R1 waiting', !!(await until(async () => (await panel.locator('.progress-tab-merges .progress-merge-card').count()) === 1)) && /R1/.test((await panel.locator('.progress-tab-merges').innerText()) ?? ''))
+    check('Merges shows the merge, B1 holding, R1 waiting', !!(await until(async () => (await panel.locator('.progress-tab-merges .progress-merge-card').count()) === 1, HUNG_MS)) && /R1/.test((await panel.locator('.progress-tab-merges').innerText()) ?? ''))
     await setWidth(440)
     await shoot('merges-wide')
     await setWidth(280)
     await shoot('merges-narrow')
     await showTab('lanes')
-    check('Lanes shows the lane, with no fold bar or edge', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane').count()) === 1)) && (await panel.locator('.progress-tab-lanes .progress-lanes-bar, .progress-tab-lanes .progress-lanes-edge').count()) === 0)
+    check('Lanes shows the lane, with no fold bar or edge', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane').count()) === 1, HUNG_MS)) && (await panel.locator('.progress-tab-lanes .progress-lanes-bar, .progress-tab-lanes .progress-lanes-edge').count()) === 0)
     await setWidth(440)
     await shoot('lanes-wide')
     await setWidth(280)
@@ -218,14 +218,14 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     // --- The keyboard: arrow keys, Home and End move through the tabs, choosing as they go; the tab kept.
     await tab('lanes').focus()
     await page.keyboard.press('ArrowRight')
-    check('Right from the last tab is Pulse, with the keyboard on it', !!(await until(async () => (await tab('pulse').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-tab'))) === 'pulse')))
+    check('Right from the last tab is Pulse, with the keyboard on it', !!(await until(async () => (await tab('pulse').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-tab'))) === 'pulse', HUNG_MS)))
     await page.keyboard.press('ArrowLeft')
-    check('Left from it is Lanes', !!(await until(async () => (await tab('lanes').getAttribute('aria-selected')) === 'true')))
+    check('Left from it is Lanes', !!(await until(async () => (await tab('lanes').getAttribute('aria-selected')) === 'true', HUNG_MS)))
     await page.keyboard.press('Home')
     await page.keyboard.press('ArrowRight')
-    check('Home, then Right: Merges', !!(await until(async () => (await tab('merges').getAttribute('aria-selected')) === 'true')))
+    check('Home, then Right: Merges', !!(await until(async () => (await tab('merges').getAttribute('aria-selected')) === 'true', HUNG_MS)))
     const key = `progress-tab:${ws.toLowerCase()}`
-    check('the tab is kept for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[key] === 1)))
+    check('the tab is kept for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[key] === 1, HUNG_MS)))
 
     // --- HR6's round 1: a card is part of what a run is a run of. The same command fails for A, then passes for B:
     // A's failure stays unresolved (the badge up by one, and stays), and the two are lines of their own.
@@ -237,20 +237,20 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const badgeNow = async () => Number((await tab('runs').locator('.progress-tab-badge').textContent().catch(() => '0')) ?? 0)
     const before = await badgeNow()
     await custom(a, false)
-    check("a card's run failing raises the badge by one", !!(await until(async () => (await badgeNow()) === before + 1)), String(await badgeNow()))
+    check("a card's run failing raises the badge by one", !!(await until(async () => (await badgeNow()) === before + 1, HUNG_MS)), String(await badgeNow()))
     await custom(b, true)
     await showTab('runs')
-    check("…another card's run of the same command passing doesn't resolve it, nor fold with it", !!(await until(async () => /custom verification/.test(await text()))) && (await badgeNow()) === before + 1 && !/custom verification ×2/.test(await text()), `${await badgeNow()} ${await text()}`)
+    check("…another card's run of the same command passing doesn't resolve it, nor fold with it", !!(await until(async () => /custom verification/.test(await text()), HUNG_MS)) && (await badgeNow()) === before + 1 && !/custom verification ×2/.test(await text()), `${await badgeNow()} ${await text()}`)
 
     // --- HR6's round 1: the lane filter reads the lane as it is now. Chosen with [A, B, C]; A Done and the list
     // changed between cards to [A, C]: B's runs leave the filtered list, the choice stays the lane.
     await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
-    check("the lane's filter shows B's unit run while B is in the lane", !!(await until(async () => /unit/.test(await text()))), await text())
+    check("the lane's filter shows B's unit run while B is in the lane", !!(await until(async () => /unit/.test(await text()), HUNG_MS)), await text())
     await inv('tasks:move', a.number, 'done', { confirm: true, reason: 'Merged by hand' })
-    await until(async () => (await inv('tasks:list')).find((x) => x.number === a.number)?.column === 'done')
+    await until(async () => (await inv('tasks:list')).find((x) => x.number === a.number)?.column === 'done', HUNG_MS)
     const changed = await api(t1, 'POST', '/v1/lanes', { cards: [a.number, c.number], reviewer: 'R1', name: 'tabs' })
     check('between cards, the lane becomes [A, C]', changed.status === 200 && JSON.stringify(changed.body?.lane?.cards?.map((x) => x.number)) === JSON.stringify([a.number, c.number]), JSON.stringify(changed.body?.lane?.cards))
-    check("…the filter follows it: B's runs leave, A's stay, the lane still chosen", !!(await until(async () => !/unit/.test(await text()) && /e2e/.test(await text()))) && (await panel.locator('.progress-runs-choices select[aria-label="Lane"]').inputValue()) !== '', await text())
+    check("…the filter follows it: B's runs leave, A's stay, the lane still chosen", !!(await until(async () => !/unit/.test(await text()) && /e2e/.test(await text()), HUNG_MS)) && (await panel.locator('.progress-runs-choices select[aria-label="Lane"]').inputValue()) !== '', await text())
     await panel.locator('.progress-runs-clear').click()
     await api(t1, 'POST', `/v1/progress/${e2e}/finish`, { ok: true })
     await api(t1, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
