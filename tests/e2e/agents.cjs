@@ -190,7 +190,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree changes since base', cs.files.some((f) => f.path === 'review.md') && cs.files.some((f) => f.path === 'README.md'), cs.files.map((f) => f.path + ':' + f.status).join(' '))
   const d = await inv('git:diff', wtPath, 'review.md', 'main')
   check('diff against base', d.original === '' && d.modified.includes('Review notes'))
-  await page.locator('.tabs .tab', { hasText: 'Git' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, 10000)
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, 10000)
   await page.locator('.root-select').first().selectOption(a3.id); await lib.until(async () => (await page.getByText('review.md').count()) > 0, 10000)
   check('Changes tab shows worktree files', await page.getByText('review.md').count() > 0)
   await shot(page, '6-changes')

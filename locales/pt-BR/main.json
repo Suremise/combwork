@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": "a pasta .hive foi preparada, então nenhum commit foi feito",
   "main.gitInit.fix.commit": "{git}. Faça o commit em um terminal ou peça a um agente",
   "main.gitInit.fix.identity": "{which, select, name {informe-o e escolha Fazer primeiro commit} email {informe-o e escolha Fazer primeiro commit} other {informe-os e escolha Fazer primeiro commit}}",
-  "main.gitInit.fix.ignored": "corrija isso e escolha Fazer primeiro commit na aba Git",
+  "main.gitInit.fix.ignored": "corrija isso e escolha Fazer primeiro commit na aba Controle de versão",
   "main.gitInit.fix.staged": "procure no .gitignore uma regra que traga a pasta .hive de volta",
   "main.gitInit.nested": "Esta pasta está dentro do repositório git em {root}. Confirme que você quer um repositório próprio dentro dele.",
   "main.gitInit.noEmail": "O git não tem um e-mail de autor para o primeiro commit: informe um.",

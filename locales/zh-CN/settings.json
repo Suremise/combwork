@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "从不",
   "settings.project.transcriptWarnMB.tip": "对话过长会拖慢 CLI 和 Hive；把工作交接给新对话即可让它重新变短。",
   "settings.project.transcriptWarnMB.title": "会话记录过大提醒",
-  "settings.project.workflow.desc": "选择一个预设，或逐项设置。每个选项都会显示其值的来源。",
+  "settings.project.workflow.moved": "由谁评审、哪些检查需先通过、由谁合并：都在项目的“版本控制”标签页的“工作流程”中设置。",
   "settings.project.workflow.title": "工作流程选项",
   "settings.project.worktreeCopy.desc": "要从项目文件夹复制到新工作树的被 Git 忽略的文件，例如 .env 文件。每行一个模式；留空则继承“设置”→“智能体与工作树”→“复制到新工作树”。",
   "settings.project.worktreeCopy.tip": "新工作树只包含 Git 跟踪的文件。不含斜杠的模式匹配任意位置的文件名或文件夹名（如 .env*）；含斜杠的模式匹配从项目根目录开始的路径（如 config/local.json）。node_modules 这样的大文件夹最好用初始化命令重新生成。",

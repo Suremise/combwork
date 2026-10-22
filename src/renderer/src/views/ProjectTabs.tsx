@@ -20,7 +20,6 @@ import { shownText } from '@shared/advanced'
 import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
-import { WorkflowOptionsForm } from '../components/WorkflowOptions'
 import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { confirmDangerousMode } from '../components/PermissionMode'
@@ -35,7 +34,7 @@ import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { addSkill, deleteSkill, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
-import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
@@ -293,6 +292,7 @@ const S = {
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
   wake: msg({ id: 'project.settings.wake', defaultMessage: 'Wake reviewers and builders', description: "Accessible name of the card-loop wakes switch." }),
+  openVersionControl: msg({ id: 'project.settings.openVersionControl', defaultMessage: 'Open Version Control', description: 'A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control).' }),
   rounds: msg({ id: 'project.settings.rounds', defaultMessage: 'Rounds', description: 'Accessible name of the card-loop rounds box.' }),
   waitHours: msg({ id: 'project.settings.waitHours', defaultMessage: 'Wait (hours)', description: "Accessible name of the card-loop wait box." }),
   hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
@@ -1941,8 +1941,11 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       section: 'workflow',
       key: 'workflow',
       ...rowText('project.workflow'),
-      wide: true,
-      render: () => <WorkflowOptionsForm project={project} />
+      render: () => (
+        <button className="btn" data-action="open-version-control" onClick={() => openVersionControl(project.path, 'workflow')}>
+          <Icon name="source-control" /> {tr(S.openVersionControl)}
+        </button>
+      )
     },
     {
       section: 'storage',

@@ -691,6 +691,7 @@
   "settings.project.transcriptWarnMB.tip": "A long conversation slows down the CLI and Hive; handing the work over to a new conversation makes it short again.",
   "settings.project.transcriptWarnMB.title": "Warn when a transcript is over",
   "settings.project.workflow.desc": "Pick a preset, or set each option. Each shows where its value comes from.",
+  "settings.project.workflow.moved": "Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.",
   "settings.project.workflow.title": "Workflow options",
   "settings.project.worktreeCopy.desc": "Git-ignored files to copy from the project folder into a new worktree, such as .env files. One pattern per line; empty inherits Settings → Agents & Worktrees → Copy into new worktrees.",
   "settings.project.worktreeCopy.tip": "A new worktree only gets the files git tracks. Patterns without a slash match a file or folder name anywhere (e.g. .env*); with a slash they match a path from the project root (e.g. config/local.json). Large folders such as node_modules are better recreated by the setup command.",

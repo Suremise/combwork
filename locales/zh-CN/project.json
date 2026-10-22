@@ -276,6 +276,7 @@
   "project.settings.on": "开启",
   "project.settings.onLower": "开启",
   "project.settings.openHive": "打开 .hive 文件夹",
+  "project.settings.openVersionControl": "打开版本控制",
   "project.settings.overrides": "覆盖了全局默认值",
   "project.settings.providerDefault": "{provider} 默认",
   "project.settings.reset": "重置",
@@ -310,7 +311,6 @@
   "project.skills.user": "用户",
   "project.tab.attachments": "附件",
   "project.tab.files": "文件",
-  "project.tab.git": "Git",
   "project.tab.mcp": "MCP",
   "project.tab.memory": "记忆",
   "project.tab.overview": "概览",
@@ -321,6 +321,7 @@
   "project.tab.skills": "技能",
   "project.tab.tasks": "任务",
   "project.tab.templates": "模板",
+  "project.tab.versionControl": "版本控制",
   "project.tabs.more": "更多",
   "project.tabs.moreTip": "项目的{tabs}",
   "project.tabs.tip": "{tab}（{key}）"

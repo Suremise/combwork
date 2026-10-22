@@ -87,7 +87,7 @@ function inUse(project, name) {
   const about = page.locator('.changes-about')
   const openChanges = async (name) => {
     await page.getByText(name, { exact: true }).first().click()
-    await page.locator('.tab', { hasText: 'Git' }).click()
+    await page.locator('.tab', { hasText: 'Version Control' }).click()
   }
   const slow = (v) => app.evaluate((_, x) => {
     process.env.HIVE_TEST_SLOW_IPC = x
@@ -129,7 +129,7 @@ function inUse(project, name) {
   // --- Back again: the last list at once, checked again in the background.
   await page.locator('.tab', { hasText: 'Overview' }).click()
   await lib.sleep(300)
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const refreshing = page.locator('[data-unused-refreshing]')
   check('coming back shows the last list at once, while it checks them again', !!(await lib.until(async () => (await rows.count()) === 2 && (await refreshing.count()) === 1, HUNG_MS)) && (await loadingPage.count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
   await shots('refreshing')

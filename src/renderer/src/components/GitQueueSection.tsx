@@ -12,17 +12,17 @@ import { QueueCard } from './ProgressQueue'
 import { Icon } from './ui'
 
 /**
- * The Git tab's Merge queue section (#1357, SPEC §16.9.3): each target's queue as the Progress panel's card shows it (now,
+ * The Version Control tab's Merge queue section (#1357, SPEC §16.9.3): each target's queue as the Progress panel's card shows it (now,
  * Pause queue / Resume queue), and its history, the latest 50 outcomes (card, revision, result or reason, when). A target
- * shows by #1356's rule (its state, old rulesets included), and while it has a history. Its own component: P6 moves it
- * into the Version Control tab as it is.
+ * shows by #1356's rule (its state, old rulesets included), and while it has a history. Placed in the Version Control
+ * tab as it was (#1416), for None too while an old Git ruleset's queue is there.
  */
 
 const list = (items: string[]): string => fmt.list(items, 'conjunction')
 
 const M = {
   region: msg({ id: 'git.queue.region', defaultMessage: 'Merge queues', description: "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue." }),
-  none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Hive merge its cards (Project Settings → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Git tab's Merge queue section when the project has no queue. Project Settings → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue." }),
+  none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Hive merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue." }),
   history: msg({ id: 'git.queue.history', defaultMessage: 'History of {target}', description: "A heading in the Git tab's Merge queue section: the latest outcomes of the queue for the branch {target} follow." }),
   noHistory: msg({ id: 'git.queue.noHistory', defaultMessage: 'Nothing merged or returned yet.', description: "The Git tab's Merge queue section, under a queue's history heading, when it has none yet." }),
   card: msg({ id: 'git.queue.card', defaultMessage: 'Card', description: "A column heading of the Git tab's merge queue history: the card." }),
@@ -36,7 +36,7 @@ const M = {
 }
 
 /** The project's queues, read for themselves (the Progress panel on or off), again on each `queue-changed`. */
-function useProjectQueues(projectPath: string): QueueView[] | null {
+export function useProjectQueues(projectPath: string): QueueView[] | null {
   const version = useStore((s) => s.queueVersion)
   const tasks = useStore((s) => s.tasks)
   const [views, setViews] = useState<QueueView[] | null>(null)

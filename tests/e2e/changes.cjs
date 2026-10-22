@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   }
 
   await page.getByText('alpha', { exact: true }).first().click()
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const retry = page.getByRole('button', { name: 'Retry' })
   check('a git failure shows the error, with Retry', !!(await until(async () => (await retry.count()) === 1 && /failed/.test(await page.locator('.empty-state').first().innerText()), 8000)))
   await page.screenshot({ path: path.join(lib.WORK, 'changes-1-error.png') })

@@ -1,6 +1,6 @@
 // S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2): "Pair (Hive merges)" with agent worktrees, the
 // Assistant off, on fake Claude Code agents acting by their own tokens (their hive tools' calls). The project's options
-// are set through Project Settings → Workflow (#1355's form: Pair, with G8 strict on); lanes are started from the board.
+// are set through Version Control → Workflow (#1355's form: Pair, with G8 strict on); lanes are started from the board.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
 // run by the builder through hive-progress --check before each submit (counted) and by the queue on the merged result.
 // Lane A (merge commits, strict):
@@ -61,9 +61,9 @@ const ancestor = (x, y) => {
     await page.getByText('alpha', { exact: true }).first().click()
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
 
-    // --- Pair (Hive merges), strict on, through Project Settings → Workflow (#1355, #1352).
-    await lib.openProjectSettings(page)
-    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    // --- Pair (Hive merges), strict on, through Version Control → Workflow (#1355, #1352).
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await waitHung(async () => (await form.count()) > 0)
     await form.locator('.workflow-preset select').selectOption('pair')

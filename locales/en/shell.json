@@ -324,8 +324,8 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it."
   },
   "shell.command.project.tab.changes": {
-    "defaultMessage": "Go to Git",
-    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
+    "defaultMessage": "Go to Version Control",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1)."
   },
   "shell.command.project.tab.files": {
     "defaultMessage": "Go to Files",
@@ -1188,7 +1188,7 @@
     "description": "Agent Setup when Hive finds no git. Git is a name: keep it."
   },
   "shell.setup.gitOk": {
-    "defaultMessage": "<b>Git {version}</b> <muted>— for worktrees, merging and the Git tab</muted>",
+    "defaultMessage": "<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>",
     "description": "Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it."
   },
   "shell.setup.gitOld": {
@@ -1200,7 +1200,7 @@
     "description": "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button."
   },
   "shell.setup.gitProblemDetail": {
-    "defaultMessage": "{problem}: worktree agents, merging, the Git tab and the unmerged counts don't work. {fix}",
+    "defaultMessage": "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}",
     "description": "Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now)."
   },
   "shell.setup.gitUnknown": {
@@ -1208,7 +1208,7 @@
     "description": "Agent Setup when Hive couldn't run git to check it."
   },
   "shell.setup.gitUnknownDetail": {
-    "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Git tab.",
+    "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.",
     "description": "Agent Setup when git couldn't be checked. {error} is the error, as given."
   },
   "shell.setup.install": {

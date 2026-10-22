@@ -692,7 +692,7 @@ interface HiveMessageValues {
   'settings.project.transcriptWarnMB.off': undefined
   'settings.project.transcriptWarnMB.tip': undefined
   'settings.project.transcriptWarnMB.title': undefined
-  'settings.project.workflow.desc': undefined
+  'settings.project.workflow.moved': undefined
   'settings.project.workflow.title': undefined
   'settings.project.worktreeCopy.desc': undefined
   'settings.project.worktreeCopy.tip': undefined

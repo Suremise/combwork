@@ -15,8 +15,9 @@ export const PROJECT_TABS = [
   { id: 'files', label: msg({ id: 'project.tab.files', defaultMessage: 'Files', description: "A project's tab: its files." }), icon: 'files' },
   // Attachments (#387): its id is from when it showed only images, kept so tab settings and shortcuts carry over.
   { id: 'images', label: msg({ id: 'project.tab.attachments', defaultMessage: 'Attachments', description: "A project's tab: what was pasted or dropped into its sessions." }), icon: 'attach' },
-  // The Git view (#607): Changes, History, Branches & remotes. Its id stays `changes` (saved tabs, `project.tab.changes`).
-  { id: 'changes', label: msg({ id: 'project.tab.git', defaultMessage: 'Git', description: "A project's tab: its git changes, history and branches. Usually kept as Git." }), icon: 'source-control' },
+  // Version Control (#1416; the Git view of #607): Workflow, then Changes, History, Branches & remotes and Merge queue. Its
+  // id stays `changes` (saved tabs, `project.tab.changes`).
+  { id: 'changes', label: msg({ id: 'project.tab.versionControl', defaultMessage: 'Version Control', description: "A project's tab (renamed from Git): its version control, workflow options, changes, history and branches. Glossary 2.1: Version Control (the tab)." }), icon: 'source-control' },
   { id: 'memory', label: msg({ id: 'project.tab.memory', defaultMessage: 'Memory', description: "A project's tab: the instructions and memory files its agents read." }), icon: 'book', more: true },
   { id: 'skills', label: msg({ id: 'project.tab.skills', defaultMessage: 'Skills', description: "A project's tab: the skills its agents get." }), icon: 'sparkle', more: true },
   { id: 'templates', label: msg({ id: 'project.tab.templates', defaultMessage: 'Templates', description: "A project's tab: templates of agents and cards." }), icon: 'library', more: true },

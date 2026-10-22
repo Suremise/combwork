@@ -278,6 +278,7 @@ interface HiveMessageValues {
   'project.settings.on': undefined
   'project.settings.onLower': undefined
   'project.settings.openHive': undefined
+  'project.settings.openVersionControl': undefined
   'project.settings.overrides': undefined
   'project.settings.providerDefault': { provider: string | number }
   'project.settings.reset': undefined
@@ -312,7 +313,6 @@ interface HiveMessageValues {
   'project.skills.user': undefined
   'project.tab.attachments': undefined
   'project.tab.files': undefined
-  'project.tab.git': undefined
   'project.tab.mcp': undefined
   'project.tab.memory': undefined
   'project.tab.overview': undefined
@@ -323,6 +323,7 @@ interface HiveMessageValues {
   'project.tab.skills': undefined
   'project.tab.tasks': undefined
   'project.tab.templates': undefined
+  'project.tab.versionControl': undefined
   'project.tabs.more': undefined
   'project.tabs.moreTip': { tabs: string | number }
   'project.tabs.tip': { tab: string | number; key: string | number }

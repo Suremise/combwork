@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": ".hive se agregó al área de preparación, así que no se hizo ningún commit",
   "main.gitInit.fix.commit": "{git}. Haz el commit en una terminal o pídeselo a un agente",
   "main.gitInit.fix.identity": "{which, select, name {escríbelo y elige Hacer el primer commit} email {escríbelo y elige Hacer el primer commit} other {escríbelos y elige Hacer el primer commit}}",
-  "main.gitInit.fix.ignored": "corrígelo y luego elige Hacer el primer commit en la pestaña Git",
+  "main.gitInit.fix.ignored": "corrígelo y luego elige Hacer el primer commit en la pestaña Control de versiones",
   "main.gitInit.fix.staged": "revisa el .gitignore por si una regla vuelve a incluir .hive",
   "main.gitInit.nested": "Esta carpeta está dentro del repositorio git de {root}. Confirma que quieres un repositorio propio dentro de él.",
   "main.gitInit.noEmail": "Git no tiene un correo electrónico con el que hacer el primer commit: escribe uno.",

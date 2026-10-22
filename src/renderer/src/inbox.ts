@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { inbox, type Inbox, type InboxItem } from '@shared/inbox'
 import { call } from './api'
-import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showGit, showView, useStore } from './store'
+import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showVersionControl, showView, useStore } from './store'
 
 /** The window's attention inbox (shared/inbox.ts): agents that need you, and worktree agents with work to review. */
 export function useInbox(): Inbox {
@@ -27,7 +27,7 @@ export function openInboxItem(item: InboxItem): void {
 export function openInboxChanges(item: InboxItem): void {
   set((s) => ({ inboxOpen: false, selectedProject: item.projectPath, changesRoot: { ...s.changesRoot, [item.projectPath]: item.agentId } }))
   showView('projects')
-  showGit(item.projectPath, 'changes')
+  showVersionControl(item.projectPath, 'changes')
 }
 
 export function openInboxMerge(item: InboxItem): void {

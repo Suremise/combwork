@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "Jamais",
   "settings.project.transcriptWarnMB.tip": "Une longue conversation ralentit la CLI et Hive ; passer le relais du travail à une nouvelle conversation la raccourcit.",
   "settings.project.transcriptWarnMB.title": "Avertir quand une transcription dépasse",
-  "settings.project.workflow.desc": "Choisis un préréglage, ou définis chaque option. Chacune indique d’où vient sa valeur.",
+  "settings.project.workflow.moved": "Qui relit, quelles vérifications passent d’abord et qui fusionne : cela se règle dans l’onglet Gestion de versions du projet, sous Flux de travail.",
   "settings.project.workflow.title": "Options du flux de travail",
   "settings.project.worktreeCopy.desc": "Fichiers ignorés par git à copier du dossier du projet dans un nouveau worktree, comme les fichiers .env. Un motif par ligne ; vide : hérite de Paramètres → Agents et worktrees → Copier dans les nouveaux worktrees.",
   "settings.project.worktreeCopy.tip": "Un nouveau worktree ne reçoit que les fichiers suivis par git. Un motif sans barre oblique correspond à un nom de fichier ou de dossier n’importe où (p. ex. .env*) ; avec une barre oblique, il correspond à un chemin depuis la racine du projet (p. ex. config/local.json). Les gros dossiers comme node_modules sont plutôt à recréer avec la commande de préparation.",
