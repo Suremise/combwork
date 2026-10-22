@@ -164,6 +164,8 @@
   "tips.hardwareAcceleration.title": "¿La ventana se ve en blanco o parpadea?",
   "tips.hiveFolder.text": "Hive mantiene fuera de git, por sí solo, la carpeta .hive de cada proyecto (sesiones, copias de seguridad, configuración de inicio). Donde no puede, por ejemplo sin git, con otro sistema de control de versiones o en una carpeta que sincroniza OneDrive o Dropbox, te lo dice el Resumen del proyecto.",
   "tips.hiveFolder.title": "La carpeta .hive de un proyecto se queda en este equipo",
+  "tips.hiveMerges.text": "En Configuración del proyecto → Flujo de trabajo, elige Pareja o pon Quién fusiona en Hive fusiona: la cola de fusión de Hive fusiona cada tarjeta aprobada cuando sus comprobaciones pasan en el resultado fusionado, así el trabajo en rojo nunca llega a la rama de destino.",
+  "tips.hiveMerges.title": "Deja que Hive fusione las tarjetas aprobadas",
   "tips.hiveSkills.text": "Los agentes y el Asistente reciben las habilidades propias de Hive: work-on-card, review-agent-work, handover y más. Hive las mantiene al día; las que edites siguen siendo tuyas.",
   "tips.hiveSkills.title": "Habilidades para trabajar con Hive",
   "tips.hooksMissing.text": "Si una actualización de la CLI o una directiva impide que los hooks de un agente lleguen a Hive, su panel dice Estado desconocido en lugar de un estado que puede ser incorrecto, no se escribe nada en él y su carril se pausa. El banner sobre su panel dice por qué cuando Hive lo sabe.",
