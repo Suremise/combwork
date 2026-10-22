@@ -267,6 +267,31 @@ const check = (name, ok, extra = '') => {
     const swapped = ['C', 'B', 'A', ...NAMES.slice(3)]
     check('A dropped on C: they swap, saved in project.json', !!(await lib.until(async () => saved() === order(swapped) && (await tileNames()).join() === order(swapped.slice(0, 12)), HUNG_MS)), `${saved()} / ${(await tileNames()).join()}`)
     check('…the drag has ended: no drop targets left', !!(await lib.until(async () => (await page.locator('.tile-drop, .tile-pages button.drop-target').count()) === 0, HUNG_MS)))
+    // A move shown while its save is held (#1229): a refresh meanwhile reads the order from before it, and its report
+    // reaches the window (seen by a listener after the window's own, then drawn); the tiles keep the move.
+    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:move=20000*1'))
+    await tile('C').focus()
+    await page.keyboard.press('Control+Alt+Shift+ArrowRight')
+    const held = ['B', 'C', 'A', ...NAMES.slice(3)]
+    check('Move Agent Right on C, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await tileNames()).join() === order(held.slice(0, 12)), HUNG_MS)) && saved() === order(swapped), `${saved()} / ${(await tileNames()).join()}`)
+    await page.evaluate(() => {
+      window.__olderOrder = null
+      window.hive.onEvent((e) => {
+        const p = e.type === 'workspace-changed' && window.__olderOrder === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
+        if (p) window.__olderOrder = p.agents.map((a) => a.name).join()
+      })
+    })
+    await inv('workspace:refresh')
+    const older = await lib.until(() => page.evaluate(() => window.__olderOrder), HUNG_MS)
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+    check('…a refresh meanwhile reports the order from before the move', older === order(swapped), String(older))
+    check('…and the tiles keep the move', (await tileNames()).join() === order(held.slice(0, 12)), (await tileNames()).join())
+    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+    // Bound: the save's hold left over, plus a hung run's.
+    check('…saved once its save goes on, still shown', !!(await lib.until(async () => saved() === order(held) && (await tileNames()).join() === order(held.slice(0, 12)), 20000 + HUNG_MS)), `${saved()} / ${(await tileNames()).join()}`)
+    await tile('C').focus()
+    await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+    check('…and Move Agent Left puts it back', !!(await lib.until(async () => saved() === order(swapped) && (await tileNames()).join() === order(swapped.slice(0, 12)), HUNG_MS)), `${saved()} / ${(await tileNames()).join()}`)
     // Page 2's button: B goes to the end, the grid showing it there.
     await drag(tile('B'), [page.locator('.session-toolbar .tile-pages button').nth(1)])
     const toEnd = ['C', 'A', ...NAMES.slice(3), 'B']
