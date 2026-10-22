@@ -11,7 +11,12 @@ const scratch = lib.WORK, userData = path.join(scratch, 'agents-profile')
 // Outside the repository, so its CLAUDE.md (which imports AGENTS.md) doesn't apply to the test sessions (#174).
 const ws = path.join(scratch, 'agents-ws')
 const wtRoot = `${ws}.worktrees`
-for (const d of [userData, ws, wtRoot]) fs.rmSync(d, { recursive: true, force: true })
+// The worktree's setup command quotes a path with a space (#1454: node-pty passed its quotes to cmd as \", so it failed).
+const setupDir = path.join(scratch, 'agents setup')
+for (const d of [userData, ws, wtRoot, setupDir]) fs.rmSync(d, { recursive: true, force: true })
+fs.mkdirSync(setupDir, { recursive: true })
+const setupScript = path.join(setupDir, 'setup.cjs')
+fs.writeFileSync(setupScript, "console.log('HIVE-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
 // Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
@@ -44,7 +49,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
-  await inv('project:updateConfig', proj, { worktreeSetup: 'echo HIVE-SETUP-RAN' })
+  await inv('project:updateConfig', proj, { worktreeSetup: `"${process.execPath}" "${setupScript}" "two words"` })
 
   // --- Agent 1 alone (added: projects start with none): the strip shows, with Add Agent
   const a1 = await lib.addAgent(inv, proj)
@@ -79,6 +84,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
     return b.includes('HIVE-SETUP-RAN') ? b : null
   }, 20000)) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
   check('setup command ran in the agent terminal', buf3.includes('HIVE-SETUP-RAN'))
+  // Its quoted path with a space and its quoted argument reached the program as typed (#1454).
+  const flat3 = lib.plainText(buf3).replace(/[ ]+/g, '')
+  check('setup command with a quoted path ran as typed', flat3.includes('HIVE-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('HIVE-SETUP-RAN'), flat3.indexOf('HIVE-SETUP-RAN') + 60))
   await lib.acceptClaudeTrust(inv, proj, a3.id, 25000)
   // Both sessions up (past starting: the CLI's SessionStart arrived).
   const up = (ids) => lib.until(async () => {

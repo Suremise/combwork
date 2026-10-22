@@ -1,8 +1,8 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, dbGeneration, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import { boardLock, boardOpen, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
 import { transaction } from './db'
-import { withFileLock } from './fsutil'
+import { placeKey, withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
 import { deleteEntry, entryKeys, insertEntries, insertEntry, keepAside, readEntries, readMeta, rowsOfEntry, setMeta, TABLE_DEFS, type TableStore } from './schema/storeCodec'
 import { keepAsBackup } from './storeBackup'
@@ -38,19 +38,21 @@ export const tableTestHooks: { failSave: ((store: TableStore) => boolean) | null
  * database opened for it and closed again) keeps nothing, those of workspaces closed since go at each save, and at most
  * MAX_COMMITTED stores are kept, the least recently saved going first.
  */
-const committed = new Map<string, { path: string; gen: number; docs: Map<string, string> }>()
+const committed = new Map<string, { path: string; place: string; gen: number; docs: Map<string, string> }>()
 export const MAX_COMMITTED = 3 * 8
 const cacheKey = (path: string, store: TableStore): string => `${path.toLowerCase()}|${store}`
-onDbReplaced((workspacePath) => {
+// Under every spelling of the workspace, by the place each save recorded as it entered (#1456).
+onDbReplaced((workspacePath, place) => {
   for (const store of Object.keys(TABLE_DEFS) as TableStore[]) committed.delete(cacheKey(resolve(workspacePath), store))
+  for (const [k, v] of [...committed]) if (v.place === place) committed.delete(k)
 })
 
 /** Keeps a store's committed entries, as the most recently saved; drops those of closed workspaces and past the bound. */
-function remember(path: string, store: TableStore, gen: number, docs: Map<string, string>): void {
+function remember(path: string, place: string, store: TableStore, gen: number, docs: Map<string, string>): void {
   const key = cacheKey(path, store)
   committed.delete(key)
   for (const [k, v] of committed) if (!boardOpen(v.path)) committed.delete(k)
-  committed.set(key, { path, gen, docs })
+  committed.set(key, { path, place, gen, docs })
   while (committed.size > MAX_COMMITTED) committed.delete(committed.keys().next().value!)
 }
 
@@ -119,14 +121,16 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
 function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, lease: DbLease, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
   const db = lease.db.writer
   const def = TABLE_DEFS[store]
-  const gen = dbGeneration(path)
+  // Its workspace's place resolved once, as the save enters: its generation, and what the cache records.
+  const place = placeKey(path)
+  const gen = dbGenerationAt(place)
   const keys = entryKeys(store, docs)
   const texts = docs.map((d) => JSON.stringify(d))
   let had = committed.get(cacheKey(path, store))
   const next = new Map<string, string>()
   transaction(db, () => {
     // A store others write too (the runtime's lanes, #1291) is compared with what the table has now.
-    if (!had || had.gen !== gen || def.shared) had = { path, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
+    if (!had || had.gen !== gen || def.shared) had = { path, place, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
     const before = had.docs
     // Those no longer in the list go first: a new entry may take what one of them held (an agent's one watch).
     const kept = new Set(keys)
@@ -168,7 +172,7 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
   // A closed workspace's last save keeps nothing (its database is closed again at once).
-  if (lease.kept) remember(path, store, gen, next)
+  if (lease.kept) remember(path, place, store, gen, next)
   else committed.delete(cacheKey(path, store))
 }
 

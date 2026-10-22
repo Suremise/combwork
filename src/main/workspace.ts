@@ -390,7 +390,7 @@ export class WorkspaceService {
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) closeBoard(closing, place)
-    if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR))
+    if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
     await this.watcher?.close()
     this.watcher = null
     this.path = null

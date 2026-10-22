@@ -171,8 +171,13 @@ environment problem when the screen shows one) when it doesn't get there, rather
   (`--no-wait` fails at once instead; tests/e2e/README.md, "Heavy runs queue").
 - **Results** go to `%LOCALAPPDATA%\hive-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
   checks, skills read, executed hive calls and mentions, versions, guidance and source, usage) and `summary.md` (a
-  table). `BASELINE.md` here records the latest baseline. Run the trials again after changing Hive's guidance, a skill
-  or a tool's description, and compare.
+  table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
+  has ended), so a run cut short keeps what it had. `BASELINE.md` here records the latest baseline. Run the trials
+  again after changing Hive's guidance, a skill or a tool's description, and compare.
+- **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
+  named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
+  provider); under `hive-progress` it gives the wrapper's row those steps. `--no-progress` or `HIVE_PROGRESS=0` turns
+  it off.
 
 Bump `FIXTURES_VERSION` in `scenarios.cjs` when a scenario's setup or checks change.
 

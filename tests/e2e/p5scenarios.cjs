@@ -49,8 +49,8 @@ const slash = (p) => p.replace(/\\/g, '/')
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1400, height: 900 })
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options({ mergeInstall: 'onManifestChange' }) })
-    // Unquoted: the folders the runner gives have no spaces, and the setup's terminal passes it to cmd as written.
-    await inv('project:updateConfig', fx.alpha, { worktreeSetup: `node ${install}` })
+    // Quoted, as a user would write a path (#1454: its quotes reach cmd as typed).
+    await inv('project:updateConfig', fx.alpha, { worktreeSetup: `node "${install}"` })
     const reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
     const column = async (n) => (await h.card(n))?.column
