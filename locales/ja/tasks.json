@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "{watcher}の監視を終了：{why, select, blocked {カードがブロックされたため} reviewer {{agent}がレビューするため} reviewTaken {待っていたレビューが他に移ったため} reassigned {{agent}に割り当て直されたため} unassigned {担当エージェントが外されたため} other {{why}}}",
   "tasks.skipped.movedColumn": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」に移動済み",
   "tasks.skipped.movedProject": "別のプロジェクトに移動済み",
+  "tasks.skipped.movedStage": "「{stage}」に移動しました",
   "tasks.skipped.noMatch": "検索の対象外",
   "tasks.skipped.unreadable": "読み込み不可",
   "tasks.skipped.unsaved": "保存不可",

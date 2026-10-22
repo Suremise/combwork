@@ -114,8 +114,48 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     await until(async () => (await tile(sentinel).count()) === 1)
     check('a drop into Merging moves nothing', (await h.card(loose))?.column === 'todo' && (await inColumn(loose, 'todo')))
 
+    // --- Archive All in Approved takes Approved's cards only, never Merging's (HR2's round 1): a card waiting for your OK
+    // (labelled ui) in Approved beside the queued one in Merging.
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { okBefore: { mode: 'labels', labels: ['ui'] } }) })
+    const okCard = (await inv('tasks:create', { title: 'Needs your OK', project: 'alpha', labels: ['ui'] })).number
+    const okBuilder = await q.agent(fx, h, 'B7', { worktree: true })
+    await q.intent(h, okBuilder, okCard, 'start')
+    fs.writeFileSync(path.join(okBuilder.folder, 'ok.txt'), 'ok\n')
+    lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'ok'])
+    await q.intent(h, okBuilder, okCard, 'submit', { summary: 'ready' })
+    await q.intent(h, reviewer, okCard, 'start-review')
+    await q.intent(h, reviewer, okCard, 'verdict', { pass: true, comment: 'ok' })
+    check('a card waiting for your OK sits in Approved, beside the queued one in Merging', !!(await until(async () => (await inColumn(okCard, 'passed')) && (await inColumn(queued.n, 'merging')))), await columns())
+    const item = (text) => page.locator('.menu .menu-item', { hasText: text })
+    await col('passed').getByRole('button', { name: 'Approved: more' }).click()
+    check("Approved's menu: Archive All in Approved (1)…, its own card only", !!(await until(async () => (await item('Archive All in Approved (1)…').count()) === 1)), JSON.stringify(await page.locator('.menu .menu-item').allTextContents()))
+    await item('Archive All in Approved (1)…').click()
+    const archiveDialog = page.locator('.dialog', { has: page.locator('.archive-all') })
+    check('…which asks for one card in Approved', !!(await until(async () => (await archiveDialog.count()) === 1)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
+    // Your OK while it is open: the card goes on to Merging; archiving Approved then leaves it there.
+    const ask = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === okCard)
+    await inv('tasks:answer', okCard, ask.request, { outcome: 'approved' })
+    check('…the OK moves it to Merging while the dialog is open', !!(await until(async () => inColumn(okCard, 'merging'))))
+    const confirm = archiveDialog.getByRole('button', { name: /^Archive/ })
+    if (await confirm.isEnabled().catch(() => false)) await confirm.click()
+    else await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await archiveDialog.count()) === 0)
+    check('…and nothing in Merging is archived', (await h.card(okCard))?.archived === false && (await h.card(queued.n))?.archived === false)
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+
     fs.writeFileSync(fx.go, 'go')
     check('merged: the card moves to Done', !!(await until(async () => (await h.card(queued.n))?.column === 'done' && (await inColumn(queued.n, 'done')))), JSON.stringify(await h.kinds(queued.n)))
+    // The OK'd card follows it through the queue.
+    await until(async () => (await h.card(okCard))?.column === 'done')
+
+    // --- With the workflow rules not enforced, every category shows, the workspace's own cards' board too (HR2's round 1).
+    const own = (await inv('tasks:create', { title: 'About the workspace', project: '' })).number
+    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await showBoard('Workspace')
+    check('rules off, the Workspace board: all six categories', !!(await until(async () => (await columns()) === 'hold todo doing review passed done' && (await inColumn(own, 'todo')))), await columns())
+    await inv('advanced:set', 'hive.workflow.enforce', null)
+    check('rules on again, the Workspace board: On Hold, Todo, Active and Done', !!(await until(async () => (await columns()) === 'hold todo doing done')), await columns())
 
     // --- A No review project alone: Review and Approved hidden.
     await showBoard('beta')

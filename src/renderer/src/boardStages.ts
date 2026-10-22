@@ -41,11 +41,14 @@ export interface BoardCardStage {
   stage: StageId
 }
 
-/** The columns of the board, by category, in board order. */
-export function boardLayout(projects: readonly BoardProject[], cards: readonly BoardCardStage[], tr?: Tr): BoardCategory[] {
+/**
+ * The columns of the board, by category, in board order. `enforced`: Settings → Advanced → Workflow rules are enforced;
+ * off, cards move freely, so every category shows, as before 1.0, whatever the board shows (the workspace's own cards
+ * too, which no project's rules cover).
+ */
+export function boardLayout(projects: readonly BoardProject[], cards: readonly BoardCardStage[], tr?: Tr, enforced = true): BoardCategory[] {
   const shown = new Set<StageId>(ALWAYS.map((c) => CATEGORY_STAGE[c]))
-  // With the workflow rules not enforced, cards move freely: every category shows, as before 1.0.
-  if (projects.some((p) => p.stages?.enforced === false)) for (const c of TASK_COLUMNS) shown.add(CATEGORY_STAGE[c.id])
+  if (!enforced) for (const c of TASK_COLUMNS) shown.add(CATEGORY_STAGE[c.id])
   const lower = (s: string): string => s.toLowerCase()
   for (const p of projects) {
     const own = cards.filter((c) => lower(c.project) === lower(p.name)).map((c) => c.stage)

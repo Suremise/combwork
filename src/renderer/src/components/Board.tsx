@@ -39,6 +39,8 @@ import { useLaneOf, useLanes } from '../laneSource'
 import { DocRefViewer, problemLines } from './DocRefViewer'
 import { boardLayout, cardColumn, cardStage, ownStageName, type BoardStageColumn } from '../boardStages'
 import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
+import { useAdvancedValue } from '../advanced'
+import type { StageId } from '@shared/workflow/facts'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
 
 const NO_TASKS: TaskCard[] = []
@@ -148,16 +150,19 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
   return null
 }
 
-/** The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. */
-function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'project' | 'scope' | 'query'>): { shown: TaskCard[]; total: number } {
-  const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && inProject(c, r.scope))
+/**
+ * The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. A stage
+ * column's (Approved beside Merging, #1420) only its stage's, as `stageOf` places each card.
+ */
+function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'stage' | 'project' | 'scope' | 'query'>, stageOf?: (c: TaskCard) => StageId): { shown: TaskCard[]; total: number } {
+  const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && (!r.stage || stageOf?.(c) === r.stage) && inProject(c, r.scope))
   return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query, get().projectKeys, get().movedCardNames)), total: there.length }
 }
 
 /** The menu item that opens Archive All: a column's, or the board's (column null). Counted, and off with nothing shown. */
-function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest, readOnly: string | null): MenuEntry {
-  const { shown, total } = archiveScope(all, r)
-  const where = r.column === null ? null : columnName(r.column, tr)
+function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest, readOnly: string | null, stageOf?: (c: TaskCard) => StageId): MenuEntry {
+  const { shown, total } = archiveScope(all, r, stageOf)
+  const where = r.column === null ? null : (r.name ?? columnName(r.column, tr))
   let label: string
   if (shown.length < total && where) label = tr(msg({ id: 'board.archiveAll.menuShownIn', defaultMessage: 'Archive the {n, number} Shown (of {total, number})…', description: "Menu item in a board column's ⋯ menu, when a search hides some of its cards: archive the {n} cards shown, of the column's {total}. Opens a dialog (…)." }), { n: shown.length, total })
   else if (shown.length < total) label = tr(msg({ id: 'board.archiveAll.menuShown', defaultMessage: '{n, plural, one {Archive the # Shown Card (of {total, number})…} other {Archive the # Shown Cards (of {total, number})…}}', description: "Menu item in the board's ⋯ menu, when a search hides some cards: archive the {n} cards shown, of the board's {total}. Opens a dialog (…)." }), { n: shown.length, total })
@@ -668,8 +673,11 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const shownProjects = useBoardProjects(project)
   const live = useMemo(() => all.filter((c) => !c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())), [all, project])
   const stageOf = (c: TaskCard) => cardStage(c.column, workBadges.get(c.number)?.stage)
-  const layout = boardLayout(shownProjects, live.map((c) => ({ project: c.project, stage: stageOf(c) })), tr)
+  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
+  const layout = boardLayout(shownProjects, live.map((c) => ({ project: c.project, stage: stageOf(c) })), tr, enforced)
   const columnOf = (c: TaskCard): BoardColumnId => cardColumn(c.column, stageOf(c), layout)
+  /** Whether a column shares its category with another stage's (Approved beside Merging). */
+  const shared = (col: BoardStageColumn): boolean => (layout.find((g) => g.category === col.category)?.columns.length ?? 0) > 1
   const [drag, showDrag] = useState<DragState | null>(null)
   // The handlers read the drag from here, not from the last render: a dragover or drop can come before React has
   // drawn the drag's start (a quick drag), and would then be refused.
@@ -841,8 +849,9 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
           { separator: true }
         ]
       : []),
-    // Merging's cards are the merge queue's: Archive All is Approved's.
-    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, project, scope, query }, readOnly)])
+    // Merging's cards are the merge queue's: no Archive All there. A stage beside another in its category (Approved by
+    // Merging) archives only its own cards (HR2's #1420 round 1).
+    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, ...(shared(col) ? { stage: col.stage, name: col.name } : {}), project, scope, query }, readOnly, stageOf)])
   ]
 
   const column = (col: BoardStageColumn) => {
@@ -1280,6 +1289,8 @@ export function ArchiveAllDialog() {
   useLanguage()
   const req = useStore((s) => s.boardArchiveAll)
   const all = useStore((s) => s.tasks)
+  // Each card's stage from its facts: a stage column's Archive All takes its own (#1420).
+  const badges = useWorkBadges()
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const assistant = useStore((s) => s.workspace?.assistant ?? null)
   const [include, setInclude] = useState(false)
@@ -1291,14 +1302,14 @@ export function ArchiveAllDialog() {
   }, [req, setError])
   if (!req) return null
   const close = (): void => set({ boardArchiveAll: null })
-  const { shown, total } = archiveScope(all, req)
+  const { shown, total } = archiveScope(all, req, (c) => cardStage(c.column, badges.get(c.number)?.stage))
   const held = shown.flatMap((c) => {
     const why = cardBusy(c, projects, assistant)
     return why ? [{ c, why }] : []
   })
   const going = include ? shown : shown.filter((c) => !held.some((h) => h.c === c))
   const filtered = shown.length < total
-  const where = req.column === null ? null : columnName(req.column, tr)
+  const where = req.column === null ? null : (req.name ?? columnName(req.column, tr))
   const n = going.length
   let title: string
   if (where && filtered) title = tr(msg({ id: 'board.archiveAll.titleShownIn', defaultMessage: 'Archive the {n, number} Shown in {column}?', description: "Title of the Archive All dialog for a column whose cards a search narrows: the {n} cards shown in the column ({column}, its name)." }), { n: shown.length, column: where })
@@ -1323,7 +1334,7 @@ export function ArchiveAllDialog() {
     const r = await call(
       'tasks:archiveBatch',
       going.map((c) => c.number),
-      { label, column: req.column, project: req.project, query: req.query, includeBusy: include }
+      { label, column: req.column, ...(req.stage ? { stage: req.stage } : {}), project: req.project, query: req.query, includeBusy: include }
     )
     await loadTasks()
     close()

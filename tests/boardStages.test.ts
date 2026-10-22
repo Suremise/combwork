@@ -7,7 +7,7 @@ import { mustCompile } from '../src/shared/workflow/compile'
 import { allOff, preset } from '../src/shared/workflow/options'
 import type { StageId } from '../src/shared/workflow/facts'
 
-const stagesOf = (o: Parameters<typeof mustCompile>[0], names: Partial<Record<StageId, string>> = {}): BoardProject['stages'] => ({ stages: mustCompile(o).stages, names, enforced: true })
+const stagesOf = (o: Parameters<typeof mustCompile>[0], names: Partial<Record<StageId, string>> = {}): BoardProject['stages'] => ({ stages: mustCompile(o).stages, names })
 const PAIR = stagesOf(preset('git', 'pair'))
 const NO_REVIEW = stagesOf({ ...allOff('git'), finish: 'committed', folder: 'project' })
 const NONE = stagesOf(allOff('none'))
@@ -31,8 +31,11 @@ describe("the board's columns from stages (#1420)", () => {
   })
 
   it('with the workflow rules not enforced, every category shows (cards move freely)', () => {
-    const off = { ...NO_REVIEW!, enforced: false }
-    expect(ids(boardLayout([{ name: 'web', stages: off }], []))).toBe('hold[hold:hold] todo[todo:todo] doing[doing:active] review[review:review] passed[passed:approved] done[done:done]')
+    const six = 'hold[hold:hold] todo[todo:todo] doing[doing:active] review[review:review] passed[passed:approved] done[done:done]'
+    expect(ids(boardLayout([{ name: 'web', stages: NO_REVIEW }], [], undefined, false))).toBe(six)
+    // The workspace's own cards (no project shown): the same, whatever projects there are.
+    expect(ids(boardLayout([], [{ project: '', stage: 'todo' }], undefined, false))).toBe(six)
+    expect(ids(boardLayout([], [{ project: '', stage: 'todo' }]))).toBe('hold[hold:hold] todo[todo:todo] doing[doing:active] done[done:done]')
   })
 
   it('a stage its options no longer produce stays while a card is in it, and goes once none is', () => {

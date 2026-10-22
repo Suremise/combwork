@@ -20,6 +20,7 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
+import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
@@ -838,6 +839,11 @@ export interface ArchiveRequest {
   label: string
   /** The column it was for; null: the whole board. */
   column: TaskColumn | null
+  /**
+   * The stage it was for, where its category shows several (Approved beside Merging, #1420): a card in another stage
+   * of the column, as its facts say now, stays.
+   */
+  stage?: StageId
   /** The project the board showed (null: every project) and its search: a card that has left them stays. */
   project: string | null
   query: string
@@ -1004,8 +1010,6 @@ export type PresetAsked = 'chosen' | 'notNow'
 export interface ProjectStages {
   stages: StageDef[]
   names: Partial<Record<StageDef['id'], string>>
-  /** Settings → Advanced → Workflow rules are enforced: off, cards move freely, so the board shows every category (#1420). */
-  enforced: boolean
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */

@@ -136,6 +136,7 @@ interface HiveMessageValues {
   'tasks.history.watchEnded': { watcher: string | number; why: string; agent: string | number }
   'tasks.skipped.movedColumn': { column: string }
   'tasks.skipped.movedProject': undefined
+  'tasks.skipped.movedStage': { stage: string | number }
   'tasks.skipped.noMatch': undefined
   'tasks.skipped.unreadable': undefined
   'tasks.skipped.unsaved': undefined
