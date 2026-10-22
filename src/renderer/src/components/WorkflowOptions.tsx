@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
+import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
+import type { PlatformId } from '@shared/platform/descriptors'
 import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
@@ -49,8 +50,9 @@ const T = {
     project: msg({ id: 'workflow.form.from.project', defaultMessage: 'Set for this project', description: 'Where a workflow option’s value comes from: set in this project.' }),
     workspace: msg({ id: 'workflow.form.from.workspace', defaultMessage: 'From the workspace', description: 'Where a workflow option’s value comes from: the workspace’s default.' }),
     global: msg({ id: 'workflow.form.from.global', defaultMessage: 'From Hive’s settings', description: 'Where a workflow option’s value comes from: Hive’s own default.' }),
-    platform: msg({ id: 'workflow.form.from.platform', defaultMessage: 'Default', description: 'Where a workflow option’s value comes from: nobody set it (every rule off).' })
-  } satisfies Record<WorkflowOptionOrigin | 'preset', ReturnType<typeof msg>>,
+    platform: msg({ id: 'workflow.form.from.platform', defaultMessage: 'Default', description: 'Where a workflow option’s value comes from: nobody set it (every rule off).' }),
+    here: msg({ id: 'workflow.form.from.here', defaultMessage: 'Set here', description: 'Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level.' })
+  } satisfies Record<WorkflowOptionOrigin | 'preset' | 'here', ReturnType<typeof msg>>,
   inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
@@ -101,12 +103,42 @@ const T = {
   laneUnnamed: msg({ id: 'workflow.form.laneUnnamed', defaultMessage: 'Builder {builder}', description: 'A running lane without a name in the dialog before saving workflow options: its builder agent.' }),
   inFlight: msg({ id: 'workflow.form.inFlight', defaultMessage: '{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}', description: 'In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it.' }),
   saved: msg({ id: 'workflow.form.saved', defaultMessage: 'Workflow options saved', description: 'A notification: the workflow options were saved.' }),
+  inheritor: msg({ id: 'workflow.form.inheritor', defaultMessage: 'Project {project} inherits these options, and the change would make its options contradict each other:', description: 'Why saving workflow defaults was refused: a project inheriting them would have contradictory options. Its reason follows on its own line. {project} is its name.' }),
+  levelConfirm: msg({ id: 'workflow.form.levelConfirm', defaultMessage: 'Projects that don’t set these options themselves use the new defaults from their next card.', description: 'The message of the dialog before saving workflow defaults (Settings → Workflow defaults or Settings → Workspace).' }),
+  heirs: msg({ id: 'workflow.form.heirs', defaultMessage: '{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}', description: 'In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves).' }),
+  noHeirs: msg({ id: 'workflow.form.noHeirs', defaultMessage: 'No project inherits the change now: each sets these options itself, or none uses this version control.', description: 'In the dialog before saving workflow defaults, when no open project uses the changed options.' }),
+  heir: msg({ id: 'workflow.form.heir', defaultMessage: 'Project {project}: {options}', description: 'A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list.' }),
+  heirElsewhere: msg({ id: 'workflow.form.heirElsewhere', defaultMessage: 'Project {project} (workspace {workspace}): {options}', description: 'A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list.' }),
+  heirLanes: msg({ id: 'workflow.form.heirLanes', defaultMessage: '{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules).' }),
+  heirCards: msg({ id: 'workflow.form.heirCards', defaultMessage: '{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules).' }),
+  levelPlatform: msg({ id: 'workflow.form.levelPlatform', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1).' }),
+  levelNone: msg({ id: 'workflow.form.levelNone', defaultMessage: 'None', description: 'The choice of the defaults for projects without version control (glossary 2.1: None).' }),
+  levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
+  levelForNone: msg({ id: 'workflow.form.levelForNone', defaultMessage: 'The defaults of projects without version control.', description: 'Beside the None · Git choice above workflow defaults, while None is chosen.' }),
+  levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
-const problemText = (p: WorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'notOffered' ? tr(NOT_OFFERED[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
+const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'notOffered' ? tr(NOT_OFFERED[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
+
+/** A problem's lines: an inheriting project's (a level's save, #1422) names it, its reason on a line of its own. */
+const problemLines = (p: WorkflowProblem): string[] => (p.kind === 'inheritor' ? [tr(T.inheritor, { project: p.project }), ownProblemText(p.problem)] : [ownProblemText(p)])
+const problemText = (p: WorkflowProblem): string => problemLines(p).join('\n')
+
+/**
+ * Where the editor's options come from and go to (#1422): a project's (the Version Control tab's Workflow section) or a
+ * level's defaults (Hive's in Settings → Workflow defaults, the workspace's in Settings → Workspace). `key` scopes what
+ * is shown: another source's read never shows.
+ */
+export interface FormSource {
+  key: string
+  level: WorkflowLevel | null
+  read: () => Promise<WorkflowForm>
+  check: (change: WorkflowChange) => Promise<WorkflowCheck | WorkflowLevelCheck>
+  save: (change: WorkflowChange, applyTo: number[]) => Promise<WorkflowForm>
+}
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
 interface CopiedOptions {
@@ -138,7 +170,59 @@ const sameOwn = (a: { preset: PresetId | null; options: Partial<WorkflowOptions>
   return a.preset === b.preset && sorted(a.options) === sorted(b.options)
 }
 
+/** A project's options, in its Version Control tab. */
 export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
+  const path = project.path
+  const source = useMemo(
+    (): FormSource => ({
+      key: path,
+      level: null,
+      read: () => call('workflow:form', path),
+      check: (change) => call('workflow:check', path, change),
+      save: (change, applyTo) => call('workflow:setOptions', path, change, { applyTo })
+    }),
+    [path]
+  )
+  return <WorkflowEditor source={source} project={project} />
+}
+
+/**
+ * A level's workflow defaults (#1422): Hive's (Settings → Workflow defaults) or the workspace's (Settings → Workspace),
+ * for None or for Git, in the project form's editor: the same groups and checks, each option inheriting from the level
+ * below (the workspace's from Hive's, Hive's from every rule off).
+ */
+export function WorkflowLevelForm({ level }: { level: WorkflowLevel }) {
+  const [platform, setPlatform] = useState<PlatformId>('git')
+  const workspacePath = useStore((s) => s.workspace?.path ?? '')
+  const source = useMemo(
+    (): FormSource => ({
+      key: `${level}:${platform}:${level === 'workspace' ? workspacePath : ''}`,
+      level,
+      read: () => call('workflow:levelForm', level, platform),
+      check: (change) => call('workflow:levelCheck', level, platform, change),
+      save: (change) => call('workflow:setLevel', level, platform, change)
+    }),
+    [level, platform, workspacePath]
+  )
+  return (
+    <div className="workflow-level" data-level={level}>
+      <div className="workflow-level-head">
+        <div className="segmented workflow-level-platform" role="radiogroup" aria-label={tr(T.levelPlatform)}>
+          {(['none', 'git'] as const).map((p) => (
+            <button key={p} type="button" role="radio" aria-checked={platform === p} className={cx(platform === p && 'active')} data-platform={p} onClick={() => setPlatform(p)}>
+              {tr(p === 'git' ? T.levelGit : T.levelNone)}
+            </button>
+          ))}
+        </div>
+        <span className="s-desc">{tr(platform === 'git' ? T.levelForGit : T.levelForNone)}</span>
+      </div>
+      <WorkflowEditor source={source} project={null} />
+    </div>
+  )
+}
+
+/** The editor: a project's options or a level's defaults (`source`), with `project` for a project's own rows. */
+function WorkflowEditor({ source, project }: { source: FormSource; project: ProjectInfo | null }) {
   // The form as read and its draft, kept with the project they are for: another project's never shows (HR5's round 1).
   const [loaded, setLoaded] = useState<{ for: string; form: WorkflowForm; draft: WorkflowChange } | null>(null)
   const [failed, setFailed] = useState<{ for: string; error: string } | null>(null)
@@ -148,18 +232,18 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
   const version = useStore((s) => s.workflowVersion)
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   /** The project shown now (a read's answer for another is dropped), the newest read's number, and the draft's edits. */
-  const pathRef = useRef(project.path)
-  pathRef.current = project.path
+  const pathRef = useRef(source.key)
+  pathRef.current = source.key
   const reads = useRef(0)
   const edits = useRef(0)
   const shownFor = useRef<string | null>(null)
   const dirtyRef = useRef(false)
-  const form = loaded?.for === project.path ? loaded.form : null
+  const form = loaded?.for === source.key ? loaded.form : null
   /** Whether the shown project's form is on screen (a failed reload keeps it, with any edits). */
   const hasForm = useRef(false)
   hasForm.current = !!form
-  const draft = loaded?.for === project.path ? loaded.draft : null
-  const error = failed?.for === project.path ? failed.error : null
+  const draft = loaded?.for === source.key ? loaded.draft : null
+  const error = failed?.for === source.key ? failed.error : null
 
   /** The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. */
   const show = useCallback((path: string, f: WorkflowForm): void => {
@@ -181,11 +265,11 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
    */
   const load = useCallback(
     async (auto: boolean): Promise<void> => {
-      const path = project.path
+      const path = source.key
       const n = ++reads.current
       const edited = edits.current
       try {
-        const f = await call('workflow:form', path)
+        const f = await source.read()
         if (n !== reads.current || pathRef.current !== path || (auto && edits.current !== edited)) return
         show(path, f)
       } catch (e) {
@@ -195,20 +279,20 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         setFailed({ for: path, error: errorMessage(e) })
       }
     },
-    [project.path, show]
+    [source, show]
   )
   // Read for each project, and again when its options change elsewhere (`workflow-changed`: the Assistant's tool, another
   // window) while nothing here is unsaved; unsaved edits stay, and their Save is refused as changed meanwhile.
   useEffect(() => {
-    const again = shownFor.current === project.path
-    shownFor.current = project.path
+    const again = shownFor.current === source.key
+    shownFor.current = source.key
     if (!again) {
       setPreview(null)
       setProblems([])
     }
     if (again && dirtyRef.current) return
     void load(again)
-  }, [load, project.path, version])
+  }, [load, source.key, version])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
@@ -236,15 +320,15 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     setDraft({ preset: c === 'allOff' ? null : c, options: draft.options.stageNames ? { ...options, stageNames: draft.options.stageNames } : options })
     setPreview(null)
   }
-  const originOf = (key: OptionKey): WorkflowOptionOrigin | 'preset' => {
+  const originOf = (key: OptionKey): WorkflowOptionOrigin | 'preset' | 'here' => {
     if (!(key in draft.options)) return form.inheritedOrigins[key]
-    return presetOptions && same(presetOptions[key], draft.options[key]) ? 'preset' : 'project'
+    return presetOptions && same(presetOptions[key], draft.options[key]) ? 'preset' : source.level ? 'here' : 'project'
   }
 
   const save = async (): Promise<void> => {
     // What the form was read with: the save is refused if the project's options are no longer these (#1418).
     const change: WorkflowChange = { ...draft, base: { preset: form.preset, options: form.own } }
-    const check = await call('workflow:check', project.path, change)
+    const check = await source.check(change)
     setProblems(check.problems)
     if (check.problems.length) return
     // Each option that changes, its value now and its new one (the Assistant for Darren: a list, never one sentence).
@@ -256,17 +340,17 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     let stale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
-      message: tr(check.appliesNow ? T.appliesNow : T.confirmMessage),
+      message: tr(source.level ? T.levelConfirm : check.appliesNow ? T.appliesNow : T.confirmMessage),
       wide: true,
-      content: <SaveDetails changes={changes} check={check} picked={picked} />,
+      content: <SaveDetails changes={changes} check={check} picked={picked} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
-        const path = project.path
+        const path = source.key
         try {
-          show(path, await call('workflow:setOptions', path, change, { applyTo: [...picked] }))
+          show(path, await source.save(change, [...picked]))
         } catch (e) {
           // Changed meanwhile (the Assistant's tool, another window): never written over; shown as it is now.
-          const now = await call('workflow:form', path).catch(() => null)
+          const now = await source.read().catch(() => null)
           if (!now || sameOwn({ preset: now.preset, options: now.own }, { preset: form.preset, options: form.own })) throw e
           stale = true
           show(path, now)
@@ -300,7 +384,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         if (v.platform !== platform) throw new Error(tr(T.pastePlatform))
         const change: WorkflowChange = { preset: v.preset ?? null, options: v.options }
         // Checked as a save would check it (OP-5): refused with its reasons, else it fills the form, to save.
-        const check = await call('workflow:check', project.path, change)
+        const check = await source.check(change)
         if (check.problems.length) throw new Error([tr(T.cantSave), ...check.problems.map(problemText)].join('\n'))
         setDraft(change)
         setProblems([])
@@ -335,6 +419,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     const title = optionTitle(key, platform, effective.folder)
     const text = OPTION_TEXT[key]
     if (!title || !text || !formShows(key, effective)) return null
+    // A level has no project identity to use (G12 is a project’s own).
+    if (key === 'identity' && source.level) return null
     const origin = originOf(key)
     const reasons = live[key] ?? []
     const stageReasons = key === 'stageNames' ? stageProblems : []
@@ -448,8 +534,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     }
   }
 
-  const rounds = project.config.loopRounds ?? workspaceLoops.rounds ?? LOOP_ROUNDS
-  const hours = project.config.loopWaitHours ?? workspaceLoops.waitHours
+  const rounds = project?.config.loopRounds ?? workspaceLoops.rounds ?? LOOP_ROUNDS
+  const hours = project?.config.loopWaitHours ?? workspaceLoops.waitHours
   const choices: Choice[] = [...form.presets.filter((p) => !p.needs).map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
@@ -499,6 +585,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       </section>
       {FORM_GROUPS[platform].map((g) => {
         if (g.id === 'elsewhere') {
+          // A project's settings owned elsewhere: a level has none.
+          if (!project) return null
           return (
             <section className="workflow-group" data-group={g.id} key={g.id}>
               <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
@@ -522,9 +610,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       {problems.length > 0 && (
         <div className="workflow-problems" role="alert">
           <div>{tr(T.cantSave)}</div>
-          {problems.map((p, i) => (
-            <div key={i}>{problemText(p)}</div>
-          ))}
+          {problems.flatMap((p, i) => problemLines(p).map((line, j) => <div key={`${i}:${j}`}>{line}</div>))}
         </div>
       )}
       <div className="workflow-actions">
@@ -696,10 +782,15 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
   )
 }
 
-/** What a save changes, the lanes keeping the old rules, and the cards in flight to apply the change to (OP-38). */
-function SaveDetails({ changes, check, picked }: { changes: string[]; check: { lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; title: string }[] }; picked: Set<number> }) {
+/**
+ * What a save changes, the lanes keeping the old rules, and the cards in flight to apply the change to (OP-38); for a
+ * level (#1422), each project inheriting the change, what changes for it, and its running lanes and cards in flight,
+ * which keep their rules until their next card.
+ */
+function SaveDetails({ changes, check, picked, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; title: (k: OptionKey) => string }) {
   const [, redraw] = useState(0)
   const tasks = useStore((s) => s.tasks)
+  const workspacePath = useStore((s) => s.workspace?.path ?? '')
   return (
     <div className="workflow-save">
       {changes.length ? (
@@ -742,6 +833,43 @@ function SaveDetails({ changes, check, picked }: { changes: string[]; check: { l
             </label>
           ))}
         </>
+      )}
+      {'projects' in check && (
+        <div className="workflow-heirs" data-heirs="">
+          <p>{check.projects.length ? tr(T.heirs, { n: check.projects.length }) : tr(T.noHeirs)}</p>
+          <ul>
+            {check.projects.map((h) => (
+              <li key={h.path} data-heir={h.name}>
+                {/* Another workspace's project (Hive's level) says which: names repeat across workspaces. */}
+                {h.workspace.path.toLowerCase() === workspacePath.toLowerCase() ? tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) }) : tr(T.heirElsewhere, { project: h.name, workspace: h.workspace.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
+                {/* Each lane and card by name (HR5's round 1), as a project's warning lists its own. */}
+                {h.lanes.length > 0 && (
+                  <div className="s-desc" data-heir-lanes="">
+                    {tr(T.heirLanes, { n: h.lanes.length })}
+                    <ul>
+                      {h.lanes.map((l) => (
+                        <li key={l.id}>{l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder })}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {h.inFlight.length > 0 && (
+                  <div className="s-desc" data-heir-cards="">
+                    {tr(T.heirCards, { n: h.inFlight.length })}
+                    <ul>
+                      {h.inFlight.map((c) => (
+                        <li key={c.number}>
+                          {/* Its own workspace's key: card numbers repeat across workspaces (HR5's round 2). */}
+                          {c.key} {c.title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

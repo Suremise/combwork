@@ -43,21 +43,34 @@ interface HiveMessageValues {
   'workflow.form.fileLocksValue': undefined
   'workflow.form.folders': undefined
   'workflow.form.from.global': undefined
+  'workflow.form.from.here': undefined
   'workflow.form.from.platform': undefined
   'workflow.form.from.preset': undefined
   'workflow.form.from.project': undefined
   'workflow.form.from.workspace': undefined
+  'workflow.form.heir': { project: string | number; options: string | number }
+  'workflow.form.heirCards': { n: number }
+  'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
+  'workflow.form.heirLanes': { n: number }
+  'workflow.form.heirs': { n: number }
   'workflow.form.identity': { name: string | number; email: string | number }
   'workflow.form.identityValue': { name: string | number; email: string | number }
   'workflow.form.inFlight': { n: number }
   'workflow.form.inherit': undefined
   'workflow.form.inheritTip': { value: string | number }
+  'workflow.form.inheritor': { project: string | number }
   'workflow.form.invalid': undefined
   'workflow.form.labels': undefined
   'workflow.form.labelsValue': { labels: string | number }
   'workflow.form.lane': { builder: string | number; name: string | number }
   'workflow.form.laneUnnamed': { builder: string | number }
   'workflow.form.lanes': { n: number }
+  'workflow.form.levelConfirm': undefined
+  'workflow.form.levelForGit': undefined
+  'workflow.form.levelForNone': undefined
+  'workflow.form.levelGit': undefined
+  'workflow.form.levelNone': undefined
+  'workflow.form.levelPlatform': undefined
   'workflow.form.loadFailed': { error: string | number }
   'workflow.form.loops': undefined
   'workflow.form.loopsSection': undefined
@@ -69,6 +82,7 @@ interface HiveMessageValues {
   'workflow.form.neverOffHead': undefined
   'workflow.form.noChanges': undefined
   'workflow.form.noChecks': undefined
+  'workflow.form.noHeirs': undefined
   'workflow.form.noIdentity': undefined
   'workflow.form.noPreset': undefined
   'workflow.form.noneValue': undefined

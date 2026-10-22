@@ -1492,6 +1492,20 @@ renaming the Active stage leaves the category Active. The user's names are for t
 project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
 **Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.
 
+**Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from `workflow:stages`
+and each card's stage from its facts). Each category in its fixed order shows its stages as columns: those the shown
+projects' current options produce, and any a card of theirs is in (a card under old rules keeps its stage shown).
+On Hold, Todo, Active and Done always show; Review and Approved only with a stage, or all six while Settings →
+Advanced → *Workflow rules are enforced* is off (cards move freely then). Approved with Merging is two columns
+under one Approved heading, in the category's colour. With several projects shown the columns are the union of their
+stages; a column takes a project's rename when one project is shown or every shown project names it alike, else its
+default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
+category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in
+Merging leaves it by Remove from queue, never by a drag into Approved; Approved's Archive All takes Approved's cards only (a
+card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. Folds are kept per column id: a category's
+apply to its stage, Merging keeps its own (`merging`). The toolbar links each shown project's workflow ("Workflow: Git ·
+Team", or a **Workflows** menu with a line per project), opening its Version Control tab at Workflow.
+
 #### 16.5.3 The piece library
 
 [#1112 D] Rules are built only from these pieces, implemented and unit-tested in code. A piece declares the
@@ -1707,6 +1721,26 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
+- **Built [#1422], the defaults at each level**: Hive's in **Settings → Workflow defaults** (`workflow.defaults`), the
+  workspace's in **Settings → Workspace → Workflow defaults**, each with a None · Git choice of which platform's it shows,
+  in #1418's editor in a level mode (`WorkflowLevelForm`): the same groups, labels, presets, All off and live
+  contradictions; a value set at the level says *Set here*, and Inherit goes back to the level below (the workspace's
+  to Hive's, Hive's to the platform's all-off). G12 (the project's identity) and the rows shown elsewhere aren't at a
+  level. `workflow:levelForm`, `workflow:levelCheck` and `workflow:setLevel` (`src/main/workflow/levels.ts`):
+  - a level is resolved on its own and checked as a project's save is;
+  - its check lists each project inheriting a changed option (Hive's level: every open workspace's projects; a project
+    setting an option itself isn't), what changes for it, its running lanes and cards in flight (they keep their rules:
+    from the next card);
+  - **a level that would make an inheriting project contradictory is refused**, naming the project and its reason (an
+    `inheritor` problem), rather than leaving that project at all-off; the all-off fall-back stays for files edited by
+    hand;
+  - the form's `base` makes a save read before another change refused (`WorkflowStale`);
+  - **workflow writes take turns** (`src/main/workflow/writes.ts`): a level's save, a project's (the Workflow section,
+    the settings tool) each checks and writes in one turn, so neither check can go stale before its write;
+  - Hive's is written with `config.setWorkflowDefaults` (a platform's options replaced whole), the workspace's with
+    `saveWorkspaceConfigWith` (workspace.json, kept with a backup), its base checked again as it is written.
+  The Assistant's settings tool takes each option at either level (`workflow.<git|none>.<option>`, app scope;
+  `workspace.workflow.<git|none>.<option>`, workspace scope; null inherits), saved through the same checks.
 - **Built [#1418], the tab's Workflow section** (`WorkflowOptions.tsx`, P4's form below rewritten):
   - **Groups** (`FORM_GROUPS`, `options.ts`), each a heading: Git's Review (G1, G1b, G2, G4, G10), Checks (G3; G9 and
     its install while Hive merges), Merging (G5, G6, G7, G8 while Hive merges, G14), Where cards are built (G11, G12,

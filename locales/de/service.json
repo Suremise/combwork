@@ -168,6 +168,7 @@
   "service.transcripts.none": "Diese Sitzung hat noch kein Transkript.",
   "service.workflow.changedMeanwhile": "Die Workflow-Optionen haben sich inzwischen geändert (in einem anderen Fenster oder durch den Hive Assistant), daher wurde nichts gespeichert. Der Abschnitt zeigt sie jetzt so, wie sie sind.",
   "service.workflow.closed": "Der Arbeitsbereich dieser Karte wurde geschlossen",
+  "service.workflow.inheritor": "Das Projekt {project} erbt diese Optionen, und die Änderung würde dazu führen, dass sich seine Optionen widersprechen:",
   "service.workflowNotice.blocked": "{card} ist blockiert: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} ist blockiert",
   "service.workflowNotice.failed": "{card} hat das Review nicht bestanden",

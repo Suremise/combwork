@@ -105,11 +105,14 @@ import type {
   WorkflowChange,
   WorkflowCheck,
   WorkflowForm,
+  WorkflowLevel,
+  WorkflowLevelCheck,
   ProjectStages,
   WorkspaceInfo
 } from './types'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
+import type { PlatformId } from './platform/descriptors'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDeleted, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
@@ -292,6 +295,12 @@ export interface HiveRequests {
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
   'workflow:presetsNoticeSaid': () => void
+  /** A level's workflow defaults for a platform as the editor shows them (#1422: Hive's, or the open workspace's). */
+  'workflow:levelForm': (level: WorkflowLevel, platform: PlatformId) => WorkflowForm
+  /** What saving a level's defaults would do: its problems, what changes, and the projects inheriting it (#1422). */
+  'workflow:levelCheck': (level: WorkflowLevel, platform: PlatformId, change: WorkflowChange) => WorkflowLevelCheck
+  /** Saves a level's defaults, checked again (refused with its reasons, or as changed meanwhile); the form as it is now. */
+  'workflow:setLevel': (level: WorkflowLevel, platform: PlatformId, change: WorkflowChange) => WorkflowForm
   /**
    * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused, or has
    * cards in flight under Hive merges into, or its current options have Hive merge into (#1356: the panel decides which

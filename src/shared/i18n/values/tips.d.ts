@@ -369,6 +369,8 @@ interface HiveMessageValues {
   'tips.versionControlTab.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.workflowDefaults.text': undefined
+  'tips.workflowDefaults.title': undefined
   'tips.workflowOptions.text': undefined
   'tips.workflowOptions.title': undefined
   'tips.workflowPresetsWhy.text': undefined

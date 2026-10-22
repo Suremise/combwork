@@ -168,6 +168,7 @@
   "service.transcripts.none": "このセッションにはまだトランスクリプトがありません。",
   "service.workflow.changedMeanwhile": "その間にワークフローのオプションが変更されたため（別のウィンドウ、または Hive Assistant による変更）、何も保存されませんでした。このセクションには現在のオプションが表示されています。",
   "service.workflow.closed": "このカードのワークスペースは閉じられました",
+  "service.workflow.inheritor": "プロジェクト {project} はこれらのオプションを継承しており、この変更でオプション同士が矛盾します:",
   "service.workflowNotice.blocked": "{card}はブロックされています：{reason}",
   "service.workflowNotice.blockedNoReason": "{card}はブロックされています",
   "service.workflowNotice.failed": "{card}はレビュー不合格です",

@@ -311,6 +311,10 @@
     "defaultMessage": "Expand {card}",
     "description": "Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
+  "board.card.stageInProject": {
+    "defaultMessage": "In {project}, this stage is {stage}",
+    "description": "Tooltip on a card's project name on the board when its project names the card's stage differently from the column's heading (glossary 2.2: stage). {project} is the project, {stage} its own name for the stage."
+  },
   "board.card.stalled": {
     "defaultMessage": "Stalled: {why}",
     "description": "On a stalled card (and its tooltip when folded): nobody is getting on with it, and why ({why}, a sentence)."
@@ -430,6 +434,10 @@
   "board.columns.expandTip": {
     "defaultMessage": "Expand {column}: {description}",
     "description": "Tooltip on a collapsed board column's strip: expands it. {column} is its name, {description} what the column is for."
+  },
+  "board.columns.mergingTip": {
+    "defaultMessage": "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.",
+    "description": "The Merging column's description (its hover; glossary 2.2: Merging, a stage inside Approved). Remove from queue is the button on the card's Work section and in the Progress panel."
   },
   "board.columns.more": {
     "defaultMessage": "{column}: more",
@@ -3246,5 +3254,9 @@
   "board.workQueue.unreadRef": {
     "defaultMessage": "not read",
     "description": "In the card dialog's Work section: where the branch points couldn't be read."
+  },
+  "board.workflows": {
+    "defaultMessage": "Workflows",
+    "description": "A button in the board's toolbar when it shows several projects: opens a list of each project's workflow (glossary 2.1: workflow), each opening that project's Version Control tab."
   }
 }

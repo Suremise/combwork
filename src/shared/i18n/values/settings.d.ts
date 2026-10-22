@@ -843,6 +843,8 @@ interface HiveMessageValues {
   'settings.section.sessions.label': undefined
   'settings.section.updates.desc': undefined
   'settings.section.updates.label': undefined
+  'settings.section.workflow.desc': undefined
+  'settings.section.workflow.label': undefined
   'settings.section.workspace.desc': undefined
   'settings.section.workspace.label': undefined
   'settings.sessions.backupRetention.desc': undefined
@@ -948,6 +950,8 @@ interface HiveMessageValues {
   'settings.viewers.revokeTitle': { name: string | number }
   'settings.viewers.token': undefined
   'settings.viewers.tokenOf': { name: string | number }
+  'settings.workflow.defaults.desc': undefined
+  'settings.workflow.defaults.title': undefined
   'settings.workspace.antivirus.desc': undefined
   'settings.workspace.antivirus.tip': undefined
   'settings.workspace.antivirus.title': undefined
@@ -963,4 +967,6 @@ interface HiveMessageValues {
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined
+  'settings.workspace.workflowDefaults.desc': undefined
+  'settings.workspace.workflowDefaults.title': undefined
 }

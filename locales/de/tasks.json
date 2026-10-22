@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "Beobachtung durch Agent {watcher} beendet: {why, select, blocked {die Karte ist blockiert} reviewer {Agent {agent} prüft sie} reviewTaken {das Review wurde dem Agenten entzogen} reassigned {Agent {agent} zugewiesen} unassigned {keinem Agenten zugewiesen} other {{why}}}",
   "tasks.skipped.movedColumn": "nach {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Geprüft} done {Erledigt} other {{column}}} verschoben",
   "tasks.skipped.movedProject": "in ein anderes Projekt verschoben",
+  "tasks.skipped.movedStage": "nach {stage} verschoben",
   "tasks.skipped.noMatch": "passt nicht mehr zur Suche",
   "tasks.skipped.unreadable": "konnte nicht gelesen werden",
   "tasks.skipped.unsaved": "konnte nicht gespeichert werden",

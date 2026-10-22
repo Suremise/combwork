@@ -8147,6 +8147,20 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 12px;
 }
+/* The checkboxes keep their one line; the workflow link (#1420) gives way first, cut with "…" (its hover has it whole). */
+.board-toolbar > label {
+  white-space: nowrap;
+}
+.board-toolbar .tip-wrap:has(> .board-workflow) {
+  min-width: 0;
+  display: flex;
+}
+.board-workflow {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .board-search {
   display: flex;
   align-items: center;
@@ -8183,6 +8197,53 @@ body.pane-resizing-v .monaco-editor {
 .board-column.collapsed {
   flex: 0 0 34px;
   min-width: 34px;
+}
+/* A category with several stages (#1420: Approved with Merging): one heading over its stages' columns, which share its
+   width as the board's columns do; its flex-grow is how many of them are open (inline). The other columns start lower
+   by the heading's height, so every column's header lines up. */
+.board-category {
+  flex: 1 1 0;
+  /* As wide as its columns' least widths: they never spill over the next category. */
+  min-width: min-content;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.board-category.collapsed {
+  flex: 0 0 auto;
+}
+.board-category-head {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 2px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.board.colored .board-category-head {
+  color: color-mix(in srgb, var(--col) var(--board-label), var(--fg-strong));
+  border-bottom-color: var(--col);
+}
+.board-category-columns {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+}
+/* A category's stages share its room: a little narrower at least, so seven columns fit where six did. */
+.board-category-columns > .board-column:not(.collapsed) {
+  min-width: 120px;
+}
+.board.grouped > .board-column {
+  margin-top: 24px;
+  /* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
+  min-width: 140px;
 }
 .board-column-strip {
   flex: 1;
@@ -8236,7 +8297,7 @@ body.pane-resizing-v .monaco-editor {
 }
 .board-column-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 8px 4px;
   font-size: 12px;
@@ -8303,16 +8364,26 @@ body.pane-resizing-v .monaco-editor {
   background: var(--bg-input, transparent);
   cursor: pointer;
 }
-/* A long column name is cut with "…" (its tooltip gives it in full), keeping the count, + and ⋯ in the column (#886). */
+/* A column's name stays readable (#886; the Assistant's #1420 OK: seven columns at a normal width): never cut within a
+   word. While it fits, the header is one row; in a narrow column the name keeps the first row beside the fold button,
+   wrapping between words, and the count, + and ⋯ move to a second row. Its tooltip gives it in full as well. */
+.board-column-header {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  /* Its width is the column's, so its name can be held to it (cqw below). */
+  container-type: inline-size;
+}
 .board-column-header > .tip-wrap:has(> .board-column-label) {
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: min-content;
   display: flex;
 }
+/* Never wider than the header beside the fold button: a name with a word longer than that (a stage's own name can be
+   24 letters, HR2's #1420 round 4) breaks within it rather than painting over the next column. */
 .board-column-header .board-column-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: calc(100cqw - 30px);
+  overflow-wrap: break-word;
+  line-height: 16px;
 }
 .board-column-header .count {
   font-weight: 400;
@@ -11932,6 +12003,23 @@ button.progress-run-show:focus-visible {
 .workflow-never-off ul {
   margin-block: 4px 0;
   padding-inline-start: 18px;
+}
+/* A level's workflow defaults (#1422): None · Git, then the editor. */
+.workflow-level {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-level-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-block-end: 10px;
+}
+.workflow-heirs ul {
+  margin-block: 4px 8px;
+  padding-inline-start: 20px;
 }
 .workflow-stages {
   display: flex;

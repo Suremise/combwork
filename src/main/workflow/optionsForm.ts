@@ -8,13 +8,14 @@
 import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
-import { ADOPTION_UPTO, boardState, boardValue, boardWrite, setBoardValue } from '../boardStore'
+import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
+import { cardLabel } from '../../shared/projectKeys'
 import { config } from '../config'
 import { HiveError } from '../hiveError'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
-import type { Text } from '../../shared/advanced'
+import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
@@ -29,6 +30,7 @@ import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
+import { workflowWrite } from './writes'
 
 const log = createLogger('workflow')
 
@@ -131,11 +133,15 @@ export async function projectStages(ws: WorkspaceService, projectPath: string): 
   return { stages: compiled.ok ? compiled.ruleset.stages : mustCompile(allOff(p.platform.id)).stages, names: r.options.stageNames ?? {}, preset: cfg.workflow?.platform === p.platform.id ? (cfg.workflow.preset ?? null) : null }
 }
 
-/** A problem in English (the Assistant's tools, the log). */
-export const problemEnglish = (p: WorkflowProblem): string => problemText(p)
+const IM = {
+  inheritor: msg({ id: 'service.workflow.inheritor', defaultMessage: 'Project {project} inherits these options, and the change would make its options contradict each other:', description: 'Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name.' })
+}
 
-/** A problem as text for the window (its message, in the user's language), or its English reason. */
-export const problemShown = (p: WorkflowProblem): Text => problemShownOf(p)
+/** A problem in English (the Assistant's tools, the log); an inheriting project's names it (#1422). */
+export const problemEnglish = (p: WorkflowProblem): string => (p.kind === 'inheritor' ? `${englishText(withValues(IM.inheritor, { project: p.project }))} ${problemText(p.problem)}` : problemText(p))
+
+/** A problem as text for the window (its message, in the user's language), or its English reason; an inheriting project's on two lines. */
+export const problemShown = (p: WorkflowProblem): Text => (p.kind === 'inheritor' ? linesOf([withValues(IM.inheritor, { project: p.project }), problemShownOf(p.problem)]) : problemShownOf(p))
 
 const PRESET_IDS: (PresetId | null)[] = ['solo', 'pair', 'team', 'pairAgent', null]
 const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -188,17 +194,18 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
 }
 
 /** The project's cards in flight now: started this cycle and not Done. */
-async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; title: string }[]> {
+export async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; key: string; title: string }[]> {
   const wf = await workflowFor(ws, project.path)
   if (!wf) return []
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
-  return store
-    .cards()
-    .filter((c) => {
-      const s = wf.state(c)
-      return !!s.started && IN_FLIGHT.has(s.stage)
-    })
-    .map((c) => ({ number: c.id, title: c.title }))
+  const cards = store.cards().filter((c) => {
+    const s = wf.state(c)
+    return !!s.started && IN_FLIGHT.has(s.stage)
+  })
+  // Each named as its own workspace's window names it (its key, else #n): a level's check lists other workspaces' cards
+  // too, whose numbers repeat (#1422, HR5's round 2).
+  const keys = cardKeys(ws, cards.map((c) => c.id))
+  return cards.map((c) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title }))
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */
@@ -226,7 +233,12 @@ export class WorkflowRefused extends HiveError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
  * form as it is now.
  */
-export async function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+  // Checked against the levels as they are now and written in the same turn of workflow writes (#1422).
+  return workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o))
+}
+
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []

@@ -77,6 +77,7 @@
   "board.card.decisionsTip": "Decisões: {n}. {decisions}",
   "board.card.dependsOn": "Depende de {cards}",
   "board.card.expand": "Expandir {card}",
+  "board.card.stageInProject": "Em {project}, esta etapa se chama {stage}",
   "board.card.stalled": "Travado: {why}",
   "board.card.stalledMark": "Travado",
   "board.card.workspace": "espaço de trabalho",
@@ -107,6 +108,7 @@
   "board.columns.expand": "Expandir {column}",
   "board.columns.expandCards": "Expandir todos os cartões",
   "board.columns.expandTip": "Expandir {column}: {description}",
+  "board.columns.mergingTip": "Cartões na fila de merge do Hive. Chegam aqui pela fila depois de aprovados, nunca arrastados; Remover da fila tira um.",
   "board.columns.more": "{column}: mais",
   "board.columns.startLane": "Iniciar raia com estes cartões…",
   "board.context.close": "Fechar",
@@ -810,5 +812,6 @@
   "board.workQueue.stuckFolder": "Pasta",
   "board.workQueue.stuckRef": "{target} está em",
   "board.workQueue.testing": "Testando agora: {step}",
-  "board.workQueue.unreadRef": "não lido"
+  "board.workQueue.unreadRef": "não lido",
+  "board.workflows": "Fluxos de trabalho"
 }
