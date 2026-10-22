@@ -147,9 +147,11 @@ function writeProject(dir, cfg) {
     const c2 = (await inv('tasks:create', { title: 'Gamma lane', project: 'gamma' })).number
     const c3 = (await inv('tasks:create', { title: 'Gamma next', project: 'gamma' })).number
     check('gamma: a card in flight under Git', (await q.intent(h, g1, c1, 'start')).status === 200 && (await startedUnder(c1)) === 'git')
-    // A lane of its own builder (starting a lane starts its agents afresh: G1 keeps its session and token).
+    // A lane of its own builder, registered by it (the hive_lane tool's route): no agent is started again, so G1 keeps
+    // its session and token.
     const gl = await q.agent(fx, h, 'GL', { project: gamma })
-    await inv('lanes:start', gamma, { builder: gl.id, reviewer: gr.id, cards: [c2], name: 'gamma lane' })
+    const lane = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${gl.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'gamma', reviewer: 'GR', cards: [c2], name: 'gamma lane' }) })
+    check('gamma: a lane runs', lane.status === 200, `${lane.status} ${await lane.text().catch(() => '')}`)
     // Again while something holds it a moment (a watcher, the scanner: EPERM under load).
     check('gamma: .git moved away', !!(await until(() => { try { fs.renameSync(path.join(gamma, '.git'), path.join(gamma, 'git-away')); return true } catch { return false } }, HUNG_MS)))
     await inv('workspace:refresh')
