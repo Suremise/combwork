@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { notWatchingAgent, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { laneOrderWait, laneOrderWaitReason, notWatchingAgent, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -136,5 +136,72 @@ describe('a card in Review whose reviewer started, gave no verdict and only watc
     expect(reviewVerdictWaitReason(started(), [], late)).toBeNull()
     // The other review stall (#521) is for a review not started: the two never both apply.
     expect(reviewWaitReason(started({ history: [{ at: at(-1), by: 'HB3 (alpha)', what: 'Moved to Review' }] }), watching, late)).toBeNull()
+  })
+})
+
+describe("a lane's deadlock: its reviewer waits for an earlier card while its builder waits on a later one's review (#1410)", () => {
+  // 22 Oct: HB2 sent #1364 to Review ahead of #1344 (Todo); HR2 kept the lane's order and watched #1344; HB2 watched #1364.
+  const t0 = Date.parse('2026-10-22T02:08:07.437Z')
+  const at = (min: number) => new Date(t0 + min * 60_000).toISOString()
+  const sent = (over: Partial<TaskCard> = {}) => card(1364, { column: 'review', agent: 'b2', history: [{ at: at(0), by: 'HB2 (alpha)', what: 'Moved to Review' }], ...over })
+  const lane = { builder: 'b2', reviewer: 'r2', cards: [{ number: 1384, column: 'passed', movedAt: at(-60) }, { number: 1344, column: 'todo', movedAt: at(-300) }, { number: 1364, column: 'review', movedAt: at(0) }, { number: 1390, column: 'todo', movedAt: at(-300) }] }
+  const hr2 = { name: 'HR2', project: 'alpha', agentId: 'r2', cards: [1344], status: 'watching', watchSince: at(0) }
+  const hb2 = { name: 'HB2', project: 'alpha', agentId: 'b2', cards: [1364], status: 'watching', watchSince: at(0) }
+  it('stalled once the mutual wait has held for the limit, naming the earlier card the reviewer waits for', () => {
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + REVIEW_WAIT_STALL_MS)).toBe('HR2 is waiting for #1344, before #1364 in the lane, while HB2 waits on the review of #1364: each has waited on the other for 15 min.')
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + 5 * 3600_000)).toMatch(/for 5 h\.$/)
+    // The reviewer watching both: it waits for the one still to come, not the one it passed.
+    expect(laneOrderWait(sent(), lane, [{ ...hr2, cards: [1384, 1344] }, hb2], t0 + 3600_000)?.waitsFor.number).toBe(1344)
+  })
+  it('counts from the latest of the arrival in Review, the earlier card\'s last move and both watches (round 1: HR6\'s design review)', () => {
+    // A card in Review for an hour, its reviewer's watch on the earlier card started a minute ago: not yet.
+    const fresh = { ...hr2, watchSince: at(59) }
+    expect(laneOrderWaitReason(sent(), lane, [fresh, hb2], t0 + 60 * 60_000)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [fresh, hb2], t0 + 59 * 60_000 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [fresh, hb2], t0 + 59 * 60_000 + REVIEW_WAIT_STALL_MS)).toMatch(/for 15 min\.$/)
+    // The builder's replacement watch the same way.
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, watchSince: at(50) }], t0 + 60 * 60_000)).toBeNull()
+    // The earlier card moved (back to Todo) five minutes ago: counted from then.
+    const moved = { ...lane, cards: [lane.cards[0], { ...lane.cards[1], movedAt: at(55) }, lane.cards[2], lane.cards[3]] }
+    expect(laneOrderWaitReason(sent(), moved, [hr2, hb2], t0 + 60 * 60_000)).toBeNull()
+    expect(laneOrderWaitReason(sent(), moved, [hr2, hb2], t0 + 55 * 60_000 + REVIEW_WAIT_STALL_MS)).toMatch(/for 15 min\.$/)
+    // Returned for review later: counted from its return.
+    const back = sent({ history: [{ at: at(0), by: 'HB2 (alpha)', what: 'Moved to Review' }, { at: at(1), by: 'HR2 (alpha)', what: 'Started reviewing' }, { at: at(2), by: 'HR2 (alpha)', what: 'Review failed' }, { at: at(40), by: 'HB2 (alpha)', what: 'Returned for review, round 2' }] })
+    expect(laneOrderWaitReason(back, lane, [hr2, hb2], t0 + 50 * 60_000)).toBeNull()
+    expect(laneOrderWaitReason(back, lane, [hr2, hb2], t0 + 40 * 60_000 + REVIEW_WAIT_STALL_MS)).toMatch(/for 15 min\.$/)
+    // A time not known (a watch's start, the earlier card's last move) never makes it look old: not flagged.
+    const day = t0 + 24 * 3600_000
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, watchSince: undefined }, hb2], day)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, watchSince: 'not a time' }], day)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, cards: [lane.cards[0], { ...lane.cards[1], movedAt: null }, lane.cards[2], lane.cards[3]] }, [hr2, hb2], day)).toBeNull()
+  })
+  it('only for a card the reviewer waits for that comes before it in the lane, with both agents only watching', () => {
+    const late = t0 + 3600_000
+    // A later card of the lane, or one not in it: no deadlock (the reviewer is ahead of the builder, or elsewhere).
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, cards: [1390] }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, cards: [77] }, hb2], late)).toBeNull()
+    // Either side at work (or its state unknown): it may be about to move.
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, status: 'working' }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, status: 'working' }], late)).toBeNull()
+    // Other agents with the same watches don't stand in for the lane's builder and reviewer, nor another project's.
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, agentId: 'r9' }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, agentId: 'b9' }], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, project: 'beta' }, hb2], late)).toBeNull()
+  })
+  it('gone once either side resumes or the watches align; not while reviewed, blocked, elsewhere or without a lane', () => {
+    const late = t0 + 3600_000
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, cards: [1344, 1364] }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, cards: [lane.cards[0], { number: 1344, column: 'review', movedAt: at(1) }, lane.cards[2], lane.cards[3]] }, [hr2, hb2], late)).toBeNull()
+    // The builder at work on the card the reviewer waits for, or not watching at all.
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, cards: [1344] }], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), null, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, reviewer: null }, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, cards: lane.cards.filter((c) => c.number !== 1364) }, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ review: { agent: 'r2', agentName: 'HR2', since: '' } as never }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ blocked: 'Asked the user' }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ archived: true }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ column: 'doing' }), lane, [hr2, hb2], late)).toBeNull()
   })
 })

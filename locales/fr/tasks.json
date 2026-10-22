@@ -35,7 +35,7 @@
   "tasks.error.labelFieldList": "{field} doit être une liste",
   "tasks.error.labelsAddedAndRemoved": "Une étiquette ne peut pas être à la fois ajoutée et retirée : {labels}.",
   "tasks.error.labelsList": "labels doit être une liste",
-  "tasks.error.labelsMixed": "labels remplace les étiquettes d’une carte : utilisez-le seul, ou addLabels et removeLabels pour ne changer que celles-là.",
+  "tasks.error.labelsMixed": "labels remplace les étiquettes d’une carte : utilise-le seul, ou addLabels et removeLabels pour ne changer que celles-là.",
   "tasks.error.needsTitle": "Une carte a besoin d’un titre.",
   "tasks.error.noCard": "Il n’y a pas de carte #{n}.",
   "tasks.error.noKindProposal": "Aucun type n’est proposé pour #{n} : son type est {kind}.",

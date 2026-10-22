@@ -2655,6 +2655,10 @@
     "defaultMessage": "You are merging",
     "description": "Who holds the merge slot, at the start of a line: the user (merging from the window)."
   },
+  "board.stall.hintLaneOrder": {
+    "defaultMessage": "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.",
+    "description": "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive."
+  },
   "board.stall.hintNobody": {
     "defaultMessage": "Nobody is working on it. Start it again (on this agent or another), or move it back to Todo.",
     "description": "Tooltip on a card stalled in Doing: no agent is working on it. Todo is a board column."
@@ -2678,6 +2682,10 @@
   "board.stall.hintWakeUntaken": {
     "defaultMessage": "Hive typed this card's wake into that agent, but its CLI didn't send it. Show the agent, click its terminal and press Enter.",
     "description": "Tooltip on a stalled card: Hive typed the line that wakes the agent into its terminal, and the agent's CLI never sent it (it waits in the agent's prompt)."
+  },
+  "board.stalled.laneOrderWait": {
+    "defaultMessage": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
+    "description": "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card that comes before this one in the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long both have been waiting so (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.noAgent": {
     "defaultMessage": "In Doing, but no agent has it.",
