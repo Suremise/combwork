@@ -42,7 +42,8 @@ import { readyFor } from './readiness'
 import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { getTask } from './tasks'
-import { workspaceFor } from './workspace'
+import { workspaceFor, WorkspaceService } from './workspace'
+import { fencedOut } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
 
@@ -203,6 +204,15 @@ async function hostPlace(host: string): Promise<{ workspace: string; scope: stri
   const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, HIVE_DIR, 'project.json'), null))?.id
   return { workspace: parent, scope: typeof saved === 'string' && saved ? saved : `folder:${basename(h).toLowerCase()}` }
 }
+/** The workspace a host's deliveries are kept in (hostPlace's, without its scope). */
+function hostWorkspace(host: string): string {
+  const h = resolve(host)
+  const parent = dirname(h)
+  return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR ? dirname(parent) : parent
+}
+/** Why a host's workspace is closed (#1391: a window closed it and none has opened it again, #1379's fence); null while open. */
+const hostFenced = (host: string): Error | null => fencedOut(join(hostWorkspace(host), HIVE_DIR))
+const hostClosed = (host: string): boolean => !!hostFenced(host)
 const nowIso = (): string => new Date().toISOString()
 
 /** Hive couldn't save a change, so it wasn't made. */
@@ -355,6 +365,9 @@ export function load(host: string): Promise<Store> {
   if (had) return Promise.resolve(had)
   const going = loading.get(k)
   if (going) return going
+  // A closed workspace's deliveries aren't read (#1391): restored when a window opens it again.
+  const shut = hostFenced(host)
+  if (shut) return Promise.reject(shut)
   const p = (async () => {
     await beforeRead?.()
     const place = await hostPlace(host)
@@ -375,6 +388,8 @@ export function load(host: string): Promise<Store> {
         if (!workspaceFor(host)) return store
         if (tries < 3) continue
       }
+      // Its workspace closed while it was read (#1391): kept by nobody, so no tick works on it.
+      if (hostClosed(host)) return store
       stores.set(k, store)
       showAll(store)
       // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
@@ -1255,6 +1270,8 @@ const trying = new Map<string, Promise<boolean>>()
 
 /** Offers an agent's waiting deliveries now if it can take a line (one try at a time per agent); `only`: that one alone. Whether a line was typed. */
 export function offerNow(host: string, agentId: string, only?: string): Promise<boolean> {
+  // Its workspace closed: nothing is offered there until a window opens it again (#1391).
+  if (hostClosed(host)) return Promise.resolve(false)
   const k = `${keyOf(host)}#${agentId}`
   const going = trying.get(k)
   if (going) return going.then(() => false)
@@ -1530,6 +1547,8 @@ export function initDeliveries(): void {
     }
     if (e.type !== 'session-status') return
     const { projectPath, agentId, status } = e.state
+    // A session ending as its workspace closes: its deliveries wait in the database for the next opening (#1391).
+    if (hostClosed(projectPath)) return
     void load(projectPath)
       .then((store) => {
         // A doorbell let pass, a launch ended: what was offered rings once more, or is uncertain.
@@ -1556,6 +1575,19 @@ export function initDeliveries(): void {
 // waited no agent could start, so none waits for an offer.
 onDbReplaced((workspacePath) => {
   for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === workspacePath.toLowerCase()) stores.delete(k)
+})
+
+// A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
+// leased its closed hive.db at each change. They stay in the database and are restored when a window opens it again. A
+// save already under way holds its store and lease, and finishes.
+WorkspaceService.closingListeners.add((workspacePath) => {
+  const ws = workspacePath.toLowerCase()
+  for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === ws) stores.delete(k)
+  for (const [k, t] of retrying)
+    if (hostWorkspace(k.slice(0, k.lastIndexOf('#'))).toLowerCase() === ws) {
+      clearTimeout(t)
+      retrying.delete(k)
+    }
 })
 
 // Sessions give their own lines through the service (#649: a lock's go-ahead, the carry-on after a sign-in, a handover's
