@@ -14,6 +14,8 @@
   "workflow.forYou.newDecision": "O cartão {card} tem uma nova decisão: você revisa de novo?",
   "workflow.forYou.okBefore": "O cartão {card} está aprovado: pode fazer o merge?",
   "workflow.forYou.passedReview": "A revisão do cartão {card} foi bem-sucedida: você aprova?",
+  "workflow.forYou.queueAdvance": "O cartão {card} está testado e pronto para o merge: atualizar {target} em {folder} agora?",
+  "workflow.forYou.queueStuck": "O merge de {card} em {target} parou no meio do caminho em {folder}, e o Hive não muda mais nada lá. {how, select, both {Para concluí-lo, execute {finish} (PowerShell) em {project}; para desfazê-lo, execute {undo} (PowerShell) em {folder}.} finish {Para concluí-lo, execute {finish} (PowerShell) em {folder}.} undo {Para desfazê-lo, execute {undo} (PowerShell) em {folder}.} other {Os arquivos não estão nem como antes nem como depois do merge: corrija-os à mão.}} Depois responda aqui, e a fila verifica de novo.",
   "workflow.forYou.review": "O cartão {card} aguarda a sua revisão",
   "workflow.forYou.roundLimit": "O cartão {card} foi reprovado em {rounds, plural, one {# revisão} other {# revisões}}: continuar com mais rodadas, dividi-lo, aceitá-lo com continuações ou assumi-lo você mesmo?",
   "workflow.forYouKind": "{kind, select, approve {Aprovar} decide {Decidir} test {Testar} signIn {Entrar} other {Outro}}",

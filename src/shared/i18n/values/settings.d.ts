@@ -178,6 +178,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.prompt.rawCardStart.title': undefined
   'settings.advanced.hive.queue.checkMinutes.desc': undefined
   'settings.advanced.hive.queue.checkMinutes.title': undefined
+  'settings.advanced.hive.queue.checkedOutTarget.ask': undefined
+  'settings.advanced.hive.queue.checkedOutTarget.auto': undefined
+  'settings.advanced.hive.queue.checkedOutTarget.desc': undefined
+  'settings.advanced.hive.queue.checkedOutTarget.title': undefined
   'settings.advanced.hive.queue.networkCodes.desc': undefined
   'settings.advanced.hive.queue.networkCodes.title': undefined
   'settings.advanced.hive.queue.signSeconds.desc': undefined

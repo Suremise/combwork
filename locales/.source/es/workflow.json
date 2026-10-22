@@ -14,6 +14,8 @@
   "workflow.forYou.newDecision": "{card} has a new decision: your review again?",
   "workflow.forYou.okBefore": "{card} is approved: OK to merge?",
   "workflow.forYou.passedReview": "{card} passed review: your OK?",
+  "workflow.forYou.queueAdvance": "{card} is tested and ready to merge: update {target} in {folder} now?",
+  "workflow.forYou.queueStuck": "{card}'s merge into {target} stopped part way in {folder}, and Hive changes nothing more there. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
   "workflow.forYou.review": "{card} waits for your review",
   "workflow.forYou.roundLimit": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
   "workflow.forYouKind": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",

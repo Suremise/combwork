@@ -96,32 +96,41 @@ describe('the merge queue in the app (#1348)', () => {
     expect(await release.recover('release')).toEqual([{ card: b.card.key, entry: expect.any(String), outcome: 'rerun' }])
   })
 
-  it('a target checked out in a folder pauses checkedOut (until #1351), naming the folder; nothing is touched', async () => {
+  it('a target checked out in a folder, Ask each time: paused for the Approve in For you, nothing touched; approved, merged there', async () => {
     const e = team()
     const { card } = await queued(e)
     const before = head(e)
-    const [o] = await e.queue({ pauseCheckedOut: true }).drain('main')
-    expect(o).toMatchObject({ outcome: 'paused', reason: 'checkedOut' })
-    expect(e.store.queuePause('main')).toMatchObject({ reason: 'checkedOut', files: [expect.stringContaining('project')] })
+    const q = e.queue({ checkedOutTarget: () => 'ask' })
+    const [o] = await q.drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'approval' })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'approval', files: [expect.stringContaining('project')] })
     expect(head(e)).toBe(before)
     expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    const [ask] = e.wf.state(card).requests
+    expect(ask).toMatchObject({ kind: 'approve', gate: 'queueAdvance', revision: before, requestText: { id: 'workflow.forYou.queueAdvance', values: { card: card.key, target: 'main' } } })
+    moved(await e.wf.answer(card.key, ask.request, 'approved'))
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated', retests: 0 })
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(head(e)).not.toBe(before)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
   })
 
-  it('the target checked out while the queue waited for the repository lock: paused checkedOut, nothing advanced or touched', async () => {
+  it('the target checked out while the queue waited for the repository lock: looked at again, and advanced the checked-out way', async () => {
     const e = team()
     detach(e)
     const { card } = await queued(e)
     const before = head(e)
+    let once = false
     const q = e.queue({
-      pauseCheckedOut: true,
       lock: (fn) => {
-        sh(e.project, 'checkout', '-q', 'main')
+        if (!once) sh(e.project, 'checkout', '-q', 'main')
+        once = true
         return fn()
       }
     })
-    expect(await q.drain('main')).toMatchObject([{ outcome: 'paused', reason: 'checkedOut' }])
-    expect(head(e)).toBe(before)
-    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    expect(await q.drain('main')).toMatchObject([{ outcome: 'integrated', retests: 1 }])
+    expect(head(e)).not.toBe(before)
+    expect(e.kinds(card.id).filter((k) => k === 'IntegrationPhase')).toHaveLength(2)
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
   })
 

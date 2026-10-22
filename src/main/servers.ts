@@ -1786,9 +1786,10 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
   throw new HttpError(400, `target is required: the branch the queue merges into${views.length ? ` (${views.map((x) => x.target).join(', ')})` : ''}`)
 }
 
-/** A queue as the Agent API gives it: no folder, and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, ...v }: QueueView): QueuePublic => ({
+/** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
+const publicQueue = ({ projectPath: _p, paused, ...v }: QueueView): QueuePublic => ({
   ...v,
+  paused: paused ? (({ stuck, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
   recent: v.recent.map(({ log: output, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 

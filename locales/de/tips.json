@@ -206,6 +206,8 @@
   "tips.mcpPerProject.title": "MCP-Server nur dort, wo sie gebraucht werden",
   "tips.memorySnapshot.text": "Schalte Einstellungen → Erweitert → Speicherabbild speichern, wenn Hive bald der Speicher ausgeht ein, um herauszufinden, was ihn gefüllt hat. Abbilder können Gigabyte groß sein, enthalten, was Hive im Speicher hatte (Kartentexte, Transkripte, möglicherweise Tokens), und bleiben auf diesem PC.",
   "tips.memorySnapshot.title": "Wurde Hive geschlossen, weil der Speicher ausging?",
+  "tips.mergeQueueFolder.text": "Wenn die Merge-Warteschlange in einen Branch mergt, der in einem Ordner ausgecheckt ist (etwa main im Projektordner), aktualisiert sie auch den Ordner, hält aber an, statt eine Datei anzufassen, die du gerade änderst. Unter Einstellungen → Erweitert kannst du sie vorher unter „Für dich“ fragen lassen.",
+  "tips.mergeQueueFolder.title": "In den Ordner mergen, in dem du arbeitest",
   "tips.mergeSlot.text": "Werden mehrere Agenten gleichzeitig fertig, holt sich jeder den Merge-Slot des Projekts, bevor er main hineinmergt, prüft und mergt, sodass niemandes Prüfungen zweimal laufen müssen. Wer ihn hat und wer wartet, zeigen die Übersicht und das Fortschrittspanel.",
   "tips.mergeSlot.title": "Agenten mergen der Reihe nach",
   "tips.messageReceipts.text": "Jede Nachricht, die der Assistent einem Agenten hinterlässt, hat eine ID und bleibt erhalten, auch über einen Neustart hinweg: Sie gilt als empfangen, sobald der Agent seinen Posteingang liest, und als bestätigt, sobald er danach gehandelt hat. Eine, die nach {minutes, plural, one {# Minute} other {# Minuten}} nicht bestätigt ist, erscheint in seinem Bereich als überfällig (✉).",
