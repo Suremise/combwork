@@ -351,6 +351,8 @@
   "tips.workflowOptions.title": "Choose how cards get to Done",
   "tips.workspaceMoved.text": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",
   "tips.workspaceMoved.title": "Move a workspace without losing its agents",
+  "tips.workspaceMovedDefender.text": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
+  "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.worktreeReuse.text": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
   "tips.worktreeReuse.title": "A kept worktree is used again",
   "tips.worktrees.text": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",

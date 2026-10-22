@@ -1,5 +1,5 @@
 import type { AgentLeftovers } from './agentProcesses'
-import type { AntivirusStatus, AvAction, AvChangeResult, AvSuggestionReply } from './antivirus'
+import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
@@ -122,6 +122,7 @@ import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
+import type { QueueResumed, QueueView } from './workflow/queue'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -260,6 +261,8 @@ export interface HiveRequests {
   'workspace:movePlan': (opts?: MoveOptions) => MovePlan | null
   /** Repairs it (refused while agents run): worktrees, session folders, the CLIs' per-path data (copied), Open Recent. */
   'workspace:moveRepair': (opts?: MoveOptions) => MoveReport
+  /** Defender and the moved workspace's old and new folders (#1302), for Repair's dialog; null when the workspace didn't move. */
+  'workspace:moveDefender': () => AvMovePlan | null
   /** Locate…: a folder picker for an agent's worktree that wasn't found; the folder, or null when cancelled. */
   'workspace:moveLocate': (projectPath: string, agentId: string) => string | null
 
@@ -283,6 +286,19 @@ export interface HiveRequests {
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
   'workflow:presetsNoticeSaid': () => void
+  /**
+   * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused. Each
+   * change comes as a `queue-changed` event.
+   */
+  'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
+  'queue:pause': (projectPath: string, target: string) => QueueView
+  /** Resume: clears the pause once its cause, where Hive can see it, is gone (`resumed`); else the queue is paused again, saying why. */
+  'queue:resume': (projectPath: string, target: string) => QueueResumed
+  /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
+  'queue:remove': (n: number, reason?: string) => TaskCard
+  /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
+  'queue:retry': (n: number, reason?: string) => TaskCard
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */

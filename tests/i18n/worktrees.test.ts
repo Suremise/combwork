@@ -4,7 +4,7 @@
 // Agent API (`notReused`) and data for the window (`notReusedText`). Reasons and a merge's errors only the window reads
 // (a check, a removal, a merge) are in its language.
 import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -18,7 +18,7 @@ const { englishText, shownText } = await import('../../src/shared/advanced')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
 const wt = await import('../../src/main/worktrees')
 const agents = await import('../../src/main/projectAgents')
-const { recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
+const { PruneBlocked, recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
 const { shownError, windowError } = await import('../../src/main/hiveError')
 const { addedForAgents, apiErrorReply } = await import('../../src/main/servers')
 
@@ -152,6 +152,33 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     expect(check).toMatchObject({ removable: false, ahead: 1, dirty: 1, reason: '1 Commit nicht in main gemergt und 1 nicht committete Datei' })
     setLanguage('en', {})
     expect((await wt.worktreeCheck(proj, { ...t, base: 'main' })).reason).toBe('1 commit not merged into main and 1 uncommitted file')
+  })
+
+  it("a recreate git's prune refuses carries the worktrees git named, not those Hive thinks missing (#1313)", async () => {
+    // Third's folder is gone (to recreate); Second, missing to Hive, has no git registration left; an unmanaged worktree
+    // made outside Hive lost its folder: only that one is what git's prune would forget.
+    const third = join(treesRoot, 'third')
+    const ext = join(base, 'external-blocker')
+    await wt.createWorktree(proj, third, 'hive/third', 'main')
+    git(proj, 'worktree', 'add', '-q', '-b', 'ext', ext)
+    const before = await run(() => w.projectConfig(proj))
+    await run(() =>
+      w.mutateProjectConfig(proj, (c) => ({
+        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'hive/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'hive/third', base: 'main' } }]
+      }))
+    )
+    try {
+      rmSync(third, { recursive: true, force: true })
+      rmSync(ext, { recursive: true, force: true })
+      const e = await caught(run(() => recreateWorktree(proj, 'a3')))
+      expect(e).toBeInstanceOf(PruneBlocked)
+      expect((e as InstanceType<typeof PruneBlocked>).blockers.map((p) => p.toLowerCase())).toEqual([ext.toLowerCase()])
+      expect(e.message).toMatch(/which would also drop git's link to .*external-blocker \(missing too\)\. Locate, recreate or remove that worktree first\./)
+    } finally {
+      await run(() => w.mutateProjectConfig(proj, () => ({ agents: before.agents })))
+      git(proj, 'worktree', 'prune')
+      git(proj, 'branch', '-D', 'ext', 'hive/third')
+    }
   })
 
   it("a merge's errors are the window's, in its language", async () => {

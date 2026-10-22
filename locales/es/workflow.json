@@ -188,6 +188,8 @@
   "workflow.refused.move.useIntent.next": "Usa en su lugar la intención {intent}.",
   "workflow.refused.platform.unknown.message": "{card}: Hive no pudo leer {what}, así que no se puede comprobar la regla {rule}.",
   "workflow.refused.platform.unknown.next": "Revisa Configuración de agentes o la carpeta y vuelve a intentarlo.",
+  "workflow.refused.queue.advancing.message": "La tarjeta {card} se está fusionando ahora en {target}: ya no se puede quitar de la cola de fusión.",
+  "workflow.refused.queue.advancing.next": "Espera a que termine la fusión. Si el cambio no se quiere, reviértelo en {target}.",
   "workflow.refused.requeue.allowed.change": "Reintentar la fusión, en la cola de fusión, la vuelve a intentar una vez.",
   "workflow.refused.requeue.allowed.message": "La tarjeta {card} en la versión {revision} no puede volver a la cola de fusión sin cambios: {why}",
   "workflow.refused.requeue.allowed.next": "Corrige el fallo, haz commit y envía la nueva versión.",

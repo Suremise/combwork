@@ -188,6 +188,8 @@
   "workflow.refused.move.useIntent.next": "代わりに{intent}を使ってください。",
   "workflow.refused.platform.unknown.message": "{card}：Hiveは{what}を読み取れなかったため、ルール「{rule}」を確認できません。",
   "workflow.refused.platform.unknown.next": "「エージェントのセットアップ」またはフォルダーを確認してから、もう一度試してください。",
+  "workflow.refused.queue.advancing.message": "{card}は今{target}にマージされています。もうマージキューから外せません。",
+  "workflow.refused.queue.advancing.next": "マージが終わるまで待ってください。変更が不要なら、{target}で元に戻してください。",
   "workflow.refused.requeue.allowed.change": "マージキューの「マージを再試行」で、1回だけ再試行できます。",
   "workflow.refused.requeue.allowed.message": "{card}のリビジョン{revision}は、変更なしではマージキューに戻せません：{why}",
   "workflow.refused.requeue.allowed.next": "失敗を修正してコミットし、新しいリビジョンを提出してください。",

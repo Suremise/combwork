@@ -125,7 +125,9 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(lostLines({ path: 'D:/x', branch: null, into: null, ahead: 1, dirty: 2 })).toEqual(['1 commit on no branch (only its detached HEAD has it)', '2 uncommitted files in D:/x', 'the files git ignores in its folder (build output, copied .env files)'])
     expect(templateWorktreesHint({ unusedWorktrees: [{ project: 'p', count: 3 }] }, () => 'hive')?.title).toBe('3 unused worktrees in hive')
     expect(templateWorktreesHint({ unusedWorktrees: [{ project: 'p', count: 1 }, { project: 'q', count: 2 }] }, () => 'hive')?.title).toBe('3 unused worktrees in 2 projects')
-    expect(CHANGES_ABOUT.unused('hive', null)).toMatch(/^Worktrees no agent of hive works in: .*or give it to an agent\.$/)
+    expect(CHANGES_ABOUT.unused('hive')).toBe('Worktrees no agent of hive works in: open one to see its changes and merge them, or give it to an agent.')
+    expect(CHANGES_ABOUT.unusedTip('main')).toMatch(/^Kept when their agent was removed, .*Those merged into main and clean can go with their branches; the others hold work that is nowhere else\.$/)
+    expect(CHANGES_ABOUT.unusedTip(null)).not.toMatch(/merged into/)
   })
 
   it("antivirus: a change's outcome, and the folders", () => {

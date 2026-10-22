@@ -8,6 +8,7 @@ import { confirm, giveWorktreeToAgent, notify, showUnusedWorktrees, useStore } f
 import { openGuideAt } from '../tips'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, InfoTip } from './ui'
+import { ItemTable, ShortPath, type ItemRow } from './ItemTable'
 import { useStorageRequests } from './Storage'
 import { msg, tr } from '@shared/i18n'
 
@@ -42,9 +43,13 @@ const M = {
   checking: msg({ id: 'workspace.unusedList.checking', defaultMessage: 'Checking…', description: 'Remove anyway while it checks the worktree.' }),
   removeAnywayButton: msg({ id: 'workspace.unusedList.removeAnywayButton', defaultMessage: 'Remove anyway…', description: "An unused worktree's button when it holds work." }),
   heading: msg({ id: 'workspace.unusedList.heading', defaultMessage: 'Unused worktrees', description: "The Changes tab's Unused worktrees page: its heading (a count follows)." }),
-  headingTip: msg({ id: 'workspace.unusedList.headingTip', defaultMessage: 'Worktrees no agent of this project uses right now, e.g. from another template (loading that template gives them back to its agents).', description: 'Tooltip on Unused worktrees.' }),
   learnMore: msg({ id: 'workspace.unusedList.learnMore', defaultMessage: 'Learn more', description: 'Unused worktrees: opens the user guide there.' }),
   review: msg({ id: 'workspace.unusedList.review', defaultMessage: 'Review', description: "The Changes tab's notice on unused worktrees holding work: shows them." }),
+  colBranch: msg({ id: 'workspace.unusedList.colBranch', defaultMessage: 'Branch', description: "Unused worktrees' table (#1314), a column heading: the worktree's branch." }),
+  colState: msg({ id: 'workspace.unusedList.colState', defaultMessage: 'State', description: "Unused worktrees' table, a column heading: merged and clean, or the work it holds, and who made it." }),
+  colFolder: msg({ id: 'workspace.unusedList.colFolder', defaultMessage: 'Folder', description: "Unused worktrees' table, a column heading: the worktree's folder (its name; the full path on hover)." }),
+  colLast: msg({ id: 'workspace.unusedList.colLast', defaultMessage: 'Last commit', description: "Unused worktrees' table, a column heading: its branch's last commit, when and its subject." }),
+  colSize: msg({ id: 'workspace.unusedList.colSize', defaultMessage: 'Size', description: "Unused worktrees' table, a column heading: the folder's size on disk." }),
   reviewInChanges: msg({ id: 'workspace.unusedList.reviewInChanges', defaultMessage: 'Review in Changes', description: "The Overview's line on unused worktrees: shows them in the Git tab's Changes." })
 }
 
@@ -160,7 +165,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     const ok = await confirm({
       title: tr(M.removeMergedTitle, { count: merged.length }),
       message: tr(M.removeMergedMessage, { into }),
-      list: merged.map((w) => `${w.branch} — ${w.path}`),
+      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong title={w.branch ?? undefined}>{w.branch ?? tr(M.detached)}</strong>, text: w.branch ?? tr(M.detached), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
       confirmLabel: tr(M.remove),
       busyLabel: tr(M.removing),
       run: async () => {
@@ -238,54 +243,72 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
           </button>
         )}
       </UnusedHeading>
-      {list.map((w) => {
-        const size = sizes?.[w.path.toLowerCase()]
-        return (
-          <div key={w.path} className="unused-wt" data-path={w.path}>
-            <Icon name="git-branch" />
-            <div className="grow">
-              <div>
-                <strong>{w.branch ?? tr(M.detached)}</strong>{' '}
-                <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')}>{unusedState(w)}</span>{' '}
-                {w.origin && (
-                  <span className={cx('badge', w.origin.madeBy === 'other' && 'accent')} data-origin={w.origin.madeBy}>
-                    {originLabel(w)}
+      <ItemTable
+        first={M.colBranch}
+        columns={[{ label: M.colState }, { label: M.colFolder }, { label: M.colLast }, { label: M.colSize }]}
+        rows={list.map((w): ItemRow => {
+          const size = sizes?.[w.path.toLowerCase()]
+          const last = w.lastCommit ? tr(msg({ id: 'workspace.unusedList.lastCommit', defaultMessage: '{when}: {subject}', description: "An unused worktree's last commit: when it was made ({when}: \"2 days ago\") and its subject line. Your language's punctuation goes around the colon." }), { when: timeAgo(w.lastCommit.at), subject: w.lastCommit.subject }) : ''
+          const sized = size === undefined ? (sizes ? '' : tr(M.measuring)) : formatSize(size)
+          return {
+            key: w.path,
+            className: 'unused-wt',
+            data: { path: w.path },
+            item: (
+              <span className="unused-wt-branch">
+                <Icon name="git-branch" /> <strong title={w.branch ?? undefined}>{w.branch ?? tr(M.detached)}</strong>
+              </span>
+            ),
+            text: w.branch ?? tr(M.detached),
+            cells: [
+              {
+                content: (
+                  <span className="unused-wt-badges">
+                    <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')} title={unusedState(w)}>
+                      {unusedState(w)}
+                    </span>
+                    {w.origin && (
+                      <span className={cx('badge', w.origin.madeBy === 'other' && 'accent')} data-origin={w.origin.madeBy} title={originLabel(w)}>
+                        {originLabel(w)}
+                      </span>
+                    )}
                   </span>
-                )}
-              </div>
-              <div className="muted mono" style={{ fontSize: 11 }}>
-                {w.path}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {[w.lastCommit ? tr(msg({ id: 'workspace.unusedList.lastCommit', defaultMessage: '{when}: {subject}', description: "An unused worktree's last commit: when it was made ({when}: \"2 days ago\") and its subject line. Your language's punctuation goes around the colon." }), { when: timeAgo(w.lastCommit.at), subject: w.lastCommit.subject }) : '', size === undefined ? (sizes ? '' : tr(M.measuring)) : formatSize(size)].filter(Boolean).join(' · ')}
-              </div>
-            </div>
-            <div className="flex">
-              {w.branch && (
-                <button className="btn small subtle" title={tr(M.openTip, { branch: w.branch, work: holdsWork(w) ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
-                  {tr(M.open)}
-                </button>
-              )}
-              {w.check.removable ? (
-                <BusyButton className="btn small" busy={busy === w.path} busyLabel={tr(M.removing)} disabled={!!busy} onClick={() => void removeOne(w)}>
-                  {tr(M.remove)}
-                </BusyButton>
-              ) : (
-                <>
-                  <button className="btn small" onClick={() => giveWorktreeToAgent(project.path, w.path)}>
-                    {tr(M.give)}
+                ),
+                text: [unusedState(w), originLabel(w)].filter(Boolean).join(' · ')
+              },
+              { content: <ShortPath path={w.path} className="muted" />, text: w.path },
+              { content: <span className="faint" title={last || undefined}>{last}</span>, text: last, className: 'unused-wt-last' },
+              { content: <span className="faint">{sized}</span>, text: sized, className: 'unused-wt-size' }
+            ],
+            actions: (
+              <>
+                {w.branch && (
+                  <button className="btn small subtle" title={tr(M.openTip, { branch: w.branch, work: holdsWork(w) ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
+                    {tr(M.open)}
                   </button>
-                  {lostByRemoving(w) && (
-                    <BusyButton className="btn small danger-text" busy={busy === w.path} busyLabel={tr(M.checking)} disabled={!!busy} onClick={() => void removeAnyway(w)}>
-                      {tr(M.removeAnywayButton)}
-                    </BusyButton>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )
-      })}
+                )}
+                {w.check.removable ? (
+                  <BusyButton className="btn small" busy={busy === w.path} busyLabel={tr(M.removing)} disabled={!!busy} onClick={() => void removeOne(w)}>
+                    {tr(M.remove)}
+                  </BusyButton>
+                ) : (
+                  <>
+                    <button className="btn small" onClick={() => giveWorktreeToAgent(project.path, w.path)}>
+                      {tr(M.give)}
+                    </button>
+                    {lostByRemoving(w) && (
+                      <BusyButton className="btn small danger-text" busy={busy === w.path} busyLabel={tr(M.checking)} disabled={!!busy} onClick={() => void removeAnyway(w)}>
+                        {tr(M.removeAnywayButton)}
+                      </BusyButton>
+                    )}
+                  </>
+                )}
+              </>
+            )
+          }
+        })}
+        className={cx(/* i18n-ignore: class names */ 'unused-wt-table', list.some((w) => !w.check.removable && lostByRemoving(w)) && 'has-work')}
+      />
     </div>
   )
 }
@@ -299,7 +322,7 @@ export function UnusedHeading({ project, count, into, children }: { project: Pro
     <>
       <h2 className="section" id="unused-worktrees">
         <span className="unused-title">{tr(M.heading)}</span> {count !== undefined && <span className="badge">{count}</span>}
-        <InfoTip text={tr(M.headingTip)} />
+        <InfoTip text={CHANGES_ABOUT.unusedTip(into ?? null)} />
         <div className="grow" />
         {children}
         <button className="btn small subtle" onClick={() => openGuideAt(UNUSED_WORKTREES_GUIDE)}>
@@ -307,7 +330,7 @@ export function UnusedHeading({ project, count, into, children }: { project: Pro
         </button>
       </h2>
       <p className="hint changes-about" data-about="unused">
-        {CHANGES_ABOUT.unused(project.name, into ?? null)}
+        {CHANGES_ABOUT.unused(project.name)}
       </p>
     </>
   )

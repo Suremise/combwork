@@ -6,7 +6,7 @@ import { basename, join, resolve } from 'path'
 import { appendFileSync } from 'original-fs'
 import { mkdir, readFile, realpath, rm, stat } from 'original-fs/promises'
 import { app } from 'electron'
-import { changeOutcome, covered, emptyStatus, folderPlan, listed, nextOffer, normPath, offerOf, parseProbe, REMIND_MS, remindAtOf, statusOf, testsEligible, type AntivirusStatus, type AvAction, type AvChangeResult, type AvPathKind, type AvSuggestionReply } from '../shared/antivirus'
+import { changeOutcome, covered, defenderMovePlan, emptyStatus, folderPlan, listed, nextOffer, normPath, offerOf, parseProbe, REMIND_MS, remindAtOf, statusOf, testsEligible, type AntivirusStatus, type AvAction, type AvChangeResult, type AvMovePlan, type AvPathKind, type AvSuggestionReply } from '../shared/antivirus'
 import { config } from './config'
 import { createLogger, userText } from './logger'
 import { worktreesRoot } from './worktrees'
@@ -78,7 +78,7 @@ ConvertTo-Json -InputObject $r -Compress -Depth 4
  * takes only exact entries that are there, so a parent someone else added is never touched. It then reads the list
  * again, and each drive's Dev Drive state, and writes all of it to `output`.
  */
-export function elevatedScript(action: AvAction, paths: string[], drives: string[], output: string): string {
+export function elevatedScript(action: AvAction, paths: string[], drives: string[], output: string, remove: string[] = []): string {
   return `
 $ErrorActionPreference = 'Stop'
 $out = @{ ok = $false; listed = $false; requested = @() }
@@ -94,6 +94,12 @@ try {
   if (-not (Readable $before)) { throw "Defender's exclusions couldn't be read even with administrator rights, so nothing was changed." }
   if ($action -eq 'add') { $need = @($paths | Where-Object { -not (Covered $_ $before) }); $out.requested = $need; if ($need.Count) { Add-MpPreference -ExclusionPath $need } }
   elseif ($action -eq 'remove') { $need = @($paths | Where-Object { Listed $_ $before }); $out.requested = $need; if ($need.Count) { Remove-MpPreference -ExclusionPath $need } }
+  elseif ($action -eq 'move') {
+    $remove = @(${remove.map(psQuote).join(', ')})
+    $rm = @($remove | Where-Object { Listed $_ $before }); $out.removing = $rm; if ($rm.Count) { Remove-MpPreference -ExclusionPath $rm }
+    $left = @($before | Where-Object { -not (Listed $_ $rm) })
+    $need = @($paths | Where-Object { -not (Covered $_ $left) }); $out.requested = $need; if ($need.Count) { Add-MpPreference -ExclusionPath $need }
+  }
   $out.ok = $true
 } catch { $out.error = $_.Exception.Message }
 try { $after = @((Get-MpPreference).ExclusionPath | Where-Object { $_ }); if (Readable $after) { $out.exclusions = $after; $out.listed = $true } } catch { $out.listError = $_.Exception.Message }
@@ -403,9 +409,50 @@ export async function applyAntivirus(id: string): Promise<{ result: AvChangeResu
   return { result, status }
 }
 
-async function elevated(action: AvAction, paths: string[], drives: string[]): Promise<AvChangeResult> {
+/** A moved workspace's old folders, as Hive kept them: where it was, and its worktrees folder beside it then. */
+const oldFolders = (from: string): string[] => [resolve(from), worktreesRoot(resolve(from))]
+
+/**
+ * Defender and a workspace moved from `from` (#1302): the old folders and the new, with whether Defender skips each,
+ * and what Repair would move. Read fresh, never cached (the old folders aren't the workspace's set); null without a
+ * workspace. For Repair's dialog, which asks for it on its own: the probe is too slow to hold up the plan.
+ */
+export async function moveDefenderPlan(w: WorkspaceService, from: string): Promise<AvMovePlan | null> {
+  const root = w.path
+  if (!root) return null
+  const old = oldFolders(from)
+  const folders = await workspaceFolders(w)
+  const status = await probe(root, [...folders, { path: old[0], kind: 'workspace' }, { path: old[1], kind: 'worktrees' }])
+  return defenderMovePlan(status, old)
+}
+
+/**
+ * Moves Hive's exclusions from the old folders to the new ones (#1302), in one elevated PowerShell (one UAC prompt):
+ * the plan worked out again now, so only what is true now is changed (exactly Hive's old entries; only the new folders
+ * Hive may offer). Null when there is nothing of Hive's to move. What Hive added is remembered from what Defender lists
+ * afterwards, as for Add and Remove.
+ */
+export async function moveExclusions(w: WorkspaceService, from: string): Promise<AvChangeResult | null> {
+  const plan = await moveDefenderPlan(w, from)
+  if (!plan || plan.scan !== 'defender' || !plan.remove.length) return null
+  log.info(`antivirus move: remove ${plan.remove.map((p) => userText(p)).join(', ')}; add ${plan.add.map((p) => userText(p)).join(', ') || '(none)'}`)
+  const result = await elevated('move', plan.add, drivesOf([...plan.add, ...plan.now.map((p) => p.path)]), plan.remove)
+  config.update((c) => {
+    const a = { ...c.antivirus }
+    if (result.exclusions) a.adminCheck = { at: new Date().toISOString(), exclusions: result.exclusions, ...(result.devDrives ? { devDrives: result.devDrives } : {}) }
+    if (result.added?.length) a.added = [...new Set([...(a.added ?? []), ...result.added])]
+    if (result.removed?.length) a.added = (a.added ?? []).filter((p) => !result.removed!.some((x) => normPath(x) === normPath(p)))
+    c.antivirus = a
+  })
+  log.info(`antivirus move: ${result.outcome}`)
+  // The window's status reads the new list.
+  if (!w.lifetime.aborted && w.path) await statusFor(w, true).catch(() => undefined)
+  return result
+}
+
+async function elevated(action: AvAction, paths: string[], drives: string[], remove: string[] = []): Promise<AvChangeResult> {
   const fixture = await readFixture()
-  if (fixture) return fixtureChange(fixture, action, paths)
+  if (fixture) return fixtureChange(fixture, action, paths, remove)
   if (isTestCopy()) throw new Error('Test copies of Hive never change Defender’s settings.') // i18n-ignore: test copies only
   if (process.platform !== 'win32') throw new Error(tr(msg({ id: 'main.antivirus.windowsOnly', defaultMessage: 'Only Windows has Defender exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning on another system.' })))
   const dir = join(tmpdir(), `hive-antivirus-${randomUUID()}`)
@@ -414,7 +461,7 @@ async function elevated(action: AvAction, paths: string[], drives: string[]): Pr
     const output = join(dir, 'result.json')
     let launch: { started: boolean; cancelled?: boolean; error?: string }
     try {
-      launch = JSON.parse((await runPowerShell(launcherScript(elevatedScript(action, paths, drives, output)), ELEVATED_TIMEOUT_MS)).trim()) as typeof launch
+      launch = JSON.parse((await runPowerShell(launcherScript(elevatedScript(action, paths, drives, output, remove)), ELEVATED_TIMEOUT_MS)).trim()) as typeof launch
     } catch (e) {
       launch = { started: false, error: (e as Error).message }
     }
@@ -426,8 +473,8 @@ async function elevated(action: AvAction, paths: string[], drives: string[]): Pr
 }
 
 /** A fixture's elevated change: what the elevated script does, on a simulated exclusion list, every call logged. */
-function fixtureChange(f: Fixture, action: AvAction, paths: string[]): AvChangeResult {
-  testLog({ call: action, paths })
+function fixtureChange(f: Fixture, action: AvAction, paths: string[], remove: string[] = []): AvChangeResult {
+  testLog({ call: action, paths, ...(action === 'move' ? { remove } : {}) })
   const e = f.elevated ?? {}
   const file = fixtureFile()!
   if (!simulated.has(file)) {
@@ -440,6 +487,17 @@ function fixtureChange(f: Fixture, action: AvAction, paths: string[]): AvChangeR
   // A redacted list even with administrator rights: which exclusions exist can't be known, so nothing changes, and the
   // list it reports (Defender's "N/A" answer, as if it had slipped through) must count as unknown.
   if (e.redacted) return changeOutcome(action, { started: true }, { ok: action === 'check', ...(action === 'check' ? {} : { error: tr(msg({ id: 'main.antivirus.unreadable', defaultMessage: "Defender's exclusions couldn't be read even with administrator rights, so nothing was changed.", description: 'An error in Settings → Workspace → Antivirus scanning.' })) }), requested: [], listed: true, exclusions: [HIDDEN] })
+  if (action === 'move') {
+    // As the elevated script does it: Hive's listed old entries removed, then the new folders the rest doesn't cover added.
+    const removing = remove.filter((p) => listed(p, current))
+    const left = current.filter((x) => !removing.some((p) => normPath(p) === normPath(x)))
+    const adding = paths.filter((p) => !covered(p, left))
+    const ok = !e.policy && !e.error
+    if (ok) current = [...left, ...adding]
+    simulated.set(file, current)
+    testLog({ call: 'move-requested', paths: adding, remove: removing })
+    return changeOutcome(action, { started: true }, { ok: !e.error, ...(e.error ? { error: e.error } : {}), requested: adding, removing, ...(e.unlisted ? {} : { listed: true, exclusions: current }), devDrives: e.devDrives ?? {} })
+  }
   const need = action === 'add' ? paths.filter((p) => !covered(p, current)) : action === 'remove' ? paths.filter((p) => listed(p, current)) : []
   const applied = e.policy ? [] : e.error ? need.slice(0, e.partial ?? 0) : need
   if (action === 'add') current = [...current, ...applied]

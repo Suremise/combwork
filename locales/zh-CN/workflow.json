@@ -188,6 +188,8 @@
   "workflow.refused.move.useIntent.next": "请改用 {intent} 操作。",
   "workflow.refused.platform.unknown.message": "{card}：Hive 无法读取{what}，因此无法检查规则 {rule}。",
   "workflow.refused.platform.unknown.next": "请检查“配置智能体”或该文件夹，然后重试。",
+  "workflow.refused.queue.advancing.message": "{card} 正在合并到 {target}：已无法再从合并队列中移除。",
+  "workflow.refused.queue.advancing.next": "请等待合并完成。如果不需要这项更改，请在 {target} 中还原它。",
   "workflow.refused.requeue.allowed.change": "合并队列上的“重试合并”可让它重试一次。",
   "workflow.refused.requeue.allowed.message": "{card} 的修订版本 {revision} 未经更改，不能重新进入合并队列：{why}",
   "workflow.refused.requeue.allowed.next": "修复失败项，提交后将新的修订版本提交评审。",

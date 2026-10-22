@@ -136,7 +136,7 @@ export const AREAS = [
   { paths: ['src/main/testedClis.ts', 'src/shared/testedClis.ts', 'resources/tested-clis.json', 'scripts/testedClis.mjs', 'scripts/tested-clis.mjs', 'scripts/release.mjs'], suites: ['testedclis'] },
   // Unused worktrees (#353): the Overview's section, the Changes notice, Storage's line and the hints.
   { paths: ['src/main/unusedWorktrees.ts', 'src/shared/unusedWorktrees.ts', 'src/shared/recentCache.ts', 'src/renderer/src/components/UnusedWorktrees.tsx'], suites: ['unusedwt', 'changespicker', 'wtreuse'] },
-  { paths: ['src/main/workspaceMove.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches'] },
+  { paths: ['src/main/workspaceMove.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
@@ -176,6 +176,8 @@ export const AREAS = [
   { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents'] },
   // Agents under Hive merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
+  // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, hive_queue.
+  { paths: ['src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/cardIntents.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecontrols.cjs'], suites: ['queuecontrols', 'replysize'] },
   { paths: ['src/main/mergeSlots.ts', 'src/main/mergeSlotHost.ts', 'src/shared/mergeSlot.ts', 'src/renderer/src/components/MergeSlots.tsx'], suites: ['mergeslot', 'progresslanes', 'replysize'] },
   // Lanes (#483): the card loop registers its lane; replysize measures hive_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'progresslanes', 'replysize'] },
@@ -204,7 +206,7 @@ export const AREAS = [
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },
   { paths: ['src/renderer/src/components/Purge.tsx'], suites: ['purge'] },
-  { paths: ['src/main/antivirus.ts', 'src/shared/antivirus.ts', 'src/renderer/src/components/Antivirus.tsx'], suites: ['antivirus', 'performance'] },
+  { paths: ['src/main/antivirus.ts', 'src/shared/antivirus.ts', 'src/renderer/src/components/Antivirus.tsx'], suites: ['antivirus', 'performance', 'repairdefender'] },
   { paths: ['src/shared/tipPlacement.ts'], suites: ['tooltips'] },
   // Where a menu opens (#1329): agents-ui checks + Add ▾ at the window's right edge; the others open menus.
   { paths: ['src/shared/menuPlacement.ts'], suites: ['agents-ui', 'context', 'cardchip', 'keys'] },

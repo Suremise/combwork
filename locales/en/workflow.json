@@ -755,6 +755,14 @@
     "defaultMessage": "Check Agent Setup or the folder, then try again.",
     "description": "The next step when Hive could not read what a rule needs."
   },
+  "workflow.refused.queue.advancing.message": {
+    "defaultMessage": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
+    "description": "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name."
+  },
+  "workflow.refused.queue.advancing.next": {
+    "defaultMessage": "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.",
+    "description": "The next step after a refused Remove from queue while the card is being merged. {target} is a branch name."
+  },
   "workflow.refused.requeue.allowed.change": {
     "defaultMessage": "Retry merge on the merge queue retries it once.",
     "description": "Who can override a refused requeue: the user, with Retry merge on the merge queue (glossary 2.5: merge queue)."

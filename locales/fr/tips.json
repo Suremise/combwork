@@ -351,6 +351,8 @@
   "tips.workflowOptions.title": "Choisis comment les cartes arrivent à Terminé",
   "tips.workspaceMoved.text": "Tu as déplacé le dossier de l’espace de travail, par exemple sur un autre disque ? Ouvre-le depuis son nouvel emplacement et choisis Réparer… dans la bannière : les worktrees des agents, leurs sessions, ainsi que les conversations et la mémoire de Claude Code suivent.",
   "tips.workspaceMoved.title": "Déplacer un espace de travail sans perdre ses agents",
+  "tips.workspaceMovedDefender.text": "Si Hive a fait ignorer à Defender les dossiers de l’espace de travail, Réparer… après un déplacement propose de déplacer ces exclusions vers les nouveaux dossiers, avec une seule demande d’administrateur, pour qu’aucune ne reste sur un dossier disparu. Les exclusions que tu as créées toi-même restent telles quelles.",
+  "tips.workspaceMovedDefender.title": "Les exclusions Defender suivent un espace de travail déplacé",
   "tips.worktreeReuse.text": "Tu ajoutes un agent avec un nouveau worktree du même nom qu’un worktree conservé (B4, et le worktree de B4 n’est pas utilisé) ? S’il est fusionné et propre, Hive donne ce dossier à l’agent, mis à jour avec main : ses node_modules y sont déjà.",
   "tips.worktreeReuse.title": "Un worktree conservé resservi",
   "tips.worktrees.text": "Dans Ajouter un agent…, choisis Nouveau worktree : l’agent travaille sur sa propre branche, et Fusionner… ramène son travail quand il te convient.",

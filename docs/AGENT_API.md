@@ -521,6 +521,36 @@ A lane is `{ id, project, name, builder: { id, name }, reviewer, cards, current,
 
 The event stream sends `lanes-changed` (`{ workspacePath }`: read the lanes again) when a lane changes, or one of its cards does.
 
+### Merge queue
+
+From api.version 9 (#1353). With a project's workflow set to **Hive merges**, Hive merges each approved card into its target branch through that target's **merge queue**, one card at a time (SPEC §16.9). Anyone who may read the project reads its queues (a project agent its own project's: another's is `403`); pausing, resuming, taking a card out and retrying its merge are the user's (in Hive's window) and the Hive Assistant's within Settings → Assistant → Control (Control agents): a project agent is refused (`403`, saying whose they are), and so is a script (`403`). Each change the Assistant makes is in its actions (`queue-pause`, `queue-resume`; a card's as `update-task`).
+
+`GET /v1/queue?project=alpha&target=integration` — the project's queues (`project` is required but for a project agent, whose own project it is; `target` narrows to one), each:
+
+```json
+{ "project": "alpha", "target": "integration",
+  "paused": { "reason": "user", "card": null, "files": [], "by": "assistant", "at": "2026-10-22T09:12:00.000Z" },
+  "runBy": "Hive", "runHere": true,
+  "testing": { "card": 12, "key": "AL-12", "title": "…", "entry": "AL-12/e7", "revision": "…", "expected": "…", "step": "checks", "started": "…", "run": "…" },
+  "queued": [{ "card": 14, "key": "AL-14", "title": "…", "entry": "AL-14/e5", "revision": "…", "at": "…" }],
+  "recent": [{ "card": 9, "key": "AL-9", "title": "…", "entry": "AL-9/e4", "outcome": "returned", "at": "…", "reason": "checks", "transient": false, "hasLog": true }] }
+```
+
+- `paused` is `null` while it runs. `reason` is `user` (Pause queue; `by` the `user` or the `assistant`) or Hive's own (`by` `null`): `needsYou` (an advance into a checked-out target was interrupted in a state Hive won't guess about, or an earlier runner's process or folder is still there: `files` names them), `checkedOut` (the target is checked out in a folder, `files[0]`: Hive doesn't merge into it yet), `rulesOff` (Settings → Advanced → Workflow rules are enforced is off), `targetMovesFast` (the target moved three times in a row while a card was tested), `uncounted` (its checks passed without counting three times), `identity` (no commit identity for the merge), `folderBusy`, `wrongBranch`, `staged`, `unstagedChanges`.
+- `runBy` is the profile of the Hive running the queue now (`null`: none), `runHere` whether it is this one.
+- `testing` is the card being merged now: its step (`testMerge`, `checks`, `advance`; `null` when another Hive runs it), the target's head it is tested on (`expected`), since when, and the progress run of its check (`run`, `GET /v1/progress`).
+- `queued` waits in order; `recent` holds the latest 20 outcomes, newest first: `merged` (`result`, the target's new head; `by`: `hive`, or `outside` for a merge done by hand that Hive saw), `returned` (to its builder: `reason` `conflict`, `checks`, `hook`…, `transient` for a check that couldn't start, `files` a conflict named, `hasLog` when Hive kept its output, which the card's work shows) and `cancelled` (`reason`: `removed`, `stale`, …).
+
+`POST /v1/queue/pause` — `{ "project": "alpha", "target": "integration" }` (`target` left out: the project's only queue): the queue stops before its next card; a card being checked finishes its checks and waits, unmerged. A queue Hive paused already keeps its pause. Replies with the queue.
+
+`POST /v1/queue/resume` — the same body: the pause is cleared and the queue runs again, `{ "resumed": true, "queue" }`. When what paused it is still there and Hive can see it (the target still checked out, the rules still off, the interrupted advance's files still changed, an earlier runner's process still running), it stays paused, `{ "resumed": false, "queue" }`.
+
+`POST /v1/queue/remove` — `{ "card": "AL-12", "reason": "The user wants it later." }` (`reason` required): the card leaves the queue (an override, `IntegrationCancelled`), back to Approved, and is never merged, after a restart too; its builder is woken. Refused (`409`, `queue.advancing`) once its merge has begun. Replies as a card intent (`{ ok, card, from, to }`).
+
+`POST /v1/queue/retry` — `{ "card": "AL-12", "reason": "A flaky test, known." }` (`reason` required): Retry merge, an override that queues a card the queue returned (a red check too) with its approved revision unchanged, once per revision (`409`, `move.notFromHere`, otherwise). Replies as a card intent.
+
+The event stream sends `queue-changed` (`{ workspacePath, project, target }`: read the queue again) when a target's queue changes: a card queued, its step, an outcome, a pause.
+
 ### Skills and MCP
 
 `GET /v1/skills[?project=name]` — the workspace's Hive skills, each provider's user (`level: "machine"`) and plugin skills, plus, if a project is given, the project's local skills, and then only the Hive skills its agents get (not those whose audience is `assistant`): `{ name, description, level, provider?, plugin?, audience?, bundled?, updateAvailable? }`, without folder paths. `audience` (Hive skills) is who gets it: `agents`, `assistant` or `all` (its `SKILL.md`'s `metadata.audience`; `agents` without one). `problem` (Hive skills) says why nobody gets it: its header can't be read, or its audience isn't `agents`, `assistant` or `all`. `bundled` is `same` or `changed` for Hive skills that ship with Hive, and `updateAvailable` marks a changed copy made from a version this Hive knows to be older than its own. A project agent may list only its own project's skills (`403` for another's).
@@ -640,6 +670,7 @@ Event types:
 | `notes-changed`, `skills-changed` | (none) | Read them again |
 | `tasks-changed` | `{ workspacePath }` | Read the board again |
 | `lanes-changed` | `{ workspacePath }` | Read the lanes again |
+| `queue-changed` | `{ workspacePath, project, target }` | A merge queue changed: read it with `GET /v1/queue` |
 | `progress-changed` | `{ workspacePath, runs }`: every run, in the public form `GET /v1/progress` gives | A progress run started, moved on or ended |
 | `merge-slots-changed` | `{ workspacePath, slots }`: the slots held or waited for, each `{ project (its folder), branch, holder, waiting }` as `GET /v1/projects/{name}/merge-slot` gives it | A merge slot was taken, released or waited for |
 | `notice` | `{ notice: { id, kind, title, projectPath, agentId? } }`: `kind` is `finished`, `waiting` or `notice`; `projectPath` is `null` for an app-wide one; `title` is in English, whatever language Hive shows | Hive told the user something (a banner or a Windows notification; not when notifications are off). Its body (an agent's last reply, its question) isn't sent |
@@ -686,6 +717,8 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `lane-start` | Started (or changed) a lane | `{ "kind": "lane-start", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-745674db", "name": "HB3" } }` |
 | `lane-join` | Had a reviewer join a lane (`agent`: the reviewer) | `{ "kind": "lane-join", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-1d2e3f40", "name": "HR3" } }` |
 | `lane-end` | Ended a lane (merged or abandoned) | `{ "kind": "lane-end", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-745674db", "name": "HB3" } }` |
+| `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
+| `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
 | `create-project` | Created a project | `{ "kind": "create-project", "ok": true, "project": "apiary" }` |
 | `activate-project` | Turned a project on | `{ "kind": "activate-project", "ok": true, "project": "apiary" }` |
 | `deactivate-project` | Was refused turning a project off (only refusals are listed) | `{ "kind": "deactivate-project", "ok": false, "error": "Not allowed by Settings → Assistant → Control", "project": "apiary" }` |
@@ -724,6 +757,7 @@ When **Provide Hive tools to sessions** is on (the default), Hive adds an MCP se
 | `hive_wait_for_agents` | `POST /v1/agents/wait` (50 seconds by default, it calls again to keep waiting; `wake: true` for an agent watch, a line; `cancel: true` to end it) |
 | `hive_merge_slot` | `GET /v1/projects/{name}/merge-slot`, `POST …/merge-slot/claim` or `…/release` (the session's project), a line (project agents only) |
 | `hive_lane` | `GET /v1/lanes`, `POST /v1/lanes` (`start`), `POST /v1/lanes/join`, `GET /v1/lanes/next` (`next`) or `POST /v1/lanes/{id}/end`, a line per lane (an agent: its own project's, as the builder or reviewer) |
+| `hive_queue` | `GET /v1/queue` (`list`), a few lines per target's queue: paused or running, the card testing and its step, the cards waiting, the latest outcomes (an agent: its own project's, `list` only) |
 | `hive_start_card` | `POST /v1/tasks/{card}/start` (the start intent), a line (project agents only) |
 | `hive_put_back`, `hive_submit`, `hive_declare_paths`, `hive_start_review`, `hive_verdict`, `hive_report_merge`, `hive_ask_user`, `hive_cannot_within_rules`, `hive_request_builder` | `POST /v1/tasks/{card}/put-back`, `…/submit`, `…/declare-paths`, `…/start-review`, `…/verdict`, `…/report-merge`, `…/ask`, `…/cannot`, `…/request` (the card intents), a line: where the card went and what the intent says of it |
 | `hive_console` | `GET /v1/console/events` or `GET /v1/console/sources`, a line per event (its own session; offered only while **Settings → Agent API → Let agents read the developer console** is on) |
@@ -750,6 +784,7 @@ The Hive Assistant's `hive` server always runs (even with this setting or the Ag
 | `hive_read_setting` | `GET /v1/settings/{id}`, as text | any |
 | `hive_update_setting` | `PATCH /v1/settings/{id}`, old → new | Change settings on (any level) |
 | `hive_undo` | `GET /v1/assistant/changes` (`list`), `POST /v1/assistant/undo`: what was undone, what was left and why | Control agents |
+| `hive_queue` | `GET /v1/queue` (`list`: any), `POST /v1/queue/pause`, `…/resume`, `…/remove`, `…/retry` (Control agents): the queue in a few lines, or the card and where it went | any (list); Control agents |
 
 It also has the board tools above (the card intents too, but not `hive_start_card`: it starts cards on agents with `hive_start_task`); Claude Code runs `hive_create_task`, `hive_update_task`, `hive_update_tasks`, `hive_reorder_tasks`, the card intents and `hive_lane` without asking from Control agents up. Claude Code runs these without asking (they are Hive's own, and limited by the control level); Codex gets a 15-minute tool timeout for them, since waiting and asking the user can take minutes.
 

@@ -18,12 +18,16 @@ const log = createLogger('queue')
 /** Where the queue's runs keep their logs: Hive's own folder, never a project's. */
 export const queueLogDir = (): string => join(app.getPath('userData'), 'logs', 'merge-queue')
 
-/** The runner for a project's queue (`QueueConfig.runCheck` and `install`). */
-export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn): ReturnType<typeof queueChecks> {
+/**
+ * The runner for a project's queue (`QueueConfig.runCheck` and `install`). `onRun`: told each run's id as it starts (null
+ * when runs aren't kept), for the queue's model (#1353).
+ */
+export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn, onRun?: (id: string | null) => void): ReturnType<typeof queueChecks> {
+  const runs = ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e)) : undefined
   return queueChecks({
     ...(spawn ? { spawn } : {}),
     env: () => childEnv(),
-    runs: ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e)) : undefined,
+    runs: runs && onRun ? { ...runs, start: (r) => { const id = runs.start(r); onRun(id); return id } } : runs,
     logDir: queueLogDir(),
     timeoutMs: () => Math.max(1, Number(advanced.get(QUEUE_CHECK_MINUTES)) || 90) * 60_000,
     networkCodes: () => advanced.pattern(QUEUE_NETWORK_CODES),

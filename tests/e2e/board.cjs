@@ -27,7 +27,9 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   // Trusted already: an agent started from the board has no terminal on screen, so its trust question wraps narrowly.
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
-  for (const p of ['beta', 'delta', 'gamma']) fs.mkdirSync(path.join(ws, p), { recursive: true })
+  for (const p of ['beta', 'gamma']) fs.mkdirSync(path.join(ws, p), { recursive: true })
+  // delta is a repository: Remove Project lists an agent's worktree of it (#1316).
+  lib.gitProject(path.join(ws, 'delta'))
   fs.writeFileSync(path.join(ws, 'gamma', 'notes.txt'), 'delete me')
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -432,7 +434,33 @@ const check = (name, ok, extra = '') => {
     return d
   }
   await inv('tasks:create', { title: 'Delta work', project: 'delta' })
+  // An agent with a long name on its own worktree (#1316): Remove Project's table shows its name and branch whole.
+  const longName = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF'
+  await inv('agents:add', path.join(ws, 'delta'), { location: 'new-worktree', name: longName })
+  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.hive', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
   let d = await removeVia('delta', 'Hide')
+  // What it touches is a table (#1316): a thing and what happens to it, for the choice made; the folder by its name, its
+  // full path behind it (on hover, and copied whole). Each choice shown in both themes, then back to Hide.
+  const touched = () => d.locator('.removal-list tbody tr').evaluateAll((rows) => rows.map((r) => [...r.children].map((c) => c.textContent.replace(/\s+/g, ' ').trim())))
+  const folderRow = async () => (await touched()).find((cells) => cells[0].startsWith('Folder')) ?? []
+  check('What it touches is a table, What · What happens, the folder by name', (await d.locator('.removal-list thead th').allInnerTexts()).slice(0, 2).join('|') === 'WHAT|WHAT HAPPENS' && (await d.locator('.removal-list .short-path[data-path]').getAttribute('data-path')).toLowerCase() === path.join(ws, 'delta').toLowerCase() && (await d.locator('.removal-list .short-path-text').innerText()) === 'delta', JSON.stringify(await touched()))
+  const themed = async (theme) => {
+    await inv('settings:update', { appearance: { theme } })
+    if (!(await until(() => themeIs(theme), HUNG_MS))) throw new Error(`the window didn't show the ${theme} theme`)
+  }
+  // Every cell's content fits it: a long name or branch wraps inside itself, never cut (only the folder's short name is).
+  const cellsFit = () => d.locator('.removal-list tbody td').evaluateAll((tds) => tds.length > 0 && tds.every((td) => td.scrollWidth <= td.clientWidth + 1))
+  for (const [choice, happens] of [['Hide', 'stays, hidden from Hive'], ['Remove from Hive', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
+    await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
+    check(`…${choice}: the folder ${happens}`, !!(await until(async () => (await folderRow())[1] === happens, HUNG_MS)), JSON.stringify(await touched()))
+    check(`…${choice}: the long agent's worktree whole, its name and branch, every cell fitting`, !!longBranch && (await touched()).some((cells) => cells[0] === `${longName} (${longBranch})`) && !!(await until(cellsFit, HUNG_MS)), JSON.stringify({ longBranch, rows: await touched() }))
+    for (const theme of ['dark', 'light']) {
+      await themed(theme)
+      await page.screenshot({ path: path.join(lib.WORK, `board-remove-${choice.toLowerCase().replace(/ /g, '-')}-${theme}.png`) })
+    }
+    await themed('dark')
+  }
+  await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
   check('Hide takes the project out of Hive', !!(await until(async () => !(await names()).includes('delta'), 8000)))

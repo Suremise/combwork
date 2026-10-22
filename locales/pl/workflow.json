@@ -188,6 +188,8 @@
   "workflow.refused.move.useIntent.next": "Użyj zamiast tego intencji {intent}.",
   "workflow.refused.platform.unknown.message": "{card}: Hive nie mógł odczytać {what}, więc nie da się sprawdzić reguły {rule}.",
   "workflow.refused.platform.unknown.next": "Sprawdź Konfigurację agentów lub folder i spróbuj ponownie.",
+  "workflow.refused.queue.advancing.message": "Karta {card} jest teraz scalana z {target}: nie można jej już usunąć z kolejki scalania.",
+  "workflow.refused.queue.advancing.next": "Poczekaj, aż scalanie się zakończy. Jeśli zmiana nie jest potrzebna, cofnij ją w {target}.",
   "workflow.refused.requeue.allowed.change": "Ponów scalanie w kolejce scalania ponawia je jeden raz.",
   "workflow.refused.requeue.allowed.message": "Karta {card} w rewizji {revision} nie może wrócić do kolejki scalania bez zmian: {why}",
   "workflow.refused.requeue.allowed.next": "Napraw błąd, zrób commit i przekaż nową rewizję.",

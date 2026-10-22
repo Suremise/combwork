@@ -188,6 +188,8 @@
   "workflow.refused.move.useIntent.next": "Use a intenção {intent} em vez disso.",
   "workflow.refused.platform.unknown.message": "{card}: o Hive não conseguiu ler {what}, então a regra {rule} não pode ser verificada.",
   "workflow.refused.platform.unknown.next": "Verifique a Configuração de agentes ou a pasta e tente de novo.",
+  "workflow.refused.queue.advancing.message": "O cartão {card} está entrando em {target} por merge agora: ele não pode mais ser removido da fila de merge.",
+  "workflow.refused.queue.advancing.next": "Espere o merge terminar. Se a mudança não for desejada, reverta-a em {target}.",
   "workflow.refused.requeue.allowed.change": "“Tentar o merge de novo”, na fila de merge, tenta mais uma vez.",
   "workflow.refused.requeue.allowed.message": "O cartão {card} na versão {revision} não pode voltar sem alterações para a fila de merge: {why}",
   "workflow.refused.requeue.allowed.next": "Corrija a falha, faça commit e envie a nova versão.",

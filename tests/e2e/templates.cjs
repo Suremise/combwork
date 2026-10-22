@@ -162,8 +162,22 @@ const check = (name, ok, extra = '') => {
   await item('pair').click()
   const warn = page.locator('.dialog', { hasText: 'Load "pair"?' })
   await shown(warn, 'warn')
-  // The plan as a table (#511): a removed agent's line, a created agent's row and its cells, by column.
-  const removedLine = async (d, name) => (await d.locator(`.template-plan-removed li[data-agent="${name}"]`).innerText().catch(() => '')).replace(/\s+/g, ' ')
+  // The plan as one table (#511, #1315): an agent's Change (replaced, new or removed, and what becomes of an old agent's
+  // worktree), a row and its cells, by column: Agent, Change, Coding agent, Model, Effort, Mode, Where.
+  // (A removed agent's worktree note is across its row's settings; a replaced one's on the line under its row.)
+  const removedLine = async (d, name) =>
+    (
+      await d
+        .locator('.template-plan-table tbody')
+        .evaluate((tb, n) => {
+          const row = tb.querySelector(`tr[data-agent="${n}"]`)
+          return [row?.querySelector('.template-plan-state')?.textContent, row?.querySelector('.template-plan-old')?.textContent, tb.querySelector(`tr[data-old-of="${n}"]`)?.textContent].filter(Boolean).join(' ')
+        }, name)
+        .catch(() => '')
+    )
+      .replace(/\s+/g, ' ')
+      .trim()
+  const stateOf = (d, name) => d.locator(`.template-plan-table tbody tr[data-agent="${name}"]`).getAttribute('data-state')
   const planRow = (d, name) => d.locator(`.template-plan-table tbody tr[data-agent="${name}"]`)
   // (An agent's name is a field to edit beside its name in the template, #702: the field's value, then the rest of the cell.)
   const cells = (d, name) =>
@@ -176,9 +190,18 @@ const check = (name, ok, extra = '') => {
         })
       )
   const placeOf = async (d, name) => ({ text: (await planRow(d, name).locator('td').last().innerText()).replace(/\s+/g, ' ').trim(), path: (await planRow(d, name).locator('.template-plan-place').getAttribute('data-path').catch(() => null)) ?? '' })
-  const created = (d) => d.locator('.template-plan-table tbody tr').evaluateAll((rows) => rows.map((r) => r.dataset.agent))
-  check('the warning lists who goes and who comes', (await warn.locator('.template-plan-removed li').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && /its worktree and branch hive\/templates-ws\/beta\/tree, merged into \w+ and clean, stay unless you tick below/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
-  await page.screenshot({ path: path.join(lib.WORK, 'templates-3-warning.png') })
+  const created = (d) => d.locator('.template-plan-table tbody tr[data-agent]:not([data-state="removed"])').evaluateAll((rows) => rows.map((r) => r.dataset.agent))
+  check('the warning lists who goes and who comes, in one table: the template\'s agents, then those removed', (await warn.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && (await warn.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Builder,Reviewer,Old,Tree' && (await warn.locator('.template-plan-removed, .template-plan h4').count()) === 0 && /^removed\b/.test(await removedLine(warn, 'Old')) && /its worktree and branch hive\/templates-ws\/beta\/tree, merged into \w+ and clean, stay unless you tick below/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
+  // Shown in both themes, each screenshot once the window shows it (a condition, never a fixed wait).
+  const themed = async (theme) => {
+    await inv('settings:update', { appearance: { theme } })
+    if (!(await lib.until(() => page.evaluate((t) => document.documentElement.dataset.theme === t, theme), HUNG_MS))) throw new Error(`the window didn't show the ${theme} theme`)
+  }
+  for (const theme of ['dark', 'light']) {
+    await themed(theme)
+    await page.screenshot({ path: path.join(lib.WORK, `templates-3-warning-${theme}.png`) })
+  }
+  await themed('dark')
   // #702 round 2: a name emptied is marked and Load template greyed out; put back as it was, it can be clicked again.
   const firstName = warn.locator('.template-plan-name-input').first()
   const warnLoad = warn.getByRole('button', { name: 'Load template' })
@@ -205,11 +228,11 @@ const check = (name, ok, extra = '') => {
   await shown(treesWarn, 'treesWarn')
   const tw = await treesWarn.innerText()
   const treePath = path.join(`${ws}.worktrees`, 'beta', 'builder')
-  check('the warning marks Builder, replaced by a new agent of the same name', /replaced by a new agent with the same name/.test(await removedLine(treesWarn, 'Builder')) && !/replaced/.test(await removedLine(treesWarn, 'Reviewer')), tw)
+  check('the warning marks Builder replaced by a new agent of the same name, Helper new, Reviewer removed', (await stateOf(treesWarn, 'Builder')) === 'replaced' && /^replaced\b/.test(await removedLine(treesWarn, 'Builder')) && (await stateOf(treesWarn, 'Helper')) === 'new' && (await stateOf(treesWarn, 'Reviewer')) === 'removed' && /^removed\b/.test(await removedLine(treesWarn, 'Reviewer')) && (await treesWarn.locator('.template-plan-table tbody tr[data-agent="Builder"]').count()) === 1, tw)
   // Agent, Coding agent, Model, Effort, Mode, Where; what the template leaves to the defaults marked "(default)".
   const builderCells = await cells(treesWarn, 'Builder')
   const helperCells = await cells(treesWarn, 'Helper')
-  check("…gives each new agent's settings in a row (inherited ones as their default)", builderCells[0].startsWith('Builder') && (await planRow(treesWarn, 'Builder').locator('.badge', { hasText: 'new' }).count()) === 1 && builderCells[1] === 'Claude Code' && builderCells[2] === 'Opus 5.5' && builderCells[3] === 'High' && builderCells[4].endsWith(' (default)') && helperCells[2] === 'Opus 5.5 (default)' && helperCells[4].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
+  check("…gives each new agent's settings in a row (inherited ones as their default)", builderCells[0].startsWith('Builder') && builderCells[2] === 'Claude Code' && builderCells[3] === 'Opus 5.5' && builderCells[4] === 'High' && builderCells[5].endsWith(' (default)') && helperCells[3] === 'Opus 5.5 (default)' && helperCells[5].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
   const builderPlace = await placeOf(treesWarn, 'Builder')
   check("…and the new worktree's branch, its folder in this project on hover", builderPlace.text === 'own worktree hive/templates-ws/beta/builder' && builderPlace.path.toLowerCase() === treePath.toLowerCase() && (await placeOf(treesWarn, 'Helper')).text === 'project folder', JSON.stringify(builderPlace))
   await planRow(treesWarn, 'Builder').locator('.template-plan-place').hover()
@@ -220,11 +243,10 @@ const check = (name, ok, extra = '') => {
   const planBox = treesWarn.locator('.detail.rich')
   check('the table fits the dialog: no scrolling sideways', await planBox.evaluate((el) => el.scrollWidth <= el.clientWidth + 1))
   for (const theme of ['dark', 'light']) {
-    await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await themed(theme)
     await page.screenshot({ path: path.join(lib.WORK, `templates-6-load-details-${theme}.png`) })
   }
-  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await themed('dark')
   await treesWarn.getByRole('button', { name: 'Cancel' }).click()
   check('cancelled: nothing changed', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && !fs.existsSync(treePath))
   await inv('project:updateConfig', beta, { worktreeSetup: '' })
