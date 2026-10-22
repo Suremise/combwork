@@ -180,6 +180,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.queue.checkMinutes.title': undefined
   'settings.advanced.hive.queue.networkCodes.desc': undefined
   'settings.advanced.hive.queue.networkCodes.title': undefined
+  'settings.advanced.hive.queue.signSeconds.desc': undefined
+  'settings.advanced.hive.queue.signSeconds.title': undefined
   'settings.advanced.hive.recorder.afterSeconds.desc': undefined
   'settings.advanced.hive.recorder.afterSeconds.title': undefined
   'settings.advanced.hive.recorder.keep.desc': undefined

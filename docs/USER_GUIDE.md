@@ -748,6 +748,19 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 - With **Settings → Advanced → Workflow rules are enforced** off, the section says so: the options are saved, and apply once the rules are enforced again.
 - Agents read the options in force (`hive_project_status`). The Hive Assistant can change them one at a time with its settings tool (`project.workflow.<option>`), within Settings → Assistant → Control, and the same checks apply. Project agents can't change them.
 
+### When the merge queue pauses
+
+When Hive merges cards itself, it commits each merge with your repository's own setup. Its commits run the repository's hooks and are signed as the repository says; Hive never skips or overrides either.
+
+Only a conflict, a failing merge check or a failing hook sends a card back to its builder. A hook that fails (`pre-merge-commit`, `commit-msg`, or `pre-commit` for a squash) sends the card back with the hook's output, as a failed check does.
+
+Anything else that stops a merge is something to fix on this computer, not in the card's work. The queue for that target pauses, the card stays where it is, the target doesn't move, and the queue's own folder is left clean. Fix the cause, then resume the queue (**Resume queue**, coming in a later version):
+- **Set a commit identity for this repository**: there is no project identity (Project Settings → Workflow) and git has no `user.name` and `user.email`. Set them in the project folder (`git config user.name "…"` and `git config user.email "…"`), or globally with `--global`.
+- **Signing waits for you**: the repository signs its commits (`commit.gpgsign`) and its signer wanted a passphrase or a PIN, or was still waiting after **Settings → Advanced → Merge queue: longest a signed merge commit takes** (60 seconds, hooks included). Hive never waits on a prompt: it ended the signer. Unlock your key so it signs without asking: start your GPG agent with the passphrase cached, or add your SSH key to `ssh-agent`. If signing or your hooks are only slow, raise that setting.
+- **A hook didn't finish**: the repository signs its commits, and one of its commit hooks was still running at that same limit. Hive ended it. Make the hook quicker, or raise the setting.
+- **Signing failed**: the signer refused, with its message (no secret key, a key that can't be loaded). Fix the signing setup (`user.signingkey`, `gpg.program`, `gpg.format`), or turn signing off for the repository.
+- **Needs you**: git couldn't merge for another reason, with git's message: another git command holding the repository's index (`index.lock`), a damaged repository, a folder it couldn't check out. Let the other command finish, or fix what git says.
+
 ### Card loops
 
 Two agents can take a list of cards in turn, one building and one reviewing, without you passing each card between them. Tell one agent *"work through #111 to #117 as the builder"* and another *"review #111 to #117 as they come in"*. Both use Hive's **card-loop** skill. The builder does a card and moves it to Review. The reviewer reviews it and passes it, or sends it back with findings; the builder fixes them and moves it to Review again. When a card passes, the builder starts the next one. The builder says which checks it ran, on exactly which code; the reviewer checks that record rather than running everything again, and runs the tests the change affects and its own probes.

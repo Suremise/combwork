@@ -2053,6 +2053,43 @@ submissions' pins once it is archived.
      output (`IntegrationFailed`, reason `hook`);
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
+   **Built [#1350]:**
+   - **Identity:** G12's when on, else the repository's own (`git config user.name` / `user.email`: local, then
+     global), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
+     window says to set a commit identity for this repository (`git config user.name` / `user.email`).
+   - **Hooks:** they run (no `--no-verify`).
+   - **Who said what** [HR4's rounds 1 and 2 on #1350]: a failure is told by which part failed, and a decision reads
+     only that part's own words, never the whole output (a hook can print anything).
+     - Hive's commits run with `GIT_TRACE2_EVENT=2`, so git writes its trace2 events into its own stderr, in order
+       with what its hooks and its signer write there. A child's text comes after its `child_start` and before its
+       `child_exit`: a hook writes before it exits, and git writes `child_exit` only once it has waited for it.
+     - Each piece of text belongs to the top git's child running then: a hook (`child_class: hook`, its name) or the
+       signer (gpg's or gpgsm's `-bsau`, ssh-keygen's `-Y sign`). Text while none runs is git's own. A git that a hook
+       runs (its sid `<parent>/<own>`) is never a source.
+     - An event is only a complete JSON record with the fields its kind needs, starting `{"event":"` and running to
+       the line's end. Anything else, an event-looking fragment included, is text. Events never appear in a message.
+   - **Hook failure:** a hook that exited non-zero (`pre-merge-commit`, `commit-msg`, or `pre-commit` for a squash's
+     commit) returns the card with its own text, then git's (`IntegrationFailed`, reason `hook`).
+   - **Other failures:** anything else (an index lock, a broken repository, a worktree it couldn't check out) pauses
+     `needsYou` with git's own lines, never a return.
+   - **No trace** (a git older than 2.24): only git's own "Not committing merge" is a hook, and signing is never read
+     from text.
+   - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,
+     `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
+     queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
+     Settings → Advanced, `hive.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
+     ended.
+     - **Ended at the bound:** always a pause, decided by what was running when it was ended (the stream as far as
+       it had come then). Ending a hook may make it exit non-zero, and that is never its rejection. A hook running
+       then pauses `hookTimedOut`. The signer, or nothing known in a repository that signs, pauses `signingWaits`,
+       "signing waits for you".
+     - **A signer that exited non-zero:** pauses `signingWaits` when **its own** text says it needs a passphrase, a
+       pinentry or a terminal, and `signing` otherwise, with its text and git's.
+   - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
+     `reset --hard`, `clean`), and nothing in the target changes.
+   - **The pause:** keeps git's message in its own words (`workflow_queue_pauses.message`, the 1.0 group's 15th
+     step). Only a conflict, a hook or red checks return a card; every other cause is a pause.
+   - Resuming after fixing the cause is #1353's; signing without a prompt stays #1185.
 5. **Merge checks** (G9) run on that worktree as runs attributed to "Hive (merge queue)", named for the card and the
    result revision (§16.13). The worktree is the queue's own and no one else writes in it, so the checks run on
    exactly the result. **Dependencies from scratch** [HB3's round 1 finding 12]: when the result's package manifests or

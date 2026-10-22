@@ -605,6 +605,19 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queueProcs(null, 'gone')).toEqual([])
   })
 
+  it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'bound', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    const pidFile = join(tempDir('qr-bound-'), 'waiter.pid')
+    // The command (git's stand-in) starts a waiter (the signer's) and waits for it; neither ever ends by itself.
+    const waiter = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`
+    const parent = `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(waiter)}], { stdio: 'inherit' }); c.on('exit', () => process.exit(0))`
+    const r = await a.runner.run('testMerge', process.execPath, ['-e', parent], { timeoutMs: 5000 })
+    expect(r).toMatchObject({ ok: false, timedOut: true })
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: 30_000, interval: 100 })
+    await a.runner.release()
+  })
+
   it("a job that can't be seen empty keeps its duties for the next runner, which pauses until it can end them, then runs", async () => {
     let endable = false
     const cfg = { store: w.store, project: w.project, target: 'stuck', root: w.root, profile: 'A', hooks: { endJob: () => endable } }
