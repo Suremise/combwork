@@ -308,11 +308,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       .catch((e) => log.warn('archiving old Done cards', e))
     // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
     void runActions(contextWorkspace()!)
-    // A reviewer whose session ended as the window closed the workspace (#1392): its cards stop showing it now.
-    const reviewing = contextWorkspace()!
-    void tasks
-      .endReviewsWithoutSession(reviewing, (project, agentId) => !!reviewing.path && !!sessions.liveFor(join(reviewing.path, project), agentId))
-      .catch((e) => log.warn('ending the reviews of sessions that ended', e))
     // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
     // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
     const opening = contextWorkspace()!
