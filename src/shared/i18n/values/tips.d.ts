@@ -166,6 +166,8 @@ interface HiveMessageValues {
   'tips.hardwareAcceleration.title': undefined
   'tips.hiveFolder.text': undefined
   'tips.hiveFolder.title': undefined
+  'tips.hiveMerges.text': undefined
+  'tips.hiveMerges.title': undefined
   'tips.hiveSkills.text': undefined
   'tips.hiveSkills.title': undefined
   'tips.hooksMissing.text': undefined

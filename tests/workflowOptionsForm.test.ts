@@ -21,7 +21,7 @@ const { config } = await import('../src/main/config')
 const form = await import('../src/main/workflow/optionsForm')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
+const { allOff, formShows, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
 
@@ -66,10 +66,42 @@ async function workspace(opts: { project?: unknown; preset?: string | null; work
   return { ws, w, repo }
 }
 
-describe("P4's presets (#1278, §16.19.1)", () => {
-  it('offers Solo and Pair (the agent merges) for Git, and shows Pair and Team unavailable with why; None gets all three', () => {
-    expect(PRESETS.git).toEqual([{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair', needs: 'hiveMerges' }, { id: 'team', needs: 'slots' }])
+describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
+  it('offers Solo, Pair (the agent merges) and Pair (Hive merges) for Git, and shows Team unavailable with why; None gets all three', () => {
+    expect(PRESETS.git).toEqual([{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team', needs: 'slots' }])
     expect(PRESETS.none.map((p) => p.id)).toEqual(['solo', 'pair', 'team'])
+  })
+
+  it("Pair is §16.6.3's as P5 offers it: Hive merges with the quick checks on the merged result, in agent worktrees, nothing of a later phase", () => {
+    const inputs = { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' } }
+    const p = preset('git', 'pair', inputs)
+    expect(p).toMatchObject({ review: 'agent', reviewers: 1, noSelfReview: true, preChecks: ['typecheck', 'lint'], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: ['typecheck', 'lint'], mergeInstall: 'onManifestChange', okBefore: { mode: 'never' }, folder: 'slots', identity: { name: 'Pat', email: 'p@e' }, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: false })
+    // Each check it names has its command (§16.13), and nothing more.
+    expect(p.commands).toEqual({ typecheck: 'npm run typecheck', lint: 'npm run lint' })
+    expect(notOffered(p)).toEqual([])
+    expect(checkOptions('git', { project: p }).problems).toEqual([])
+    const r = compile(p)
+    expect(r.ok && r.ruleset.guards.integrate).toContain('integrate.checksPassed')
+    // The repository's own default branch when it has another.
+    expect(preset('git', 'pair', { ...inputs, target: 'master' }).target).toBe('master')
+    // A project without scripts: no checks suggested, so none guessed.
+    expect(preset('git', 'pair')).toMatchObject({ preChecks: [], mergeChecks: [], commands: {} })
+  })
+
+  it('Hive merges still needs Git and its own folder per card (§16.7.2)', () => {
+    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'project' } }).problems).toEqual([{ kind: 'contradiction', id: 'mergeNeedsSlots' }])
+    expect(checkOptions('none', { project: { finish: 'hiveMerges' } }).problems).toContainEqual({ kind: 'contradiction', id: 'hiveMergesNeedsGit' })
+    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', mergeChecks: ['lint'], mergeInstall: 'always', commands: { lint: 'npm run lint' } } }).problems).toEqual([])
+  })
+
+  it("shows G9's checks only when Hive merges, and its install only with merge checks", () => {
+    const o = { ...allOff('git'), folder: 'slots' as const }
+    expect([formShows('mergeChecks', o), formShows('mergeInstall', o)]).toEqual([false, false])
+    expect([formShows('mergeChecks', { ...o, finish: 'hiveMerges' }), formShows('mergeInstall', { ...o, finish: 'hiveMerges' })]).toEqual([true, false])
+    expect(formShows('mergeInstall', { ...o, finish: 'hiveMerges', mergeChecks: ['lint'] })).toBe(true)
+    expect(formShows('mergeInstall', { ...o, finish: 'agentMerges', mergeChecks: ['lint'] })).toBe(false)
+    expect(formShows('review', o)).toBe(true)
+    expect(formShows('excluded', o)).toBe(false)
   })
 
   it("Pair (the agent merges) is §16.19.1's: a reviewer agent, the agent merges, agent worktrees, the quick checks before review", () => {
@@ -115,7 +147,9 @@ describe('the Workflow section (#1278)', () => {
     expect(f.inheritedOrigins.target).toBe('platform')
     const pair = f.presets.find((p) => p.id === 'pairAgent')!
     expect(pair.options).toMatchObject({ preChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' }, identity: { name: 'Pat Builder', email: 'pat@example.com' } })
-    expect(f.presets.filter((p) => p.needs).map((p) => p.id)).toEqual(['pair', 'team'])
+    expect(f.presets.filter((p) => p.needs).map((p) => p.id)).toEqual(['team'])
+    // Pair (Hive merges) suggests the same scripts as its merge checks (OP-24).
+    expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })
 
   it('refuses a contradiction whole, with its reason, and saves the options and the preset they started from', async () => {
@@ -186,7 +220,12 @@ describe("the Assistant's settings tool (#1278)", () => {
     const e = settingEntry('project.workflow.finish')!
     expect(e).toMatchObject({ scope: 'project', workflow: 'finish', inherits: true })
     expect(checkSettingValue(e, 'The agent merges, Hive checks')).toEqual({ value: 'agentMerges' })
-    expect(checkSettingValue(e, 'hiveMerges')).toMatchObject({ error: expect.stringMatching(/takes one of: agentMerges, committed, notChecked, or null to inherit/) })
+    expect(checkSettingValue(e, 'hiveMerges')).toEqual({ value: 'hiveMerges' })
+    expect(checkSettingValue(e, 'typo')).toMatchObject({ error: expect.stringMatching(/takes one of: hiveMerges, agentMerges, committed, notChecked, or null to inherit/) })
+    expect(checkSettingValue(settingEntry('project.workflow.mergeChecks')!, ['lint', 'test'])).toEqual({ value: ['lint', 'test'] })
+    expect(checkSettingValue(settingEntry('project.workflow.mergeChecks')!, 'lint')).toMatchObject({ error: expect.stringMatching(/a list of check names the merge queue runs/) })
+    expect(checkSettingValue(settingEntry('project.workflow.mergeInstall')!, 'Before every merge')).toEqual({ value: 'always' })
+    expect(checkSettingValue(settingEntry('project.workflow.mergeInstall')!, 'sometimes')).toMatchObject({ error: expect.stringMatching(/one of: onManifestChange, always/) })
     expect(checkSettingValue(settingEntry('project.workflow.reviewers')!, '2')).toEqual({ value: 2 })
     expect(checkSettingValue(settingEntry('project.workflow.preChecks')!, ['lint'])).toEqual({ value: ['lint'] })
     expect(checkSettingValue(e, null)).toEqual({ value: null })
@@ -202,6 +241,19 @@ describe("the Assistant's settings tool (#1278)", () => {
       expect(await settingsTools.applySetting(folder, 'slots', repo)).toEqual({ old: 'project', new: 'slots' })
       expect(await settingsTools.applySetting(folder, null, repo)).toEqual({ old: 'slots', new: 'inherit' })
     })
+    // Hive merges with merge checks and the install, one at a time (#1355), read back as agents read them.
+    await inWorkspace(w, async () => {
+      await expect(settingsTools.applySetting(e, 'hiveMerges', repo)).rejects.toThrow(/each card needs its own folder/)
+      await settingsTools.applySetting(settingEntry('project.workflow.folder')!, 'slots', repo)
+      expect(await settingsTools.applySetting(e, 'hiveMerges', repo)).toEqual({ old: 'notChecked', new: 'hiveMerges' })
+      expect(await settingsTools.applySetting(settingEntry('project.workflow.commands')!, { lint: 'npm run lint' }, repo)).toMatchObject({ new: expect.anything() })
+      expect(await settingsTools.applySetting(settingEntry('project.workflow.mergeChecks')!, ['lint'], repo)).toMatchObject({ new: expect.anything() })
+      expect(await settingsTools.applySetting(settingEntry('project.workflow.mergeInstall')!, 'always', repo)).toEqual({ old: 'inherit', new: 'always' })
+      // The folder can't go back to the project folder while Hive merges.
+      await expect(settingsTools.applySetting(settingEntry('project.workflow.folder')!, 'project', repo)).rejects.toThrow(/each card needs its own folder/)
+    })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ finish: 'hiveMerges', folder: 'slots', mergeChecks: ['lint'], mergeInstall: 'always', commands: { lint: 'npm run lint' } })
+    expect(await form.workflowSummary(w, repo)).toMatchObject({ options: { finish: 'hiveMerges', mergeChecks: ['lint'], mergeInstall: 'always' }, setBy: { project: expect.arrayContaining(['finish', 'mergeChecks', 'mergeInstall']) } })
     const patch = settingPatch(e, 'notChecked')
     expect('project' in patch && patch.project({ version: 2, platform: 'git' } as never)).toEqual({ workflow: { platform: 'git', preset: null, options: { finish: 'notChecked' } } })
   })

@@ -1,5 +1,5 @@
 // The workflow options' words (SPEC §16.6.1, §16.6.2; glossary 2.6, agreed 20 Oct): each option's label and what it
-// does, and its values, for P4's Workflow section in Project Settings (#1278) and the settings catalog's rows the
+// does, and its values, for the plain Workflow section in Project Settings (#1278) and the settings catalog's rows the
 // Assistant sets them by. Kept as messages, shown with tr() where they are rendered.
 
 import { msg, type Msg } from '../i18n/msg'
@@ -38,7 +38,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does.' })
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' })
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
@@ -47,6 +47,14 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   target: {
     title: msg({ id: 'workflow.option.target.title', defaultMessage: 'Work merges into', description: 'A workflow option (glossary 2.6, G7): the target branch.' }),
     desc: msg({ id: 'workflow.option.target.desc', defaultMessage: 'The target branch. Left empty, the repository’s default branch.', description: 'What the workflow option “Work merges into” does.' })
+  },
+  mergeChecks: {
+    title: msg({ id: 'workflow.option.mergeChecks.title', defaultMessage: 'Checks pass on the merged result', description: 'A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch.' }),
+    desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Each check is a named command. Hive’s merge queue runs them on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' })
+  },
+  mergeInstall: {
+    title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
+    desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result. A change to the lock file or the manifests always installs from scratch, whichever you choose.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' })
   },
   okBefore: {
     title: msg({ id: 'workflow.option.okBefore.title', defaultMessage: 'Your OK before merging', description: 'A workflow option (glossary 2.6, G10).' }),
@@ -106,6 +114,10 @@ export const VALUE_TEXT = {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
     squash: msg({ id: 'workflow.value.style.squash', defaultMessage: 'Squash', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' })
   },
+  mergeInstall: {
+    onManifestChange: msg({ id: 'workflow.value.mergeInstall.onManifestChange', defaultMessage: 'When the lock file or manifests change', description: 'A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value).' }),
+    always: msg({ id: 'workflow.value.mergeInstall.always', defaultMessage: 'Before every merge', description: 'A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.' })
+  },
   okBefore: {
     never: msg({ id: 'workflow.value.okBefore.never', defaultMessage: 'Never', description: 'A value of the workflow option “Your OK before merging” (glossary 2.6, G10).' }),
     labels: msg({ id: 'workflow.value.okBefore.labels', defaultMessage: 'Cards with these labels', description: 'A value of the workflow option “Your OK before merging” (glossary 2.6, G10).' }),
@@ -128,7 +140,6 @@ export const PRESET_TEXT: Record<PresetId | 'custom', Msg> = {
 
 /** Why a preset is shown unavailable (§16.19.1). */
 export const PRESET_NEEDS_TEXT: Record<PresetNeeds, Msg> = {
-  hiveMerges: msg({ id: 'workflow.preset.needs.hiveMerges', defaultMessage: 'Needs Hive to merge cards, which comes in a later version.', description: 'Why a workflow preset can’t be chosen yet.' }),
   slots: msg({ id: 'workflow.preset.needs.slots', defaultMessage: 'Needs a folder of its own for every card, which comes in a later version.', description: 'Why a workflow preset can’t be chosen yet.' })
 }
 

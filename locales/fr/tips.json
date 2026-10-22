@@ -164,6 +164,8 @@
   "tips.hardwareAcceleration.title": "Une fenêtre vide ou qui clignote ?",
   "tips.hiveFolder.text": "Hive garde tout seul hors de git le dossier .hive de chaque projet (sessions, sauvegardes, paramètres de lancement). Quand il ne peut pas, par exemple sans git, avec un autre gestionnaire de versions ou dans un dossier synchronisé par OneDrive ou Dropbox, la Vue d’ensemble du projet te le signale.",
   "tips.hiveFolder.title": "Le .hive d’un projet reste sur cet ordinateur",
+  "tips.hiveMerges.text": "Dans Paramètres du projet → Flux de travail, choisis Binôme, ou règle Qui fusionne sur Hive fusionne : la file de fusion de Hive fusionne chaque carte approuvée dès que ses vérifications passent sur le résultat fusionné, si bien qu’un travail en échec n’atteint jamais la branche cible.",
+  "tips.hiveMerges.title": "Laisse Hive fusionner les cartes approuvées",
   "tips.hiveSkills.text": "Les agents et l’Assistant reçoivent les compétences propres à Hive : work-on-card, review-agent-work, handover et d’autres. Hive les tient à jour ; celles que tu modifies restent les tiennes.",
   "tips.hiveSkills.title": "Des compétences pour travailler avec Hive",
   "tips.hooksMissing.text": "Si une mise à jour de la CLI ou une stratégie empêche les hooks d’un agent d’atteindre Hive, son volet affiche Statut inconnu au lieu d’un statut peut-être faux, rien n’y est tapé et son couloir se met en pause. La bannière au-dessus de son volet dit pourquoi quand Hive le sait.",

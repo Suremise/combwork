@@ -70,20 +70,20 @@ export interface WorkflowOptions {
 }
 
 /**
- * The presets: Solo, Pair and Team (§16.6.3), and P4's Pair, in which the agent merges (`pairAgent`, §16.19.1): what an
- * RC offers before Hive merges (P5) and slots (P7) exist.
+ * The presets: Solo, Pair and Team (§16.6.3), and P4's Pair, in which the agent merges (`pairAgent`, §16.19.1), kept
+ * beside Pair (Hive merges) since P5 (#1355).
  */
 export type PresetId = 'solo' | 'pair' | 'team' | 'pairAgent'
 
 /** Why a preset isn't offered yet: the piece it needs comes in a later version (§16.19.1). */
-export type PresetNeeds = 'hiveMerges' | 'slots'
+export type PresetNeeds = 'slots'
 
 /**
  * The presets the form offers for a platform, in order, and those it shows unavailable with why (§16.19.1: no RC's preset
- * needs a later phase; shown, not hidden, so the choice reads as P6's will).
+ * needs a later phase; shown, not hidden, so the choice reads as P6's will). Team is #1361's.
  */
 export const PRESETS: Record<PlatformId, { id: PresetId; needs?: PresetNeeds }[]> = {
-  git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair', needs: 'hiveMerges' }, { id: 'team', needs: 'slots' }],
+  git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team', needs: 'slots' }],
   none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
 }
 
@@ -93,6 +93,8 @@ export interface PresetInputs {
   tests: string[]
   commands?: Record<string, string>
   identity?: { name: string; email: string } | null
+  /** The repository's default branch, for Pair's and Team's G7 (#1355); `main` when it can't be read. */
+  target?: string
 }
 
 const BASE: Omit<WorkflowOptions, 'platform'> = {
@@ -157,6 +159,9 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
       dependenciesDone: true,
       commands: commandsOf(checks.quick)
     }
+  // §16.6.3's Pair as P5 offers it (#1355): Hive merges with the quick checks on the merged result, in the agent's
+  // worktree (§16.19.1). The target is the repository's default branch, named (`main` in the table), so a repository
+  // whose default is another branch isn't given one it lacks. G15 (slots up to date) comes with slots (P7).
   const pair: WorkflowOptions = {
     ...allOff('git'),
     review: 'agent',
@@ -164,16 +169,17 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     preChecks: checks.quick,
     finish: 'hiveMerges',
     style: 'merge',
-    target: 'main',
+    target: checks.target || 'main',
     mergeChecks: checks.quick,
     mergeInstall: 'onManifestChange',
     folder: 'slots',
+    identity: checks.identity ?? null,
     stopOwnRuns: true,
     dependenciesDone: true,
-    slotsUpToDate: true
+    commands: commandsOf(checks.quick)
   }
   if (id === 'pair') return pair
-  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] } }
+  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: commandsOf(quickAndTests) }
 }
 
 /** Why a combination of options can't be saved (§16.5.4's contradictions), each a whole sentence. */
@@ -250,25 +256,34 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
 
 /**
- * The options P4's form shows for a platform, in order (§16.6.1, §16.6.2; #1278). P4 offers only what it ships
- * (§16.19.1): G8 strict, G9 merge checks, G15 and G17 wait for Hive merges and slots, and None's stage names (N5) for the
- * Version Control tab. The check commands (`commands`) are edited with the checks that name them.
+ * The options the plain form shows for a platform, in order (§16.6.1, §16.6.2; #1278, #1355). It offers only what this
+ * version ships (§16.19.1): G8 strict, G15 and G17 wait for later phases, and None's stage names (N5) for the Version
+ * Control tab. The check commands (`commands`) are edited with the checks that name them. G9 and its install show only
+ * where they apply (`formShows`).
  */
 export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
-  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
+  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'mergeChecks', 'mergeInstall', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
   none: ['review', 'noSelfReview', 'preChecks', 'excluded', 'dependenciesDone']
+}
+
+/**
+ * Whether the form shows an option's row for these options (#1355): G9's merge checks only when Hive merges, and its
+ * install only when there are merge checks (with none, nothing is installed).
+ */
+export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
+  if (key === 'mergeChecks') return o.finish === 'hiveMerges'
+  if (key === 'mergeInstall') return o.finish === 'hiveMerges' && o.mergeChecks.length > 0
+  return FORM_OPTIONS[o.platform].includes(key)
 }
 
 /** Why a value can't be set yet: its piece comes in a later version (§16.19.1). */
 export const NOT_OFFERED = {
-  hiveMerges: msg({ id: 'workflow.notOffered.hiveMerges', defaultMessage: '“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.', description: 'Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive.' }),
   later: msg({ id: 'workflow.notOffered.later', defaultMessage: 'Some of these options aren’t available in this version yet: leave them as they are.', description: 'Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive.' })
 } satisfies Record<string, Msg>
 
 /**
  * The values a project sets that this version doesn't offer yet (§16.19.1), by why. Hive merges and merge checks are
- * offered since P5's queue (#1348; the presets and form rows that offer them are #1355's); `hiveMerges` stays as a
- * reason for an older build's refusal.
+ * offered since P5 (#1348's queue, #1355's form).
  */
 export function notOffered(own: Partial<WorkflowOptions>): (keyof typeof NOT_OFFERED)[] {
   const out: (keyof typeof NOT_OFFERED)[] = []

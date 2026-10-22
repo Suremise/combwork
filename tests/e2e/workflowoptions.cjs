@@ -1,9 +1,10 @@
 // Project Settings → Workflow (#1278): after an upgrade from 0.9 the one-time presets notice names the project, and
-// Choose… opens its Workflow section; picking Pair (the agent merges) fills in its options (Pair and Team shown
-// unavailable, with why), each with where its value comes from; Save… lists the running lane that keeps the old rules
+// Choose… opens its Workflow section; picking Pair (the agent merges) fills in its options (Team shown unavailable, with
+// why), each with where its value comes from; Pair (Hive merges, #1355) fills in G9's checks and the install row, shown
+// only while Hive merges and with merge checks; Save… lists the running lane that keeps the old rules
 // and saves; a contradiction is refused with its reason; Inherit goes back to the inherited value; Copy as JSON and Paste
-// JSON… carry the options; with Workflow rules are enforced off the section says so. Screenshots in both themes and in
-// Polish. Dev build, throwaway profile and workspace; no CLI is started.
+// JSON… carry the options; with Workflow rules are enforced off the section says so. Screenshots in both themes, in
+// Polish and in German. Dev build, throwaway profile and workspace; no CLI is started.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -93,9 +94,11 @@ function board(sql, ...args) {
     const row = (option) => section.locator(`.workflow-option[data-option="${option}"]`)
     check('the version control is shown: Git', (await section.locator('.workflow-platform').innerText()).trim() === 'Git')
     check('no preset was chosen', (await section.locator('.workflow-preset select').inputValue()) === '')
-    check('Pair and Team are listed unavailable, with why', (await section.locator('.workflow-unavailable').allInnerTexts()).join('\n').includes('Needs Hive to merge cards'))
+    const unavailable = (await section.locator('.workflow-unavailable').allInnerTexts()).join('\n')
+    check('Team is listed unavailable, with why; Pair (Hive merges) is offered (#1355)', unavailable.includes('Team: Needs a folder of its own') && !unavailable.includes('Pair') && (await section.locator('.workflow-preset select option[value="pair"]').isEnabled()), unavailable)
     check('the upgrade’s options are the project’s own', (await row('finish').innerText()).includes('Set for this project'))
-    check('Hive merges and later options are not shown', (await row('finish').locator('option').allInnerTexts()).every((t) => t !== 'Hive merges') && (await section.locator('.workflow-option[data-option="strict"]').count()) === 0)
+    check('Hive merges is offered; strict is not shown', (await row('finish').locator('option').allInnerTexts()).includes('Hive merges') && (await section.locator('.workflow-option[data-option="strict"]').count()) === 0)
+    check('G9 and its install are not shown while the agent does not merge through Hive', (await row('mergeChecks').count()) === 0 && (await row('mergeInstall').count()) === 0)
     await themes('form', null, section.locator('.workflow-preset'))
     await themes('form-end', null, section.locator('.workflow-actions'))
 
@@ -208,6 +211,45 @@ function board(sql, ...args) {
     check('a good paste fills the form, to save', (await row('target').locator('input').inputValue()) === 'release')
     await section.getByRole('button', { name: 'Discard Changes' }).click()
 
+    // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
+    await section.locator('.workflow-preset select').selectOption('pair')
+    check('Pair: Hive merges', (await row('finish').locator('select').inputValue()) === 'hiveMerges')
+    check('…into the repository’s own default branch, by name (master here)', (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
+    const values = (option) => row(option).locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))
+    check('…G9: the quick checks from its scripts, with their commands', JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
+    check('…the install row, when the lock file or manifests change', (await row('mergeInstall').locator('select').inputValue()) === 'onManifestChange' && (await row('mergeInstall').innerText()).includes('always installs from scratch'), await row('mergeInstall').innerText().catch(() => ''))
+    // A merge check with its own command keeps the checks before review's commands (one commands map).
+    await row('mergeChecks').getByRole('button', { name: 'Add Check' }).click()
+    const unit = row('mergeChecks').locator('.workflow-check').last()
+    await unit.locator('input').first().fill('')
+    await unit.locator('input').first().pressSequentially('unit')
+    await unit.locator('input').nth(1).pressSequentially('npm test')
+    await row('mergeInstall').locator('select').selectOption('always')
+    check('…the checks before review keep their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
+    // Earlier toasts (copied, saved) dismissed first, so the shots show the rows (the Assistant's note on #1278).
+    const clearToasts = async () => {
+      while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
+      // The pointer off the rows: a hovered row is drawn highlighted.
+      await page.mouse.move(430, 700)
+    }
+    await clearToasts()
+    await themes('hivemerges', null, row('mergeChecks'))
+    await section.getByRole('button', { name: 'Save…' }).click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const pairSaid = await dialog.innerText()
+    check('the warning names Hive merges and the merge checks', pairSaid.includes('Who merges: The agent merges, Hive checks → Hive merges') && pairSaid.includes('Checks pass on the merged result: None → typecheck, lint, and unit'), pairSaid)
+    await saveAndClose()
+    check('saved: Hive merges, the merge checks with their commands and the install, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint', 'unit']) && saved().mergeInstall === 'always' && saved().commands?.unit === 'npm test' && saved().commands?.lint === 'npm run lint', HUNG_MS)), JSON.stringify(saved()))
+    check('…shown as such once saved', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await values('mergeChecks')).includes('npm test'), HUNG_MS)))
+    // With no merge checks, nothing is installed: the install row goes.
+    for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
+    check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
+    // Another finisher is G9's off switch: its rows go.
+    await row('finish').locator('select').selectOption('agentMerges')
+    check('with the agent merging, G9’s rows are not shown', !!(await lib.until(async () => (await row('mergeChecks').count()) === 0, HUNG_MS)))
+    await section.getByRole('button', { name: 'Discard Changes' }).click()
+    check('Discard Changes brings back the saved merge checks', !!(await lib.until(async () => (await row('mergeChecks').count()) === 1 && (await row('mergeInstall').count()) === 1, HUNG_MS)))
+
     // --- With the rules not enforced, the section says so.
     await inv('advanced:set', 'hive.workflow.enforce', false)
     await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
@@ -227,6 +269,16 @@ function board(sql, ...args) {
     check('the section shows in Polish', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Kto scala'), HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-form-pl.png') })
+    await clearToasts()
+    await row('mergeChecks').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-pl.png') })
+    // German, among the longest: G9's rows as they wrap.
+    const de = path.join(lib.ROOT, 'locales', 'de')
+    await speak({ ...base, code: 'de', locale: 'de', messages: Object.assign({}, ...fs.readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(de, f), 'utf8')))) })
+    check('the section shows in German', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Wer mergt'), HUNG_MS)), await section.innerText().catch(() => ''))
+    await clearToasts()
+    await row('mergeChecks').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-de.png') })
     await speak(base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
