@@ -138,10 +138,30 @@ interface HiveMessageValues {
   'git.push.tipTo': { branch: string | number; upstream: string | number }
   'git.push.tipTrack': { branch: string | number }
   'git.push.title': { branch: string | number }
+  'git.pushTo.about': { onBranch: string; branch: string | number }
+  'git.pushTo.all': undefined
+  'git.pushTo.button': undefined
+  'git.pushTo.thisBranch': { branch: string | number }
+  'git.pushTo.tip': { branch: string | number }
+  'git.pushTo.title': undefined
+  'git.pushTo.what': undefined
   'git.reading': undefined
   'git.remote.change': undefined
   'git.remote.changeFailed': { remote: string | number }
   'git.remote.changeTitle': { remote: string | number }
+  'git.remote.removeButton': undefined
+  'git.remote.removeDetail': { remote: string | number }
+  'git.remote.removeFailed': { remote: string | number }
+  'git.remote.removeMessage': { n: number; remote: string | number }
+  'git.remote.removeTip': { remote: string | number }
+  'git.remote.removeTitle': { remote: string | number }
+  'git.remote.removing': undefined
+  'git.remote.renameButton': undefined
+  'git.remote.renameFailed': { remote: string | number }
+  'git.remote.renameMessage': undefined
+  'git.remote.renameTip': { remote: string | number }
+  'git.remote.renameTitle': { remote: string | number }
+  'git.remote.taken': { remote: string | number }
   'git.remotes.add': undefined
   'git.remotes.addAbout': undefined
   'git.remotes.addButton': undefined
@@ -208,6 +228,17 @@ interface HiveMessageValues {
   'git.tool.oldLoses': { lost: string; version: string | number }
   'git.tool.tooOld': { version: string | number; min: string | number }
   'git.tool.tooOldToRun': { version: string | number }
+  'git.track.about': { tracks: string; branch: string | number; upstream: string | number }
+  'git.track.button': undefined
+  'git.track.pushFirst': { remote: string | number; branch: string | number; local: string | number }
+  'git.track.remoteBranch': undefined
+  'git.track.tip': { branch: string | number }
+  'git.track.title': { branch: string | number }
+  'git.untrack.button': undefined
+  'git.untrack.failed': { branch: string | number; upstream: string | number }
+  'git.untrack.message': { branch: string | number }
+  'git.untrack.tip': { upstream: string | number }
+  'git.untrack.title': { branch: string | number; upstream: string | number }
   'git.upstream.gone': undefined
   'git.validate.enterName': undefined
   'git.validate.enterUrl': undefined

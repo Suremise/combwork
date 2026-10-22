@@ -36,6 +36,11 @@ export class NonePlatform implements PlatformAdapter {
     return null
   }
 
+  /** None has no target: its evidence is its paths. */
+  planCovered(): boolean {
+    return true
+  }
+
   /** None's fingerprint is already its paths' content hash: nothing more to ask. */
   async content(): Promise<string | null> {
     return null

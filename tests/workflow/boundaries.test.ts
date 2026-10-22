@@ -51,23 +51,79 @@ describe('evidence checked where the intent writes', () => {
     expect(s.stale?.why).toBe('change')
   })
 
-  it("Git: the dependency's target reset while the start is on its way → refused; started again, the dependency blocks", async () => {
+  // G7 naming the target, and G7 empty: the repository's default branch, which the start resolves (#1401).
+  for (const target of ['main', ''])
+    it(`Git: the dependency's target reset while the start is on its way → refused; started again, the dependency blocks (G7 ${target ? `"${target}"` : 'empty: the default branch'})`, async () => {
+      const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target }))
+      const before = sh(e.project, 'rev-parse', 'main')
+      const a = await queued(e, 'A', 'a.txt')
+      sh(e.project, 'merge', '-q', '--no-ff', '-m', 'A', e.wf.state(a).latest!.revision!)
+      moved(await e.wf.reportMerge(a.key, B1))
+      const b = e.wf.createCard({ title: 'Needs A', blockedBy: [a.id] })
+      e.wf.cfg.hooks = {
+        beforeWrite: async (move) => {
+          if (move !== 'start') return
+          e.wf.cfg.hooks = {}
+          sh(e.project, 'reset', '-q', '--hard', before)
+        }
+      }
+      refusedBy(await e.wf.start(b.key, B2), 'evidence.changed')
+      expect(e.wf.state(b).stage).toBe('todo')
+      refusedBy(await e.wf.start(b.key, B2), 'start.dependenciesIntegrated')
+    })
+
+  it("Git: a card in Todo's evidence covers the target its start plans on, however it is resolved (#1401)", async () => {
     const e = (env = setup({ ...pairOpts, finish: 'agentMerges' }))
-    const before = sh(e.project, 'rev-parse', 'main')
-    const a = await queued(e, 'A', 'a.txt')
-    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'A', e.wf.state(a).latest!.revision!)
-    moved(await e.wf.reportMerge(a.key, B1))
-    const b = e.wf.createCard({ title: 'Needs A', blockedBy: [a.id] })
+    sh(e.project, 'branch', 'dev')
+    const p = e.wf.platform(e.options)
+    const card = e.store.cardByKey(e.wf.createCard({ title: 'Todo' }).key)!
+    const s = e.wf.state(card)
+    const cases: { name: string; o: Partial<typeof e.options>; worktree?: boolean; want: string }[] = [
+      { name: 'slots, G7 empty: the default branch', o: { folder: 'slots', target: '' }, want: 'main' },
+      { name: 'slots, G7 named', o: { folder: 'slots', target: 'dev' }, want: 'dev' },
+      { name: 'project folder, G7 empty: its line', o: { folder: 'project', target: '' }, want: 'main' },
+      { name: 'project folder, G7 named', o: { folder: 'project', target: 'dev' }, want: 'dev' },
+      { name: 'project folder, finishing by commit: its line', o: { folder: 'project', finish: 'committed', target: 'dev' }, want: 'main' },
+      { name: "the builder's worktree, G7 empty: its base", o: { target: '' }, worktree: true, want: 'dev' },
+      { name: "the builder's worktree, G7 named", o: { target: 'main' }, worktree: true, want: 'main' }
+    ]
+    for (const c of cases) {
+      const o = { ...e.options, ...c.o }
+      e.wf.cfg.agentFolder = c.worktree ? async () => ({ path: e.project, base: 'dev' }) : undefined
+      const primed = (await p.prime(card, s, o, B2)) as { target?: string | null }
+      const plan = (await p.start(card, o, B2)) as { target?: string }
+      expect([primed?.target, plan.target], c.name).toEqual([c.want, c.want])
+      // Its ref is what the fingerprint reads: moved, the evidence moves.
+      const was = p.evidence(card, s, o, primed)
+      sh(e.project, 'update-ref', `refs/heads/${c.want}`, sh(e.project, 'commit-tree', '-m', 'moved', `${c.want}^{tree}`, '-p', c.want))
+      expect(p.evidence(card, s, o, primed), c.name).not.toBe(was)
+    }
+    e.wf.cfg.agentFolder = undefined
+  })
+
+  it("Git: the builder worktree's base changing between the evidence and the plan → refused; the plan never uses a target the evidence didn't cover (#1401 round 2)", async () => {
+    const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target: '' }))
+    sh(e.project, 'branch', 'dev')
+    // Its base main as the evidence is taken, dev as the start is planned; dev then moves before the write.
+    let asked = 0
+    e.wf.cfg.agentFolder = async () => ({ path: e.project, base: ++asked === 1 ? 'main' : 'dev' })
+    const c = e.wf.createCard({ title: 'Changing base' })
     e.wf.cfg.hooks = {
       beforeWrite: async (move) => {
         if (move !== 'start') return
         e.wf.cfg.hooks = {}
-        sh(e.project, 'reset', '-q', '--hard', before)
+        sh(e.project, 'update-ref', 'refs/heads/dev', sh(e.project, 'commit-tree', '-m', 'moved', 'dev^{tree}', '-p', 'dev'))
       }
     }
-    refusedBy(await e.wf.start(b.key, B2), 'evidence.changed')
-    expect(e.wf.state(b).stage).toBe('todo')
-    refusedBy(await e.wf.start(b.key, B2), 'start.dependenciesIntegrated')
+    refusedBy(await e.wf.start(c.key, B2), 'evidence.changed')
+    expect(e.wf.state(c).stage).toBe('todo')
+    // Asked again with its base steady (dev), nothing moving it: it starts on dev, as it is now.
+    e.wf.cfg.hooks = {}
+    e.wf.cfg.agentFolder = async () => ({ path: e.project, base: 'dev' })
+    const s = await e.wf.start(c.key, B2)
+    moved(s)
+    expect([s.data!.target, s.data!.base]).toEqual(['dev', sh(e.project, 'rev-parse', 'dev')])
+    e.wf.cfg.agentFolder = undefined
   })
 
   it("a dependency's own facts changing while the start is on its way → refused", async () => {

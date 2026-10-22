@@ -734,6 +734,7 @@ function workflowRows(): Row[] {
     option('target', 'text'),
     option('mergeChecks', 'custom'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
+    option('strict', 'boolean'),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
     option('identity', 'custom'),

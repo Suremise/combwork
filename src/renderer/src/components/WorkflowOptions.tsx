@@ -310,6 +310,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       case 'noSelfReview':
         return <Switch checked={effective.noSelfReview || reviewerAgent(effective.review)} disabled={reviewerAgent(effective.review)} onChange={(v) => set('noSelfReview', v)} />
       case 'stopOwnRuns':
+      case 'strict':
       case 'dependenciesDone':
       case 'sharedFolderWarning':
         return <Switch checked={effective[key]} onChange={(v) => set(key, v)} />

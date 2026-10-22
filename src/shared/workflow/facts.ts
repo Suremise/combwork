@@ -6,6 +6,7 @@
 // In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { StoredText, TransientCause } from '../types'
+import { samePath } from '../movePaths'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
@@ -160,6 +161,8 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
   LineRenamed: { from: string; to: string; why: 'repair' }
+  /** The card's folder moved (#1343: Repair relinking or recreating the agent's worktree at a new place): its work follows it. */
+  FolderMoved: { from: string; to: string; why: 'repair' }
   /**
    * A line's move begun (#1271): written before it, so a move with no outcome after it (`LineMoved`, or
    * `LineMoveUndone`) holds the next card until it is settled.
@@ -179,7 +182,8 @@ export interface FactData {
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
   IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string }
+  /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
@@ -251,6 +255,8 @@ export interface QueueEntry {
   cancelled?: FactData['IntegrationCancelled']['reason']
   started?: FactData['IntegrationStarted']
   phases: FactData['IntegrationPhase']['phase'][]
+  /** G8 (#1352): the reviewed revision brought up to date with the target for this entry, the change the same. */
+  updated?: Pick<FactData['Updated'], 'from' | 'to' | 'how'>
 }
 
 export interface CardState {
@@ -395,8 +401,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       }
       case 'Updated': {
+        // The queue brought the reviewed revision up to date for one entry (G8, #1352): that entry's, never the card's
+        // approved revision, which stays the reviewed one (the builder's line; reconciliation and requeues read it).
         const d = f.data as FactData['Updated']
-        if (d.carried && s.approved) s.approved = { ...s.approved, revision: d.to }
+        const e = s.entries.find((x) => x.id === d.entry)
+        if (e && d.carried) e.updated = { from: d.from, to: d.to, how: d.how }
         break
       }
       case 'Stale': {
@@ -509,6 +518,12 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // Its line is the new name from here on: reconciliation reads the branch by it, and never finds it gone (#1305).
         const d = f.data as FactData['LineRenamed']
         if (s.started?.line && s.started.line.toLowerCase() === d.from.toLowerCase()) s.started = { ...s.started, line: d.to }
+        break
+      }
+      case 'FolderMoved': {
+        // Its folder is the new place from here on: reconciliation reads it there, and never finds it gone (#1343).
+        const d = f.data as FactData['FolderMoved']
+        if (s.started && s.started.folder !== 'project' && samePath(s.started.folder, d.from)) s.started = { ...s.started, folder: d.to }
         break
       }
       case 'HeadMoved': {

@@ -547,6 +547,8 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
   /** The queue with a counting install, each card changing (or not) package.json. */
   async function installs(mergeInstall: 'onManifestChange' | 'always', manifests: (string | null)[]) {
     const e = team({ mergeInstall })
+    // main not checked out: the target advances as a ref, without the checked-out folder's steps (#1351's suites test those).
+    sh(e.project, 'checkout', '-q', '--detach')
     let n = 0
     const q = e.queue({ install: async () => (n++, { ok: true, output: '' }) })
     const counts: number[] = []
@@ -558,8 +560,13 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
     return counts
   }
 
-  it('onManifestChange: installs for the first entry, not again while the manifests are unchanged, again when they change', async () => {
-    expect(await installs('onManifestChange', [null, null, '{"dependencies":{}}\n'])).toEqual([1, 1, 2])
+  // Two entries a test: each entry is a whole card and merge (#1396: three in one test neared the bound under load).
+  it('onManifestChange: installs for the first entry, not again while the manifests are unchanged', async () => {
+    expect(await installs('onManifestChange', [null, null])).toEqual([1, 1])
+  })
+
+  it('onManifestChange: installs again when the manifests change', async () => {
+    expect(await installs('onManifestChange', [null, '{"dependencies":{}}\n'])).toEqual([1, 2])
   })
 
   it('always: installs before every entry\'s checks', async () => {

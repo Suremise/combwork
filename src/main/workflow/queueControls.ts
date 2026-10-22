@@ -24,11 +24,12 @@ import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
 import { MergeQueue } from './mergeQueue'
 import { kickQueue, queueChanged, queueLive } from './queueHost'
+import { queueOrder } from './queueState'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
-import { QUEUE_ADVANCE_GATE, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
-import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
+import { QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
+import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -91,54 +92,14 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
 export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope): QueueView {
   const store = wf.store
-  const states = new Map<number, { card: CardRecord; s: CardState }>()
-  const of = (id: number): { card: CardRecord; s: CardState } => {
-    let x = states.get(id)
-    if (!x) {
-      const card = store.card(id)
-      states.set(id, (x = { card, s: wf.state(card) }))
-    }
-    return x
-  }
-  // The entries for this target, in the order queued: those still to merge, and every entry's card (for the outcomes).
-  const open: { f: Fact; card: CardRecord; state: 'open' | 'started' }[] = []
-  const entries = new Set<string>()
-  const cards = new Set<number>()
-  for (const f of store.factsOfKind('IntegrationRequested')) {
-    const d = f.data as FactData['IntegrationRequested']
-    if (d.target !== target) continue
-    entries.add(d.entry)
-    cards.add(f.card)
-    const { card, s } = of(f.card)
-    const e = s.entries.find((x) => x.id === d.entry)
-    if (e && (e.state === 'open' || e.state === 'started')) open.push({ f, card, state: e.state })
-  }
+  // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
+  // card reads and refusals give agents too).
   const live = queueLive(ws, projectPath, target)
+  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live)
   const lease = store.queueLease(target)
-  const named = (card: CardRecord): { card: number; key: string; title: string } => ({ card: card.id, key: card.key, title: card.title })
-  // Testing now: this Hive's entry at its step; else an advance begun (its recovery finishes it), or, when another
-  // Hive runs the queue, its first entry (its step isn't known here).
-  let testing: QueueTesting | null = null
-  if (live.now) {
-    const n = live.now
-    testing = { ...named(store.card(n.number)), entry: n.entry, revision: n.revision, expected: n.expected, step: n.step, started: n.started, run: live.run }
-  } else {
-    const begun = open.find((o) => o.state === 'started') ?? (lease && !live.running ? open[0] : undefined)
-    if (begun) {
-      const d = begun.f.data as FactData['IntegrationRequested']
-      const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started
-      testing = { ...named(begun.card), entry: d.entry, revision: d.revision, expected: st?.expected ?? null, step: st ? 'advance' : null, started: null, run: null }
-    }
-  }
-  const queued: QueueQueued[] = open
-    .filter((o) => (o.f.data as FactData['IntegrationRequested']).entry !== testing?.entry)
-    .map((o) => {
-      const d = o.f.data as FactData['IntegrationRequested']
-      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at }
-    })
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const { recent, returns, returnsMore } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const { recent, returns, returnsMore } = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),

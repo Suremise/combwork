@@ -150,6 +150,8 @@ interface HiveMessageValues {
   'tips.gitCheck.title': undefined
   'tips.gitInit.text': undefined
   'tips.gitInit.title': undefined
+  'tips.gitRemotes.text': undefined
+  'tips.gitRemotes.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
   'tips.gotoProject.text': { key: string | number }
@@ -214,6 +216,8 @@ interface HiveMessageValues {
   'tips.mergeQueuePanel.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
+  'tips.mergeStrict.text': undefined
+  'tips.mergeStrict.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined

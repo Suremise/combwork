@@ -13,6 +13,7 @@ import { join, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { boardSavepoint, boardWrite } from '../boardStore'
+import { samePlace } from '../fsutil'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
 import { isUnknown } from '../platform/types'
@@ -24,6 +25,7 @@ import { FactStore } from './factStore'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow } from './runtime'
+import { NOT_RUN_HERE, type QueueLive } from './queueState'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = 'hive.workflow.enforce'
@@ -39,6 +41,15 @@ const M = {
 let runsGoing: ((project: string, agent: string) => string[]) | null = null
 export function setRunsGoing(fn: ((project: string, agent: string) => string[]) | null): void {
   runsGoing = fn
+}
+
+/**
+ * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals
+ * give agents, #1354). Given by the app as it starts (none in unit tests: nothing runs a queue here).
+ */
+let queueLiveOf: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null = null
+export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null): void {
+  queueLiveOf = fn
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -151,6 +162,11 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Before P7's slots, an agent's own worktree is a card's folder (SPEC §16.19.1), as project.json has it.
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
+    // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
+    movePending: async () => {
+      const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
+      return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)
+    },
     agentFolder: async (agent) => {
       const a = projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent)
       return a?.worktree?.path ? { path: a.worktree.path, base: a.worktree.base ?? null } : null
@@ -175,6 +191,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
         { alive }
       )
     },
-    enforced: workflowEnforced
+    enforced: workflowEnforced,
+    queueLive: (target) => queueLiveOf?.(ws, project.path, target) ?? NOT_RUN_HERE
   })
 }

@@ -45,6 +45,8 @@
   "workspace.antivirus.devUntrustedTip": "信頼されていないDev Driveです。Defenderはほかのドライブと同じようにスキャンします。",
   "workspace.antivirus.dontAsk": "今後表示しない",
   "workspace.antivirus.folder": "フォルダー",
+  "workspace.antivirus.goneHint": "{n, plural, other {Hive は、存在しなくなったフォルダー（移動または削除済み）を除外しています。「Hiveの除外を削除…」でこれらも削除されます。}}",
+  "workspace.antivirus.goneTitle": "存在しなくなったフォルダーに対する Hive の除外",
   "workspace.antivirus.hidden": "Defenderは除外一覧を管理者にしか見せないため、Hiveは許可を求めない限り確認できません。",
   "workspace.antivirus.holdsHome": "ホームフォルダー、プロファイル、またはシステムフォルダーそのものか、それを含んでいます",
   "workspace.antivirus.kindTests": "Hiveのテスト領域（Hiveの開発用）",

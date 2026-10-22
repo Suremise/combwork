@@ -116,7 +116,7 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { GitHistory, GitRepoInfo, GitRepoSummary } from './gitRepo'
+import type { GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -757,6 +757,15 @@ export interface HiveRequests {
   'git:pull': (projectPath: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
   'git:push': (projectPath: string, remote?: string) => string
+  /** Push to… (#1385): the branch checked out, or every branch and tag, to any remote; never changes what a branch tracks. */
+  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string) => string
+  /** The local branches tracking a remote, all of them: what Remove's confirmation lists (#1385). */
+  'git:remoteTracking': (projectPath: string, remote: string) => string[]
+  /** `expected`: the branches the confirmation listed; refused when those tracking it now differ. */
+  'git:removeRemote': (projectPath: string, name: string, expected?: string[]) => string
+  'git:renameRemote': (projectPath: string, from: string, to: string) => string
+  /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
+  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean) => string
   'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string

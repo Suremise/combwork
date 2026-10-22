@@ -82,6 +82,8 @@ describe('test waits (#524)', () => {
     expect(findUnbounded(lines(`  await ${P}(() => count()).toBe(2)`))).toHaveLength(1)
     // Over several lines, with a trailing comma.
     expect(findUnbounded(lines(`  await ${W}(`, '    async () => {', '      expect(await read()).toBe(1)', '    },', '  )'))).toEqual([{ line: 1, code: `await ${W}(`, commented: false }])
+    // In a ternary, its ':' after the call (#1400: not taken for a definition's return type).
+    expect(findUnbounded(lines(`  const id = sent > 0 ? await ${U}(() => turnOf(text)) : null`, `  const v = ready ? ${U}(() => x()) : null`))).toHaveLength(2)
   })
 
   it('finds a bound under 5 s given as a number: a time budget, not a bound for a hung run', () => {
@@ -99,6 +101,8 @@ describe('test waits (#524)', () => {
     const U = ['unt', 'il'].join('')
     expect(findUnbounded(lines(`  await lib.${U}(() => open(), HUNG_MS)`, `  await ${U}(() => open(), 10000, 150)`, `  await ${W}(() => expect(n).toBe(1), { timeout: HUNG_MS, interval: 50 })`, `  await ${W}(() => expect(n).toBe(1), HANG)`, `  await ${P}(() => n, { timeout: 30_000 }).toBe(1)`))).toEqual([])
     expect(findUnbounded(lines(`const ${U} = async (fn, ms = 10000) => {`, '  return fn()', '}', `async function ${U}(fn, ms) {}`))).toEqual([])
+    // Definitions with a return type or a body: a method, a function's signature.
+    expect(findUnbounded(lines(`  async ${U}(fn: () => boolean, ms: number): Promise<boolean> {`, '  }', `  ${U}(fn, ms) {`, '  }', `export function ${U}(fn: () => unknown, ms?: number): Promise<unknown>`))).toEqual([])
     expect(findUnbounded(lines(`  const sample = 'await ${U}(() => x)'`, `  // await ${U}(() => x)`, `  const re = /${U}\\(/`))).toEqual([])
     // A regex with a bracket in it doesn't throw the reading of the call after it.
     expect(findUnbounded(lines(`  await lib.${U}(async () => /\\(x/.test(await text()), HUNG_MS)`, `  await lib.${U}(() => ok())`))).toEqual([{ line: 2, code: `await lib.${U}(() => ok())`, commented: false }])
