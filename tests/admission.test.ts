@@ -3,11 +3,12 @@
 // workspaces is kept. A persistent reader of one no window holds is refused, also while a connection to it is still open;
 // what must reach a workspace no window holds (the Assistant told of an unexpected close at start) goes on a transient
 // open of its own (leaveEntry, leaveDelivery) that leaves no handle, and never admits it.
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { junction, shortPath } from './pathAliases'
 
 const base = tempDir('hive-admission-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -187,34 +188,74 @@ describe('deliveries (#1395)', () => {
     await w.close()
   })
 
-  // HR6's round 1: the window's store read the host before the lease's write; once it lands the store has it too.
-  for (const how of ['loaded', 'loading'] as const) {
-    it(`a window opening the workspace and ${how === 'loaded' ? 'loading' : 'starting to load'} the host while a delivery is left: saved, and live in the window's store; the lease doesn't close the window's board`, async () => {
+  // HR6's rounds 1 and 2: the window's store read the host before the lease's write; once it lands the store has it too,
+  // however the lease and the window spell the workspace (a path saved by the last run may not be the one opened now).
+  type Spelling = 'real' | 'junction' | '8.3'
+  const cases: { lease: Spelling; window: Spelling; how: 'loaded' | 'loading' }[] = [
+    { lease: 'real', window: 'real', how: 'loaded' },
+    { lease: 'real', window: 'real', how: 'loading' },
+    { lease: 'junction', window: 'real', how: 'loaded' },
+    { lease: 'real', window: 'junction', how: 'loaded' },
+    { lease: 'junction', window: 'real', how: 'loading' },
+    { lease: '8.3', window: 'real', how: 'loaded' },
+    { lease: 'real', window: '8.3', how: 'loaded' }
+  ]
+  for (const c of cases) {
+    it(`a delivery left by the ${c.lease} path while a window opens the workspace by the ${c.window} path and ${c.how === 'loaded' ? 'loads' : 'starts loading'} the host: saved, and live in the window's store`, async ({ skip }) => {
       const ws = workspace()
-      const host = join(ws, 'proj')
-      let early: ReturnType<typeof deliveries.load> | null = null
-      deliveries.setInLeaveForTests(async () => {
-        deliveries.setInLeaveForTests(null)
-        await w.open(ws)
-        early = deliveries.load(host)
-        if (how === 'loaded') expect((await early).records).toEqual([])
-      })
-      const r = (await deliveries.leaveDelivery(host, delivery('while opening')))!
-      await early
-      expect(board.boardOpen(ws)).toBe(true)
-      expect(nothingOpen(ws)).toBe(false)
-      // Persisted, and in the store the window loaded (the same one, not a fresh load), waiting for its agent.
-      expect((await deliveries.savedForTests(host)).deliveries.map((x) => x.id)).toEqual([r.id])
-      expect(deliveries.deliveryNow(host, r.id)).toMatchObject({ state: 'queued', body: 'while opening' })
-      expect(await deliveries.load(host)).toBe(await early)
-      // A delivery made the ordinary way next takes the next id, beside it.
-      const next = await deliveries.createDelivery(host, delivery('after'))
-      expect(next.seq).toBe(r.seq + 1)
-      expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => x.id)).toEqual([r.id, next.id])
-      await w.close()
+      const short = shortPath(ws)
+      if ((c.lease === '8.3' || c.window === '8.3') && !short) return skip('this volume makes no 8.3 names')
+      const via = junction(ws, join(base, `via-${++n}`))
+      const spelt = (s: Spelling): string => (s === 'real' ? ws : s === 'junction' ? via : short!)
+      try {
+        const host = join(spelt(c.window), 'proj')
+        let early: ReturnType<typeof deliveries.load> | null = null
+        deliveries.setInLeaveForTests(async () => {
+          deliveries.setInLeaveForTests(null)
+          await w.open(spelt(c.window))
+          early = deliveries.load(host)
+          if (c.how === 'loaded') expect((await early).records).toEqual([])
+        })
+        const r = (await deliveries.leaveDelivery(join(spelt(c.lease), 'proj'), delivery('while opening')))!
+        await early
+        expect(board.boardOpen(spelt(c.window))).toBe(true)
+        // Persisted, and in the store the window loaded (the same one, not a fresh load), waiting for its agent.
+        expect((await deliveries.savedForTests(host)).deliveries.map((x) => x.id)).toEqual([r.id])
+        expect(deliveries.deliveryNow(host, r.id)).toMatchObject({ state: 'queued', body: 'while opening' })
+        expect(await deliveries.load(host)).toBe(await early)
+        // A delivery made the ordinary way next takes the next id, beside it.
+        const next = await deliveries.createDelivery(host, delivery('after'))
+        expect(next.seq).toBe(r.seq + 1)
+        expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => x.id)).toEqual([r.id, next.id])
+        await w.close()
+      } finally {
+        unlinkSync(via)
+      }
       expect(nothingOpen(ws)).toBe(true)
     })
   }
+
+  it("a delivery left for one project's host isn't given to, nor read again by, another project's in the same workspace (control)", async () => {
+    const ws = workspace()
+    mkdirSync(join(ws, 'other', '.hive'), { recursive: true })
+    writeFileSync(join(ws, 'other', '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'B1' }] }))
+    const other = join(ws, 'other')
+    let theirs: Awaited<ReturnType<typeof deliveries.load>> | null = null
+    let records: unknown = null
+    deliveries.setInLeaveForTests(async () => {
+      deliveries.setInLeaveForTests(null)
+      await w.open(ws)
+      theirs = await deliveries.load(other)
+      records = theirs.records
+    })
+    const r = (await deliveries.leaveDelivery(join(ws, 'proj'), delivery('for proj only')))!
+    expect(await deliveries.load(other)).toBe(theirs)
+    expect(theirs!.records).toBe(records)
+    expect(deliveries.deliveryNow(other, r.id)).toBeNull()
+    expect(deliveries.deliveryNow(join(ws, 'proj'), r.id)).toBeNull()
+    expect((await deliveries.deliveriesOf(join(ws, 'proj'), 'b1')).map((x) => x.id)).toEqual([r.id])
+    await w.close()
+  })
 })
 
 describe('the usage worker (#1395)', () => {

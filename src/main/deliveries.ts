@@ -886,25 +886,30 @@ export async function leaveDelivery(host: string, nd: NewDelivery): Promise<Deli
   const { meta, agentName } = checkedNew(host, nd)
   const place = await hostPlace(host)
   const rec = await leftOnLease(host, place, nd, meta, agentName)
-  if (rec) await reconcileLeft(host)
+  if (rec) await reconcileLeft(place)
   return rec
 }
 
 /**
- * A host loaded while a delivery was left on a lease (HR6's #1395 round 1: a window opened its workspace meanwhile): a
- * load under way is awaited, then the store read again from what is committed, under its lock (after its transactions
- * before, as a save that found another Hive's change does: reread), and its agents shown what waits. Not loaded: nothing.
+ * The host whose deliveries a lease's write left, loaded meanwhile (HR6's #1395 rounds 1 and 2: a window opened its
+ * workspace, by whatever spelling, and loaded it). A host's deliveries are one (workspace place, scope): its real
+ * location and its scope, never the spelling a store is kept under. Each load under way of that workspace is awaited (its
+ * scope known once it resolves; one starting after the write reads it anyway), then every store of that identity read
+ * again from what is committed, under its lock (after its transactions before, as a save that found another Hive's change
+ * does: reread; what it holds in memory alone, offers and confirmations, is kept), and its agents shown what waits. A
+ * store of another scope, or another workspace, isn't touched.
  */
-async function reconcileLeft(host: string): Promise<void> {
-  const k = keyOf(host)
-  await loading.get(k)?.catch(() => undefined)
-  const store = stores.get(k)
-  if (!store) return
-  try {
-    await locked(store, () => reread(store))
-    showAll(store)
-  } catch (e) {
-    log.warn('reading the deliveries again after one was left for them', e)
+async function reconcileLeft(place: { workspace: string; scope: string }): Promise<void> {
+  const ws = placeKey(place.workspace)
+  await Promise.allSettled([...loading].filter(([k]) => placeKey(hostWorkspace(k)) === ws).map(([, p]) => p))
+  for (const store of [...stores.values()]) {
+    if (store.place.scope !== place.scope || placeKey(store.place.workspace) !== ws) continue
+    try {
+      await locked(store, () => reread(store))
+      showAll(store)
+    } catch (e) {
+      log.warn('reading the deliveries again after one was left for them', e)
+    }
   }
 }
 
