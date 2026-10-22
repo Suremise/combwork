@@ -37,6 +37,7 @@ import { projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { BusyButton, Icon, IconButton, LoadFailed, Modal, StaleNote, Tooltip, useBusy } from '../components/ui'
 import { INIT_TEXT, InitRepoButton, InitRepoHost } from '../components/InitRepo'
 import { ChangesTab } from './ProjectTabs'
+import { GitQueueSection } from '../components/GitQueueSection'
 
 /** A message with markup, as React children (keyed, so a list of parts renders without warnings). */
 const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
@@ -276,6 +277,8 @@ export function GitTab({ project }: { project: ProjectInfo }) {
           <GitProblem problem={s.gitProblem} retry={summary.reload} />
         ) : section === 'history' ? (
           <HistorySection project={project} summary={s} />
+        ) : section === 'queue' ? (
+          <GitQueueSection project={project} />
         ) : (
           <BranchesSection project={project} />
         )}

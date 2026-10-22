@@ -36,6 +36,7 @@
   "errors.log.none": "That run reported no log.",
   "errors.log.notFullPath": "The run reported its log without a full path: {path}",
   "errors.log.notText": "Hive opens only text logs and reports, not {file}: use Show in folder.",
+  "errors.merge.queueMerges": "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
   "errors.mergeSlot.holdRequired": "Which hold to release is required",
   "errors.pref.notProjectPref": "Not a project preference.",
   "errors.pref.notValue": "Not a {pref} value.",

@@ -29,7 +29,7 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
-import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
+import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -128,7 +128,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
  * exactly. Only rows the panel shows get seen, and it shows only `returns`, so kept rows never outnumber the bound and
  * nothing displaces them: the next unseen ones come as they fold (the window reads again then).
  */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, bound: number): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, bound: number, latest = RECENT_MAX): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
   const out: (QueueRecent & { seq: number })[] = []
   const named = (f: Fact) => {
     const c = card(f.card)
@@ -138,14 +138,14 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
     const d = f.data as FactData['Integrated']
     // A card of this queue merged into its target (by the queue, or seen merged outside it).
     if (d.target !== target || !cards.has(f.card) || (d.entry && !entries.has(d.entry))) continue
-    out.push({ ...named(f), entry: d.entry ?? '', outcome: 'merged', result: d.result, by: d.by })
+    out.push({ ...named(f), entry: d.entry ?? '', outcome: 'merged', revision: d.revision, result: d.result, by: d.by })
   }
   for (const f of wf.store.factsOfKind('IntegrationFailed')) {
     const d = f.data as FactData['IntegrationFailed']
     // A target that moved is tested again (a new entry), never returned.
     if (d.target !== target || !entries.has(d.entry) || d.reason === 'targetMoved') continue
     const at = seen.get(d.entry)
-    out.push({ ...named(f), entry: d.entry, outcome: 'returned', reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
+    out.push({ ...named(f), entry: d.entry, outcome: 'returned', revision: d.revision, reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
   }
   for (const f of wf.store.factsOfKind('IntegrationCancelled')) {
     const d = f.data as FactData['IntegrationCancelled']
@@ -171,7 +171,7 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
   kept.sort((a, b) => (a.seen === b.seen ? newer(a, b) : a.seen! < b.seen! ? 1 : -1))
   const shownKept = kept.slice(0, bound)
   const slots = bound - shownKept.length
-  return { recent: out.slice(0, RECENT_MAX).map(strip), returns: [...shownKept, ...unseen.slice(0, slots)].map(strip), returnsMore: Math.max(0, unseen.length - slots) }
+  return { recent: out.slice(0, latest).map(strip), returns: [...shownKept, ...unseen.slice(0, slots)].map(strip), returnsMore: Math.max(0, unseen.length - slots) }
 }
 
 /**
@@ -240,6 +240,48 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
 export async function recheckStuck(ws: WorkspaceService, projectPath: string, target: string): Promise<void> {
   const wf = await workflowFor(ws, projectPath)
   if (wf?.store.queuePause(target)?.reason === 'needsYou') await resumeQueue(ws, projectPath, target)
+}
+
+/**
+ * A target's queue history (#1357, the Git tab's Merge queue section): its latest HISTORY_MAX outcomes, newest first
+ * (merged with the result, returned with why, cancelled), each with its card. The window's only.
+ */
+export async function queueHistory(ws: WorkspaceService, projectPath: string, target: string): Promise<QueueRecent[]> {
+  const wf = await workflowFor(ws, projectPath)
+  if (!wf) return []
+  const { entries, cards } = queueOrder(wf, target, queueLive(ws, projectPath, target))
+  return recentOutcomes(wf, target, entries, cards, (id) => wf.store.card(id), wf.store.queueSeen(), new Set(), 0, HISTORY_MAX).recent
+}
+
+/**
+ * The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog, OP-13): a card in flight
+ * (started, not Done) on that line whose own ruleset has Hive merge it, with the rules enforced; and where it stands in
+ * the queue. Null: no such card (the dialog merges as ever).
+ */
+export async function branchQueueCard(ws: WorkspaceService, projectPath: string, branch: string): Promise<BranchQueueCard | null> {
+  const wf = await workflowFor(ws, projectPath)
+  if (!wf || !workflowEnforced() || !branch) return null
+  for (const card of wf.store.cards()) {
+    const s = wf.state(card)
+    if (!s.started || s.started.line !== branch || s.stage === 'todo' || s.stage === 'done') continue
+    const o = wf.rulesetOf(card, s).options
+    if (o.platform !== 'git' || o.finish !== 'hiveMerges') continue
+    const target = s.entries.at(-1)?.target ?? s.started.target ?? ''
+    const v = target ? queueView(ws, wf, projectPath, target) : null
+    const at = v?.queued.findIndex((q) => q.card === card.id) ?? -1
+    const where: BranchQueueCard['where'] = v?.testing?.card === card.id ? 'testing' : at >= 0 ? 'queued' : s.stage === 'merging' ? 'queued' : 'notYet'
+    return { card: card.id, key: card.key, title: card.title, target, where, ...(at >= 0 ? { position: at + 1 + (v?.testing ? 1 : 0) } : {}), paused: !!v?.paused }
+  }
+  return null
+}
+
+/**
+ * The user merged a Hive-merges card's branch from the Merge dialog anyway (#1357, OP-13): an override on the card, its
+ * reason given. The merge itself is observed as one done outside Hive (§16.4.4), which cancels its queue entry.
+ */
+export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: string, n: number, reason: string): Promise<void> {
+  const wf = await needWorkflow(ws, projectPath)
+  await wf.mergedOutsideQueue(n, reason)
 }
 
 /**

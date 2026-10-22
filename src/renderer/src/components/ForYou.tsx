@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { ROUND_LIMIT_GATE, type RoundChoice } from '@shared/workflow/facts'
+import { QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type RoundChoice } from '@shared/workflow/facts'
 import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import type { ForYouAnswer, ForYouItem } from '@shared/workflow/workView'
 import { call, errorMessage } from '../api'
 import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, Tooltip, useBusy } from './ui'
+import { SHOW_QUEUE_WORK } from './CardQueue'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
 // its dialog where the user answers them (tasks:answer, #1269: only the user answers). Hive's own requests are shown
@@ -71,6 +72,14 @@ export function ForYouSection({ card, items, drafts, setDraft, setAnswering }: {
   )
 }
 
+/**
+ * Brings the card dialog's Work section into view at its merge queue part (the stopped merge's files and commands):
+ * the Work section opens if it is folded, and shows it once read (HR3's #1357 round 1 finding 2).
+ */
+function showStuck(): void {
+  window.dispatchEvent(new Event(SHOW_QUEUE_WORK))
+}
+
 function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: TaskCard; item: ForYouItem; reply: string; setReply: (text: string) => void; setAnswering: (busy: boolean) => void }) {
   const agents = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.agents)
   const [rounds, setRounds] = useState('1')
@@ -111,6 +120,12 @@ function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: Ta
         <span className="for-you-kind">{kindText(item)}</span> {text}
       </div>
       <div className="faint for-you-asked">{tr(M.asked, { who, when: timeAgo(item.since) })}</div>
+      {/* A merge stopped part way (#1357, the Assistant's requirement): its files and commands are one click away. */}
+      {item.gate === QUEUE_STUCK_GATE && (
+        <button type="button" className="btn small subtle for-you-show-work" data-action="show-stuck" onClick={showStuck}>
+          <Icon name="list-flat" /> {tr(msg({ id: 'board.forYou.showStuck', defaultMessage: 'Show the files and commands', description: "A button on a For you request about a merge that stopped part way: shows the card's Work section, where each file and the commands that finish or undo the merge are listed." }))}
+        </button>
+      )}
       {!!item.checklist?.length && (
         <div className="for-you-checklist">
           <div className="faint">{tr(M.checklist)}</div>

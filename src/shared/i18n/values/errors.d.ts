@@ -38,6 +38,7 @@ interface HiveMessageValues {
   'errors.log.none': undefined
   'errors.log.notFullPath': { path: string | number }
   'errors.log.notText': { file: string | number }
+  'errors.merge.queueMerges': { card: string | number }
   'errors.mergeSlot.holdRequired': undefined
   'errors.pref.notProjectPref': undefined
   'errors.pref.notValue': { pref: string | number }

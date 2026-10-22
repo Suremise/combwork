@@ -36,6 +36,7 @@
   "errors.log.none": "Essa execução não informou nenhum log.",
   "errors.log.notFullPath": "A execução informou o log sem um caminho completo: {path}",
   "errors.log.notText": "O Hive só abre logs e relatórios de texto, não {file}: use Mostrar na pasta.",
+  "errors.merge.queueMerges": "O Hive faz o merge de {card} pela fila de merge. Faça o merge por lá, ou escolha Fazer o merge mesmo assim no diálogo de merge.",
   "errors.mergeSlot.holdRequired": "É preciso dizer qual vez de merge liberar",
   "errors.pref.notProjectPref": "Não é uma preferência de projeto.",
   "errors.pref.notValue": "Não é um valor de {pref}.",

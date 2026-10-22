@@ -459,6 +459,17 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     expect(shownReturns(withKept([later], keptLive([...aKept, ...bKept], Date.now()))[0], Date.now())).toEqual([])
   })
 
+  it("a target's history for the Git tab (#1357): its latest 50 outcomes, newest first, each with its card's revision", async () => {
+    const { w, repo, card, view } = await returned(54)
+    const { queueHistory } = await import('../src/main/workflow/queueControls')
+    const h = await inWorkspace(w, () => queueHistory(w, repo, 'main'))
+    expect(h).toHaveLength(50)
+    expect(h[0]).toMatchObject({ entry: 'o53/e1', outcome: 'returned', reason: 'checks', revision: 'f'.repeat(40) })
+    expect(h.some((r) => r.card === card)).toBe(false)
+    // The Agent API's model keeps its 20 (its revision stripped by publicQueue).
+    expect((await view()).recent).toHaveLength(20)
+  })
+
   it('equal seen times keep a fixed order; a second mark (another window) keeps the first time', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
     const { view, see } = await returned(3)
@@ -501,5 +512,34 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     expect(v.returnsMore).toBe(0)
     const seen = FactStore.forBoard(w, { project: 'p', key: 'p' }).queueSeen()
     expect([...seen.keys()].some((e) => /^o(2\d|[3-6]\d)\/e1$/.test(e))).toBe(false)
+  })
+})
+
+describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)', () => {
+  it("the Merge dialog's card for a branch: Hive merges it (its own ruleset, the rules enforced), where it stands; Merge anyway recorded as an override", async () => {
+    const { w, wt, repo } = await workspace()
+    const { branchQueueCard, mergedOutsideQueue } = await import('../src/main/workflow/queueControls')
+    const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
+    // Started: not in the queue yet.
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'On the branch', project: 'p' }, user)).number)
+    await act(w, card, builder, { kind: 'start' })
+    expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, target: 'main', where: 'notYet', paused: false })
+    writeFileSync(join(wt, 'q.txt'), 'q\n')
+    git(wt, 'add', '-A')
+    git(wt, 'commit', '-qm', 'q')
+    await act(w, card, builder, { kind: 'submit', summary: 'ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'ok' })
+    expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued', position: 1 })
+    // The next cards go to the agent: this one keeps its ruleset, so Hive still merges it.
+    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
+    expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued' })
+    // Another branch, or the rules off: none.
+    expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'other'))).toBeNull()
+    await advanced.set(service.ENFORCE, false)
+    expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toBeNull()
+    await advanced.set(service.ENFORCE, true)
+    await inWorkspace(w, () => mergedOutsideQueue(w, repo, card, 'release today'))
+    expect(facts(w, card).filter((f) => f.kind === 'Override').at(-1)?.data).toEqual({ rules: ['integrate'], move: 'merge outside the queue', by: 'user', reason: 'release today' })
   })
 })

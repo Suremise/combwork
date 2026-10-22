@@ -147,6 +147,10 @@
     "defaultMessage": "Hive opens only text logs and reports, not {file}: use Show in folder.",
     "description": "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
   },
+  "errors.merge.queueMerges": {
+    "defaultMessage": "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
+    "description": "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue."
+  },
   "errors.mergeSlot.holdRequired": {
     "defaultMessage": "Which hold to release is required",
     "description": "Releasing a merge slot without saying which (a programming error, rarely seen)."

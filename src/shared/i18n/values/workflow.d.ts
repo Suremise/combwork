@@ -17,7 +17,7 @@ interface HiveMessageValues {
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
   'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
-  'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; how: string; finish: string | number; project: string | number; undo: string | number }
+  'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; files: number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
   'workflow.forYouKind': { kind: string }
