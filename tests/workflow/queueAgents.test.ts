@@ -5,12 +5,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { leftWake, NOT_RUN_HERE, pauseWait, queueLine, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
+import { leftWake, NOT_RUN_HERE, pauseWait, queueLine, type PauseWait, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
 import { keptLog, KEPT_LOG, type PauseReason } from '../../src/main/workflow/mergeQueue'
 import { refusalLines } from '../../src/shared/workflow/refusals'
 import { laneNextText } from '../../src/shared/lanes'
 import { cardChange, loopWakeLine } from '../../src/shared/watch'
 import type { FactData } from '../../src/shared/workflow/facts'
+import type { QueueStuck } from '../../src/shared/workflow/queue'
 import type { TaskCard } from '../../src/shared/types'
 
 let env: Env | null = null
@@ -89,7 +90,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
     expect(refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'notYet' }, { one: (m) => m.id, list: (x) => x.join(', '), names: true }).next).toBe('workflow.refused.merge.hiveMerges.next')
     // A paused queue's next step by what the pause waits for (#1406).
     const paused = (waits?: string) => refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'paused', target: 'main', ...(waits ? { waits } : {}) }, { one: (m) => m.id, list: (x) => x.join(', '), names: true }).next
-    expect([paused('resume'), paused('answer'), paused('folder'), paused('rules'), paused()]).toEqual(['nextPaused', 'nextPausedAnswer', 'nextPausedFolder', 'nextPausedRules', 'nextPaused'].map((x) => `workflow.refused.merge.hiveMerges.${x}`))
+    expect([paused('resume'), paused('answer'), paused('fix'), paused('folder'), paused('rules'), paused()]).toEqual(['nextPaused', 'nextPausedAnswer', 'nextPausedFix', 'nextPausedFolder', 'nextPausedRules', 'nextPaused'].map((x) => `workflow.refused.merge.hiveMerges.${x}`))
   })
 
   it("a paused queue: the line and the refusal's next step say what the pause waits for, the agent's own step the same (#1406)", async () => {
@@ -97,20 +98,25 @@ describe('refusals under Hive merges (the card says what to do)', () => {
     const { card: first } = await queued(e, 'One')
     const { card } = await queued(e, 'Two')
     const tail = ': wait for Done, or for it to come back.'
-    const cases: [PauseReason, string, string][] = [
-      ['user', 'it moves on once the user resumes it.', 'which is paused until it is resumed'],
-      ['targetMovesFast', 'it moves on once the user resumes it.', 'which is paused until it is resumed'],
-      ['approval', 'it moves on once the user answers, in For you, whether to update main now.', 'which is paused until the user answers in For you'],
-      ['needsYou', 'it moves on once the user settles what stopped it (their answer in For you, or Resume).', 'which is paused until the user answers in For you'],
-      ['wrongBranch', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
-      ['staged', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
-      ['unstagedChanges', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
-      ['folderBusy', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
-      ['rulesOff', 'it paused while workflow rules were off; it moves on once the user resumes it.', 'which paused while workflow rules were off and waits until the user resumes it']
+    // A stuck advance (its terminal state, asked in For you), as the queue saves it.
+    const stuck: QueueStuck = { folder: e.project, branch: 'main', ref: null, expected: 'a'.repeat(40), result: 'b'.repeat(40), phase: 'files', files: [{ path: 'a.txt', side: 'other' }], commands: [] }
+    const cases: [PauseReason, PauseWait, string, string, QueueStuck?][] = [
+      ['user', 'resume', 'it moves on once the user resumes it.', 'which is paused until it is resumed'],
+      ['targetMovesFast', 'resume', 'it moves on once the user resumes it.', 'which is paused until it is resumed'],
+      ['approval', 'answer', 'it moves on once the user answers, in For you, whether to update main now.', 'which is paused until the user answers in For you'],
+      // needsYou with no question (git's error, an earlier runner's process): fixed, then Resume; a stuck advance: For you.
+      ['needsYou', 'fix', 'it moves on once the user fixes what stopped it and resumes it.', 'which is paused until the user fixes what stopped it and resumes it'],
+      ['needsYou', 'answer', 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume).', 'which is paused until the user answers in For you', stuck],
+      ['wrongBranch', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
+      ['staged', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
+      ['unstagedChanges', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
+      ['folderBusy', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
+      // Hive resumes it once the rules are enforced again (queueHost's startOpen); one left from before, Resume.
+      ['rulesOff', 'rules', 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it).', 'which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it)']
     ]
-    for (const [reason, line, next] of cases) {
-      e.store.setQueuePause('main', { reason, card: first.key })
-      expect(pauseWait(reason)).toBe(reason === 'approval' || reason === 'needsYou' ? 'answer' : reason === 'rulesOff' ? 'rules' : reason === 'user' || reason === 'targetMovesFast' ? 'resume' : 'folder')
+    for (const [reason, waits, line, next, st] of cases) {
+      e.store.setQueuePause('main', { reason, card: first.key, ...(st ? { stuck: st } : {}) })
+      expect(pauseWait(reason, !!st)).toBe(waits)
       expect(e.wf.queueLineOf(card.key)).toBe(`Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, which is paused (${reason}, on ${first.key}); ${line}`)
       const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
       expect(r.next).toBe(`It is in the merge queue for main, ${next}${tail}`)

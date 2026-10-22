@@ -2393,10 +2393,11 @@ switches to "The agent merges", and one started afterwards reports its merge.
 - **Refusals** (`merge.hiveMerges`, three messages in 7 locales; agents get the English): `report merge` (and an
   agent's `hive_update_task` move to Done, translated or not) and a merge-slot claim naming the card are refused with
   where it is in the queue as the next step (`QUEUE_NEXT`: queued with its position, being merged, paused, returned,
-  merged; otherwise "once it is approved"; paused, with what the pause waits for, #1406: `pauseWait` of its reason, the
-  user's Resume, their answer in For you (`approval`, `needsYou`), the checked-out folder put right (`wrongBranch`,
-  `staged`, `unstagedChanges`, `folderBusy`), or Resume after the rules were off (`rulesOff`), as the agent's queue
-  line says too), and "set in Version Control → Who merges. A card keeps the rules it started
+  merged; otherwise "once it is approved"; paused, with what the pause waits for, #1406: `pauseWait` of the saved pause,
+  the user's Resume, their answer in For you (`approval`; `needsYou` with a stuck advance), what stopped it fixed and
+  Resume (`needsYou` with no question: git's error, an earlier runner's process), the checked-out folder put right and
+  Resume (`wrongBranch`, `staged`, `unstagedChanges`, `folderBusy`), or the rules enforced again, which resumes it
+  (`rulesOff`; Resume for one left paused with them on), as the agent's queue line says too), and "set in Version Control → Who merges. A card keeps the rules it started
   with." The claim is refused before the slot is touched; one naming no card, or cards the agent merges, is unchanged,
   and so is the Merge dialog's. Each is a `Refused` fact; `override` is none.
 - **Wakes**: a returned card's (`returnCard`) says what came back (a conflict: its files; checks: which check, `install`

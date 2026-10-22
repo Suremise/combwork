@@ -1237,7 +1237,7 @@ export class Workflow {
     if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
     if (q.state === 'queued') values.n = q.position
     // What the pause waits for (#1406): the refusal's next step says it.
-    if (q.state === 'paused') values.waits = pauseWait(q.reason)
+    if (q.state === 'paused') values.waits = pauseWait(q.reason, q.stuck)
     return { rule: 'merge.hiveMerges', values }
   }
 
