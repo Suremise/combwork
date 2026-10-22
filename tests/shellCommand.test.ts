@@ -8,7 +8,10 @@ import { createRequire } from 'module'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
-const { stopProcessesIn } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number }
+const req = createRequire(import.meta.url)
+const { stopProcessesIn } = req('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number }
+// The run context's allowlisted environment, never the shell's (tests/README.md).
+const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined }))
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
@@ -24,13 +27,12 @@ describe("a worktree setup command's command line", () => {
 
 describe.runIf(process.platform === 'win32')('a worktree setup command with a quoted path run in a terminal', () => {
   const dir = tempDir('hive-shell-command-')
-  // A folder with a space, as the path the user quotes.
-  const spaced = join(dir, 'with space')
+  // A folder with a space (and an & cmd would read as a command separator unquoted), as the path the user quotes.
+  const spaced = join(dir, 'with space & ampersand')
   mkdirSync(spaced, { recursive: true })
   const script = join(spaced, 'setup.js')
   writeFileSync(script, "console.log('SETUP-ARGS ' + JSON.stringify(process.argv.slice(2)))\n")
-  const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('HIVE_')) env[k] = v
+  const env = baseEnv()
   const plain = (s: string): string => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07]*\x07/g, '').replace(/\s+/g, ' ')
 
   async function run(name: string, gated: boolean): Promise<{ code: number; output: string }> {
