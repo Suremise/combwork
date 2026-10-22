@@ -26,7 +26,7 @@ import { kickQueue, queueChanged, queueLive } from './queueHost'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
-import type { CardState, Fact, FactData } from '../../shared/workflow/facts'
+import { QUEUE_ADVANCE_GATE, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
 import { RECENT_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
 
 /** The targets of a project's queues: every target a card was queued for, and any paused one, in that order. */
@@ -98,7 +98,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     project: basename(projectPath),
     projectPath,
     target,
-    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null } : null,
+    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.stuck ? { stuck: p.stuck } : {}) } : null,
     runBy: lease?.profile ?? null,
     runHere: live.running,
     testing,
@@ -173,6 +173,15 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
 }
 
 /**
+ * The user's answer to a stuck advance's request (#1351, For you): its needs-you pause looked at again, as Resume does,
+ * and lifted once recovery can carry on. Any other pause (Pause queue, say) stays as it is.
+ */
+export async function recheckStuck(ws: WorkspaceService, projectPath: string, target: string): Promise<void> {
+  const wf = await workflowFor(ws, projectPath)
+  if (wf?.store.queuePause(target)?.reason === 'needsYou') await resumeQueue(ws, projectPath, target)
+}
+
+/**
  * A card's Remove from queue or Retry merge, by the user or the Assistant (an agent is refused by the intent path),
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
@@ -192,19 +201,19 @@ async function needWorkflow(ws: WorkspaceService, projectPath: string): Promise<
 }
 
 /**
- * Whether a pause's cause still holds, as far as Hive can see it now: the rules still off; the target still checked out
- * (Hive doesn't merge into a checked-out target yet: #1351); §16.9.2's conditions on its folder; a begun advance still
- * in its terminal state; an earlier runner's process still running or its folder still there. What it finds (the
- * files named now), or null when it is gone or Hive can't tell (Pause queue, targetMovesFast…: the user's word).
+ * Whether a pause's cause still holds, as far as Hive can see it now: the rules still off; §16.9.2's conditions on its
+ * folder; the user's answer to "update it now" still awaited (For you: Resume doesn't stand in for it); a begun advance
+ * still in its terminal state; an earlier runner's process still running or its folder still there. What it finds (the
+ * files named now), or null when it is gone or Hive can't tell (Pause queue, targetMovesFast…: the user's word). A
+ * `checkedOut` pause is from before #1351: Hive merges into a checked-out target now.
  */
 async function stillPaused(wf: Workflow, projectPath: string, target: string, p: QueuePause): Promise<Partial<QueuePause> | null> {
   switch (p.reason) {
     case 'rulesOff':
       return workflowEnforced() ? null : {}
-    case 'checkedOut': {
-      const where = await G.checkouts(projectPath)
-      if (isUnknown(where)) return {}
-      return where[target] ? { files: [where[target]!] } : null
+    case 'approval': {
+      const card = p.card ? wf.store.cardByKey(p.card) : null
+      return card && wf.state(card).requests.some((r) => r.gate === QUEUE_ADVANCE_GATE) ? {} : null
     }
     case 'wrongBranch':
     case 'staged':

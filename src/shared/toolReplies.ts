@@ -710,6 +710,13 @@ export function queueText(q: QueuePublic): string {
         ? 'running'
         : 'empty'
   const lines = [`Merge queue for ${q.target} in ${q.project}: ${state}.`]
+  const st = q.paused?.stuck
+  if (st) {
+    // An advance into the checked-out target left part way (#1351): where it stands, and how to settle it.
+    const files = st.files.slice(0, QUEUE_SHOWN).map((f) => `${f.path} (${f.side})`).join(', ')
+    const how = st.commands.map((c) => `to ${c.purpose}, in the ${c.place === 'project' ? 'project folder' : "target's folder"}: ${c.command}`).join('; ')
+    lines.push(`Stopped part way (${st.phase}): ${st.branch ? `the folder is on ${st.branch}` : 'the folder has no branch'}, ${q.target} at ${rev(st.ref)} (expected ${rev(st.expected)}, result ${rev(st.result)})${files ? `; files ${files}${st.files.length > QUEUE_SHOWN ? `, ${st.files.length - QUEUE_SHOWN} more` : ''}` : ''}.${how ? ` ${how.charAt(0).toUpperCase()}${how.slice(1)}.` : ''}`)
+  }
   if (q.testing) lines.push(`Testing: ${q.testing.key} ${clip(q.testing.title, 60)} at ${rev(q.testing.revision)}${q.testing.step ? ` (${q.testing.step})` : ''}.`)
   if (q.queued.length) {
     const more = q.queued.length - QUEUE_SHOWN

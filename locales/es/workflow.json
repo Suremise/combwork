@@ -14,6 +14,8 @@
   "workflow.forYou.newDecision": "La tarjeta {card} tiene una decisión nueva: ¿la revisas otra vez?",
   "workflow.forYou.okBefore": "La tarjeta {card} está aprobada: ¿das tu aprobación para fusionarla?",
   "workflow.forYou.passedReview": "La tarjeta {card} superó la revisión: ¿das tu aprobación?",
+  "workflow.forYou.queueAdvance": "La tarjeta {card} está probada y lista para fusionar: ¿actualizar {target} en {folder} ahora?",
+  "workflow.forYou.queueStuck": "La fusión de {card} en {target} se detuvo a medias en {folder}, y Hive ya no cambia nada allí. {how, select, both {Para terminarla, ejecuta {finish} en {project}; para deshacerla, ejecuta {undo} en {folder}.} finish {Para terminarla, ejecuta {finish} en {folder}.} undo {Para deshacerla, ejecuta {undo} en {folder}.} other {Sus archivos no están ni como estaban ni como fusionados: arréglalos a mano.}} Luego responde aquí y la cola vuelve a mirar.",
   "workflow.forYou.review": "La tarjeta {card} espera tu revisión",
   "workflow.forYou.roundLimit": "La tarjeta {card} no superó {rounds, plural, one {# revisión} other {# revisiones}}: ¿continuar con más rondas, dividirla, aceptarla con seguimientos o encargarte tú?",
   "workflow.forYouKind": "{kind, select, approve {Aprobar} decide {Decidir} test {Probar} signIn {Iniciar sesión} other {Otro}}",

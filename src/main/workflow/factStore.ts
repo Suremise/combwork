@@ -24,6 +24,7 @@ import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
+import type { QueueCommand, QueueFileSide, QueueStuck } from '../../shared/workflow/queue'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -82,7 +83,14 @@ export interface QueuePause {
   by?: 'user' | 'assistant'
   /** When (ISO), as the store saved it; left out of a pause written, the store's time then. */
   at?: string
+  /**
+   * An advance into a checked-out target left part way (#1351): its state, its listed files with their sides, and the
+   * commands that finish or undo it. Its files are then `files` too, in that order.
+   */
+  stuck?: QueueStuck
 }
+
+type PauseRow = { reason: string; card: string; pid: number | null; message: string | null; paused_by: 'user' | 'assistant' | null; paused_at: string | null; folder: string | null; branch: string | null; ref: string | null; expected: string | null; result: string | null; phase: QueueStuck['phase'] | null }
 
 /** A target's queue runner (#1360, queue_runners): who runs it, the holder process, when taken and last renewed. */
 export interface QueueLease {
@@ -560,10 +568,16 @@ export class FactStore {
   queuePause(target: string): QueuePause | null {
     const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT reason, card, pid, message, paused_by, paused_at FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null; message: string | null; paused_by: 'user' | 'assistant' | null; paused_at: string | null } | undefined
+      const row = db.prepare('SELECT reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as PauseRow | undefined
       if (!row) return null
-      const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}) }
+      const rows = db.prepare('SELECT path, side FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string; side: QueueFileSide | null }[]
+      const files = rows.map((r) => r.path)
+      let stuck: QueueStuck | undefined
+      if (row.folder !== null && row.expected !== null && row.result !== null && row.phase !== null) {
+        const commands = db.prepare('SELECT purpose, place, command FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as unknown as QueueCommand[]
+        stuck = { folder: row.folder, branch: row.branch, ref: row.ref, expected: row.expected, result: row.result, phase: row.phase, files: rows.map((r) => ({ path: r.path, side: r.side ?? 'other' })), commands: commands.map((c) => ({ purpose: c.purpose, place: c.place, command: c.command })) }
+      }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}), ...(stuck ? { stuck } : {}) }
     })
   }
 
@@ -578,9 +592,14 @@ export class FactStore {
     this.conn.write((db) => {
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
       if (!pause) return
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString())
-      const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
-      pause.files?.forEach((f, i) => ins.run(p, target, i, f))
+      const st = pause.stuck
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString(), st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
+      const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
+      // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
+      if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))
+      else pause.files?.forEach((f, i) => ins.run(p, target, i, f, null))
+      const cmd = db.prepare('INSERT INTO workflow_queue_pause_commands (project, target, ord, purpose, place, command) VALUES (?, ?, ?, ?, ?, ?)')
+      st?.commands.forEach((c, i) => cmd.run(p, target, i, c.purpose, c.place, c.command))
     })
   }
 

@@ -204,6 +204,8 @@
   "tips.mcpPerProject.title": "Serwery MCP tylko tam, gdzie są potrzebne",
   "tips.memorySnapshot.text": "Włącz Ustawienia → Zaawansowane → Zapisz zrzut pamięci, gdy Hive’owi ma zabraknąć pamięci, aby sprawdzić, co ją zapełniło. Zrzuty mogą mieć gigabajty, zawierają to, co Hive miał w pamięci (teksty kart, transkrypcje, możliwe, że tokeny), i zostają na tym komputerze.",
   "tips.memorySnapshot.title": "Hive zamknął się z braku pamięci?",
+  "tips.mergeQueueFolder.text": "Gdy kolejka scalania scala do gałęzi wybranej w folderze, na przykład main w folderze projektu, najpierw pyta w sekcji Dla Ciebie i wstrzymuje się, zamiast ruszać plik, który właśnie zmieniasz. Ustawienia → Zaawansowane pozwalają jej działać bez pytania.",
+  "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
   "tips.mergeSlot.text": "Gdy kilku agentów kończy naraz, każdy zajmuje kolejkę scalania projektu, zanim scali do siebie main, sprawdzi i scali, więc niczyje testy nie muszą się wykonywać dwa razy. Kto ją zajmuje, a kto czeka, widać w Przeglądzie i w panelu Postęp.",
   "tips.mergeSlot.title": "Agenci scalają po kolei",
   "tips.messageReceipts.text": "Każda wiadomość, którą Asystent zostawia agentowi, ma identyfikator i jest przechowywana, nawet po ponownym uruchomieniu: jest odebrana, gdy agent przeczyta skrzynkę odbiorczą, i potwierdzona, gdy na nią zareaguje. Niepotwierdzona w ciągu {minutes, plural, one {# minuty} few {# minut} many {# minut} other {# minuty}} pokazuje się w jego panelu jako zaległa (✉).",

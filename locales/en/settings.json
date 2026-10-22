@@ -707,6 +707,22 @@
     "defaultMessage": "Merge queue: longest a merge check runs",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target."
   },
+  "settings.advanced.hive.queue.checkedOutTarget.ask": {
+    "defaultMessage": "Ask each time",
+    "description": "A choice of the advanced setting \"Merge queue: merge into a checked-out branch\": ask the user (For you) before each update of the folder."
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.auto": {
+    "defaultMessage": "Automatically",
+    "description": "A choice of the advanced setting \"Merge queue: merge into a checked-out branch\": update the folder without asking."
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.desc": {
+    "defaultMessage": "When the branch the merge queue merges into is checked out in a folder (the project folder's main, say), merging changes that folder's files too. Ask each time waits, once a card is tested and ready, for you to approve updating the folder in For you. Automatically updates it at once. Either way the queue first checks that no agent is working in the folder, that it is on that branch and that you have no changes in the files the merge changes, and pauses if not. One rare race, another program switching that folder's branch in the same instant, can leave the merged files in the other branch; Hive then says so and lists them. A branch checked out nowhere is always merged at once.",
+    "description": "What the advanced setting \"Merge queue: merge into a checked-out branch\" does (Settings → Advanced, under Hive). Ask each time and Automatically are the setting's choices: use the words its list shows. For you is a place in Hive."
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.title": {
+    "defaultMessage": "Merge queue: merge into a checked-out branch",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change."
+  },
   "settings.advanced.hive.queue.networkCodes.desc": {
     "defaultMessage": "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
     "description": "What the advanced setting \"Merge queue: network errors that count as temporary\" does (Settings → Advanced). The error codes, (?!) and 75 are literal: keep them."

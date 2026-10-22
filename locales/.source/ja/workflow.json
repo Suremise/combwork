@@ -14,6 +14,14 @@
   "workflow.forYou.newDecision": "{card} has a new decision: your review again?",
   "workflow.forYou.okBefore": "{card} is approved: OK to merge?",
   "workflow.forYou.passedReview": "{card} passed review: your OK?",
+  "workflow.forYou.queueAdvance": {
+    "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
+    "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queueStuck": {
+    "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, and Hive changes nothing more there. {how, select, both {To finish it, run {finish} in {project}; to undo it, run {undo} in {folder}.} finish {To finish it, run {finish} in {folder}.} undo {To undo it, run {undo} in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
+    "description": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {project} the project folder; {finish} and {undo} are git commands (keep them exactly). Translate each choice of {how}; keep the codes before the braces."
+  },
   "workflow.forYou.review": "{card} waits for your review",
   "workflow.forYou.roundLimit": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
   "workflow.forYouKind": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",

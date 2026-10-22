@@ -741,8 +741,38 @@ export const QUEUE_PAUSE_BY_STEP: SchemaStep = {
   ddl: ["ALTER TABLE workflow_queue_pauses ADD COLUMN paused_by TEXT CHECK (paused_by IN ('user', 'assistant'))", 'ALTER TABLE workflow_queue_pauses ADD COLUMN paused_at TEXT']
 }
 
+/**
+ * The state an advance into a checked-out target was left in, for its terminal "needs you" pause (#1351, SPEC §16.9.2):
+ * the folder, the branch its HEAD named and where the target's ref was when Hive looked, the advance's expected revision
+ * and result, the journal's last phase (`done`: the ref moved, but the folder was on another branch by then), the side
+ * each listed file is at (its index and working copy at the expected revision, at the result, or neither), and the
+ * commands that finish or undo it, generated from the journal, each run in the project folder or the checked-out one.
+ */
+export const QUEUE_PAUSE_STATE_STEP: SchemaStep = {
+  name: 'queue pause state',
+  ddl: [
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN folder TEXT',
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN branch TEXT',
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN ref TEXT',
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN expected TEXT',
+    'ALTER TABLE workflow_queue_pauses ADD COLUMN result TEXT',
+    "ALTER TABLE workflow_queue_pauses ADD COLUMN phase TEXT CHECK (phase IN ('started', 'files', 'ref', 'rollback', 'done'))",
+    "ALTER TABLE workflow_queue_pause_files ADD COLUMN side TEXT CHECK (side IN ('expected', 'result', 'other'))",
+    `CREATE TABLE workflow_queue_pause_commands (
+      project TEXT    NOT NULL COLLATE NOCASE,
+      target  TEXT    NOT NULL,
+      ord     INTEGER NOT NULL,
+      purpose TEXT    NOT NULL CHECK (purpose IN ('finish', 'undo')),
+      place   TEXT    NOT NULL CHECK (place IN ('project', 'folder')),
+      command TEXT    NOT NULL,
+      PRIMARY KEY (project, target, ord),
+      FOREIGN KEY (project, target) REFERENCES workflow_queue_pauses (project, target) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -832,7 +862,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
     args: [1, 'p'],
     index: ['lane_cards_card', 'lane_pending_card']
   },
-  'queuePauses.of': { sql: 'SELECT reason, card, pid, message, paused_by, paused_at FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.of': { sql: 'SELECT reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.files': { sql: 'SELECT path, side FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.commands': { sql: 'SELECT purpose, place, command FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
   // queueControls.ts (#1353): a project's paused targets, for its queues' listing.
   'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.

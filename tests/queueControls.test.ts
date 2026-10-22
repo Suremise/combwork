@@ -239,15 +239,21 @@ describe('Pause queue and Resume (#1353)', () => {
     await pause({ reason: 'user', card: '', by: 'user' })
     expect(await resume()).toMatchObject({ resumed: true, view: { paused: null } })
     expect(host.kicked).toEqual(['main'])
-    // Checked out in the project folder (Hive doesn't merge into it yet, #1351): still paused, naming the folder.
-    await pause({ reason: 'checkedOut', card: 'p-1', files: ['old'] })
+    // Something staged in the checked-out target's folder (§16.9.2): still paused while it is.
+    writeFileSync(join(repo, 'staged.txt'), 'staged\n')
+    git(repo, 'add', 'staged.txt')
+    await pause({ reason: 'staged', card: 'p-1', files: ['staged.txt'] })
     const still = await resume()
     expect(still.resumed).toBe(false)
-    expect(still.view.paused).toMatchObject({ reason: 'checkedOut', files: [expect.stringMatching(/[\\/]p$/)] })
+    expect(still.view.paused).toMatchObject({ reason: 'staged', files: ['staged.txt'] })
     expect(host.kicked).toEqual(['main'])
-    // Checked out nowhere now: resumed.
-    git(repo, 'checkout', '-q', '--detach')
+    // Nothing staged now: resumed.
+    git(repo, 'reset', '-q')
     expect((await resume()).resumed).toBe(true)
+    // A checked-out pause from before #1351 (Hive merges into a checked-out target now): resumed.
+    await pause({ reason: 'checkedOut', card: 'p-1', files: ['old'] })
+    expect((await resume()).resumed).toBe(true)
+    git(repo, 'checkout', '-q', '--detach')
     // The rules off: still paused until they are on again.
     await advanced.set(service.ENFORCE, false)
     await pause({ reason: 'rulesOff', card: 'p-1' })
@@ -259,6 +265,6 @@ describe('Pause queue and Resume (#1353)', () => {
     expect((await resume()).resumed).toBe(false)
     await pause({ reason: 'needsYou', card: '', pid: 2 ** 30 })
     expect((await resume()).resumed).toBe(true)
-    expect(host.kicked).toEqual(['main', 'main', 'main', 'main'])
+    expect(host.kicked).toEqual(['main', 'main', 'main', 'main', 'main'])
   })
 })

@@ -175,6 +175,9 @@ export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
 
+/** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
+export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
+
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
@@ -572,6 +575,26 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 5,
     max: 3600,
     unit: 's',
+    applies: 'now'
+  },
+  // Merging into a branch checked out in a folder (#1351, OP-40, SPEC §16.9.2): its journaled update has one race it
+  // detects but can't prevent, so the queue asks first until the update's crash-injection tests have passed.
+  {
+    id: QUEUE_CHECKED_OUT_TARGET,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.title', defaultMessage: 'Merge queue: merge into a checked-out branch', description: "An advanced setting's title (Settings → Advanced), listed under Hive: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change." }),
+    desc: msg({
+      id: 'settings.advanced.hive.queue.checkedOutTarget.desc',
+      defaultMessage:
+        "When the branch the merge queue merges into is checked out in a folder (the project folder's main, say), merging changes that folder's files too. Ask each time waits, once a card is tested and ready, for you to approve updating the folder in For you. Automatically updates it at once. Either way the queue first checks that no agent is working in the folder, that it is on that branch and that you have no changes in the files the merge changes, and pauses if not. One rare race, another program switching that folder's branch in the same instant, can leave the merged files in the other branch; Hive then says so and lists them. A branch checked out nowhere is always merged at once.",
+      description: 'What the advanced setting "Merge queue: merge into a checked-out branch" does (Settings → Advanced, under Hive). Ask each time and Automatically are the setting\'s choices: use the words its list shows. For you is a place in Hive.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'ask', label: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.ask', defaultMessage: 'Ask each time', description: 'A choice of the advanced setting "Merge queue: merge into a checked-out branch": ask the user (For you) before each update of the folder.' }) },
+      { value: 'auto', label: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.auto', defaultMessage: 'Automatically', description: 'A choice of the advanced setting "Merge queue: merge into a checked-out branch": update the folder without asking.' }) }
+    ],
+    default: 'ask',
     applies: 'now'
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own

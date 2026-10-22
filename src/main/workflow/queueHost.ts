@@ -9,7 +9,9 @@
 // The card's ruleset decides (§16.6.5): an entry whose card started under Hive merges is merged even after the project's
 // options moved to another finisher. With workflow rules off (`hive.workflow.enforce`), nothing runs to an advance: open
 // entries pause `rulesOff` (once an advance has begun, recovery finishes it), and carry on when the rules are on again.
-// A target checked out in a folder pauses `checkedOut` until #1351.
+// A target checked out in a folder is advanced there by the journaled update (#1351, §16.9.2), with that folder fenced
+// (folderFence.ts) and paused while an agent builds in it; asked first (For you) while Settings → Advanced, Merge into a
+// checked-out branch, says Ask each time.
 //
 // Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
 // (queueControls.ts), and tells the window of each change (`queue-changed`).
@@ -27,13 +29,16 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, type QueueConfig, type QueueStepInfo } from './mergeQueue'
+import { MergeQueue, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
+import { changingFolder, inFolder } from '../folderFence'
+import { sessions } from '../sessions'
+import { progress } from '../progressService'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { QUEUE_CHECKED_OUT_TARGET, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 
 const log = createLogger('queue')
 
@@ -170,7 +175,12 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
-    pauseCheckedOut: true,
+    // A target checked out in a folder (#1351, §16.9.2): advanced there with that folder fenced, unless an agent builds
+    // in it; asked first while Merge into a checked-out branch says so (OP-40).
+    // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
+    fence: (folder, fn) => changingFolder(folder, 'a merge by the merge queue', fn),
+    folderBusy: (folder) => folderBuilders(h.ws, folder),
+    checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
     onStep: (step) => {
@@ -178,11 +188,49 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
       h.now = step
       queueChanged(h.ws, h.projectPath, h.target)
     },
-    // Test copies (unpackaged): HIVE_TEST_QUEUE_CRASH=afterAdvance ends Hive at once once the target has moved, before
-    // `Integrated` is written (S33c: the next start's recovery observes it); no quit handler runs, nothing is released.
-    ...(!app.isPackaged && process.env.HIVE_TEST_QUEUE_CRASH === 'afterAdvance' ? { hooks: { afterAdvance: () => (exitBy('app.exit', 'a test crash after the merge queue advanced', () => app.exit(1)), new Promise<void>(() => undefined)) } } : {})
+    ...(app.isPackaged ? {} : { hooks: testHooks(h.projectPath, h.target) })
   }
   return cfg
+}
+
+/** The points of an advance a test copy can crash at (HIVE_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
+const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
+let raced = false
+
+/**
+ * Test copies (unpackaged) only. `HIVE_TEST_QUEUE_CRASH=<point>` ends Hive at once at that point of an advance (S33c,
+ * S34d: the next start's recovery reads the journal); no quit handler runs, nothing is released.
+ * `HIVE_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
+ */
+function testHooks(projectPath: string, target: string): QueueHooks {
+  const hooks: QueueHooks = {}
+  const crash = process.env.HIVE_TEST_QUEUE_CRASH
+  const point = CRASH_POINTS.find((p) => p === crash)
+  if (point) hooks[point] = () => (exitBy('app.exit', `a test crash at the merge queue's ${point}`, () => app.exit(1)), new Promise<void>(() => undefined))
+  if (process.env.HIVE_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
+    hooks.beforeRef = async () => {
+      // Once per run of Hive: the entry tested again on the moved target then merges.
+      if (raced) return
+      raced = true
+      // A commit on the target made outside Hive (an empty one, on its tree), the ref moved to it.
+      const head = await git(projectPath, ['rev-parse', `refs/heads/${target}`])
+      const made = head.ok ? await git(projectPath, ['-c', 'user.name=Race', '-c', 'user.email=race@example.invalid', 'commit-tree', `${head.out.trim()}^{tree}`, '-p', head.out.trim(), '-m', 'race']) : null
+      if (made?.ok) await git(projectPath, ['update-ref', `refs/heads/${target}`, made.out.trim(), head.out.trim()])
+    }
+  }
+  return hooks
+}
+
+/**
+ * What makes an agent build in a folder (§16.9.2): the files agents hold locks on there, and the folders of the runs
+ * going there (an agent's, the Assistant's or a script's; not Hive's own). Null when there are none: an idle agent, or one
+ * whose session lives there but works in a review copy, holds no lock and runs nothing there.
+ */
+function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
+  const locked = sessions.locksIn(folder)
+  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'hive' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
+  const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]
+  return what.length ? what : null
 }
 
 /** Rules off: a target with open entries is paused `rulesOff` (its first entry's card named), unless paused already. */
@@ -259,6 +307,11 @@ export function startQueueHosts(): void {
     const target = typeof a.payload.target === 'string' ? a.payload.target : ''
     if (!project || !target) return
     queueChanged(ws, project, target)
+    // The user answered that an advance left part way is settled (#1351): looked at again, as Resume does.
+    if (a.payload.recheck === true) {
+      void import('./queueControls').then((c) => c.recheckStuck(ws, project, target)).catch((e) => log.warn(`looking again at the merge queue for ${userText(target)}`, e))
+      return
+    }
     void kickQueue(ws, project, target)
   })
   onAction('releaseSlot', () => undefined)
