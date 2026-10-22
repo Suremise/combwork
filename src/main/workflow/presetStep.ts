@@ -5,7 +5,8 @@
 // section's own save, which records `chosen` (optionsForm.ts).
 
 import { createLogger, userText } from '../logger'
-import { projectPlatform } from '../platform/registry'
+import { projectPlatform } from '../platform/registry'
+import { isPlatformId } from '../../shared/platform/descriptors'
 import { HiveError } from '../hiveError'
 import { asksPreset } from '../../shared/workflow/presetStep'
 import { setPresetAsked } from '../../shared/workflow/projectWorkflow'
@@ -15,16 +16,21 @@ import { workflowWrite } from './writes'
 
 const log = createLogger('workflow')
 
-/** Not now: the platform in force answered without a preset. Nothing changes if it was answered meanwhile. */
-export function presetNotNow(ws: WorkspaceService, projectPath: string): Promise<void> {
+/**
+ * Not now, for the platform the step was shown for (`shown`): answered without a preset. Nothing changes if it was
+ * answered meanwhile, or if the project uses another platform now (a switch meanwhile, another Hive's: that platform's
+ * own question isn't answered for it, HR3's #1423 round 1).
+ */
+export function presetNotNow(ws: WorkspaceService, projectPath: string, shown: unknown): Promise<void> {
+  if (!isPlatformId(shown)) return Promise.reject(new HiveError({ lines: ['A version control is one of: none, git'] }, { kind: 'invalid' })) // i18n-ignore: a mistake in a caller, never the window's
   return workflowWrite(async () => {
     const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
     if (!p?.platform) throw new HiveError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
     let answered = false
     await ws.mutateProjectConfig(p.path, (cfg) => {
       const platform = projectPlatform(p.path, cfg.platform).id
-      // Answered, or given options, meanwhile (another window, the Assistant): that answer stands.
-      if (!asksPreset(cfg, platform)) return {}
+      // Switched since the step was shown, or answered or given options meanwhile (another window, the Assistant).
+      if (platform !== shown || !asksPreset(cfg, platform)) return {}
       answered = true
       return { workflow: setPresetAsked(cfg.workflow, platform, 'notNow') }
     })

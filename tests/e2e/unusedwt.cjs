@@ -48,7 +48,7 @@ function pathWithoutGit() {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   // "How do you work?" answered (#1423), as a user does once: its step would take the tab's room this suite measures.
-  await inv('workflow:presetNotNow', repo)
+  await inv('workflow:presetNotNow', repo, 'git')
   await lib.waitForProvider(inv)
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `unusedwt-${name}.png`) })
   const theme = async (t) => {

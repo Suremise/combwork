@@ -1234,9 +1234,11 @@ Everything is visible in the Version Control tab itself, not only through the As
   no preset, no options of its own and no answer (`workflow.presetAsked`). That is a project added since 1.0 (New
   Project, a folder found when the workspace is read, one the Assistant or the Agent API adds) and one switched to a
   platform it never had (#1419: nothing in `kept`), even with its other platform answered. A project from before 1.0
-  has the options its upgrade wrote, so it never asks (it gets the one-time presets notice, §16.17).
+  (no platform recorded) never asks, also before its upgrade has run: the upgrade writes its options (it gets the
+  one-time presets notice, §16.17).
 - **The answer is the platform's:** `chosen` (any save from the Workflow section, the step's Choose included) or
-  `notNow`, written with `setPresetAsked` (`projectWorkflow.ts`) under the project's lock; it goes into `kept` with the
+  `notNow` (for the platform the step showed: one switched meanwhile isn't answered for it), written with
+  `setPresetAsked` (`projectWorkflow.ts`) under the project's lock; it goes into `kept` with the
   platform's options when the project switches away and comes back with them, so each platform asks once. The settings
   tool's saves keep it.
 - **The step**, under the Version Control tab's header (`PresetStep.tsx`): Solo, Pair and Team (for Git, Pair is Hive
@@ -3440,8 +3442,9 @@ when a role or name says *review*.
   projects with no preset chosen; **Choose…** opens the first one's Project Settings → Workflow, **Not Now** dismisses
   it. Either answer is recorded in `board_meta` (`workflow.presetsNotice`), so it shows once per workspace, and never on
   a board made by 1.0 (no card from before it: `adoption_upto` 0).
-- **[#1423]** A board made by 1.0 (`adoption_upto` 0) has no project from before 1.0 either: the adoption gives its
-  projects no upgrade options, and they ask "How do you work?" (§16.3.5) instead.
+- **[#1423]** Only projects from before 1.0 get the upgrade's options: those whose project.json records no platform
+  (Hive records it as it makes a project.json, which no Hive before 1.0 did), whatever the board (an upgraded board
+  with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

@@ -95,14 +95,13 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
     if (!folder || c.archived || !IN_FLIGHT.has(c.column)) toMark.push(c)
     else byProject.set(folder, [...(byProject.get(folder) ?? []), c])
   }
-  // Every project gets its options, cards in flight or not (the ruleset its next card starts under).
-  // A board made by 1.0 (no card from before it) has no project from before it either: its projects keep no options of
-  // the upgrade's, and ask "How do you work?" instead (#1423, §16.3.5). Upgraded boards' projects get theirs.
-  const upgraded = Number(boardValue(ws, ADOPTION_UPTO) ?? 0) > 0
-  for (const folder of upgraded ? new Set(folders.values()) : new Set<string>()) {
+  // Every project from before 1.0 gets its options, cards in flight or not (the ruleset its next card starts under). One
+  // made by 1.0 keeps none of the upgrade's, and asks "How do you work?" instead (#1423, §16.3.5).
+  for (const folder of new Set(folders.values())) {
     const name = basename(folder)
     const r = await projectOptions(ws, folder, lanes.some((l) => l.project.toLowerCase() === name.toLowerCase()), alive)
     if (!r) return null
+    if (r === MADE_BY_1_0) continue
     if (r.configured) out.configured++
     const inFlight = byProject.get(folder) ?? []
     // What each card's folder shows now: read before the board's lock (git), never inside it.
@@ -164,22 +163,39 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
  * (its platform as recorded, else detected; a reviewer agent if it has reviewer agents or a lane; slots if an agent has
  * a worktree), written once through mutateProjectConfig with the platform recorded too (#1213's note).
  */
-async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boolean, alive: () => boolean): Promise<{ cfg: ProjectConfig; platform: PlatformId; configured: boolean } | null> {
+async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boolean, alive: () => boolean): Promise<{ cfg: ProjectConfig; platform: PlatformId; configured: boolean } | typeof MADE_BY_1_0 | null> {
   const before = await ws.projectConfig(folder)
   if (before.workflow) return { cfg: before, platform: before.workflow.platform, configured: false }
+  if (madeBy1_0(before)) return MADE_BY_1_0
   if (!alive()) return null
   let configured = false
+  let made = false
   const cfg = await ws.mutateProjectConfig(folder, (c) => {
     // Under the lock, from the file as it is now: another Hive (or a rerun) may have written them meanwhile.
     if (c.workflow) return {}
+    if (madeBy1_0(c)) {
+      made = true
+      return {}
+    }
     configured = true
     const platform = projectPlatform(folder, c.platform).id
     const agents = c.agents ?? []
     const options = upgradeOptions(platform, { reviewers: hasLane || agents.some(isReviewer), worktrees: agents.some((a) => !!a.worktree) })
     return { platform: c.platform ?? platform, workflow: { platform, preset: null, options } }
   })
-  return { cfg, platform: cfg.workflow!.platform, configured }
+  if (made || !cfg.workflow) return MADE_BY_1_0
+  return { cfg, platform: cfg.workflow.platform, configured }
 }
+
+/** A project made by 1.0, which has no options from before it to keep (#1423): its upgrade gives it none. */
+const MADE_BY_1_0 = 'madeBy1.0' as const
+
+/**
+ * Whether a project was made by 1.0: Hive records its platform as it makes its project.json (§16.3.5, ensureProject),
+ * which no Hive before 1.0 did. Its provenance, whatever the board (an upgraded board with no cards included, HR3's
+ * #1423 round 1).
+ */
+const madeBy1_0 = (c: Pick<ProjectConfig, 'platform'>): boolean => c.platform !== undefined
 
 /** The folder an agent works in, as its project's config says (its worktree and the branch it merges into, or none). */
 function placeOf(cfg: ProjectConfig, agent: string | null): string {

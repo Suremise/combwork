@@ -89,7 +89,7 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
     showVersionControl(project.path, 'workflow')
   }
   const notNow = (): void => {
-    void call('workflow:presetNotNow', project.path).catch((e) => notify('error', errorMessage(e)))
+    void call('workflow:presetNotNow', project.path, platform).catch((e) => notify('error', errorMessage(e)))
   }
 
   return (
@@ -156,7 +156,7 @@ export function NewProjectsNotice() {
     openVersionControl(projects[0].path, 'workflow')
   }
   const notNow = (): void => {
-    for (const p of projects) void call('workflow:presetNotNow', p.path).catch((e) => notify('error', errorMessage(e)))
+    for (const p of projects) void call('workflow:presetNotNow', p.path, p.platform!.id).catch((e) => notify('error', errorMessage(e)))
   }
   return (
     <div className="banner info step-notice" role="status" data-step-notice="">

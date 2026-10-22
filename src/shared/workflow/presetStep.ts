@@ -8,8 +8,13 @@ import type { PlatformId } from '../platform/descriptors'
 import type { ProjectConfig } from '../types'
 import type { PresetId } from './options'
 
-/** Whether a project asks "How do you work?" for the platform in force. */
-export function asksPreset(cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): boolean {
+/**
+ * Whether a project asks "How do you work?" for the platform in force. A project with no platform recorded is from
+ * before 1.0 (Hive records it as it makes a project.json): its upgrade gives it options, so it never asks, also while
+ * that upgrade is still to run.
+ */
+export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, platform: PlatformId): boolean {
+  if (cfg.platform === undefined) return false
   const wf = cfg.workflow
   if (!wf || wf.platform !== platform) return true
   return !wf.preset && !Object.keys(wf.options ?? {}).length && !wf.presetAsked

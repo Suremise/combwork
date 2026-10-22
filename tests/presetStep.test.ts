@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { as09 } from './boardDb'
 
 const base = tempDir('hive-presetstep-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -66,11 +67,13 @@ describe('the suggestion, from the agents (#1423)', () => {
 })
 
 describe('which projects ask (#1423)', () => {
-  it('new: yes; from before 1.0 (options the upgrade wrote): no; answered: no; options of its own or a preset: no', () => {
-    expect(asksPreset({}, 'git')).toBe(true)
-    expect(asksPreset({ workflow: { platform: 'git', preset: null, options: { review: 'none' } } }, 'git')).toBe(false)
-    expect(asksPreset({ workflow: { platform: 'git', preset: null, options: {}, presetAsked: 'notNow' } }, 'git')).toBe(false)
-    expect(asksPreset({ workflow: { platform: 'git', preset: 'solo', options: {} } }, 'git')).toBe(false)
+  it('new: yes; from before 1.0 (no platform recorded, or options the upgrade wrote): no; answered: no; options of its own or a preset: no', () => {
+    expect(asksPreset({ platform: 'git' }, 'git')).toBe(true)
+    expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: null, options: { review: 'none' } } }, 'git')).toBe(false)
+    expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: null, options: {}, presetAsked: 'notNow' } }, 'git')).toBe(false)
+    expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: 'solo', options: {} } }, 'git')).toBe(false)
+    // No platform recorded: from before 1.0, whose upgrade gives it options (also before that has run).
+    expect(asksPreset({}, 'git')).toBe(false)
   })
 
   it('switched to a platform with nothing kept: yes, even with the other platform answered; back: its answer restored', async () => {
@@ -84,7 +87,7 @@ describe('which projects ask (#1423)', () => {
     await sw.setPlatform(w, repo, 'none', { expected: 'git' })
     expect(asksPreset(await w.projectConfig(repo), 'none')).toBe(true)
     // Not now for None, under the lock.
-    await step.presetNotNow(w, repo)
+    await step.presetNotNow(w, repo, 'none')
     expect(onDisk(repo)).toMatchObject({ platform: 'none', preset: null, options: {}, presetAsked: 'notNow', kept: { git: { preset: 'pair', presetAsked: 'chosen' } } })
     expect(asksPreset(await w.projectConfig(repo), 'none')).toBe(false)
     // Back to Git: Pair and its answer; None's notNow kept.
@@ -100,7 +103,7 @@ describe('which projects ask (#1423)', () => {
 describe('the answer (#1423)', () => {
   it("Not now writes no options (they stay inherited); the settings tool keeps the answer; answered meanwhile, Not now changes nothing", async () => {
     const { w, repo } = await workspace()
-    await step.presetNotNow(w, repo)
+    await step.presetNotNow(w, repo, 'git')
     expect(onDisk(repo)).toEqual({ platform: 'git', preset: null, options: {}, presetAsked: 'notNow' })
     // Its resolved options are the inherited ones (all off here).
     expect((await form.workflowForm(w, repo)).own).toEqual({})
@@ -108,8 +111,41 @@ describe('the answer (#1423)', () => {
     expect(onDisk(repo)).toMatchObject({ presetAsked: 'notNow', options: { style: 'squash' } })
     // A second Not now (another window's) after options were set: nothing changes.
     const before = onDisk(repo)
-    await step.presetNotNow(w, repo)
+    await step.presetNotNow(w, repo, 'git')
     expect(onDisk(repo)).toEqual(before)
+  })
+
+  it("a Not now shown for Git, landing after a switch to None, answers nothing (HR3's round 1, finding 2)", async () => {
+    const { w, repo } = await workspace()
+    await sw.setPlatform(w, repo, 'none', { expected: 'git' })
+    await step.presetNotNow(w, repo, 'git')
+    expect(onDisk(repo)).toBeUndefined()
+    expect(asksPreset(await w.projectConfig(repo), 'none')).toBe(true)
+  })
+
+  it("a project from before 1.0 never asks, also before its upgrade has run; an empty 0.9 board's projects get their options (HR3's round 1, finding 1)", async () => {
+    const ws = join(base, `ws-${++n}`)
+    const repo = join(ws, 'p')
+    mkdirSync(join(repo, '.hive'), { recursive: true })
+    mkdirSync(join(ws, '.hive'), { recursive: true })
+    git(repo, 'init', '-q', '-b', 'main')
+    // As 0.9 left it: no platform recorded, no workflow, no card on the board.
+    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+    const w0 = createWorkspaceService()
+    await w0.open(ws)
+    // Its board made (an empty one), then as 0.9 left it.
+    await store.boardWrite(w0, async () => undefined)
+    await disposeWorkspaceService(w0)
+    store.closeBoard(ws)
+    as09(store.boardFile(ws))
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
+    expect(onDisk(repo)).toMatchObject({ platform: 'git', preset: null, options: { review: 'agent' } })
+    expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
   })
 
   it("a board made by 1.0 gives its projects no upgrade options: they ask", async () => {
