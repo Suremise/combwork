@@ -2869,7 +2869,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   seen; the next ones come as rows fold, the window reading the queue again then by itself (an idle or paused queue
   pages on, a page at a time, each its full 10 s). Each window also keeps the rows it showed and marked seen until
   their own 10 s are up, merged with main's list (the Assistant, #1356 round 6): two windows marking different
-  snapshots can leave main's bounded list without one of them; **paused**, each pause reason a sentence (git's own message under it), with **Resume
+  snapshots can leave main's bounded list without one of them, and a row main lists as seen earlier (another window
+  saw it first) still shows until this window's own 10 s are up, with main's latest data (#1427); **paused**, each pause reason a sentence (git's own message under it), with **Resume
   queue**, and Open card for needs you; **run by <profile>** for another Hive's queue; and **Queue in Version
   Control**, which opens the project's Git tab (#1357 points it at its Merge queue section). **When a queue shows**
   (item 0, round 2 of #1338) is decided from its actual state, never the current options alone: an entry testing,
