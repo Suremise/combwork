@@ -1848,13 +1848,43 @@ export interface MoveOptions {
   unlink?: string[]
   /** Missing worktrees to make again (on their branch, or new from their base). */
   recreate?: string[]
+  /**
+   * Move Hive's Defender exclusions from the moved workspace's old folders to its new ones (#1302): one administrator
+   * prompt, at the end. Only when true (the dialog's box): a Repair asked for otherwise never prompts.
+   */
+  defender?: boolean
 }
 
-/** What Repair did: each line a step, for the dialog and the log. */
+/** What a row of Repair's report is about (#1313): the dialog words it as the plan's What column does. */
+export type MoveReportWhat =
+  | { kind: 'worktree' | 'branch'; agent: string }
+  | { kind: 'sessions' }
+  | { kind: 'copy'; provider: ProviderId }
+  | { kind: 'board'; from: string }
+  | { kind: 'saved' | 'recent' | 'working' | 'defender' }
+
+/** A step of Repair's report as a table row (#1313): what, where it was and is, and how it went in a few words. */
+export interface MoveReportRow {
+  /** The project (or the Assistant) it is about, by name; none: the workspace's (Open Recent, Working on, the board). */
+  host?: string
+  what: MoveReportWhat
+  /** Where it was and is: folders (shortened to the part that differs) unless `names` (branches). */
+  was?: string
+  now?: string
+  names?: boolean
+  outcome: 'done' | 'skipped' | 'failed'
+  /** How it went, short (the Result column): "linked again", "couldn't be repaired: …". */
+  result: string
+  /** The step's full sentence, as in done, skipped or failed: the row's tooltip and what a screen reader reads. */
+  line: string
+}
+
+/** What Repair did: each line a step, for the dialog and the log; `rows`, the same steps for the dialog's table. */
 export interface MoveReport {
   done: string[]
   skipped: string[]
   failed: string[]
+  rows: MoveReportRow[]
   /** Nothing is left to repair: the banner goes. */
   complete: boolean
 }
@@ -2635,6 +2665,8 @@ export type HiveEvent =
   | { type: 'merge-slots-changed'; workspacePath: string; slots: MergeSlotInfo[] }
   /** A workspace's lanes changed, or one of their cards did (the lanes it lists, as lanes:list gives them). */
   | { type: 'lanes-changed'; workspacePath: string; lanes: LaneInfo[] }
+  /** A target's merge queue changed (#1353): an entry queued, its step, an outcome, a pause; read it with queue:list. */
+  | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
   | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */

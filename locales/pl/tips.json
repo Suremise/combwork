@@ -351,6 +351,8 @@
   "tips.workflowOptions.title": "Wybierz, jak karty dochodzą do Gotowe",
   "tips.workspaceMoved.text": "Przeniesiono folder obszaru roboczego, np. na inny dysk? Otwórz go z nowego miejsca i wybierz Napraw… na banerze: worktree agentów, ich sesje oraz rozmowy i pamięć Claude Code pójdą za nim.",
   "tips.workspaceMoved.title": "Przenieś obszar roboczy bez utraty agentów",
+  "tips.workspaceMovedDefender.text": "Jeśli Hive kazał Defenderowi pomijać foldery obszaru roboczego, Napraw… po przeniesieniu proponuje przenieść te wykluczenia do nowych folderów, z jednym pytaniem o uprawnienia administratora, żeby żadne nie zostało na folderze, którego już nie ma. Twoje własne wykluczenia zostają bez zmian.",
+  "tips.workspaceMovedDefender.title": "Wykluczenia Defendera idą za przeniesionym obszarem roboczym",
   "tips.worktreeReuse.text": "Dodajesz agenta z nowym worktree o nazwie takiej jak zachowany (B4, a worktree B4 jest nieużywany)? Jeśli jest scalony i czysty, Hive daje agentowi ten folder, zaktualizowany do main: jego node_modules już tam są.",
   "tips.worktreeReuse.title": "Zachowany worktree wraca do użytku",
   "tips.worktrees.text": "W oknie Dodaj agenta… wybierz Nowy worktree: agent pracuje na własnej gałęzi, a Scal… przenosi jego pracę z powrotem, gdy praca Ci odpowiada.",

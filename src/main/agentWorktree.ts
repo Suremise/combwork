@@ -8,7 +8,8 @@ import { config } from './config'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { HiveError, hiveError } from './hiveError'
+import { withValues } from '../shared/advanced'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
@@ -66,6 +67,19 @@ async function usableParent(p: string): Promise<boolean> {
 }
 
 /**
+ * Recreating refused: git's prune would also forget the worktrees in `blockers` (missing too, as git lists them: a folder,
+ * or "(name)" for a registration whose folder git doesn't record). Repair's report names them (#1313).
+ */
+export class PruneBlocked extends HiveError {
+  constructor(
+    m: Parameters<typeof withValues>[0],
+    readonly blockers: string[]
+  ) {
+    super(withValues(m, { folders: blockers.join(', '), n: blockers.length }))
+  }
+}
+
+/**
  * Makes a missing agent worktree again: on its branch (`git worktree add <path> <branch>`, no -b) when it survives,
  * else a new one from its base (as Add Agent does). At `prefer` (Repair's moved-along place), else the recorded path,
  * else, if that can't be used, the agent's default worktree location. Prunes git's stale entry first, refusing if the
@@ -84,7 +98,7 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
   const others = (await prunable(projectPath)).filter((p) => !samePlace(p, old.path) && !(opts.alsoRecreating ?? []).some((q) => samePlace(p, q)))
   if (others.length) {
-    throw hiveError(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), { folders: others.join(', '), n: others.length })
+    throw new PruneBlocked(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), others)
   }
   await git(projectPath, ['worktree', 'prune'])
   if ((await listWorktrees(projectPath)).some((l) => samePlace(l.path, old.path))) throw hiveError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })

@@ -1811,10 +1811,6 @@
     "defaultMessage": "Coding agent",
     "description": "Load template's table: the column of each agent's CLI (Claude Code, Codex…)."
   },
-  "assistant.templatePlan.created": {
-    "defaultMessage": "Created",
-    "description": "Load template: the heading over the template's agents."
-  },
   "assistant.templatePlan.default": {
     "defaultMessage": "(default)",
     "description": "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults."
@@ -1843,10 +1839,6 @@
     "defaultMessage": "Name of agent {n}",
     "description": "Load template's table: the accessible name of the box for agent number {n}'s name."
   },
-  "assistant.templatePlan.newBadge": {
-    "defaultMessage": "new",
-    "description": "Load template's table: a badge on an agent that replaces one of the same name."
-  },
   "assistant.templatePlan.newTip": {
     "defaultMessage": "A new worktree in {path}, from {base}",
     "description": "Load template's table: tooltip on a new worktree ({path}: its folder; {base}: the branch it starts from)."
@@ -1863,14 +1855,6 @@
     "defaultMessage": "own worktree",
     "description": "Load template's table, Where: the agent gets a worktree of its own."
   },
-  "assistant.templatePlan.removed": {
-    "defaultMessage": "Removed",
-    "description": "Load template: the heading over the agents that go."
-  },
-  "assistant.templatePlan.replaced": {
-    "defaultMessage": "(replaced by a new agent with the same name)",
-    "description": "Load template, after an agent that goes."
-  },
   "assistant.templatePlan.reuseTip": {
     "defaultMessage": "Works in its worktree again: {path} (clean; its branch is left as it is)",
     "description": "Load template's table: tooltip on a worktree worked in again ({path}: its folder)."
@@ -1878,6 +1862,34 @@
   "assistant.templatePlan.reuses": {
     "defaultMessage": "reuses {branch}",
     "description": "Load template's table, Where: the agent works in an old worktree again, on branch {branch}."
+  },
+  "assistant.templatePlan.state": {
+    "defaultMessage": "Change",
+    "description": "Load template's table (#1315): the column saying what happens to each agent (replaced, new, removed)."
+  },
+  "assistant.templatePlan.stateNew": {
+    "defaultMessage": "new",
+    "description": "Load template's table, the Change column: an agent the project doesn't have yet. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateNewTip": {
+    "defaultMessage": "An agent the project doesn’t have yet.",
+    "description": "Load template's table: tooltip on new."
+  },
+  "assistant.templatePlan.stateRemoved": {
+    "defaultMessage": "removed",
+    "description": "Load template's table, the Change column: a project agent the template has none of: it goes. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateRemovedTip": {
+    "defaultMessage": "The template has no agent of this name, so this one goes.",
+    "description": "Load template's table: tooltip on removed."
+  },
+  "assistant.templatePlan.stateReplaced": {
+    "defaultMessage": "replaced",
+    "description": "Load template's table, the Change column: the template's agent replaces the project's agent of the same name. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateReplacedTip": {
+    "defaultMessage": "A new agent with these settings replaces the agent of the same name.",
+    "description": "Load template's table: tooltip on replaced."
   },
   "assistant.templatePlan.where": {
     "defaultMessage": "Where",
@@ -2591,6 +2603,18 @@
     "defaultMessage": "Its reason stays as a comment.",
     "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
   },
+  "assistant.undo.why.queuePaused": {
+    "defaultMessage": "A merge queue it paused stays paused: resume it if it should run.",
+    "description": "Why a change of the Assistant's can't be undone: it paused a project's merge queue."
+  },
+  "assistant.undo.why.queueResumed": {
+    "defaultMessage": "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+    "description": "Why a change of the Assistant's can't be undone: it resumed a project's merge queue."
+  },
+  "assistant.undo.why.removedFromQueue": {
+    "defaultMessage": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
+    "description": "What of the Assistant taking a card out of the merge queue stays when it is undone. Retry merge: a command on the card (use it as Hive shows it)."
+  },
   "assistant.undo.why.reportMerge": {
     "defaultMessage": "The merge it reported stays in the card's work.",
     "description": "What of a merge the Assistant reported stays when it is undone."
@@ -2598,6 +2622,10 @@
   "assistant.undo.why.request": {
     "defaultMessage": "Its request to the builder stays as a comment.",
     "description": "What of a request the Assistant made to a card's builder stays when it is undone."
+  },
+  "assistant.undo.why.retriedMerge": {
+    "defaultMessage": "Its Retry merge stays in the card's work.",
+    "description": "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone."
   },
   "assistant.undo.why.start": {
     "defaultMessage": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
