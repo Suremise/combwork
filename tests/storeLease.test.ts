@@ -271,7 +271,7 @@ describe("a store's save holds its own connection (#1383)", () => {
     await w.open(elsewhere)
     const others = Array.from({ length: 100 }, (_, i) => join(base, 'closed-after', `ws-${i}`))
     try {
-      for (const o of others) markClosed(o, new Error('closed'))
+      for (const o of others) markClosed(o)
       g.release()
       await expect(reader).rejects.toThrow('The workspace was closed')
       expect(board.boardOpen(ws)).toBe(false)

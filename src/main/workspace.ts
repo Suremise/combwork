@@ -19,7 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
-import { markClosed, markOpen } from './openingFence'
+import { markClosed, markOpen, setFenceReason } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -47,6 +47,8 @@ const M = {
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it.' })
 }
+// What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
+setFenceReason(() => hiveError(M.closed, undefined, { kind: 'conflict' }))
 
 /** The notice that a project's folder no longer has the version control Hive recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
@@ -331,7 +333,7 @@ export class WorkspaceService {
     this.life.abort(reason)
     const closing = this.path
     // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
-    if (closing) markClosed(closing, reason)
+    if (closing) markClosed(closing)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
