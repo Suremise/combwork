@@ -45,6 +45,10 @@ const ancestor = (x, y) => {
 
 ;(async () => {
   q.prepare(fx)
+  // The repository's own commit identity, which the preset takes as G12's: never the machine's global one (a clean
+  // Windows, as in the Sandbox checks, has none, and the queue would pause for it).
+  lib.git(alpha, ['config', 'user.name', fx.identity.name])
+  lib.git(alpha, ['config', 'user.email', fx.identity.email])
   // The project's quick check, as the preset offers it from its scripts: `typecheck`, which runs the fixture's check.
   fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node ${slash(path.join(fx.tools, 'check.js'))}` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
@@ -73,7 +77,7 @@ const ancestor = (x, y) => {
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true ? projectJson().workflow.options : null))
-    check('Pair (Hive merges) saved from the form, strict on: Hive merges into main, agent worktrees, typecheck before review and on the merged result', !!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]', JSON.stringify(projectJson().workflow))
+    check("Pair (Hive merges) saved from the form, strict on: Hive merges into main, agent worktrees, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()

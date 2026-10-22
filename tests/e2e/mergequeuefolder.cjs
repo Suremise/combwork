@@ -123,7 +123,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   }
 
   // --- S34a: main moved by another client just before the swap (no crash): rolled back, tested again, merged once.
-  try {
+  // The race is a test seam of unpackaged builds: a packaged one (HIVE_EXE, the Sandbox checks) skips it, saying so.
+  if (process.env.HIVE_EXE) console.log('NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE')
+  else try {
     h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_RACE: 'beforeRef' }, keepOptions: true })
     const r = await q.rejoin(fx, h, reviewer)
     const atRace = main()
