@@ -561,6 +561,9 @@ export class Workflow {
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder)
     if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
+    // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
+    // covers, so a change to it before the write would go unseen (#1401 round 2).
+    if (!this.platform(o).planCovered(before.primed, plan)) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     const { existing, ...planned } = plan
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     // Dependencies Done by facts, in this card's target (§16.7.4).

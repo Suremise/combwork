@@ -111,6 +111,12 @@ export class GitPlatform implements PlatformAdapter {
     return G.branch(this.project)
   }
 
+  /** The plan's target is the one prime resolved and the evidence covers (a Todo card's; otherwise nothing was resolved). */
+  planCovered(primed: unknown, plan: StartPlan): boolean {
+    const p = primed as Primed | null
+    return !p || p.target === undefined || p.target === plan.target
+  }
+
   private common: string | null = null
 
   /** The slow part of the evidence, once per intent: the git folders, and the tracked files (and their folders) it covers. */
