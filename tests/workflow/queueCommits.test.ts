@@ -236,7 +236,8 @@ describe("Hive's queue commits (#1350)", () => {
 describe("a commit's stream, git's trace in it (#1350)", () => {
   // Real git 2.45 stderr (GIT_TRACE2_EVENT=2) of a failing merge commit, recorded with its paths replaced
   // (tests/fixtures/queueCommits: how each was made is in its README).
-  const stream = (name: string): string => readFileSync(join(__dirname, '..', 'fixtures', 'queueCommits', `${name}.txt`), 'utf8')
+  // git wrote them with LF; a checkout may give them CRLF (core.autocrlf).
+  const stream = (name: string): string => readFileSync(join(__dirname, '..', 'fixtures', 'queueCommits', `${name}.txt`), 'utf8').replace(/\r\n/g, '\n')
   const failed = (err: string, more: Partial<QueueGitResult> = {}): QueueGitResult => ({ ok: false, out: '', err, code: 128, ...more })
   const noEvents = (s: string): boolean => !/\{"event":"/.test(s)
 
