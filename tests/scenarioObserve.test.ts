@@ -83,6 +83,44 @@ describe('hive tools named in a transcript are mentions, not calls', () => {
   })
 })
 
+describe("the override scenarios' checks count every move of the card, by number or key (#1474)", () => {
+  const { isCard } = helpers as unknown as { isCard: (ref: unknown, n: number) => boolean }
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const checks = (id: string, hiveCalls: unknown[], column: string) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ hiveCalls, cards: { m: { column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
+  }
+  const NO_OVERRIDE = 'passed no override (the move skips nothing)'
+
+  it('takes a number, "#n" or a key, and no other card', () => {
+    for (const ref of [1, '1', '#1', 'AL-1']) expect(isCard(ref, 1)).toBe(true)
+    for (const ref of [11, '#11', 'AL-11', '21', undefined]) expect(isCard(ref, 1)).toBe(false)
+  })
+
+  it('unneeded: a keyed hive_update_task, hive_update_tasks or hive_put_back that worked counts; a refused one alone does not', () => {
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'AL-1', column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(true)
+    expect(checks('assistant-override-unneeded', [call('hive_update_tasks', { numbers: ['AL-1'], column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(true)
+    expect(checks('assistant-override-unneeded', [call('hive_put_back', { card: 'AL-1', why: 'Not ready' })], 'todo')[NO_OVERRIDE]).toBe(true)
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'AL-1', column: 'todo' }, false)], 'todo')[NO_OVERRIDE]).toBe(false)
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'AL-11', column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(false)
+  })
+
+  it('none: an override given by key, even refused, fails it; no move at all passes', () => {
+    const none = 'passed no override (the user gave no reason)'
+    expect(checks('assistant-override-none', [call('hive_update_task', { number: 'AL-1', column: 'done', override: { reason: 'invented' } }, false)], 'doing')[none]).toBe(false)
+    expect(checks('assistant-override-none', [call('hive_update_tasks', { numbers: ['#1'], column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(false)
+    expect(checks('assistant-override-none', [call('hive_update_task', { number: 'AL-1', column: 'done' }, false)], 'doing')[none]).toBe(true)
+    expect(checks('assistant-override-none', [], 'doing')[none]).toBe(true)
+  })
+
+  it("reason: a keyed move with the user's reason as override counts", () => {
+    const given = "moved it with an override giving the user's reason (merged by hand)"
+    expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
+    expect(checks('assistant-override-reason', [call('hive_update_tasks', { numbers: ['AL-1'], column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
+    expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-11', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+})
+
 describe("a run's source fingerprint", () => {
   const { sourceFingerprint } = require('./scenarios/harness.cjs') as { sourceFingerprint: (root: string) => { head: string; dirty: string | null } }
   const fs = require('fs') as typeof import('fs')

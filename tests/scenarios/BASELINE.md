@@ -52,6 +52,12 @@ db34091a with the change uncommitted.
   sessions (API-equivalent, as the CLI reports it).
 - **Codex** (0.163.0, its default model, its test home): 30 of 30 in 3 samples of each (`2026-10-22T21-17-11-codex`),
   every move by `hive_update_task`. $0.48 for the 9 sessions.
+- **Round 2** (still v74, never merged at the first round's checks): the checks take a card by number, "#n" or its key
+  ("AL-1"), in `hive_update_task`, `hive_update_tasks` and the intents alike, and assistant-override-reason counts an
+  override given through `hive_update_tasks` too (unit tests in `tests/scenarioObserve.test.ts`). Fakes again: every
+  check passes (`2026-10-22T21-30-17-fake`, `2026-10-22T21-31-08-fake-codex`). The 18 real sessions above, re-scored with
+  these checks from their recorded observations rather than run again: all 60 results unchanged (every call named the
+  card by number).
 
 ## The Assistant's override, Claude Code's trial: fixtures v73, 22 October 2026
 

@@ -126,16 +126,22 @@ function handMerged(c, n) {
   return { branch, base }
 }
 /**
- * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column, and the intents that
- * move a card (their card is "#n" or a key ending in n).
+ * Whether a call's card reference is card `n`: its number (12, "12", "#12") or its key ("AL-12"), as the tools take it
+ * (#1219).
+ */
+const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
+/**
+ * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column or an override, and
+ * the intents that move a card.
  */
 const MOVING_INTENTS = ['hive_start_card', 'hive_put_back', 'hive_submit', 'hive_verdict', 'hive_report_merge']
 const movesOf = (o, n) =>
   o.hiveCalls.filter((x) => {
     const a = argsOf(x)
-    if (x.tool === 'hive_update_task') return field(x.args, 'number', n) && a.column !== undefined
-    if (x.tool === 'hive_update_tasks') return (a.numbers ?? []).some((m) => String(m).replace(/^#/, '') === String(n) || new RegExp(`-${n}$`).test(String(m))) && a.column !== undefined
-    return MOVING_INTENTS.includes(x.tool) && new RegExp(`(^#|-)${n}$`).test(String(a.card ?? ''))
+    const moves = a.column !== undefined || a.override !== undefined
+    if (x.tool === 'hive_update_task') return isCard(a.number, n) && moves
+    if (x.tool === 'hive_update_tasks') return (a.numbers ?? []).some((m) => isCard(m, n)) && moves
+    return MOVING_INTENTS.includes(x.tool) && isCard(a.card, n)
   })
 /** The facts of kind `kind` of the scenario's card `key`. */
 const factsOf = (o, key, kind) => (o.facts?.[key] ?? []).filter((f) => f.kind === kind)
@@ -2208,7 +2214,8 @@ module.exports.SCENARIOS = [
     prompt: (c) => `I merged card #${c.cards.m}'s branch, ${c.merged.branch}, into ${c.merged.base} by hand. Move #${c.cards.m} to Done.`,
     fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done","override":{"reason":"The user merged its branch into main by hand"}}`,
     expect: (o, c) => {
-      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      // #1474: by number or key, through hive_update_task or hive_update_tasks.
+      const calls = movesOf(o, c.cards.m)
       const given = calls.find((x) => x.ok && argsOf(x).override)
       const overrides = overridesOf(o, 'm')
       return [
@@ -3509,4 +3516,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, read, moved, history, field, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { called, ran, asksTheUser, read, moved, history, field, isCard, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
