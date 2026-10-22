@@ -1,12 +1,17 @@
-// The workflow options (#1278), in the Version Control tab's Workflow section since #1416: after an upgrade from 0.9 the
-// one-time presets notice names the project, and Choose… opens its Version Control tab at Workflow; picking Pair (the agent merges) fills in its options (every preset offered), each
-// with where its value comes from; Pair (Hive merges, #1355) fills in G9's checks and the install row, shown only while
-// Hive merges and with merge checks; Team (#1361) adds the unit tests, a clean install every time and your OK for ui and
-// release, and says per-card focused tests come later; Save… lists the running lane that keeps the old rules
-// and saves; a contradiction is refused with its reason; Inherit goes back to the inherited value; Copy as JSON and Paste
-// JSON… carry the options; with Workflow rules are enforced off the section says so. Screenshots in both themes, in
-// Polish and in German. Dev build, throwaway profile and workspace; no CLI is started.
+// The Version Control tab's Workflow section (#1418; P4's plain form #1278 before it): after an upgrade from 0.9 the
+// one-time presets notice names the project, and Choose… opens its tab at Workflow. The options are in groups (Review,
+// Checks, Merging, Where cards are built, Stages, Shown here, set elsewhere; None: Review, Checks, The work, Stages,
+// elsewhere), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
+// (and All off) previews what it sets and why, marking what it would change, before Use fills the form: Pair (the agent
+// merges), Pair (Hive merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
+// rows as it is chosen and keeps Save off; those the form can't reach are refused when pasted, as a save is. Save… lists
+// what changes and the running lane keeping the old rules; a stage rename alone applies now; a save after another change
+// (the Assistant's tool, another window) is refused as changed meanwhile and the section reloads. Inherit, Copy as JSON
+// and Paste JSON…, All off with what never turns off, and the rules not enforced. G4 set from the tab decides a clean
+// rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
+// German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
 const lib = require('./lib.cjs')
+const q = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
@@ -17,6 +22,7 @@ const HUNG_MS = 15000
 const userData = path.join(lib.WORK, 'workflowoptions-profile')
 const ws = path.join(lib.WORK, 'workflowoptions-ws')
 const project = path.join(ws, 'web')
+const notes = path.join(ws, 'notes')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -33,6 +39,55 @@ function board(sql, ...args) {
   }
 }
 
+/** The form, its rows and its controls, in one window. */
+async function theForm(page, app, inv) {
+  const section = page.locator('.workflow-form')
+  const row = (option) => section.locator(`.workflow-option[data-option="${option}"]`)
+  const groups = () => section.locator('.workflow-group[data-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
+  const choice = (id) => section.locator(`.workflow-choice[data-choice="${id}"]`)
+  const preview = section.locator('.workflow-preview')
+  const save = section.locator('[data-action="save"]')
+  const reasons = (option) => row(option).locator('.workflow-contradiction').evaluateAll((els) => els.map((e) => e.getAttribute('data-contradiction')))
+  const values = (option) => row(option).locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))
+  const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
+  /** Previews a choice and uses it. */
+  const applyChoice = async (id) => {
+    await choice(id).click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    await preview.locator('[data-action="use-choice"]').click()
+    await preview.waitFor({ state: 'detached', timeout: HUNG_MS })
+  }
+  /** Saves through the warning, waiting for it to close (it reloads the form as it ends). */
+  const saveAll = async () => {
+    await save.click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+  }
+  /** Leaves the Workflow section and comes back to it: the form is read again. */
+  const reopen = async () => {
+    await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    await section.waitFor({ timeout: HUNG_MS })
+  }
+  const discard = () => section.getByRole('button', { name: 'Discard Changes' }).click()
+  // Earlier toasts dismissed first, and the pointer off the rows, so the shots show the rows (the Assistant's note on #1278).
+  const clearToasts = async () => {
+    while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
+    await page.mouse.move(5, 5)
+  }
+  const themes = async (name, target) => {
+    await clearToasts()
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      if (target) await target.scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(lib.WORK, `workflowoptions-${name}-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  }
+  return { section, row, groups, choice, preview, save, reasons, values, dialog, applyChoice, saveAll, reopen, discard, clearToasts, themes, app, inv }
+}
+
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(project, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'web', scripts: { typecheck: 'tsc', lint: 'oxlint', test: 'vitest' } }) })
@@ -42,6 +97,12 @@ function board(sql, ...args) {
   fs.mkdirSync(path.join(project, '.hive'), { recursive: true })
   const upgraded = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'notChecked', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: false, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
   fs.writeFileSync(path.join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }], workflow: { platform: 'git', preset: null, options: upgraded } }))
+  // A project without version control, for None's groups and the contradictions only it can have.
+  fs.mkdirSync(notes, { recursive: true })
+  fs.writeFileSync(path.join(notes, 'README.md'), '# Notes\n')
+  // Its preset chosen, so the presets notice names only web.
+  fs.mkdirSync(path.join(notes, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(notes, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: 'solo', options: {} } }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -57,21 +118,10 @@ function board(sql, ...args) {
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
-    // A dialog or banner by itself; the section (taller than the window) as the window shows it, scrolled to `target`.
-    const themes = async (name, target, scrollTo) => {
-      for (const theme of ['dark', 'light']) {
-        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-        if (scrollTo) await scrollTo.scrollIntoViewIfNeeded()
-        await (scrollTo ? page : (target ?? page)).screenshot({ path: path.join(lib.WORK, `workflowoptions-${name}-${theme}.png`) })
-      }
-      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
-    }
-    /** Saves in the open dialog and waits for it to close: it reloads the form as it ends, so the next step edits the form as saved. */
-    const saveAndClose = async () => {
-      await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-      await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
-    }
-    const projectJson = () => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
+    const f = await theForm(page, app, inv)
+    const { section, row, groups, choice, preview, save, reasons, values, dialog, applyChoice, saveAll, reopen, discard, themes } = f
+    const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+    const saved = () => projectJson().workflow?.options ?? {}
 
     // A board made by 1.0 has no notice; one upgraded from 0.9 (cards from before it) has, once.
     check('no presets notice on a board made by 1.0', (await inv('workflow:presetsNotice')) === null)
@@ -85,117 +135,102 @@ function board(sql, ...args) {
     await lib.appReady(page)
     const notice = page.locator('.presets-notice')
     check('after the upgrade, the presets notice names the project', !!(await lib.until(async () => (await notice.count()) > 0 && (await notice.innerText()).includes('web'), HUNG_MS)), await page.locator('.main-area').innerText().catch(() => ''))
-    await themes('notice', notice)
     await notice.getByRole('button', { name: 'Choose…' }).click()
-    const section = page.locator('.workflow-form')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
     check('Choose… opens the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
-    /** Leaves the Workflow section and comes back to it: the form is read again. */
-    const reopen = async () => {
-      await page.locator('.git-sections [data-section="changes"]').click()
-      await workflowTab.click()
-    }
     check('the notice is gone, and answered for good', !!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)))
 
-    // --- The form as the upgrade left it: no preset, each option with where its value comes from.
-    const row = (option) => section.locator(`.workflow-option[data-option="${option}"]`)
-    check('the version control is shown: Git', (await section.locator('.workflow-platform').innerText()).trim() === 'Git')
-    check('no preset was chosen', (await section.locator('.workflow-preset select').inputValue()) === '')
-    const unavailable = (await section.locator('.workflow-unavailable').allInnerTexts()).join('\n')
-    check('every preset is offered: Pair (Hive merges, #1355) and Team (#1361), none listed unavailable', !unavailable && (await section.locator('.workflow-preset select option[value="pair"]').isEnabled()) && (await section.locator('.workflow-preset select option[value="team"]').isEnabled()), unavailable)
+    // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
+    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'stages', 'elsewhere']), JSON.stringify(await groups()))
+    const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
+    const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), stages: await inGroup('stages') }
+    check('each group has its options (G4 in Review; G9 and G8 hidden while the agent doesn’t merge through Hive)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
+    check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
+    check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
     check('the upgrade’s options are the project’s own', (await row('finish').innerText()).includes('Set for this project'))
-    check('Hive merges is offered; strict is not shown', (await row('finish').locator('option').allInnerTexts()).includes('Hive merges') && (await section.locator('.workflow-option[data-option="strict"]').count()) === 0)
-    check('G9 and its install are not shown while the agent does not merge through Hive', (await row('mergeChecks').count()) === 0 && (await row('mergeInstall').count()) === 0)
-    await themes('form', null, section.locator('.workflow-preset'))
-    await themes('form-end', null, section.locator('.workflow-actions'))
+    check('G1 in a shared folder reads “Work is reviewed before it’s done”', (await row('review').innerText()).startsWith('Work is reviewed before it’s done'), await row('review').innerText())
+    check('G4 says what each value does', (await row('sameness').innerText()).includes('a pass carries over to a clean rebase or squash of the same change; with Exact revision only, any new revision makes it stale'), await row('sameness').innerText())
+    check('the shared-folder warning shows with everyone in the project folder', (await row('sharedFolderWarning').count()) === 1)
+    check('Shown here, set elsewhere: the card loops’ rounds and wait, with a link', (await section.locator('.workflow-group[data-group="elsewhere"]').innerText()).includes('Rounds and wait'))
+    await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
+    await themes('groups-end', section.locator('.workflow-group[data-group="elsewhere"]'))
 
-    // --- Pick Pair (the agent merges): its options, the quick checks from the project's scripts.
-    await section.locator('.workflow-preset select').selectOption('pairAgent')
-    check('Pair (the agent merges): the agent merges', (await row('finish').locator('select').inputValue()) === 'agentMerges')
-    check('…each card in its own folder (the builder’s worktree)', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('worktree'))
-    const checkNames = await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))
-    check('…the quick checks from its scripts, with their commands', JSON.stringify(checkNames) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(checkNames))
-    check('…each from the preset', (await row('review').innerText()).includes('From the preset'))
+    // --- A preset's preview: what it sets and why, what it would change; Use fills the form.
+    await choice('pairAgent').click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    const lines = await preview.locator('li[data-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
+    check('Pair (the agent merges)’s preview lists each option it sets, G4 included, each with why', lines.includes('sameness') && lines.includes('finish') && (await preview.locator('li[data-option="sameness"]').innerText()).includes('A clean rebase doesn’t change what was reviewed'), JSON.stringify(lines))
+    check('…the options it would change marked, with their value now', (await preview.locator('li.changes[data-option="finish"]').innerText()).includes('Now: Not checked') && (await preview.locator('li.changes').count()) >= 3)
+    check('…and the form is unchanged until Use', (await row('finish').locator('select').inputValue()) === 'notChecked')
+    await themes('preview', preview)
+    await preview.locator('[data-action="use-choice"]').click()
+    check('Use: the agent merges', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'agentMerges', HUNG_MS)))
+    check('…each card in its own folder (the builder’s worktree), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
+    check('…the shared-folder warning not shown with each card in its own folder', (await row('sharedFolderWarning').count()) === 0)
+    check('…the quick checks from its scripts, with their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
+    check('…each from the preset; the preset line names it', (await row('review').innerText()).includes('From the preset') && (await section.locator('.workflow-preset-now').innerText()).trim() === 'Pair (the agent merges)')
     check('…commits as the project’s own identity, shown', (await row('identity').innerText()).includes('Pat Builder <pat@example.invalid>'), await row('identity').innerText())
 
-    // --- Save…: what changes, the running lane that keeps the old rules; saved.
-    await section.getByRole('button', { name: 'Save…' }).click()
-    const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
+    // --- Save…: what changes, the running lane that keeps the old rules; saved through the one writer.
+    await save.click()
     await dialog.waitFor({ timeout: HUNG_MS })
     const said = await dialog.innerText()
-    check('the warning lists what changes, each option old → new', said.includes('Who merges: Not checked → The agent merges, Hive checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
+    check('the warning lists what changes, each option old → new, from the next card', said.includes('apply from the next card') && said.includes('Who merges: Not checked → The agent merges, Hive checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
     check('…and lists the running lane, which keeps the old rules', said.includes('keeps the old rules') && said.includes('Builder B1'), said)
     await themes('save', dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-    check('saved: Pair (the agent merges), in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'pairAgent' && projectJson().workflow.options.finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow))
+    check('saved: Pair (the agent merges), in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'pairAgent' && saved().finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow))
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
 
-    // --- A contradiction is refused with its reason, nothing saved.
+    // --- Contradictions as you choose: the reason under both rows at once, Save off until it's resolved.
+    const both = async (c, a, b) => JSON.stringify(await reasons(a)).includes(c) && JSON.stringify(await reasons(b)).includes(c)
     await row('finish').locator('select').selectOption('committed')
-    check('a changed option makes it Custom, started from the preset', (await section.locator('.workflow-preset select option[value=""]').innerText()).includes('started from Pair (the agent merges)'))
-    await section.getByRole('button', { name: 'Save…' }).click()
-    const problems = section.locator('.workflow-problems')
-    check('a contradiction is refused with its reason', !!(await lib.until(async () => (await problems.count()) > 0 && (await problems.innerText()).includes('“Committed is done” needs everyone in the project folder.'), HUNG_MS)), await problems.innerText().catch(() => ''))
-    // Shot once the earlier save's toast has gone (a refused save says nothing of a save; the Assistant's note).
-    check('the earlier save’s toast has gone before the shot', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'saved' }).count()) === 0, HUNG_MS)))
-    await themes('refused', null, section.locator('.workflow-problems'))
-    check('…and nothing was saved', projectJson().workflow.options.finish === 'agentMerges')
-    await section.getByRole('button', { name: 'Discard Changes' }).click()
+    check('Committed is done with each card in its own folder: the reason under Who merges and Where cards are built', !!(await lib.until(() => both('committedNeedsFolder', 'finish', 'folder'), HUNG_MS)) && (await row('folder').innerText()).includes('“Committed is done” needs everyone in the project folder.'))
+    check('…and Save is off', await save.isDisabled())
+    check('…the preset line says Custom, started from the preset', (await section.locator('.workflow-preset-now').innerText()).includes('started from Pair (the agent merges)'))
+    await themes('contradiction', row('finish'))
+    await row('folder').locator('select').selectOption('project')
+    check('resolved: the reasons go, Save is on', !!(await lib.until(async () => (await reasons('finish')).length === 0 && (await reasons('folder')).length === 0 && (await save.isEnabled()), HUNG_MS)))
+    await row('finish').locator('select').selectOption('hiveMerges')
+    check('Hive merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
+    await discard()
+    await row('reviewers').locator('select').selectOption('2')
+    await row('review').locator('select').selectOption('you')
+    check('Two reviewers with you reviewing: under both rows', !!(await lib.until(() => both('quorumNeedsAgent', 'reviewers', 'review'), HUNG_MS)))
+    await row('okBefore').locator('select').selectOption('every')
+    check('Your OK before merging while you review: under both rows', !!(await lib.until(() => both('okWithReview', 'okBefore', 'review'), HUNG_MS)) && (await save.isDisabled()))
+    await discard()
+    check('Discard Changes clears them', !!(await lib.until(async () => (await section.locator('.workflow-contradiction').count()) === 0, HUNG_MS)))
 
     // --- Inherit: an option the project sets goes back to the inherited value (the platform's: the default branch).
     await row('target').locator('input').fill('release')
+    await row('target').locator('input').blur()
     check('a value set here shows Inherit', (await row('target').getByRole('button', { name: 'Inherit' }).count()) === 1)
     await row('target').getByRole('button', { name: 'Inherit' }).click()
     check('…which goes back to the inherited value', (await row('target').locator('input').inputValue()) === '' && (await row('target').innerText()).includes('Default'))
     await row('style').locator('select').selectOption('squash')
-    await row('style').getByRole('button', { name: 'Inherit' }).waitFor({ timeout: HUNG_MS })
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    await saveAndClose()
-    check('saved with the merge style set', !!(await lib.until(async () => projectJson().workflow?.options.style === 'squash', HUNG_MS)))
+    await saveAll()
+    check('saved with the merge style set', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
     await row('style').getByRole('button', { name: 'Inherit' }).click()
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    await saveAndClose()
-    check('an option inherited again is left out of project.json', !!(await lib.until(async () => !('style' in projectJson().workflow.options) && projectJson().workflow.options.finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow.options))
+    await saveAll()
+    check('an option inherited again is left out of project.json', !!(await lib.until(async () => !('style' in saved()) && saved().finish === 'agentMerges', HUNG_MS)), JSON.stringify(saved()))
 
-    // --- Typed as a person types (HR6's round 1: fill() hid both): Your OK before merging shows the policy chosen, and
-    // a check's command keeps its spaces; both saved and shown again when the section is opened again.
+    // --- Typed as a person types (HR6's round 1): Your OK's labels and a check's command keep their spaces.
     const okSelect = row('okBefore').locator('select')
-    await okSelect.selectOption('every')
-    check('Your OK before merging shows Every card once chosen', (await okSelect.inputValue()) === 'every')
     await okSelect.selectOption('labels')
-    check('…and Cards with these labels, with its labels field', (await okSelect.inputValue()) === 'labels' && (await row('okBefore').locator('input').count()) === 1)
     await row('okBefore').locator('input').pressSequentially('ui, release')
-    check('…its labels typed with a comma and a space, kept as typed', (await row('okBefore').locator('input').inputValue()) === 'ui, release')
     await row('preChecks').getByRole('button', { name: 'Add Check' }).click()
     const newCheck = row('preChecks').locator('.workflow-check').last()
     await newCheck.locator('input').first().fill('')
     await newCheck.locator('input').first().pressSequentially('unit tests')
     await newCheck.locator('input').nth(1).pressSequentially('npm run test -- --silent')
-    check('a check’s command typed with spaces keeps them', (await newCheck.locator('input').nth(1).inputValue()) === 'npm run test -- --silent', await newCheck.locator('input').nth(1).inputValue())
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    await saveAndClose()
-    const saved = () => projectJson().workflow?.options ?? {}
+    await saveAll()
     check('saved: the labels policy and the check with its command', !!(await lib.until(async () => saved().okBefore?.mode === 'labels' && saved().commands?.['unit tests'] === 'npm run test -- --silent', HUNG_MS)), JSON.stringify(saved()))
-    check('…the labels as a list', JSON.stringify(saved().okBefore?.labels) === JSON.stringify(['ui', 'release']) && saved().preChecks?.includes('unit tests'))
     await reopen()
-    await section.waitFor({ timeout: HUNG_MS })
-    check('opened again: the policy shows Cards with these labels, its labels and the check’s command', !!(await lib.until(async () => (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release' && (await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))).includes('npm run test -- --silent'), HUNG_MS)))
+    check('opened again: the labels and the check’s command', !!(await lib.until(async () => (await okSelect.inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release' && (await values('preChecks')).includes('npm run test -- --silent'), HUNG_MS)))
 
-    // The warning shows what a structured value holds: a labels-only change names the old and new labels (HR6's round 3).
-    await row('okBefore').locator('input').fill('backend')
-    await row('okBefore').locator('input').blur()
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    const labelsSaid = await dialog.innerText()
-    check('a labels-only change shows the old and the new labels', labelsSaid.includes('Your OK before merging: Cards with these labels: ui and release → Cards with these labels: backend'), labelsSaid)
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
-    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
-    await section.getByRole('button', { name: 'Discard Changes' }).click()
-
-    // --- Copy as JSON and Paste JSON… (the clipboard stubbed: never the real one).
+    // --- Copy as JSON and Paste JSON… (the clipboard stubbed: never the real one); a paste is checked as a save is.
     await page.evaluate(() => {
       window.__copied = null
       navigator.clipboard.writeText = async (t) => void (window.__copied = t)
@@ -204,121 +239,175 @@ function board(sql, ...args) {
     const copied = await lib.until(() => page.evaluate(() => window.__copied), HUNG_MS)
     const parsed = copied ? JSON.parse(copied) : null
     check('Copy as JSON gives the version control, the preset and every option', parsed?.platform === 'git' && parsed?.preset === 'pairAgent' && parsed?.options.finish === 'agentMerges' && 'style' in parsed.options, String(copied))
-    await section.getByRole('button', { name: 'Paste JSON…' }).click()
-    const paste = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
-    await paste.waitFor({ timeout: HUNG_MS })
-    await paste.locator('textarea').fill(JSON.stringify({ ...parsed, options: { ...parsed.options, finish: 'committed' } }))
-    await paste.getByRole('button', { name: 'Use These Options' }).click()
-    check('a pasted contradiction is refused in the dialog, with its reason', !!(await lib.until(async () => (await paste.innerText()).includes('needs everyone in the project folder'), HUNG_MS)), await paste.innerText())
-    // A failure stays in the dialog, its button now Try Again.
-    await paste.locator('textarea').fill(JSON.stringify({ ...parsed, options: { ...parsed.options, target: 'release' } }))
-    await paste.getByRole('button', { name: 'Try Again' }).click()
-    await paste.waitFor({ state: 'detached', timeout: HUNG_MS })
+    const pasteIn = async (json) => {
+      await section.getByRole('button', { name: 'Paste JSON…' }).click()
+      const d = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
+      await d.waitFor({ timeout: HUNG_MS })
+      await d.locator('textarea').fill(JSON.stringify(json))
+      await d.getByRole('button', { name: 'Use These Options' }).click()
+      return d
+    }
+    // The contradiction the form can't reach (its switch is held on while a reviewer agent checks): refused when pasted.
+    const selfReview = await pasteIn({ ...parsed, options: { ...parsed.options, noSelfReview: false } })
+    check('a pasted contradiction the form can’t reach is refused in the dialog, with its reason', !!(await lib.until(async () => (await selfReview.innerText()).includes('be off while a reviewer agent checks the work'), HUNG_MS)), await selfReview.innerText())
+    await selfReview.locator('textarea').fill(JSON.stringify({ ...parsed, options: { ...parsed.options, target: 'release' } }))
+    await selfReview.getByRole('button', { name: 'Try Again' }).click()
+    await selfReview.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('a good paste fills the form, to save', (await row('target').locator('input').inputValue()) === 'release')
-    await section.getByRole('button', { name: 'Discard Changes' }).click()
+    await discard()
 
     // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
-    await section.locator('.workflow-preset select').selectOption('pair')
-    check('Pair: Hive merges', (await row('finish').locator('select').inputValue()) === 'hiveMerges')
-    check('…into the repository’s own default branch, by name (master here)', (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
-    const values = (option) => row(option).locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))
-    check('…G9: the quick checks from its scripts, with their commands', JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
-    check('…the install row, when the lock file or manifests change', (await row('mergeInstall').locator('select').inputValue()) === 'onManifestChange' && (await row('mergeInstall').innerText()).includes('always installs from scratch'), await row('mergeInstall').innerText().catch(() => ''))
-    // A merge check with its own command keeps the checks before review's commands (one commands map).
-    await row('mergeChecks').getByRole('button', { name: 'Add Check' }).click()
-    const unit = row('mergeChecks').locator('.workflow-check').last()
-    await unit.locator('input').first().fill('')
-    await unit.locator('input').first().pressSequentially('unit')
-    await unit.locator('input').nth(1).pressSequentially('npm test')
+    await applyChoice('pair')
+    check('Pair: Hive merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
+    check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
+    check('…G8 shown in Merging while Hive merges', (await inGroup('merging')).includes('strict'))
+    await themes('hivemerges', row('mergeChecks'))
     await row('mergeInstall').locator('select').selectOption('always')
-    check('…the checks before review keep their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
-    // Earlier toasts (copied, saved) dismissed first, so the shots show the rows (the Assistant's note on #1278).
-    const clearToasts = async () => {
-      while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
-      // The pointer off the rows: a hovered row is drawn highlighted.
-      await page.mouse.move(430, 700)
-    }
-    await clearToasts()
-    await themes('hivemerges', null, row('mergeChecks'))
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    const pairSaid = await dialog.innerText()
-    check('the warning names Hive merges and the merge checks', pairSaid.includes('Who merges: The agent merges, Hive checks → Hive merges') && pairSaid.includes('Checks pass on the merged result: None → typecheck, lint, and unit'), pairSaid)
-    await saveAndClose()
-    check('saved: Hive merges, the merge checks with their commands and the install, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint', 'unit']) && saved().mergeInstall === 'always' && saved().commands?.unit === 'npm test' && saved().commands?.lint === 'npm run lint', HUNG_MS)), JSON.stringify(saved()))
-    check('…shown as such once saved', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await values('mergeChecks')).includes('npm test'), HUNG_MS)))
-    // With no merge checks, nothing is installed: the install row goes.
+    await saveAll()
+    check('saved: Hive merges, the merge checks and the install, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always', HUNG_MS)), JSON.stringify(saved()))
     for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
     check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
-    // Another finisher is G9's off switch: its rows go.
-    await row('finish').locator('select').selectOption('agentMerges')
-    check('with the agent merging, G9’s rows are not shown', !!(await lib.until(async () => (await row('mergeChecks').count()) === 0, HUNG_MS)))
-    await section.getByRole('button', { name: 'Discard Changes' }).click()
-    check('Discard Changes brings back the saved merge checks', !!(await lib.until(async () => (await row('mergeChecks').count()) === 1 && (await row('mergeInstall').count()) === 1, HUNG_MS)))
+    await discard()
 
-    // --- Team (#1361, Darren's point 1 on #1121): Pair plus the unit tests before review and on the merged result,
-    // installed from scratch every time, your OK for ui and release; it says per-card focused tests come later.
+    // --- Team (#1361): Pair plus the unit tests before review and on the merged result, a clean install every time,
+    // your OK for ui and release; its note says per-card focused tests come later.
     const note = section.locator('.workflow-preset-note')
-    check('no preset note while Pair is chosen', (await note.count()) === 0)
-    await section.locator('.workflow-preset select').selectOption('team')
-    check('Team: its note says per-card focused tests come later', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('focused tests there too comes in a later version'), HUNG_MS)), await note.innerText().catch(() => ''))
-    check('…Hive merges into the default branch', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master')
+    await applyChoice('team')
+    check('Team: its note says per-card focused tests come later', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('focused tests there too comes in a later version'), HUNG_MS)))
     const teamChecks = JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint', 'test', 'npm test'])
-    check('…quick checks + unit tests before review and on the merged result, with their commands', JSON.stringify(await values('preChecks')) === teamChecks && JSON.stringify(await values('mergeChecks')) === teamChecks, JSON.stringify([await values('preChecks'), await values('mergeChecks')]))
-    check('…installed from scratch before every merge', (await row('mergeInstall').locator('select').inputValue()) === 'always')
-    check('…your OK for cards labelled ui or release', (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release')
-    await clearToasts()
-    await themes('team', null, section.locator('.workflow-preset'))
-    await themes('team-checks', null, row('mergeChecks'))
-    await section.getByRole('button', { name: 'Save…' }).click()
-    await dialog.waitFor({ timeout: HUNG_MS })
-    await saveAndClose()
-    check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().mergeInstall === 'always' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint', 'test']) && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
-    // A change after it makes it Custom, started from Team; the note stays (it is still Team's checks).
-    await row('mergeInstall').locator('select').selectOption('onManifestChange')
-    check('a changed option: Custom, started from Team, the note kept', (await section.locator('.workflow-preset select option[value=""]').innerText()).includes('started from Team') && (await note.count()) === 1)
-    await section.getByRole('button', { name: 'Discard Changes' }).click()
+    check('…quick checks + unit tests before review and on the merged result', JSON.stringify(await values('preChecks')) === teamChecks && JSON.stringify(await values('mergeChecks')) === teamChecks)
+    check('…installed from scratch before every merge, your OK for ui or release', (await row('mergeInstall').locator('select').inputValue()) === 'always' && (await row('okBefore').locator('input').inputValue()) === 'ui, release')
+    await themes('team', section.locator('.workflow-group[data-group="presets"]'))
+    await saveAll()
+    check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
 
-    // --- With the rules not enforced, the section says so.
+    // --- Stage names (N5): a rename alone applies now, never "old rules".
+    const stageBox = (stage) => row('stageNames').locator(`input[aria-label="Name of the stage ${stage}"]`)
+    check('Stage names: a box per stage these options produce, its default name as the placeholder', (await stageBox('Review').getAttribute('placeholder')) === 'Review' && (await stageBox('Merging').count()) === 1, await row('stageNames').innerText())
+    await stageBox('Review').fill('Checking')
+    await stageBox('Review').blur()
+    await save.click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const renameSaid = await dialog.innerText()
+    check('a rename alone: the warning says it applies now, and lists no lane keeping old rules', renameSaid.includes('names aren’t rules, so they apply now') && !renameSaid.includes('keeps the old rules'), renameSaid)
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('saved: the name, the preset kept (names aren’t rules)', !!(await lib.until(async () => saved().stageNames?.review === 'Checking' && projectJson().workflow.preset === 'team', HUNG_MS)), JSON.stringify(projectJson().workflow))
+    await stageBox('Merging').fill('Checking')
+    await stageBox('Merging').blur()
+    check('a duplicate name: its reason under the row, Save off', !!(await lib.until(async () => (await row('stageNames').locator('[data-stage-problem]').count()) > 0 && (await save.isDisabled()), HUNG_MS)), await row('stageNames').innerText())
+    await discard()
+
+    // --- A save after another change (the Assistant's settings tool, another window) is refused and the form reloads.
+    await row('style').locator('select').selectOption('squash')
+    // Another window's save, as main takes it (no base: the tool's way).
+    await inv('workflow:setOptions', project, { preset: 'team', options: { ...saved(), target: 'release' } })
+    await save.click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    check('the stale save is refused, said, and the section reloads to what is saved now', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'changed meanwhile' }).count()) > 0 && (await row('target').locator('input').inputValue()) === 'release' && (await row('style').locator('select').inputValue()) === 'merge', HUNG_MS)))
+    check('…nothing written over it', saved().target === 'release' && saved().style !== 'squash', JSON.stringify(saved()))
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS }).catch(() => {})
+
+    // --- All off (§16.6.4): chosen and saved; the section says what never turns off.
+    await choice('allOff').click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    check('All off’s preview lists what never turns off', (await preview.locator('[data-never-off]').innerText()).includes('index.lock'))
+    await themes('alloff', preview)
+    await preview.locator('[data-action="use-choice"]').click()
+    check('All off: no review, not checked, the project folder, no checks; the never-off note shown', !!(await lib.until(async () => (await row('review').locator('select').inputValue()) === 'none' && (await row('finish').locator('select').inputValue()) === 'notChecked' && (await row('folder').locator('select').inputValue()) === 'project' && (await values('preChecks')).length === 0 && (await section.locator('.workflow-form > [data-never-off], [data-never-off]').count()) >= 1, HUNG_MS)))
+    await saveAll()
+    check('saved: every rule off, no preset; the stage name kept', !!(await lib.until(async () => projectJson().workflow?.preset === null && saved().review === 'none' && saved().finish === 'notChecked' && saved().folder === 'project' && saved().stageNames?.review === 'Checking', HUNG_MS)), JSON.stringify(projectJson().workflow))
+
+    // --- With the rules not enforced, the section says so and still saves.
     await inv('advanced:set', 'hive.workflow.enforce', false)
     await reopen()
     check('with Workflow rules are enforced off, the section says so', !!(await lib.until(async () => (await section.locator('.workflow-note').count()) > 0 && (await section.innerText()).includes('aren’t enforced'), HUNG_MS)))
+    await row('style').locator('select').selectOption('squash')
+    await saveAll()
+    check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
     await inv('advanced:set', 'hive.workflow.enforce', null)
 
-    // --- Another language: Polish.
-    // As main sends a change of language (i18nlive), with Polish's own catalogue.
-    const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'pl', locale: 'pl', messages })
+    // --- None (no version control): its groups, and the contradictions only its options could have, refused when pasted.
+    await page.getByText('notes', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await workflowTab.click()
+    check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'work', 'stages', 'elsewhere']), HUNG_MS)), JSON.stringify(await groups()))
+    const noneLayout = { review: await inGroup('review'), checks: await inGroup('checks'), work: await inGroup('work') }
+    check('…N1, N2 in Review, N3 in Checks, N4 and N6 in The work; N7 shown elsewhere', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone'] }) && (await section.locator('.workflow-group[data-group="elsewhere"]').innerText()).includes('File locks'), JSON.stringify(noneLayout))
+    check('…N1 reads “Who checks the work before it’s done”', (await row('review').innerText()).startsWith('Who checks the work before it’s done'))
+    await themes('none', section.locator('.workflow-group[data-group="review"]'))
+    const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
+    const merging = await pasteIn({ ...noneBase, options: { finish: 'hiveMerges' } })
+    check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
+    await merging.locator('textarea').fill(JSON.stringify({ ...noneBase, options: { folder: 'slots' } }))
+    await merging.getByRole('button', { name: 'Try Again' }).click()
+    check('None: a folder per card pasted is refused, everyone works in the project folder', !!(await lib.until(async () => (await merging.innerText()).includes('everyone works in the project folder'), HUNG_MS)), await merging.innerText())
+    await merging.getByRole('button', { name: 'Cancel' }).click()
+
+    // --- German, among the longest labels, and Polish: the groups and the presets.
+    await page.getByText('web', { exact: true }).first().click()
     await reopen()
-    check('the section shows in Polish', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Kto scala'), HUNG_MS)), await section.innerText().catch(() => ''))
-    await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-form-pl.png') })
-    check('Team’s note shows in Polish', (await note.innerText()).includes('w późniejszej wersji'), await note.innerText().catch(() => ''))
-    await clearToasts()
-    await row('mergeChecks').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-pl.png') })
-    // German, among the longest: G9's rows as they wrap.
-    const de = path.join(lib.ROOT, 'locales', 'de')
-    await speak({ ...base, code: 'de', locale: 'de', messages: Object.assign({}, ...fs.readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(de, f), 'utf8')))) })
-    check('the section shows in German', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Wer mergt'), HUNG_MS)), await section.innerText().catch(() => ''))
-    await clearToasts()
-    await row('mergeChecks').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-de.png') })
-    await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-team-de.png') })
-    await speak(base)
+    const base = (await inv('app:info')).language
+    const speak = async (code) => {
+      const dir = path.join(lib.ROOT, 'locales', code)
+      const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+    }
+    await speak('de')
+    check('the section shows in German', !!(await lib.until(async () => (await section.innerText()).includes('Wer mergt'), HUNG_MS)))
+    await choice('team').click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    await themes('presets-de', section.locator('.workflow-group[data-group="presets"]'))
+    await preview.getByRole('button').last().click()
+    await themes('groups-de', section.locator('.workflow-group[data-group="merging"]'))
+    await speak('pl')
+    check('the section shows in Polish', !!(await lib.until(async () => (await section.innerText()).includes('Kto scala'), HUNG_MS)))
+    await themes('groups-pl', section.locator('.workflow-group[data-group="review"]'))
+    await speak('en')
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
-    // What the window showed then, for whoever reads the failure.
     await app
       .firstWindow()
       .then((p) => p.screenshot({ path: path.join(lib.WORK, 'workflowoptions-failed.png') }))
       .catch(() => {})
   } finally {
     await app.close().catch(() => {})
+  }
+
+  // --- G4 set from the tab decides a clean rebase (S9): with Same change an approved card rebased cleanly onto a newer
+  // target keeps its pass (CarriedOver); with Exact revision only, the same rebase makes it stale. The agent merges, so
+  // nothing merges meanwhile.
+  const fx = q.queueProject('workflowoptions-g4')
+  q.prepare(fx)
+  let h = null
+  try {
+    h = await q.startHive(fx, { port: lib.port(47857), keepOptions: true })
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
+    await h.page.getByText('alpha', { exact: true }).first().click()
+    await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await h.page.locator('.git-sections [data-section="workflow"]').click()
+    const g = await theForm(h.page, h.app, h.inv)
+    const sameness = async (value) => {
+      await g.row('sameness').locator('select').selectOption(value)
+      await g.saveAll()
+      return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)
+    }
+    const reviewer = await q.agent(fx, h, 'R1')
+    check('G4: Same change saved from the tab', !!(await sameness('change')))
+    const kept = await q.approve(fx, h, reviewer, 'Same change card', { 'b.txt': 'same\n' })
+    check('G4: Exact revision only saved from the tab', !!(await sameness('exact')))
+    const exact = await q.approve(fx, h, reviewer, 'Exact revision card', { 'c.txt': 'exact\n' })
+    check('both cards approved', !!(await lib.until(async () => (await h.card(kept.n))?.column === 'passed' && (await h.card(exact.n))?.column === 'passed', HUNG_MS)), JSON.stringify([kept.steps, exact.steps]))
+    // The target moves on, and each builder rebases its card cleanly onto it.
+    q.commitOn(fx, 'integration', { 'd.txt': 'elsewhere\n' }, 'Someone else’s change')
+    for (const c of [kept, exact]) lib.git(c.builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'rebase', '-q', 'integration'])
+    check('Same change: the pass carries over (CarriedOver), the card stays approved', !!(await lib.until(async () => (await h.kinds(kept.n)).includes('CarriedOver'), 30000)) && !(await h.kinds(kept.n)).includes('Stale'), JSON.stringify(await h.kinds(kept.n)))
+    check('Exact revision only: the same rebase makes the pass stale', !!(await lib.until(async () => (await h.kinds(exact.n)).includes('Stale'), 30000)) && !(await h.kinds(exact.n)).includes('CarriedOver'), JSON.stringify(await h.kinds(exact.n)))
+  } catch (e) {
+    check('G4’s part ran to the end', false, e.stack ?? String(e))
+  } finally {
+    if (h) await h.app.close().catch(() => {})
   }
   console.log(failed ? `\n${failed} check(s) failed` : '\nworkflowoptions: all checks passed')
   process.exit(failed ? 1 : 0)

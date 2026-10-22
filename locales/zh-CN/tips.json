@@ -365,6 +365,8 @@
   "tips.viewerTokens.title": "让其他应用查看 Hive",
   "tips.workflowOptions.text": "“版本控制”→“工作流程”用于设置由谁评审卡片的工作、哪些检查需先通过以及由谁合并。选择一个预设，或逐项设置：更改从下一张开始的卡片起生效。",
   "tips.workflowOptions.title": "选择卡片如何到达完成",
+  "tips.workflowPresetsWhy.text": "在“版本控制”→“工作流程”中点击“单人”“结对”或“团队”：预设会列出它设置的每个选项及原因，并标出它会更改的内容。在你使用并保存之前，什么都不会改变。",
+  "tips.workflowPresetsWhy.title": "使用预设前先看看它会做什么",
   "tips.workspaceMoved.text": "把工作区文件夹移动了，比如移到另一个驱动器？从新位置打开它，然后在横幅中选择“修复…”：智能体的工作树、它们的会话，以及 Claude Code 的对话和记忆都会随之迁移。",
   "tips.workspaceMoved.title": "移动工作区而不丢失智能体",
   "tips.workspaceMovedDefender.text": "如果 Hive 曾让 Defender 跳过工作区的文件夹，移动后点击“修复…”即可将这些排除项移到新文件夹（一次管理员提示），不会在已不存在的文件夹上留下排除项。你自己创建的排除项保持不变。",

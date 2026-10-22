@@ -166,6 +166,7 @@
   "service.transcripts.noImage": "No such image",
   "service.transcripts.noTool": "No such tool call",
   "service.transcripts.none": "This session has no transcript yet.",
+  "service.workflow.changedMeanwhile": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
   "service.workflow.closed": "The workspace this card belongs to has closed",
   "service.workflowNotice.blocked": "{card} is blocked: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} is blocked",

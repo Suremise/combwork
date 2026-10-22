@@ -166,6 +166,7 @@
   "service.transcripts.noImage": "Nie ma takiego obrazu",
   "service.transcripts.noTool": "Nie ma takiego wywołania narzędzia",
   "service.transcripts.none": "Ta sesja nie ma jeszcze transkrypcji.",
+  "service.workflow.changedMeanwhile": "Opcje przepływu pracy zmieniły się w międzyczasie (w innym oknie albo przez Hive Assistant), więc nic nie zapisano. Sekcja pokazuje je w obecnym stanie.",
   "service.workflow.closed": "Obszar roboczy tej karty został zamknięty",
   "service.workflowNotice.blocked": "{card} jest zablokowana: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} jest zablokowana",

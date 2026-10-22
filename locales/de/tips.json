@@ -365,6 +365,8 @@
   "tips.viewerTokens.title": "Eine andere App Hive beobachten lassen",
   "tips.workflowOptions.text": "Versionsverwaltung → Workflow legt fest, wer die Arbeit einer Karte reviewt, welche Checks vorher bestehen und wer sie mergt. Wähle eine Voreinstellung oder setze jede Option einzeln: Eine Änderung gilt ab der nächsten Karte, die startet.",
   "tips.workflowOptions.title": "Lege fest, wie Karten zu Erledigt kommen",
+  "tips.workflowPresetsWhy.text": "Klicke in Versionsverwaltung → Workflow auf Solo, Paar oder Team: Die Voreinstellung listet jede Option auf, die sie setzt, mit dem Grund, und markiert, was sie ändern würde. Nichts ändert sich, bis du sie verwendest und speicherst.",
+  "tips.workflowPresetsWhy.title": "Sieh dir an, was eine Voreinstellung tut, bevor du sie verwendest",
   "tips.workspaceMoved.text": "Den Ordner des Arbeitsbereichs verschoben, etwa auf ein anderes Laufwerk? Öffne ihn am neuen Ort und wähle „Reparieren…“ im Banner: Die Worktrees der Agenten, ihre Sitzungen sowie die Unterhaltungen und das Gedächtnis von Claude Code ziehen mit.",
   "tips.workspaceMoved.title": "Einen Arbeitsbereich verschieben, ohne seine Agenten zu verlieren",
   "tips.workspaceMovedDefender.text": "Hat Hive Defender die Ordner des Arbeitsbereichs überspringen lassen, bietet „Reparieren…“ nach einer Verschiebung an, diese Ausschlüsse mit einer Administratorabfrage in die neuen Ordner zu verschieben, damit keiner auf einem Ordner bleibt, den es nicht mehr gibt. Ausschlüsse, die du selbst angelegt hast, bleiben, wie sie sind.",

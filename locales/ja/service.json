@@ -166,6 +166,7 @@
   "service.transcripts.noImage": "その画像はありません",
   "service.transcripts.noTool": "そのツール呼び出しはありません",
   "service.transcripts.none": "このセッションにはまだトランスクリプトがありません。",
+  "service.workflow.changedMeanwhile": "その間にワークフローのオプションが変更されたため（別のウィンドウ、または Hive Assistant による変更）、何も保存されませんでした。このセクションには現在のオプションが表示されています。",
   "service.workflow.closed": "このカードのワークスペースは閉じられました",
   "service.workflowNotice.blocked": "{card}はブロックされています：{reason}",
   "service.workflowNotice.blockedNoReason": "{card}はブロックされています",

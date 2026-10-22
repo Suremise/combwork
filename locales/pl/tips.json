@@ -365,6 +365,8 @@
   "tips.viewerTokens.title": "Pozwól innej aplikacji obserwować Hive",
   "tips.workflowOptions.text": "Kontrola wersji → Przepływ pracy określa, kto recenzuje pracę karty, jakie sprawdzenia muszą przejść najpierw i kto ją scala. Wybierz ustawienie wstępne albo ustaw każdą opcję: zmiana obowiązuje od następnej karty, która się zacznie.",
   "tips.workflowOptions.title": "Wybierz, jak karty dochodzą do Gotowe",
+  "tips.workflowPresetsWhy.text": "W Kontrola wersji → Przepływ pracy kliknij Solo, Para albo Zespół: ustawienie wstępne pokaże każdą opcję, którą ustawia, wraz z powodem, i oznaczy, co by zmieniło. Nic się nie zmieni, dopóki go nie użyjesz i nie zapiszesz.",
+  "tips.workflowPresetsWhy.title": "Zobacz, co robi ustawienie wstępne, zanim go użyjesz",
   "tips.workspaceMoved.text": "Przeniesiono folder obszaru roboczego, np. na inny dysk? Otwórz go z nowego miejsca i wybierz Napraw… na banerze: worktree agentów, ich sesje oraz rozmowy i pamięć Claude Code pójdą za nim.",
   "tips.workspaceMoved.title": "Przenieś obszar roboczy bez utraty agentów",
   "tips.workspaceMovedDefender.text": "Jeśli Hive kazał Defenderowi pomijać foldery obszaru roboczego, Napraw… po przeniesieniu proponuje przenieść te wykluczenia do nowych folderów, z jednym pytaniem o uprawnienia administratora, żeby żadne nie zostało na folderze, którego już nie ma. Twoje własne wykluczenia zostają bez zmian.",
