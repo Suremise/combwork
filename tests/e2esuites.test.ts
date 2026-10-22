@@ -52,7 +52,7 @@ describe('the e2e suite list', () => {
 
   it('names suites that exist, and every suite file is listed', () => {
     for (const n of names) expect(existsSync(join(dir, `${n}.cjs`)), n).toBe(true)
-    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'boardRows', 'sessionDeliveryCodec', 'windowsExits', 'layoutReport']
+    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'boardRows', 'sessionDeliveryCodec', 'windowsExits', 'layoutReport', 'queueFixture']
     const files = execFileSync('git', ['ls-files', 'tests/e2e/*.cjs'], { cwd: root, encoding: 'utf8' })
       .split(/\r?\n/)
       .filter(Boolean)
@@ -115,7 +115,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['attention', 'codexfolder', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'models', 'providerdetect', 'sessiontree', 'skilldelivery', 'termsize', 'turnledger'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['attention', 'codexfolder', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'models', 'providerdetect', 'sessiontree', 'skilldelivery', 'termsize', 'turnledger'])
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
     expect(affectedSuites(['resources/tray.png'], names).all).toBe(true)
     expect(affectedSuites(['scripts/build-icons.mjs'], names).all).toBe(true)

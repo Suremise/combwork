@@ -259,7 +259,7 @@ export async function clearJournal(root: string, lease: string, dir?: string): P
 
 /**
  * The launcher (run by Node): waits for its input's first line, then runs the command it was given (HIVE_QUEUE_LAUNCH,
- * JSON: command, args, shell) with its own output and what follows on its input, and exits with its code. Its input
+ * JSON: command, args, shell, verbatim: Windows' arguments as given, a shell's command line) with its own output and what follows on its input, and exits with its code. Its input
  * closing before that line (Hive gone, or the launch given up) ends it with nothing run.
  */
 const LAUNCHER = `
@@ -277,7 +277,7 @@ process.stdin.on('data', (d) => {
   if (process.env.HIVE_QUEUE_RUN_AS_NODE !== undefined) process.env.ELECTRON_RUN_AS_NODE = process.env.HIVE_QUEUE_RUN_AS_NODE
   else delete process.env.ELECTRON_RUN_AS_NODE
   delete process.env.HIVE_QUEUE_RUN_AS_NODE
-  const c = require('child_process').spawn(spec.command, spec.args, { stdio: ['pipe', 'inherit', 'inherit'], shell: !!spec.shell, windowsHide: true })
+  const c = require('child_process').spawn(spec.command, spec.args, { stdio: ['pipe', 'inherit', 'inherit'], shell: !!spec.shell, windowsVerbatimArguments: !!spec.verbatim, windowsHide: true })
   c.stdin.on('error', () => {})
   const rest = got.slice(i + 1)
   if (rest) c.stdin.write(rest)
@@ -294,7 +294,7 @@ process.stdin.on('end', () => { if (!started) end(70) })
  * executable runs it as Node (ELECTRON_RUN_AS_NODE, which the command gets back as it was). The clock readings either
  * side of its start come back with it, for the job's check and the record.
  */
-export function startLauncher(spec: { command: string; args: readonly string[]; shell?: boolean }, opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): { child: ChildProcess; after: number; before: number } {
+export function startLauncher(spec: { command: string; args: readonly string[]; shell?: boolean; verbatim?: boolean }, opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): { child: ChildProcess; after: number; before: number } {
   const env = opts.env ?? process.env
   const launchEnv: NodeJS.ProcessEnv = { ...env, ELECTRON_RUN_AS_NODE: '1', HIVE_QUEUE_LAUNCH: JSON.stringify(spec) }
   if (env.ELECTRON_RUN_AS_NODE !== undefined) launchEnv.HIVE_QUEUE_RUN_AS_NODE = env.ELECTRON_RUN_AS_NODE
