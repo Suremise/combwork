@@ -801,9 +801,9 @@ export class Workflow {
 
   /**
    * Wakes an agent: a durable action delivered once (§16.4.5). `about: 'answer'`: the user's answer, which reaches the
-   * agent whether or not the card has a reviewer (loopWakes.ts).
+   * agent whether or not the card has a reviewer (loopWakes.ts); `'review'`: an arrival in Review whose wake says `why`.
    */
-  wake(w: Write, agent: string | null | undefined, why: string, about?: 'answer'): void {
+  wake(w: Write, agent: string | null | undefined, why: string, about?: 'answer' | 'review'): void {
     if (!agent || agent === 'user') return
     // In the user's answer's write (finish's wakes too): an answer's wake, the answer first (HR3's #1269 round 2).
     const answer = about ?? (w.answer !== null ? 'answer' : undefined)
@@ -931,6 +931,7 @@ export class Workflow {
 
     await this.cfg.hooks?.beforeWrite?.('submit')
     if (await this.revalidate(g.card, g.s, g.o, g.before)) return this.regather(card, () => this.submit(ref, actor, args))
+    let ahead: CardRecord[] | null = null
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
       if (changed) return changed
@@ -939,11 +940,37 @@ export class Workflow {
       const ins = this.submitInputs(g)
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
       if (bad) return bad
-      this.applySubmit(w, g, args, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent')
+      // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
+      ahead = this.enforced() && !args.drag && g.o.review !== 'none' ? this.laneReorder(w, card) : null
+      this.applySubmit(w, g, args, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent', ahead)
       return null
     })
     if (out) return this.refuse(card, actor, 'submit', out)
-    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length }, g.warnings)
+    const reordered = ahead as CardRecord[] | null
+    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length, ...(reordered ? { lane: `moved ahead of ${reordered.map((c) => c.key).join(', ')} (not started); its reviewer is told` } : {}) }, g.warnings) // i18n-ignore: an intent's reply, agent-facing
+  }
+
+  /**
+   * A lane's card submitted ahead of earlier cards of its lane that haven't started (#1410: the user's own drag started
+   * it, or it was started before the lane listed it): it moves before them in the lane's list, in the submission's
+   * write, so its reviewer reviews it next instead of waiting for a card nobody works on, and `LaneChanged` records it.
+   * Returns the cards it went before; null when there are none, when an earlier card is in flight unreviewed (Active or
+   * in Review: the lane waits on that one as it is), or while a list change is queued (applied at the card boundary, it
+   * would undo this).
+   */
+  private laneReorder(w: Write, card: CardRecord): CardRecord[] | null {
+    const now = this.store.card(card.id)
+    const l = now.lane ? this.lane(now.lane) : null
+    if (!l || l.ended || l.pending?.length) return null
+    const at = l.cards.indexOf(card.id)
+    const open = l.cards.slice(0, Math.max(at, 0)).filter((c) => !this.laneDone(c)).map((c) => this.store.card(c))
+    if (!open.some((c) => c.stage === 'todo') || open.some((c) => c.stage === 'active' || c.stage === 'review')) return null
+    const ahead = open.filter((c) => c.stage === 'todo')
+    const first = l.cards.indexOf(ahead[0].id)
+    const cards = [...l.cards.slice(0, first), card.id, ...l.cards.slice(first).filter((c) => c !== card.id)]
+    this.saveLane({ ...l, cards })
+    w.fact('LaneChanged', { lane: l.id, before: [...l.cards], after: cards }) // i18n-ignore: a fact's kind and codes, not text
+    return ahead
   }
 
   /**
@@ -1000,7 +1027,7 @@ export class Workflow {
   }
 
   /** A submission's facts and actions, in its write: `Submitted`, its pin, then Review (its reviewer woken or the user asked) or Finish. */
-  private applySubmit(w: Write, g: SubmitGathered, args: { summary: string; note?: string }, cause: FactData['Moved']['cause']): void {
+  private applySubmit(w: Write, g: SubmitGathered, args: { summary: string; note?: string }, cause: FactData['Moved']['cause'], ahead: CardRecord[] | null = null): void {
     if (g.setPaths) this.store.updateCard(g.card.id, { paths: g.setPaths })
     const st = w.state()
     const sub = w.fact('Submitted', { // i18n-ignore: a fact's kind and codes, not text
@@ -1025,7 +1052,10 @@ export class Workflow {
     }
     w.move('review', cause)
     w.action('prepareReviewCopy', { revision: g.revision })
-    if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review`) // i18n-ignore: a wake, agent-facing
+    if (reviewerAgent(g.o.review) && ahead) {
+      const keys = ahead.map((c) => c.key).join(', ')
+      this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review ahead of ${keys}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review ${g.card.key} now; the lane goes on to ${ahead[0].key} after it`, 'review') // i18n-ignore: a wake, agent-facing
+    } else if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review`) // i18n-ignore: a wake, agent-facing
     else this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: g.card.key }))
   }
 

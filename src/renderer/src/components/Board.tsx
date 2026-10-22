@@ -3,7 +3,7 @@ import type { AgentInfo, ArchiveBatch, BoardFold, ProjectInfo, ProviderId, Store
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
-import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, taskOverview, type BoardFoldChange } from '@shared/tasks'
+import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -35,6 +35,7 @@ import { SET_ASIDE_ITEM } from './SetAside'
 import { useNow } from '../usage'
 import { ProviderIcon } from './ProviderIcon'
 import { CardCostLine } from './CardCost'
+import { useLaneOf, useLanes } from '../laneSource'
 import { DocRefViewer, problemLines } from './DocRefViewer'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
 
@@ -83,17 +84,18 @@ function cardAgent(projects: ProjectInfo[], c: TaskCard): { project: ProjectInfo
 /**
  * Why nobody is working on the card, from the agents as the window knows them: a Doing card's agent gone or stopped, an
  * agent looping on the card (Doing or Review) whose turn ended with no card watch (#376), or a card in Review an agent
- * watches but hasn't started reviewing for a while (#521), or one its reviewer started and only watches, with no verdict (#843).
+ * watches but hasn't started reviewing for a while (#521), or one its reviewer started and only watches, with no verdict (#843),
+ * or one its lane's deadlock holds up (#1410: `lane`, its running lane, useLaneOf).
  */
-export function cardStalled(projects: ProjectInfo[], c: TaskCard): string | null {
-  return cardStall(projects, c)?.text ?? null
+export function cardStalled(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | null): string | null {
+  return cardStall(projects, c, lane)?.text ?? null
 }
 
 /** What a stalled card's hover says to do, by why it is stalled. */
-type StallKind = 'nobody' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict'
+type StallKind = 'nobody' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order'
 
 /** Why the card is stalled (cardStalled), in the window's language, and which kind of stall it is. */
-function cardStall(projects: ProjectInfo[], c: TaskCard): { text: string; kind: StallKind } | null {
+function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | null): { text: string; kind: StallKind } | null {
   const { agent } = cardAgent(projects, c)
   const nobody = stalledReason(c, agent ? { name: agent.name, running: !!agent.live } : null, tr)
   if (nobody) return { text: nobody, kind: 'nobody' }
@@ -104,7 +106,9 @@ function cardStall(projects: ProjectInfo[], c: TaskCard): { text: string; kind: 
   const waiting = reviewWaitReason(c, watchers, Date.now(), tr)
   if (!waiting) {
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr)
-    return verdict ? { text: verdict, kind: 'review-verdict' } : null
+    if (verdict) return { text: verdict, kind: 'review-verdict' }
+    const order = laneOrderWaitReason(c, lane, watchers, Date.now(), tr)
+    return order ? { text: order, kind: 'lane-order' } : null
   }
   // The watcher reviewWaitReason names: its state unknown (silent) or not.
   const w = watchers.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.agentId !== c.agent && x.cards.includes(c.number))
@@ -117,6 +121,7 @@ function stallHint(kind: StallKind): string {
   if (kind === 'not-watching') return tr(msg({ id: 'board.stall.hintNotWatching', defaultMessage: 'Nothing will wake that agent when this card changes. Show it and ask it to carry on its card loop.', description: "Tooltip on a stalled card: an agent in a card loop stopped without a card watch (what wakes it when the card changes)." }))
   if (kind === 'review-silent') return tr(msg({ id: 'board.stall.hintReviewSilent', defaultMessage: 'Its reviewer may have finished its turn without Hive seeing it end. Show the reviewer: if its terminal waits at its prompt, Mark idle, and the watch wakes it.', description: 'Tooltip on a card stalled in Review whose reviewer Hive has heard nothing from. "Mark idle" is a command in the agent\'s menu: keep its wording as that command is translated.' }))
   if (kind === 'review-verdict') return tr(msg({ id: 'board.stall.hintReviewVerdict', defaultMessage: 'Its reviewer stopped without a verdict and waits on the card. Read its latest comment (it may have a question for you), then show the reviewer and ask it to finish its review.', description: 'Tooltip on a card stalled in Review: its reviewer started reviewing, then went back to waiting on the card without passing or failing it.' }))
+  if (kind === 'lane-order') return tr(msg({ id: 'board.stall.hintLaneOrder', defaultMessage: "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.", description: "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive." }))
   if (kind === 'review-wait') return tr(msg({ id: 'board.stall.hintReviewWait', defaultMessage: "Its reviewer's watch didn't wake it. Show the reviewer and ask it to review the card.", description: 'Tooltip on a card stalled in Review: its reviewer watches it but has not started.' }))
   return tr(msg({ id: 'board.stall.hintNobody', defaultMessage: 'Nobody is working on it. Start it again (on this agent or another), or move it back to Todo.', description: 'Tooltip on a card stalled in Doing: no agent is working on it. Todo is a board column.' }))
 }
@@ -483,7 +488,8 @@ function CardTile({
   const finished = c.column === 'doing' && agent?.live?.status === 'finished'
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
   useNow(60_000)
-  const stall = cardStall(projects, c)
+  const laneOf = useLaneOf()
+  const stall = cardStall(projects, c, laneOf(c))
   const stalled = stall?.text ?? null
   const fold = (
     <IconButton
@@ -638,6 +644,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const movedNames = useStore((s) => s.movedCardNames)
   // Each card's work badges (#1224), read with the board.
   const workBadges = useWorkBadges()
+  // The lanes, for a card held up by its lane's deadlock (#1410).
+  useLanes()
   // What waits for the user on each card (#1276): its chip, and the For you filter.
   const forYou = useForYou().byCard
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
@@ -1176,8 +1184,10 @@ export function TaskStrip({ project }: { project: ProjectInfo | null }) {
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Counted again each minute: a card waiting in Review becomes stalled with time (#521).
   const tick = useNow(60_000)
+  useLanes()
+  const laneOf = useLaneOf()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const o = useMemo(() => taskOverview(tasks, project?.name ?? null, (c) => !!cardStalled(projects, c)), [tasks, projects, project?.name, tick])
+  const o = useMemo(() => taskOverview(tasks, project?.name ?? null, (c) => !!cardStalled(projects, c, laneOf(c))), [tasks, projects, project?.name, tick, laneOf])
   const open = (): void => {
     if (project) return setProjectTab(project.path, 'tasks')
     set({ boardProject: null, boardArchived: false, boardQuery: '' })
@@ -1499,7 +1509,9 @@ export function BoardPanel() {
   const open = (name: string | null): number => tasks.filter((c) => !c.archived && c.column !== 'done' && (name === null || c.project.toLowerCase() === name.toLowerCase())).length
   const review = tasks.filter((c) => !c.archived && c.column === 'review')
   useNow(60_000)
-  const stalled = tasks.filter((c) => cardStalled(projects, c))
+  useLanes()
+  const laneOf = useLaneOf()
+  const stalled = tasks.filter((c) => cardStalled(projects, c, laneOf(c)))
   const row = (name: string | null, label: string, icon: string) => (
     <div key={name === null ? 'all' : `p:${name}`} className={cx('row', chosen === name && 'selected')} onClick={() => set({ boardProject: name })}>
       <Icon name={icon} /> <span className="label">{label}</span>
@@ -1527,7 +1539,7 @@ export function BoardPanel() {
               <InfoTip text={tr(msg({ id: 'board.panel.stalledInfo', defaultMessage: "Cards in Doing that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Doing or Review that an agent in a card loop left without waiting on them.", description: "The (i) beside the Board sidebar's Stalled heading. Doing and Review are board columns." }))} />
             </div>
             {stalled.map((c) => (
-              <Tooltip key={c.number} block content={cardStalled(projects, c) ?? ''}>
+              <Tooltip key={c.number} block content={cardStalled(projects, c, laneOf(c)) ?? ''}>
                 <div className="row" onClick={() => set({ taskOpen: c.number })}>
                   <span className="task-number">{cardLabel(c)}</span> <span className="label">{c.title}</span>
                 </div>

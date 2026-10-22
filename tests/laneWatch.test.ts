@@ -622,6 +622,33 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a lane deadlocked, its reviewer waiting for one card while its builder waits on another's review, wakes it once the limit has passed (#1410)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a, b] = await newCards(w, 'b1', 2)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })
+    // B1 sends the second card to Review and watches it; R1 keeps the lane's order and watches the first (22 Oct).
+    await inWorkspace(w, () => tasks.updateTask(b, { column: 'review' }, agent('b1')))
+    const since = new Date().toISOString()
+    const watching = (id: string, name: string, cards: number[]) => ({ projectPath: alpha, agentId: id, agentName: name, status: 'watching', watch: { cards, changes: ['verdict', 'column'], column: 'review', label: '', since, limitAt: '' } })
+    Object.assign(sessions, { liveStates: () => [watching('r1', 'R1', [a]), watching('b1', 'B1', [b])] })
+    await watchAll(w, home, st)
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    // Neither moves for the limit: Hive's clock moves on (the lane tick looks again now and then).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(Date.parse(since) + REVIEW_WAIT_STALL_MS + 60_000)
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(st.told[0]).toMatch(new RegExp(`#${b} is stalled: "R1 is waiting for #${a}, before #${b} in the lane, while B1 waits on the review of #${b}: each has waited on the other for 1[67] mi`))
+    await disposeWorkspaceService(w)
+  })
+
   it("a lane's merge due with its builder idle and no merge slot wakes it once the limit has passed (#869, lane G)", async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
