@@ -9131,6 +9131,11 @@ textarea.input.task-blocked-input {
 .merge-queue-note {
   margin-bottom: 8px;
 }
+/* Its Merge, held while Hive merges the card: plainly off, its reason on hover (the disabled button passes the hover to
+   its tooltip). */
+.btn.merge-held:disabled {
+  pointer-events: none;
+}
 .card-work-files .link {
   background: none;
   border: none;

@@ -767,7 +767,7 @@
   "board.workQueue.approve": "Aprobar",
   "board.workQueue.approved": "Versión aprobada",
   "board.workQueue.cancelled": "{reason, select, removed {Sacada de la cola (Quitar de la cola).} stale {Sacada de la cola: su superación ya no cuenta.} hold {Sacada de la cola: la tarjeta pasó a En espera.} decision {Sacada de la cola: se registró una decisión.} integratedOutside {Sacada de la cola: se fusionó fuera de Hive.} other {Sacada de la cola.}}",
-  "board.workQueue.command": "{purpose, select, finish {Para terminarla} other {Para deshacerla}}, en {place, select, project {la carpeta del proyecto} other {{folder}}}",
+  "board.workQueue.command": "{purpose, select, finish {Para terminarla} other {Para deshacerla}}, en {folder}",
   "board.workQueue.commands": "Comandos (PowerShell): nada los ejecuta por ti",
   "board.workQueue.conflictFiles": "Archivos en conflicto",
   "board.workQueue.copied": "Comando copiado",

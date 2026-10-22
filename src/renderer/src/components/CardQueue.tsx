@@ -62,7 +62,7 @@ const M = {
   files: msg({ id: 'board.workQueue.files', defaultMessage: '{n, plural, one {# file, and where it is} other {# files, and where each is}}', description: "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither." }),
   side: msg({ id: 'board.workQueue.side', defaultMessage: '{side, select, expected {as before the merge} result {as merged} other {neither}}', description: "Beside a file in the card dialog's Work section: whether its contents are as before the merge, as merged, or neither. Keep the select keys." }),
   commands: msg({ id: 'board.workQueue.commands', defaultMessage: 'Commands (PowerShell): nothing runs them for you', description: "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Hive doesn't." }),
-  command: msg({ id: 'board.workQueue.command', defaultMessage: '{purpose, select, finish {To finish it} other {To undo it}}, in {place, select, project {the project folder} other {{folder}}}', description: "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and where to run it (the project folder, or the folder the branch is checked out in: {folder}). Keep the select keys." }),
+  command: msg({ id: 'board.workQueue.command', defaultMessage: '{purpose, select, finish {To finish it} other {To undo it}}, in {folder}', description: "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and the folder to run it in ({folder}: its name, such as alpha; the full path on hover). Keep the select keys." }),
   noCommands: msg({ id: 'board.workQueue.noCommands', defaultMessage: 'Its files are neither as they were nor as merged: put them right by hand.', description: "In the card dialog's Work section when no command can settle a stopped merge: the user fixes the files by hand." }),
   copy: msg({ id: 'board.workQueue.copy', defaultMessage: 'Copy', description: "A button beside a command in the card dialog's Work section: copies it. Keep it short." }),
   copyNamed: msg({ id: 'board.workQueue.copyNamed', defaultMessage: 'Copy the command {purpose, select, finish {to finish it} other {to undo it}}', description: "Accessible name of the Copy button beside a command in the card dialog's Work section. Keep the select keys." }),
@@ -164,7 +164,7 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
       )}
       {advance && <Advance card={card} request={advance.request} target={q?.target ?? target ?? ''} />}
       {queue?.paused && open && !stuck && <Paused queue={queue} projectPath={projectPath!} />}
-      {stuck && <Stuck stuck={stuck} target={queue!.target} short={short} />}
+      {stuck && <Stuck stuck={stuck} target={queue!.target} short={short} projectPath={projectPath ?? ''} />}
     </div>
   )
 }
@@ -265,7 +265,10 @@ function Advance({ card, request, target }: { card: TaskCard; request: string; t
 }
 
 /** An advance stopped part way (§16.9.2's terminal state): the state as Hive found it, each file's side, the commands. */
-function Stuck({ stuck: st, target, short }: { stuck: QueueStuck; target: string; short: (id: string) => string }) {
+function Stuck({ stuck: st, target, short, projectPath }: { stuck: QueueStuck; target: string; short: (id: string) => string; projectPath: string }) {
+  // Where each command runs, named one way (the Assistant's #1357 review): the folder's name, its full path on hover.
+  const where = (place: 'project' | 'folder'): string => (place === 'project' ? projectPath : st.folder)
+  const name = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path
   const copy = (text: string): void =>
     void navigator.clipboard.writeText(text).then(
       () => notify('success', tr(M.copied)),
@@ -320,7 +323,9 @@ function Stuck({ stuck: st, target, short }: { stuck: QueueStuck; target: string
       {st.commands.length === 0 && <div>{tr(M.noCommands)}</div>}
       {st.commands.map((c, i) => (
         <div key={i} className="card-work-queue-command" data-purpose={c.purpose}>
-          <div className="faint">{tr(M.command, { purpose: c.purpose, place: c.place, folder: st.folder })}</div>
+          <div className="faint" title={where(c.place)}>
+            {tr(M.command, { purpose: c.purpose, folder: name(where(c.place)) })}
+          </div>
           <div className="card-work-queue-command-row">
             <code>{c.command}</code>
             <button type="button" className="btn small subtle" aria-label={tr(M.copyNamed, { purpose: c.purpose })} onClick={() => copy(c.command)}>

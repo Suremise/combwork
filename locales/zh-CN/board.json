@@ -767,7 +767,7 @@
   "board.workQueue.approve": "批准",
   "board.workQueue.approved": "已批准的修订版本",
   "board.workQueue.cancelled": "{reason, select, removed {已移出队列（移出队列）。} stale {已移出队列：其通过已不再有效。} hold {已移出队列：卡片已搁置。} decision {已移出队列：已记录一项决定。} integratedOutside {已移出队列：已在 Hive 之外合并。} other {已移出队列。}}",
-  "board.workQueue.command": "{purpose, select, finish {要完成它} other {要撤销它}}，在{place, select, project {项目文件夹} other {{folder}}}中",
+  "board.workQueue.command": "{purpose, select, finish {要完成它} other {要撤销它}}，在 {folder} 中",
   "board.workQueue.commands": "命令（PowerShell）：不会自动替你运行",
   "board.workQueue.conflictFiles": "有冲突的文件",
   "board.workQueue.copied": "已复制命令",

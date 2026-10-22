@@ -767,7 +767,7 @@
   "board.workQueue.approve": "承認",
   "board.workQueue.approved": "承認済みのリビジョン",
   "board.workQueue.cancelled": "{reason, select, removed {キューから外されました（キューから外す）。} stale {キューから外されました：合格がもう有効ではありません。} hold {キューから外されました：カードが保留になりました。} decision {キューから外されました：判断が記録されました。} integratedOutside {キューから外されました：Hive の外でマージされました。} other {キューから外されました。}}",
-  "board.workQueue.command": "{purpose, select, finish {完了するには} other {元に戻すには}}、{place, select, project {プロジェクトフォルダー} other {{folder}}}で",
+  "board.workQueue.command": "{purpose, select, finish {完了するには} other {元に戻すには}}、{folder} で",
   "board.workQueue.commands": "コマンド (PowerShell)：自動では実行されません",
   "board.workQueue.conflictFiles": "コンフリクトしたファイル",
   "board.workQueue.copied": "コマンドをコピーしました",

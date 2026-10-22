@@ -767,7 +767,7 @@
   "board.workQueue.approve": "Approve",
   "board.workQueue.approved": "Approved revision",
   "board.workQueue.cancelled": "{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} other {Taken out of the queue.}}",
-  "board.workQueue.command": "{purpose, select, finish {To finish it} other {To undo it}}, in {place, select, project {the project folder} other {{folder}}}",
+  "board.workQueue.command": "{purpose, select, finish {To finish it} other {To undo it}}, in {folder}",
   "board.workQueue.commands": "Commands (PowerShell): nothing runs them for you",
   "board.workQueue.conflictFiles": "Files in conflict",
   "board.workQueue.copied": "Command copied",

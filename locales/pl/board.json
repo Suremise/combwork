@@ -767,7 +767,7 @@
   "board.workQueue.approve": "Zatwierdź",
   "board.workQueue.approved": "Zatwierdzona rewizja",
   "board.workQueue.cancelled": "{reason, select, removed {Usunięta z kolejki (Usuń z kolejki).} stale {Usunięta z kolejki: jej zaliczenie już się nie liczy.} hold {Usunięta z kolejki: karta została wstrzymana.} decision {Usunięta z kolejki: zapisano decyzję.} integratedOutside {Usunięta z kolejki: scalono ją poza Hive.} other {Usunięta z kolejki.}}",
-  "board.workQueue.command": "{purpose, select, finish {Aby je dokończyć} other {Aby je cofnąć}}, w {place, select, project {folderze projektu} other {{folder}}}",
+  "board.workQueue.command": "{purpose, select, finish {Aby je dokończyć} other {Aby je cofnąć}}, w {folder}",
   "board.workQueue.commands": "Polecenia (PowerShell): nic nie uruchomi ich za Ciebie",
   "board.workQueue.conflictFiles": "Pliki z konfliktem",
   "board.workQueue.copied": "Skopiowano polecenie",

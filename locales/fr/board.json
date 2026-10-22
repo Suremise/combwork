@@ -767,7 +767,7 @@
   "board.workQueue.approve": "Approuver",
   "board.workQueue.approved": "Révision validée",
   "board.workQueue.cancelled": "{reason, select, removed {Retirée de la file (Retirer de la file).} stale {Retirée de la file : sa validation ne compte plus.} hold {Retirée de la file : la carte est passée en Suspendu.} decision {Retirée de la file : une décision a été enregistrée.} integratedOutside {Retirée de la file : elle a été fusionnée hors de Hive.} other {Retirée de la file.}}",
-  "board.workQueue.command": "{purpose, select, finish {Pour la terminer} other {Pour l’annuler}}, dans {place, select, project {le dossier du projet} other {{folder}}}",
+  "board.workQueue.command": "{purpose, select, finish {Pour la terminer} other {Pour l’annuler}}, dans {folder}",
   "board.workQueue.commands": "Commandes (PowerShell) : rien ne les lance à ta place",
   "board.workQueue.conflictFiles": "Fichiers en conflit",
   "board.workQueue.copied": "Commande copiée",

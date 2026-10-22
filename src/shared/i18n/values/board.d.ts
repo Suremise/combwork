@@ -769,7 +769,7 @@ interface HiveMessageValues {
   'board.workQueue.approve': undefined
   'board.workQueue.approved': undefined
   'board.workQueue.cancelled': { reason: string }
-  'board.workQueue.command': { purpose: string; place: string; folder: string | number }
+  'board.workQueue.command': { purpose: string; folder: string | number }
   'board.workQueue.commands': undefined
   'board.workQueue.conflictFiles': undefined
   'board.workQueue.copied': undefined

@@ -767,7 +767,7 @@
   "board.workQueue.approve": "Zustimmen",
   "board.workQueue.approved": "Genehmigte Revision",
   "board.workQueue.cancelled": "{reason, select, removed {Aus der Warteschlange genommen (Aus der Warteschlange entfernen).} stale {Aus der Warteschlange genommen: Das Bestehen zählt nicht mehr.} hold {Aus der Warteschlange genommen: Die Karte wurde geparkt.} decision {Aus der Warteschlange genommen: Eine Entscheidung wurde festgehalten.} integratedOutside {Aus der Warteschlange genommen: Sie wurde außerhalb von Hive gemergt.} other {Aus der Warteschlange genommen.}}",
-  "board.workQueue.command": "{purpose, select, finish {Zum Abschließen} other {Zum Rückgängigmachen}}, in {place, select, project {dem Projektordner} other {{folder}}}",
+  "board.workQueue.command": "{purpose, select, finish {Zum Abschließen} other {Zum Rückgängigmachen}}, in {folder}",
   "board.workQueue.commands": "Befehle (PowerShell): Nichts führt sie für dich aus",
   "board.workQueue.conflictFiles": "Dateien mit Konflikt",
   "board.workQueue.copied": "Befehl kopiert",

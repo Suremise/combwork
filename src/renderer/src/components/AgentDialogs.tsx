@@ -1211,7 +1211,8 @@ export function MergeDialog() {
           )}
           {!result?.conflicts && (
             <Tooltip content={queueCard ? tr(QUEUE_MERGES, { card: queueCard.key }) : lookup.state === 'pending' ? tr(QUEUE_LOOKUP) : lookup.state === 'failed' ? tr(QUEUE_LOOKUP_FAILED, { why: lookup.error ?? '' }) : null}>
-              <button className="btn primary" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken || !!queueCard || lookup.state !== 'done'} onClick={() => void merge()}>
+              {/* While Hive merges the card (or that isn't known yet), Merge is plainly off, Merge anyway the action (the Assistant's #1357 review); its reason on hover. */}
+              <button className={cx('btn', queueCard || lookup.state !== 'done' ? 'merge-held' : 'primary')} data-action="merge" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken || !!queueCard || lookup.state !== 'done'} onClick={() => void merge()}>
                 <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(MERGE)}
               </button>
             </Tooltip>

@@ -3072,8 +3072,8 @@
     "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive."
   },
   "board.workQueue.command": {
-    "defaultMessage": "{purpose, select, finish {To finish it} other {To undo it}}, in {place, select, project {the project folder} other {{folder}}}",
-    "description": "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and where to run it (the project folder, or the folder the branch is checked out in: {folder}). Keep the select keys."
+    "defaultMessage": "{purpose, select, finish {To finish it} other {To undo it}}, in {folder}",
+    "description": "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and the folder to run it in ({folder}: its name, such as alpha; the full path on hover). Keep the select keys."
   },
   "board.workQueue.commands": {
     "defaultMessage": "Commands (PowerShell): nothing runs them for you",
