@@ -124,7 +124,7 @@
   "main.move.result.original": "仍链接到旧文件夹中的项目",
   "main.move.result.recent": "列出新文件夹",
   "main.move.result.recreateFailed": "{made, select, new {无法新建：{why}} other {无法重新创建：{why}}}",
-  "main.move.result.recreated": "{made, select, new {已在 {branch} 上新建（其分支已不在）} other {已在 {branch} 上重新创建}}",
+  "main.move.result.recreated": "{made, select, new {已新建（其分支已不在）} other {已在其分支上重新创建}}",
   "main.move.result.renameFailed": "无法重命名：{why}",
   "main.move.result.renamed": "{remote, select, none {已重命名} other {已重命名；仍跟踪 {remote} 上的旧名称}}",
   "main.move.result.sessions": "{n, plural, other {# 个会话现在指向这里}}",

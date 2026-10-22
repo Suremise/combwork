@@ -124,7 +124,7 @@
   "main.move.result.original": "stays linked to the project at its old folder",
   "main.move.result.recent": "lists the new folder",
   "main.move.result.recreateFailed": "{made, select, new {couldn't be made new: {why}} other {couldn't be recreated: {why}}}",
-  "main.move.result.recreated": "{made, select, new {made new on {branch} (its branch was gone)} other {recreated on {branch}}}",
+  "main.move.result.recreated": "{made, select, new {made new (its branch was gone)} other {recreated on its branch}}",
   "main.move.result.renameFailed": "couldn't be renamed: {why}",
   "main.move.result.renamed": "{remote, select, none {renamed} other {renamed; it still tracks {remote}'s old name}}",
   "main.move.result.sessions": "{n, plural, one {# session points here now} other {# sessions point here now}}",

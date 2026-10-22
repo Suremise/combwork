@@ -124,7 +124,7 @@
   "main.move.result.original": "continua vinculado ao projeto na pasta antiga",
   "main.move.result.recent": "lista a nova pasta",
   "main.move.result.recreateFailed": "{made, select, new {não foi possível criar de novo: {why}} other {não foi possível recriar: {why}}}",
-  "main.move.result.recreated": "{made, select, new {criado de novo em {branch} (o branch tinha sumido)} other {recriado em {branch}}}",
+  "main.move.result.recreated": "{made, select, new {criado de novo (o branch tinha sumido)} other {recriado no seu branch}}",
   "main.move.result.renameFailed": "não foi possível renomear: {why}",
   "main.move.result.renamed": "{remote, select, none {renomeado} other {renomeado; ainda acompanha o nome antigo em {remote}}}",
   "main.move.result.sessions": "{n, plural, one {# sessão aponta para cá agora} other {# sessões apontam para cá agora}}",

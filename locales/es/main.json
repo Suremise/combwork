@@ -124,7 +124,7 @@
   "main.move.result.original": "sigue vinculado al proyecto en su carpeta antigua",
   "main.move.result.recent": "muestra la nueva carpeta",
   "main.move.result.recreateFailed": "{made, select, new {no se pudo crear de nuevo: {why}} other {no se pudo volver a crear: {why}}}",
-  "main.move.result.recreated": "{made, select, new {creado de nuevo en {branch} (su rama ya no estaba)} other {vuelto a crear en {branch}}}",
+  "main.move.result.recreated": "{made, select, new {creado de nuevo (su rama ya no estaba)} other {vuelto a crear en su rama}}",
   "main.move.result.renameFailed": "no se pudo renombrar: {why}",
   "main.move.result.renamed": "{remote, select, none {renombrada} other {renombrada; aún sigue el nombre antiguo en {remote}}}",
   "main.move.result.sessions": "{n, plural, one {# sesión apunta aquí ahora} many {# sesiones apuntan aquí ahora} other {# sesiones apuntan aquí ahora}}",

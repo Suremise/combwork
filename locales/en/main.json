@@ -500,8 +500,8 @@
     "description": "Repair's report, the Result column: an agent's worktree couldn't be made again ({why}: the reason)."
   },
   "main.move.result.recreated": {
-    "defaultMessage": "{made, select, new {made new on {branch} (its branch was gone)} other {recreated on {branch}}}",
-    "description": "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone ({branch}: a branch name)."
+    "defaultMessage": "{made, select, new {made new (its branch was gone)} other {recreated on its branch}}",
+    "description": "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone. The branch's name is in the agent's branch row (Repair may rename it in the same run)."
   },
   "main.move.result.renameFailed": {
     "defaultMessage": "couldn't be renamed: {why}",

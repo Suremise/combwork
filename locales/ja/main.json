@@ -124,7 +124,7 @@
   "main.move.result.original": "古いフォルダーのプロジェクトにリンクしたまま",
   "main.move.result.recent": "新しいフォルダーを表示",
   "main.move.result.recreateFailed": "{made, select, new {新規作成できませんでした：{why}} other {再作成できませんでした：{why}}}",
-  "main.move.result.recreated": "{made, select, new {{branch}上に新規作成（ブランチがありませんでした）} other {{branch}上に再作成}}",
+  "main.move.result.recreated": "{made, select, new {新規作成（ブランチがありませんでした）} other {ブランチ上に再作成}}",
   "main.move.result.renameFailed": "名前を変更できませんでした：{why}",
   "main.move.result.renamed": "{remote, select, none {名前を変更} other {名前を変更（{remote}の古い名前を引き続き追跡）}}",
   "main.move.result.sessions": "{n, plural, other {#件のセッションがここを指すように}}",

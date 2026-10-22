@@ -124,7 +124,7 @@
   "main.move.result.original": "zostaje powiązany z projektem w starym folderze",
   "main.move.result.recent": "pokazuje nowy folder",
   "main.move.result.recreateFailed": "{made, select, new {nie udało się utworzyć na nowo: {why}} other {nie udało się odtworzyć: {why}}}",
-  "main.move.result.recreated": "{made, select, new {utworzono na nowo na {branch} (brakowało jego gałęzi)} other {odtworzono na {branch}}}",
+  "main.move.result.recreated": "{made, select, new {utworzono na nowo (brakowało jego gałęzi)} other {odtworzono na jego gałęzi}}",
   "main.move.result.renameFailed": "nie udało się zmienić nazwy: {why}",
   "main.move.result.renamed": "{remote, select, none {zmieniono nazwę} other {zmieniono nazwę; nadal śledzi starą nazwę w {remote}}}",
   "main.move.result.sessions": "{n, plural, one {# sesja wskazuje teraz tutaj} few {# sesje wskazują teraz tutaj} many {# sesji wskazuje teraz tutaj} other {# sesji wskazuje teraz tutaj}}",

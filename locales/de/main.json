@@ -124,7 +124,7 @@
   "main.move.result.original": "bleibt mit dem Projekt im alten Ordner verknüpft",
   "main.move.result.recent": "führt den neuen Ordner auf",
   "main.move.result.recreateFailed": "{made, select, new {konnte nicht neu angelegt werden: {why}} other {konnte nicht wiederhergestellt werden: {why}}}",
-  "main.move.result.recreated": "{made, select, new {neu auf {branch} angelegt (sein Branch fehlte)} other {auf {branch} wiederhergestellt}}",
+  "main.move.result.recreated": "{made, select, new {neu angelegt (sein Branch fehlte)} other {auf seinem Branch wiederhergestellt}}",
   "main.move.result.renameFailed": "konnte nicht umbenannt werden: {why}",
   "main.move.result.renamed": "{remote, select, none {umbenannt} other {umbenannt; folgt weiter dem alten Namen bei {remote}}}",
   "main.move.result.sessions": "{n, plural, one {# Sitzung zeigt jetzt hierher} other {# Sitzungen zeigen jetzt hierher}}",

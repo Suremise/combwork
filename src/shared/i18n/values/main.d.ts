@@ -126,7 +126,7 @@ interface HiveMessageValues {
   'main.move.result.original': undefined
   'main.move.result.recent': undefined
   'main.move.result.recreateFailed': { made: string; why: string | number }
-  'main.move.result.recreated': { made: string; branch: string | number }
+  'main.move.result.recreated': { made: string }
   'main.move.result.renameFailed': { why: string | number }
   'main.move.result.renamed': { remote: string }
   'main.move.result.sessions': { n: number }

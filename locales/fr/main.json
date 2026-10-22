@@ -124,7 +124,7 @@
   "main.move.result.original": "reste relié au projet dans son ancien dossier",
   "main.move.result.recent": "affiche le nouveau dossier",
   "main.move.result.recreateFailed": "{made, select, new {n’a pas pu être créé à nouveau : {why}} other {n’a pas pu être recréé : {why}}}",
-  "main.move.result.recreated": "{made, select, new {créé à nouveau sur {branch} (sa branche avait disparu)} other {recréé sur {branch}}}",
+  "main.move.result.recreated": "{made, select, new {créé à nouveau (sa branche avait disparu)} other {recréé sur sa branche}}",
   "main.move.result.renameFailed": "n’a pas pu être renommée : {why}",
   "main.move.result.renamed": "{remote, select, none {renommée} other {renommée ; elle suit encore l’ancien nom sur {remote}}}",
   "main.move.result.sessions": "{n, plural, one {# session pointe ici maintenant} many {# sessions pointent ici maintenant} other {# sessions pointent ici maintenant}}",

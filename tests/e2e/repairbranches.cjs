@@ -100,6 +100,10 @@ const agentsOf = (project) => configOf(project).agents
       check('Repair renames JB1’s and JB2’s, and keeps JB3’s', !!(await lib.until(async () => /JB1's branch hive\/Scratch\/juniper\/jb1 is now hive\/Tools\/juniper\/jb1\./.test(await text()) && /JB2's branch hive\/Scratch\/juniper\/jb2 is now hive\/Tools\/juniper\/jb2; it still tracks origin's hive\/Scratch\/juniper\/jb2/.test(await text()) && /JB3's branch hive\/Scratch\/juniper\/jb3 keeps its name/.test(await text()), HUNG_MS)), await text())
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-report.png') })
       const now = branches(proj)
+      // The report's Now column is each branch as it is after Repair (#1313 round 2): the new name once renamed, the old
+      // one when it was kept.
+      const nowCell = async (what) => (await dialog.locator('.repair-report tr', { hasText: what }).first().locator('td').nth(2).innerText()).trim()
+      check('the report’s Now: JB1’s new name, and JB3’s kept name, as git has them', (await nowCell("JB1's branch")) === 'hive/Tools/juniper/jb1' && (await nowCell("JB3's branch")) === 'hive/Scratch/juniper/jb3' && now.includes('hive/Scratch/juniper/jb3') && now.includes('hive/Tools/juniper/jb1'), JSON.stringify({ jb1: await nowCell("JB1's branch"), jb3: await nowCell("JB3's branch"), git: now }))
       check('git has the new names', now.includes('hive/Tools/juniper/jb1') && now.includes('hive/Tools/juniper/jb2') && !now.includes('hive/Scratch/juniper/jb1') && !now.includes('hive/Scratch/juniper/jb2') && now.includes('hive/Scratch/juniper/jb3'), JSON.stringify(now))
       check('JB4’s worktree is back on its renamed branch, its record with it', fs.existsSync(wt('JB4').path) && git(wt('JB4').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb4' && wt('JB4').branch === 'hive/Tools/juniper/jb4' && !branches(proj).includes('hive/Scratch/juniper/jb4'), JSON.stringify({ wt: wt('JB4'), git: branches(proj) }))
       check('the worktrees have them out', git(wt('JB1').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb1' && git(wt('JB2').path, ['rev-parse', '--abbrev-ref', 'HEAD']) === 'hive/Tools/juniper/jb2')
@@ -155,6 +159,9 @@ const agentsOf = (project) => configOf(project).agents
         fs.chmodSync(cfgFile, 0o644)
       }
       check('with project.json unwritable: JB2’s rename fails, JB1’s isn’t recorded yet', refused.failed.some((l) => /JB2's branch hive\/Elsewhere\/juniper\/jb2 couldn't be renamed/.test(l)) && refused.failed.some((l) => /JB1's branch is now hive\/Tools\/juniper\/jb1-3, but Hive couldn't record it yet/.test(l)), JSON.stringify(refused))
+      // Its rows: JB2's (failed before git) is at its old name, JB1's (git's step done, not recorded) at its new one.
+      const row = (agent) => refused.rows.find((r) => r.what.kind === 'branch' && r.what.agent === agent)
+      check('…the report’s rows say where each branch is now, as git has it', row('JB2')?.outcome === 'failed' && row('JB2')?.now === 'hive/Elsewhere/juniper/jb2' && branches(proj).includes(row('JB2').now) && row('JB1')?.outcome === 'failed' && row('JB1')?.now === 'hive/Tools/juniper/jb1-3' && branches(proj).includes(row('JB1').now), JSON.stringify({ rows: refused.rows, git: branches(proj) }))
       check('…git has JB2’s as it was, and the records are unchanged', branches(proj).includes('hive/Elsewhere/juniper/jb2') && !branches(proj).includes('hive/Tools/juniper/jb2') && wt('JB1').branch === 'hive/Tools/juniper/jb1' && wt('JB2').branch === 'hive/Elsewhere/juniper/jb2', JSON.stringify({ git: branches(proj), cfg: configOf(proj).agents.map((a) => a.worktree.branch) }))
       check('…and the banner stays', (await banner.count()) === 1)
       const report = await inv('workspace:moveRepair')
