@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A worktree setup command with quotes runs.** A project's worktree setup command that quoted a path (`node "C:\My Tools\setup.js"`) failed when a new agent worktree ran it, and the agent never started: the quotes reached the program as part of its arguments. The command now runs as you typed it (#1454).
 - **A workspace reached by another name is let go too.** If something had opened a workspace's board, the Assistant's journal or the usage history through another name for its folder (a junction, or a short 8.3 name such as `C:\Users\RUNNER~1\…`), it stayed open after the window closed the workspace, so Windows refused to move or delete the folder until Hive quit. Closing a workspace now closes them under every name (#1402, #1456).
 - **A merge queue carries on when the Hive running it ends.** With the dev and the installed Hive on one workspace, only one runs each merge queue, and the other's panel says *Run by …*. If that Hive ended unexpectedly, the other went on saying so, and the queue waited until a new card was queued, you resumed it or reopened the workspace. Now the other Hive notices within about half a minute and takes the queue over: the card being checked is tested again in a folder of its own and merged once (#1455).
 - **The Assistant's journal gives back the space its size cap frees.** After pruning old entries to fit Settings → Assistant's journal size, the file could keep its biggest size on disk, though the entries had gone. Hive now closes its databases so that the space is given back.
