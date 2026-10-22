@@ -729,9 +729,12 @@ function workflowRows(): Row[] {
     option('preChecks', 'custom'),
     option('commands', 'custom'),
     option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
-    option('finish', 'select', [['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
+    option('finish', 'select', [['hiveMerges', V.finish.hiveMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash]]),
     option('target', 'text'),
+    option('mergeChecks', 'custom'),
+    option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
+    option('strict', 'boolean'),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
     option('identity', 'custom'),
@@ -824,7 +827,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'assistant.mode': 'text',
   'project.defaultProvider': 'select',
   'project.worktreeCopy': 'text',
-  ...Object.fromEntries(['preChecks', 'commands', 'okBefore', 'identity', 'excluded'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
   ...Object.fromEntries(
     PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
@@ -1223,6 +1226,7 @@ function checkWorkflowValue(e: SettingEntry, kind: NonNullable<ReturnType<typeof
 export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKind>): string {
   const shapes: Partial<Record<OptionKey, string>> = {
     preChecks: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', // i18n-ignore: the Assistant's tools (English)
+    mergeChecks: 'a list of check names the merge queue runs on the merged result when Hive merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', // i18n-ignore: the Assistant's tools (English)
     commands: 'an object of check name → command, e.g. {"lint": "npm run lint"}', // i18n-ignore: the Assistant's tools (English)
     okBefore: 'an object {"mode": "never" | "labels" | "every", "labels": [...]}', // i18n-ignore: the Assistant's tools (English)
     identity: 'null (off) or {"name": ..., "email": ...}', // i18n-ignore: the Assistant's tools (English)

@@ -2,6 +2,7 @@ import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watch
 import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
+import { initReviewsOnOpen } from './reviewsOnOpen'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
 import { initWorkflowNotices } from './workflowNotices'
@@ -50,9 +51,9 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
-import { startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
-import { setRunsGoing } from './workflow/service'
+import { setQueueLive, setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
@@ -902,6 +903,7 @@ app.whenReady().then(async () => {
   initLoopWakes()
   initLoopCheck()
   initDeliveries()
+  initReviewsOnOpen()
   initInboxNotices()
   initDecisionWakes()
   initWorkflowNotices()
@@ -981,6 +983,8 @@ app.whenReady().then(async () => {
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
+  // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
+  setQueueLive(queueLive)
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
   // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
   // its CLI hasn't taken yet, it is busy.

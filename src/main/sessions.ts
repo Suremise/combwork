@@ -6,7 +6,7 @@ import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
-import { folderChanging, folderSteady } from './folderFence'
+import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
@@ -104,7 +104,7 @@ import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
-import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
+import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
 import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
@@ -2354,11 +2354,7 @@ class SessionManager {
     log.warn(`${userText(label)}: no hooks from ${st.provider} ${after === 'start' ? 'since it started' : after === 'transcript' ? 'for a turn its transcript shows it took' : 'after a prompt it went to work on'}${why ? ` (${why})` : ''}: its status may be wrong, and nothing is typed into it until they come`)
     hookJournal(`run=${st.runId} (no hook) hooks missing after ${after}${why ? ` (${why})` : ''}`)
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
-    const told = `${st.agentId}\n${st.sessionId || st.runId}`
-    if (this.hooksTold.has(told)) return
-    this.hooksTold.add(told)
-    // A bounded few: the oldest go first.
-    if (this.hooksTold.size > 500) this.hooksTold.delete(this.hooksTold.values().next().value!)
+    if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
     // A toast, kept in Notifications.
     toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath) // i18n-ignore: select keys, never shown
   }
@@ -2373,8 +2369,8 @@ class SessionManager {
     log.info(`${userText(this.label(st))}: its hooks are arriving again${was ? ` (missing since ${was.since})` : ''}`)
   }
 
-  /** Agents and conversations told their hooks went missing (#1336): once each while Hive runs. */
-  private hooksTold = new Set<string>()
+  /** Agents and conversations told their hooks went missing (#1336): once each while Hive runs, a bounded few (#1369). */
+  private hooksTold = new SeenOnce(500)
 
   /**
    * A line Hive typed into an agent wasn't taken, even after Enter again (#430: its CLI wasn't reading its input). It is
@@ -2486,6 +2482,11 @@ class SessionManager {
   locksFor(projectPath: string, agentId: string): string[] {
     const id = liveId(projectPath, agentId)
     return [...this.locks.values()].filter((x) => x.liveId === id).map((x) => x.path)
+  }
+
+  /** Files any agent holds a lock on in a folder (#1351: an agent builds there, so the merge queue doesn't update it). */
+  locksIn(folder: string): string[] {
+    return [...this.locks.values()].filter((x) => inFolder(x.path, folder)).map((x) => x.path)
   }
 
   /** Types a message into an agent's terminal and sends it. */

@@ -11,10 +11,10 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
 import { existsSync, readFileSync } from 'original-fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
-import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
+import { openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -24,10 +24,12 @@ import { isUnknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
+import { leftWake, returnedWake } from './queueState'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
 import type { RunCheck } from '../../shared/types'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueueStep, type QueueStuck } from '../../shared/workflow/queue'
 
 export interface CheckResult {
   ok: boolean
@@ -36,6 +38,8 @@ export interface CheckResult {
   /** Why it was (#1362): recorded on the card's IntegrationFailed. */
   cause?: TransientFailure
   output: string
+  /** Its log's path, when the log holds its output (#1354: a returned card's wake names it). */
+  logPath?: string
   /** The command that ran, and its run's id (a progress run's, when Hive keeps runs). */
   command?: string
   run?: string
@@ -53,7 +57,8 @@ export interface CheckContext {
 }
 
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string } | { kind: 'uncounted' }
+/** A red outcome names the check (`install` for the install before them) and its log, when it holds its output (#1354). */
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -64,8 +69,23 @@ export interface QueueConfig {
   install?: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
   /** The files whose change since the last install means a clean install (#187). */
   manifests?: string[]
-  /** An agent builds in this folder (holds file locks there, or has a run going in it). */
-  folderBusy?: (folder: string) => boolean
+  /**
+   * What makes an agent build in this folder now (§16.9.2): the files it holds locks on there, a run going with it as
+   * its working folder; null when none does. An idle agent, or one whose session lives there but works in a review copy,
+   * doesn't count.
+   */
+  folderBusy?: (folder: string) => string[] | null
+  /**
+   * Runs the advance into a checked-out target with its folder fenced (#646, folderFence.changingFolder): nothing of
+   * Hive's is typed into that folder and no agent starts there until it settles. Left out, as it is.
+   */
+  fence?: <T>(folder: string, fn: () => Promise<T>) => Promise<T>
+  /**
+   * Merge into a checked-out branch (Advanced `hive.queue.checkedOutTarget`, OP-40, read at each use): `ask`, an entry
+   * ready to advance into a target checked out in a folder waits for the user's Approve (For you); `auto`, it advances.
+   * A target checked out nowhere is always automatic. Left out, automatic.
+   */
+  checkedOutTarget?: () => 'ask' | 'auto'
   /**
    * Whether this queue's runner still holds its target's lease (#1360, QueueRunner.holds): checked inside every store
    * write the queue's work makes (its facts, reconciliation's, values, a pause: withWriteFence), which is refused whole
@@ -93,19 +113,21 @@ export interface QueueConfig {
    */
   enforced?: () => boolean
   /**
-   * A target checked out in a folder (§16.9.2) pauses `checkedOut` instead of being advanced there (#1348: until
-   * #1351 builds that advance).
+   * Told each step of an entry's way as it begins (#1353: the queue's model shows what is testing now), and null once the
+   * entry has its outcome.
    */
-  pauseCheckedOut?: boolean
-  /** Test seams: crash injection and races between the queue's steps. */
-  hooks?: {
-    afterTest?: (entry: string) => void | Promise<void>
-    afterChecks?: (entry: string) => void | Promise<void>
-    afterStarted?: (entry: string) => void | Promise<void>
-    afterFiles?: (entry: string) => void | Promise<void>
-    afterAdvance?: (entry: string) => void | Promise<void>
-  }
+  onStep?: (step: QueueStepInfo | null) => void
+  /**
+   * Test seams: crash injection and races between the queue's steps. A checked-out target's journal (§16.9.2), in order:
+   * `afterStarted` (IntegrationStarted written), `beforeFiles` (phase files written, before read-tree), `afterFiles`
+   * (read-tree ran), `beforeRef` (phase ref written, before update-ref), `afterAdvance` (update-ref ran, before
+   * `Integrated`); a rollback's `inRollback` (phase rollback written, before its read-tree) and `afterRollback`.
+   */
+  hooks?: QueueHooks
 }
+
+export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback'
+export type QueueHooks = Partial<Record<QueueHook, (entry: string) => void | Promise<void>>>
 
 /** How the queue runs a git command that may run the repository's hooks or sign (#1350): its environment and bound. */
 export interface QueueGitOptions {
@@ -129,16 +151,79 @@ export type QueueOutcome =
   | { card: string; entry: string; outcome: 'integrated'; result: string; retests: number }
   | { card: string; entry: string; outcome: 'returned'; reason: FactData['IntegrationFailed']['reason']; transient: boolean }
   | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[]; message?: string }
-  | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' }
+  | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' | 'declined' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
+
+/** How much of a failure's output its card keeps (`IntegrationFailed.log`), and how much of that is its start. */
+export const KEPT_LOG = 4000
+const KEPT_HEAD = 800
+
+/**
+ * A failure's output as its card keeps it (#1354): whole up to KEPT_LOG characters, else its start and its end (where
+ * the error is, which the wake and card reads quote as its last lines), the middle replaced by a line saying how much
+ * was left out.
+ */
+export function keptLog(log: string, max = KEPT_LOG): string {
+  if (log.length <= max) return log
+  const head = Math.min(KEPT_HEAD, Math.floor(max / 5))
+  const mark = (left: number): string => `\n… (${left} characters left out) …\n` // i18n-ignore: inside a command's stored output, which agents read
+  // The mark's own length decides the tail's, and the count it gives: settled in two steps (its digits barely change).
+  let tail = max - head - mark(log.length).length
+  tail = max - head - mark(log.length - head - tail).length
+  return `${log.slice(0, head)}${mark(log.length - head - tail)}${log.slice(log.length - tail)}`
+}
+
+/** The entry a queue is taking through its steps now: its card, revision, the target's head it tests on, since when. */
+export interface QueueStepInfo {
+  card: string
+  number: number
+  entry: string
+  revision: string
+  /** The target's head the test merge is made on (null until it is read). */
+  expected: string | null
+  step: QueueStep
+  /** When the queue took the entry (ISO). */
+  started: string
+}
 
 /**
  * `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says
  * why). `signingWaits`: signing Hive's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
  * (git's message in the pause). `hookTimedOut`: a hook of a signed commit was still running at the signing bound.
- * `identity`: no commit identity for the repository (its folder in the pause).
+ * `identity`: no commit identity for the repository (its folder in the pause). `user`: Pause queue (the user's, or the
+ * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
+ * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
  */
-export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval'
+
+/** What an advance came to (advanceRef, advanceCheckedOut). */
+type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
+
+/** The state a checked-out target's begun advance is found in (§16.9.2's recovery table), and what it calls for. */
+type Found = 'integrated' | 'residue' | 'rerun' | 'swap' | 'rollback' | 'requeue' | 'stuck'
+
+/** git's status in porcelain v1 with -z: the paths with a change in the working copy or index, both sides of a rename. */
+function statusPaths(out: string): string[] {
+  const t = out.split('\0')
+  const paths: string[] = []
+  for (let i = 0; i < t.length; i++) {
+    if (t[i].length < 4) continue
+    paths.push(t[i].slice(3))
+    // A rename or copy: its source follows as a token of its own.
+    if (t[i][0] === 'R' || t[i][0] === 'C') paths.push(t[++i] ?? '')
+  }
+  return paths.filter(Boolean)
+}
+
+const nulList = (out: string): string[] => out.split('\0').filter(Boolean)
+
+/** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
+function advanceApprovedIn(s: CardState, entry: string, expected: string, result: string): boolean {
+  return s.approvals.some((a) => {
+    const r = s.made[a.request]
+    return a.answer === 'approved' && r?.gate === QUEUE_ADVANCE_GATE && r.entry === entry && r.revision === expected && r.result === result
+  })
+}
 
 /** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
 const SIGN_TIMEOUT_MS = 60_000
@@ -371,11 +456,25 @@ export class MergeQueue {
     this.wf.store.setQueuePause(target, null)
   }
 
-  /** Pauses the target's queue at this entry: its reason, the files or folder it names, git's message (bounded). */
-  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string): Promise<QueueOutcome> {
+  /**
+   * Pauses the target's queue at this entry: its reason, the files or folder it names, git's message (bounded). A stuck
+   * advance (§16.9.2's terminal state) keeps its state, and the user is asked (For you) to finish or undo it.
+   */
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck): Promise<QueueOutcome> {
     const m = message?.trim().slice(0, 4000) || undefined
-    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }))
-    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }
+    const named = stuck ? stuck.files.map((f) => f.path) : files
+    // Never in place of a pause saved meanwhile (the user's Pause queue, say), decided in the pause's own write; the
+    // terminal state, which says more, and which the user must settle, is written whatever was there.
+    const wrote = await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }, !stuck))
+    if (!wrote) return this.held(card, entry, this.paused(target)?.reason ?? 'user')
+    if (stuck) {
+      const finish = stuck.commands.find((c) => c.purpose === 'finish')
+      const undo = stuck.commands.find((c) => c.purpose === 'undo')
+      const how = finish && undo ? 'both' : finish ? 'finish' : undo ? 'undo' : 'none'
+      const text = workflowText(FOR_YOU.queueStuck, { card: card.key, target, folder: stuck.folder, project: this.project, how, finish: finish?.command ?? '', undo: undo?.command ?? '' })
+      await this.write(card, (w) => this.wf.askUser(w, 'decide', QUEUE_STUCK_GATE, text, { unbound: true, entry: entry.id, result: stuck.result, revision: stuck.expected }))
+    }
+    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}) }
   }
 
   /**
@@ -417,10 +516,47 @@ export class MergeQueue {
 
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
-    if (this.paused(target)) return null
+    const p = this.paused(target)
+    if (p?.reason === 'approval') return this.fenced(target, () => this.answered(target, p.card)).catch(lostIsNull)
+    if (p) return null
     const next = this.entries(target)[0]
     if (!next) return null
     return this.fenced(target, () => this.process(next.card, next.entry)).catch(lostIsNull)
+  }
+
+  /**
+   * The user's answer to "Update <target> in <folder> now" (Ask each time, #1351), read from the card's facts: not yet,
+   * the queue still waits. Approved: the pause lifted and the advance run at once, on the test merge it was asked about
+   * (tested again, and asked again, if the target moved meanwhile). Declined: the entry leaves the queue, the card back
+   * to Approved as Remove from queue leaves it, and the queue goes on. An entry with an outcome meanwhile: the pause lifted.
+   */
+  private async answered(target: string, key: string): Promise<QueueOutcome | null> {
+    const card = this.wf.store.cardByKey(key)
+    const s = card ? this.wf.state(card) : null
+    const e = s ? openEntry(s) : undefined
+    const asked = s && e ? Object.values(s.made).filter((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === e.id).at(-1) : undefined
+    // Lifted only from the approval it is (a Pause queue saved in its place stays, and the queue with it).
+    const lift = (): Promise<boolean> => this.wf.locked(() => this.wf.store.clearQueuePause(target, 'approval'))
+    if (!card || !s || !e || e.target !== target || !asked) {
+      return (await lift()) ? this.runOnce(target) : null
+    }
+    const open = s.requests.some((r) => r.request === asked.request)
+    // Still asked: waits, unless the setting says Automatically now (HR4's #1351 round 1: a change to it wakes the queue,
+    // queueHost), which advances that test merge as an approval would; its question is retired by the entry's outcome.
+    const auto = open && this.cfg.checkedOutTarget?.() === 'auto'
+    if (open && !auto) return null
+    const answer = auto ? 'approved' : s.approvals.filter((a) => a.request === asked.request).at(-1)?.answer
+    if (!(await lift())) return null
+    if (answer !== 'approved') {
+      const wrote = await this.write(card, (w) => {
+        if (!this.isOpen(w, e)) return false
+        w.fact('IntegrationCancelled', { entry: e.id, reason: 'user' }) // i18n-ignore: a fact's kind and codes, not text
+        w.move(w.ruleset && hasStage(w.ruleset, 'approved') ? 'approved' : 'active', 'user')
+        return true
+      })
+      return { card: card.key, entry: e.id, outcome: 'skipped', why: wrote ? 'declined' : 'cancelled' } // i18n-ignore: a reason's key, not text
+    }
+    return this.process(card, e, asked.revision && asked.result ? { expected: asked.revision, result: asked.result } : undefined)
   }
 
   private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
@@ -433,8 +569,9 @@ export class MergeQueue {
    * the entry still the card's open one, the card in Merging, approved at the current generation and not stale. A
    * decision, a cancel or a stale pass that landed after the queue's last check stops it here, before git is touched.
    * Workflow rules turned off by now (while the queue waited for the repository lock, say): no advance begins, `rulesOff`.
+   * The queue paused by now (Pause queue): none begins either, `held`, the entry left open.
    */
-  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff'> {
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask'> {
     return this.write(card, (w) => {
       const s = w.state()
       const e = s.entries.find((x) => x.id === entry.id)
@@ -443,6 +580,10 @@ export class MergeQueue {
       const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
       if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
+      if (this.wf.store.queuePause(entry.target)) return 'held' as const
+      // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
+      // the setting and the answers are now, here in the lock (HR4's #1351 round 1: a check before it is an early-out).
+      if (data.checkedOut && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(s, entry.id, data.expected, data.result)) return 'ask' as const
       w.fact('IntegrationStarted', data)
       return 'started' as const
     })
@@ -458,8 +599,18 @@ export class MergeQueue {
     return { s, ok, cancelled }
   }
 
-  private async process(card: CardRecord, entry: QueueEntry): Promise<QueueOutcome> {
+  /** `ready`: the test merge the user approved advancing (Ask each time): straight to its advance while the target is still where it was. */
+  private async process(card: CardRecord, entry: QueueEntry, ready?: { expected: string; result: string }): Promise<QueueOutcome> {
+    try {
+      return await this.steps(card, entry, ready)
+    } finally {
+      this.cfg.onStep?.(null)
+    }
+  }
+
+  private async steps(card: CardRecord, entry: QueueEntry, ready?: { expected: string; result: string }): Promise<QueueOutcome> {
     const target = entry.target
+    const started = new Date().toISOString()
     let retests = 0
     let uncounted = 0
     for (;;) {
@@ -467,36 +618,62 @@ export class MergeQueue {
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
       const revision = s.approved?.revision ?? entry.revision
-      const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
-      // Already in the target (merged by hand meanwhile): observed, no empty merge.
-      const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key })
-      if (!isUnknown(found) && found) {
-        await reconcile(this.wf, card)
-        return { card: card.key, entry: entry.id, outcome: 'integratedOutside' }
-      }
-      const expected = await G.lineHead(this.project, target)
-      if (isUnknown(expected) || !expected) return this.pause(target, card, entry, 'needsYou')
+      const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
+      let expected: string
+      let result: string
+      if (ready) {
+        // Approved: the advance at once, on the test merge and checks the user was asked about (its result pinned on the
+        // card's queue ref). The target moving since is caught below, and the entry is tested again.
+        ;({ expected, result } = ready)
+        ready = undefined
+      } else {
+        step('testMerge', null)
+        const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
+        // Already in the target (merged by hand meanwhile): observed, no empty merge.
+        const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key })
+        if (!isUnknown(found) && found) {
+          await reconcile(this.wf, card)
+          return { card: card.key, entry: entry.id, outcome: 'integratedOutside' }
+        }
+        const head = await G.lineHead(this.project, target)
+        if (isUnknown(head) || !head) return this.pause(target, card, entry, 'needsYou')
+        expected = head
 
-      // The test merge, in the queue's own worktree, at the expected revision.
-      const test = await this.testMerge(card, s, revision, expected)
-      if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
-      if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
-      const result = test.result
-      await this.cfg.hooks?.afterTest?.(entry.id)
+        // The test merge, in the queue's own worktree, at the expected revision; under strict (G8) of the reviewed revision
+        // brought up to date with it there first (#1352), the card's line untouched.
+        step('testMerge', expected)
+        let updated: string | undefined
+        if (this.wf.rulesetOf(card, s).options.strict) {
+          const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected)
+          if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
+          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log)
+          updated = up.updated ?? undefined
+        }
+        const test = await this.testMerge(card, s, revision, expected, updated)
+        if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
+        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
+        result = test.result
+        await this.cfg.hooks?.afterTest?.(entry.id)
 
-      // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
-      // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
-      const checks = await this.mergeChecks(card, result)
-      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause)
-      if (checks.kind === 'uncounted') {
-        if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
-        continue
+        // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
+        // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
+        step('checks', expected)
+        const checks = await this.mergeChecks(card, result)
+        if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
+        if (checks.kind === 'uncounted') {
+          if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
+          continue
+        }
+        await this.cfg.hooks?.afterChecks?.(entry.id)
       }
-      await this.cfg.hooks?.afterChecks?.(entry.id)
 
       // The last check before the target moves: still approved (a decision since cancels the entry).
       const last = this.stillApproved(card, entry)
       if (!last.ok) return this.skip(card, entry, last.cancelled)
+      // Paused meanwhile (Pause queue): the entry's checks are done, and it waits, open, for Resume (from its test merge).
+      const held = this.paused(target)
+      if (held) return this.held(card, entry, held.reason)
+      step('advance', expected)
       const now = await G.lineHead(this.project, target)
       if (isUnknown(now) || now !== expected) {
         // The target moved since the test: tested again against the new head; never an untested advance.
@@ -508,12 +685,19 @@ export class MergeQueue {
       if (this.cfg.enforced && !this.cfg.enforced()) return this.pause(target, card, entry, 'rulesOff')
       const where = await G.checkouts(this.project)
       if (isUnknown(where)) return this.pause(target, card, entry, 'needsYou')
-      // Checked out in a folder, as far as is known now (advanceRef looks again under the lock).
-      const folder = where[target] ?? null
-      if (folder && this.cfg.pauseCheckedOut) return this.pause(target, card, entry, 'checkedOut', [folder])
-      const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder) : await this.advanceRef(card, entry, target, expected, result)
-      // Checked out in a folder while the queue waited for the lock: looked at again, the checked-out way.
-      if (adv === 'checkedOut') {
+      // Checked out in a folder, as far as is known now (each advance looks again under the lock).
+      const folder = where[target] ? resolve(where[target]) : null
+      // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge. An early-out
+      // only: decided again in IntegrationStarted's write, in the lock.
+      if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
+      const method = s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge'
+      const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'hive')
+      const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, integrate) : await this.advanceRef(card, entry, target, expected, result)
+      // Settled in the lock: a pause, the terminal state, the ask.
+      if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
+      // Checked out (or not any more) while the queue waited for the lock, or the target moved before anything was
+      // touched: looked at again, the right way.
+      if (adv === 'retest') {
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
         continue
       }
@@ -523,10 +707,31 @@ export class MergeQueue {
         continue
       }
       if (adv === 'denied') return this.skip(card, entry, this.stillApproved(card, entry).cancelled)
-      if (typeof adv === 'object') return this.pause(target, card, entry, adv.pause, adv.files)
-      await this.integrated(card, entry, revision, target, result, s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge', 'hive')
+      if (adv === 'held') return this.held(card, entry, this.paused(target)?.reason ?? 'user')
+      if (typeof adv === 'object') {
+        // Every advance settles its pauses in the lock; one that didn't is settled here.
+        const s2 = await this.settle(card, entry, target, adv, integrate)
+        if (typeof s2 === 'object' && 'outcome' in s2) return s2.outcome
+        return this.pause(target, card, entry, 'needsYou')
+      }
+      await integrate()
       return { card: card.key, entry: entry.id, outcome: 'integrated', result, retests }
     }
+  }
+
+  /**
+   * Whether the entry is still open (or begun) in this write's state: an outcome the queue writes late (a red check, a
+   * stale pass, a moved target) is written only then, so one removed from the queue meanwhile (Remove from queue, a
+   * decision) keeps its cancellation and the card where that put it (#1353).
+   */
+  private isOpen(w: Write, entry: QueueEntry): boolean {
+    const e = w.state().entries.find((x) => x.id === entry.id)
+    return !!e && (e.state === 'open' || e.state === 'started')
+  }
+
+  /** Paused by someone while the entry ran (Pause queue): it stays open, and the pause as it is. */
+  private held(card: CardRecord, entry: QueueEntry, reason: string): QueueOutcome {
+    return { card: card.key, entry: entry.id, outcome: 'paused', reason: reason as PauseReason }
   }
 
   /**
@@ -536,11 +741,19 @@ export class MergeQueue {
    */
   private async skip(card: CardRecord, entry: QueueEntry, cancelled: boolean): Promise<QueueOutcome> {
     if (!cancelled) {
-      await this.write(card, (w) => {
-        w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
-        w.move(w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active', 'derived')
-        this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`) // i18n-ignore: a wake, agent-facing
+      const wrote = await this.write(card, (w) => {
+        if (!this.isOpen(w, entry)) return false
+        const s = w.state()
+        // Why (#1354): its pass is stale, or a decision since needs its passes again (none at the current generation).
+        const why = !s.stale && s.generation > 0 && !s.verdicts.some((v) => v.pass && v.generation === s.generation) ? 'decision' : 'stale'
+        w.fact('IntegrationCancelled', { entry: entry.id, reason: why }) // i18n-ignore: a fact's kind and codes, not text
+        const to = w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active'
+        w.move(to, 'derived')
+        this.wf.wake(w, s.started?.builder, leftWake(card.key, why, to))
+        return true
       })
+      // Cancelled meanwhile: that cancellation is its outcome.
+      if (!wrote) cancelled = true
     }
     return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
   }
@@ -555,22 +768,87 @@ export class MergeQueue {
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
    */
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  /** Where two revisions' histories meet ('' when git can't say: an update then fails as git refuses it). */
+  private async mergeBaseOf(a: string, b: string): Promise<string> {
+    const r = await this.git(this.project, ['merge-base', a, b])
+    return r.ok ? r.out.trim() : ''
+  }
+
+  /** The queue's own worktree, made or reused, detached and clean at `at`; a pause when git can't. */
+  private async folderAt(at: string): Promise<{ pause: PauseReason; message?: string } | null> {
+    const f = this.cfg.folder
+    if (!existsSync(f)) {
+      const add = await this.git(this.project, ['worktree', 'add', '--detach', f, at])
+      return add.ok ? null : { pause: 'needsYou', message: add.err }
+    }
+    const co = await this.git(f, ['checkout', '--detach', '-f', at])
+    if (!co.ok) return { pause: 'needsYou', message: co.err }
+    await this.git(f, ['clean', '-fdq'])
+    return null
+  }
+
+  /**
+   * Strict, G8 (§16.9.1 step 3, #1352): a reviewed revision that doesn't contain the target's head is brought up to date
+   * in the queue's own worktree only, never on the card's line (the builder's branch, in its worktree): the target merged
+   * into it, or, with merge style Squash, it rebased onto the target, as Hive's commits are made (#1350: the project's
+   * identity, the repository's hooks and signing, never a prompt). The result is the same change (§16.3.2's replay:
+   * `sameChange`) or the card goes back to its builder: a conflict with the files, or a different change, both
+   * `notUpToDate`. The same: kept on `refs/hive/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
+   * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
+   * after the target moved updates afresh, never on an earlier update.
+   */
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+    const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
+    if (anc.code === 0) return { updated: null }
+    if (anc.code !== 1) return { pause: 'needsYou', message: anc.err }
+    const id = await this.identity()
+    if (!id) return { pause: 'identity', files: [this.project] }
+    const at = await this.folderAt(revision)
+    if (at) return at
+    const f = this.cfg.folder
+    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const rebase = this.wf.rulesetOf(card, s).options.style === 'squash'
+    const signs = (await this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign'])).out.trim() === 'true'
+    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
+    const target = entry.target
+    const message = `Merge ${target} into ${card.key}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}` // i18n-ignore: a commit message, in English
+    // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
+    // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
+    // Overridden for this command only; the repository's config is left as it is.
+    const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
+    if (!u.ok) {
+      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+      const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
+      await this.folderAt(expected)
+      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text) }
+      return commitFailed(u, signs)
+    }
+    const h = await G.head(f)
+    if (isUnknown(h)) return { pause: 'needsYou' }
+    // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
+    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: h }))) {
+      return { fail: 'notSame', log: `${card.key}: ${revision.slice(0, 7)} brought up to date with ${target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
+    }
+    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(entry.id)}`, h])
+    await this.write(card, (w) => {
+      if (this.isOpen(w, entry)) w.fact('Updated', { entry: entry.id, from: revision, to: h, how: rebase ? 'rebased' : 'mergedTarget', carried: true }) // i18n-ignore: a fact's kind and codes, not text
+    })
+    return { updated: h }
+  }
+
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, updated?: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity()
     if (!id) return { pause: 'identity', files: [this.project] }
     const f = this.cfg.folder
-    if (!existsSync(f)) {
-      const add = await this.git(this.project, ['worktree', 'add', '--detach', f, expected])
-      if (!add.ok) return { pause: 'needsYou', message: add.err }
-    } else {
-      const co = await this.git(f, ['checkout', '--detach', '-f', expected])
-      if (!co.ok) return { pause: 'needsYou', message: co.err }
-      await this.git(f, ['clean', '-fdq'])
-    }
+    const at = await this.folderAt(expected)
+    if (at) return at
     const r = this.wf.rulesetOf(card, s)
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
-    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
+    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${updated ? `\nHive-Updated: ${updated}` : ''}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
     // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
@@ -624,7 +902,7 @@ export class MergeQueue {
     let noInstall = false
     if (this.cfg.install && (o.mergeInstall === 'always' || this.wf.store.meta(key) !== now)) {
       const i = await this.cfg.install(f, true, ctx)
-      if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output }
+      if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output, check: 'install', ...(i.logPath ? { logPath: i.logPath } : {}) }
       noInstall = !!i.skipped
       await this.wf.locked(() => this.wf.store.setMeta(key, now))
     }
@@ -648,95 +926,258 @@ export class MergeQueue {
       }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
-      if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output }
+      if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output, check: name, ...(r.logPath ? { logPath: r.logPath } : {}) }
       if (!b.counted) return { kind: 'uncounted' }
     }
     return { kind: 'green' }
   }
 
+  /**
+   * Ask each time (OP-40, #1351): "Update <target> in <folder> now", the card's For you Approve, bound to the entry and
+   * its test merge; the queue waits for it (paused `approval`, naming the folder). Asked once per test merge.
+   */
+  private async askAdvance(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<QueueOutcome> {
+    // The pause first, and only when none is saved (HR4's #1351 round 1: the user's Pause queue meanwhile stands, and
+    // nothing is asked under it); then the question.
+    const out = await this.pause(target, card, entry, 'approval', [folder])
+    if (this.paused(target)?.reason !== 'approval' || this.paused(target)?.card !== card.key) return out
+    await this.write(card, (w) => {
+      const s = w.state()
+      if (s.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === entry.id && r.revision === expected && r.result === result)) return
+      this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueAdvance, { card: card.key, target, folder }), { unbound: true, entry: entry.id, revision: expected, result })
+    })
+    return out
+  }
+
+  /** The lease, checked just before git touches the target: a runner that lost it touches nothing. */
+  private stillHolds(target: string): void {
+    if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
+  }
+
   /** The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`). */
-  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<'done' | 'moved' | 'denied' | 'checkedOut' | { pause: PauseReason; files?: string[] }> {
+  private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<Advance> {
     const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
     // Under the repository's lock (#1347): the target still checked out nowhere (the user or another Hive may have
     // checked it out while the queue waited: a swap then would leave that folder's files behind), `IntegrationStarted`
     // (its write checks the lease, the fence, and the rules) and the ref's compare-and-swap, the lease checked once more
     // just before the swap.
-    const r = await lock(async () => {
+    const r = await lock(async (): Promise<Advance> => {
       const where = await G.checkouts(this.project)
-      if (isUnknown(where)) return { pause: 'needsYou' as const }
-      const folder = where[target]
-      if (folder) return this.cfg.pauseCheckedOut ? { pause: 'checkedOut' as const, files: [folder] } : ('checkedOut' as const)
+      if (isUnknown(where)) return this.settle(card, entry, target, { pause: 'needsYou' })
+      if (where[target]) return 'retest'
       const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
-      if (started === 'rulesOff') return { pause: 'rulesOff' as const }
-      if (started === 'denied') return 'denied' as const
+      if (started === 'rulesOff') return this.settle(card, entry, target, { pause: 'rulesOff' })
+      if (started === 'denied' || started === 'held' || started === 'ask') return started === 'ask' ? 'retest' : started
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
-      return (await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok ? ('done' as const) : ('moved' as const)
-    })
-    if (r === 'moved') {
+      if ((await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok) return 'done'
       await this.moved(card, entry, target)
       return 'moved'
-    }
+    })
     if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
     return r
+  }
+
+  /**
+   * What an advance came to, settled before the repository lock is released (HR4's #1351 round 1): a pause Hive writes
+   * for what it saw there (a condition, the rules, the terminal state) is written in the lock, so no other run, this
+   * Hive's or another's, acts on the target between the finding and the pause; a residue is merged, then paused.
+   */
+  private async settle(card: CardRecord, entry: QueueEntry, target: string, adv: Advance, integrate?: () => Promise<void>): Promise<Advance> {
+    if (typeof adv !== 'object' || 'outcome' in adv) return adv
+    if ('residue' in adv) {
+      await integrate?.()
+      return { outcome: await this.pause(target, card, entry, 'needsYou', undefined, undefined, adv.residue) }
+    }
+    // A pause on a condition after the entry was failed and queued again (an edit since the check): that entry's.
+    const at = adv.stuck ? entry : (openEntry(this.wf.state(card)) ?? entry)
+    return { outcome: await this.pause(target, card, at, adv.pause, adv.files, adv.message, adv.stuck) }
   }
 
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
   private async moved(card: CardRecord, entry: QueueEntry, target: string): Promise<void> {
     await this.write(card, (w) => {
+      // Cancelled meanwhile: not queued again (the queue's next look skips it as cancelled).
+      if (!this.isOpen(w, entry)) return
       w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason: 'targetMoved', transient: true }) // i18n-ignore: a fact's kind and codes, not text
       const s = w.state()
       w.fact('IntegrationRequested', { entry: `${card.key}/e${s.lastSeq + 1}`, revision: entry.revision, key: s.latest?.key ?? null, target, style: w.ruleset!.options.style })
     })
   }
 
+  /** Appends a journal phase of a begun advance (§16.9.2): written, and committed, before its step runs. */
+  private async phase(card: CardRecord, entry: QueueEntry, phase: FactData['IntegrationPhase']['phase']): Promise<void> {
+    await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase }))
+  }
+
+  /** The repository lock and the folder's fence around `fn` (#1347, #646), as the config gives them. */
+  private guarded<T>(folder: string, fn: () => Promise<T>): Promise<T> {
+    const lock = this.cfg.lock ?? (<U,>(f: () => Promise<U>) => f())
+    const fence = this.cfg.fence ?? (<U,>(_folder: string, f: () => Promise<U>) => f())
+    return lock(() => fence(folder, fn))
+  }
+
   /**
-   * The target checked out in a folder (§16.9.2): conditions checked before anything is touched (else a pause), then
-   * a journal: `IntegrationStarted`, phase files, read-tree, phase ref, update-ref, `Integrated`.
+   * The target checked out in a folder (§16.9.2). Under the repository lock and that folder's fence (nothing of Hive's is
+   * typed into it meanwhile), where it is checked out is read again and the conditions checked before anything is
+   * touched, each failed one a pause naming its files; then the journal: `IntegrationStarted` (the listed files), phase
+   * files and `read-tree -m -u <expected> <result>`, phase ref and `update-ref <target> <result> <expected>`, and, once
+   * HEAD is seen to still name the target, `Integrated` (the caller's). A swap that finds the ref moved rolls the files
+   * back (phase rollback). Each phase's fact checks the lease in its write, and the lease is checked again just before
+   * git runs: a runner that lost its lease writes nothing more and touches nothing.
    */
-  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<'done' | 'moved' | 'denied' | { pause: PauseReason; files?: string[] }> {
-    if (this.cfg.folderBusy?.(folder)) return { pause: 'folderBusy' }
+  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, integrate: () => Promise<void>): Promise<Advance> {
+    const where = await G.checkouts(this.project)
+    if (isUnknown(where)) return this.settle(card, entry, target, { pause: 'needsYou' })
+    // As Windows writes it (git lists worktrees with forward slashes): the journal, the pauses and the fence all name it so.
+    const seen = where[target] ? resolve(where[target]) : null
+    if (!seen) return 'retest'
+    const r = await this.guarded(seen, async (): Promise<Advance> => {
+      // Where the target is checked out now, under the lock: switched meanwhile, looked at again the right way.
+      const now = await G.checkouts(this.project)
+      if (isUnknown(now)) return this.settle(card, entry, target, { pause: 'needsYou' })
+      if (!now[target] || resolve(now[target]).toLowerCase() !== seen.toLowerCase()) return 'retest'
+      return this.settle(card, entry, target, await this.journal(card, entry, target, expected, result, seen), integrate)
+    })
+    if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
+    return r
+  }
+
+  private async journal(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<Advance> {
+    // Conditions, before anything is touched: no agent builds there (an idle one, or one reviewing in a review copy,
+    // doesn't count); HEAD names the target, at the expected revision; nothing staged; no unstaged or untracked change in
+    // a file the merge changes (the user's other edits are left as they are).
+    const busy = this.cfg.folderBusy?.(folder)
+    if (busy) return { pause: 'folderBusy', files: busy.length ? busy : [folder] }
     const b = await G.branch(folder)
-    if (isUnknown(b) || b !== target) return { pause: 'wrongBranch' }
-    const staged = await this.git(folder, ['diff', '--cached', '--quiet', expected])
-    if (staged.code !== 0) return { pause: 'staged' }
-    const changed = await this.git(this.project, ['diff', '--name-only', '-z', expected, result])
-    if (!changed.ok) return { pause: 'needsYou' }
-    const files = changed.out.split('\0').filter(Boolean)
-    if (files.length) {
-      const st = await this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
-      const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-      if (!st.ok || busy.length) return { pause: 'unstagedChanges', files: busy }
-    }
-    const ref = await G.lineHead(this.project, target)
-    if (ref !== expected) return 'moved'
+    if (isUnknown(b) || b !== target) return { pause: 'wrongBranch', files: [folder] }
+    if ((await G.lineHead(this.project, target)) !== expected) return 'retest'
+    const staged = await this.git(folder, ['diff', '--cached', '--name-only', '-z', expected])
+    if (!staged.ok) return { pause: 'needsYou', message: staged.err }
+    if (nulList(staged.out).length) return { pause: 'staged', files: nulList(staged.out) }
+    const changed = await this.git(this.project, ['diff', '--name-only', '-z', '--no-renames', expected, result])
+    if (!changed.ok) return { pause: 'needsYou', message: changed.err }
+    const files = nulList(changed.out)
+    const edited = await this.editedOf(folder, files)
+    if (edited === null) return { pause: 'needsYou' }
+    if (edited.length) return { pause: 'unstagedChanges', files: edited }
+
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
     if (started === 'rulesOff') return { pause: 'rulesOff' }
-    if (started === 'denied') return 'denied'
+    // Ask each time, as the setting is now: asked here, before the lock is released.
+    if (started === 'ask') return { outcome: await this.askAdvance(card, entry, target, expected, result, folder) }
+    if (started === 'denied' || started === 'held') return started
     await this.cfg.hooks?.afterStarted?.(entry.id)
-    await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'files' }))
+
+    // 1. The files: index and the listed files to the result. git refuses, writing nothing, rather than overwrite a file
+    // changed since the check.
+    await this.phase(card, entry, 'files')
+    await this.cfg.hooks?.beforeFiles?.(entry.id)
+    this.stillHolds(target)
     const rt = await this.git(folder, ['read-tree', '-m', '-u', expected, result])
     if (!rt.ok) {
-      // git refused before writing: the files are as they were. The user's edit since the check pauses (named); anything
-      // else is the target moving: back to the test merge.
-      const st = await this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
-      const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-      await this.moved(card, entry, target)
-      if (busy.length) return { pause: 'unstagedChanges', files: busy }
-      return 'moved'
+      const sides = await this.sidesOf(folder, files, expected, result)
+      // Nothing written (every listed file still at the expected revision in the index): back to the test merge, and a
+      // file the user edited since the check pauses, named. Anything else is the terminal state.
+      if (sides && sides.every((f) => f.side === 'expected' || (f.side === 'other' && f.staged === 'expected'))) {
+        const now = await this.editedOf(folder, files)
+        await this.moved(card, entry, target)
+        return now?.length ? { pause: 'unstagedChanges', files: now } : 'moved'
+      }
+      return { pause: 'needsYou', message: rt.err, stuck: await this.stuckOf(target, folder, expected, result, files, 'files') }
     }
     await this.cfg.hooks?.afterFiles?.(entry.id)
-    await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'ref' }))
+
+    // 2. The ref: a compare-and-swap; the ref moved meanwhile, the files rolled back.
+    await this.phase(card, entry, 'ref')
+    await this.cfg.hooks?.beforeRef?.(entry.id)
+    this.stillHolds(target)
     const u = await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])
-    if (!u.ok) {
-      await this.write(card, (w) => w.fact('IntegrationPhase', { entry: entry.id, phase: 'rollback' }))
-      const back = await this.git(folder, ['read-tree', '-m', '-u', result, expected])
-      if (!back.ok) return { pause: 'needsYou', files }
-      await this.moved(card, entry, target)
-      return 'moved'
-    }
-    await this.cfg.hooks?.afterAdvance?.(entry.id)
+    if (!u.ok) return this.rollback(card, entry, target, expected, result, folder, files)
+
+    // HEAD no longer names the target (another client switched the folder in that instant: §16.9.2's "does not
+    // guarantee"): merged, with the merged files in the other branch's working copy, listed to restore.
+    const after = await G.branch(folder)
+    if (isUnknown(after) || after !== target) return { residue: await this.stuckOf(target, folder, expected, result, files, 'done') }
     return 'done'
+  }
+
+  /** The swap found the ref moved: the files rolled back (phase rollback), and the entry tested again; refused, terminal. */
+  private async rollback(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string, files: string[]): Promise<Advance> {
+    await this.phase(card, entry, 'rollback')
+    await this.cfg.hooks?.inRollback?.(entry.id)
+    this.stillHolds(target)
+    const back = await this.git(folder, ['read-tree', '-m', '-u', result, expected])
+    if (!back.ok) return { pause: 'needsYou', message: back.err, stuck: await this.stuckOf(target, folder, expected, result, files, 'rollback') }
+    await this.cfg.hooks?.afterRollback?.(entry.id)
+    await this.moved(card, entry, target)
+    return 'moved'
+  }
+
+  /**
+   * Of the files a merge changes, those with a change in the folder (unstaged, staged or untracked), both sides of a
+   * rename; null when git can't say. The whole folder's status, then the listed files: a long list never makes a
+   * command line too long.
+   */
+  private async editedOf(folder: string, files: string[]): Promise<string[] | null> {
+    if (!files.length) return []
+    const st = await this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
+    if (!st.ok) return null
+    const listed = new Set(files)
+    return [...new Set(statusPaths(st.out).filter((p) => listed.has(p)))]
+  }
+
+  /**
+   * Where each listed file stands in the folder: its index entry and working copy both at the expected revision, both at
+   * the result, or neither (`other`, with the side its index entry is at, when one). Null when git can't say.
+   */
+  private async sidesOf(folder: string, files: string[], expected: string, result: string): Promise<{ path: string; side: QueueFileSide; staged: QueueFileSide }[] | null> {
+    const [ix, rx, st] = await Promise.all([
+      this.git(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', expected]),
+      this.git(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', result]),
+      this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
+    ])
+    if (!ix.ok || !rx.ok || !st.ok) return null
+    const notExpected = new Set(nulList(ix.out))
+    const notResult = new Set(nulList(rx.out))
+    // A working copy that differs from its index entry (unstaged or untracked: the status's second column, or `??`).
+    const dirty = new Set(
+      st.out
+        .split('\0')
+        .filter((t) => t.length > 3 && (t[1] !== ' ' || t.startsWith('??')))
+        .map((t) => t.slice(3))
+    )
+    return files.map((path) => {
+      const staged: QueueFileSide = !notExpected.has(path) ? 'expected' : !notResult.has(path) ? 'result' : 'other'
+      return { path, side: dirty.has(path) ? 'other' : staged, staged }
+    })
+  }
+
+  /**
+   * §16.9.2's terminal state as Hive finds it: the branch, the ref, each listed file's side, and the commands that finish
+   * or undo it, as far as the state allows (none when a file is at neither side: git would refuse them).
+   */
+  private async stuckOf(target: string, folder: string, expected: string, result: string, files: string[], phase: QueueStuck['phase']): Promise<QueueStuck> {
+    const b = await G.branch(folder)
+    const r = await G.lineHead(this.project, target)
+    const branch = isUnknown(b) ? null : b
+    const ref = isUnknown(r) ? null : r
+    const sides = (await this.sidesOf(folder, files, expected, result)) ?? files.map((path) => ({ path, side: 'other' as const, staged: 'other' as const }))
+    const all = (side: QueueFileSide): boolean => sides.every((f) => f.side === side)
+    // Each command as its arguments, the ref as it is (a ref may hold `$` or `&`): shown for PowerShell by shellLine.
+    const cmd = (purpose: QueueCommand['purpose'], place: QueueCommand['place'], args: string[]): QueueCommand => ({ purpose, place, args, command: shellLine(args) })
+    const swap = ['git', 'update-ref', `refs/heads/${target}`, result, expected]
+    const back = ['git', 'read-tree', '-m', '-u', result, expected]
+    const forth = ['git', 'read-tree', '-m', '-u', expected, result]
+    const commands: QueueCommand[] = []
+    // A ref with `"` in it (git allows one) can't be handed to git by Windows PowerShell as written (it splits native
+    // arguments at quotes): no command names it then; the state says where things are.
+    if (branch === target && ref === expected && all('result')) commands.push(...(target.includes('"') ? [] : [cmd('finish', 'project', swap)]), cmd('undo', 'folder', back))
+    else if (branch === target && ref === result && all('expected')) commands.push(cmd('finish', 'folder', forth))
+    else if (branch === target && ref !== expected && ref !== result && all('result')) commands.push(cmd('undo', 'folder', back))
+    // The merged files in another branch's working copy: put back as that branch had them.
+    else if (phase === 'done' && all('result')) commands.push(cmd('undo', 'folder', back))
+    return { folder, branch, ref, expected, result, phase, files: sides.map(({ path, side }) => ({ path, side })), commands }
   }
 
   /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
@@ -756,14 +1197,21 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure): Promise<QueueOutcome> {
-    await this.write(card, (w) => {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }): Promise<QueueOutcome> {
+    // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
+    // the card where that left it (Approved), and the late failure isn't written.
+    const wrote = await this.write(card, (w) => {
+      if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check }
+      w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
-      this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`) // i18n-ignore: a wake, agent-facing
+      // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
+      this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
+      return true
     })
+    if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' } // i18n-ignore: a reason's key, not text
     return { card: card.key, entry: entry.id, outcome: 'returned', reason, transient }
   }
 
@@ -787,8 +1235,7 @@ export class MergeQueue {
       const s = this.wf.state(card)
       const e = openEntry(s)
       if (!e || e.state !== 'started' || !e.started || (target !== undefined && e.target !== target)) continue
-      const { expected, result, checkedOut, files = [] } = e.started
-      const ref = await G.lineHead(this.project, e.target)
+      const { expected, result, checkedOut } = e.started
       const done = async () => {
         await this.write(card, (w) => {
           const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method: 'merge', by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
@@ -797,17 +1244,28 @@ export class MergeQueue {
           w.action('releaseSlot', {})
           w.action('endLaneIfDone', {})
         })
-        out.push({ card: card.key, entry: e.id, outcome: 'integrated' })
       }
-      if (ref === result) {
-        await done()
-        continue
+      // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Hive
+      // won't guess about. Read in the lock, before anything else, whatever started this run (another card's enqueue, a
+      // reopen, another Hive): recovery writes nothing and touches nothing until the user lifts it (Resume, or the
+      // answer to its For you, which check first). Other pauses still let a begun advance finish or roll back.
+      const frozen = (): boolean => {
+        const p = this.paused(e.target)
+        return p?.reason === 'needsYou' && !!p.card
       }
       if (!checkedOut) {
-        if (ref === expected) {
-          this.rerun.add(e.id)
-          out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
-        } else {
+        const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
+        const outcome = await lock(async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
+          if (frozen()) return 'needsYou'
+          const ref = await G.lineHead(this.project, e.target)
+          if (ref === result) {
+            await done()
+            return 'integrated'
+          }
+          if (ref === expected) {
+            this.rerun.add(e.id)
+            return 'rerun'
+          }
           // The target moved meanwhile: containment decides. Found → Done (observed); not found → tested again.
           await this.write(card, (w) => w.fact('IntegrationFailed', { entry: e.id, revision: e.revision, target: e.target, reason: 'targetMoved', transient: true })) // i18n-ignore: a fact's kind and codes, not text
           await reconcile(this.wf, card)
@@ -817,31 +1275,108 @@ export class MergeQueue {
               w.fact('IntegrationRequested', { entry: `${card.key}/e${st.lastSeq + 1}`, revision: e.revision, key: st.latest?.key ?? null, target: e.target, style: w.ruleset!.options.style })
             })
           }
-          out.push({ card: card.key, entry: e.id, outcome: 'failed' })
-        }
+          return 'failed'
+        })
+        out.push({ card: card.key, entry: e.id, outcome })
         continue
       }
-      const at = async (rev: string) => files.length === 0 || ((await this.git(checkedOut, ['diff', '--cached', '--quiet', rev, '--', ...files])).code === 0 && (await this.git(checkedOut, ['diff', '--quiet', '--', ...files])).code === 0)
-      const phase = e.phases.at(-1)
-      const branchOk = (await G.branch(checkedOut)) === e.target
-      if (branchOk && ref === expected && phase !== 'rollback' && (await at(expected))) {
-        this.rerun.add(e.id)
-        out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
-      } else if (branchOk && ref === expected && (phase === 'files' || phase === 'ref') && (await at(result))) {
-        const u = await this.git(this.project, ['update-ref', `refs/heads/${e.target}`, result, expected])
-        if (u.ok) await done()
-        else {
-          await this.pause(e.target, card, e, 'needsYou', files)
-          out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
+      // Checked out (§16.9.2's table): read and acted on under the repository lock and the folder's fence, so neither
+      // Hive's other work nor the Git view acts in the folder in between.
+      const outcome = await this.guarded(checkedOut, async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
+        if (frozen()) return 'needsYou'
+        const f = await this.found(e)
+        const stuck = async (st: QueueStuck, merged = false): Promise<'integrated' | 'needsYou'> => {
+          if (merged) await done()
+          await this.pause(e.target, card, e, 'needsYou', undefined, undefined, st)
+          return merged ? 'integrated' : 'needsYou'
         }
-      } else if (phase === 'rollback' && (await at(expected))) {
-        this.rerun.add(e.id)
-        out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
-      } else {
-        await this.pause(e.target, card, e, 'needsYou', files)
-        out.push({ card: card.key, entry: e.id, outcome: 'needsYou' })
-      }
+        if (f.found === 'integrated') {
+          await done()
+          return 'integrated'
+        }
+        if (f.found === 'residue') return stuck(f.stuck!, true)
+        if (f.found === 'rerun') {
+          this.rerun.add(e.id)
+          return 'rerun'
+        }
+        if (f.found === 'requeue') {
+          await this.moved(card, e, e.target)
+          return 'failed'
+        }
+        if (f.found === 'rollback') {
+          const r = await this.rollback(card, e, e.target, expected, result, checkedOut, e.started!.files ?? [])
+          return r === 'moved' ? 'failed' : stuck((r as { stuck: QueueStuck }).stuck)
+        }
+        if (f.found === 'swap') {
+          // The journaled commit, never a new merge: hooks or time can't make it differ.
+          if (e.phases.at(-1) !== 'ref') await this.phase(card, e, 'ref')
+          this.stillHolds(e.target)
+          const u = await this.git(this.project, ['update-ref', `refs/heads/${e.target}`, result, expected])
+          if (!u.ok) {
+            const r = await this.rollback(card, e, e.target, expected, result, checkedOut, e.started!.files ?? [])
+            return r === 'moved' ? 'failed' : stuck((r as { stuck: QueueStuck }).stuck)
+          }
+          const after = await G.branch(checkedOut)
+          if (isUnknown(after) || after !== e.target) return stuck(await this.stuckOf(e.target, checkedOut, expected, result, e.started!.files ?? [], 'done'), true)
+          await done()
+          return 'integrated'
+        }
+        return stuck(f.stuck!)
+      })
+      out.push({ card: card.key, entry: e.id, outcome })
     }
     return out
+  }
+
+  /**
+   * §16.9.2's recovery table for an advance begun into a checked-out target, from its journal (the last phase), the
+   * folder's branch, the ref and each listed file's side: run it again from the test merge (`rerun`; `requeue` when the
+   * ref moved before anything was touched, or after a rollback finished: failed and queued again), finish its swap
+   * (`swap`), roll the files back (`rollback`: the ref moved meanwhile), merged (`integrated`; `residue` when the folder
+   * is on another branch with the merged files in its working copy), or the terminal state (`stuck`). Reads only.
+   */
+  private async found(e: QueueEntry): Promise<{ found: Found; stuck?: QueueStuck }> {
+    const { expected, result, files = [] } = e.started!
+    const folder = e.started!.checkedOut!
+    const phase = e.phases.at(-1) ?? 'started'
+    const b = await G.branch(folder)
+    const r = await G.lineHead(this.project, e.target)
+    const branch = isUnknown(b) ? null : b
+    const ref = isUnknown(r) ? null : r
+    const sides = await this.sidesOf(folder, files, expected, result)
+    const all = (side: QueueFileSide): boolean => !!sides && sides.every((f) => f.side === side)
+    const stuck = async (p: QueueStuck['phase'] = phase): Promise<{ found: Found; stuck: QueueStuck }> => ({ found: 'stuck', stuck: await this.stuckOf(e.target, folder, expected, result, files, p) })
+    if (ref === result) {
+      if (branch === e.target || !sides) return { found: 'integrated' }
+      // Merged, and the folder is on another branch now: the merged files left in its working copy (changed from its
+      // HEAD, at the result), if any, are listed to restore.
+      const vsHead = await this.git(folder, ['diff', '--name-only', '-z', '--no-renames', 'HEAD'])
+      const changed = new Set(vsHead.ok ? nulList(vsHead.out) : files)
+      return sides.some((f) => (f.side === 'result' || f.staged === 'result') && changed.has(f.path)) ? { found: 'residue', stuck: await this.stuckOf(e.target, folder, expected, result, files, 'done') } : { found: 'integrated' }
+    }
+    if (branch !== e.target || !sides) return stuck()
+    if (ref === expected) {
+      if ((phase === 'started' || phase === 'files' || phase === 'rollback') && all('expected')) return { found: 'rerun' }
+      if ((phase === 'files' || phase === 'ref') && all('result')) return { found: 'swap' }
+      return stuck()
+    }
+    // The ref moved meanwhile (another client), not to the result.
+    if (ref !== null && phase !== 'started' && all('result')) return { found: 'rollback' }
+    if (ref !== null && phase !== 'ref' && all('expected')) return { found: 'requeue' }
+    return stuck()
+  }
+
+  /**
+   * Resume of a needs-you pause (#1353, §16.9.3): whether the target's begun advance is still in §16.9.2's terminal state,
+   * as recovery would find it now (the files it names, or [] for none), or null when recovery can carry on. Reads only.
+   */
+  async stillStuck(target: string): Promise<string[] | null> {
+    for (const card of this.wf.store.cards()) {
+      const e = openEntry(this.wf.state(card))
+      if (!e || e.state !== 'started' || !e.started || e.target !== target || !e.started.checkedOut) continue
+      const f = await this.found(e)
+      return f.found === 'stuck' || f.found === 'residue' ? (f.stuck?.files.map((x) => x.path) ?? []) : null
+    }
+    return null
   }
 }

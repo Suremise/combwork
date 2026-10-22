@@ -65,6 +65,8 @@ import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
+import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
@@ -78,7 +80,8 @@ import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
-import { recordDecisionsReceived } from './workflow/recorder'
+import { actorOf, recordDecisionsReceived } from './workflow/recorder'
+import { workflowFor } from './workflow/service'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -567,7 +570,9 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'stop-agent': UNDO_FINAL.agentStopped,
   'reorder-tasks': UNDO_FINAL.cardsOrder,
   'cancel-messages': UNDO_FINAL.withdrawn,
-  'lane-end': UNDO_FINAL.laneEnded
+  'lane-end': UNDO_FINAL.laneEnded,
+  'queue-pause': UNDO_FINAL.queuePaused,
+  'queue-resume': UNDO_FINAL.queueResumed
 }
 
 /**
@@ -620,7 +625,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 8
+export const API_VERSION = 9
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1517,6 +1522,22 @@ async function slotAgent(p: string): Promise<SlotAgent> {
   return { projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, runId: live.runId }
 }
 
+/**
+ * A claim naming cards Hive merges (each card's own rules, #1354): refused before the slot is touched, as the card's
+ * report merge would be (`merge.hiveMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
+ * no card, or cards the agent merges, is unchanged: the slot stays for agents' merges and the user's own.
+ */
+async function refuseHiveMerges(projectPath: string, cards: number[]): Promise<void> {
+  if (!cards.length) return
+  const wf = await workflowFor(workspace, projectPath).catch(() => null)
+  if (!wf) return
+  const actor = actorOf(await taskActor())
+  for (const n of cards) {
+    const refused = await wf.refuseHiveMerge(`#${n}`, actor, 'merge slot') // i18n-ignore: the refused move's name, agent-facing
+    if (refused) throw new tasks.WorkflowRefusedError(refused)
+  }
+}
+
 /** The branch a slot call names, or the one the project folder is on (what Hive's Merge dialog merges into). */
 async function slotBranchFor(p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null) return slotBranch(v)
@@ -1548,6 +1569,7 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const agent = await slotAgent(p)
     const branch = await slotBranchFor(p, body?.branch)
     const cards = slotCards(cardRefsIn(body?.cards))
+    await refuseHiveMerges(p, cards)
     const t = body?.timeoutSeconds
     if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, 'timeoutSeconds must be a number of seconds')
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
@@ -1644,7 +1666,14 @@ route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
     if (!a) throw new HttpError(400, "next is a lane agent's: read a lane with GET /v1/lanes/{id}")
-    return lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    // Its passed cards Hive merges, each with where it is in the merge queue (#1354): the next waits for them.
+    const queue: { card: number; line: string }[] = []
+    for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
+      const line = await queueLineFor(r.lane.project, c.number)
+      if (line) queue.push({ card: c.number, line })
+    }
+    return queue.length ? { ...r, queue } : r
   })
 )
 
@@ -1730,6 +1759,91 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     })
   })
 )
+
+// --- The merge queue (#1353, SPEC §16.9.3): its model for whoever may read the project (an agent its own project's);
+// Pause queue, Resume, Remove from queue and Retry merge are the user's (the window) and the Assistant's within
+// Settings → Assistant → Control (assistantChange), never a project agent's or a script's.
+
+/** The project a queue call is about: an agent's own (another's refused), anyone else's named. */
+function queueProject(v: unknown): string {
+  const a = agentCaller()
+  if (a) {
+    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), 'A merge queue')
+    return a.projectPath
+  }
+  if (typeof v !== 'string' || !v) throw new HttpError(400, 'project is required')
+  return projectByName(v)
+}
+
+/** A queue's target from a request: the one given, else the project's only queue's (several or none: say which). */
+async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promise<string> {
+  if (v !== undefined && v !== null && v !== '') {
+    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, 'target is a branch name')
+    return v
+  }
+  const views = await queueViews(ws, p)
+  if (views.length === 1) return views[0].target
+  throw new HttpError(400, `target is required: the branch the queue merges into${views.length ? ` (${views.map((x) => x.target).join(', ')})` : ''}`)
+}
+
+/** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
+const publicQueue = ({ projectPath: _p, paused, ...v }: QueueView): QueuePublic => ({
+  ...v,
+  paused: paused ? (({ stuck, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
+  recent: v.recent.map(({ log: output, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+})
+
+/** A project agent asking to change a queue: refused, saying whose controls these are. */
+function notAgents(what: string): void {
+  if (agentCaller()) throw new HttpError(403, `Project agents can't ${what}: the merge queue's controls are the user's, and the Hive Assistant's within Settings → Assistant → Control. Tell the user if it should be done.`)
+}
+
+route('GET', '/v1/queue', async ({ query }) => {
+  const ws = requireWorkspace()
+  const p = queueProject(query.get('project'))
+  const target = query.get('target') || undefined
+  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, 'target is a branch name')
+  return (await queueViews(ws, p, target)).map(publicQueue)
+})
+
+route('POST', '/v1/queue/pause', async ({ body }) => {
+  notAgents('pause a merge queue')
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  return assistantChange('agents', `pause the merge queue of ${basename(p)}`, { kind: 'queue-pause', project: basename(p) }, async (guard) => {
+    const target = await queueTargetOf(ws, p, body?.target)
+    const v = await pauseQueue(ws, p, target, 'assistant', guard)
+    return { done: `Paused the merge queue for ${target} in ${basename(p)}`, result: publicQueue(v) }
+  })
+})
+
+route('POST', '/v1/queue/resume', async ({ body }) => {
+  notAgents('resume a merge queue')
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  return assistantChange('agents', `resume the merge queue of ${basename(p)}`, { kind: 'queue-resume', project: basename(p) }, async (guard) => {
+    const target = await queueTargetOf(ws, p, body?.target)
+    const r = await resumeQueue(ws, p, target, guard)
+    return { done: r.resumed ? `Resumed the merge queue for ${target} in ${basename(p)}` : `The merge queue for ${target} in ${basename(p)} is still paused (${r.view.paused?.reason ?? 'paused'})`, result: { resumed: r.resumed, queue: publicQueue(r.view) } }
+  })
+})
+
+/** Remove from queue or Retry merge, the Assistant's: its reason required, run as the card's intent (#1353). */
+async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Promise<IntentDone> {
+  notAgents(kind === 'removeFromQueue' ? 'take a card out of the merge queue' : "retry a card's merge")
+  const ws = requireWorkspace()
+  const ref = intentRef(String(body?.card ?? ''))
+  const reason = textField(body, 'reason', true)
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', `${INTENT_WORDS[kind]} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const { done, card } = await queueCardChange(ws, ref.n, await taskActor(), kind, reason, guard)
+    const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
+    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, stays: INTENT_STAYS[kind] }
+  })
+}
+
+route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge'))
 
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))
 
@@ -1918,6 +2032,16 @@ async function taskActor(): Promise<tasks.TaskActor> {
  * A card with what its agent is doing now (and its name now), for callers deciding what to do next. `agents` keeps
  * each project's agents for a whole list, so a long board reads each project.json once.
  */
+/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Hive merges it. */
+async function queueLineFor(project: string, n: number): Promise<string | null> {
+  try {
+    const wf = await workflowFor(workspace, projectByName(project))
+    return wf?.queueLineOf(`#${n}`) ?? null
+  } catch {
+    return null
+  }
+}
+
 async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: { name: string; running: boolean } | null = null
@@ -1971,7 +2095,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
   // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
   const k = cardKind(workspace, c.number)
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage }
+  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
+  const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage, ...(merge ? { merge } : {}) }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2490,7 +2616,9 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   reportMerge: 'report the merge of',
   ask: 'ask the user about',
   cannot: 'report a rule blocking',
-  request: 'ask the builder of'
+  request: 'ask the builder of',
+  removeFromQueue: 'take out of the merge queue',
+  retryMerge: 'retry the merge of'
 }
 
 /** What an intent did, in the Assistant's activity line. */
@@ -2504,7 +2632,9 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   reportMerge: 'reported its merge',
   ask: 'asked the user',
   cannot: 'reported a rule blocking it',
-  request: 'asked its builder'
+  request: 'asked its builder',
+  removeFromQueue: 'taken out of the merge queue',
+  retryMerge: 'queued again (Retry merge)'
 }
 
 /**
@@ -2540,7 +2670,9 @@ const INTENT_STAYS: Partial<Record<CardIntent['kind'], string>> = {
   reportMerge: UNDO_FINAL.reportMerge,
   ask: UNDO_FINAL.ask,
   cannot: UNDO_FINAL.cannot,
-  request: UNDO_FINAL.request
+  request: UNDO_FINAL.request,
+  removeFromQueue: UNDO_FINAL.removedFromQueue,
+  retryMerge: UNDO_FINAL.retriedMerge
 }
 
 /** A body's text field, trimmed; required ones refused when missing or empty. */

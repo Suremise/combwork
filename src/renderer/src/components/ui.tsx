@@ -324,6 +324,53 @@ export function StaleNote({ what, error, at, onRetry }: { what: string; error: s
   )
 }
 
+const COPY_CODE = {
+  copy: msg({ id: 'shell.copyCode.copy', defaultMessage: 'Copy {code}', description: 'Tooltip of the small Copy button beside a command or path shown as code (Agent Setup, say): {code} is exactly what it copies.' }),
+  label: msg({ id: 'shell.copyCode.label', defaultMessage: 'Copy', description: 'The accessible name of the small Copy button beside a command or path shown as code. Keep it short.' }),
+  copied: msg({ id: 'shell.copyCode.copied', defaultMessage: 'Copied', description: 'Shown for a moment beside a command or path after its Copy button copied it.' })
+}
+
+/**
+ * A command or path shown as code, with a small Copy button beside it (#1204) that copies exactly it, nothing around it,
+ * and says Copied for a moment.
+ */
+export function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+  return (
+    <span className="copy-code">
+      <code>{code}</code>
+      <button
+        type="button"
+        className="copy-code-btn"
+        data-copy-code={code}
+        aria-label={tr(COPY_CODE.label)}
+        title={tr(COPY_CODE.copy, { code })}
+        onClick={() => {
+          void navigator.clipboard.writeText(code).then(() => setCopied(true), () => undefined)
+        }}
+      >
+        <Icon name={copied ? 'check' : 'copy'} />
+      </button>
+      {copied && (
+        <span className="copy-code-done" role="status">
+          {tr(COPY_CODE.copied)}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Text with `code` and **bold** spans, as provider notes are written: each code span copyable on its own (#1204). */
+export function CodeText({ text }: { text: string }) {
+  const code = (s: string, k: number) => s.split('`').map((part, i) => (i % 2 ? <CopyableCode key={`${k}.${i}`} code={part} /> : <span key={`${k}.${i}`}>{part}</span>))
+  return <>{text.split('**').map((part, k) => (k % 2 ? <strong key={k}>{code(part, k)}</strong> : code(part, k)))}</>
+}
+
 export function IconButton({
   icon,
   title,

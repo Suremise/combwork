@@ -1,11 +1,11 @@
 import { existsSync } from 'original-fs'
 import { readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
-import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveWorktree, PathDataCopy, ProjectConfig, WorkspaceMoved } from '../shared/types'
+import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProjectConfig, WorkspaceMoved } from '../shared/types'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
-import { recreateWorktree } from './agentWorktree'
+import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
 import { config } from './config'
 import { realPath, samePlace } from './fsutil'
 import { git } from './git'
@@ -17,8 +17,10 @@ import type { WorkspaceService } from './workspace'
 import { listWorktrees, localBranches } from './worktrees'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
+import { moveExclusions } from './antivirus'
 import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/hiveBranches'
 import { orphanNames } from '../shared/projectIds'
+import { shortPath } from '../shared/shortPath'
 import { legacyCards, moveOrphanCards, stampCardProjects } from './tasks'
 import { legacyLanes, moveOrphanLanes } from './lanes'
 import { legacyWatches, moveOrphanWatches } from './watches'
@@ -243,6 +245,51 @@ export function moveOwner(m: { of?: string; owner?: MoveOwner }): MoveOwner | nu
 const COPIED = msg({ id: 'main.move.copied', defaultMessage: "{n, plural, one {{owner, select, project {{host}: copied {n, number} file of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} file of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} file of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} file of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}} other {{owner, select, project {{host}: copied {n, number} files of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} files of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} files of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} files of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}}}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many files; {provider} is the coding agent (Claude Code); {owner} whose folder the files are for: the project, the Assistant, an agent's worktree ({agent} is the agent), or other (a name kept from an older record, {of})." })
 const COPY_KEPT = msg({ id: 'main.move.copyKept', defaultMessage: "{n, plural, one {{owner, select, project {{host}: {n, number} file of {provider}'s for the project already in {folder} with other content, not overwritten: {files}.} assistant {{host}: {n, number} file of {provider}'s for the Assistant already in {folder} with other content, not overwritten: {files}.} worktree {{host}: {n, number} file of {provider}'s for {agent}'s worktree already in {folder} with other content, not overwritten: {files}.} other {{host}: {n, number} file of {provider}'s for {of} already in {folder} with other content, not overwritten: {files}.}}} other {{owner, select, project {{host}: {n, number} files of {provider}'s for the project already in {folder} with other content, not overwritten: {files}.} assistant {{host}: {n, number} files of {provider}'s for the Assistant already in {folder} with other content, not overwritten: {files}.} worktree {{host}: {n, number} files of {provider}'s for {agent}'s worktree already in {folder} with other content, not overwritten: {files}.} other {{host}: {n, number} files of {provider}'s for {of} already in {folder} with other content, not overwritten: {files}.}}}}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many files; {provider} is the coding agent (Claude Code); {owner} whose folder the files are for: the project, the Assistant, an agent's worktree ({agent} is the agent), or other (a name kept from an older record, {of}); {folder} is where they would go; {files} lists them." })
 const COPY_FAILED = msg({ id: 'main.move.copyFailed', defaultMessage: "{n, plural, one {{owner, select, project {{host}: {n, number} file of {provider}'s for the project couldn't be copied to {folder}: {files}. Repair tries them again.} assistant {{host}: {n, number} file of {provider}'s for the Assistant couldn't be copied to {folder}: {files}. Repair tries them again.} worktree {{host}: {n, number} file of {provider}'s for {agent}'s worktree couldn't be copied to {folder}: {files}. Repair tries them again.} other {{host}: {n, number} file of {provider}'s for {of} couldn't be copied to {folder}: {files}. Repair tries them again.}}} other {{owner, select, project {{host}: {n, number} files of {provider}'s for the project couldn't be copied to {folder}: {files}. Repair tries them again.} assistant {{host}: {n, number} files of {provider}'s for the Assistant couldn't be copied to {folder}: {files}. Repair tries them again.} worktree {{host}: {n, number} files of {provider}'s for {agent}'s worktree couldn't be copied to {folder}: {files}. Repair tries them again.} other {{host}: {n, number} files of {provider}'s for {of} couldn't be copied to {folder}: {files}. Repair tries them again.}}}}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many files; {provider} is the coding agent (Claude Code); {owner} whose folder the files are for: the project, the Assistant, an agent's worktree ({agent} is the agent), or other (a name kept from an older record, {of}); {folder} is where they would go; {files} lists them." })
+
+/** Repair's report as a table (#1313): each step's result in a few words, its Result column; the full line says the rest. */
+const R = {
+  linked: msg({ id: 'main.move.result.linked', defaultMessage: 'linked again', description: "Repair's report, the Result column: an agent's worktree is linked to the moved project again (git worktree repair)." }),
+  notRepaired: msg({ id: 'main.move.result.notRepaired', defaultMessage: "couldn't be repaired{hasWhy, select, yes {: {why}} other {}}", description: "Repair's report, the Result column: an agent's worktree couldn't be linked again; {why} is git's message." }),
+  recreated: msg({ id: 'main.move.result.recreated', defaultMessage: '{made, select, new {made new (its branch was gone)} other {recreated on its branch}}', description: "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone. The branch's name is in the agent's branch row (Repair may rename it in the same run)." }),
+  pruneBlocked: msg({ id: 'main.move.result.pruneBlocked', defaultMessage: "couldn't be recreated while {n, plural, one {another worktree is missing too ({worktrees}): locate, recreate or remove it first} other {# other worktrees are missing too ({worktrees}): locate, recreate or remove them first}}", description: "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees. {worktrees} lists them (an agent's worktree, main.move.result.agentWorktree, or a folder's name); {n}: how many. The row's tooltip says it in full." }),
+  agentWorktree: msg({ id: 'main.move.result.agentWorktree', defaultMessage: "{agent}'s worktree", description: "Repair's report: an agent's worktree ({agent}: its name), in a list of worktrees in the way (main.move.result.pruneBlocked's {worktrees})." }),
+  recreateFailed: msg({ id: 'main.move.result.recreateFailed', defaultMessage: "{made, select, new {couldn't be made new: {why}} other {couldn't be recreated: {why}}}", description: "Repair's report, the Result column: an agent's worktree couldn't be made again ({why}: the reason)." }),
+  unlinked: msg({ id: 'main.move.result.unlinked', defaultMessage: 'link removed; its folder was left as it was', description: "Repair's report, the Result column: the agent no longer has a worktree; the folder, if any, is untouched." }),
+  missing: msg({ id: 'main.move.result.missing', defaultMessage: '{gone, select, yes {not found, its branch gone too: create, locate or remove its link} other {not found: recreate, locate or remove its link}}', description: "Repair's report, the Result column: an agent's worktree wasn't found; Repair waits for the user's choice (Repair's buttons)." }),
+  original: msg({ id: 'main.move.result.original', defaultMessage: 'stays linked to the project at its old folder', description: "Repair's report, the Result column: a worktree stays with the project folder it was made from, which is still there (a copy was moved)." }),
+  renamed: msg({ id: 'main.move.result.renamed', defaultMessage: "{remote, select, none {renamed} other {renamed; it still tracks {remote}'s old name}}", description: "Repair's report, the Result column: an agent's branch was renamed; {remote} is the remote it tracks (origin), which keeps the old name, or none." }),
+  taken: msg({ id: 'main.move.result.taken', defaultMessage: 'kept: the new name is a branch already', description: "Repair's report, the Result column: an agent's branch isn't renamed, because a branch with the new name exists." }),
+  renameFailed: msg({ id: 'main.move.result.renameFailed', defaultMessage: "couldn't be renamed: {why}", description: "Repair's report, the Result column: an agent's branch couldn't be renamed ({why}: git's or the system's message)." }),
+  gone: msg({ id: 'main.move.result.gone', defaultMessage: "gone, so it isn't renamed", description: "Repair's report, the Result column: an agent's branch to rename no longer exists." }),
+  unrecorded: msg({ id: 'main.move.result.unrecorded', defaultMessage: "renamed, but not recorded yet ({why}): Repair finishes it", description: "Repair's report, the Result column: git renamed an agent's branch, but Hive couldn't record it yet ({why}: the system's message)." }),
+  sessions: msg({ id: 'main.move.result.sessions', defaultMessage: '{n, plural, one {# session points here now} other {# sessions point here now}}', description: "Repair's report, the Result column: session records pointed to the new folder ({n}: how many)." }),
+  failedWhy: msg({ id: 'main.move.result.failed', defaultMessage: "couldn't be updated: {why}", description: "Repair's report, the Result column: a step failed ({why}: the system's message); the next Repair tries again." }),
+  copied: msg({ id: 'main.move.result.copied', defaultMessage: '{n, plural, one {# file copied} other {# files copied}}', description: "Repair's report, the Result column: a coding agent's conversation and memory files copied to the new folder ({n}: how many)." }),
+  copyKept: msg({ id: 'main.move.result.copyKept', defaultMessage: "{n, plural, one {# file already there with other content, kept} other {# files already there with other content, kept}}", description: "Repair's report, the Result column: a coding agent's files already in the new folder with other content, never overwritten (the row's tooltip lists them)." }),
+  copyFailed: msg({ id: 'main.move.result.copyFailed', defaultMessage: "{n, plural, one {# file couldn't be copied} other {# files couldn't be copied}}", description: "Repair's report, the Result column: a coding agent's files that couldn't be copied (the row's tooltip lists them); Repair tries them again." }),
+  given: msg({ id: 'main.move.result.given', defaultMessage: 'given to {to}: {what}', description: "Repair's report, the Result column of a board row: what was saved under a project's old name went to the project ({to}); {what} lists it (\"9 cards, 1 lane\")." }),
+  cards: msg({ id: 'main.move.result.cards', defaultMessage: '{n, plural, one {# card, with its agents} other {# cards, with their agents}}', description: "Repair's report: cards that went to a project, in a list (main.move.result.given's {what}). {n} is how many." }),
+  notGiven: msg({ id: 'main.move.result.notGiven', defaultMessage: "couldn't all be given to {to}: {why}", description: "Repair's report, the Result column: what was saved under an old name couldn't all go to its project ({to}: the project, or none known; {why}: the system's message). Repair tries again." }),
+  working: msg({ id: 'main.move.result.working', defaultMessage: 'marked again: {projects}', description: "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again." }),
+  recent: msg({ id: 'main.move.result.recent', defaultMessage: 'lists the new folder', description: "Repair's report, the Result column of Open Recent: the new folder replaces the old one." })
+}
+
+/**
+ * The worktrees git's prune would forget (a recreate's refusal, `PruneBlocked`), as Repair's report names them: an
+ * agent's by its name, any other (made outside Hive, or whose agent is gone) by its folder's name. Exported for tests.
+ */
+export function blockerNames(blockers: readonly string[], worktrees: readonly Pick<MoveWorktree, 'agentName' | 'from' | 'to'>[]): string[] {
+  return blockers.map((p) => {
+    const w = worktrees.find((x) => samePath(x.from, p) || (!!x.to && samePath(x.to, p)))
+    return w ? tr(R.agentWorktree, { agent: w.agentName }) : shortPath(p)
+  })
+}
+
+/** One step of Repair's report: its line in done, skipped or failed, and its row in the dialog's table (#1313). */
+function say(report: MoveReport, outcome: MoveReportRow['outcome'], line: string, row: Omit<MoveReportRow, 'outcome' | 'line'>): void {
+  report[outcome].push(line)
+  report.rows.push({ ...row, outcome, line })
+}
 
 /**
  * What Repair's report says of one CLI's copy for a moved folder, in the language shown when it is called (the owner
@@ -492,14 +539,13 @@ async function adoptSaved(ws: WorkspaceService, report: MoveReport): Promise<voi
     await adoptHandovers(ws)
     await adoptBenchmarkOwners(benchContext(ws))
   } catch (e) {
-    report.failed.push(
-      tr(msg({ id: 'main.move.adoptFailed', defaultMessage: "The handovers and kept comparisons saved under a project's earlier name couldn't all be given to it ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {why} is the system's message. Kept comparisons are benchmarks kept in Performance → Compare." }), { why: e instanceof Error ? e.message : String(e) })
-    )
+    const why = e instanceof Error ? e.message : String(e)
+    say(report, 'failed', tr(msg({ id: 'main.move.adoptFailed', defaultMessage: "The handovers and kept comparisons saved under a project's earlier name couldn't all be given to it ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {why} is the system's message. Kept comparisons are benchmarks kept in Performance → Compare." }), { why }), { what: { kind: 'saved' }, result: tr(R.failedWhy, { why }) })
   }
 }
 
 async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveReport> {
-  const report: MoveReport = { done: [], skipped: [], failed: [], complete: false }
+  const report: MoveReport = { done: [], skipped: [], failed: [], rows: [], complete: false }
   const plan = await movePlan(ws, opts)
   if (!plan || !moveHasWork(plan)) {
     // What a Repair before couldn't give its project (#514): tried again, and it isn't done until that is.
@@ -525,11 +571,23 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       for (const w of fix) {
         const ok = listed.some((l) => samePlace(l.path, w.to!)) && (await linked(h.path, w.to!))
         if (!ok) {
-          report.failed.push(
+          const why = r.ok ? '' : (r.err || tr(msg({ id: 'main.move.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it." }), { command: 'git worktree repair' })).trim() // i18n-ignore: a git command's name
+          say(
+            report,
+            'failed',
             r.ok
               ? tr(msg({ id: 'main.move.notRepaired', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree." }), { host: h.name, agent: w.agentName, path: w.to! })
-              : tr(msg({ id: 'main.move.notRepairedWhy', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {why} git's message." }), { host: h.name, agent: w.agentName, path: w.to!, why: (r.err || tr(msg({ id: 'main.move.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it." }), { command: 'git worktree repair' })).trim() }) // i18n-ignore: a git command's name
+              : tr(msg({ id: 'main.move.notRepairedWhy', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {why} git's message." }), { host: h.name, agent: w.agentName, path: w.to!, why }),
+            { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.notRepaired, { hasWhy: why ? 'yes' : 'no', why }) }
           )
+          continue
+        }
+        // Its cards' work follows it first (#1343), so a Repair cut short before the record below writes it again.
+        try {
+          await moveCardFolders(h.path, w.from, w.to!)
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e)
+          say(report, 'failed', tr(msg({ id: 'main.move.cardsNotMoved', defaultMessage: "{host}: the cards {agent} works on couldn't be told its worktree is now at {path} ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder: the board's record of the cards worked on in an agent's worktree couldn't be updated to its new place. {host} is the project; {agent} an agent; {path} the worktree's new folder; {why} the system's message." }), { host: h.name, agent: w.agentName, path: w.to!, why }), { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.failedWhy, { why }) })
           continue
         }
         // The new path, and the move its data follows until that is copied, in one locked change.
@@ -538,10 +596,13 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           agents: projectAgents(cfg).map((a) => (a.id === w.agentId && a.worktree ? { ...a, worktree: { ...a.worktree, path: w.to! } } : a)),
           ...(samePath(w.from, w.to!) ? {} : { pendingCopies: withPending(cfg.pendingCopies, m) })
         }))
-        report.done.push(
+        say(
+          report,
+          'done',
           samePath(w.from, w.to!)
             ? tr(msg({ id: 'main.move.relinked', defaultMessage: "{host}: {agent}'s worktree at {path} is linked to the project again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree." }), { host: h.name, agent: w.agentName, path: w.to! })
-            : tr(msg({ id: 'main.move.movedTo', defaultMessage: "{host}: {agent}'s worktree is now at {path}.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is where the worktree is now." }), { host: h.name, agent: w.agentName, path: w.to! })
+            : tr(msg({ id: 'main.move.movedTo', defaultMessage: "{host}: {agent}'s worktree is now at {path}.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is where the worktree is now." }), { host: h.name, agent: w.agentName, path: w.to! }),
+          { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.linked) }
         )
       }
     }
@@ -552,33 +613,49 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         // Its new path and the move its sessions and data follow are written together (in recreateWorktree).
         const def = await recreateWorktree(h.path, w.agentId, { prefer: w.to ?? undefined, alsoRecreating: remake.map((x) => x.from) })
         const to = def.worktree!.path
-        report.done.push(
+        say(
+          report,
+          'done',
           w.branchExists
             ? tr(msg({ id: 'main.move.recreated', defaultMessage: "{host}: {agent}'s worktree was recreated on its branch {branch}, at {path}.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {branch} is its branch, {path} the new worktree." }), { host: h.name, agent: w.agentName, branch: w.branch ?? '', path: to })
-            : tr(msg({ id: 'main.move.madeNew', defaultMessage: "{host}: {agent}'s worktree was made new on {branch} (its branch was gone), at {path}.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {branch} is the new branch, {path} the new worktree." }), { host: h.name, agent: w.agentName, branch: w.branch ?? '', path: to })
+            : tr(msg({ id: 'main.move.madeNew', defaultMessage: "{host}: {agent}'s worktree was made new on {branch} (its branch was gone), at {path}.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {branch} is the new branch, {path} the new worktree." }), { host: h.name, agent: w.agentName, branch: w.branch ?? '', path: to }),
+          { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: to, result: tr(R.recreated, { made: w.branchExists ? 'again' : 'new' }) }
         )
       } catch (e) {
         const why = e instanceof Error ? e.message : String(e)
-        report.failed.push(
+        say(
+          report,
+          'failed',
           w.branchExists
             ? tr(msg({ id: 'main.move.recreateFailed', defaultMessage: "{host}: {agent}'s worktree couldn't be recreated: {why}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {why} says why." }), { host: h.name, agent: w.agentName, why })
-            : tr(msg({ id: 'main.move.makeNewFailed', defaultMessage: "{host}: {agent}'s worktree couldn't be made new: {why}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {why} says why." }), { host: h.name, agent: w.agentName, why })
+            : tr(msg({ id: 'main.move.makeNewFailed', defaultMessage: "{host}: {agent}'s worktree couldn't be made new: {why}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {why} says why." }), { host: h.name, agent: w.agentName, why }),
+          {
+            host: h.name,
+            what: { kind: 'worktree', agent: w.agentName },
+            was: w.from,
+            // Git's clean-up would forget the worktrees git names (not the plan's missing ones: git's list may differ),
+            // each by its agent or folder here, the full paths in the line.
+            result: e instanceof PruneBlocked ? tr(R.pruneBlocked, { n: e.blockers.length, worktrees: fmt.list(blockerNames(e.blockers, h.worktrees), 'unit') }) : tr(R.recreateFailed, { made: w.branchExists ? 'again' : 'new', why })
+          }
         )
       }
     }
     for (const w of h.worktrees) {
       if (w.how === 'unlink') {
         await ws.mutateProjectConfig(h.path, (cfg) => ({ agents: projectAgents(cfg).map((a) => (a.id === w.agentId ? { ...a, worktree: undefined } : a)) }))
-        report.done.push(tr(msg({ id: 'main.move.unlinked', defaultMessage: '{host}: {agent} no longer has a worktree (its folder {path} was left as it was).', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the old worktree." }), { host: h.name, agent: w.agentName, path: w.from }))
+        say(report, 'done', tr(msg({ id: 'main.move.unlinked', defaultMessage: '{host}: {agent} no longer has a worktree (its folder {path} was left as it was).', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the old worktree." }), { host: h.name, agent: w.agentName, path: w.from }), { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, result: tr(R.unlinked) })
       } else if (w.how === 'missing') {
         open = true
-        report.skipped.push(
+        say(
+          report,
+          'skipped',
           w.branchExists
             ? tr(msg({ id: 'main.move.missing', defaultMessage: "{host}: {agent}'s worktree wasn't found (it was at {path}). Recreate it on its branch, locate it, or remove the agent's worktree link.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is where it was. Its branch is still there." }), { host: h.name, agent: w.agentName, path: w.from })
-            : tr(msg({ id: 'main.move.missingNoBranch', defaultMessage: "{host}: {agent}'s worktree wasn't found (it was at {path}). Create a new worktree, locate it, or remove the agent's worktree link.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is where it was. Its branch has gone too." }), { host: h.name, agent: w.agentName, path: w.from })
+            : tr(msg({ id: 'main.move.missingNoBranch', defaultMessage: "{host}: {agent}'s worktree wasn't found (it was at {path}). Create a new worktree, locate it, or remove the agent's worktree link.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is where it was. Its branch has gone too." }), { host: h.name, agent: w.agentName, path: w.from }),
+          { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, result: tr(R.missing, { gone: w.branchExists ? 'no' : 'yes' }) }
         )
       } else if (w.how === 'original') {
-        report.skipped.push(tr(msg({ id: 'main.move.original', defaultMessage: "{host}: {agent}'s worktree at {path} stays linked to the project at {project}, which is still there.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {project} the project folder it was made from (a copy was moved, not that one)." }), { host: h.name, agent: w.agentName, path: w.from, project: h.from }))
+        say(report, 'skipped', tr(msg({ id: 'main.move.original', defaultMessage: "{host}: {agent}'s worktree at {path} stays linked to the project at {project}, which is still there.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {project} the project folder it was made from (a copy was moved, not that one)." }), { host: h.name, agent: w.agentName, path: w.from, project: h.from }), { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, result: tr(R.original) })
       }
     }
     // Branches named after the old place (#1305): one operation a failure part way never leaves half done. The rename
@@ -586,14 +663,17 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     // that has it out); then each card whose work is on that line follows it (LineRenamed); then the agent's record,
     // the rename dropped from the list. Cut short anywhere, the next Repair finishes it from there (branchesOf).
     for (const b of h.branches ?? []) {
-      if (b.kept) report.skipped.push(tr(msg({ id: 'main.move.branchTaken', defaultMessage: "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }))
+      if (b.kept) say(report, 'skipped', tr(msg({ id: 'main.move.branchTaken', defaultMessage: "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }), { host: h.name, what: { kind: 'branch', agent: b.agentName }, was: b.from, now: b.from, names: true, result: tr(R.taken) })
     }
     const renames = (h.branches ?? []).filter((b) => !b.kept)
     // No reconciliation reads a line while it is renamed: runs under way finish first, and new ones wait (repairingMove).
     if (renames.length) await reconcilersIdle(ws)
     for (const b of renames) {
+      // Now is the branch as it is after this step (#1313 round 2): its old name until git's rename is done, the new one
+      // after, none once it's gone; the name it was to have is in the row's full line.
+      const branchRow = { host: h.name, what: { kind: 'branch', agent: b.agentName }, was: b.from, names: true } as const
       const failed = (why: string): void => {
-        report.failed.push(tr(msg({ id: 'main.move.branchFailed', defaultMessage: "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, why }))
+        say(report, 'failed', tr(msg({ id: 'main.move.branchFailed', defaultMessage: "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, why }), { ...branchRow, now: b.from, result: tr(R.renameFailed, { why }) })
       }
       const whyOf = (e: unknown): string => (e instanceof Error ? e.message : String(e))
       try {
@@ -622,7 +702,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       } else if (!has(b.to)) {
         // Neither name is a branch any more (deleted meanwhile): nothing to rename, and nothing left to finish.
         await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingBranchRenames: dropRename(cfg.pendingBranchRenames, b.agentId) })).catch((e) => log.warn('dropping a branch rename', e))
-        report.skipped.push(tr(msg({ id: 'main.move.branchGone', defaultMessage: "{host}: {agent}'s branch {from} is gone, so it isn't renamed.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name." }), { host: h.name, agent: b.agentName, from: b.from }))
+        say(report, 'skipped', tr(msg({ id: 'main.move.branchGone', defaultMessage: "{host}: {agent}'s branch {from} is gone, so it isn't renamed.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name." }), { host: h.name, agent: b.agentName, from: b.from }), { ...branchRow, result: tr(R.gone) })
         continue
       }
       try {
@@ -635,13 +715,16 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})
         }))
       } catch (e) {
-        report.failed.push(tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: {agent}'s branch is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }))
+        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: {agent}'s branch is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
         continue
       }
-      report.done.push(
+      say(
+        report,
+        'done',
         b.remote
           ? tr(msg({ id: 'main.move.branchRenamedRemote', defaultMessage: "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, remote: b.remote })
-          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: "{host}: {agent}'s branch {from} is now {to}.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to })
+          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: "{host}: {agent}'s branch {from} is now {to}.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }),
+        { ...branchRow, now: b.to, result: tr(R.renamed, { remote: b.remote ?? 'none' }) }
       )
     }
     // Sessions and the CLIs' per-path data follow the project and the worktrees now at new places: those are kept in
@@ -652,10 +735,11 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     let sessionsOk = true
     try {
       const n = await sessionCwds(ws, h.path, moves, true)
-      if (n) report.done.push(tr(msg({ id: 'main.move.sessions', defaultMessage: '{n, plural, one {{host}: # session now points to the new folder.} other {{host}: # sessions now point to the new folder.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many sessions." }), { host: h.name, n }))
+      if (n) say(report, 'done', tr(msg({ id: 'main.move.sessions', defaultMessage: '{n, plural, one {{host}: # session now points to the new folder.} other {{host}: # sessions now point to the new folder.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many sessions." }), { host: h.name, n }), { host: h.name, what: { kind: 'sessions' }, was: h.from, now: h.folder, result: tr(R.sessions, { n }) })
     } catch (e) {
       sessionsOk = false
-      report.failed.push(tr(msg({ id: 'main.move.sessionsFailed', defaultMessage: "{host}: the sessions' folders couldn't be updated ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {why} is the system's message." }), { host: h.name, why: e instanceof Error ? e.message : String(e) }))
+      const why = e instanceof Error ? e.message : String(e)
+      say(report, 'failed', tr(msg({ id: 'main.move.sessionsFailed', defaultMessage: "{host}: the sessions' folders couldn't be updated ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {why} is the system's message." }), { host: h.name, why }), { host: h.name, what: { kind: 'sessions' }, was: h.from, result: tr(R.failedWhy, { why }) })
     }
     // Copied, never moved; the old folders stay.
     for (const m of moves) {
@@ -663,9 +747,11 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       for (const f of results) {
         const who = allProviders().find((p) => p.id === f.provider)?.descriptor.name ?? f.provider
         const said = copyReport(h.name, f, who)
-        report.done.push(...said.done)
-        report.skipped.push(...said.skipped)
-        report.failed.push(...said.failed)
+        // Where the folder moved from and to (whose it is), not the CLI's own folders for them: the line names those.
+        const row = { host: h.name, what: { kind: 'copy', provider: f.provider }, was: m.from, now: m.to } as const
+        for (const line of said.done) say(report, 'done', line, { ...row, result: tr(R.copied, { n: f.copy }) })
+        for (const line of said.skipped) say(report, 'skipped', line, { ...row, result: tr(R.copyKept, { n: f.kept.length }) })
+        for (const line of said.failed) say(report, 'failed', line, { ...row, result: tr(R.copyFailed, { n: f.failed?.length ?? 0 }) })
       }
       if (sessionsOk && pending.some((x) => samePath(x.from, m.from) && samePath(x.to, m.to)) && !results.some((f) => f.failed?.length)) await donePending(ws, h.path, m)
     }
@@ -680,10 +766,14 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       // projects' names, after a restart too), once the cards that told it are moved.
       const id = ws.projectIdsNow().byPath.get(join(ws.path!, m.to).toLowerCase())
       if (id) await noteFormerName(ws, id, m.from)
+      const board = { what: { kind: 'board', from: m.from } } as const
       const n = m.cards.length ? await moveOrphanCards(ws, m) : 0
       if (n)
-        report.done.push(
-          tr(msg({ id: 'main.move.cards', defaultMessage: '{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {n} is how many cards." }), { n, from: m.from, to: m.to })
+        say(
+          report,
+          'done',
+          tr(msg({ id: 'main.move.cards', defaultMessage: '{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {n} is how many cards." }), { n, from: m.from, to: m.to }),
+          { ...board, result: tr(R.given, { to: m.to, what: tr(R.cards, { n }) }) }
         )
       const lanes = m.lanes ? await moveOrphanLanes(ws, m) : 0
       const watches = m.watches ? await moveOrphanWatches(ws, m) : 0
@@ -692,11 +782,15 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         ...(watches ? [tr(msg({ id: 'main.move.watches', defaultMessage: '{n, plural, one {# card watch} other {# card watches}}', description: "Agents' card watches that went to a project, in a list (main.move.alsoMoved). {n} is how many." }), { n: watches })] : [])
       ]
       if (also.length)
-        report.done.push(
-          tr(msg({ id: 'main.move.alsoMoved', defaultMessage: "{n, plural, one {{things} of {from} now is {to}'s.} other {{things} of {from} now are {to}'s.}}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {things} lists the lanes and card watches (main.move.lanes, main.move.watches); {n} is how many in all." }), { things: fmt.list(also), from: m.from, to: m.to, n: lanes + watches })
+        say(
+          report,
+          'done',
+          tr(msg({ id: 'main.move.alsoMoved', defaultMessage: "{n, plural, one {{things} of {from} now is {to}'s.} other {{things} of {from} now are {to}'s.}}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {things} lists the lanes and card watches (main.move.lanes, main.move.watches); {n} is how many in all." }), { things: fmt.list(also), from: m.from, to: m.to, n: lanes + watches }),
+          { ...board, result: tr(R.given, { to: m.to, what: fmt.list(also) }) }
         )
     } catch (e) {
-      report.failed.push(tr(msg({ id: 'main.move.savedFailed', defaultMessage: "What was saved under {from} couldn't all be given to {to} ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {from} is a project's old name, {to} the project, {why} the system's message." }), { from: m.from, to: m.to, why: e instanceof Error ? e.message : String(e) }))
+      const why = e instanceof Error ? e.message : String(e)
+      say(report, 'failed', tr(msg({ id: 'main.move.savedFailed', defaultMessage: "What was saved under {from} couldn't all be given to {to} ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {from} is a project's old name, {to} the project, {why} the system's message." }), { from: m.from, to: m.to, why }), { what: { kind: 'board', from: m.from }, result: tr(R.notGiven, { to: m.to, why }) })
     }
   }
   if (plan.cards?.length) await stampCardProjects(ws).catch((e) => log.warn("giving the cards their projects' ids", e))
@@ -711,7 +805,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         c.activeProjects[k] = [...new Set(list.map((n) => marked.find((h) => basename(h.from).toLowerCase() === n.toLowerCase())?.name ?? n))]
       }
     })
-    report.done.push(tr(msg({ id: 'main.move.workingRenamed', defaultMessage: '{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many." }), { projects: trimList(marked.map((h) => h.name)), n: marked.length }))
+    say(report, 'done', tr(msg({ id: 'main.move.workingRenamed', defaultMessage: '{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many." }), { projects: trimList(marked.map((h) => h.name)), n: marked.length }), { what: { kind: 'working' }, result: tr(R.working, { projects: trimList(marked.map((h) => h.name)) }) })
   }
   if (plan.recent && plan.from) {
     const from = plan.from
@@ -720,13 +814,24 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       c.recentWorkspaces = rest.some((p) => samePath(p, plan.to)) ? rest : [plan.to, ...rest]
     })
     recentChanged()
-    report.done.push(tr(msg({ id: 'main.move.recent', defaultMessage: 'Open Recent lists {to} instead of {from}.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). Open Recent is a menu (File → Open Recent): use its name as shown. {to} is the workspace folder now, {from} where it was." }), { to: plan.to, from }))
+    say(report, 'done', tr(msg({ id: 'main.move.recent', defaultMessage: 'Open Recent lists {to} instead of {from}.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). Open Recent is a menu (File → Open Recent): use its name as shown. {to} is the workspace folder now, {from} where it was." }), { to: plan.to, from }), { what: { kind: 'recent' }, was: from, now: plan.to, result: tr(R.recent) })
   }
   if (plan.working.length) {
     config.update((c) => {
       c.activeProjects[plan.to] = [...new Set([...(c.activeProjects[plan.to] ?? []), ...plan.working])]
     })
-    report.done.push(tr(msg({ id: 'main.move.workingMoved', defaultMessage: 'Working on: {projects}, as before the move.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): the projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them." }), { projects: trimList(plan.working) }))
+    say(report, 'done', tr(msg({ id: 'main.move.workingMoved', defaultMessage: 'Working on: {projects}, as before the move.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): the projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them." }), { projects: trimList(plan.working) }), { what: { kind: 'working' }, result: tr(R.working, { projects: trimList(plan.working) }) })
+  }
+  // Hive's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
+  // is done; only when the dialog's box asked for it. A declined prompt changes nothing and is said; a refusal too.
+  if (opts.defender && plan.from) {
+    try {
+      const r = await moveExclusions(ws, plan.from)
+      if (r) say(report, r.outcome === 'done' ? 'done' : r.outcome === 'refused' ? 'skipped' : 'failed', r.message, { what: { kind: 'defender' }, result: r.message })
+    } catch (e) {
+      const why = e instanceof Error ? e.message : String(e)
+      say(report, 'failed', tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Hive's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why }), { what: { kind: 'defender' }, result: tr(R.failedWhy, { why }) })
+    }
   }
   await recordDone(ws, repaired, repaired.length === plan.hosts.length)
   const after = await movePlan(ws)

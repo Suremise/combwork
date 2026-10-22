@@ -25,7 +25,7 @@ import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, createBranch, createTag, fetchAll, pull, push, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, switchBranch } from './gitRepo'
+import { addRemote, createBranch, createTag, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -76,7 +76,7 @@ import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
 import * as skills from './skills'
 import * as storage from './storage'
-import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, prepareAntivirus } from './antivirus'
+import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
@@ -102,6 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -284,7 +285,7 @@ function moveOptions(o: unknown): MoveOptions {
   const list = (x: unknown): string[] | undefined => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : undefined)
   const unlink = list(v.unlink)
   const recreate = list(v.recreate)
-  return { ...(locate ? { locate } : {}), ...(unlink ? { unlink } : {}), ...(recreate ? { recreate } : {}) }
+  return { ...(locate ? { locate } : {}), ...(unlink ? { unlink } : {}), ...(recreate ? { recreate } : {}), ...(v.defender === true ? { defender: true } : {}) }
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
@@ -594,6 +595,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'workspace:movePlan': (opts) => movePlan(currentWorkspace(), moveOptions(opts)),
     'workspace:moveRepair': (opts) => repairMove(currentWorkspace(), moveOptions(opts)),
+    'workspace:moveDefender': async () => {
+      const w = currentWorkspace()
+      const from = (await movePlan(w))?.from
+      return from ? moveDefenderPlan(w, from) : null
+    },
     'workspace:moveLocate': async (projectPath, agentId) => {
       const agent = agentsOf(await workspace.projectConfig(workspace.assertProject(projectPath))).find((a) => a.id === agentId)
       const title = agent ? tr(M.locateWorktree, { agent: agent.name }) : tr(M.locateAgentWorktree)
@@ -729,6 +735,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
+    'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined),
+    'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
+    'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
+    'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     'project:excludeHive': async (p) => {
       p = workspace.assertProject(p)
       const r = await ensureHiveExcluded(p)
@@ -1245,6 +1256,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:fetch': (p) => fetchAll(p),
     'git:pull': (p) => pull(p),
     'git:push': (p, remote) => push(p, remote ? String(remote) : undefined),
+    'git:pushTo': (p, remote, scope, branch) => pushToRemote(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
+    'git:remoteTracking': (p, remote) => remoteTracking(p, String(remote ?? '')),
+    'git:removeRemote': (p, name, expected) => removeRemote(p, String(name ?? ''), Array.isArray(expected) ? expected.map(String) : undefined),
+    'git:renameRemote': (p, from, to) => renameRemote(p, String(from ?? ''), String(to ?? '')),
+    'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
     'git:createTag': (p, name, message, pushTo) => createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),
     'git:setIdentity': (p, name, email) => setIdentity(p, String(name ?? ''), String(email ?? '')),
     'git:initCheck': (p) => initCheck(p),
@@ -1329,4 +1345,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       }
     })
   }
+}
+
+/** A merge queue's target as the window names it (a branch): refused when it isn't one. */
+function queueTarget(target: unknown): string {
+  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new HiveError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+  return target
 }

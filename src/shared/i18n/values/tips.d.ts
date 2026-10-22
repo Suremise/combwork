@@ -150,6 +150,8 @@ interface HiveMessageValues {
   'tips.gitCheck.title': undefined
   'tips.gitInit.text': undefined
   'tips.gitInit.title': undefined
+  'tips.gitRemotes.text': undefined
+  'tips.gitRemotes.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
   'tips.gotoProject.text': { key: string | number }
@@ -166,6 +168,8 @@ interface HiveMessageValues {
   'tips.hardwareAcceleration.title': undefined
   'tips.hiveFolder.text': undefined
   'tips.hiveFolder.title': undefined
+  'tips.hiveMerges.text': undefined
+  'tips.hiveMerges.title': undefined
   'tips.hiveSkills.text': undefined
   'tips.hiveSkills.title': undefined
   'tips.hooksMissing.text': undefined
@@ -206,8 +210,12 @@ interface HiveMessageValues {
   'tips.mcpPerProject.title': undefined
   'tips.memorySnapshot.text': undefined
   'tips.memorySnapshot.title': undefined
+  'tips.mergeQueueFolder.text': undefined
+  'tips.mergeQueueFolder.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
+  'tips.mergeStrict.text': undefined
+  'tips.mergeStrict.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined
@@ -316,6 +324,8 @@ interface HiveMessageValues {
   'tips.storagePurge.title': undefined
   'tips.taskbarBadge.text': undefined
   'tips.taskbarBadge.title': undefined
+  'tips.teamPreset.text': undefined
+  'tips.teamPreset.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
   'tips.templateWorktrees.text': undefined
@@ -353,6 +363,8 @@ interface HiveMessageValues {
   'tips.workflowOptions.title': undefined
   'tips.workspaceMoved.text': undefined
   'tips.workspaceMoved.title': undefined
+  'tips.workspaceMovedDefender.text': undefined
+  'tips.workspaceMovedDefender.title': undefined
   'tips.worktreeReuse.text': undefined
   'tips.worktreeReuse.title': undefined
   'tips.worktrees.text': undefined

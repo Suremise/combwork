@@ -962,6 +962,15 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
   const loadingEarlier = useRef(false)
   /** Whether the view follows the end of the transcript. */
   const pinned = useRef(jump === null)
+  /**
+   * A jump placed the view (a search hit, a compaction): only the user's own scrolling follows the end again, not the
+   * scroll events of Hive's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
+   * the view again and the jump was scrolled away).
+   */
+  const placed = useRef(false)
+  const unplace = (): void => {
+    placed.current = false
+  }
   const followDefault = useStore((s) => s.settings?.sessions.followTranscripts ?? false)
   useDateStyle()
   // A running session is followed only when switched on (Follow), else it updates with Refresh.
@@ -1042,6 +1051,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
     }
     // Runs for a new jump, or once its items have loaded — not on every transcript update (it would scroll back).
     pinned.current = false
+    placed.current = true
     setExpanded((s) => new Set(s).add(jump.itemId))
     let frames = 0
     const go = (): void => {
@@ -1151,9 +1161,12 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
         ref={scroller}
         onScroll={(e) => {
           const el = e.currentTarget
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+          if (!placed.current) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
           if (el.scrollTop < 200) void loadEarlier()
         }}
+        onWheel={unplace}
+        onPointerDown={unplace}
+        onKeyDown={unplace}
       >
         {error ? (
           <div className="empty-state">{/no transcript/i.test(error) ? tr(NOTHING_SAID) : error}</div>

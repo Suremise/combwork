@@ -16,6 +16,8 @@ interface HiveMessageValues {
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
+  'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
+  'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
   'workflow.forYouKind': { kind: string }
@@ -95,7 +97,6 @@ interface HiveMessageValues {
   'workflow.move.startReview': undefined
   'workflow.move.submit': undefined
   'workflow.move.verdict': undefined
-  'workflow.notOffered.hiveMerges': undefined
   'workflow.notOffered.later': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
@@ -110,6 +111,10 @@ interface HiveMessageValues {
   'workflow.option.folder.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
+  'workflow.option.mergeChecks.desc': undefined
+  'workflow.option.mergeChecks.title': undefined
+  'workflow.option.mergeInstall.desc': undefined
+  'workflow.option.mergeInstall.title': undefined
   'workflow.option.noSelfReview.desc': undefined
   'workflow.option.noSelfReview.title': undefined
   'workflow.option.okBefore.desc': undefined
@@ -127,13 +132,15 @@ interface HiveMessageValues {
   'workflow.option.sharedFolderWarning.title': undefined
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
+  'workflow.option.strict.desc': undefined
+  'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
   'workflow.preset.custom': undefined
-  'workflow.preset.needs.hiveMerges': undefined
   'workflow.preset.needs.slots': undefined
+  'workflow.preset.note.team': undefined
   'workflow.preset.pair': undefined
   'workflow.preset.pairAgent': undefined
   'workflow.preset.solo': undefined
@@ -169,6 +176,18 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.roundLimit.message': { card: string | number }
   'workflow.refused.loop.roundLimit.next': undefined
+  'workflow.refused.merge.hiveMerges.change': undefined
+  'workflow.refused.merge.hiveMerges.message': { card: string | number }
+  'workflow.refused.merge.hiveMerges.next': undefined
+  'workflow.refused.merge.hiveMerges.nextMerged': undefined
+  'workflow.refused.merge.hiveMerges.nextPaused': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFix': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFolder': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedRules': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
+  'workflow.refused.merge.hiveMerges.nextReturned': undefined
+  'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined
@@ -182,6 +201,8 @@ interface HiveMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
+  'workflow.refused.queue.advancing.message': { card: string | number; target: string | number }
+  'workflow.refused.queue.advancing.next': { target: string | number }
   'workflow.refused.requeue.allowed.change': undefined
   'workflow.refused.requeue.allowed.message': { card: string | number; revision: string | number; why: string | number }
   'workflow.refused.requeue.allowed.next': undefined
@@ -297,6 +318,8 @@ interface HiveMessageValues {
   'workflow.value.finish.notChecked': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
+  'workflow.value.mergeInstall.always': undefined
+  'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined
   'workflow.value.okBefore.labels': undefined
   'workflow.value.okBefore.never': undefined

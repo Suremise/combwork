@@ -123,9 +123,16 @@ export interface PlatformAdapter {
    * line's refs, the card folder's own HEAD, its index, an operation under way and every tracked file and folder it
    * covers (the agent's own paths in a shared folder); None, its paths' hash. Read before the slow reads and again
    * inside the transaction: if it changed, or can't be read (null), the intent is refused, never written on stale
-   * evidence. `prime` does the slow part once per intent (the git folders, the tracked files) and hands it on.
+   * evidence. `prime` does the slow part once per intent (the git folders, the tracked files) and hands it on; for a
+   * start, `builder` (the agent it is started for) decides its target as the start's plan does (#1401).
    */
-  prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown>
+  prime(card: CardRecord, s: CardState, o: WorkflowOptions, builder?: string): Promise<unknown>
+  /**
+   * Whether a start's plan is on what `prime` covered (#1401): the plan resolves its target again after the evidence was
+   * taken, and a target that changed meanwhile (the builder worktree's base, say) isn't in the fingerprint. False: the
+   * start is refused as evidence that changed.
+   */
+  planCovered(primed: unknown, plan: StartPlan): boolean
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
   /**
    * The platform's own answer about the same evidence, by content (#1206), read with processes (never in the

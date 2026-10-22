@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
+import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { englishText, forAgents, withValues, type Text } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
@@ -1890,6 +1891,47 @@ async function endReviewsUnbatched(project: string, agentId: string, why: Review
   }
   if (out.length) changed(ws)
   return out
+}
+
+let amidRepair: (() => Promise<void> | void) | null = null
+/** For tests: awaited inside endReviewsWithoutSession, once it has listed the cards (the moment a test switches workspaces in). */
+export const setAmidRepairForTests = (fn: (() => Promise<void> | void) | null): void => {
+  amidRepair = fn
+}
+/**
+ * As a workspace opens (#1392): the reviews whose reviewer has no session running end, as its session's end would have
+ * ended them. An end that came as its window closed the workspace (or after) didn't reach its board, which is fenced
+ * then, so the card kept a reviewer that had gone. `live`: whether that agent of that project has a session now, asked
+ * again just before each card is changed, so a reviewer that started meanwhile keeps its review. Only for the workspace
+ * open as it is called: closed or switched meanwhile, it stops, and neither that board nor the next one is changed.
+ */
+export async function endReviewsWithoutSession(ws: WorkspaceService, live: (project: string, agentId: string) => boolean): Promise<number[]> {
+  const path = ws.path
+  const life = ws.lifetime
+  if (!path) return []
+  const alive = (): boolean => !life.aborted && ws.path === path
+  return boardWrite(ws, async () => {
+    const gone = (await allTasks(ws, { archived: false })).filter((c) => c.review && c.review.agent !== ASSISTANT_AGENT_ID && !live(c.project, c.review.agent))
+    await amidRepair?.()
+    const out: number[] = []
+    for (const c of gone) {
+      if (!alive()) break
+      const ended = await (async () => {
+        const card = await getTask(c.number, ws)
+        if (!alive() || !card.review || card.review.agent !== c.review!.agent || live(c.project, card.review.agent)) return false
+        note(card, BY.hive, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END['its session ended'] }))
+        delete card.review
+        await saveCard(ws, c.number, card)
+        return true
+      })().catch((e) => {
+        log.warn(`Could not end the review of #${c.number}`, e)
+        return false
+      })
+      if (ended) out.push(c.number)
+    }
+    if (out.length) changed(ws)
+    return out
+  }, { alive })
 }
 
 /**

@@ -6,7 +6,7 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { moneyLabel } from '@shared/usageTotals'
 import { formatDateTime } from '@shared/dates'
 import { call } from '../api'
-import { Icon, IconButton, InfoTip, LoadFailed, Tooltip, sentences } from '../components/ui'
+import { CodeText, Icon, IconButton, InfoTip, LoadFailed, Tooltip, sentences } from '../components/ui'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { confirm, notify, prompt, useLanguage } from '../store'
 import { useScopedLoad } from '../scopedLoad'
@@ -287,7 +287,9 @@ export function ComparePanel({ workspacePath, scope, query, keeps }: { workspace
         <div className="empty-state perf-empty">
           <Icon name="git-compare" />
           {entries.length ? tr(M.oneMore) : tr(M.nothingYet)}
-          <span className="hint">{tr(M.emptyHint, { scope: scope.kind === 'project' || scope.own ? 'other' : 'workspace' })}</span>
+          <span className="hint">
+            <CodeText text={tr(M.emptyHint, { scope: scope.kind === 'project' || scope.own ? 'other' : 'workspace' })} />
+          </span>
         </div>
       )}
       {base && run && base === run && <p className="hint">{tr(M.sameFile)}</p>}

@@ -9,7 +9,7 @@ import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
 import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
-import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
 import { testedNote, testedSummary } from '@shared/testedClis'
@@ -21,7 +21,7 @@ import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
-import { BusyButton, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
+import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
 
 const LEVEL_ICON = { info: 'info', success: 'pass', warning: 'warning', error: 'error' } as const
 
@@ -732,12 +732,6 @@ function installNotFoundText(name: string): string {
   return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Agent Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
 }
 
-/** Text with `code` and **bold** spans, as provider notes are written. */
-function CodeText({ text }: { text: string }) {
-  const code = (s: string, k: number) => s.split('`').map((part, i) => (i % 2 ? <code key={`${k}.${i}`}>{part}</code> : <span key={`${k}.${i}`}>{part}</span>))
-  return <>{text.split('**').map((part, k) => (k % 2 ? <strong key={k}>{code(part, k)}</strong> : code(part, k)))}</>
-}
-
 /**
  * Git, under every provider's tab (#346): worktrees, merging, the Changes tab and the unmerged counts need it, whichever
  * CLI runs. Check again looks at it too.
@@ -997,19 +991,19 @@ export function AgentSetupDialog() {
           {info.editorExtensionOnly && p.extensionNote && (
             <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
               <Icon name="info" />
-              <span>{p.extensionNote}</span>
+              <span>{shownText(p.extensionNote, p.text?.extensionNote, tr)}</span>
             </div>
           )}
           {p.installNote && (
-            <p className="hint">
-              <CodeText text={p.installNote} />
+            <p className="hint" data-install-note>
+              <CodeText text={shownText(p.installNote, p.text?.installNote, tr)} />
             </p>
           )}
         </>
       )}
       {!!info?.rejected?.length && (
         <p className="hint setup-wrap">
-          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <code key="path">{info.rejected[0]}</code> })}
+          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
         </p>
       )}
       <GitSetupRow />

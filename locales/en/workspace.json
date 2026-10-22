@@ -183,6 +183,14 @@
     "defaultMessage": "Folder",
     "description": "Settings → Workspace's antivirus table: a column."
   },
+  "workspace.antivirus.goneHint": {
+    "defaultMessage": "{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}",
+    "description": "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown."
+  },
+  "workspace.antivirus.goneTitle": {
+    "defaultMessage": "Hive’s exclusions of folders that are gone",
+    "description": "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)."
+  },
   "workspace.antivirus.hidden": {
     "defaultMessage": "Defender shows its exclusions only to administrators, so Hive can’t see them without asking.",
     "description": "Settings → Workspace's antivirus: why the states are unknown."
@@ -210,6 +218,14 @@
   "workspace.antivirus.loadTarget": {
     "defaultMessage": "the antivirus status",
     "description": "What could not be loaded: shown in \"Could not load {what}: {error}\", with Retry."
+  },
+  "workspace.antivirus.moveNotApplied": {
+    "defaultMessage": "Defender accepted the change but {missing, plural, one {one folder isn't} other {# folders aren't}} as asked: your organisation's settings probably override local exclusions.",
+    "description": "After Repair moved Hive's Defender exclusions (#1302), when Defender doesn't show the change for some folders (an old one still listed, or a new one missing)."
+  },
+  "workspace.antivirus.moved": {
+    "defaultMessage": "Moved Hive's exclusions to the new folders: {removed, plural, =0 {none removed} one {# removed} other {# removed}}, {added, plural, =0 {none added (Defender already skips them)} one {# added} other {# added}}.",
+    "description": "After Repair moved Hive's Defender exclusions from a moved workspace's old folders to its new ones (#1302): how many old ones were removed and new ones added."
   },
   "workspace.antivirus.noPrompt": {
     "defaultMessage": "Windows couldn't start the administrator prompt{hasError, select, yes {: {error}} other {.}}",
@@ -415,13 +431,17 @@
     "defaultMessage": "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).",
     "description": "The Changes tab, over the project folder's changes."
   },
-  "workspace.changes.aboutUnused": {
-    "defaultMessage": "Worktrees no agent of {project} works in: kept when their agent was removed, or made outside Hive (by an agent's own git worktree add, say). Open one to see its changes and merge them, or give it to an agent.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
-    "description": "The Changes tab's Unused worktrees page, at the top. Keep git worktree add as it is; {into} is the main branch."
-  },
   "workspace.changes.aboutUnusedOne": {
     "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to give it to an agent or remove it.",
     "description": "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name."
+  },
+  "workspace.changes.aboutUnusedShort": {
+    "defaultMessage": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or give it to an agent.",
+    "description": "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)."
+  },
+  "workspace.changes.aboutUnusedTip": {
+    "defaultMessage": "Kept when their agent was removed, made outside Hive (by an agent's own git worktree add, say), or from another template (loading that template gives them back to its agents).{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
+    "description": "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch."
   },
   "workspace.docs.about": {
     "defaultMessage": "About {app}",
@@ -1067,9 +1087,21 @@
     "defaultMessage": "Cancel",
     "description": "Remove Project's button that closes it."
   },
-  "workspace.removal.cards": {
-    "defaultMessage": "{count, plural, one {# card} other {# cards}} on the board{archived, plural, =0 {} other { (and # archived)}}: {how, select, delete {deleted.} remove {archived, and a copy packed into the folder.} other {archived until you restore it.}}",
-    "description": "Remove Project, what it touches: the project's cards, for the choice made."
+  "workspace.removal.cardsHow": {
+    "defaultMessage": "{how, select, delete {deleted} remove {archived, and a copy packed into the folder} other {archived until you restore it}}",
+    "description": "Remove Project, What it touches, What happens to the project's cards, for the choice made."
+  },
+  "workspace.removal.cardsThing": {
+    "defaultMessage": "{count, plural, =0 {No cards} one {# card} other {# cards}}{archived, plural, =0 {} other { (and # archived)}}",
+    "description": "Remove Project, What it touches, the What column: the project's cards on the board, and its archived ones."
+  },
+  "workspace.removal.colHappens": {
+    "defaultMessage": "What happens",
+    "description": "Remove Project's What it touches table, a column: what the choice made does to each."
+  },
+  "workspace.removal.colWhat": {
+    "defaultMessage": "What",
+    "description": "Remove Project's What it touches table (#1316), a column: the project's things (its folder, handovers, cards…)."
   },
   "workspace.removal.delete": {
     "defaultMessage": "Delete",
@@ -1099,13 +1131,17 @@
     "defaultMessage": "Files of this project have unsaved edits in Hive. They are lost.",
     "description": "Remove Project, before Delete."
   },
-  "workspace.removal.folder": {
-    "defaultMessage": "The folder {path}: {how, select, delete {to the Recycle Bin.} remove {stays where it is.} other {stays, hidden from Hive.}}",
-    "description": "Remove Project, what it touches: the project folder, for the choice made."
-  },
   "workspace.removal.folderGone": {
     "defaultMessage": "The folder is no longer in the workspace.",
     "description": "Under a hidden project whose folder is gone."
+  },
+  "workspace.removal.folderHow": {
+    "defaultMessage": "{how, select, delete {to the Recycle Bin} remove {stays where it is} other {stays, hidden from Hive}}",
+    "description": "Remove Project, What it touches, What happens to the project folder, for the choice made."
+  },
+  "workspace.removal.folderThing": {
+    "defaultMessage": "Folder",
+    "description": "Remove Project, What it touches, the What column: the project's folder (its name follows; the full path on hover)."
   },
   "workspace.removal.forget": {
     "defaultMessage": "Forget",
@@ -1115,9 +1151,13 @@
     "defaultMessage": "Could not forget {name}",
     "description": "An error notice."
   },
-  "workspace.removal.handovers": {
-    "defaultMessage": "{count, plural, one {# handover} other {# handovers}} in the shared notes: {how, select, hide {left where they are.} remove {packed into the folder, then moved to the Recycle Bin.} other {to the Recycle Bin.}}",
-    "description": "Remove Project, what it touches: the project's handovers, for the choice made."
+  "workspace.removal.handoversHow": {
+    "defaultMessage": "{how, select, hide {left in the shared notes} remove {packed into the folder, then moved to the Recycle Bin} other {to the Recycle Bin}}",
+    "description": "Remove Project, What it touches, What happens to the project's handovers, for the choice made."
+  },
+  "workspace.removal.handoversThing": {
+    "defaultMessage": "{count, plural, =0 {No handovers} one {# handover} other {# handovers}}",
+    "description": "Remove Project, What it touches, the What column: the project's handovers in the shared notes."
   },
   "workspace.removal.hiddenDone": {
     "defaultMessage": "{name} is hidden",
@@ -1158,14 +1198,6 @@
   "workspace.removal.modeRemoved": {
     "defaultMessage": "Removed from Hive",
     "description": "A project removed from Hive, in Settings → Workspace."
-  },
-  "workspace.removal.noCards": {
-    "defaultMessage": "No cards on the board.",
-    "description": "Remove Project, what it touches."
-  },
-  "workspace.removal.noHandovers": {
-    "defaultMessage": "No handovers in the shared notes.",
-    "description": "Remove Project, what it touches."
   },
   "workspace.removal.noWorkspace": {
     "defaultMessage": "Open a workspace to see its hidden projects.",
@@ -1219,9 +1251,13 @@
     "defaultMessage": "{project}: {what} restored",
     "description": "A notice: the folder's packed handovers and cards are back ({what}: \"2 handovers and 3 board cards\")."
   },
-  "workspace.removal.running": {
-    "defaultMessage": "{count, plural, one {# running agent} other {# running agents}}: stopped first (their conversations are kept).",
-    "description": "Remove Project, what it touches."
+  "workspace.removal.runningAgents": {
+    "defaultMessage": "{count, plural, one {# running agent} other {# running agents}}",
+    "description": "Remove Project, What it touches, the What column: the running agents."
+  },
+  "workspace.removal.runningHow": {
+    "defaultMessage": "stopped first; their conversations are kept",
+    "description": "Remove Project, What it touches, What happens to the running agents."
   },
   "workspace.removal.title": {
     "defaultMessage": "Remove {name}",
@@ -1231,9 +1267,13 @@
     "defaultMessage": "What it touches",
     "description": "Remove Project: the heading over what the choice does to the project's things."
   },
-  "workspace.removal.transcripts": {
-    "defaultMessage": "The coding agents' own transcripts (in ~/.claude and ~/.codex) are left alone.",
-    "description": "Remove Project, what it touches. Keep the paths as they are."
+  "workspace.removal.transcriptsHow": {
+    "defaultMessage": "left alone (in ~/.claude and ~/.codex)",
+    "description": "Remove Project, What it touches, What happens to the coding agents' own transcripts. Keep the paths as they are."
+  },
+  "workspace.removal.transcriptsThing": {
+    "defaultMessage": "Coding agents' transcripts",
+    "description": "Remove Project, What it touches, the What column: the coding agents' own conversation files."
   },
   "workspace.removal.typeName": {
     "defaultMessage": "Type <b>{name}</b> to delete it.",
@@ -1251,13 +1291,25 @@
     "defaultMessage": "With {which, select, both {{handovers, plural, one {# handover} other {# handovers}} and {cards, plural, one {# card} other {# cards}}} handovers {{handovers, plural, one {# handover} other {# handovers}}} other {{cards, plural, one {# card} other {# cards}}}}.",
     "description": "Under {name} is back: the handovers and cards that came back with it."
   },
-  "workspace.removal.worktree": {
-    "defaultMessage": "{agent} ({branch}){hasError, select, yes {: {error}} other {}}{ahead, plural, =0 {} one {: # commit not merged} other {: # commits not merged}}{dirty, plural, =0 {} other {{ahead, plural, =0 {:} other {,}} {dirty, plural, one {# uncommitted file} other {# uncommitted files}}}}",
-    "description": "Remove Project: an agent's worktree, and what in it isn't merged."
+  "workspace.removal.worktreeThing": {
+    "defaultMessage": "{agent} ({branch})",
+    "description": "Remove Project, What it touches: an agent's worktree, by the agent ({agent}) and its branch ({branch}), under the worktrees' row."
   },
-  "workspace.removal.worktrees": {
-    "defaultMessage": "{count, plural, one {# worktree} other {# worktrees}}: {how, select, hide {left as they are.} remove {removed with their branches, once nothing in them is unmerged.} other {to the Recycle Bin.}}",
-    "description": "Remove Project, what it touches: the agents' worktrees (each follows), for the choice made."
+  "workspace.removal.worktreeWork": {
+    "defaultMessage": "{hasError, select, yes {{error}} other {{ahead, plural, =0 {{dirty, plural, =0 {nothing unmerged} one {# uncommitted file} other {# uncommitted files}}} one {# commit not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}} other {# commits not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}}}}}",
+    "description": "Remove Project, What it touches: what in an agent's worktree isn't merged ({error}: why git couldn't check it)."
+  },
+  "workspace.removal.worktreesHow": {
+    "defaultMessage": "{how, select, hide {left as they are} remove {removed with their branches, once nothing in them is unmerged} other {to the Recycle Bin}}",
+    "description": "Remove Project, What it touches, What happens to the agents' worktrees, for the choice made."
+  },
+  "workspace.removal.worktreesThing": {
+    "defaultMessage": "{count, plural, one {# worktree} other {# worktrees}}",
+    "description": "Remove Project, What it touches, the What column: the agents' worktrees (each on a row under it)."
+  },
+  "workspace.repair.addLater": {
+    "defaultMessage": "Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.",
+    "description": "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown."
   },
   "workspace.repair.board": {
     "defaultMessage": "Board: {from}",
@@ -1287,6 +1339,10 @@
     "defaultMessage": "Create",
     "description": "Repair's plan, a missing worktree's compact button when its branch is gone too (its tooltip: workspace.move.createButton)."
   },
+  "workspace.repair.defender": {
+    "defaultMessage": "Microsoft Defender",
+    "description": "Repair's plan: the heading over the rows about Microsoft Defender's exclusions of the old and new folders (#1302). A product name."
+  },
   "workspace.repair.folders": {
     "defaultMessage": "{count, plural, one {# folder} other {# folders}}",
     "description": "Repair's plan: how many of a coding agent's folders are copied (one per moved folder)."
@@ -1307,6 +1363,10 @@
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.",
     "description": "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)."
   },
+  "workspace.repair.leaveExclusion": {
+    "defaultMessage": "leave Hive's exclusion as it is",
+    "description": "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked."
+  },
   "workspace.repair.listNew": {
     "defaultMessage": "list the new folder",
     "description": "Repair's plan, the Will do column of Open Recent: the new folder replaces the old one."
@@ -1315,6 +1375,22 @@
     "defaultMessage": "mark {projects} again",
     "description": "Repair's plan, the Will do column of Working on ({projects}: the projects)."
   },
+  "workspace.repair.moveBox": {
+    "defaultMessage": "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)",
+    "description": "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt."
+  },
+  "workspace.repair.moveExclusion": {
+    "defaultMessage": "move Hive's exclusion",
+    "description": "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead."
+  },
+  "workspace.repair.needsAdmin": {
+    "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",
+    "description": "Repair's plan, under the table: Defender hides its exclusion list without administrator rights."
+  },
+  "workspace.repair.noneToMove": {
+    "defaultMessage": "nothing (no exclusion of Hive's)",
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)."
+  },
   "workspace.repair.notFound": {
     "defaultMessage": "not found",
     "description": "Repair's plan, the Now column: an agent's worktree wasn't found."
@@ -1322,6 +1398,10 @@
   "workspace.repair.nothingToCopy": {
     "defaultMessage": "nothing to copy",
     "description": "Repair's plan, the Will do column: a coding agent's folder with nothing to copy (some files kept or unreadable, said after)."
+  },
+  "workspace.repair.nothingToDo": {
+    "defaultMessage": "nothing to do",
+    "description": "Repair's plan, the Will do column of a Defender row: the new folder is already excluded."
   },
   "workspace.repair.now": {
     "defaultMessage": "Now",
@@ -1335,9 +1415,17 @@
     "defaultMessage": "{count, plural, one {point # session} other {point # sessions}}",
     "description": "Repair's plan, the Will do column: the session records pointed to the new folder ({count}: how many)."
   },
+  "workspace.repair.readingDefender": {
+    "defaultMessage": "Reading Defender's exclusions…",
+    "description": "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders."
+  },
   "workspace.repair.recent": {
     "defaultMessage": "Open Recent",
     "description": "Repair's plan, the What column: File → Open Recent's entry for the workspace. Use the menu's name as shown."
+  },
+  "workspace.repair.recheck": {
+    "defaultMessage": "Repair's administrator prompt reads Defender's list again before it changes anything.",
+    "description": "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Hive's exclusions reads them again first."
   },
   "workspace.repair.recreate": {
     "defaultMessage": "{exists, select, yes {recreate on {branch}} other {create new on {branch}}}",
@@ -1355,6 +1443,18 @@
     "defaultMessage": "{remote, select, none {rename} other {rename; {remote} keeps the old name}}",
     "description": "Repair's plan, the Will do column: an agent's branch named after the old place is renamed ({remote}: the remote it tracks, which keeps the old name, or none)."
   },
+  "workspace.repair.result": {
+    "defaultMessage": "Result",
+    "description": "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)."
+  },
+  "workspace.repair.saved": {
+    "defaultMessage": "Handovers and kept comparisons",
+    "description": "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name."
+  },
+  "workspace.repair.scanned": {
+    "defaultMessage": "nothing (Defender scans it)",
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder."
+  },
   "workspace.repair.sentence": {
     "defaultMessage": "{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}",
     "description": "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns."
@@ -1370,6 +1470,14 @@
   "workspace.repair.taken": {
     "defaultMessage": "kept: the new name is taken",
     "description": "Repair's plan, the Will do column: an agent's branch isn't renamed, because a branch with the new name exists."
+  },
+  "workspace.repair.theirs": {
+    "defaultMessage": "yours: change it in Windows Security",
+    "description": "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown."
+  },
+  "workspace.repair.theirsNote": {
+    "defaultMessage": "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.",
+    "description": "Repair's plan, under the table: the user's own Defender exclusion of an old folder."
   },
   "workspace.repair.unlink": {
     "defaultMessage": "remove the worktree link",
@@ -1875,6 +1983,26 @@
     "defaultMessage": "Checking…",
     "description": "Remove anyway while it checks the worktree."
   },
+  "workspace.unusedList.colBranch": {
+    "defaultMessage": "Branch",
+    "description": "Unused worktrees' table (#1314), a column heading: the worktree's branch."
+  },
+  "workspace.unusedList.colFolder": {
+    "defaultMessage": "Folder",
+    "description": "Unused worktrees' table, a column heading: the worktree's folder (its name; the full path on hover)."
+  },
+  "workspace.unusedList.colLast": {
+    "defaultMessage": "Last commit",
+    "description": "Unused worktrees' table, a column heading: its branch's last commit, when and its subject."
+  },
+  "workspace.unusedList.colSize": {
+    "defaultMessage": "Size",
+    "description": "Unused worktrees' table, a column heading: the folder's size on disk."
+  },
+  "workspace.unusedList.colState": {
+    "defaultMessage": "State",
+    "description": "Unused worktrees' table, a column heading: merged and clean, or the work it holds, and who made it."
+  },
   "workspace.unusedList.detached": {
     "defaultMessage": "(detached)",
     "description": "An unused worktree with no branch (a detached HEAD)."
@@ -1890,10 +2018,6 @@
   "workspace.unusedList.heading": {
     "defaultMessage": "Unused worktrees",
     "description": "The Changes tab's Unused worktrees page: its heading (a count follows)."
-  },
-  "workspace.unusedList.headingTip": {
-    "defaultMessage": "Worktrees no agent of this project uses right now, e.g. from another template (loading that template gives them back to its agents).",
-    "description": "Tooltip on Unused worktrees."
   },
   "workspace.unusedList.keptMany": {
     "defaultMessage": "{count, plural, one {# worktree was kept} other {# worktrees were kept}}",

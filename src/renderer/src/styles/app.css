@@ -237,6 +237,39 @@ pre,
   font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 
+/* A command or path with its Copy button (#1204, CopyableCode): the code may wrap, the button stays beside its end. */
+.copy-code {
+  overflow-wrap: anywhere;
+}
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 3px;
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.copy-code-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-strong);
+}
+.copy-code-btn:focus-visible {
+  outline: 1px solid var(--accent);
+}
+.copy-code-btn .codicon {
+  font-size: 13px;
+}
+.copy-code-done {
+  margin-left: 4px;
+  color: var(--success);
+  font-size: 11px;
+}
+
 kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -2150,6 +2183,17 @@ textarea.input {
 .repair-plan tr.repair-sub td:first-child .short-path {
   padding-left: 18px;
 }
+/* Repair's report (#1313): a result wraps, so a problem's reason is read whole; its icon in the outcome's colour. */
+.repair-report td:nth-child(4),
+.repair-report td:nth-child(4) .short-path {
+  white-space: normal;
+}
+.repair-report tr.repair-done td:nth-child(4) .codicon {
+  color: var(--success);
+}
+.repair-report tr.repair-skipped td:nth-child(4) .codicon {
+  color: var(--fg-muted);
+}
 .repair-choice {
   height: 22px;
   padding: 0 6px;
@@ -2558,19 +2602,9 @@ p.hint {
   .changes-split > .split > .split-main {
     min-height: 0;
   }
-  /* The unused worktrees' heading and rows wrap rather than run out of the pane: its buttons go under the title, a
-     row's buttons under its text, and a long path breaks anywhere. */
-  .changes-split #unused-worktrees,
-  .changes-split .unused-wt,
-  .changes-split .unused-wt > .flex {
+  /* The unused worktrees' heading wraps rather than run out of the pane: its buttons go under the title. */
+  .changes-split #unused-worktrees {
     flex-wrap: wrap;
-  }
-  .changes-split .unused-wt .mono {
-    overflow-wrap: anywhere;
-  }
-  .changes-split .unused-wt > .grow {
-    flex: 1 1 160px;
-    min-width: 0;
   }
 }
 @container templates-split (max-width: 399px) {
@@ -2808,26 +2842,33 @@ p.hint {
   overflow-wrap: normal;
   color: var(--fg);
 }
-.template-plan h4 {
-  margin: 8px 0 2px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fg-muted);
+/* What happens to each agent (#1315: one table, no Removed list): its badge; what becomes of an old agent's worktree
+   across a removed row's empty settings, or on a line under a replaced one's row (no rule between the two). A removed
+   agent's row is muted. */
+.template-plan-table td.template-plan-state {
+  white-space: nowrap;
 }
-.template-plan-removed {
-  margin: 0 0 4px;
-  padding-left: 18px;
+.template-plan-old {
+  font-size: 11.5px;
+}
+.template-plan-table tr.template-plan-has-old td {
+  border-bottom: none;
+}
+.template-plan-table tr.template-plan-old-row td {
+  padding-top: 0;
+}
+.template-plan-removed-row .template-plan-name {
+  color: var(--fg-muted);
+  font-weight: normal;
 }
 .template-plan-table td {
-  padding: 4px 8px;
+  padding: 4px 6px;
   vertical-align: top;
 }
 /* A long heading ("Coding agent" in Spanish) wraps between its words when the dialog is short of room, rather than
    push Where out of it (#886). */
 .template-plan-table th {
-  padding: 4px 8px;
+  padding: 4px 6px;
   white-space: normal;
   vertical-align: bottom;
 }
@@ -2951,6 +2992,9 @@ p.hint {
   border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
   white-space: pre-line;
   user-select: text;
+  /* A long one (Push to…'s every branch by name, #1385) scrolls in its own box, the buttons staying in view. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .field-error {
   color: var(--error);
@@ -3200,6 +3244,9 @@ p.hint {
   margin-top: 2px;
   word-break: break-word;
   white-space: pre-line;
+  /* A long message (Push to…'s every branch by name, #1385) scrolls rather than run off the screen. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .toast-actions {
   display: flex;
@@ -3799,19 +3846,144 @@ h2.section#unused-worktrees {
 .unused-worktrees-line a {
   cursor: pointer;
 }
-.unused-wt {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-sidebar);
-  margin-bottom: 8px;
+
+/* Unused worktrees as a table (#1314, ItemTable): a line a worktree, Branch · State · Folder · Last commit · Size, its
+   actions at the right edge, aligned down the table; a cell too long is cut with an ellipsis (the full text on hover).
+   Sized by the list's own width: under 1000px each row is two lines (branch, state and actions; under them folder, last
+   commit and size, muted), under 520px it stacks, its actions on a line of their own. */
+.unused-worktrees {
+  container: unused-list / inline-size;
 }
-.unused-wt > .codicon {
-  font-size: 18px;
+.table.item-table.unused-wt-table {
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 4px;
+  --item-actions: 128px;
+}
+.table.item-table.unused-wt-table.has-work {
+  --item-actions: 290px;
+}
+.unused-wt-table th:nth-child(1) {
+  width: 18%;
+}
+.unused-wt-table th:nth-child(3) {
+  width: 9%;
+}
+.unused-wt-table th:nth-child(4) {
+  width: 20%;
+}
+.unused-wt-table th:nth-child(5) {
+  width: 64px;
+}
+.table.item-table.unused-wt-table .item-table-actions {
+  width: var(--item-actions);
+}
+.unused-wt-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-table td > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-branch .codicon {
+  margin-right: 2px;
   color: var(--fg-muted);
+  vertical-align: text-bottom;
+}
+/* The state and who made it, badges in a row: never cut (the Assistant's OK on #1314); a badge that doesn't fit beside
+   the other goes under it, and one wider than its cell wraps inside itself. */
+.unused-wt-table td > span.unused-wt-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  overflow: visible;
+}
+.unused-wt-badges .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.unused-wt-table .item-table-actions .btn + .btn,
+.unused-wt-table .item-table-actions .btn + .tip-wrap,
+.unused-wt-table .item-table-actions .tip-wrap + .btn {
+  margin-left: 4px;
+}
+@container unused-list (max-width: 999px) {
+  .unused-wt-table,
+  .unused-wt-table tbody {
+    display: block;
+  }
+  .unused-wt-table thead {
+    display: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt {
+    display: grid;
+    grid-template-columns: minmax(0, 32%) minmax(0, 1fr) auto;
+    grid-template-areas: 'branch state actions' 'folder last size';
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 1px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .table.item-table.unused-wt-table tr.unused-wt:last-child {
+    border-bottom: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt td {
+    padding: 0;
+    border: none;
+    width: auto;
+    min-width: 0;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(1) {
+    grid-area: branch;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(2) {
+    grid-area: state;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(3) {
+    grid-area: folder;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(4) {
+    grid-area: last;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(5) {
+    grid-area: size;
+    justify-self: end;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td.item-table-actions {
+    grid-area: actions;
+  }
+}
+@container unused-list (max-width: 519px) {
+  .table.item-table.unused-wt-table tr.unused-wt {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'branch branch' 'state state' 'folder size' 'last last' 'actions actions';
+    row-gap: 3px;
+  }
+  /* Its buttons wrap rather than run out of the pane, from the right. */
+  .table.item-table.unused-wt-table tr.unused-wt td.item-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    padding-top: 2px;
+    white-space: normal;
+  }
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .btn,
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .tip-wrap,
+  .unused-wt-table tr.unused-wt .item-table-actions .tip-wrap + .btn {
+    margin-left: 0;
+  }
+}
+/* Remove all merged's confirmation (#1314): Branch · Folder. */
+.unused-merged-table th:nth-child(1) {
+  width: 65%;
 }
 /* What a page of changes shows, at the top of its right side (#476); the list being checked again over it. */
 .changes-page-head {
@@ -6525,6 +6697,14 @@ body.pane-resizing .monaco-editor {
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
 }
+/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+.antivirus-gone h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: inherit;
+}
+.antivirus-gone td.mono {
+  overflow-wrap: anywhere;
+}
 .perf-antivirus a {
   cursor: pointer;
 }
@@ -8913,14 +9093,31 @@ textarea.input.task-blocked-input {
   gap: 4px;
   max-width: 420px;
 }
-/* Remove Project: what each choice touches. */
-.removal-list {
-  margin: 0 0 10px;
-  padding-left: 20px;
-  font-size: 13px;
+/* Remove Project: what each choice touches (#1316), an item table: a thing (its count, or the folder by its name) and
+   what happens to it, both wrapping rather than being cut (only the folder's name is cut, its full path on hover); an
+   agent's worktree indented under the worktrees' row. */
+.table.item-table.removal-list {
+  margin: 2px 0 10px;
+  font-size: 12.5px;
 }
-.removal-list ul {
-  padding-left: 18px;
+.removal-list th:first-child {
+  width: 42%;
+}
+/* A long name or branch breaks inside itself rather than being cut (the shared table's ellipsis is for the folder's
+   short name only). */
+.item-table.fill.removal-list td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+/* "Folder" and its name on one line (the shared table makes a path's tooltip a block of its own). */
+.item-table.removal-list td > .tip-wrap:has(> .short-path) {
+  display: inline-block;
+  max-width: calc(100% - 60px);
+  vertical-align: bottom;
+}
+.removal-list tr.removal-sub td:first-child {
+  padding-left: 16px;
 }
 .warn-text {
   color: var(--warning);
@@ -10885,6 +11082,14 @@ button.progress-run-show:focus-visible {
 }
 .git-ref {
   flex-shrink: 0;
+}
+/* A branch row's Track… and Stop tracking (#1385): kept whole at its end, before Switch. */
+.git-row-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.git-form-note {
+  margin-top: 8px;
 }
 .git-ref.git-tag {
   background: rgba(245, 196, 81, 0.16);

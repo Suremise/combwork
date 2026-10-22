@@ -14,7 +14,8 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */
 
-const STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
+/** How a folder's scanning is worded and coloured, here and in Repair's Defender rows (#1302). */
+export const AV_STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
   excluded: { label: msg({ id: 'workspace.antivirus.stateExcluded', defaultMessage: 'Excluded', description: "A folder's scanning in Settings → Workspace's antivirus table: Defender skips it." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateExcludedTip', defaultMessage: 'Defender doesn’t scan it.', description: 'Tooltip on Excluded.' }) },
   'not-excluded': { label: msg({ id: 'workspace.antivirus.stateScanned', defaultMessage: 'Scanned', description: "A folder's scanning: Defender scans it." }), tone: 'warn-text', tip: msg({ id: 'workspace.antivirus.stateScannedTip', defaultMessage: 'Defender scans every file Hive’s work creates or opens here.', description: 'Tooltip on Scanned.' }) },
   unknown: { label: msg({ id: 'workspace.antivirus.stateUnknown', defaultMessage: 'Unknown', description: "A folder's scanning: Defender hides its exclusions without administrator rights." }), tone: 'faint', tip: msg({ id: 'workspace.antivirus.stateUnknownTip', defaultMessage: 'Defender shows its exclusions only to administrators: Check with administrator rights to see them.', description: 'Tooltip on Unknown. Check with administrator rights is a button below.' }) },
@@ -60,6 +61,8 @@ const M = {
   checked: msg({ id: 'workspace.antivirus.checkedAt', defaultMessage: 'Checked {when}', description: 'When the antivirus status was checked ({when}: "4 minutes ago").' }),
   checkAgain: msg({ id: 'workspace.antivirus.checkAgain', defaultMessage: 'Check Again', description: "Settings → Workspace's antivirus: a button." }),
   checkAdmin: msg({ id: 'workspace.antivirus.checkAdmin', defaultMessage: 'Check with Administrator Rights…', description: "Settings → Workspace's antivirus: a button (Windows asks for administrator rights)." }),
+  goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Hive’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)." }),
+  goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown." }),
   removeHive: msg({ id: 'workspace.antivirus.removeHive', defaultMessage: 'Remove Hive’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   addExclusions: msg({ id: 'workspace.antivirus.addExclusions', defaultMessage: 'Add Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   aboutDevDrive: msg({ id: 'workspace.antivirus.aboutDevDrive', defaultMessage: 'About Dev Drive', description: "Settings → Workspace's antivirus: opens Microsoft's Dev Drive documentation." }),
@@ -73,6 +76,9 @@ const M = {
   review: msg({ id: 'workspace.antivirus.review', defaultMessage: 'Review…', description: "The suggestion's button: opens the antivirus status." }),
   dontAsk: msg({ id: 'workspace.antivirus.dontAsk', defaultMessage: 'Don’t Ask Again', description: "The suggestion's button: no more suggestions for this workspace." })
 }
+
+/** Where the states come from, as the panel says it; Repair's Defender rows say it the same way (#1302). */
+export const AV_SOURCE = { live: M.live, adminCheck: M.adminCheck }
 
 const antivirusLink = (c: React.ReactNode[]): React.ReactNode => <a onClick={showAntivirus}>{c}</a>
 
@@ -161,7 +167,7 @@ export function AntivirusPanel() {
   const defender = status.scan === 'defender'
   const offerable = status.paths.filter((p) => !p.unsafe)
   const toAdd = offerable.filter((p) => p.state !== 'excluded')
-  const hiveAdded = offerable.some((p) => p.addedByHive)
+  const hiveAdded = offerable.some((p) => p.addedByHive) || !!status.gone?.length
   return (
     <div className="antivirus">
       <p className={cx('antivirus-scan', status.slowed && 'warn-text')}>
@@ -185,8 +191,8 @@ export function AntivirusPanel() {
                     {p.unsafe && <div className="warn-text small">{tr(M.notOffered, { why: p.unsafe })}</div>}
                   </td>
                   <td className="nowrap">
-                    <span className={STATE[p.state].tone} title={tr(STATE[p.state].tip)}>
-                      {tr(STATE[p.state].label)}
+                    <span className={AV_STATE[p.state].tone} title={tr(AV_STATE[p.state].tip)}>
+                      {tr(AV_STATE[p.state].label)}
                     </span>
                   </td>
                   <td className="nowrap faint" title={tr(DEV_DRIVE[p.devDrive].tip)}>
@@ -196,6 +202,35 @@ export function AntivirusPanel() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {defender && !!status.gone?.length && (
+        <div className="antivirus-gone">
+          <h4>{tr(M.goneTitle)}</h4>
+          <p className="hint">{tr(M.goneHint, { n: status.gone.length })}</p>
+          <div className="table-wrap">
+            <table className="table antivirus-folders">
+              <thead>
+                <tr>
+                  <th>{tr(M.folder)}</th>
+                  <th>{tr(M.scanning)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.gone.map((g) => (
+                  <tr key={g.path}>
+                    <td className="mono small">{g.path}</td>
+                    <td className="nowrap">
+                      {/* Muted, never the good colour: a leftover exclusion isn't good news (the Assistant's call). */}
+                      <span className="faint" title={tr(AV_STATE[g.state].tip)}>
+                        {tr(AV_STATE[g.state].label)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {defender && (

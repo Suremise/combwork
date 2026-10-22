@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
+const until = (fn, ms) => lib.until(fn, ms, 150)
 const jsonl = (file) => {
   try {
     return fs.readFileSync(file, 'utf8').split('\n').flatMap((l) => {
@@ -88,8 +88,8 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
       fs.writeFileSync(hold, '')
       const mark = (await raw(a)).length
       const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), text, { submitted: async () => ended(lib.plainText((await raw(a)).slice(mark))) })
-      const id = sent > 0 ? await until(() => turnOf(text)) : null
-      const idle = await until(async () => ['ready', 'finished', 'unknown'].includes((await live(a))?.status) || !!(await live(a))?.hooksMissing || ended(lib.plainText((await raw(a)).slice(mark))))
+      const id = sent > 0 ? await until(() => turnOf(text), HUNG_MS) : null
+      const idle = await until(async () => ['ready', 'finished', 'unknown'].includes((await live(a))?.status) || !!(await live(a))?.hooksMissing || ended(lib.plainText((await raw(a)).slice(mark))), HUNG_MS)
       fs.rmSync(hold, { force: true })
       return { id, ok: sent > 0 && !!id && !!idle }
     }
@@ -113,12 +113,12 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     nohooks('Builder', true, claudeHome)
     const deaf = await quickTurn(cc, 'hh-deaf two', promptIdOf, ccEnded)
     check('with its hooks off, a quick marked turn runs and is over before any check (held)', deaf.ok, JSON.stringify(deaf))
-    const flagged = await until(async () => (await live(cc))?.hooksMissing)
+    const flagged = await until(async () => (await live(cc))?.hooksMissing, HUNG_MS)
     check("released, its transcript shows the turn no hook named: hooks missing, shown by the transcript, naming that turn's promptId", flagged?.after === 'transcript' && flagged?.turn === deaf.id && deaf.id !== healthy.id, JSON.stringify({ flagged, deaf: deaf.id, healthy: healthy.id }))
     nohooks('Builder', false, claudeHome)
     const mark = (await raw(cc)).length
     await lib.sendPrompt(inv, lib.ptyKey(alpha, cc.id), 'hh-back three', { submitted: async () => ccEnded(lib.plainText((await raw(cc)).slice(mark))) })
-    check('its hooks back, a newer turn’s hook clears it', !!(await until(async () => !(await live(cc))?.hooksMissing)), JSON.stringify((await live(cc))?.hooksMissing))
+    check('its hooks back, a newer turn’s hook clears it', !!(await until(async () => !(await live(cc))?.hooksMissing, HUNG_MS)), JSON.stringify((await live(cc))?.hooksMissing))
 
     // --- Codex: its turns by turn_id. Started with its hooks on, so its session (and rollout) is known.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex' })
@@ -135,12 +135,12 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     nohooks('Cx', true, codexHome)
     const cxDeaf = await quickTurn(cx, 'hh-cx deaf', turnIdOf, cxEnded)
     check('with its hooks off, a quick marked Codex turn runs (held)', cxDeaf.ok, JSON.stringify(cxDeaf))
-    const cxFlag = await until(async () => (await live(cx))?.hooksMissing)
+    const cxFlag = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)
     check("released, the rollout's turn no hook named: hooks missing by the transcript, naming its turn_id", cxFlag?.after === 'transcript' && cxFlag?.turn === cxDeaf.id && cxDeaf.id !== first.id, JSON.stringify({ cxFlag, deaf: cxDeaf.id, healthy: first.id }))
     nohooks('Cx', false, codexHome)
     const cxMark = (await raw(cx)).length
     await lib.sendPrompt(inv, lib.ptyKey(alpha, cx.id), 'hh-cx back', { submitted: async () => cxEnded(lib.plainText((await raw(cx)).slice(cxMark))) })
-    check('its hooks back, the next turn clears it', !!(await until(async () => !(await live(cx))?.hooksMissing)), JSON.stringify((await live(cx))?.hooksMissing))
+    check('its hooks back, the next turn clears it', !!(await until(async () => !(await live(cx))?.hooksMissing, HUNG_MS)), JSON.stringify((await live(cx))?.hooksMissing))
   } catch (e) {
     check('suite ran', false, e?.stack ?? String(e))
   } finally {

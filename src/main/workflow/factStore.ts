@@ -24,6 +24,7 @@ import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -78,7 +79,18 @@ export interface QueuePause {
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
   message?: string
+  /** Who paused it (#1353: Pause queue); left out, Hive (its reason says why). */
+  by?: 'user' | 'assistant'
+  /** When (ISO), as the store saved it; left out of a pause written, the store's time then. */
+  at?: string
+  /**
+   * An advance into a checked-out target left part way (#1351): its state, its listed files with their sides, and the
+   * commands that finish or undo it. Its files are then `files` too, in that order.
+   */
+  stuck?: QueueStuck
 }
+
+type PauseRow = { reason: string; card: string; pid: number | null; message: string | null; paused_by: 'user' | 'assistant' | null; paused_at: string | null; folder: string | null; branch: string | null; ref: string | null; expected: string | null; result: string | null; phase: QueueStuck['phase'] | null }
 
 /** A target's queue runner (#1360, queue_runners): who runs it, the holder process, when taken and last renewed. */
 export interface QueueLease {
@@ -556,23 +568,56 @@ export class FactStore {
   queuePause(target: string): QueuePause | null {
     const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT reason, card, pid, message FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null; message: string | null } | undefined
+      const row = db.prepare('SELECT reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as PauseRow | undefined
       if (!row) return null
-      const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}) }
+      const rows = db.prepare('SELECT path, side FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string; side: QueueFileSide | null }[]
+      const files = rows.map((r) => r.path)
+      let stuck: QueueStuck | undefined
+      if (row.folder !== null && row.expected !== null && row.result !== null && row.phase !== null) {
+        const commands = db.prepare('SELECT ord, purpose, place FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { ord: number; purpose: QueueCommand['purpose']; place: QueueCommand['place'] }[]
+        const args = db.prepare('SELECT command, arg FROM workflow_queue_pause_command_args WHERE project = ? AND target = ? ORDER BY command, ord').all(p, target) as { command: number; arg: string }[]
+        const of = (ord: number): string[] => args.filter((a) => a.command === ord).map((a) => a.arg)
+        stuck = { folder: row.folder, branch: row.branch, ref: row.ref, expected: row.expected, result: row.result, phase: row.phase, files: rows.map((r) => ({ path: r.path, side: r.side ?? 'other' })), commands: commands.map((c) => ({ purpose: c.purpose, place: c.place, args: of(c.ord), command: shellLine(of(c.ord)) })) }
+      }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}), ...(stuck ? { stuck } : {}) }
     })
   }
 
-  /** Pauses a target's queue (`pause`), or resumes it (null). */
-  setQueuePause(target: string, pause: QueuePause | null): void {
+  /** The targets of this project whose queue is paused. */
+  pausedTargets(): string[] {
+    return this.conn.read((db) => (db.prepare('SELECT target FROM workflow_queue_pauses WHERE project = ?').all(this.scope.project) as { target: string }[]).map((r) => r.target))
+  }
+
+  /**
+   * Pauses a target's queue (`pause`), or resumes it (null). `keep`: only when it isn't paused already, decided in the same
+   * write (HR4's #1351 round 1: Hive's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
+   * was written.
+   */
+  setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {
     const p = this.scope.project
-    this.conn.write((db) => {
+    return this.conn.write((db) => {
+      if (keep && db.prepare('SELECT 1 FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target)) return false
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
-      if (!pause) return
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message) VALUES (?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null)
-      const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
-      pause.files?.forEach((f, i) => ins.run(p, target, i, f))
+      if (!pause) return true
+      const st = pause.stuck
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString(), st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
+      const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
+      // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
+      if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))
+      else pause.files?.forEach((f, i) => ins.run(p, target, i, f, null))
+      const cmd = db.prepare('INSERT INTO workflow_queue_pause_commands (project, target, ord, purpose, place) VALUES (?, ?, ?, ?, ?)')
+      const arg = db.prepare('INSERT INTO workflow_queue_pause_command_args (project, target, command, ord, arg) VALUES (?, ?, ?, ?, ?)')
+      st?.commands.forEach((c, i) => {
+        cmd.run(p, target, i, c.purpose, c.place)
+        c.args.forEach((a, j) => arg.run(p, target, i, j, a))
+      })
+      return true
     })
+  }
+
+  /** Resumes a target's queue only from a pause of this reason, in one write (a pause saved since in its place stays). */
+  clearQueuePause(target: string, reason: string): boolean {
+    return this.conn.write((db) => Number(db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason).changes) > 0)
   }
 
   // --- The queue's runner (#1360): its lease, its processes, its worktrees. Quiet writes: the window shows none of them.

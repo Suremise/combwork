@@ -106,7 +106,7 @@ const TAIL_BYTES = 64 * 1024
 export const MAX_LOGS = 100
 /** Once a check at its time limit has been ended, how long its output may stay open before its run ends anyway. */
 const CLOSE_AFTER_KILL_MS = 10_000
-/** The output a result carries (the card's failure keeps 4000 characters of it). */
+/** The output a result carries (the card's failure keeps its start and end, KEPT_LOG characters: mergeQueue.ts keptLog). */
 const OUTPUT_CHARS = 8000
 
 /** Environment variables a check never gets, whatever its base has (compared without case, as Windows does). */
@@ -634,6 +634,8 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
       output,
       command,
       run: id ?? randomUUID(),
+      // Its whole log, for a returned card's builder (#1354): only one that holds its output.
+      ...(log.usable && logPath ? { logPath } : {}),
       ...(id ? { note: (c: RunCheck) => deps.runs?.counts(id, c) } : {})
     }
   }

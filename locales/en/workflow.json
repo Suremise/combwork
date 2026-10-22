@@ -59,6 +59,14 @@
     "defaultMessage": "{card} passed review: your OK?",
     "description": "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12."
   },
+  "workflow.forYou.queueAdvance": {
+    "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
+    "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queueStuck": {
+    "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, and Hive changes nothing more there. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
+    "description": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {project} the project folder; {finish} and {undo} are git commands for PowerShell (keep them exactly, with (PowerShell) after them). Translate each choice of {how}; keep the codes before the braces."
+  },
   "workflow.forYou.review": {
     "defaultMessage": "{card} waits for your review",
     "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
@@ -375,10 +383,6 @@
     "defaultMessage": "Verdict",
     "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
   },
-  "workflow.notOffered.hiveMerges": {
-    "defaultMessage": "“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.",
-    "description": "Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive."
-  },
   "workflow.notOffered.later": {
     "defaultMessage": "Some of these options aren’t available in this version yet: leave them as they are.",
     "description": "Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive."
@@ -412,8 +416,8 @@
     "description": "A workflow option for a project without version control (glossary 2.6, N4)."
   },
   "workflow.option.finish.desc": {
-    "defaultMessage": "When a card is done: once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
-    "description": "What the workflow option “Who merges” does."
+    "defaultMessage": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
   },
   "workflow.option.finish.title": {
     "defaultMessage": "Who merges",
@@ -434,6 +438,22 @@
   "workflow.option.identity.title": {
     "defaultMessage": "Commits use the project’s identity",
     "description": "A workflow option (glossary 2.6, G12)."
+  },
+  "workflow.option.mergeChecks.desc": {
+    "defaultMessage": "Each check is a named command. Hive’s merge queue runs them on the card’s work merged with the target branch, and moves the target only once each one has passed.",
+    "description": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.mergeChecks.title": {
+    "defaultMessage": "Checks pass on the merged result",
+    "description": "A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch."
+  },
+  "workflow.option.mergeInstall.desc": {
+    "defaultMessage": "Before the checks on the merged result. A change to the lock file or the manifests always installs from scratch, whichever you choose.",
+    "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
+  },
+  "workflow.option.mergeInstall.title": {
+    "defaultMessage": "Install dependencies from scratch",
+    "description": "A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks."
   },
   "workflow.option.noSelfReview.desc": {
     "defaultMessage": "Always on while a reviewer agent checks the work.",
@@ -503,6 +523,14 @@
     "defaultMessage": "Agents stop what they started before review",
     "description": "A workflow option (glossary 2.6, G13)."
   },
+  "workflow.option.strict.desc": {
+    "defaultMessage": "When the target branch has moved on since the review, Hive’s merge queue merges it into the card’s work (or rebases the work, with the Squash merge style) in its own folder, never on the builder’s branch. The review still counts if the result is the same change; if not, or if it conflicts, the card goes back to its builder.",
+    "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
+  },
+  "workflow.option.strict.title": {
+    "defaultMessage": "Work is up to date with its target branch before it merges",
+    "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself."
+  },
   "workflow.option.style.desc": {
     "defaultMessage": "How a card’s work is merged into the target branch.",
     "description": "What the workflow option “Merge style” does."
@@ -523,13 +551,13 @@
     "defaultMessage": "Custom",
     "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
   },
-  "workflow.preset.needs.hiveMerges": {
-    "defaultMessage": "Needs Hive to merge cards, which comes in a later version.",
-    "description": "Why a workflow preset can’t be chosen yet."
-  },
   "workflow.preset.needs.slots": {
     "defaultMessage": "Needs a folder of its own for every card, which comes in a later version.",
     "description": "Why a workflow preset can’t be chosen yet."
+  },
+  "workflow.preset.note.team": {
+    "defaultMessage": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
+    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result)."
   },
   "workflow.preset.pair": {
     "defaultMessage": "Pair",
@@ -671,6 +699,54 @@
     "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
     "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
   },
+  "workflow.refused.merge.hiveMerges.change": {
+    "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
+    "description": "Where the rule that Hive merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
+  },
+  "workflow.refused.merge.hiveMerges.message": {
+    "defaultMessage": "Hive merges {card}: agents don't merge it or report its merge.",
+    "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12."
+  },
+  "workflow.refused.merge.hiveMerges.next": {
+    "defaultMessage": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, when it isn't in the merge queue yet."
+  },
+  "workflow.refused.merge.hiveMerges.nextMerged": {
+    "defaultMessage": "The merge queue has merged it already: nothing is left to do.",
+    "description": "The next step after a refused merge of a card Hive has already merged."
+  },
+  "workflow.refused.merge.hiveMerges.nextPaused": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFix": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+    "defaultMessage": "It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextQueued": {
+    "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
+  },
+  "workflow.refused.merge.hiveMerges.nextReturned": {
+    "defaultMessage": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
+    "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
+  },
+  "workflow.refused.merge.hiveMerges.nextTesting": {
+    "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."
@@ -722,6 +798,14 @@
   "workflow.refused.platform.unknown.next": {
     "defaultMessage": "Check Agent Setup or the folder, then try again.",
     "description": "The next step when Hive could not read what a rule needs."
+  },
+  "workflow.refused.queue.advancing.message": {
+    "defaultMessage": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
+    "description": "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name."
+  },
+  "workflow.refused.queue.advancing.next": {
+    "defaultMessage": "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.",
+    "description": "The next step after a refused Remove from queue while the card is being merged. {target} is a branch name."
   },
   "workflow.refused.requeue.allowed.change": {
     "defaultMessage": "Retry merge on the merge queue retries it once.",
@@ -1182,6 +1266,14 @@
   "workflow.value.folder.slots": {
     "defaultMessage": "Each card in its own folder",
     "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). In this version the folder is the builder’s worktree."
+  },
+  "workflow.value.mergeInstall.always": {
+    "defaultMessage": "Before every merge",
+    "description": "A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks."
+  },
+  "workflow.value.mergeInstall.onManifestChange": {
+    "defaultMessage": "When the lock file or manifests change",
+    "description": "A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value)."
   },
   "workflow.value.okBefore.every": {
     "defaultMessage": "Every card",

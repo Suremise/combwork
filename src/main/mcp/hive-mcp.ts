@@ -18,8 +18,9 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
+import type { QueuePublic } from '../../shared/workflow/queue'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
@@ -585,6 +586,35 @@ const tools: Tool[] = [
       if (a.action !== 'end') throw new Error('action must be start, join, next, end or list')
       if (typeof a.lane !== 'string' || !a.lane) throw new Error('lane is required: the id hive_lane list gives')
       return named((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo, laneEndText)
+    }
+  },
+  {
+    name: 'hive_queue',
+    description: ASSISTANT
+      ? `A project's merge queues, one per target branch: Hive merges approved cards into it one at a time. list: project, target (narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom. pause: project, target (left out: the project's only queue): the queue stops before its next card; one being checked finishes its checks and waits, unmerged. resume: project, target: the queue runs again; when what paused it is still there (a target checked out, the rules off), it stays paused and says so. remove: card, reason: takes the card out of the queue, back to Approved, never merged, and wakes its builder; refused once its merge has begun. retry: card, reason: queues a card the queue returned (its approved revision, unchanged) once more. Replies with the queue in a few lines (remove, retry: the card and where it went).${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: the others need Control agents.'}`
+      : "Your project's merge queues, one per target branch: Hive merges approved cards into it one at a time. list (target narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom. Replies in a few lines per queue.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry'] : ['list'] },
+        ...(ASSISTANT ? { project: projectArg } : {}),
+        target: { type: 'string', description: 'The target branch.' },
+        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: "remove, retry: the user's reason, recorded with the override." } } : {})
+      },
+      required: ['action']
+    },
+    run: async (a) => {
+      const project = ASSISTANT ? a.project : PROJECT
+      if (a.action === 'list') {
+        const q = [project ? `project=${enc(String(project))}` : '', a.target ? `target=${enc(String(a.target))}` : ''].filter(Boolean).join('&')
+        return queuesText((await api('GET', `/v1/queue${q ? `?${q}` : ''}`)) as QueuePublic[], String(project ?? ''))
+      }
+      if (!ASSISTANT) throw new Error('action must be list')
+      const where = { ...(project !== undefined ? { project } : {}), ...(a.target !== undefined ? { target: a.target } : {}) }
+      if (a.action === 'pause') return queueText((await api('POST', '/v1/queue/pause', where)) as QueuePublic)
+      if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
+      if (a.action !== 'remove' && a.action !== 'retry') throw new Error('action must be list, pause, resume, remove or retry')
+      return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
     }
   },
   {

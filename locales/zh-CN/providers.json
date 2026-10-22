@@ -45,6 +45,7 @@
   "providers.codex.sandbox.upgrade": "**升级**会将 Codex 切换到默认沙盒，它在独立的 Windows 账户而不是你自己的账户下运行命令。Windows 会请求一次管理员权限。正在运行的 Codex 智能体在重启前保持原有沙盒。",
   "providers.codex.sandbox.upgradeAction": "升级",
   "providers.codex.storePwsh.fix": "要避免此问题，请用安装程序而不是 Store 安装 PowerShell 7（`winget install --id Microsoft.PowerShell --source winget`），卸载 Store 版本，然后重启 Hive 及其 Codex 智能体。Hive 不会更改你的 shell。",
+  "providers.codex.storePwsh.label": "已安装 Microsoft Store 中的 PowerShell 7",
   "providers.codex.storePwsh.symptom": "症状：Codex 命令立即失败并显示 `CreateProcessAsUserW failed: 5`（拒绝访问），关闭所有 PowerShell 7 窗口和命令后又能正常运行。",
   "providers.codex.storePwsh.warning": "当 Microsoft Store 中的 PowerShell 7 处于打开状态时，Codex 智能体的命令可能会失败：只要该 PowerShell 的另一个副本在运行，Codex 的 Windows 沙盒就无法启动它。",
   "providers.codex.stray.message": "{folder} 中有 {files}，它们既不是 Codex 配置（config.toml、agents、rules），也不是 Codex 引用的文件。Codex 将该文件夹视为自己的，其中多余的文件（智能体的临时文件或日志）可能导致所有 Codex 智能体的命令失败（“setup refresh had errors”）。请将这些文件移出（临时文件应放在项目之外）；Codex 的配置保留原处。",

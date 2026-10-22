@@ -92,9 +92,11 @@ interface HiveMessageValues {
   'main.move.branchTaken': { host: string | number; agent: string | number; from: string | number; to: string | number }
   'main.move.branchUnrecorded': { host: string | number; agent: string | number; to: string | number; why: string | number }
   'main.move.cards': { n: number; from: string | number; to: string | number }
+  'main.move.cardsNotMoved': { host: string | number; agent: string | number; path: string | number; why: string | number }
   'main.move.copied': { n: number; owner: string; host: string | number; provider: string | number; agent: string | number; of: string | number }
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.copyKept': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
+  'main.move.defenderFailed': { why: string | number }
   'main.move.gitFailed': { command: string | number }
   'main.move.lanes': { n: number }
   'main.move.madeNew': { host: string | number; agent: string | number; branch: string | number; path: string | number }
@@ -111,6 +113,30 @@ interface HiveMessageValues {
   'main.move.recreateFailed': { host: string | number; agent: string | number; why: string | number }
   'main.move.recreated': { host: string | number; agent: string | number; branch: string | number; path: string | number }
   'main.move.relinked': { host: string | number; agent: string | number; path: string | number }
+  'main.move.result.agentWorktree': { agent: string | number }
+  'main.move.result.cards': { n: number }
+  'main.move.result.copied': { n: number }
+  'main.move.result.copyFailed': { n: number }
+  'main.move.result.copyKept': { n: number }
+  'main.move.result.failed': { why: string | number }
+  'main.move.result.given': { to: string | number; what: string | number }
+  'main.move.result.gone': undefined
+  'main.move.result.linked': undefined
+  'main.move.result.missing': { gone: string }
+  'main.move.result.notGiven': { to: string | number; why: string | number }
+  'main.move.result.notRepaired': { hasWhy: string; why: string | number }
+  'main.move.result.original': undefined
+  'main.move.result.pruneBlocked': { n: number; worktrees: string | number }
+  'main.move.result.recent': undefined
+  'main.move.result.recreateFailed': { made: string; why: string | number }
+  'main.move.result.recreated': { made: string }
+  'main.move.result.renameFailed': { why: string | number }
+  'main.move.result.renamed': { remote: string }
+  'main.move.result.sessions': { n: number }
+  'main.move.result.taken': undefined
+  'main.move.result.unlinked': undefined
+  'main.move.result.unrecorded': { why: string | number }
+  'main.move.result.working': { projects: string | number }
   'main.move.running': { agents: string | number }
   'main.move.savedFailed': { from: string | number; to: string | number; why: string | number }
   'main.move.sessions': { n: number; host: string | number }

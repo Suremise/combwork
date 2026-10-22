@@ -250,6 +250,33 @@ describe('reviewing a card', () => {
     expect(await run(() => tasks.endReviews('alpha', 'r1', 'its session ended', w))).toEqual([])
   })
 
+  it("as the workspace opens again, the reviews of a reviewer whose session ended as it closed end (#1392); a running one's stay", async () => {
+    const mine = await done('Left by a close')
+    const theirs = await done('Still reviewed')
+    await run(() => tasks.updateTask(mine.number, { review: 'start' }, reviewer))
+    await run(() => tasks.updateTask(theirs.number, { review: 'start' }, third))
+    // The window switches away and back; Reviewer's session ended meanwhile, its end never reaching the board.
+    const other = join(base, 'ws-other')
+    mkdirSync(other, { recursive: true })
+    await w.open(other)
+    await w.open(wsPath)
+    const ended = await tasks.endReviewsWithoutSession(w, (p, agentId) => p === 'alpha' && agentId === 't1')
+    expect(ended).toContain(mine.number)
+    expect(ended).not.toContain(theirs.number)
+    const a = await run(() => tasks.getTask(mine.number))
+    expect([a.review, a.column, a.agent]).toEqual([undefined, 'review', 'c1'])
+    expect(history(a).at(-1)).toBe('Hive: Review by Reviewer stopped: its session ended')
+    expect((await run(() => tasks.getTask(theirs.number))).review?.agent).toBe('t1')
+    // A reviewer whose session started between the listing and its card's change keeps its review.
+    const started = await done('Started meanwhile')
+    await run(() => tasks.updateTask(started.number, { review: 'start' }, reviewer))
+    let asked = 0
+    expect(await tasks.endReviewsWithoutSession(w, (_p, agentId) => agentId === 't1' || (agentId === 'r1' && asked++ > 0))).toEqual([])
+    expect((await run(() => tasks.getTask(started.number))).review?.agent).toBe('r1')
+    // Nothing left to end: nothing changes.
+    expect(await tasks.endReviewsWithoutSession(w, () => true)).toEqual([])
+  })
+
   it('a card file from before reviews, or with a damaged review, reads as not being reviewed', async () => {
     const c = await done('Old')
     const raw = readCard(w, c.number)

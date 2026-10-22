@@ -2,7 +2,7 @@
 // outcome instead of stalling the target; a swap that loses the race after `IntegrationStarted` tests again; restarts
 // at each point of the advance recover from the platform, never by assumption, a rerun keeping its entry id.
 import { afterEach, describe, expect, it } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
@@ -115,5 +115,18 @@ describe('the merge queue, round 1 claims', () => {
     expect(r.wf.state(a).stage).toBe('done')
     expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('A\n')
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it("target checked out, a listed file edited after the crash: still stuck (Resume's check, #1353) until the file is back", async () => {
+    const e = team()
+    const a = await queued(e, 'A', 'a.txt')
+    await expect(e.queue({ hooks: { afterFiles: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    writeFileSync(join(e.project, 'a.txt'), 'edited by the user\n')
+    const r = restarted(e)
+    expect(await r.q.stillStuck('main')).toEqual(['a.txt'])
+    // The file back as the journal left it (the index's): recovery can finish the swap, so Resume may run it.
+    sh(e.project, 'checkout', '--', 'a.txt')
+    expect(await r.q.stillStuck('main')).toBeNull()
+    expect(await r.q.recover('main')).toEqual([{ card: a.key, entry: expect.any(String), outcome: 'integrated' }])
   })
 })

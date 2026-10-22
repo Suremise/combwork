@@ -8,11 +8,13 @@ import { config } from './config'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { HiveError, hiveError } from './hiveError'
+import { withValues } from '../shared/advanced'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { copyIgnored, createWorktree, currentBranch, GIT_FAILED, listWorktrees, uniqueFolder } from './worktrees'
+import { workflowFor } from './workflow/service'
 
 /**
  * An agent's worktree whose folder is gone (#146): deleted after its work was merged, or a workspace copied to another
@@ -36,6 +38,26 @@ export async function missingWorktree(projectPath: string, agentId: string): Pro
   const a = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === agentId)
   if (!a?.worktree || existsSync(a.worktree.path)) return null
   return { agentName: a.name, path: a.worktree.path, branch: a.worktree.branch, base: a.worktree.base, branchExists: await branchExists(projectPath, a.worktree.branch) }
+}
+
+/**
+ * Each card of the project whose folder is `from` follows it to `to` (#1343): a FolderMoved fact, so its fold, its view
+ * and its reconciliation read the worktree at its new place, and never take it for gone. Written before the agent's
+ * record: cut short between the two, the next Repair writes it again, which changes nothing once a card's folder is
+ * `to` (the fold only moves the folder it names). A board without the fact log (waiting for its 1.0 upgrade) has none.
+ */
+export async function moveCardFolders(projectPath: string, from: string, to: string): Promise<void> {
+  if (samePath(from, to)) return
+  const wf = await workflowFor(workspaceOf(projectPath), projectPath)
+  if (!wf) return
+  const on = (folder: string | undefined): boolean => !!folder && folder !== 'project' && samePath(folder, from)
+  for (const card of wf.store.cards()) {
+    if (!on(wf.state(card).started?.folder)) continue
+    // Checked again under the write's lock: a card another observer has already moved gets no second fact.
+    await wf.write(card, null, 'hive', (w) => {
+      if (on(w.state().started?.folder)) w.fact('FolderMoved', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
+    })
+  }
 }
 
 /**
@@ -66,6 +88,19 @@ async function usableParent(p: string): Promise<boolean> {
 }
 
 /**
+ * Recreating refused: git's prune would also forget the worktrees in `blockers` (missing too, as git lists them: a folder,
+ * or "(name)" for a registration whose folder git doesn't record). Repair's report names them (#1313).
+ */
+export class PruneBlocked extends HiveError {
+  constructor(
+    m: Parameters<typeof withValues>[0],
+    readonly blockers: string[]
+  ) {
+    super(withValues(m, { folders: blockers.join(', '), n: blockers.length }))
+  }
+}
+
+/**
  * Makes a missing agent worktree again: on its branch (`git worktree add <path> <branch>`, no -b) when it survives,
  * else a new one from its base (as Add Agent does). At `prefer` (Repair's moved-along place), else the recorded path,
  * else, if that can't be used, the agent's default worktree location. Prunes git's stale entry first, refusing if the
@@ -84,7 +119,7 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
   const others = (await prunable(projectPath)).filter((p) => !samePlace(p, old.path) && !(opts.alsoRecreating ?? []).some((q) => samePlace(p, q)))
   if (others.length) {
-    throw hiveError(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), { folders: others.join(', '), n: others.length })
+    throw new PruneBlocked(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), others)
   }
   await git(projectPath, ['worktree', 'prune'])
   if ((await listWorktrees(projectPath)).some((l) => samePlace(l.path, old.path))) throw hiveError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })
@@ -107,6 +142,8 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   // At a new place, its sessions and the CLIs' data for the old folder are to follow it (workspaceMove.ts finishes
   // that): the move is recorded in the same locked change as the new path, so a failure or exit after it can't lose it.
   const moved = !samePath(dest, old.path)
+  // Its cards' work follows it first (#1343). Should that fail, reconciliation follows it later from the agent's record.
+  if (moved) await moveCardFolders(projectPath, old.path, dest).catch((e) => log.warn(`moving ${userText(a.name)}'s cards to its recreated worktree`, e))
   let next: AgentDef | undefined
   await workspace.mutateProjectConfig(projectPath, (now) => {
     const setup = !!now.worktreeSetup.trim()

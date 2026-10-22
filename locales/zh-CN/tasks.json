@@ -49,7 +49,7 @@
   "tasks.error.orderChanged": "排序期间 #{n} 发生了变化；请重新读取看板。",
   "tasks.error.orderElsewhere": "#{n} 在“{other, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{other}}}”中，不在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”中。只有已在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”中的卡片才能在那里排序。",
   "tasks.error.orderNone": "cards：请按所需顺序列出卡片编号。",
-  "tasks.error.overrideNotAgents": "代理不能对工作流程规则例外放行：只有用户或助手可以。",
+  "tasks.error.overrideNotAgents": "智能体不能对工作流程规则例外放行：只有用户或助手可以。",
   "tasks.error.overrideShape": "例外放行需要理由：以文本说明卡片为何不顾其规则而移动。",
   "tasks.error.ownCardsOnly": "你只能查看自己项目（{project}）的卡片。",
   "tasks.error.projectThenAgent": "请先把卡片移到另一个项目，再交给该项目的某个智能体。",

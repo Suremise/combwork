@@ -267,10 +267,30 @@ target. The runtime's `enqueue` action (written with each `IntegrationRequested`
 with open entries) start it; it takes the target's lease (`QueueRunner.acquire`, with agents' process supervisor), runs
 `MergeQueue.recover(target)` with each run's queue, then `drain(target)` with the runner's folder, its recording git and spawn, #1349's
 checks (`queueChecksApp.ts`, on `spawnNow`), the advance under #1347's `withRepoLock` (the lease checked again inside
-it) and `workflowEnforced` (off: entries pause `rulesOff` before the advance); a target checked out in a folder pauses
-`checkedOut` until #1351. It releases the runner when the queue is empty or paused; a workspace closing releases its
+it) and `workflowEnforced` (off: entries pause `rulesOff` before the advance). A target checked out in a folder (#1351,
+SPEC §16.9.2) is advanced by `MergeQueue.advanceCheckedOut`'s journal under the lock and `folderFence.changingFolder`,
+its conditions first (`folderBuilders`: `sessions.locksIn` and the folder's running Progress runs), its recovery
+`MergeQueue.found` (the table, read only) acted on under the same; its terminal state is a typed record on the pause
+(`QueuePause.stuck`: schema step 17) and a For you Decide (`QUEUE_STUCK_GATE`), whose answer's `enqueue` action
+(`recheck`) runs `queueControls.recheckStuck`. Under Advanced `hive.queue.checkedOutTarget` = ask, the queue asks
+(`QUEUE_ADVANCE_GATE`, bound to entry, expected and result) and pauses `approval`; `runOnce` reads the answer
+(`answered`): approved, `process(…, ready)` advances that test merge at once. Test copies' seams: `HIVE_TEST_QUEUE_CRASH`
+(any `QueueHook` of the journal) and `HIVE_TEST_QUEUE_RACE`. It releases the runner when the queue is empty or paused; a workspace closing releases its
 runners first, so a check the close ends writes nothing. The action worker's runs and the hosts' run outside any write
 fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is a no-op until P7.
+
+**The queue's controls** (#1353, SPEC §16.9.3): `workflow/queueControls.ts` builds the one model of a target's queue
+(`shared/workflow/queue.ts`: testing, queued, the latest outcomes from the cards' facts, the pause, the lease's
+profile) and does Pause queue and Resume; a card's Remove from queue and Retry merge are intents on the board's intent
+path (`cardIntents.ts`, the runtime's `removeFromQueue` and `retryMerge`, by the user or the Assistant only). Each host
+keeps its entry's step (`QueueConfig.onStep`) and its check's run (`appQueueChecks`' `onRun`) for the model
+(`queueLive`), and every change is a `queue-changed` event. The queue's order (its open entries as requested, the one
+testing now, those waiting) is `queueOrder` in `workflow/queueState.ts`, which agents' card reads and refusals use too
+(#1354: the runtime reads `queueLive` through `WorkflowConfig.queueLive`, set by the app with `setQueueLive`). The window's `queue:*` IPC is the user's; the Agent API's
+`/v1/queue` routes are readable by the project's agents and changeable only by the Assistant (`assistantChange`); the
+Assistant's `hive_queue` wraps them. A user pause is checked again inside `IntegrationStarted`'s write, so a pause that
+lands while the advance waits for the repository lock stops it; Resume reads the recovery table without writing
+(`MergeQueue.stillStuck`) before it clears a needs-you pause.
 
 **Hive's queue commits** (#1350, SPEC §16.9.1 step 4): `MergeQueue.testMerge` runs the merge (and a squash's commit)
 with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a

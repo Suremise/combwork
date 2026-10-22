@@ -1,5 +1,5 @@
 import type { AgentLeftovers } from './agentProcesses'
-import type { AntivirusStatus, AvAction, AvChangeResult, AvSuggestionReply } from './antivirus'
+import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
@@ -116,12 +116,13 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { GitHistory, GitRepoInfo, GitRepoSummary } from './gitRepo'
+import type { GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
+import type { QueueResumed, QueueView } from './workflow/queue'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -260,6 +261,8 @@ export interface HiveRequests {
   'workspace:movePlan': (opts?: MoveOptions) => MovePlan | null
   /** Repairs it (refused while agents run): worktrees, session folders, the CLIs' per-path data (copied), Open Recent. */
   'workspace:moveRepair': (opts?: MoveOptions) => MoveReport
+  /** Defender and the moved workspace's old and new folders (#1302), for Repair's dialog; null when the workspace didn't move. */
+  'workspace:moveDefender': () => AvMovePlan | null
   /** Locate…: a folder picker for an agent's worktree that wasn't found; the folder, or null when cancelled. */
   'workspace:moveLocate': (projectPath: string, agentId: string) => string | null
 
@@ -283,6 +286,19 @@ export interface HiveRequests {
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
   'workflow:presetsNoticeSaid': () => void
+  /**
+   * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused. Each
+   * change comes as a `queue-changed` event.
+   */
+  'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
+  'queue:pause': (projectPath: string, target: string) => QueueView
+  /** Resume: clears the pause once its cause, where Hive can see it, is gone (`resumed`); else the queue is paused again, saying why. */
+  'queue:resume': (projectPath: string, target: string) => QueueResumed
+  /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
+  'queue:remove': (n: number, reason?: string) => TaskCard
+  /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
+  'queue:retry': (n: number, reason?: string) => TaskCard
   /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */
@@ -738,6 +754,15 @@ export interface HiveRequests {
   'git:pull': (projectPath: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
   'git:push': (projectPath: string, remote?: string) => string
+  /** Push to… (#1385): the branch checked out, or every branch and tag, to any remote; never changes what a branch tracks. */
+  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string) => string
+  /** The local branches tracking a remote, all of them: what Remove's confirmation lists (#1385). */
+  'git:remoteTracking': (projectPath: string, remote: string) => string[]
+  /** `expected`: the branches the confirmation listed; refused when those tracking it now differ. */
+  'git:removeRemote': (projectPath: string, name: string, expected?: string[]) => string
+  'git:renameRemote': (projectPath: string, from: string, to: string) => string
+  /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
+  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean) => string
   'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string

@@ -9,7 +9,12 @@
 // The card's ruleset decides (§16.6.5): an entry whose card started under Hive merges is merged even after the project's
 // options moved to another finisher. With workflow rules off (`hive.workflow.enforce`), nothing runs to an advance: open
 // entries pause `rulesOff` (once an advance has begun, recovery finishes it), and carry on when the rules are on again.
-// A target checked out in a folder pauses `checkedOut` until #1351.
+// A target checked out in a folder is advanced there by the journaled update (#1351, §16.9.2), with that folder fenced
+// (folderFence.ts) and paused while an agent builds in it; asked first (For you) while Settings → Advanced, Merge into a
+// checked-out branch, says Ask each time.
+//
+// Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
+// (queueControls.ts), and tells the window of each change (`queue-changed`).
 
 import { basename, join } from 'path'
 import { app } from 'electron'
@@ -24,13 +29,16 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, type QueueConfig } from './mergeQueue'
+import { MergeQueue, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
+import { changingFolder, inFolder } from '../folderFence'
+import { sessions } from '../sessions'
+import { progress } from '../progressService'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { QUEUE_CHECKED_OUT_TARGET, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 
 const log = createLogger('queue')
 
@@ -46,6 +54,9 @@ interface Host {
   target: string
   running: Promise<void> | null
   again: boolean
+  /** The entry its queue is taking through its steps now, and the progress run of the check running for it. */
+  now: QueueStepInfo | null
+  run: string | null
 }
 
 const hosts = new Map<string, Host>()
@@ -61,7 +72,7 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
   const key = hostKey(ws.path, projectPath, target)
   let h = hosts.get(key)
   if (!h || !alive(h)) {
-    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false }
+    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false, now: null, run: null }
     hosts.set(key, h)
   }
   if (h.running) {
@@ -74,6 +85,9 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
     .catch((e) => log.warn(`running the merge queue for ${userText(target)} in ${userText(basename(projectPath))}`, e))
     .finally(() => {
       host.running = null
+      host.now = null
+      host.run = null
+      queueChanged(ws, projectPath, target)
       if (!alive(host)) hosts.delete(key)
       // Asked again after its loop had ended (while it released its runner): run once more.
       else if (host.again) void kickQueue(ws, projectPath, target)
@@ -82,7 +96,22 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
 }
 
 /** This profile's name, as another Hive's panel says who runs a queue ("run by Hive-Dev"). */
-const profileName = (): string => basename(app.getPath('userData'))
+export const profileName = (): string => basename(app.getPath('userData'))
+
+/** Tells the workspace's window that a target's queue changed (its model: queueControls.ts), for the panel and the card. */
+export function queueChanged(ws: WorkspaceService, projectPath: string, target: string): void {
+  if (ws.path) ws.emit({ type: 'queue-changed', workspacePath: ws.path, projectPath, target })
+}
+
+/**
+ * What this Hive's host of a target is doing now: running (a run going), the entry's step and the check's run. Nothing
+ * running here: all null (another Hive may run it: its lease says).
+ */
+export function queueLive(ws: WorkspaceService, projectPath: string, target: string): { running: boolean; now: QueueStepInfo | null; run: string | null } {
+  const h = ws.path ? hosts.get(hostKey(ws.path, projectPath, target)) : undefined
+  if (!h || !alive(h)) return { running: false, now: null, run: null }
+  return { running: !!h.running, now: h.now, run: h.run }
+}
 
 async function runHost(h: Host): Promise<void> {
   let runner: QueueRunner | null = null
@@ -135,7 +164,10 @@ async function runHost(h: Host): Promise<void> {
 
 /** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Hive's checks. */
 function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
-  const checks = appQueueChecks(h.ws, h.projectPath, (file, args, opts) => runner.spawnNow('check', file, args, opts))
+  const checks = appQueueChecks(h.ws, h.projectPath, (file, args, opts) => runner.spawnNow('check', file, args, opts), (run) => {
+    h.run = run
+    queueChanged(h.ws, h.projectPath, h.target)
+  })
   const cfg: QueueConfig = {
     folder: runner.folder(),
     holds: () => runner.holds(),
@@ -143,26 +175,78 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
-    pauseCheckedOut: true,
+    // A target checked out in a folder (#1351, §16.9.2): advanced there with that folder fenced, unless an agent builds
+    // in it; asked first while Merge into a checked-out branch says so (OP-40).
+    // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
+    fence: (folder, fn) => changingFolder(folder, 'a merge by the merge queue', fn),
+    folderBusy: (folder) => folderBuilders(h.ws, folder),
+    checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
-    // Test copies (unpackaged): HIVE_TEST_QUEUE_CRASH=afterAdvance ends Hive at once once the target has moved, before
-    // `Integrated` is written (S33c: the next start's recovery observes it); no quit handler runs, nothing is released.
-    ...(!app.isPackaged && process.env.HIVE_TEST_QUEUE_CRASH === 'afterAdvance' ? { hooks: { afterAdvance: () => (exitBy('app.exit', 'a test crash after the merge queue advanced', () => app.exit(1)), new Promise<void>(() => undefined)) } } : {})
+    onStep: (step) => {
+      if (step?.step !== h.now?.step || step?.entry !== h.now?.entry) h.run = null
+      h.now = step
+      queueChanged(h.ws, h.projectPath, h.target)
+    },
+    ...(app.isPackaged ? {} : { hooks: testHooks(h.projectPath, h.target) })
   }
   return cfg
+}
+
+/** The points of an advance a test copy can crash at (HIVE_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
+const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
+let raced = false
+
+/**
+ * Test copies (unpackaged) only. `HIVE_TEST_QUEUE_CRASH=<point>` ends Hive at once at that point of an advance (S33c,
+ * S34d: the next start's recovery reads the journal); no quit handler runs, nothing is released.
+ * `HIVE_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
+ */
+function testHooks(projectPath: string, target: string): QueueHooks {
+  const hooks: QueueHooks = {}
+  const crash = process.env.HIVE_TEST_QUEUE_CRASH
+  const point = CRASH_POINTS.find((p) => p === crash)
+  if (point) hooks[point] = () => (exitBy('app.exit', `a test crash at the merge queue's ${point}`, () => app.exit(1)), new Promise<void>(() => undefined))
+  if (process.env.HIVE_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
+    hooks.beforeRef = async () => {
+      // Once per run of Hive: the entry tested again on the moved target then merges.
+      if (raced) return
+      raced = true
+      // A commit on the target made outside Hive (an empty one, on its tree), the ref moved to it.
+      const head = await git(projectPath, ['rev-parse', `refs/heads/${target}`])
+      const made = head.ok ? await git(projectPath, ['-c', 'user.name=Race', '-c', 'user.email=race@example.invalid', 'commit-tree', `${head.out.trim()}^{tree}`, '-p', head.out.trim(), '-m', 'race']) : null
+      if (made?.ok) await git(projectPath, ['update-ref', `refs/heads/${target}`, made.out.trim(), head.out.trim()])
+    }
+  }
+  return hooks
+}
+
+/**
+ * What makes an agent build in a folder (§16.9.2): the files agents hold locks on there, and the folders of the runs
+ * going there (an agent's, the Assistant's or a script's; not Hive's own). Null when there are none: an idle agent, or one
+ * whose session lives there but works in a review copy, holds no lock and runs nothing there.
+ */
+function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
+  const locked = sessions.locksIn(folder)
+  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'hive' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
+  const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]
+  return what.length ? what : null
 }
 
 /** Rules off: a target with open entries is paused `rulesOff` (its first entry's card named), unless paused already. */
 async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Promise<void> {
   const first = q.entries(target)[0]
   if (!first || q.paused(target)) return
-  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key })) // i18n-ignore: a pause reason's code, not text
+  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key }, true)) // i18n-ignore: a pause reason's code, not text
 }
 
 /** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
 async function dropQueuePin(projectPath: string, cardKey: string): Promise<void> {
-  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${cardKey.replace(/[^A-Za-z0-9._-]/g, '-')}`])
+  const key = cardKey.replace(/[^A-Za-z0-9._-]/g, '-')
+  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${key}`])
+  // Its entries' strict updates (#1352: `refs/hive/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/hive/queue/${key}-e*`])
+  for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(projectPath, ['update-ref', '-d', ref])
 }
 
 /**
@@ -225,7 +309,14 @@ export function startQueueHosts(): void {
   onAction('enqueue', (a, ws) => {
     const project = projectOfCard(ws, a.card)
     const target = typeof a.payload.target === 'string' ? a.payload.target : ''
-    if (project && target) void kickQueue(ws, project, target)
+    if (!project || !target) return
+    queueChanged(ws, project, target)
+    // The user answered that an advance left part way is settled (#1351): looked at again, as Resume does.
+    if (a.payload.recheck === true) {
+      void import('./queueControls').then((c) => c.recheckStuck(ws, project, target)).catch((e) => log.warn(`looking again at the merge queue for ${userText(target)}`, e))
+      return
+    }
+    void kickQueue(ws, project, target)
   })
   onAction('releaseSlot', () => undefined)
   // A submission's pin (§16.9.3): what was reviewed is kept until its card is archived (prunePins).
@@ -244,10 +335,16 @@ export function startQueueHosts(): void {
     }
   })
   let enforced = workflowEnforced()
+  const checkedOutMode = (): unknown => advanced.get(QUEUE_CHECKED_OUT_TARGET)
+  let mode = checkedOutMode()
   const offAdvanced = advanced.onChange(() => {
     const now = workflowEnforced()
     if (now && !enforced) for (const ws of openWorkspaces()) void startOpen(ws, true).catch((x) => log.warn('resuming the merge queues', x))
+    // Merge into a checked-out branch set to Automatically (#1351, HR4's round 1): a queue waiting for an Approve looks
+    // again, and goes ahead.
+    else if (checkedOutMode() === 'auto' && mode !== 'auto') for (const ws of openWorkspaces()) void startOpen(ws).catch((x) => log.warn('waking the merge queues', x))
     enforced = now
+    mode = checkedOutMode()
   })
   // A workspace closing: its runners released first (their processes ended; from then on every write their runs try is
   // refused by the fence, so a check ended by the close never returns its card), then its runs waited for, briefly.

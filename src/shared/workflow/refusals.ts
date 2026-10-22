@@ -9,7 +9,7 @@ import type { GuardId } from './pieces'
 import { MOVE_NAMES, RULE_NAMES, STAGE_NAME, workflowLine } from './texts'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -121,6 +121,12 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.done.contained.next', defaultMessage: 'Merge {revision} into {target}, then report the merge again.', description: 'The next step after a refused report of a merge.' }),
     msg({ id: 'workflow.refused.done.contained.change', defaultMessage: 'This rule is set in Version Control → Who merges.', description: 'Where the rule that checks a merge is changed.' })
   ),
+  'merge.hiveMerges': r(
+    msg({ id: 'workflow.refused.merge.hiveMerges.message', defaultMessage: "Hive merges {card}: agents don't merge it or report its merge.", description: "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12." }),
+    // Its next step is the card's place in the queue (QUEUE_NEXT, by its `queue` value).
+    msg({ id: 'workflow.refused.merge.hiveMerges.next', defaultMessage: 'Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.', description: "The next step after a refused merge of a card Hive merges, when it isn't in the merge queue yet." }),
+    msg({ id: 'workflow.refused.merge.hiveMerges.change', defaultMessage: 'This rule is set in Version Control → Who merges. A card keeps the rules it started with.', description: 'Where the rule that Hive merges cards is changed; a card keeps the rules it started under unless the change is applied to it.' })
+  ),
   'move.notFromHere': r(
     msg({ id: 'workflow.refused.move.notFromHere.message', defaultMessage: "{card} is in {stage}: {move} isn't possible from there.", description: 'A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent.' }),
     msg({ id: 'workflow.refused.move.notFromHere.next', defaultMessage: 'From {stage}, use: {moves}.', description: 'The next step: the intents possible from the stage. {moves} lists them.' })
@@ -161,6 +167,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),
     msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: 'The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.', description: "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card." })
   ),
+  'queue.advancing': r(
+    msg({ id: 'workflow.refused.queue.advancing.message', defaultMessage: '{card} is being merged into {target} now: it can no longer be taken out of the merge queue.', description: "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name." }),
+    msg({ id: 'workflow.refused.queue.advancing.next', defaultMessage: "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.", description: 'The next step after a refused Remove from queue while the card is being merged. {target} is a branch name.' })
+  ),
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
     msg({ id: 'workflow.refused.review.noSubmission.next', defaultMessage: 'Wait for its builder to submit it.', description: 'The next step when there is nothing to review.' })
@@ -190,6 +200,29 @@ export const WHY = {
   stale: msg({ id: 'workflow.refused.why.stale', defaultMessage: 'its pass is stale.', description: "The {why} of a refused merge or requeue: the revision's pass no longer holds." }),
   passes: msg({ id: 'workflow.refused.why.passes', defaultMessage: '{n, number} of {q, plural, one {# reviewer} other {# reviewers}} passed it.', description: 'The {why} of a refused merge: not enough distinct reviewers passed the revision. {n} and {q} are numbers.' }),
   userOk: msg({ id: 'workflow.refused.why.userOk', defaultMessage: "it waits for the OK before merging.", description: "The {why} of a refused merge: the user's approval is missing." })
+} satisfies Record<string, Msg>
+
+/**
+ * The next step of `merge.hiveMerges` by the card's place in the merge queue (its `queue` value: queueState.ts's state);
+ * one not listed (not queued yet, or left it) is the rule's own next.
+ */
+export const QUEUE_NEXT = {
+  queued: msg({ id: 'workflow.refused.merge.hiveMerges.nextQueued', defaultMessage: 'It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.', description: 'The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next).' }),
+  testing: msg({ id: 'workflow.refused.merge.hiveMerges.nextTesting', defaultMessage: 'The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.', description: 'The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name.' }),
+  paused: msg({ id: 'workflow.refused.merge.hiveMerges.nextPaused', defaultMessage: 'It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.', description: "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name." }),
+  returned: msg({ id: 'workflow.refused.merge.hiveMerges.nextReturned', defaultMessage: 'It came back from the merge queue: fix it in your worktree, commit and submit again.', description: 'The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook).' }),
+  merged: msg({ id: 'workflow.refused.merge.hiveMerges.nextMerged', defaultMessage: 'The merge queue has merged it already: nothing is left to do.', description: 'The next step after a refused merge of a card Hive has already merged.' })
+} satisfies Record<string, Msg>
+
+/**
+ * The next step for a card in a paused merge queue by what the pause waits for (#1406, the refusal's `waits`, from
+ * queueState.ts's pauseWait): the user's Resume is QUEUE_NEXT.paused.
+ */
+export const PAUSED_NEXT = {
+  answer: msg({ id: 'workflow.refused.merge.hiveMerges.nextPausedAnswer', defaultMessage: "It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.", description: "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name." }),
+  fix: msg({ id: 'workflow.refused.merge.hiveMerges.nextPausedFix', defaultMessage: 'It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.', description: 'The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name.' }),
+  folder: msg({ id: 'workflow.refused.merge.hiveMerges.nextPausedFolder', defaultMessage: 'It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.', description: "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name." }),
+  rules: msg({ id: 'workflow.refused.merge.hiveMerges.nextPausedRules', defaultMessage: 'It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.', description: 'The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name.' })
 } satisfies Record<string, Msg>
 
 /** The next step of `move.notFromHere` when nothing can be done from the stage (a request answered meanwhile). */
@@ -242,7 +275,9 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
-  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : t.next
+  const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
+  const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
+  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : (queued ?? t.next)
   return { message: f.one(t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 
