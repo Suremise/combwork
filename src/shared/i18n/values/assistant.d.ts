@@ -454,7 +454,6 @@ interface HiveMessageValues {
   'assistant.templateLoad.wholeTitle': { count: number }
   'assistant.templatePlan.agent': undefined
   'assistant.templatePlan.codingAgent': undefined
-  'assistant.templatePlan.created': undefined
   'assistant.templatePlan.default': undefined
   'assistant.templatePlan.effort': undefined
   'assistant.templatePlan.folder': undefined
@@ -462,15 +461,19 @@ interface HiveMessageValues {
   'assistant.templatePlan.mode': undefined
   'assistant.templatePlan.model': undefined
   'assistant.templatePlan.nameLabel': { n: string | number }
-  'assistant.templatePlan.newBadge': undefined
   'assistant.templatePlan.newTip': { path: string | number; base: string | number }
   'assistant.templatePlan.noteSentence': { note: string | number }
   'assistant.templatePlan.ownOn': { branch: string | number }
   'assistant.templatePlan.ownWorktree': undefined
-  'assistant.templatePlan.removed': undefined
-  'assistant.templatePlan.replaced': undefined
   'assistant.templatePlan.reuseTip': { path: string | number }
   'assistant.templatePlan.reuses': { branch: string | number }
+  'assistant.templatePlan.state': undefined
+  'assistant.templatePlan.stateNew': undefined
+  'assistant.templatePlan.stateNewTip': undefined
+  'assistant.templatePlan.stateRemoved': undefined
+  'assistant.templatePlan.stateRemovedTip': undefined
+  'assistant.templatePlan.stateReplaced': undefined
+  'assistant.templatePlan.stateReplacedTip': undefined
   'assistant.templatePlan.where': undefined
   'assistant.templatePlan.withNote': { thing: string | number; note: string | number }
   'assistant.templates.aProject': undefined

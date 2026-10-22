@@ -1811,10 +1811,6 @@
     "defaultMessage": "Coding agent",
     "description": "Load template's table: the column of each agent's CLI (Claude Code, Codex…)."
   },
-  "assistant.templatePlan.created": {
-    "defaultMessage": "Created",
-    "description": "Load template: the heading over the template's agents."
-  },
   "assistant.templatePlan.default": {
     "defaultMessage": "(default)",
     "description": "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults."
@@ -1843,10 +1839,6 @@
     "defaultMessage": "Name of agent {n}",
     "description": "Load template's table: the accessible name of the box for agent number {n}'s name."
   },
-  "assistant.templatePlan.newBadge": {
-    "defaultMessage": "new",
-    "description": "Load template's table: a badge on an agent that replaces one of the same name."
-  },
   "assistant.templatePlan.newTip": {
     "defaultMessage": "A new worktree in {path}, from {base}",
     "description": "Load template's table: tooltip on a new worktree ({path}: its folder; {base}: the branch it starts from)."
@@ -1863,14 +1855,6 @@
     "defaultMessage": "own worktree",
     "description": "Load template's table, Where: the agent gets a worktree of its own."
   },
-  "assistant.templatePlan.removed": {
-    "defaultMessage": "Removed",
-    "description": "Load template: the heading over the agents that go."
-  },
-  "assistant.templatePlan.replaced": {
-    "defaultMessage": "(replaced by a new agent with the same name)",
-    "description": "Load template, after an agent that goes."
-  },
   "assistant.templatePlan.reuseTip": {
     "defaultMessage": "Works in its worktree again: {path} (clean; its branch is left as it is)",
     "description": "Load template's table: tooltip on a worktree worked in again ({path}: its folder)."
@@ -1878,6 +1862,34 @@
   "assistant.templatePlan.reuses": {
     "defaultMessage": "reuses {branch}",
     "description": "Load template's table, Where: the agent works in an old worktree again, on branch {branch}."
+  },
+  "assistant.templatePlan.state": {
+    "defaultMessage": "Change",
+    "description": "Load template's table (#1315): the column saying what happens to each agent (replaced, new, removed)."
+  },
+  "assistant.templatePlan.stateNew": {
+    "defaultMessage": "new",
+    "description": "Load template's table, the Change column: an agent the project doesn't have yet. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateNewTip": {
+    "defaultMessage": "An agent the project doesn’t have yet.",
+    "description": "Load template's table: tooltip on new."
+  },
+  "assistant.templatePlan.stateRemoved": {
+    "defaultMessage": "removed",
+    "description": "Load template's table, the Change column: a project agent the template has none of: it goes. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateRemovedTip": {
+    "defaultMessage": "The template has no agent of this name, so this one goes.",
+    "description": "Load template's table: tooltip on removed."
+  },
+  "assistant.templatePlan.stateReplaced": {
+    "defaultMessage": "replaced",
+    "description": "Load template's table, the Change column: the template's agent replaces the project's agent of the same name. Lower case, a badge."
+  },
+  "assistant.templatePlan.stateReplacedTip": {
+    "defaultMessage": "A new agent with these settings replaces the agent of the same name.",
+    "description": "Load template's table: tooltip on replaced."
   },
   "assistant.templatePlan.where": {
     "defaultMessage": "Where",
