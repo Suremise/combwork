@@ -215,7 +215,11 @@ describe('retention and the size cap', () => {
     expect(Math.max(...goneIds)).toBeLessThan(Math.min(...ids.filter((x) => left.has(x))))
     // Freed pages are given back (incremental auto-vacuum): the file isn't kept at its biggest.
     j.closeJournal(h)
-    expect(statSync(j.journalFile(h)).size).toBeLessThan(6 * 1024 * 1024)
+    // What was left beside it, if it isn't (#1324: once 16 MB in a loaded full run): a WAL still there is a checkpoint
+    // that didn't finish at the close, none is a vacuum that gave nothing back.
+    const file = j.journalFile(h)
+    const beside = ['-wal', '-shm'].map((x) => `${x}: ${existsSync(file + x) ? statSync(file + x).size : 'none'}`).join(', ')
+    expect(statSync(file).size, beside).toBeLessThan(6 * 1024 * 1024)
   })
 })
 
