@@ -11,7 +11,9 @@ import { join } from 'path'
 import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
 import { config } from '../config'
-import { HiveError } from '../hiveError'
+import { HiveError, hiveError } from '../hiveError'
+import { projectPlatform } from '../platform/registry'
+import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
@@ -47,7 +49,8 @@ function projectOf(ws: WorkspaceService, projectPath: string): { path: string; n
   return { path: p.path, name: p.name, platform: p.platform.id }
 }
 
-const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null): OptionLevels => ({ global: config.settings.workflow, workspace: ws.config.workflow, project: own })
+/** The levels of a project's options; `folder` checks its place too (OP-29: inside a larger repository, #1419). */
+const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null, folder?: string): OptionLevels => ({ global: config.settings.workflow, workspace: ws.config.workflow, project: own, ...(folder ? { folder } : {}) })
 
 /** The options the project sets itself, for its platform (a project's options for another platform don't apply). */
 const ownOf = (cfg: { workflow?: { platform: PlatformId; options: Partial<WorkflowOptions> } }, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : {})
@@ -82,7 +85,7 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
   const project = projectOf(ws, projectPath)
   const cfg = await ws.projectConfig(project.path)
   const own = ownOf(cfg, project.platform)
-  const levels = levelsOf(ws, own)
+  const levels = levelsOf(ws, own, project.path)
   const below = resolveOptions(project.platform, { ...levels, project: null })
   const now = checkOptions(project.platform, levels)
   const inputs = await presetInputs(project.path, project.platform)
@@ -183,9 +186,9 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
 export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
-function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange) {
-  const before = checkOptions(platform, levelsOf(ws, current))
-  const after = checkOptions(platform, levelsOf(ws, change.options))
+function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {
+  const before = checkOptions(platform, levelsOf(ws, current, folder))
+  const after = checkOptions(platform, levelsOf(ws, change.options, folder))
   const was = before.problems.length ? resolveOptions(platform, levelsOf(ws, current)).options : before.resolved.options
   // Every key either has: an optional option (the names, N5) set before and gone now is a change too.
   const keys = [...new Set([...Object.keys(after.resolved.options), ...Object.keys(was)])] as (keyof WorkflowOptions)[]
@@ -193,7 +196,7 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
   return { problems: after.problems, changed, options: after.resolved.options }
 }
 
-/** The project's cards in flight now: started this cycle and not Done. */
+/** The project's cards in flight now: started this cycle and not Done (also the platform switch's warning, #1419). */
 export async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; key: string; title: string }[]> {
   const wf = await workflowFor(ws, project.path)
   if (!wf) return []
@@ -213,7 +216,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const project = projectOf(ws, projectPath)
   const change = shapeOf(raw)
   const cfg = await ws.projectConfig(project.path)
-  const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change)
+  const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)
   // Names alone (N5) aren't rules: they apply at once, so no lane or card keeps old rules over them.
   const appliesNow = namesOnly(c.changed)
   const lanes = appliesNow ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
@@ -243,9 +246,12 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []
   await ws.mutateProjectConfig(project.path, (cfg) => {
+    // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
+    const now = projectPlatform(project.path, cfg.platform).id
+    if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
     // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
     if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
-    const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change)
+    const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)
     if (c.problems.length) throw new WorkflowRefused(c.problems)
     changed = c.changed
     const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))

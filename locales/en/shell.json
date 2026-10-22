@@ -311,6 +311,10 @@
     "defaultMessage": "Open External Terminal Here",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
   },
+  "shell.command.project.openVersionControl": {
+    "defaultMessage": "Open Version Control",
+    "description": "A command, in the Project category: shows a project's Version Control tab (glossary 2.1). It isn't in the menus or the palette: notifications run it by its name (Hive found another version control in a project's folder)."
+  },
   "shell.command.project.previous": {
     "defaultMessage": "Previous Project",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."

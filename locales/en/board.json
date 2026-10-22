@@ -2219,6 +2219,10 @@
     "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes."
   },
+  "board.queue.pause.subfolderTarget": {
+    "defaultMessage": "This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (OP-29): the project is a subfolder of a bigger Git repository and the card's options name no target branch. {card} is the card's key. Version Control → Workflow is a place in Hive (glossary 2.1); saving the options there can apply them to cards already started."
+  },
   "board.queue.pause.targetMovesFast": {
     "defaultMessage": "{target} kept moving during each test merge. Resume once it settles.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the target ({target}: a branch) moved during every test merge. Glossary 2.5: test merge."

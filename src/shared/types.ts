@@ -17,6 +17,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
+import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
@@ -1088,6 +1089,23 @@ export interface WorkflowCheck {
   inFlight: { number: number; key: string; title: string }[]
 }
 
+/**
+ * What switching a project's version control would do (#1419, §16.6.5's warning): from what to what, why it can't be
+ * made now (null: it can), and the running lanes and cards in flight that keep their platform's rules. A switch is never
+ * applied to cards in flight: a Git card can't finish under None's rules.
+ */
+export interface PlatformSwitchCheck {
+  from: PlatformId
+  to: PlatformId
+  refused: SwitchRefusal | null
+  lanes: { id: string; name: string | null; builder: string }[]
+  inFlight: { number: number; title: string }[]
+  /** None chosen for a folder that is a Git repository: Hive then records no commits or merges for its cards. */
+  gitFolder: boolean
+  /** A card in flight goes through Hive's merge queue (its ruleset's): the queue carries on, and stays shown. */
+  queue: boolean
+}
+
 export interface ProjectConfig {
   /** 2 since 0.2.0: agents are all equal and a project starts with none (0.1's agents are cleared). */
   version: 2
@@ -1153,6 +1171,11 @@ export interface ProjectConfig {
    * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
    */
   platform?: PlatformId
+  /**
+   * What detection found when the user last switched the platform (#1419, `foundKey`): `git`, `none` or `other:<name>`.
+   * While the folder still shows that, no switch is offered: choosing None for a Git folder isn't asked about again.
+   */
+  platformFound?: string
   /**
    * The project's workflow options (SPEC §16.6.6, OP-5): its platform, the preset they came from (null: set one by one,
    * or the upgrade's), and the options. The upgrade to 1.0 writes them from how the project works today (#1218, §16.17);

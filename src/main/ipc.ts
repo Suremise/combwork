@@ -102,6 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
@@ -735,12 +736,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       // The workflow options are checked as a whole (contradictions, what this version offers): workflow:setOptions.
       if (patch.workflow !== undefined) throw new HiveError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+      // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
+      if (patch.platform !== undefined) throw new HiveError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
       return workspace.updateProjectConfig(workspace.assertProject(p), patch)
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
+    'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
+    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'workflow:levelForm': (level, platform) => levelForm(workspace, level, platform),

@@ -77,6 +77,7 @@
   "shell.command.project.next": "Następny projekt",
   "shell.command.project.openExplorer": "Pokaż projekt w Eksploratorze plików",
   "shell.command.project.openTerminal": "Otwórz tutaj terminal zewnętrzny",
+  "shell.command.project.openVersionControl": "Otwórz Kontrolę wersji",
   "shell.command.project.previous": "Poprzedni projekt",
   "shell.command.project.remove": "Usuń projekt…",
   "shell.command.project.storage": "Miejsce na dysku i porządki w projekcie…",

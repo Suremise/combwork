@@ -77,7 +77,7 @@ import { cardFacts, cardKind, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
-import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
+import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
@@ -485,6 +485,9 @@ async function projectSummary(p: string) {
     })),
     // The workspace's MCP servers (#713): all available to the project, on only where turned on.
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), on: mcpOn },
+    // Its version control, what Hive finds in its folder now, and the switch it offers when they differ (#1419): never
+    // switched silently; the user switches it (the Assistant within Control: project.workflow.platform).
+    ...(info.platform ? { versionControl: versionControlOf(info.platform) } : {}),
     // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
     workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
     // The project's configuration; its workflow options are `workflow`'s, resolved (not again here, raw).
@@ -493,6 +496,13 @@ async function projectSummary(p: string) {
 }
 
 const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<ProjectConfig, 'workflow'> => rest
+
+/** A project's version control for agents, lean: in force, found, and the offer when they differ. */
+function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
+  const d = p.detected
+  const found = d.other ? `${d.other} (not supported: None)` : d.platform === 'git' ? `git at ${d.root ?? ''}${d.subfolder ? ' (a subfolder of that repository)' : ''}` : 'none' // i18n-ignore: agent-facing (English)
+  return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
+}
 
 /** The agent an API call is for: an agent id or name, else the project's only agent (400 with several, 409 with none). */
 async function agentParam(p: string, value: unknown): Promise<string> {
@@ -929,7 +939,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
       await recordingChanges(ws, 'setting', `change ${path}${where}`, () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
-    return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}) }
+    return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
   } catch (err) {
     assistant.record(ws, act, line, (err as Error).message, { reason: publicReason(statusOf(err)) })
     throw err instanceof SettingRefused ? new HttpError(err.status, err.message) : err

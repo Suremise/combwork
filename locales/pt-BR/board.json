@@ -554,6 +554,7 @@
   "board.queue.pause.signing": "Não foi possível assinar o commit de merge.",
   "board.queue.pause.signingWaits": "A assinatura do commit de merge está aguardando você (uma frase secreta ou um PIN). Desbloqueie sua chave de assinatura e depois retome.",
   "board.queue.pause.staged": "Há alterações preparadas na pasta em que {target} está em checkout. Faça commit delas ou retire-as da preparação e depois retome.",
+  "board.queue.pause.subfolderTarget": "Este projeto está dentro de um repositório maior, então a fila só faz merge em um branch indicado pelas opções do cartão. Indique-o em Controle de versão → Fluxo de trabalho, aplique-o a {card} ao salvar e depois retome; ou remova {card} da fila.",
   "board.queue.pause.targetMovesFast": "{target} mudou durante cada merge de teste. Retome quando estabilizar.",
   "board.queue.pause.uncounted": "As verificações de merge passaram, mas não contaram para o merge, várias vezes seguidas. A seção Trabalho do cartão diz por quê.",
   "board.queue.pause.unstagedChanges": "{files, select, none {Arquivos que o merge altera} other {{files}}} têm alterações na pasta em que {target} está em checkout. Faça commit delas ou desfaça-as e depois retome.",

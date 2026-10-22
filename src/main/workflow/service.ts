@@ -16,6 +16,7 @@ import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
+import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
 import { msg } from '../../shared/i18n'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -163,6 +164,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
+    // Its Git repository gone, or another version control found (#1419, S20): what Hive offers in its place is None.
+    repositoryGone: () => detect(project.path).platform !== 'git',
     movePending: async () => {
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
       return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)

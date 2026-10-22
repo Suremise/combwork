@@ -784,8 +784,8 @@
     "description": "An error opening a workspace: the folder {folder} is the workspace of another Hive window."
   },
   "service.workspace.platformGitFound": {
-    "defaultMessage": "{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.",
-    "description": "A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it."
+    "defaultMessage": "{project} is a Git repository now. Hive goes on treating it as a project without version control until you switch it in its Version Control tab.",
+    "description": "A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it by itself: the Version Control tab offers the switch (glossary 2.1: Version Control)."
   },
   "service.workspace.platformInvalid": {
     "defaultMessage": "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.",
@@ -795,13 +795,17 @@
     "defaultMessage": "Unknown version control setting in {project}",
     "description": "A notice's title: the project {project}'s settings file names a version control Hive doesn't have."
   },
+  "service.workspace.platformOpen": {
+    "defaultMessage": "Open Version Control",
+    "description": "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)."
+  },
   "service.workspace.platformOtherFound": {
-    "defaultMessage": "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.",
-    "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it."
+    "defaultMessage": "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
+    "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
   },
   "service.workspace.platformRepositoryGone": {
-    "defaultMessage": "{project}'s Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back.",
-    "description": "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it."
+    "defaultMessage": "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.",
+    "description": "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
   },
   "service.workspace.platformTitle": {
     "defaultMessage": "Version control changed in {project}",

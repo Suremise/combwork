@@ -363,6 +363,8 @@
   "tips.unmerged.title": "See what a worktree agent has to merge",
   "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
   "tips.unusedWorktrees.title": "Tidy kept worktrees",
+  "tips.versionControlSwitch.text": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
+  "tips.versionControlSwitch.title": "Switch between None and Git",
   "tips.versionControlTab.text": "A project’s Version Control tab says what Hive found in its folder, and starts with Workflow: who reviews, which checks pass first and who merges. Its header names the preset, and a click on it opens them.",
   "tips.versionControlTab.title": "One tab for version control and workflow",
   "tips.viewerTokens.text": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",

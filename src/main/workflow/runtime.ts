@@ -118,6 +118,11 @@ export interface WorkflowConfig {
    * an agent's worktree still recorded at its old place is Repair's to move then, not gone.
    */
   movePending?: () => Promise<boolean>
+  /**
+   * Whether the project's Git repository is gone (#1419, S20: `.git` removed or moved, or another version control found
+   * instead): a Git card's refusal for what couldn't be read then offers the switch to None as its next step.
+   */
+  repositoryGone?: () => boolean
   /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
   locksOf?: (agent: string) => string[]
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
@@ -400,6 +405,8 @@ export class Workflow {
 
   /** A refusal: recorded as `Refused` when an agent or the Assistant was refused (the user's refused drags aren't). */
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
+    // A Git card refused for what couldn't be read, its repository gone (S20): the next step is the offer (#1419).
+    if (g.rule === 'platform.unknown' && card && this.rulesetOf(card).options.platform === 'git' && this.cfg.repositoryGone?.()) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).

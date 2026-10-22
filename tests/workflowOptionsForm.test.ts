@@ -305,12 +305,14 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       committedNeedsFolder: { ...allOff('git'), finish: 'committed', folder: 'slots' },
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
       hiveMergesNeedsGit: { ...allOff('none'), finish: 'hiveMerges' },
-      noneHasNoSlots: { ...allOff('none'), folder: 'slots' }
+      noneHasNoSlots: { ...allOff('none'), folder: 'slots' },
+      // A project inside a larger repository (#1419), its target not its own: known where the save checks it.
+      subfolderTarget: { ...allOff('git'), finish: 'agentMerges', folder: 'slots', target: 'main' }
     }
     // Every row of CONTRADICTIONS has its case: a new one fails here until it has.
     expect(Object.keys(cases).sort()).toEqual(Object.keys(CONTRADICTIONS).sort())
     for (const [c, o] of Object.entries(cases) as [Contradiction, WorkflowOptions][]) {
-      const live = liveContradictions(o)
+      const live = liveContradictions(o, c === 'subfolderTarget' ? { subfolder: true } : {})
       for (const key of CONTRADICTION_ROWS[c]) expect(live[key], `${c} under ${key}`).toContain(c)
     }
     expect(liveContradictions(preset('git', 'pair'))).toEqual({})

@@ -105,14 +105,15 @@ import type {
   WorkflowChange,
   WorkflowCheck,
   WorkflowForm,
+  PlatformSwitchCheck,
   WorkflowLevel,
   WorkflowLevelCheck,
   ProjectStages,
   WorkspaceInfo
 } from './types'
+import type { PlatformId } from './platform/descriptors'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
-import type { PlatformId } from './platform/descriptors'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDeleted, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
@@ -291,6 +292,13 @@ export interface HiveRequests {
    * null for a project whose version control isn't recorded yet. A `workflow-changed` event says when to read it again.
    */
   'workflow:stages': (projectPath: string) => ProjectStages | null
+  /** What switching the project's version control would do (#1419, §16.6.5's warning): why it can't now, what keeps old rules. */
+  'workflow:checkPlatform': (projectPath: string, to: PlatformId) => PlatformSwitchCheck
+  /**
+   * Switches the project's version control from its next card (#1419), checked again under its lock: refused when
+   * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
+   */
+  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
   /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */

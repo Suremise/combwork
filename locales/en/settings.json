@@ -2767,6 +2767,22 @@
     "defaultMessage": "Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.",
     "description": "What the setting \"Workflow options\" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1."
   },
+  "settings.project.workflow.platform.desc": {
+    "defaultMessage": "None or Git, from the next card: Git only where a Git repository is found and no other version control is. Each keeps its own workflow options.",
+    "description": "What the setting \"Version control\" does (the project’s Version Control tab): switching applies from the next card; cards started keep their rules. None and Git: glossary 2.1."
+  },
+  "settings.project.workflow.platform.git": {
+    "defaultMessage": "Git",
+    "description": "A value of the setting \"Version control\": Git (glossary 2.1: keep)."
+  },
+  "settings.project.workflow.platform.none": {
+    "defaultMessage": "None",
+    "description": "A value of the setting \"Version control\": no version control (glossary 2.1: None)."
+  },
+  "settings.project.workflow.platform.title": {
+    "defaultMessage": "Version control",
+    "description": "A setting's title (the project's Version Control tab): None or Git (glossary 2.1)."
+  },
   "settings.project.workflow.title": {
     "defaultMessage": "Workflow options",
     "description": "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own."

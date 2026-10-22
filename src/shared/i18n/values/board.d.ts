@@ -556,6 +556,7 @@ interface HiveMessageValues {
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined
   'board.queue.pause.staged': { target: string | number }
+  'board.queue.pause.subfolderTarget': { card: string | number }
   'board.queue.pause.targetMovesFast': { target: string | number }
   'board.queue.pause.uncounted': undefined
   'board.queue.pause.unstagedChanges': { files: string; target: string | number }

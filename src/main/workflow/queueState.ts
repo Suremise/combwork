@@ -127,6 +127,8 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
       return 'answer'
     case 'needsYou':
       return stuck ? 'answer' : 'fix'
+    case 'subfolderTarget':
+      return 'fix'
     case 'wrongBranch':
     case 'staged':
     case 'unstagedChanges':

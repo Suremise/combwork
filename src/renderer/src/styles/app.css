@@ -11548,6 +11548,29 @@ button.progress-run-show:focus-visible {
 .vc-init .hint {
   margin: 0;
 }
+/* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
+.vc-offer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 14px 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.vc-offer-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vc-offer-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.vc-switch .caution {
+  color: var(--warning);
+}
 .git-head-status {
   font-size: 12px;
   white-space: nowrap;

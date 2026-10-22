@@ -87,16 +87,19 @@ function launches(fx) {
   return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
 }
 
-/** Adds an agent (`worktree`: in a new worktree of its own), starts it and reads its token: { id, folder, token }. */
-async function agent(fx, h, name, { worktree = false } = {}) {
-  const a = await lib.addAgent(h.inv, fx.alpha, { name, ...(worktree ? { location: 'new-worktree' } : {}) })
-  const folder = a.worktree?.path ?? fx.alpha
+/**
+ * Adds an agent (`worktree`: in a new worktree of its own; `project`: another project of the workspace than alpha),
+ * starts it and reads its token: { id, folder, token }.
+ */
+async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {}) {
+  const a = await lib.addAgent(h.inv, project, { name, ...(worktree ? { location: 'new-worktree' } : {}) })
+  const folder = a.worktree?.path ?? project
   // The fake trusts the folders it is told of (its trust prompt never shows).
   const trusted = path.join(fx.claudeHome, 'fake-trusted.json')
   const was = fs.existsSync(trusted) ? JSON.parse(fs.readFileSync(trusted, 'utf8')) : []
-  fs.writeFileSync(trusted, JSON.stringify([...new Set([...was, fx.ws.toLowerCase(), fx.alpha.toLowerCase(), folder.toLowerCase()])]))
-  await h.inv('session:start', fx.alpha, { agentId: a.id })
-  const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === a.id)
+  fs.writeFileSync(trusted, JSON.stringify([...new Set([...was, fx.ws.toLowerCase(), project.toLowerCase(), folder.toLowerCase()])]))
+  await h.inv('session:start', project, { agentId: a.id })
+  const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id)
   const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
   const launch = await lib.until(() => launches(fx).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS, 200)
   const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null

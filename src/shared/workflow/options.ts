@@ -41,6 +41,12 @@ export interface WorkflowOptions {
   style: 'merge' | 'squash'
   /** G7: the target line; empty means the repository's default branch. */
   target: string
+  /**
+   * G7 named by the project's own options, not inherited from the workspace's or Hive's (#1419, OP-29): never set by a
+   * level, worked out as options are resolved, so a card or lane keeps it with the rest of its ruleset. The merge queue
+   * merges a card of a project inside a larger repository only when its ruleset has it.
+   */
+  targetOwn?: true
   /** G8. */
   strict: boolean
   /** G9: named checks on the merged result (Hive merges only). */
@@ -206,10 +212,15 @@ export const CONTRADICTIONS = {
   okWithReview: msg({ id: 'workflow.contradiction.okWithReview', defaultMessage: 'Your OK before merging is already part of review by you.', description: "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews." }),
   hiveMergesNeedsGit: msg({ id: 'workflow.contradiction.hiveMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
+  subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' })
 } satisfies Record<string, Msg>
 
 export type Contradiction = keyof typeof CONTRADICTIONS
+
+
+/** `targetOwn` (#1419): a Git project's target set by its own options. Worked out as options are resolved. */
+export const ownsTarget = (o: WorkflowOptions, targetFrom: string): boolean => o.platform === 'git' && !!o.target && targetFrom === 'project'
 
 export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'agentThenYou'
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'
@@ -225,18 +236,28 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   okWithReview: ['okBefore', 'review'],
   hiveMergesNeedsGit: ['finish'],
   quorumNeedsAgent: ['reviewers', 'review'],
-  noneHasNoSlots: ['folder']
+  noneHasNoSlots: ['folder'],
+  subfolderTarget: ['target', 'finish']
 }
 
 /** Each row's contradictions in these options, by option (#1418: shown under the rows as you choose). */
-export function liveContradictions(o: WorkflowOptions): Partial<Record<OptionKey, Contradiction[]>> {
+export function liveContradictions(o: WorkflowOptions, where: ContradictionPlace = {}): Partial<Record<OptionKey, Contradiction[]>> {
   const out: Partial<Record<OptionKey, Contradiction[]>> = {}
-  for (const c of contradictions(o)) for (const k of CONTRADICTION_ROWS[c]) (out[k] ??= []).push(c)
+  for (const c of contradictions(o, where)) for (const k of CONTRADICTION_ROWS[c]) (out[k] ??= []).push(c)
   return out
 }
 
-/** The contradictions in a set of options: empty when it can be saved and compiled. */
-export function contradictions(o: WorkflowOptions): Contradiction[] {
+/** Where the options are for, when a check knows (a save): a project inside a larger repository (OP-29, #1419). */
+export interface ContradictionPlace {
+  subfolder?: boolean
+}
+
+/**
+ * The contradictions in a set of options: empty when it can be saved and compiled. `where`: OP-29 (#1419), a project
+ * inside a larger repository merges (Hive or the agent) only into a branch it names itself (`targetOwn`: G7 set by the
+ * project, not inherited), since its merges change that whole repository.
+ */
+export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {}): Contradiction[] {
   const out: Contradiction[] = []
   if (reviewerAgent(o.review) && !o.noSelfReview) out.push('selfReview')
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
@@ -249,6 +270,7 @@ export function contradictions(o: WorkflowOptions): Contradiction[] {
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
+  if (where.subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
   return out
 }
 
@@ -275,6 +297,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
   target: (v) => typeof v === 'string',
+  targetOwn: (v) => v === true,
   strict: bool,
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),

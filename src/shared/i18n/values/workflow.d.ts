@@ -8,6 +8,7 @@ interface HiveMessageValues {
   'workflow.contradiction.okWithReview': undefined
   'workflow.contradiction.quorumNeedsAgent': undefined
   'workflow.contradiction.selfReview': undefined
+  'workflow.contradiction.subfolderTarget': undefined
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
   'workflow.forYou.lineRefused': { line: string | number; target: string | number; reason: string | number; next: string | number }
@@ -238,6 +239,7 @@ interface HiveMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
+  'workflow.refused.platform.unknown.nextGone': undefined
   'workflow.refused.queue.advancing.message': { card: string | number; target: string | number }
   'workflow.refused.queue.advancing.next': { target: string | number }
   'workflow.refused.requeue.allowed.change': undefined
