@@ -7,7 +7,7 @@ import { mustCompile } from '../src/shared/workflow/compile'
 import { allOff, preset } from '../src/shared/workflow/options'
 import type { StageId } from '../src/shared/workflow/facts'
 
-const stagesOf = (o: Parameters<typeof mustCompile>[0], names: Partial<Record<StageId, string>> = {}): BoardProject['stages'] => ({ stages: mustCompile(o).stages, names })
+const stagesOf = (o: Parameters<typeof mustCompile>[0], names: Partial<Record<StageId, string>> = {}): BoardProject['stages'] => ({ stages: mustCompile(o).stages, names, preset: null })
 const PAIR = stagesOf(preset('git', 'pair'))
 const NO_REVIEW = stagesOf({ ...allOff('git'), finish: 'committed', folder: 'project' })
 const NONE = stagesOf(allOff('none'))

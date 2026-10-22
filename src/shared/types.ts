@@ -22,7 +22,6 @@ import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
-import type { StageId } from './workflow/facts'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
