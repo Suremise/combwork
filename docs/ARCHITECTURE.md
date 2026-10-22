@@ -274,9 +274,11 @@ fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlo
 with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
 `timeoutMs` and end the launcher's whole tree at the bound (`endTree`); without a config git, `gitTree` does the same.
-`commitFailed` classifies a failure from git's exit and message: a signer that waited or failed pauses (`signingWaits`,
-`signing`), a hook returns the card (`hook`), anything else pauses `needsYou`; a pause keeps git's message
-(`QueuePause.message`, `workflow_queue_pauses.message`).
+Each command runs with `GIT_TRACE2_EVENT` set to a file of its own; `readCommitTrace` reads which of the top git's
+children (a hook, the signer) failed or was still running, and `commitFailed` classifies from that, never from the
+output's words: a hook that failed returns the card (`hook`), a hook still running at the bound pauses `hookTimedOut`,
+a signer that waited or failed pauses (`signingWaits`, `signing`), anything else pauses `needsYou`. A pause keeps git's
+message (`QueuePause.message`, `workflow_queue_pauses.message`).
 
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a

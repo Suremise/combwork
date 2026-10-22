@@ -10,8 +10,9 @@
 
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, readFileSync } from 'original-fs'
-import { join, resolve } from 'path'
+import { existsSync, readFileSync, rmSync } from 'original-fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
 import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
@@ -130,21 +131,92 @@ export type QueueOutcome =
 /**
  * `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says
  * why). `signingWaits`: signing Hive's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
- * (git's message in the pause). `identity`: no commit identity for the repository (its folder in the pause).
+ * (git's message in the pause). `hookTimedOut`: a hook of a signed commit was still running at the signing bound.
+ * `identity`: no commit identity for the repository (its folder in the pause).
  */
-export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing'
+export type PauseReason = 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut'
 
 /** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
 const SIGN_TIMEOUT_MS = 60_000
 
-/** git's messages (and a signer's) that say signing would wait for someone: a passphrase, a pinentry, a terminal. */
+/**
+ * A signer's messages that say it would wait for someone (a passphrase, a pinentry, a terminal): read only once git's
+ * trace says the signer is what failed, never to tell a signer from a hook.
+ */
 const SIGN_WAITS = /passphrase|pinentry|inappropriate ioctl|cannot open \/dev\/tty|no tty|tty.*not available/i
 
-/** git's messages that say signing the commit failed (gpg's, ssh-keygen's, or git's own around them). */
-const SIGN_FAILED = /gpg failed to sign|failed to sign|signing failed|couldn't load public key|ssh-keygen|failed to write commit object/i
-
-/** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit. */
+/** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit (used only with no trace to read). */
 const MERGE_HOOK_STOPPED = /^Not committing merge;/m
+
+/**
+ * What git's own trace (trace2's events, `GIT_TRACE2_EVENT`) says about the children a commit ran (#1350): which hook
+ * failed or was still running, and whether the signer (gpg's `-bsau`, gpgsm's, ssh-keygen's `-Y sign`) failed or was
+ * still running. Only the top git's own children count, never those of a git a hook ran.
+ */
+export interface CommitChildren {
+  hookFailed?: string
+  hookRunning?: string
+  signerFailed: boolean
+  signerRunning: boolean
+}
+
+/** Reads a commit's trace2 event file into what its children did; null when there is none to read (an old git). */
+export function readCommitTrace(file: string): CommitChildren | null {
+  let text: string
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch {
+    return null
+  }
+  const started = new Map<number, { hook?: string; signer: boolean }>()
+  const exits = new Map<number, number>()
+  let top: string | null = null
+  for (const line of text.split(/\r?\n/)) {
+    let ev: { event?: string; sid?: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
+    try {
+      ev = JSON.parse(line)
+    } catch {
+      continue
+    }
+    // The top git's session id has no parent's prefix; a nested git's is `<parent>/<own>`.
+    if (top === null && ev.sid && !ev.sid.includes('/')) top = ev.sid
+    if (ev.sid !== top || typeof ev.child_id !== 'number') continue
+    if (ev.event === 'child_start') {
+      const argv = ev.argv ?? []
+      const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
+      started.set(ev.child_id, { ...(ev.child_class === 'hook' ? { hook: ev.hook_name ?? argv[0] ?? 'hook' } : {}), signer })
+    } else if (ev.event === 'child_exit' && typeof ev.code === 'number') exits.set(ev.child_id, ev.code)
+  }
+  if (top === null) return null
+  const out: CommitChildren = { signerFailed: false, signerRunning: false }
+  for (const [id, c] of started) {
+    const code = exits.get(id)
+    if (c.hook && code === undefined) out.hookRunning ??= c.hook
+    else if (c.hook && code !== 0) out.hookFailed ??= c.hook
+    if (c.signer && code === undefined) out.signerRunning = true
+    else if (c.signer && code !== 0) out.signerFailed = true
+  }
+  return out
+}
+
+/**
+ * Why Hive's merge, or a squash's commit, failed (#1350), from which child of git failed (its trace), never from words
+ * a hook may print: a hook that failed returns the card with the output; a hook still running at the bound pauses
+ * `hookTimedOut`; a signer still running at the bound, or failing saying it needs a passphrase, pauses `signingWaits`,
+ * and one failing otherwise pauses `signing`; anything else (an index lock, a broken repository) pauses `needsYou`
+ * with git's message, never a return. With no trace to read (an old git), only git's own "Not committing merge" is a hook.
+ */
+export function commitFailed(r: QueueGitResult, children: CommitChildren | null, signs: boolean): { fail: 'hook'; log: string } | { pause: PauseReason; message?: string } {
+  const log = [r.out.trim(), r.err.trim()].filter(Boolean).join('\n')
+  if (children?.hookFailed) return { fail: 'hook', log }
+  if (r.timedOut) {
+    if (children?.hookRunning) return { pause: 'hookTimedOut', message: log }
+    return { pause: signs ? 'signingWaits' : 'needsYou', message: log }
+  }
+  if (children?.signerFailed) return { pause: SIGN_WAITS.test(log) ? 'signingWaits' : 'signing', message: log }
+  if (!children && MERGE_HOOK_STOPPED.test(log)) return { fail: 'hook', log }
+  return { pause: 'needsYou', message: log }
+}
 
 /**
  * The environment of Hive's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
@@ -444,20 +516,33 @@ export class MergeQueue {
       await this.git(f, ['reset', '--hard', '-q', expected])
       await this.git(f, ['clean', '-fdq'])
     }
-    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
-    if (!m.ok) {
-      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+    // Each command traced (trace2's events), so a failure is told by which child of git failed, never by its words.
+    const traced = async (args: string[]): Promise<{ r: QueueGitResult; children: CommitChildren | null }> => {
+      const trace = join(tmpdir(), `hive-queue-${randomUUID()}.trace2.json`)
+      try {
+        const run = await this.git(f, args, { ...opts, env: { ...opts.env, GIT_TRACE2_EVENT: trace } })
+        return { r: run, children: run.ok ? null : readCommitTrace(trace) }
+      } finally {
+        try {
+          rmSync(trace, { force: true })
+        } catch {
+          // still held by a process the bound ended: the system's temp folder's own clean-up has it
+        }
+      }
+    }
+    const m = await traced([...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision])
+    if (!m.r.ok) {
+      const u = m.r.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
       const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
       await clean()
-      if (files.length) return { fail: 'conflict', files, log: m.out + m.err }
-      return this.commitFailed(m, squash ? 'squash' : 'merge', signs, f)
+      if (files.length) return { fail: 'conflict', files, log: m.r.out + m.r.err }
+      return commitFailed(m.r, m.children, signs)
     }
     if (squash) {
-      const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
-      if (!c.ok) {
-        const why = await this.commitFailed(c, 'commit', signs, f)
+      const c = await traced([...who, 'commit', '-q', '-m', message])
+      if (!c.r.ok) {
         await clean()
-        return why
+        return commitFailed(c.r, c.children, signs)
       }
     }
     const h = await G.head(f)
@@ -466,31 +551,6 @@ export class MergeQueue {
     return { result: h }
   }
 
-  /**
-   * Why Hive's merge commit (`merge`), squash (`squash`, the merge step that makes no commit) or its commit (`commit`)
-   * failed, from git's exit and message (#1350): a signer that waited (ended at the bound, or saying it needs a
-   * passphrase) or failed pauses; a hook that stopped the commit returns the card with its output; anything else (an
-   * index lock, a broken repository) pauses `needsYou` with git's message, never a return.
-   */
-  private async commitFailed(r: QueueGitResult, step: 'merge' | 'squash' | 'commit', signs: boolean, folder: string): Promise<{ fail: 'hook'; log: string } | { pause: PauseReason; message?: string }> {
-    const log = [r.out.trim(), r.err.trim()].filter(Boolean).join('\n')
-    if (r.timedOut) return { pause: signs ? 'signingWaits' : 'needsYou', message: log }
-    if (signs && step !== 'squash' && SIGN_WAITS.test(log)) return { pause: 'signingWaits', message: log }
-    if (signs && step !== 'squash' && SIGN_FAILED.test(log)) return { pause: 'signing', message: log }
-    if (step === 'merge' && MERGE_HOOK_STOPPED.test(log)) return { fail: 'hook', log }
-    // `git commit` says nothing of its own when a hook stops it (the hook's output only): a hook that would run, and no
-    // `fatal:` from git.
-    if (step === 'commit' && r.code === 1 && !/^fatal:/m.test(log) && (await this.commitHooks(folder))) return { fail: 'hook', log }
-    return { pause: 'needsYou', message: log }
-  }
-
-  /** Whether a hook that runs on `git commit` (pre-commit, prepare-commit-msg, commit-msg) is there, wherever the repository keeps its hooks. */
-  private async commitHooks(folder: string): Promise<boolean> {
-    const p = await this.git(folder, ['rev-parse', '--git-path', 'hooks'])
-    if (!p.ok || !p.out.trim()) return false
-    const dir = resolve(folder, p.out.trim())
-    return ['pre-commit', 'prepare-commit-msg', 'commit-msg'].some((h) => existsSync(join(dir, h)))
-  }
 
   /**
    * Runs the merge checks (G9) on the test merge's result, one after another, stopping at the first that isn't green.

@@ -2054,17 +2054,22 @@ submissions' pins once it is archived.
    - **Identity:** G12's when on, else the repository's own (`git config user.name` / `user.email`: local, then
      global), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
      window says to set a commit identity for this repository (`git config user.name` / `user.email`).
-   - **Hooks:** they run (no `--no-verify`). A merge stopped by `pre-merge-commit` or `commit-msg` (git's "Not
-     committing merge") returns the card with the output (`IntegrationFailed`, reason `hook`). So does a squash's
-     `git commit` that exits 1 with no `fatal:` of git's while a `pre-commit`, `prepare-commit-msg` or `commit-msg`
-     hook is there. Any other failure of git (an index lock, a broken repository, a worktree it couldn't check out)
-     pauses `needsYou` with git's message, never a return.
+   - **Hooks:** they run (no `--no-verify`). Which part failed is told by git's own trace of the command (trace2's
+     events, `GIT_TRACE2_EVENT`, a file per command), never by words in the output, which a hook can print [HR4's
+     round 1 on #1350]. The trace names each child git ran: a hook (`child_class: hook`, its name) or the signer
+     (gpg's or gpgsm's `-bsau`, ssh-keygen's `-Y sign`), with its exit code. Only the top git's own children count,
+     not those of a git a hook ran. A hook that exited non-zero (`pre-merge-commit`, `commit-msg`, or `pre-commit`
+     for a squash's commit) returns the card with the output (`IntegrationFailed`, reason `hook`). Any other failure
+     of git (an index lock, a broken repository, a worktree it couldn't check out) pauses `needsYou` with git's
+     message, never a return. With no trace to read (a git older than 2.24), only git's own "Not committing merge"
+     is a hook.
    - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,
      `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
      queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
      Settings → Advanced, `hive.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
-     ended, and the entry pauses `signingWaits`, "signing waits for you". So does a signer whose message says it needs
-     a passphrase, a pinentry or a terminal. A signing error pauses `signing` with git's message.
+     ended. The entry pauses `signingWaits`, "signing waits for you", unless the trace shows a hook still running then:
+     that pauses `hookTimedOut`. A signer that exited non-zero pauses `signingWaits` when its message says it needs a
+     passphrase, a pinentry or a terminal, and `signing` with git's message otherwise.
    - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
      `reset --hard`, `clean`), and nothing in the target changes.
    - **The pause:** keeps git's message in its own words (`workflow_queue_pauses.message`, the 1.0 group's 15th

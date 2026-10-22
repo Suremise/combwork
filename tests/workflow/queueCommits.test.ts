@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { git } from '../../src/main/git'
+import { commitFailed, readCommitTrace, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
+import { tempDir } from '../tempDir'
 
 let env: Env | null = null
 afterEach(() => {
@@ -86,6 +88,46 @@ describe("Hive's queue commits (#1350)", () => {
     expect(e.wf.state(card).stage).toBe('active')
     expect(head(e)).toBe(before)
     expect(e.store.queuePause('main')).toBeNull()
+    cleanAt(e, before)
+  })
+
+  it('HR4 r1: a hook is told by git\'s trace, not its words — signed, a commit-msg hook saying "passphrase" returns the card', async () => {
+    const e = team()
+    const card = await queued(e)
+    sh(e.project, 'config', 'commit.gpgsign', 'true')
+    sh(e.project, 'config', 'gpg.program', script(join(e.home, 'gpg-fails.sh'), 'exit 2').replace(/\\/g, '/'))
+    hook(e, 'commit-msg', 'echo "passphrase policy rejected this message" >&2\nexit 1')
+    const before = head(e)
+    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'hook' }])
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').at(-1)!.data).toMatchObject({ reason: 'hook', log: expect.stringContaining('passphrase policy rejected this message') })
+    expect(e.store.queuePause('main')).toBeNull()
+    cleanAt(e, before)
+  })
+
+  it('HR4 r1: squash, a pre-commit hook printing a "fatal:" line of its own returns the card', async () => {
+    const e = team({ style: 'squash' })
+    const card = await queued(e)
+    hook(e, 'pre-commit', 'echo "fatal: policy rejected src/c.txt" >&2\nexit 1')
+    const before = head(e)
+    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'hook' }])
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').at(-1)!.data).toMatchObject({ log: expect.stringContaining('fatal: policy rejected src/c.txt') })
+    expect(e.store.queuePause('main')).toBeNull()
+    cleanAt(e, before)
+  })
+
+  it('signed, a hook still running at the bound: ended with the tree, paused hookTimedOut (not signing), the worktree clean', async () => {
+    const e = team()
+    const card = await queued(e)
+    const pidFile = join(e.home, 'hook.pid')
+    const waiter = join(e.home, 'hook-wait.js')
+    writeFileSync(waiter, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)\n`)
+    sh(e.project, 'config', 'commit.gpgsign', 'true')
+    hook(e, 'pre-merge-commit', `exec node "${waiter.replace(/\\/g, '/')}"`)
+    const before = head(e)
+    expect(await e.queue({ signTimeoutMs: 3000 }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'hookTimedOut' }])
+    expect(running(Number(readFileSync(pidFile, 'utf8')))).toBe(false)
+    expect(e.kinds(card.id)).not.toContain('IntegrationFailed')
+    expect(head(e)).toBe(before)
     cleanAt(e, before)
   })
 
@@ -175,5 +217,39 @@ describe("Hive's queue commits (#1350)", () => {
     expect(e.wf.state(card).stage).toBe('merging')
     expect(head(e)).toBe(before)
     cleanAt(e, before)
+  })
+})
+
+describe("a commit's trace (#1350)", () => {
+  it("counts only the top git's children: a git a hook ran, whose own hook failed, isn't the commit's hook", () => {
+    const file = join(tempDir('trace-'), 'trace.json')
+    const ev = (o: object): string => JSON.stringify(o)
+    writeFileSync(
+      file,
+      [
+        ev({ event: 'version', sid: 'T1' }),
+        ev({ event: 'child_start', sid: 'T1', child_id: 0, child_class: 'hook', hook_name: 'pre-commit', argv: ['.git/hooks/pre-commit'] }),
+        ev({ event: 'child_start', sid: 'T1/N1', child_id: 0, child_class: 'hook', hook_name: 'commit-msg', argv: ['x'] }),
+        ev({ event: 'child_exit', sid: 'T1/N1', child_id: 0, code: 1 }),
+        ev({ event: 'child_exit', sid: 'T1', child_id: 0, code: 0 }),
+        ev({ event: 'child_start', sid: 'T1', child_id: 1, child_class: '?', argv: ['gpg', '--status-fd=2', '-bsau', 'me'] }),
+        ev({ event: 'child_exit', sid: 'T1', child_id: 1, code: 2 }),
+        'not json'
+      ].join('\n')
+    )
+    expect(readCommitTrace(file)).toEqual({ signerFailed: true, signerRunning: false })
+    expect(readCommitTrace(join(tempDir('trace-'), 'none.json'))).toBeNull()
+  })
+
+  it('classifies by the child that failed: a hook over its words, a signer, a hook or signer at the bound, and git itself', () => {
+    const r = (err: string, more: Partial<QueueGitResult> = {}): QueueGitResult => ({ ok: false, out: '', err, code: 1, ...more })
+    const none = { signerFailed: false, signerRunning: false }
+    expect(commitFailed(r('fatal: passphrase needed'), { ...none, hookFailed: 'pre-commit' }, true)).toMatchObject({ fail: 'hook' })
+    expect(commitFailed(r('gpg: signing failed: No pinentry'), { ...none, signerFailed: true }, true)).toMatchObject({ pause: 'signingWaits' })
+    expect(commitFailed(r('gpg: signing failed: No secret key'), { ...none, signerFailed: true }, true)).toMatchObject({ pause: 'signing' })
+    expect(commitFailed(r('', { timedOut: true }), { ...none, hookRunning: 'pre-commit' }, true)).toMatchObject({ pause: 'hookTimedOut' })
+    expect(commitFailed(r('', { timedOut: true }), { ...none, signerRunning: true }, true)).toMatchObject({ pause: 'signingWaits' })
+    expect(commitFailed(r('passphrase policy: Not committing merge; nope'), none, true)).toMatchObject({ pause: 'needsYou' })
+    expect(commitFailed(r("Not committing merge; use 'git commit' to complete the merge."), null, false)).toMatchObject({ fail: 'hook' })
   })
 })
