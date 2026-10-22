@@ -503,6 +503,36 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a reviewer whose own comment watch tells it of a design learns its id from that line and answers it (#1382, HR4's round 2 finding 1)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], changes: ['comment'] }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: the id rides in the first line.' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // One line, its watch's: the loop wake stands aside, and the line's latest comment names the design.
+    expect(st.typed).toHaveLength(1)
+    expect(st.typed[0].text).toMatch(/Your card watch has ended/)
+    const learned = /Design (\S+\/s\d+), for the reviewer's check/.exec(st.typed[0].text)?.[1]
+    expect(learned).toBeTruthy()
+    // So does the card's latest comment, as hive_read_task with latestComment gives it.
+    expect((await inWorkspace(w, () => tasks.getTask(c, w))).comments.at(-1)?.text.split('\n')[0]).toContain(learned!)
+    // The reviewer answers with what it learned: taken.
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds.', design: learned }))
+    expect((await history(w, c)).at(-1)).toBe('R1 (alpha): Checked the design: OK: "Holds."')
+    await disposeWorkspaceService(w)
+  })
+
   it("going ahead unchecked tells the reviewer, with nothing to answer (#1382, HR4's round 1 finding 5)", async () => {
     await loopWakes.clearLoopWakes()
     vi.useFakeTimers({ toFake: ['Date'] })

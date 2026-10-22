@@ -1336,12 +1336,13 @@ export class Workflow {
 
   /**
    * A card's loop reviewer as the write sees it (#1382): its running lane's reviewer, else the agent that last reviewed it
-   * (its latest review started or verdict, any cycle); null when it has none. loopWakes.ts wakes the same agent.
+   * (its latest review started or verdict, any cycle), while it is one of the project's agents now (`agents`: a removed
+   * one can't be woken, as loopWakes.ts, which wakes the same agent, finds); null when it has none.
    */
-  loopReviewer(w: Write): string | null {
-    if (w.card.reviewer) return w.card.reviewer
+  loopReviewer(w: Write, agents: readonly string[]): string | null {
     const last = w.tx.facts(w.card.id).findLast((f) => f.kind === 'ReviewStarted' || f.kind === 'Verdict')
-    return last ? ((last.data as { reviewer?: string }).reviewer ?? null) : null
+    const id = w.card.reviewer ?? (last ? ((last.data as { reviewer?: string }).reviewer ?? null) : null)
+    return id && agents.includes(id) ? id : null
   }
 
   /**
@@ -1353,7 +1354,7 @@ export class Workflow {
    * agent that last reviewed it), an answer its builder. A design with no reviewer to check it is refused. With the rules
    * off, nothing is checked.
    */
-  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string, opts: { design?: string; waitMinutes: number; now?: number }): Promise<Reply> {
+  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string, opts: { design?: string; waitMinutes: number; agents: readonly string[]; now?: number }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1363,7 +1364,7 @@ export class Workflow {
       const now = w.state()
       const agent = agentOf(actor)
       const side = loopStepSide(step)
-      const reviewer = this.loopReviewer(w)
+      const reviewer = this.loopReviewer(w, opts.agents)
       const at = opts.now ?? Date.now()
       if (this.enforced()) {
         const builder = now.started?.builder ?? null

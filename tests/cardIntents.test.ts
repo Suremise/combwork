@@ -264,7 +264,8 @@ describe('a card by intent (#1267)', () => {
     expect(due - t0).toBeGreaterThanOrEqual(30 * 60_000 - 1000)
     expect(due - t0).toBeLessThanOrEqual(30 * 60_000 + 60_000)
     expect(posted.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(posted.card.comments.at(-1)).toMatchObject({ text: 'Design: a LoopStep fact and its wake.' })
+    // Its comment names it first: what a watch's wake and latestComment show (HR4's round 2 finding 1).
+    expect(posted.card.comments.at(-1)).toMatchObject({ text: `Design ${id}, for the reviewer's check (an answer names ${id}):\n\nDesign: a LoopStep fact and its wake.` })
     // Its line, with when the check is due (a value its words don't show, for the stall check).
     expect(posted.card.history.at(-1)).toMatchObject({ what: 'Posted a design for the reviewer to check: "Design: a LoopStep fact and its wake."', whatText: { values: { until: posted.done.data?.until } } })
     expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'design', id, by: 'a1', until: posted.done.data?.until })
@@ -341,6 +342,23 @@ describe('a card by intent (#1267)', () => {
     opened.push(again)
     expect(foldCard(facts(again, card)).step).toMatchObject({ id: posted.done.data?.design, until: posted.done.data?.until })
     expect(await refused(act(again, card, builder, answer('proceed', String(posted.done.data?.design))))).toBe('loop.tooEarly')
+  })
+
+  it("a design whose last reviewer was removed from the project is refused: nobody could be woken (#1382, HR4's round 2 finding 2)", async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    // No lane: a1 builds, a2 reviews and fails it.
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'h.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Post a design first.' })
+    // With a2 still in the project it is the reviewer; once removed, nobody is.
+    const id = String((await act(w, card, builder, design('Revised design'))).done.data?.design)
+    await act(w, card, reviewer, answer('gaps', id, 'Bounds?'))
+    await w.mutateProjectConfig(join(w.path!, 'p'), (cfg) => ({ agents: (cfg.agents ?? []).filter((a: { id: string }) => a.id !== 'a2') }))
+    expect(await refused(act(w, card, builder, design('Revised design v2')))).toBe('loop.noReviewer')
+    expect(foldCard(facts(w, card)).step).toBeNull()
   })
 
   it('a design with no reviewer to check it is refused, and an answer is the current reviewer\'s (#1382, findings 3 and 4)', async () => {

@@ -2282,6 +2282,66 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'card-loop-design-first',
+    title: "A card loop builder asked for a design first (#1382): it arms its watch, posts the design for its reviewer's check with hive_loop_step, and builds nothing yet",
+    files: { 'cache.js': 'module.exports = new Map()\n' },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
+      // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
+      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
+      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+    },
+    prompt: (c) =>
+      `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card's decision: have a design checked before you build. Start the card, post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
+    fake: (c) =>
+      `skill card-loop then hive hive_start_card {"card":"#${c.cards.d}"} then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true,"limitMinutes":30} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. A test for each.' })}`,
+    expect: (o, c) => {
+      const tools = o.hiveCalls.map((x) => x.tool)
+      const posted = ran(o, 'hive_loop_step').filter((x) => argsOf(x).step === 'design')
+      const watchAt = tools.indexOf('hive_wait_for_tasks')
+      const postAt = tools.findIndex((t, i) => t === 'hive_loop_step' && argsOf(o.hiveCalls[i]).step === 'design')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['posted a design with hive_loop_step (a LoopStep fact)', posted.length > 0 && factsOf(o, 'd', 'LoopStep').some((f) => f.data.step === 'design'), tools.join(',')],
+        ['armed its watch on the card before posting it', watchAt >= 0 && postAt > watchAt, tools.join(',')],
+        ['the card stays in Doing, not submitted', o.cards.d?.column === 'doing', o.cards.d?.column],
+        ['built nothing yet (cache.js unchanged)', c.read('cache.js') === 'module.exports = new Map()\n', c.read('cache.js')]
+      ]
+    }
+  },
+  {
+    id: 'card-loop-design-check',
+    title: "A card loop reviewer told of a design to check (#1382): it answers with hive_loop_step naming the design, not a verdict",
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
+      // Implementer's lane, the subject (Coder) reviewing; Implementer starts the card and posts its design, with its own token.
+      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await c.startAgent('implementer')
+      const started = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/start`)
+      if (started.status !== 200) throw new Error(`start: ${JSON.stringify(started.body)}`)
+      const posted = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/loop-step`, { step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. No tests.' })
+      if (posted.status !== 200) throw new Error(`design: ${JSON.stringify(posted.body)}`)
+      c.design = posted.body.data.design
+    },
+    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.d}, Implementer posted a design for your check before building: check it and answer as your loop says.`,
+    fake: (c) =>
+      `skill card-loop then hive hive_read_task {"number":${c.cards.d},"latestComment":true} then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'gaps', text: '1. Add a test for expiry and for invalidation on write.', design: c.design })}`,
+    expect: (o, c) => {
+      const tools = o.hiveCalls.map((x) => x.tool)
+      const answers = ran(o, 'hive_loop_step').filter((x) => ['ok', 'gaps'].includes(argsOf(x).step))
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['answered the design with hive_loop_step (ok or gaps)', answers.length > 0, tools.join(',')],
+        ['named the design it was shown', answers.some((x) => argsOf(x).design === c.design) && factsOf(o, 'd', 'LoopStep').some((f) => ['ok', 'gaps'].includes(f.data.step) && f.data.design === c.design), JSON.stringify(answers.map((x) => argsOf(x)))],
+        ['gave no verdict and started no review (a design check is not a review)', !factsOf(o, 'd', 'Verdict').length && !factsOf(o, 'd', 'ReviewStarted').length, (o.facts?.d ?? []).map((f) => f.kind).join(',')],
+        ['the card stays in Doing', o.cards.d?.column === 'doing', o.cards.d?.column]
+      ]
+    }
+  },
+  {
     id: 'old-move-submit',
     title: "A builder's move to Review is its submission for now (#1268): today's skills, the card's rules (Pair in the project folder), its summary the comment",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },

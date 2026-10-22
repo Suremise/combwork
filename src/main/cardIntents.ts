@@ -11,6 +11,7 @@ import { workspace } from './workspace'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { loopStepWaitMinutes } from '../shared/lanes'
+import { projectAgents } from '../shared/defaults'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
@@ -64,7 +65,10 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   if (!wf) throw hiveError(M.noWorkflow, { n: ref.n }, { kind: 'conflict' })
   const who = actorOf(actor)
   // How long a design waits for its check (#1382): the project's Card loops → Design check wait, read before the write.
-  const stepWait = intent.kind === 'loopStep' || intent.kind === 'start' ? loopStepWaitMinutes(ws.path ? await ws.projectConfig(join(ws.path, before.project)).catch(() => null) : null) : 0
+  const cfg = (intent.kind === 'loopStep' || intent.kind === 'start') && ws.path ? await ws.projectConfig(join(ws.path, before.project)).catch(() => null) : null
+  const stepWait = loopStepWaitMinutes(cfg)
+  // Who can be its reviewer: the project's agents now (a removed one can't be woken, so can't check a design).
+  const agents = cfg ? projectAgents(cfg).map((a) => a.id) : []
   const self = actor.kind === 'agent' ? actor.self : undefined
   // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
   if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}`, alias: `#${ref.n}` }, null))
@@ -92,7 +96,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'request':
         return w.requestToBuilder(named, who, intent.text)
       case 'loopStep':
-        return w.loopStep(named, who, intent.step, intent.text, { waitMinutes: stepWait, ...(intent.design ? { design: intent.design } : {}) })
+        return w.loopStep(named, who, intent.step, intent.text, { waitMinutes: stepWait, agents, ...(intent.design ? { design: intent.design } : {}) })
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':
@@ -130,9 +134,14 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'request':
         // Its history line too, which the builder's watch counts (#1272).
         return { opts: { keepAgent, comment: intent.text, note: [requestNote(intent.text)] } }
-      case 'loopStep':
-        // A design's line keeps when its check is due, which the stall check reads (shared/tasks.ts' pendingDesign).
-        return { opts: { keepAgent, comment: intent.text, note: [loopStepNote(intent.step, intent.text, (w.written.findLast((f) => f.kind === 'LoopStep')?.data as { until?: string } | undefined)?.until)] } }
+      case 'loopStep': {
+        const step = w.written.findLast((f) => f.kind === 'LoopStep')?.data as { design?: string; until?: string } | undefined
+        // A design's comment names it first (#1382): its first line is what a watch's wake and latestComment show, so the
+        // reviewer has the id its answer names whichever way it is woken. Its history line keeps when its check is due,
+        // which the stall check reads (shared/tasks.ts' pendingDesign).
+        const comment = intent.step === 'design' && step?.design ? `Design ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        return { opts: { keepAgent, comment, note: [loopStepNote(intent.step, intent.text, step?.until)] } }
+      }
       default:
         return { opts: { keepAgent } }
     }

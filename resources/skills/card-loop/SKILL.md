@@ -85,7 +85,7 @@ For each card, in order:
 3. **Blocking findings**: start the watch for its return (above), then `hive_verdict` with `pass: false` and them in the comment, numbered, each with what to fix (`failKind: "explanation"` when only how the work was explained falls short), and end your turn. It goes back to Doing for its builder. Points that aren't blocking become follow-up cards, not another round.
 4. **Passed**: `hive_verdict` with `pass: true`: it moves on and waits to be merged. Done is for merged work, not yours to move. Take the next card.
 
-**A design to check** (woken with "The builder: design HI-12/s40 posted for your check…", the card in Doing): read its latest comment, start your watch again as before, then answer with `hive_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design` as the wake names it, and end your turn. It's not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.
+**A design to check** (woken with "The builder: design HI-12/s40 posted for your check…", the card in Doing): read its latest comment, start your watch again as before, then answer with `hive_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id (the wake names it, and so does the first line of the design's comment: `hive_read_task` with `latestComment`), and end your turn. It's not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.
 
 ## Rounds and when to ask
 

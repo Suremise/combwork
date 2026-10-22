@@ -2057,10 +2057,13 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   wait (`designWaitMinutes`), so the builder arms its watch before posting. The reviewer answers `ok` or `gaps`; with no
   answer by `until`, the builder sends `proceed` and builds as posted. An answer and `proceed` name the design they are
   about (`design`), and one about another design is refused (`loop.staleStep`), so a late answer never settles a newer
-  design; posting again replaces the one waiting. `proceed` before the check is due is refused (`loop.tooEarly`), and a
+  design; posting again replaces the one waiting. A design's comment starts with a line naming it ("Design HI-12/s40, for
+  the reviewer's check (an answer names HI-12/s40):"), so the reviewer has its id however it hears of it: the loop wake,
+  its own watch's line (which quotes a comment's first line) or `hive_read_task` with `latestComment`. `proceed` before the check is due is refused (`loop.tooEarly`), and a
   design's deadline never moves (a changed setting, a watch started again, a restart). Each side only its own
   (`loop.stepNotYours`): the builder's steps by the card's builder; an answer by its reviewer, the reviewer of its running
-  lane, else the agent that last reviewed it, never its builder, read under the write's lock; the user and the Assistant
+  lane, else the agent that last reviewed it, while it is one of the project's agents (a removed one can't be woken), never
+  its builder, read under the write's lock; the user and the Assistant
   take either. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
   (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
