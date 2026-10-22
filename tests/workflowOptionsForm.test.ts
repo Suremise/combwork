@@ -499,3 +499,79 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     expect(w.config.workflow?.git).toEqual({})
   })
 })
+
+describe("workflow writes take turns: a level's check and write, and a project's, never interleave (#1422, HR5's round 1)", () => {
+  /** A gate a test opens: what waits on it goes on then. */
+  const gate = (): { wait: Promise<void>; open: () => void } => {
+    let open = (): void => undefined
+    const wait = new Promise<void>((r) => (open = r))
+    return { wait, open }
+  }
+
+  it("a project's save during a level's write is checked against the level as written: refused, not committed", async () => {
+    const { w, repo } = await workspace()
+    const g = gate()
+    const reached = gate()
+    const real = w.saveWorkspaceConfigWith.bind(w)
+    const spy = vi.spyOn(w, 'saveWorkspaceConfigWith').mockImplementation(async (change) => {
+      reached.open()
+      await g.wait
+      return real(change)
+    })
+    try {
+      const level = levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { folder: 'slots' }, base: { preset: null, options: {} } })
+      await reached.wait
+      // Valid against the defaults as they are before the level's write lands: it waits its turn, then checks.
+      const project = form.setWorkflowOptions(w, repo, { preset: null, options: { finish: 'committed' } })
+      g.open()
+      await level
+      await expect(project).rejects.toThrow(/needs everyone in the project folder/)
+    } finally {
+      spy.mockRestore()
+    }
+    expect(w.config.workflow?.git).toEqual({ folder: 'slots' })
+    expect((await w.projectConfig(repo)).workflow?.options?.finish).toBeUndefined()
+    expect((await form.workflowForm(w, repo)).invalid).toBeNull()
+  })
+
+  for (const level of ['workspace', 'global'] as const) {
+    it(`a ${level} level saved during a project's write is checked against the project as written: refused, naming it`, async () => {
+      const { w, repo } = await workspace()
+      const g = gate()
+      const reached = gate()
+      const real = w.mutateProjectConfig.bind(w)
+      const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation(async (path, fn) => {
+        reached.open()
+        await g.wait
+        return real(path, fn)
+      })
+      try {
+        const project = form.setWorkflowOptions(w, repo, { preset: null, options: { finish: 'committed' } })
+        await reached.wait
+        const saved = levels.setLevelOptions(w, level, 'git', { preset: null, options: { folder: 'slots' } })
+        g.open()
+        await project
+        await expect(saved).rejects.toThrow(/Project p inherits these options[\s\S]*needs everyone in the project folder/)
+      } finally {
+        spy.mockRestore()
+      }
+      expect((await w.projectConfig(repo)).workflow?.options?.finish).toBe('committed')
+      expect((level === 'global' ? config.settings.workflow : w.config.workflow)?.git?.folder).toBeUndefined()
+      expect((await form.workflowForm(w, repo)).invalid).toBeNull()
+    })
+  }
+
+  it('a stage name taken back to inherit lists the projects inheriting it, and tells their views', async () => {
+    const { w, repo } = await workspace({ workspace: { git: { stageNames: { active: 'Working' } } } })
+    const check = await levels.checkLevelChange(w, 'workspace', 'git', { preset: null, options: {} })
+    expect(check.changed).toEqual(['stageNames'])
+    expect(check.projects).toEqual([expect.objectContaining({ name: 'p', path: repo, changed: ['stageNames'] })])
+    const emitted = vi.spyOn(w, 'emit')
+    try {
+      await levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: {} })
+      expect(emitted).toHaveBeenCalledWith(expect.objectContaining({ type: 'workflow-changed', projectPath: repo }))
+    } finally {
+      emitted.mockRestore()
+    }
+  })
+})

@@ -7,6 +7,7 @@ import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { levelOwn, setLevelOptions } from './workflow/levels'
+import { workflowWrite } from './workflow/writes'
 import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
@@ -209,13 +210,16 @@ export async function applySetting(
   if ('project' in change) {
     if (!projectPath) throw new SettingRefused(400, `${e.id} is a project's setting: say which project.`)
     let old: unknown
-    const next = await workspace.mutateProjectConfig(projectPath, (cfg) => {
-      old = settingValue(e, config.settings, cfg)
-      guard?.(old)
-      const patch = change.project(cfg)
-      if (e.workflow) checkWorkflowPatch(projectPath, patch)
-      return patch
-    })
+    const write = (): ReturnType<typeof workspace.mutateProjectConfig> =>
+      workspace.mutateProjectConfig(projectPath, (cfg) => {
+        old = settingValue(e, config.settings, cfg)
+        guard?.(old)
+        const patch = change.project(cfg)
+        if (e.workflow) checkWorkflowPatch(projectPath, patch)
+        return patch
+      })
+    // A workflow option is checked against the levels and written in one turn of workflow writes (#1422).
+    const next = e.workflow ? await workflowWrite(write) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     return { old, new: settingValue(e, config.settings, next) }
   }

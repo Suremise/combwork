@@ -8,6 +8,7 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 15000
 
@@ -59,6 +60,17 @@ const check = (name, ok, extra = '') => {
     }
     const before = await startCard('Before the default')
     check('a card started before the change has its ruleset', !!before)
+    // A running lane of alpha's, as the card-loop skill registers one (lanes.ts reads its table each time).
+    const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+    try {
+      const at = new Date().toISOString()
+      const next = await inv('tasks:create', { title: 'Next in the lane', project: 'alpha' })
+      db.prepare("INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES ('lane-wd1', 0, 'alpha', 'b1', 'B1', 'r1', 'R1', 10, 360, 'active', 'B1 (alpha)', ?, ?)").run(at, at)
+      db.prepare('INSERT INTO lane_cards (lane, ord, card) VALUES (?, 0, ?)').run('lane-wd1', next.number)
+      db.prepare("UPDATE lanes SET name = 'Lane next' WHERE id = 'lane-wd1'").run()
+    } finally {
+      db.close()
+    }
 
     // --- The workspace's defaults: Settings → Workspace → Workflow defaults, Git.
     await settingsSection('Workspace')
@@ -74,7 +86,7 @@ const check = (name, ok, extra = '') => {
     await dialog.waitFor({ timeout: HUNG_MS })
     const said = await text(dialog)
     check('Save… lists the project inheriting the change, and what changes for it', said.includes('Project alpha: Merge style') && said.includes('from their next card'), said)
-    check('…and that alpha’s card in flight keeps the old rules', said.includes('Its card in flight keeps the old rules'), said)
+    check('…and names alpha’s running lane and its card in flight, which keep the old rules', said.includes('Its running lane keeps the old rules until it ends:') && said.includes('Builder B1: Lane next') && said.includes('Its card in flight keeps the old rules:') && said.includes('Before the default'), said)
     await shots('save', dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })

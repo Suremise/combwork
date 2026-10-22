@@ -17,6 +17,7 @@ import { openWorkspaces, type WorkspaceService } from '../workspace'
 import { checkOptions, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
 import { workflowEnforced } from './service'
 import { cardsInFlight, keptNames, problemEnglish, WorkflowRefused, WorkflowStale } from './optionsForm'
+import { workflowWrite } from './writes'
 
 const log = createLogger('workflow')
 
@@ -83,7 +84,9 @@ async function inheritors(ws: WorkspaceService, level: WorkflowLevel, platform: 
       const s = w.config.workflow
       const before = resolveOptions(platform, levels(g, s)).options
       const after = checkOptions(platform, level === 'global' ? levels({ ...g, [platform]: own }, s) : levels(g, { ...s, [platform]: own }))
-      const changed = (Object.keys(after.resolved.options) as (keyof WorkflowOptions)[]).filter((k) => k !== 'platform' && !(k in projectOwn) && JSON.stringify(after.resolved.options[k]) !== JSON.stringify(before[k]))
+      // Every option either side has: an optional one (the stage names) taken back to inherit is a change too (HR5's round 1).
+      const keys = [...new Set([...Object.keys(after.resolved.options), ...Object.keys(before)])] as (keyof WorkflowOptions)[]
+      const changed = keys.filter((k) => k !== 'platform' && !(k in projectOwn) && JSON.stringify(after.resolved.options[k]) !== JSON.stringify(before[k]))
       if (changed.length) out.push({ w, path: p.path, name: p.name, changed, problems: after.problems })
     }
   }
@@ -123,7 +126,13 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
  * contradict), or as changed meanwhile when the form's base is no longer the level's. Hive's in config, the workspace's
  * in workspace.json (written in turn, kept with a backup). The inheriting projects' views read again. Returns the form.
  */
-export async function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+  // The level and every project it reaches checked as they are now, and written in the same turn of workflow writes:
+  // no project or level changes between the check and the write (HR5's round 1).
+  return workflowWrite(() => saveLevelOptions(ws, rawLevel, rawPlatform, raw))
+}
+
+async function saveLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
   const { level, platform } = levelArgs(rawLevel, rawPlatform)
   const change = shapeOf(raw)
   const sameAsBase = (): boolean => !change.base || JSON.stringify(sortedOf(change.base.options)) === JSON.stringify(sortedOf(levelOwn(ws, level, platform)))

@@ -1721,6 +1721,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     `inheritor` problem), rather than leaving that project at all-off; the all-off fall-back stays for files edited by
     hand;
   - the form's `base` makes a save read before another change refused (`WorkflowStale`);
+  - **workflow writes take turns** (`src/main/workflow/writes.ts`): a level's save, a project's (the Workflow section,
+    the settings tool) each checks and writes in one turn, so neither check can go stale before its write;
   - Hive's is written with `config.setWorkflowDefaults` (a platform's options replaced whole), the workspace's with
     `saveWorkspaceConfigWith` (workspace.json, kept with a backup), its base checked again as it is written.
   The Assistant's settings tool takes each option at either level (`workflow.<git|none>.<option>`, app scope;

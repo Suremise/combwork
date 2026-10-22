@@ -29,6 +29,7 @@ import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
+import { workflowWrite } from './writes'
 
 const log = createLogger('workflow')
 
@@ -230,7 +231,12 @@ export class WorkflowRefused extends HiveError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
  * form as it is now.
  */
-export async function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+  // Checked against the levels as they are now and written in the same turn of workflow writes (#1422).
+  return workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o))
+}
+
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []

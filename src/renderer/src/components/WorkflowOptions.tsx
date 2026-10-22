@@ -108,8 +108,8 @@ const T = {
   heirs: msg({ id: 'workflow.form.heirs', defaultMessage: '{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}', description: 'In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves).' }),
   noHeirs: msg({ id: 'workflow.form.noHeirs', defaultMessage: 'No project inherits the change now: each sets these options itself, or none uses this version control.', description: 'In the dialog before saving workflow defaults, when no open project uses the changed options.' }),
   heir: msg({ id: 'workflow.form.heir', defaultMessage: 'Project {project}: {options}', description: 'A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list.' }),
-  heirLanes: msg({ id: 'workflow.form.heirLanes', defaultMessage: '{n, plural, one {Its running lane keeps the old rules until it ends.} other {Its # running lanes keep the old rules until they end.}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them (glossary 2.1: old rules).' }),
-  heirCards: msg({ id: 'workflow.form.heirCards', defaultMessage: '{n, plural, one {Its card in flight keeps the old rules.} other {Its # cards in flight keep the old rules.}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started (glossary 2.1: old rules).' }),
+  heirLanes: msg({ id: 'workflow.form.heirLanes', defaultMessage: '{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules).' }),
+  heirCards: msg({ id: 'workflow.form.heirCards', defaultMessage: '{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules).' }),
   levelPlatform: msg({ id: 'workflow.form.levelPlatform', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1).' }),
   levelNone: msg({ id: 'workflow.form.levelNone', defaultMessage: 'None', description: 'The choice of the defaults for projects without version control (glossary 2.1: None).' }),
   levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
@@ -839,8 +839,29 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
             {check.projects.map((h) => (
               <li key={h.path} data-heir={h.name}>
                 {tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
-                {h.lanes.length > 0 && <div className="s-desc">{tr(T.heirLanes, { n: h.lanes.length })}</div>}
-                {h.inFlight.length > 0 && <div className="s-desc">{tr(T.heirCards, { n: h.inFlight.length })}</div>}
+                {/* Each lane and card by name (HR5's round 1), as a project's warning lists its own. */}
+                {h.lanes.length > 0 && (
+                  <div className="s-desc" data-heir-lanes="">
+                    {tr(T.heirLanes, { n: h.lanes.length })}
+                    <ul>
+                      {h.lanes.map((l) => (
+                        <li key={l.id}>{l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder })}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {h.inFlight.length > 0 && (
+                  <div className="s-desc" data-heir-cards="">
+                    {tr(T.heirCards, { n: h.inFlight.length })}
+                    <ul>
+                      {h.inFlight.map((c) => (
+                        <li key={c.number}>
+                          {cardLabelOf({ tasks }, c.number)} {c.title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
