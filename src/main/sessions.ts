@@ -567,9 +567,14 @@ export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): (
   return () => count() > before
 }
 
-/** Runs a worktree's setup command in the agent's terminal (Windows: cmd.exe, elsewhere: sh). */
-function shellCommand(command: string): { file: string; args: string[] } {
-  return process.platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', command] } : { file: '/bin/sh', args: ['-c', command] }
+/**
+ * Runs a worktree's setup command in the agent's terminal (Windows: cmd.exe, elsewhere: sh). On Windows as one command
+ * line, `/d /s /c "<command>"`, passed as written (#1454): as arguments, node-pty would quote the command and turn each
+ * `"` in it into `\"`, which cmd doesn't read, so a quoted path reached the program with its quotes in it. With /s, cmd
+ * takes off the outer quotes and runs the command as typed.
+ */
+export function shellCommand(command: string, platform: NodeJS.Platform = process.platform): { file: string; args: string[] | string } {
+  return platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: `/d /s /c "${command}"` } : { file: '/bin/sh', args: ['-c', command] }
 }
 
 const shownNotifications = new Set<Notification>()

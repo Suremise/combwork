@@ -2,6 +2,7 @@ import { closeSync, existsSync, openSync, readSync, renameSync } from 'original-
 import { join, resolve } from 'path'
 import { createHash } from 'crypto'
 import { config } from './config'
+import { placeKey } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup } from './storeBackup'
 import { readTable, saveTable } from './storeTables'
@@ -713,10 +714,14 @@ const live = new Set<Store>()
  * order and an older snapshot can never overwrite a newer one. A store is forgotten after its final save if nobody
  * reopened it meanwhile.
  */
-const byFile = new Map<string, { store: Store; lifetime: AbortSignal }>()
+const byFile = new Map<string, { store: Store; lifetime: AbortSignal; place: string }>()
 const fileKey = (file: string): string => (process.platform === 'win32' ? resolve(file).toLowerCase() : resolve(file))
 // The workspace's database replaced (the upgrade to 1.0, a restore): its store reads what the file has now.
-onDbReplaced((workspacePath) => byFile.get(fileKey(join(workspacePath, '.hive', 'metrics', 'metrics.json')))?.store.reread())
+// Under every spelling of the workspace, by the place each store's handle recorded as it entered (#1456).
+onDbReplaced((workspacePath, place) => {
+  const key = fileKey(join(workspacePath, '.hive', 'metrics', 'metrics.json'))
+  for (const store of new Set([...byFile].filter(([k, o]) => k === key || o.place === place).map(([, o]) => o.store))) store.reread()
+})
 /** Saves started by a workspace closing, still going (quitting waits for them). */
 const closing = new Set<Promise<void>>()
 
@@ -758,7 +763,8 @@ export function metricsHandle(w: WorkspaceService | null | undefined): MetricsHa
   // The same file's store if one is still here (saving after its workspace closed): reused, under this lifetime.
   const shared = byFile.get(key)
   const store = shared?.store ?? new Store(file)
-  const owner = { store, lifetime }
+  // Its workspace's place resolved as it enters (#1456).
+  const owner = { store, lifetime, place: placeKey(w.path) }
   byFile.set(key, owner)
   const entry: MetricsHandle = { lifetime, store }
   stores.set(w, entry)

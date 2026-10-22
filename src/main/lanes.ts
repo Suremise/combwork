@@ -9,7 +9,7 @@ import { msg } from '../shared/i18n'
 import { HiveError } from './hiveError'
 import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
-import { renameRetrying, withFileLock } from './fsutil'
+import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
 import { boardOpen, boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
@@ -107,10 +107,16 @@ const readGens = new WeakMap<LaneRecord[], number>()
  */
 const readAs = new WeakMap<LaneRecord[], string>()
 
-/** Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Hive started. */
-const opened = new Set<string>()
-// The database replaced (the upgrade to 1.0, a restore): lanes.json is looked for again (its move may have waited).
-onDbReplaced((workspacePath) => opened.delete(workspacePath.toLowerCase()))
+/**
+ * Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Hive started, by spelling, with the
+ * workspace's place as it entered (#1456).
+ */
+const opened = new Map<string, string>()
+// The database replaced (the upgrade to 1.0, a restore): lanes.json is looked for again (its move may have waited), under
+// every spelling of the workspace, by the place each recorded.
+onDbReplaced((workspacePath, place) => {
+  for (const [k, at] of [...opened]) if (k === workspacePath.toLowerCase() || at === place) opened.delete(k)
+})
 
 /**
  * lanes.json from before #1018, read to move it in (#1018 round 1): null only when there is none. One that can't be read
@@ -153,11 +159,13 @@ async function savedLanes(ws: WorkspaceService): Promise<{ version: 1; lanes: Re
   const path = ws.path!
   const key = path.toLowerCase()
   const file = fileOf(ws)
-  const data = opened.has(key)
+  // Its place resolved as it enters, before anything is awaited (#1456).
+  const place = opened.has(key) ? null : placeKey(path)
+  const data = place === null
     ? readTable(path, 'lanes')
     : await openTable(path, 'lanes', file, () => readLanesFile(file))
   // While the upgrade to 1.0 waits nothing was moved in: looked for again once it is upgraded.
-  if (!upgradeWaiting(path)) opened.add(key)
+  if (place !== null && !upgradeWaiting(path)) opened.set(key, place)
   return { version: 1, lanes: data.docs as Record<string, unknown>[] }
 }
 

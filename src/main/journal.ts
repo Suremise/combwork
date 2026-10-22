@@ -1,13 +1,14 @@
 import { brotliCompressSync, brotliDecompressSync } from 'zlib'
 import { createHash } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import type { DatabaseSync } from 'node:sqlite'
 import { app } from 'electron'
 import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES, inScope, isoWeek, weekStart, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalKind, type JournalPage, type JournalRow, type JournalSettings, type JournalSource, type LinkType } from '../shared/journal'
 import { openDb, transaction, type Db, type Migration } from './db'
+import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
-import { assertAdmitted, assertPlaceAdmitted, isAdmitted, ownerOf, refusal } from './openingFence'
+import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
 
 const log = createLogger('journal')
@@ -111,54 +112,91 @@ const hiveVersion = (): string => {
   }
 }
 
-const open = new Map<string, Db>()
-/** Each open journal's workspace (its place, `ownerOf` as it opened): it stays usable only while that is admitted (#1395). */
-const owners = new Map<string, string | null>()
+/**
+ * An open journal: its connection, the file it opened (where the journal really is, case kept, as it opened) and its
+ * workspace (its place, `ownerOf` that file). It stays usable only while that is admitted (#1395), and the workspace's
+ * close closes it by this, under whatever spelling it was opened (#1456).
+ */
+interface OpenJournal {
+  db: Db
+  file: string
+  owner: string
+}
+/** Open journals by their file's spelling: one opened through a junction or an 8.3 name is another connection to it. */
+const open = new Map<string, OpenJournal>()
 const keyOf = (file: string): string => file.toLowerCase()
 
 /** The journal file of an Assistant home (`<workspace>/.hive/assistant`). */
 export const journalFile = (home: string): string => join(home, JOURNAL_FILE)
 
-/** Journals being deleted (#1031 round 1): nothing opens them meanwhile, so the file can go. */
+/**
+ * Where a journal is, resolved once as a call enters and used for everything it does (#1456): the open one's file and
+ * workspace as it opened, else where its spelling leads now and that file's workspace (null: in no `.hive`). Never
+ * the spelling itself, which a junction pointed elsewhere meanwhile would take to another workspace's journal.
+ */
+interface Located {
+  file: string
+  owner: string | null
+}
+function located(home: string): Located {
+  const spelt = journalFile(home)
+  const o = open.get(keyOf(spelt))
+  if (o) return { file: o.file, owner: o.owner }
+  const file = realPath(spelt)
+  return { file, owner: ownerOf(file) }
+}
+
+/**
+ * Journals being deleted (#1031 round 1), by their workspace's place (#1456: under any spelling; a file in no `.hive` by
+ * itself): nothing opens them meanwhile, so the file can go.
+ */
 const deleting = new Set<string>()
+const deletingKey = (at: Located): string => at.owner ?? keyOf(at.file)
 
 /** The journal of an Assistant home, opened (and made) when first used; refused while it is being deleted. */
-function journalOf(home: string): Db {
-  const file = journalFile(home)
-  const k = keyOf(file)
-  if (deleting.has(k)) throw new JournalBusy('The journal is being deleted: try again in a moment.')
+function journalOf(home: string, at: Located = located(home)): Db {
   // Kept open only for a workspace a window holds (#1395): late work of one closed, or never opened, is refused, also
   // while its connection is still open (before the close has closed it).
+  if (deleting.has(deletingKey(at))) throw new JournalBusy('The journal is being deleted: try again in a moment.')
+  if (at.owner === null) throw refusedOpen()
+  assertPlaceAdmitted(at.owner)
+  const k = keyOf(journalFile(home))
   const was = open.get(k)
-  if (was) {
-    const owner = owners.get(k)
-    if (owner == null) throw refusal(file)!
-    assertPlaceAdmitted(owner)
-    return was
-  }
-  assertAdmitted(file)
-  const db = openJournalDb(home)
-  open.set(k, db)
-  owners.set(k, ownerOf(file))
+  if (was) return was.db
+  const db = openJournalDb(at.file)
+  open.set(k, { db, file: at.file, owner: at.owner })
   return db
 }
 
-const openJournalDb = (home: string): Db => openDb(journalFile(home), { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(home, 'backups'), setup })
+/** Opens the journal at `file`, where it really is (its backups beside it). */
+const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup })
 
-/** Closes a home's journal (its workspace closed, or before it is deleted). */
-export function closeJournal(home: string): void {
-  const k = keyOf(journalFile(home))
-  const db = open.get(k)
-  if (!db) return
-  open.delete(k)
-  owners.delete(k)
-  db.close()
+/**
+ * Closes a home's journal (its workspace closed, or before it is deleted): every connection to it, however it was spelt
+ * as it opened (#1456: one opened through a junction or an 8.3 name would otherwise hold the folder until Hive quits).
+ * The workspace is `place`, its real location as its window opened it, else as this spelling's journal opened: never
+ * what the spelling resolves to now, so a junction removed or pointed at another workspace since neither keeps this
+ * one's journals open nor closes another's.
+ */
+export function closeJournal(home: string, place?: string): void {
+  const file = journalFile(home)
+  const key = keyOf(file)
+  const others = [...open.keys()].some((k) => k !== key)
+  const at = others ? (place ?? open.get(key)?.owner ?? ownerOf(file)) : null
+  for (const [k, o] of [...open]) if (k === key || (at !== null && o.owner === at)) closeOne(k, o)
 }
 
+function closeOne(key: string, o: OpenJournal): void {
+  open.delete(key)
+  o.db.close()
+}
+
+/** Whether a home's journal is open under this spelling (tests). */
+export const journalOpen = (home: string): boolean => open.has(keyOf(journalFile(home)))
+
 export function closeAllJournals(): void {
-  for (const db of [...open.values()]) db.close()
+  for (const o of [...open.values()]) o.db.close()
   open.clear()
-  owners.clear()
 }
 
 /** An error the tools return as their reply: the caller's mistake, said plainly. */
@@ -256,12 +294,12 @@ export function writeEntry(home: string, settings: JournalSettings, input: Entry
  * workspace meanwhile keeps its own (pruned and shown once it is opened). Refused while the journal is being deleted.
  */
 export function leaveEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
-  const file = journalFile(home)
-  const owner = ownerOf(file)
-  if (owner !== null && isAdmitted(owner)) return writeEntry(home, settings, input, source)
+  // Where it is, resolved once as it enters (#1456): admitted by it, and opened there.
+  const at = located(home)
+  if (at.owner !== null && isAdmitted(at.owner)) return writeEntry(home, settings, input, source)
   const e = entryOf(settings, input)
-  if (deleting.has(keyOf(file))) throw new JournalBusy('The journal is being deleted: try again in a moment.')
-  const db = openJournalDb(home)
+  if (deleting.has(deletingKey(at))) throw new JournalBusy('The journal is being deleted: try again in a moment.')
+  const db = openJournalDb(at.file)
   try {
     return insertEntry(db.writer, e, source)
   } finally {
@@ -498,9 +536,9 @@ export function deleteEntry(home: string, id: number): boolean {
 
 /** How big the journal is (bytes, its pages in use) and how many entries it has; null when there is none yet (or it is being deleted). */
 export function journalSize(home: string): { bytes: number; entries: number } | null {
-  const k = keyOf(journalFile(home))
-  if (deleting.has(k) || (!open.has(k) && !existsSync(journalFile(home)))) return null
-  const { reader } = journalOf(home)
+  const at = located(home)
+  if (deleting.has(deletingKey(at)) || (!open.has(keyOf(journalFile(home))) && !existsSync(at.file))) return null
+  const { reader } = journalOf(home, at)
   const pages = (reader.prepare('PRAGMA page_count').get() as { page_count: number }).page_count
   const free = (reader.prepare('PRAGMA freelist_count').get() as { freelist_count: number }).freelist_count
   const size = (reader.prepare('PRAGMA page_size').get() as { page_size: number }).page_size
@@ -510,8 +548,8 @@ export function journalSize(home: string): { bytes: number; entries: number } | 
 
 /** Whether a home has a journal to read (without making one); false while it is being deleted. */
 export function hasJournal(home: string): boolean {
-  const k = keyOf(journalFile(home))
-  return !deleting.has(k) && (open.has(k) || existsSync(journalFile(home)))
+  const at = located(home)
+  return !deleting.has(deletingKey(at)) && (open.has(keyOf(journalFile(home))) || existsSync(at.file))
 }
 
 /**
@@ -584,17 +622,18 @@ function pruneSoon(home: string, settings: JournalSettings): void {
  * opened again under the move.
  */
 export async function deleteJournal(home: string): Promise<void> {
-  const file = journalFile(home)
-  const k = keyOf(file)
-  if (deleting.has(k)) throw new JournalBusy('The journal is already being deleted.')
-  deleting.add(k)
+  // Where it is, resolved once as it enters (#1456): every connection of its workspace closed and kept closed by its
+  // place, and the files there moved, through every await, never where the spelling leads by then.
+  const at = located(home)
+  const { file } = at
+  const key = deletingKey(at)
+  if (deleting.has(key)) throw new JournalBusy('The journal is already being deleted.')
+  deleting.add(key)
   try {
-    const db = open.get(k)
-    open.delete(k)
-    db?.close()
+    closeJournal(home, at.owner ?? undefined)
     for (const f of [file, `${file}-wal`, `${file}-shm`]) if (existsSync(f)) await trash(f)
   } finally {
-    deleting.delete(k)
+    deleting.delete(key)
   }
   log.info(`deleted the journal in ${userText(home)}`)
   told(home)
@@ -602,7 +641,7 @@ export async function deleteJournal(home: string): Promise<void> {
 
 /** The journal's file size on disk (with its WAL), for Settings; 0 when there is none. */
 export function journalFileBytes(home: string): number {
-  const file = journalFile(home)
+  const { file } = located(home)
   let n = 0
   for (const f of [file, `${file}-wal`]) {
     try {

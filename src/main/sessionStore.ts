@@ -3,7 +3,7 @@ import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
 import { onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
-import { readKeptJson, writeKeptJson } from './fsutil'
+import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
 import { transaction, type Db } from './db'
@@ -148,15 +148,21 @@ async function readOldFile(file: string): Promise<SessionsFile | null> {
   return readKeptJson<SessionsFile>(file, EMPTY())
 }
 
-/** Hosts whose file was moved in this run (by workspace and scope): asked once, not at every read. */
-const opened = new Set<string>()
+/**
+ * Hosts whose file was moved in this run (by workspace and scope), with their workspace's place as the move entered
+ * (#1456): asked once, not at every read.
+ */
+const opened = new Map<string, string>()
 const openedKey = (p: SessionsPlace): string => `${p.workspace.toLowerCase()}\0${p.scope}`
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts are looked at again (a
-// sessions.json whose move waited, or one a restore brought back the need for). The records keep no copy in memory.
-onDbReplaced((workspacePath) => {
+// sessions.json whose move waited, or one a restore brought back the need for), under every spelling of the workspace,
+// by the place each recorded. The records keep no copy in memory.
+onDbReplaced((workspacePath, place) => {
   const prefix = `${workspacePath.toLowerCase()}\0`
-  for (const k of [...opened]) if (k.startsWith(prefix)) opened.delete(k)
+  for (const [k, at] of [...opened]) if (k.startsWith(prefix) || at === place) opened.delete(k)
 })
+/** For tests: the workspaces (as spelt, lower-cased) whose hosts were moved in this run. */
+export const sessionsOpenedFor = (): string[] => [...new Set([...opened.keys()].map((k) => k.slice(0, k.indexOf('\0'))))]
 
 /** Hosts being removed now (Remove from Hive, by workspace and scope): what they export stays in their folder. */
 const removing = new Set<string>()
@@ -175,15 +181,18 @@ const TABLE = {
 async function opening(place: SessionsPlace, db?: Db): Promise<void> {
   const k = openedKey(place)
   if (opened.has(k) || (db ? !!db.pending : upgradeWaiting(place.workspace))) return
-  if (storeValue((db ?? workspaceDb(resolve(place.workspace))).writer, 'sessions', place.scope, 'exported') !== null) {
-    // Not marked opened: asked again at each read until the project is back.
-    if (place.removed || removing.has(k)) return
+  const exported = storeValue((db ?? workspaceDb(resolve(place.workspace))).writer, 'sessions', place.scope, 'exported') !== null
+  // Not marked opened: asked again at each read until the project is back.
+  if (exported && (place.removed || removing.has(k))) return
+  // Its workspace's place resolved as it enters, before anything is awaited (#1456).
+  const at = placeKey(place.workspace)
+  if (exported) {
     await moveBack(place)
-    opened.add(k)
+    opened.set(k, at)
     return
   }
   await openTable(place.workspace, 'sessions', place.scope, place.file, () => readOldFile(place.file), TABLE, { whenEmpty: true, db })
-  opened.add(k)
+  opened.set(k, at)
 }
 
 /**

@@ -86,7 +86,11 @@ export function startSize(key: string): { cols: number; rows: number } {
 
 export interface SpawnOptions {
   file: string
-  args: string[]
+  /**
+   * Its arguments; on Windows, one string is a command line passed as written (node-pty quotes an array's arguments
+   * CRT-style, turning a `"` in one into `\"`, which `cmd /s /c` doesn't read: #1454).
+   */
+  args: string[] | string
   cwd: string
   env: Record<string, string>
   cols?: number
@@ -154,7 +158,7 @@ export function forLog(arg: string): string {
 export function spawnPty(key: string, opts: SpawnOptions): IPty {
   // i18n-ignore: a guard for Hive's own code (callers refuse a second start first, in their own words); the key is internal
   if (entries.has(key)) throw new Error(`A process is already running for ${key}`)
-  log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(argsForLog(opts.args.map(forLog)))}`)
+  log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(typeof opts.args === 'string' ? userText(forLog(opts.args)) : argsForLog(opts.args.map(forLog)))}`)
   const size = startSize(key)
   const gate = opts.track && process.platform === 'win32' ? launchGate(opts.file, opts.args, opts.env) : null
   let proc: IPty

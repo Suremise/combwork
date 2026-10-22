@@ -759,6 +759,46 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
     expect(calls).toEqual([])
   })
 
+  it('scenarios (#1457): a step per trial named with the results so far, finished with the counts; estimates by provider; under hive-progress, step lines', async () => {
+    const { scenariosProgress } = await import('./progressReport.mts')
+    const first = scenariosProgress(['work-on-card', 'review-card', 'handover'], 'fake', ['--only', 'work-on-card,review-card,handover'])
+    first.start(0, 'work-on-card')
+    first.done('work-on-card', 1000, 'ok')
+    first.start(1, 'review-card')
+    first.done('review-card', 3000, 'failed')
+    first.start(2, 'handover')
+    first.done('handover', 0, 'skipped')
+    await vi.waitFor(() => expect(calls.filter((c) => c.method === 'PATCH').at(-1)?.body).toEqual({ step: 2, stepName: 'handover · 1 ok, 1 failed' }), { timeout: HUNG_MS })
+    await first.finish(false, '1 ok, 1 failed, 1 skipped', join(dir, 'summary.md'))
+    expect(calls[0].body).toEqual({ title: 'scenarios: 3 (fake)', total: 3, step: 0, command: 'npm run scenarios -- --only work-on-card,review-card,handover', pid: process.pid })
+    expect(calls.at(-1)).toMatchObject({ path: '/v1/progress/run-1/finish', body: { ok: false, summary: '1 ok, 1 failed, 1 skipped', logPath: join(dir, 'summary.md') } })
+    calls.length = 0
+    // work-on-card took a second (the others failed or were skipped, so not timed: each counts as that average).
+    const second = scenariosProgress(['work-on-card', 'review-card'], 'fake', [])
+    await vi.waitFor(() => expect(calls[0]?.body.estimateMs).toBe(2000), { timeout: HUNG_MS })
+    await second.finish(true)
+    calls.length = 0
+    // Another provider's trials are timed apart: no estimate yet.
+    const codex = scenariosProgress(['work-on-card'], 'fake-codex', [])
+    await vi.waitFor(() => expect(calls.length).toBe(1), { timeout: HUNG_MS })
+    expect(calls[0].body.estimateMs).toBeUndefined()
+    await codex.finish(true)
+    calls.length = 0
+    // Under hive-progress: step lines for the wrapper's run, each naming the trial starting and the results so far.
+    const lines: string[] = []
+    const wrapped = scenariosProgress(['a', 'b'], 'fake', [], { target: null, lines: (l) => lines.push(l) })
+    wrapped.start(0, 'a')
+    wrapped.done('a', 10, 'ok')
+    wrapped.start(1, 'b')
+    wrapped.done('b', 10, 'ok')
+    await wrapped.finish(true, '2 ok, 0 failed')
+    expect(lines).toEqual(['##hive-progress step=1 total=2', '##hive-progress step=1 name=a', '##hive-progress step=2 name=b · 1 ok'])
+    const off = scenariosProgress(['a'], 'fake', ['--no-progress'])
+    off.start(0, 'a')
+    await off.finish(true)
+    expect(calls).toEqual([])
+  })
+
   it('unit: a step per file as it finishes, finished with the counts; timed only when all passed', async () => {
     const { VitestProgress } = await import('./progressReport.mts')
     const v = new VitestProgress()
