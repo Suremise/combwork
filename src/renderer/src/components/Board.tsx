@@ -25,7 +25,7 @@ import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { formatDateTime } from '@shared/dates'
 import { returnRound } from '@shared/watch'
-import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useClipped, useContextMenu, type MenuEntry } from './ui'
+import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useContextMenu, type MenuEntry } from './ui'
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { openLaneStart } from './LaneStartDialog'
@@ -963,25 +963,21 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
 /** Merging's description (its hover): no drop there (#1420). */
 const MERGING_TIP = msg({ id: 'board.columns.mergingTip', defaultMessage: "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.", description: "The Merging column's description (its hover; glossary 2.2: Merging, a stage inside Approved). Remove from queue is the button on the card's Work section and in the Progress panel." })
 
-/** A board column's name in its header: cut with "…" when the column is narrow, and then given in full in its tooltip (#886). */
+/**
+ * A board column's name in its header: wrapped to two lines when the column is narrow (cut with "…" only past them), and
+ * always given in full in its tooltip with what the column is for (#886, #1420).
+ */
 function ColumnLabel({ name, description }: { name: string; description: string }) {
-  const [ref, clipped] = useClipped<HTMLSpanElement>()
   return (
     <Tooltip
       content={
-        clipped ? (
-          <>
-            <strong>{name}</strong>
-            <div>{description}</div>
-          </>
-        ) : (
-          description
-        )
+        <>
+          <strong>{name}</strong>
+          <div>{description}</div>
+        </>
       }
     >
-      <span className="board-column-label" ref={ref}>
-        {name}
-      </span>
+      <span className="board-column-label">{name}</span>
     </Tooltip>
   )
 }
