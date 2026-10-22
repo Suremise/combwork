@@ -440,7 +440,10 @@ export class MergeQueue {
   private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string, stuck?: QueueStuck): Promise<QueueOutcome> {
     const m = message?.trim().slice(0, 4000) || undefined
     const named = stuck ? stuck.files.map((f) => f.path) : files
-    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }))
+    // Never in place of a pause saved meanwhile (the user's Pause queue, say), decided in the pause's own write; the
+    // terminal state, which says more, and which the user must settle, is written whatever was there.
+    const wrote = await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}), ...(stuck ? { stuck } : {}) }, !stuck))
+    if (!wrote) return this.held(card, entry, this.paused(target)?.reason ?? 'user')
     if (stuck) {
       const finish = stuck.commands.find((c) => c.purpose === 'finish')
       const undo = stuck.commands.find((c) => c.purpose === 'undo')
@@ -509,14 +512,18 @@ export class MergeQueue {
     const s = card ? this.wf.state(card) : null
     const e = s ? openEntry(s) : undefined
     const asked = s && e ? Object.values(s.made).filter((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === e.id).at(-1) : undefined
-    const lift = (): Promise<void> => this.wf.locked(() => this.wf.store.setQueuePause(target, null))
+    // Lifted only from the approval it is (a Pause queue saved in its place stays, and the queue with it).
+    const lift = (): Promise<boolean> => this.wf.locked(() => this.wf.store.clearQueuePause(target, 'approval'))
     if (!card || !s || !e || e.target !== target || !asked) {
-      await lift()
-      return this.runOnce(target)
+      return (await lift()) ? this.runOnce(target) : null
     }
-    if (s.requests.some((r) => r.request === asked.request)) return null
-    const answer = s.approvals.filter((a) => a.request === asked.request).at(-1)?.answer
-    await lift()
+    const open = s.requests.some((r) => r.request === asked.request)
+    // Still asked: waits, unless the setting says Automatically now (HR4's #1351 round 1: a change to it wakes the queue,
+    // queueHost), which advances that test merge as an approval would; its question is retired by the entry's outcome.
+    const auto = open && this.cfg.checkedOutTarget?.() === 'auto'
+    if (open && !auto) return null
+    const answer = auto ? 'approved' : s.approvals.filter((a) => a.request === asked.request).at(-1)?.answer
+    if (!(await lift())) return null
     if (answer !== 'approved') {
       const wrote = await this.write(card, (w) => {
         if (!this.isOpen(w, e)) return false
@@ -830,12 +837,16 @@ export class MergeQueue {
    * its test merge; the queue waits for it (paused `approval`, naming the folder). Asked once per test merge.
    */
   private async askAdvance(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, folder: string): Promise<QueueOutcome> {
+    // The pause first, and only when none is saved (HR4's #1351 round 1: the user's Pause queue meanwhile stands, and
+    // nothing is asked under it); then the question.
+    const out = await this.pause(target, card, entry, 'approval', [folder])
+    if (this.paused(target)?.reason !== 'approval' || this.paused(target)?.card !== card.key) return out
     await this.write(card, (w) => {
       const s = w.state()
       if (s.requests.some((r) => r.gate === QUEUE_ADVANCE_GATE && r.entry === entry.id && r.revision === expected && r.result === result)) return
       this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueAdvance, { card: card.key, target, folder }), { unbound: true, entry: entry.id, revision: expected, result })
     })
-    return this.pause(target, card, entry, 'approval', [folder])
+    return out
   }
 
   /** The lease, checked just before git touches the target: a runner that lost it touches nothing. */

@@ -2213,7 +2213,9 @@ touched:
   lock and, for a checked-out target, its folder's fence, after deciding again there, from state read there, the
   target's saved pause, Ask or Automatic with the matching approval, the rules, the card's open entry and approval, and
   where the target is checked out. A check before the lock is an early-out only. A pause Hive writes for what it saw in
-  the lock (a condition, the terminal state, the ask) is written before the lock is released. Whoever caused the run
+  the lock (a condition, the terminal state, the ask) is written before the lock is released, and never in place of a
+  pause saved meanwhile (the user's Pause queue stands, and nothing is asked under it; decided in the pause's own
+  write), except the terminal state, which the user must settle anyway. Whoever caused the run
   (the card's own queue, another card's enqueue, a workspace reopening, another Hive), the same holds. **A needs-you
   pause naming a card freezes its target:** recovery reads it first, in the lock, and writes nothing until the user
   lifts it (Resume, or the answer to its For you, which check first); other pauses (Pause queue, rules off, approval)
@@ -2271,7 +2273,9 @@ touched:
   result) and the queue pauses `approval`, naming the folder. The answer is an `enqueue` of its target: approved, the
   advance runs at once on that test merge (the target moved meanwhile: tested again, and asked again, the earlier
   request retired); declined, the entry leaves the queue as Remove from queue leaves it (Approved), and the queue goes
-  on. Resume doesn't stand in for the answer. A target checked out nowhere never asks.
+  on. Resume doesn't stand in for the answer. The setting turned to *Automatically* wakes a queue waiting for its
+  Approve: it advances the asked test merge as an approval would, and the question is retired with the entry's
+  outcome. A target checked out nowhere never asks.
 - **Crash injection** (S34d): test copies (unpackaged) take `HIVE_TEST_QUEUE_CRASH` = `afterStarted`, `beforeFiles`,
   `afterFiles`, `beforeRef`, `afterAdvance`, `inRollback` or `afterRollback` (Hive ends at that point, no quit handler)
   and `HIVE_TEST_QUEUE_RACE=beforeRef` (the target moved by another client just before the swap, once per run): the

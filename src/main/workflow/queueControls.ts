@@ -145,7 +145,7 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
   await wf.locked(() => {
     // The caller's authority as it is now, in the write (the Assistant's change boundary: Control, its session).
     guard?.()
-    if (!wf.store.queuePause(target)) wf.store.setQueuePause(target, { reason: 'user', card: '', by }) // i18n-ignore: a pause reason's code, not text
+    wf.store.setQueuePause(target, { reason: 'user', card: '', by }, true) // i18n-ignore: a pause reason's code, not text
   })
   queueChanged(ws, projectPath, target)
   return queueView(ws, wf, projectPath, target)

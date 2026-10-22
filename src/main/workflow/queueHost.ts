@@ -237,7 +237,7 @@ function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
 async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Promise<void> {
   const first = q.entries(target)[0]
   if (!first || q.paused(target)) return
-  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key })) // i18n-ignore: a pause reason's code, not text
+  await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key }, true)) // i18n-ignore: a pause reason's code, not text
 }
 
 /** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
@@ -331,10 +331,16 @@ export function startQueueHosts(): void {
     }
   })
   let enforced = workflowEnforced()
+  const checkedOutMode = (): unknown => advanced.get(QUEUE_CHECKED_OUT_TARGET)
+  let mode = checkedOutMode()
   const offAdvanced = advanced.onChange(() => {
     const now = workflowEnforced()
     if (now && !enforced) for (const ws of openWorkspaces()) void startOpen(ws, true).catch((x) => log.warn('resuming the merge queues', x))
+    // Merge into a checked-out branch set to Automatically (#1351, HR4's round 1): a queue waiting for an Approve looks
+    // again, and goes ahead.
+    else if (checkedOutMode() === 'auto' && mode !== 'auto') for (const ws of openWorkspaces()) void startOpen(ws).catch((x) => log.warn('waking the merge queues', x))
     enforced = now
+    mode = checkedOutMode()
   })
   // A workspace closing: its runners released first (their processes ended; from then on every write their runs try is
   // refused by the fence, so a check ended by the close never returns its card), then its runs waited for, briefly.

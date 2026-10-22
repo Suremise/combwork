@@ -434,6 +434,55 @@ describe("every target write authorised in the lock, from state read there (HR4'
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
   })
 
+  it("the user's Pause queue saved just as the queue asks stands: no question, no approval pause in its place", async () => {
+    const e = pair()
+    const card = await queued(e)
+    let paused = false
+    const q = e.queue({
+      checkedOutTarget: () => {
+        // Read just before the ask: the user pauses the queue in that instant.
+        if (!paused) e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })
+        paused = true
+        return 'ask'
+      }
+    })
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'user' })
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'user', by: 'user' })
+    expect(e.wf.state(card).requests.filter((r) => r.gate === QUEUE_ADVANCE_GATE)).toHaveLength(0)
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+  })
+
+  it('Ask each time switched to Automatically wakes the waiting queue: it advances the asked test merge, its question retired', async () => {
+    const e = pair()
+    const card = await queued(e)
+    let mode: 'ask' | 'auto' = 'ask'
+    const q = e.queue({ checkedOutTarget: () => mode })
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'approval' })
+    const asked = e.wf.state(card).requests.find((r) => r.gate === QUEUE_ADVANCE_GATE)!
+    // Still Ask: a run of the queue (another card's enqueue) waits on.
+    expect(await q.drain('main')).toEqual([])
+    mode = 'auto'
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated', retests: 0 })
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('done')
+    expect(s.requests.some((r) => r.request === asked.request)).toBe(false)
+    expect(sh(e.project, 'rev-parse', 'main^1')).toBe(asked.revision)
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it("a run under a user's pause that replaced the approval lifts nothing", async () => {
+    const e = pair()
+    const card = await queued(e)
+    const q = e.queue({ checkedOutTarget: () => 'ask' })
+    await q.drain('main')
+    e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })
+    const r = e.wf.state(card).requests.find((x) => x.gate === QUEUE_ADVANCE_GATE)!
+    moved(await e.wf.answer(card.key, r.request, 'approved'))
+    expect(await q.drain('main')).toEqual([])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+  })
+
   it("a terminal pause freezes the target: put back but not answered, a fresh queue's or another Hive's recovery writes nothing", async () => {
     const e = pair()
     const card = await queued(e)

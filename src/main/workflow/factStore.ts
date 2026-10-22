@@ -588,12 +588,17 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT target FROM workflow_queue_pauses WHERE project = ?').all(this.scope.project) as { target: string }[]).map((r) => r.target))
   }
 
-  /** Pauses a target's queue (`pause`), or resumes it (null). */
-  setQueuePause(target: string, pause: QueuePause | null): void {
+  /**
+   * Pauses a target's queue (`pause`), or resumes it (null). `keep`: only when it isn't paused already, decided in the same
+   * write (HR4's #1351 round 1: Hive's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
+   * was written.
+   */
+  setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {
     const p = this.scope.project
-    this.conn.write((db) => {
+    return this.conn.write((db) => {
+      if (keep && db.prepare('SELECT 1 FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target)) return false
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
-      if (!pause) return
+      if (!pause) return true
       const st = pause.stuck
       db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString(), st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
@@ -606,7 +611,13 @@ export class FactStore {
         cmd.run(p, target, i, c.purpose, c.place)
         c.args.forEach((a, j) => arg.run(p, target, i, j, a))
       })
+      return true
     })
+  }
+
+  /** Resumes a target's queue only from a pause of this reason, in one write (a pause saved since in its place stays). */
+  clearQueuePause(target: string, reason: string): boolean {
+    return this.conn.write((db) => Number(db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason).changes) > 0)
   }
 
   // --- The queue's runner (#1360): its lease, its processes, its worktrees. Quiet writes: the window shows none of them.
