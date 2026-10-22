@@ -16,7 +16,7 @@ import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
-import { placeKey, withFileLock } from './fsutil'
+import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -272,6 +272,11 @@ interface Board {
   path: string
   /** Its real location (`placeKey`) as it opened: another spelling's board of the same folder is closed with it (#1402). */
   place: string
+  /**
+   * Its `.hive` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
+   * presence marker's removal) goes there, never through a spelling that may point elsewhere by then (#1402).
+   */
+  hive: string
   db: Db
   /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
   legacy: boolean
@@ -643,13 +648,16 @@ function boardOf(path: string, transient = false): Board {
  */
 function openBoard(path: string, upgrade: boolean): Board {
   const key = keyOf(path)
-  const hive = join(path, HIVE_DIR)
+  // The folder's `.hive` where it really is, now: what every later write and removal for this board uses (#1402), the
+  // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
+  const real = realPath(path)
+  const hive = join(real, HIVE_DIR)
   let db: Db | null = null
   try {
-    db = openDb(join(hive, DB_FILE), {
+    db = openDb(join(path, HIVE_DIR, DB_FILE), {
       migrations: BOARD_MIGRATIONS,
       hiveVersion: hiveVersion(),
-      backupDir: join(hive, BACKUPS),
+      backupDir: join(path, HIVE_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
@@ -659,7 +667,8 @@ function openBoard(path: string, upgrade: boolean): Board {
     const w = db.writer
     const b: Board = {
       path,
-      place: placeKey(path),
+      place: real.toLowerCase(),
+      hive,
       db,
       legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
@@ -819,13 +828,14 @@ function closeOne(key: string, b: Board): void {
   boards.delete(key)
   clearInterval(b.poll)
   clearInterval(b.presence)
+  // The profile's marker at the place is every open board's of it here (another spelling's too): it goes with the last.
   try {
-    removePresence(join(b.path, HIVE_DIR), presenceId())
+    if (![...boards.values()].some((o) => o.place === b.place)) removePresence(b.hive, presenceId())
   } catch (e) {
     log.warn('removing the workspace presence marker', e)
   }
   try {
-    if (writable(b.db) && existsSync(join(b.path, HIVE_DIR, TASKS))) writeStub(join(b.path, HIVE_DIR), nextOf(b.db.writer))
+    if (writable(b.db) && existsSync(join(b.hive, TASKS))) writeStub(b.hive, nextOf(b.db.writer))
   } catch (e) {
     log.warn('bringing the board folder up to date', e)
   }
@@ -1475,7 +1485,7 @@ export function deleteCard(ws: WorkspaceService, n: number): boolean {
 export function takeNumber(ws: WorkspaceService): number {
   return writeOp(ws, (b) => {
     const n = takeNumberIn(b.db.writer)
-    writeStubNext(join(b.path, HIVE_DIR), n + 1)
+    writeStubNext(b.hive, n + 1)
     return n
   })
 }

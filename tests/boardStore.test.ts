@@ -489,6 +489,9 @@ describe('a board opened under another name for its folder (#1402)', () => {
   /** The window's board, opened as it is first used (by its window's spelling). */
   const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
   const fenced = (ws: string): boolean => fencedOut(join(ws, '.hive', 'hive.db')) !== null
+  /** The next number in the stub older versions read, and the profiles' presence markers there. */
+  const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next
+  const markers = (ws: string): string[] => (existsSync(join(ws, '.hive', 'open')) ? readdirSync(join(ws, '.hive', 'open')) : [])
   /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
   async function moves(ws: string): Promise<void> {
     await renameRetrying(ws, `${ws}-moved`)
@@ -564,19 +567,45 @@ describe('a board opened under another name for its folder (#1402)', () => {
     await moves(ws)
   })
 
-  it("a lease's own board, under another name, closes only itself as the lease ends", async () => {
+  it("the junction the window opened by pointed at another window's workspace: the close writes nothing there and leaves its presence marker (HR6 round 2)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      for (const t of ['One', 'Two', 'Three']) await inWorkspace(w, () => tasks.createTask({ title: t, project: 'p' }, user))
+      const w2 = await open(other)
+      await useBoard(w2)
+      const before = { stub: stubNext(other), markers: markers(other) }
+      expect(before.markers).toHaveLength(1)
+      expect(stubNext(ws)).toBe(4)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect({ stub: stubNext(other), markers: markers(other) }).toEqual(before)
+      expect(markers(ws)).toEqual([])
+      expect(store.boardOpen(other)).toBe(true)
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+  })
+
+  it("a lease's own board, under another name, closes only itself as the lease ends, the profile's presence marker kept while the window's board is open (HR6 round 2)", async () => {
     const ws = workspaceWith()
     const w = await open(ws)
     await useBoard(w)
+    expect(markers(ws)).toHaveLength(1)
     const alias = aliasOf('junction', ws)!
     try {
       store.leaseDb(alias.path).release()
       expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, false])
+      expect(markers(ws)).toHaveLength(1)
     } finally {
       alias.drop()
     }
     await w.close()
     expect(store.boardOpen(ws)).toBe(false)
+    expect(markers(ws)).toEqual([])
   })
 })
 
