@@ -132,6 +132,8 @@ interface HiveMessageValues {
   'workflow.option.sharedFolderWarning.title': undefined
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
+  'workflow.option.strict.desc': undefined
+  'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined

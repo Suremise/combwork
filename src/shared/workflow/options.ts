@@ -263,12 +263,12 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 
 /**
  * The options the plain form shows for a platform, in order (§16.6.1, §16.6.2; #1278, #1355). It offers only what this
- * version ships (§16.19.1): G8 strict, G15 and G17 wait for later phases, and None's stage names (N5) for the Version
+ * version ships (§16.19.1): G15 and G17 wait for later phases (G8 strict is offered since #1352), and None's stage names (N5) for the Version
  * Control tab. The check commands (`commands`) are edited with the checks that name them. G9 and its install show only
  * where they apply (`formShows`).
  */
 export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
-  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'mergeChecks', 'mergeInstall', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
+  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'mergeChecks', 'mergeInstall', 'strict', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
   none: ['review', 'noSelfReview', 'preChecks', 'excluded', 'dependenciesDone']
 }
 
@@ -279,6 +279,8 @@ export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'mergeChecks') return o.finish === 'hiveMerges'
   if (key === 'mergeInstall') return o.finish === 'hiveMerges' && o.mergeChecks.length > 0
+  // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
+  if (key === 'strict') return o.finish === 'hiveMerges'
   return FORM_OPTIONS[o.platform].includes(key)
 }
 
@@ -289,10 +291,10 @@ export const NOT_OFFERED = {
 
 /**
  * The values a project sets that this version doesn't offer yet (§16.19.1), by why. Hive merges and merge checks are
- * offered since P5 (#1348's queue, #1355's form).
+ * offered since P5 (#1348's queue, #1355's form), and strict (G8) since #1352.
  */
 export function notOffered(own: Partial<WorkflowOptions>): (keyof typeof NOT_OFFERED)[] {
   const out: (keyof typeof NOT_OFFERED)[] = []
-  if (own.strict === true || own.slotsUpToDate === true) out.push('later')
+  if (own.slotsUpToDate === true) out.push('later')
   return out
 }

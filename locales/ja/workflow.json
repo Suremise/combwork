@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "コミットに他のエージェントのファイルが含まれていたら警告",
   "workflow.option.stopOwnRuns.desc": "ビルダー自身の実行とバックグラウンドのコマンドが停止して初めて、カードはレビューに進みます。",
   "workflow.option.stopOwnRuns.title": "レビュー前にエージェントが開始したものを停止する",
+  "workflow.option.strict.desc": "レビュー後にマージ先ブランチが進んでいた場合、Hive のマージキューは自分のフォルダーで、それをカードの作業にマージします（マージ方式がスカッシュならリベースします）。ビルダーのブランチには一切触れません。結果が同じ変更ならレビューはそのまま有効です。同じでない場合や競合した場合、カードはビルダーに戻ります。",
+  "workflow.option.strict.title": "マージ前に作業をマージ先ブランチの最新に合わせる",
   "workflow.option.style.desc": "カードの作業をマージ先ブランチにマージする方法です。",
   "workflow.option.style.title": "マージ方法",
   "workflow.option.target.desc": "マージ先ブランチです。空欄の場合は、リポジトリの既定のブランチになります。",

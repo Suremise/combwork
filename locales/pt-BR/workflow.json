@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "Avisar quando um commit inclui arquivos de outro agente",
   "workflow.option.stopOwnRuns.desc": "Um cartão só vai para revisão depois que as execuções e os comandos em segundo plano do próprio executor pararam.",
   "workflow.option.stopOwnRuns.title": "Os agentes param o que iniciaram antes da revisão",
+  "workflow.option.strict.desc": "Se o branch de destino avançou desde a revisão, a fila de merge do Hive faz o merge dele no trabalho do cartão (ou o rebase do trabalho, com o estilo de merge Squash) na sua própria pasta, nunca no branch do executor. A revisão continua valendo se o resultado for a mesma mudança; se não for, ou se houver conflito, o cartão volta ao executor.",
+  "workflow.option.strict.title": "O trabalho está atualizado com o branch de destino antes do merge",
   "workflow.option.style.desc": "Como o trabalho de um cartão é mesclado no branch de destino.",
   "workflow.option.style.title": "Tipo de merge",
   "workflow.option.target.desc": "O branch de destino. Se ficar vazio, o branch padrão do repositório.",

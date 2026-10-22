@@ -242,7 +242,11 @@ async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Pr
 
 /** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
 async function dropQueuePin(projectPath: string, cardKey: string): Promise<void> {
-  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${cardKey.replace(/[^A-Za-z0-9._-]/g, '-')}`])
+  const key = cardKey.replace(/[^A-Za-z0-9._-]/g, '-')
+  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${key}`])
+  // Its entries' strict updates (#1352: `refs/hive/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/hive/queue/${key}-e*`])
+  for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(projectPath, ['update-ref', '-d', ref])
 }
 
 /**
