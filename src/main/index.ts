@@ -2,6 +2,7 @@ import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watch
 import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
+import { initReviewsOnOpen } from './reviewsOnOpen'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
 import { initWorkflowNotices } from './workflowNotices'
@@ -902,6 +903,7 @@ app.whenReady().then(async () => {
   initLoopWakes()
   initLoopCheck()
   initDeliveries()
+  initReviewsOnOpen()
   initInboxNotices()
   initDecisionWakes()
   initWorkflowNotices()

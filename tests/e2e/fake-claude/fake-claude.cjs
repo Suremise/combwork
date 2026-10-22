@@ -921,6 +921,11 @@ function drawTrust() {
   out(`\r\nQuick safety check: Do you trust the files in ${cwd}?\r\n ${trustMenu.on === 'No' ? '>' : ' '} No, exit\r\n ${trustMenu.on === 'Yes' ? '>' : ' '} Yes, I trust this folder\r\n Enter to confirm · Esc to cancel\r\n`)
 }
 let ctrlC = 0
+/** The screen rows the input line takes (begun at the row's start), wrapped at the terminal's width and at its line breaks. */
+const lineRows = () => {
+  const cols = process.stdout.columns || 80
+  return line.split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / cols)), 0)
+}
 /** Inside a bracketed paste, which can come in several reads. */
 let inPaste = false
 /** fake-log-input.txt in its home at its start: each read of its input, as it came, goes into fake-input.jsonl there (#1286). */
@@ -962,7 +967,8 @@ process.stdin.on('data', (data) => {
     ctrlC = 0
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
-      if (line) out('\r\x1b[K')
+      // The whole line goes, as in Claude Code, the rows it wrapped onto too (#1398: a narrow pane kept a line's first row).
+      if (line) out(`\r${lineRows() > 1 ? `\x1b[${lineRows() - 1}A` : ''}\x1b[J`)
       line = ''
       enters = 0
     } else if ((ch === '\r' || ch === '\n') && !onEnter && Date.now() < drawingUntil) {

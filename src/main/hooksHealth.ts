@@ -286,3 +286,23 @@ export const hooksMissingFor = (projectPath: string, agentId: string): boolean =
 export function onHooksHealthChanged(fn: () => void): void {
   listeners.push(fn)
 }
+
+/**
+ * Agents and conversations whose user was told their hooks went missing (#1336, #1369): told once each while Hive runs,
+ * at most `max` remembered. One seen again moves to the newest place, so only conversations no longer missing hooks
+ * are forgotten (one forgotten and missing them again is told again).
+ */
+export class SeenOnce {
+  private seen = new Set<string>()
+  constructor(private readonly max: number) {}
+  /** Whether `key` is new (tell it); either way it is now the newest. */
+  first(key: string): boolean {
+    const had = this.seen.delete(key)
+    this.seen.add(key)
+    if (this.seen.size > this.max) this.seen.delete(this.seen.values().next().value!)
+    return !had
+  }
+  get size(): number {
+    return this.seen.size
+  }
+}

@@ -711,6 +711,18 @@
     "defaultMessage": "The agent summarises the conversation so far and continues from the summary, which makes every later message cheaper. The full history stays in the session's transcript.",
     "description": "The Compact dialog: what compacting does."
   },
+  "shell.copyCode.copied": {
+    "defaultMessage": "Copied",
+    "description": "Shown for a moment beside a command or path after its Copy button copied it."
+  },
+  "shell.copyCode.copy": {
+    "defaultMessage": "Copy {code}",
+    "description": "Tooltip of the small Copy button beside a command or path shown as code (Agent Setup, say): {code} is exactly what it copies."
+  },
+  "shell.copyCode.label": {
+    "defaultMessage": "Copy",
+    "description": "The accessible name of the small Copy button beside a command or path shown as code. Keep it short."
+  },
   "shell.diagnostics.attach": {
     "defaultMessage": "Attach the newest developer console recording ({when}, {n, plural, one {# event} other {# events}}), its newest events redacted again",
     "description": "A box in Copy Diagnostics. {when} is when the recording started; {n} how many events it has."

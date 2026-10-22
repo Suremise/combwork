@@ -130,7 +130,7 @@ export const AREAS = [
   // Git missing or too old (#346): Agent Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
-  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitview', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit'] },
+  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
   { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   { paths: ['src/main/testedClis.ts', 'src/shared/testedClis.ts', 'resources/tested-clis.json', 'scripts/testedClis.mjs', 'scripts/tested-clis.mjs', 'scripts/release.mjs'], suites: ['testedclis'] },
@@ -239,6 +239,7 @@ export const AREAS = [
   { paths: ['src/main/loopWakes.ts', 'src/main/lanes.ts'], suites: ['loopwakes', 'lanenotices'] },
   // Hive's own notices of the work (#1266): a card's request for the user, a lane's events without the Assistant.
   { paths: ['src/main/workflowNotices.ts', 'tests/e2e/lanenotices.cjs'], suites: ['lanenotices'] },
+  { paths: ['src/main/reviewsOnOpen.ts'], suites: ['review', 'stopswitch', 'recent'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/shared/laneBar.ts', 'src/main/tasks.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/boardgates.cjs'], suites: ['boardgates'] },
   { paths: ['src/main/cardIntents.ts', 'tests/e2e/intents.cjs'], suites: ['intents', 'replysize'] },
   { paths: ['src/renderer/src/components/CardKind.tsx', 'tests/e2e/nocode.cjs'], suites: ['nocode'] },
@@ -257,6 +258,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Inbox.tsx', 'src/renderer/src/inbox.ts', 'src/shared/inbox.ts'], suites: ['inbox', 'attention', 'bell', 'signin'] },
   { paths: ['src/renderer/src/components/Keybindings.tsx'], suites: ['keys'] },
   // A change of language while the window is open: the palette and the shortcut editor's clashes (#795).
+  { paths: ['src/renderer/src/components/ui.tsx', 'src/renderer/src/components/Overlays.tsx', 'tests/e2e/setupcopy.cjs'], suites: ['setupcopy', 'setuplayout'] },
   { paths: ['src/renderer/src/keyConflicts.ts', 'src/renderer/src/components/Keybindings.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/commands.ts', 'tests/e2e/i18nlive.cjs'], suites: ['i18nlive', 'keys'] },
   { paths: ['src/renderer/src/components/NumberField.tsx', 'src/shared/numberInput.ts'], suites: ['numbers'] },
   { paths: ['src/renderer/src/components/Overlays.tsx', 'src/shared/folderLabels.ts'], suites: ['about', 'quit', 'carddialog', 'keys', 'closewindow', 'removeall', 'testedclis', 'contrast', 'setuplayout'] },
