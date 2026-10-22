@@ -10,7 +10,7 @@ import type { HookIds, LaunchContext } from '../src/main/providers/types'
 import { claudeTranscriptTurns } from '../src/main/providers/claude/turns'
 import { admit, newLedger } from '../src/main/turnLedger'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
-import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
+import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
 import { promptKey } from '../src/main/providers/turns'
 import { readyFor } from '../src/main/readiness'
 import { agentState } from '../src/shared/agentState'
@@ -487,5 +487,23 @@ describe("a turn its transcript shows (#1371)", () => {
     transcriptTurns(later, [copilotTurn('I4', 40_000, 'say Tools.')], 41_000, since)
     hookTurn(later, 40_100, null, null)
     expect(hooksMissing(later, quiet, 100 * BOUND, BOUND)).toBeNull()
+  })
+})
+
+describe('telling the user once per conversation (#1369)', () => {
+  it('a conversation is told once; the set stays bounded, and one seen again is kept over older ones', () => {
+    const told = new SeenOnce(3)
+    expect([told.first('a'), told.first('a'), told.first('b')]).toEqual([true, false, true])
+    // a seen again: the newest now, so c and d push b out first, then the next push a.
+    expect(told.first('a')).toBe(false)
+    expect([told.first('c'), told.first('d')]).toEqual([true, true])
+    expect(told.size).toBe(3)
+    expect(told.first('a')).toBe(false)
+    expect(told.first('b')).toBe(true)
+    // Bounded however many come.
+    for (let i = 0; i < 1000; i++) told.first(`s${i}`)
+    expect(told.size).toBe(3)
+    // Forgotten after so many others: told again.
+    expect(told.first('a')).toBe(true)
   })
 })
