@@ -15,6 +15,9 @@
 //
 // Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
 // (queueControls.ts), and tells the window of each change (`queue-changed`).
+//
+// A host that finds another Hive running its target watches that runner's process (#1455, S50): once it is gone, with
+// entries still open, the host runs again here and takes the lease over (the runner's own rule: only a gone process).
 
 import { basename, join } from 'path'
 import { app } from 'electron'
@@ -35,6 +38,7 @@ import { sessions } from '../sessions'
 import { progress } from '../progressService'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
+import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
@@ -60,6 +64,60 @@ interface Host {
 }
 
 const hosts = new Map<string, Host>()
+
+/** How often a host whose target another Hive runs looks at that runner's process: the runners' renewal period. */
+let holderMs = 30_000
+let holderProbe: ProcessProbe | null = null
+/**
+ * A watch of another Hive's runner (watchHolder): the host it is for, and its next look. It stays registered while it
+ * looks (its probe awaited), so a second run finding the lease held meanwhile keeps it rather than starting another.
+ */
+interface HolderWatch {
+  host: Host
+  timer: NodeJS.Timeout | null
+  ended: boolean
+}
+/** The targets another Hive runs that this Hive watches, by host key: one watch each. */
+const holderWatches = new Map<string, HolderWatch>()
+
+/** Ends a watch: its timer cleared, its entry removed (only its own: a newer watch under the key is left). */
+function endWatch(key: string, w: HolderWatch): void {
+  w.ended = true
+  if (w.timer) clearTimeout(w.timer)
+  w.timer = null
+  if (holderWatches.get(key) === w) holderWatches.delete(key)
+}
+
+/** Ends the watches of a workspace's hosts (it is closing), or every watch (stopQueueHosts). */
+function endWatches(wsPath?: string): void {
+  for (const [key, w] of [...holderWatches]) if (!wsPath || w.host.wsPath.toLowerCase() === wsPath.toLowerCase()) endWatch(key, w)
+}
+
+/** Tests: how many targets are watched now, and how many of those have a look waiting. */
+export function holderWatchState(): { watched: number; timers: number } {
+  const all = [...holderWatches.values()]
+  return { watched: all.length, timers: all.filter((w) => w.timer).length }
+}
+
+/** Whether a pid names a process now (whoever's: EPERM is one this process may not signal). */
+function pidThere(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/** Tests: how often a watch looks and how it tells a process is gone (null: as the app does, every watch ended). */
+export function setHolderWatch(opts: { ms?: number; probe?: ProcessProbe } | null): void {
+  holderMs = opts?.ms ?? 30_000
+  holderProbe = opts?.probe ?? null
+  if (!opts) endWatches()
+}
+
+/** Tests: a workspace's watches ended as its close ends them. */
+export const endHolderWatches = (wsPath: string): void => endWatches(wsPath)
 const hostKey = (wsPath: string, projectPath: string, target: string): string => `${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}\n${target}`
 const alive = (h: Host): boolean => !h.life.aborted && h.ws.lifetime === h.life && h.ws.path === h.wsPath
 
@@ -134,8 +192,10 @@ async function runHost(h: Host): Promise<void> {
           needed: async () => queueFolderNeeded(wf, h.target)
         })
         if (!got.ok) {
-          if (got.heldBy) log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))} is run by ${userText(got.heldBy.profile)}`)
-          else log.warn(`The merge queue for ${userText(h.target)} can't run: ${userText(got.problem ?? 'its runner could not start')}`)
+          if (got.heldBy) {
+            log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))} is run by ${userText(got.heldBy.profile)}`)
+            watchHolder(h, wf)
+          } else log.warn(`The merge queue for ${userText(h.target)} can't run: ${userText(got.problem ?? 'its runner could not start')}`)
           return
         }
         runner = got.runner
@@ -160,6 +220,48 @@ async function runHost(h: Host): Promise<void> {
     // The queue is empty, paused or its workspace is going: the lease goes (its folder kept while the queue needs it).
     await runner?.release().catch((e) => log.warn(`releasing the merge queue for ${userText(h.target)}`, e))
   }
+}
+
+/**
+ * Watches the runner another Hive has of a host's target (#1455, S50), by the process its lease names: once that is
+ * gone (`alive` false: a reused pid counts as gone), or the lease is no one's, the host runs again here, which takes the
+ * lease over. A runner whose process can't be checked counts as running, as acquire takes it.
+ *
+ * One watch per target, owned by its host (HR4's #1358 round 1): a host already watched keeps its watch (a second run
+ * finding the lease held, even while a look awaits its probe); a newer host of the target (the workspace reopened)
+ * replaces an older host's watch. A watch ends with its host's workspace (its lifetime, or the close: endWatches), once
+ * the target has nothing open, and when it kicks; it re-checks after every await that it is still the target's watch.
+ * While a run goes on here it only looks again later: that run either takes the lease or finds it held and keeps this.
+ */
+function watchHolder(h: Host, wf: Workflow): void {
+  const key = hostKey(h.wsPath, h.projectPath, h.target)
+  const was = holderWatches.get(key)
+  if (was && was.host === h && !was.ended) return
+  if (was) endWatch(key, was)
+  const w: HolderWatch = { host: h, timer: null, ended: false }
+  holderWatches.set(key, w)
+  const current = (): boolean => !w.ended && holderWatches.get(key) === w
+  const look = async (): Promise<void> => {
+    w.timer = null
+    if (!current()) return
+    if (!alive(h) || !openTargets(wf).includes(h.target)) return endWatch(key, w)
+    if (h.running) return schedule()
+    const lease = wf.store.queueLease(h.target)
+    // A pid that isn't there is gone at once; one that is, by its start time too (the probe: PowerShell on Windows).
+    const gone = !lease || !pidThere(lease.pid) || (await (holderProbe ?? defaultProbe()).alive(lease.pid, lease.started)) === false
+    if (!current()) return
+    if (!alive(h)) return endWatch(key, w)
+    if (!gone || h.running) return schedule()
+    endWatch(key, w)
+    log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Hive runs it`)
+    void kickQueue(h.ws, h.projectPath, h.target)
+  }
+  const schedule = (): void => {
+    if (!current()) return
+    w.timer = setTimeout(() => void look().catch((e) => log.warn(`watching the runner of the merge queue for ${userText(h.target)}`, e)), holderMs)
+    w.timer.unref?.()
+  }
+  schedule()
 }
 
 /** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Hive's checks. */
@@ -349,6 +451,8 @@ export function startQueueHosts(): void {
   // A workspace closing: its runners released first (their processes ended; from then on every write their runs try is
   // refused by the fence, so a check ended by the close never returns its card), then its runs waited for, briefly.
   const closing = async (path: string): Promise<void> => {
+    // Its watches of other Hives' runners end with it (a reopened workspace's hosts watch afresh).
+    endWatches(path)
     await releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase())
     const runs = [...hosts.values()].filter((h) => h.wsPath.toLowerCase() === path.toLowerCase() && h.running).map((h) => h.running)
     let timer: NodeJS.Timeout | undefined
@@ -359,6 +463,7 @@ export function startQueueHosts(): void {
   stopHosts = () => {
     off()
     offAdvanced()
+    endWatches()
     WorkspaceService.closingTasks.delete(closing)
   }
 }

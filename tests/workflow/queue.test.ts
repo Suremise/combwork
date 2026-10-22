@@ -6,7 +6,7 @@ import { join } from 'path'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
-import { MergeQueue } from '../../src/main/workflow/mergeQueue'
+import { MAX_RETESTS, MergeQueue } from '../../src/main/workflow/mergeQueue'
 import { Workflow } from '../../src/main/workflow/runtime'
 
 let env: Env | null = null
@@ -156,6 +156,46 @@ describe('the merge queue', () => {
       if (checkedOut) expect(readFileSync(join(e.project, 'src/c.txt'), 'utf8')).toBe('c\n')
     })
   }
+
+  it('S52: the target moves during every test → after MAX_RETESTS retests the entry pauses (targetMovesFast), nothing advanced by Hive', async () => {
+    const e = team()
+    sh(e.project, 'checkout', '-q', '--detach')
+    const { card } = await queued(e)
+    let n = 0
+    // Someone pushes to main after every test's checks.
+    const q = e.queue({ hooks: { afterChecks: () => void sh(e.project, 'update-ref', 'refs/heads/main', commit(e.project, { [`race${n}.txt`]: `${n++}\n` }, `race ${n}`)) } })
+    const [o] = await q.drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'targetMovesFast' })
+    expect(n).toBe(MAX_RETESTS + 1)
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'targetMovesFast', card: card.key })
+    // main is where the last push left it: no merge of Hive's on it.
+    expect(sh(e.project, 'log', '-1', '--format=%s', 'main')).toBe(`race ${n}`)
+    expect(e.kinds(card.id)).not.toContain('Integrated')
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+
+  it('S52: a hand merge of the change during its test → observed (Integrated outside), no empty merge commit of Hive\'s', async () => {
+    const e = team()
+    sh(e.project, 'checkout', '-q', '--detach')
+    const { card } = await queued(e)
+    const revision = e.wf.state(card).latest!.revision!
+    let byHand = ''
+    const q = e.queue({
+      hooks: {
+        afterChecks: () => {
+          if (byHand) return
+          // Someone merges the card's revision into main by hand while the queue tests it.
+          const tree = sh(e.project, 'merge-tree', '--write-tree', 'main', revision)
+          byHand = sh(e.project, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit-tree', tree, '-p', 'main', '-p', revision, '-m', 'merged by hand')
+          sh(e.project, 'update-ref', 'refs/heads/main', byHand)
+        }
+      }
+    })
+    await q.drain('main')
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.wf.state(card).integrated).toMatchObject({ by: 'outside' })
+    expect(mainHead(e)).toBe(byHand)
+  })
 
   // The transient and the red check each in their own case (#1380, as S27).
   it('S32: a transient merge check failure requeues unchanged at most twice', async () => {
