@@ -1030,10 +1030,15 @@ export interface WorkflowForm {
   enforced: boolean
 }
 
-/** A change to a project's workflow options: the preset they start from and the options the project sets itself. */
+/**
+ * A change to a project's workflow options: the preset they start from and the options the project sets itself. `base`:
+ * the preset and options the window's form was read with (#1418); a save is refused when the project's are no longer
+ * those (changed meanwhile by the Assistant's tool or another window), never written over them.
+ */
 export interface WorkflowChange {
   preset: PresetId | null
   options: Partial<WorkflowOptions>
+  base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }
 }
 
 /** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */

@@ -168,6 +168,7 @@ interface HiveMessageValues {
   'service.transcripts.noImage': undefined
   'service.transcripts.noTool': undefined
   'service.transcripts.none': undefined
+  'service.workflow.changedMeanwhile': undefined
   'service.workflow.closed': undefined
   'service.workflowNotice.blocked': { card: string | number; reason: string | number }
   'service.workflowNotice.blockedNoReason': { card: string | number }

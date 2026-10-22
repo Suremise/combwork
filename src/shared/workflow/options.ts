@@ -214,6 +214,27 @@ export type Contradiction = keyof typeof CONTRADICTIONS
 export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'agentThenYou'
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'
 
+/**
+ * The rows each contradiction is about (#1418): the window shows its reason under each of them as the options are
+ * chosen, before Save (which checks again under the project's lock).
+ */
+export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
+  selfReview: ['review', 'noSelfReview'],
+  mergeNeedsSlots: ['finish', 'folder'],
+  committedNeedsFolder: ['finish', 'folder'],
+  okWithReview: ['okBefore', 'review'],
+  hiveMergesNeedsGit: ['finish'],
+  quorumNeedsAgent: ['reviewers', 'review'],
+  noneHasNoSlots: ['folder']
+}
+
+/** Each row's contradictions in these options, by option (#1418: shown under the rows as you choose). */
+export function liveContradictions(o: WorkflowOptions): Partial<Record<OptionKey, Contradiction[]>> {
+  const out: Partial<Record<OptionKey, Contradiction[]>> = {}
+  for (const c of contradictions(o)) for (const k of CONTRADICTION_ROWS[c]) (out[k] ??= []).push(c)
+  return out
+}
+
 /** The contradictions in a set of options: empty when it can be saved and compiled. */
 export function contradictions(o: WorkflowOptions): Contradiction[] {
   const out: Contradiction[] = []
@@ -275,27 +296,60 @@ const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'appr
 /** Whether a value is one its option takes (false for anything that isn't an option). */
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
 
+/** The Workflow section's groups (#1418), each a heading with its options. */
+export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | 'stages' | 'elsewhere'
+
 /**
- * The options the plain form shows for a platform, in order (§16.6.1, §16.6.2; #1278, #1355). It offers only what this
- * version ships (§16.19.1): G15 and G17 wait for later phases (G8 strict is offered since #1352), and None's stage names (N5) for the Version
- * Control tab. The check commands (`commands`) are edited with the checks that name them. G9 and its install show only
- * where they apply (`formShows`).
+ * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). It offers
+ * what this version ships (§16.19.1): G15 and G17 wait for slots (P7). The check commands (`commands`) are edited with
+ * the checks that name them. "Shown here, set elsewhere" holds rows whose owner is another setting (N7, Card loops).
+ * Some rows show only where they apply (`formShows`).
  */
-export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
-  git: ['review', 'reviewers', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'mergeChecks', 'mergeInstall', 'strict', 'okBefore', 'folder', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning'],
-  none: ['review', 'noSelfReview', 'preChecks', 'excluded', 'dependenciesDone']
+export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionKey[] }[]> = {
+  git: [
+    { id: 'review', options: ['review', 'reviewers', 'noSelfReview', 'sameness', 'okBefore'] },
+    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
+    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'dependenciesDone'] },
+    { id: 'where', options: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
+    { id: 'stages', options: ['stageNames'] },
+    { id: 'elsewhere', options: [] }
+  ],
+  none: [
+    { id: 'review', options: ['review', 'noSelfReview'] },
+    { id: 'checks', options: ['preChecks'] },
+    { id: 'work', options: ['excluded', 'dependenciesDone'] },
+    { id: 'stages', options: ['stageNames'] },
+    { id: 'elsewhere', options: [] }
+  ]
 }
 
 /**
- * Whether the form shows an option's row for these options (#1355): G9's merge checks only when Hive merges, and its
- * install only when there are merge checks (with none, nothing is installed).
+ * The rule options the form edits for a platform, in its order (the names, N5, aren't rules: a preset leaves them, and
+ * they never make the options Custom).
+ */
+export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
+  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NAME_OPTIONS.includes(k)),
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NAME_OPTIONS.includes(k))
+}
+
+/**
+ * Whether the form shows an option's row for these options (#1355, #1418): G9's merge checks only when Hive merges, and
+ * its install only when there are merge checks (with none, nothing is installed); G8 only when Hive merges; G16 only
+ * with everyone in the project folder (the only place a commit can take in another agent's files).
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'mergeChecks') return o.finish === 'hiveMerges'
   if (key === 'mergeInstall') return o.finish === 'hiveMerges' && o.mergeChecks.length > 0
   // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
   if (key === 'strict') return o.finish === 'hiveMerges'
-  return FORM_OPTIONS[o.platform].includes(key)
+  if (key === 'sharedFolderWarning') return o.folder === 'project'
+  return FORM_GROUPS[o.platform].some((g) => g.options.includes(key))
+}
+
+/** Whether every check and balance is off (§16.6.4): the section then says what never turns off. */
+export function isAllOff(o: WorkflowOptions): boolean {
+  const off = allOff(o.platform)
+  return o.review === 'none' && o.preChecks.length === 0 && o.finish === off.finish && o.folder === 'project' && o.okBefore.mode === 'never' && !o.dependenciesDone && !o.stopOwnRuns
 }
 
 /** Why a value can't be set yet: its piece comes in a later version (§16.19.1). */

@@ -667,6 +667,10 @@
     "defaultMessage": "This session has no transcript yet.",
     "description": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet."
   },
+  "service.workflow.changedMeanwhile": {
+    "defaultMessage": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "description": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them."
+  },
   "service.workflow.closed": {
     "defaultMessage": "The workspace this card belongs to has closed",
     "description": "An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace."

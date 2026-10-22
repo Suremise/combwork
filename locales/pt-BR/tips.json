@@ -367,6 +367,8 @@
   "tips.viewerTokens.title": "Deixe outro app acompanhar o Hive",
   "tips.workflowOptions.text": "Controle de versão → Fluxo de trabalho define quem revisa o trabalho de um cartão, quais verificações passam antes e quem faz o merge. Escolha uma predefinição ou configure cada opção: uma mudança vale a partir do próximo cartão que começar.",
   "tips.workflowOptions.title": "Escolha como os cartões chegam a Concluído",
+  "tips.workflowPresetsWhy.text": "Em Controle de versão → Fluxo de trabalho, clique em Solo, Dupla ou Equipe: a predefinição lista cada opção que define e por quê, e marca o que mudaria. Nada muda até você usá-la e salvar.",
+  "tips.workflowPresetsWhy.title": "Veja o que uma predefinição faz antes de usá-la",
   "tips.workspaceMoved.text": "Moveu a pasta do espaço de trabalho, por exemplo para outra unidade? Abra-a no novo local e escolha Reparar… no banner: os worktrees dos agentes, as sessões deles e as conversas e a memória do Claude Code vão junto.",
   "tips.workspaceMoved.title": "Mova um espaço de trabalho sem perder os agentes",
   "tips.workspaceMovedDefender.text": "Se o Hive fez o Defender ignorar as pastas do espaço de trabalho, Reparar… depois de mover oferece mover essas exclusões para as pastas novas, com um só pedido de administrador, para que nenhuma fique numa pasta que não existe mais. As exclusões criadas por você continuam como estão.",

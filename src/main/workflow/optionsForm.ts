@@ -15,6 +15,7 @@ import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
 import type { Text } from '../../shared/advanced'
+import { msg } from '../../shared/i18n/msg'
 import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
@@ -136,12 +137,33 @@ export const problemEnglish = (p: WorkflowProblem): string => problemText(p)
 /** A problem as text for the window (its message, in the user's language), or its English reason. */
 export const problemShown = (p: WorkflowProblem): Text => problemShownOf(p)
 
-/** Checks a change's shape (it comes from the window or the API): a preset id and an object of options. */
+const PRESET_IDS: (PresetId | null)[] = ['solo', 'pair', 'team', 'pairAgent', null]
+const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+/** Checks a change's shape (it comes from the window or the API): a preset id and an object of options, and its base. */
 function shapeOf(change: unknown): WorkflowChange {
   const c = change as Partial<WorkflowChange> | null
-  const presets: (PresetId | null)[] = ['solo', 'pair', 'team', 'pairAgent', null]
-  if (!c || typeof c !== 'object' || !presets.includes(c.preset ?? null) || !c.options || typeof c.options !== 'object' || Array.isArray(c.options)) throw new HiveError({ lines: ['A workflow change is { preset, options }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
-  return { preset: c.preset ?? null, options: keptNames(c.options) }
+  const base = c?.base
+  if (!c || typeof c !== 'object' || !PRESET_IDS.includes(c.preset ?? null) || !isOptions(c.options) || (base !== undefined && (!base || !PRESET_IDS.includes(base.preset ?? null) || !isOptions(base.options)))) throw new HiveError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  return { preset: c.preset ?? null, options: keptNames(c.options), ...(base ? { base: { preset: base.preset ?? null, options: base.options } } : {}) }
+}
+
+/** The project's own preset and options now, as a form reads them (for its platform). */
+const ownNow = (cfg: { workflow?: { platform: PlatformId; preset: PresetId | null; options: Partial<WorkflowOptions> } }, platform: PlatformId): { preset: PresetId | null; options: Partial<WorkflowOptions> } => ({ preset: cfg.workflow?.platform === platform ? cfg.workflow.preset : null, options: ownOf(cfg, platform) })
+
+/** Whether a form's base is still the project's preset and options (keys in any order). */
+const sameBase = (a: { preset: PresetId | null; options: Partial<WorkflowOptions> }, b: { preset: PresetId | null; options: Partial<WorkflowOptions> }): boolean => a.preset === b.preset && sorted(a.options) === sorted(b.options)
+const sorted = (o: object): string => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([x], [y]) => x.localeCompare(y))))
+
+const M = {
+  changedMeanwhile: msg({ id: 'service.workflow.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.', description: 'Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them.' })
+}
+
+/** A form's save refused: the options changed after it read them (#1418). */
+export class WorkflowStale extends HiveError {
+  constructor() {
+    super(M.changedMeanwhile, { kind: 'conflict' })
+  }
 }
 
 /** Options with each stage name (N5) as it is kept: trimmed. */
@@ -209,6 +231,8 @@ export async function setWorkflowOptions(ws: WorkspaceService, projectPath: stri
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []
   await ws.mutateProjectConfig(project.path, (cfg) => {
+    // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
+    if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
     const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change)
     if (c.problems.length) throw new WorkflowRefused(c.problems)
     changed = c.changed
