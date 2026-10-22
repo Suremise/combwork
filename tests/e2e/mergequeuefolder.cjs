@@ -10,8 +10,7 @@
 // - S34b: the folder on another branch: main is checked out nowhere then, and merged by compare-and-swap, the folder's
 //   files untouched.
 // - S34a: main moved by another client just before the swap (HIVE_TEST_QUEUE_RACE): rolled back, tested again, merged once.
-// Crashes at each point of the journal and the terminal state are mergequeuecrash's (S34d: the runner's 10 minutes
-// a suite hold both only with no room to spare).
+// Crashes at each point of the journal and the terminal state are mergequeuecrash's (S34d), in a suite of their own.
 // Dev build, throwaway profiles, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')

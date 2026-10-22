@@ -2263,8 +2263,8 @@ touched:
   `afterFiles`, `beforeRef`, `afterAdvance`, `inRollback` or `afterRollback` (Hive ends at that point, no quit handler)
   and `HIVE_TEST_QUEUE_RACE=beforeRef` (the target moved by another client just before the swap, once per run): the
   e2e suite `mergequeuecrash` restarts after each and checks the card is merged exactly once with the folder clean, and
-  the terminal state; `mergequeuefolder` has S27, S34a–c, S42 and Ask each time (two suites: together they don't fit
-  the runner's 10 minutes a suite).
+  the terminal state; `mergequeuefolder` has S27, S34a–c, S42 and Ask each time (the crash restarts in a suite of
+  their own, so a failure in one never hides the other's).
 
 #### 16.9.3 Around the queue
 
