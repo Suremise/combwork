@@ -116,6 +116,15 @@ export const ROUND_LIMIT_GATE = 'roundLimit'
 /** The gate of Hive's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
 export const LINE_GATE = 'lineUpdate'
 
+/**
+ * The gate of Hive's question before it updates a target checked out in a folder (§16.9.2, OP-40, #1351: Settings →
+ * Advanced, Merge into a checked-out branch, Ask each time): bound to the queue entry and the target's expected revision.
+ */
+export const QUEUE_ADVANCE_GATE = 'queueAdvance'
+
+/** The gate of Hive's notice that an advance into a checked-out target stopped part way (§16.9.2's terminal state, #1351). */
+export const QUEUE_STUCK_GATE = 'queueStuck'
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
@@ -164,7 +173,8 @@ export interface FactData {
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[] }
+  /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds. */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
@@ -172,7 +182,8 @@ export interface FactData {
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
   IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string }
+  /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
@@ -329,6 +340,11 @@ const addOnce = (list: string[], x: string): string[] => (list.includes(x) ? lis
 /** A request a gate waits on (the user's review, or the OK before merging), bound to its submission, stage and generation. */
 const isGateRequest = (r: FactData['ApprovalRequested']): boolean => r.gate === 'review' || r.gate === 'okBefore'
 
+/** An entry's outcome retires the merge queue's requests about it (#1351): it can't be updated or stuck any more. */
+const retireEntry = (s: CardState, entry: string): void => {
+  s.requests = s.requests.filter((r) => r.entry !== entry)
+}
+
 /** Folds a card's facts (in seq order) into its state. Pure: the stage is the last `Moved`'s, never a claim. */
 export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
   const s = emptyState()
@@ -395,6 +411,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'ApprovalRequested': {
         const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at }
+        // The merge queue asks again (the target moved, a new test merge): its earlier request of that gate is retired.
+        if (d.entry) s.requests = s.requests.filter((r) => !r.entry || r.gate !== d.gate)
         s.requests.push(d)
         s.made[d.request] = d
         break
@@ -420,13 +438,15 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const d = f.data as FactData['IntegrationCancelled']
         const e = s.entries.find((x) => x.id === d.entry)
         if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'cancelled', cancelled: d.reason })
+        retireEntry(s, d.entry)
         break
       }
       case 'IntegrationStarted': {
         const d = f.data as FactData['IntegrationStarted']
-        // A late fact can't revive an entry that has its outcome (cancelled, failed, integrated).
+        // A late fact can't revive an entry that has its outcome (cancelled, failed, integrated). An advance begun again
+        // (a restart's rerun) has a journal of its own: the earlier attempt's phases don't count (#1351).
         const e = s.entries.find((x) => x.id === d.entry)
-        if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'started', started: d })
+        if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'started', started: d, phases: [] })
         break
       }
       case 'IntegrationPhase': {
@@ -438,6 +458,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const d = f.data as FactData['IntegrationFailed']
         const e = s.entries.find((x) => x.id === d.entry)
         if (e && (e.state === 'open' || e.state === 'started')) Object.assign(e, { state: 'failed', failure: d })
+        retireEntry(s, d.entry)
         break
       }
       case 'Integrated': {
@@ -445,6 +466,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.integrated = d
         const e = d.entry ? s.entries.find((x) => x.id === d.entry) : undefined
         if (e) e.state = 'integrated'
+        if (d.entry) s.requests = s.requests.filter((r) => r.entry !== d.entry || r.gate === QUEUE_STUCK_GATE)
         if (d.outsideRules?.length) s.marks.outsideRules = d.outsideRules
         delete s.marks.leftTarget
         break

@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -28,6 +28,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+import { NOT_RUN_HERE, queueLine, queueStateOf, type QueueLive } from './queueState'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -141,6 +142,8 @@ export interface WorkflowConfig {
    * ruleset as ever. Read at each use; left out, always.
    */
   enforced?: () => boolean
+  /** What runs a target's queue in this Hive now (queueHost's queueLive, #1354); left out, nothing here runs one. */
+  queueLive?: (target: string) => QueueLive
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -442,6 +445,11 @@ export class Workflow {
     return this.idsOf(w.ruleset, move, only)
   }
 
+  /** What runs a target's queue in this Hive now (cfg.queueLive): for the queue's order, queueState.ts. */
+  queueLive(target: string): QueueLive {
+    return this.cfg.queueLive?.(target) ?? NOT_RUN_HERE
+  }
+
   /** Whether the guards run (cfg.enforced: Settings → Advanced, #1265). */
   enforced(): boolean {
     return this.cfg.enforced ? this.cfg.enforced() : true
@@ -738,14 +746,14 @@ export class Workflow {
    * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
    * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
    */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[] } = {}): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -1132,6 +1140,12 @@ export class Workflow {
         if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
         return null
       }
+      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE) {
+        // The merge queue's own (#1351): its target's queue looks at the answer now (an approved update runs at once; a
+        // stuck advance is looked at again, as Resume does).
+        const e = st.entries.find((x) => x.id === req.entry)
+        if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
+      }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
         // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.
         this.wake(w, req.asker ?? builder, said, 'answer')
@@ -1166,8 +1180,14 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
-    // Only where the builder merges (or nothing is checked): under Hive merges the queue merges, never a report.
-    if (s.stage !== 'approved' || (r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // Under Hive merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
+    const hive = r.options.finish === 'hiveMerges'
+    const queued = this.hiveMergesRefusal(card, s)
+    if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // Only where the builder merges (or nothing is checked); with workflow rules off, a card Hive merges is reported as
+    // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
+    const from = s.stage === 'approved' || (hive && s.stage === 'merging')
+    if (!from || (!hive && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const before = await this.evidenceOf(card, s, r.options)
     const target = s.started?.target ?? ''
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
@@ -1189,13 +1209,47 @@ export class Workflow {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
+      const open = hive ? openEntry(w.state()) : undefined
+      if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'intent')
       w.action('endLaneIfDone', {})
       w.action('releaseSlot', {})
       return null
     })
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'approved', 'done')
+    return this.ok(card, s.stage, 'done')
+  }
+
+  /**
+   * A card Hive merges (its own ruleset: the options it started under, or a change applied to it, never the project's
+   * current options) while the rules are enforced: an agent's merge of it is refused, its next step where it is in the
+   * merge queue (#1354, queueState.ts). Null otherwise: the agent merges, nobody checks, or the rules are off.
+   */
+  hiveMergesRefusal(card: CardRecord, s: CardState = this.state(card)): GuardRefusal | null {
+    if (!this.enforced()) return null
+    const q = queueStateOf(this, card, s)
+    if (!q) return null
+    const values: Record<string, string | number> = { card: card.key, queue: q.state }
+    if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
+    if (q.state === 'queued') values.n = q.position
+    return { rule: 'merge.hiveMerges', values }
+  }
+
+  /** Who merges a card and where it is with the merge queue, in a sentence for agents (#1354); null unless Hive merges it. */
+  queueLineOf(ref: unknown): string | null {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return null
+    const q = queueStateOf(this, card)
+    // Merged, it is Done: nothing more to say.
+    return q && q.state !== 'merged' ? queueLine(q, this.enforced()) : null
+  }
+
+  /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Hive merges it. */
+  async refuseHiveMerge(ref: unknown, actor: Actor, move: string): Promise<Refusal | null> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return null
+    const g = this.hiveMergesRefusal(card)
+    return g ? this.refuse(card, actor, move, g, null) : null
   }
 
   /** ask the user (§16.8.1): For you of a kind. */
@@ -1496,7 +1550,9 @@ export class Workflow {
     const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     if (!opts.translate) {
       const card = this.resolve(ref, actor)
-      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      // Done for a card Hive merges: no intent of the agent's does it, so the refusal names the queue (#1354).
+      const queued = column === 'done' && !isRefusal(card) ? this.hiveMergesRefusal(card) : null
+      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, queued ?? { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     }
     const reply = await (column === 'doing'
       ? this.start(ref, actor, { reopen: true, ...(opts.builder ? { builder: opts.builder } : {}) })

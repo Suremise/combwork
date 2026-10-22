@@ -104,6 +104,36 @@ async function agent(fx, h, name, { worktree = false } = {}) {
   return { id: a.id, name, folder, token }
 }
 
+/**
+ * An agent added before (`agent`), started again in a new run of Hive (#1351: suites that restart Hive reuse their
+ * agents, under the project's agent limit): its token, which each launch has its own of.
+ */
+async function rejoin(fx, h, a) {
+  // This launch's, never an earlier one's (a resumed session keeps its id).
+  const before = launches(fx).length
+  await h.inv('session:start', fx.alpha, { agentId: a.id })
+  const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === a.id)
+  const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
+  const launch = await lib.until(() => launches(fx).slice(before).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS, 200)
+  const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+  return { ...a, token: hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null }
+}
+
+/** approve() with a builder of the caller's (one agent for many cards, in its own worktree): { n, revision, steps }. */
+async function approveBy(fx, h, builder, reviewer, title, files) {
+  const n = (await h.inv('tasks:create', { title, project: 'alpha' })).number
+  const steps = {}
+  steps.start = await intent(h, builder, n, 'start')
+  for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(builder.folder, f), text)
+  lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+  lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', title])
+  const revision = lib.git(builder.folder, ['rev-parse', 'HEAD']).trim()
+  steps.submit = await intent(h, builder, n, 'submit', { summary: `${title}: ready` })
+  steps.review = await intent(h, reviewer, n, 'start-review')
+  steps.verdict = await intent(h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
+  return { n, revision, steps }
+}
+
 /** An agent's intent on a card (`#n`): its status and reply. */
 async function intent(h, who, n, name, body = {}) {
   const res = await fetch(`http://127.0.0.1:${h.port}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${who.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -153,4 +183,33 @@ function mergeOn(fx, branch, revision, message) {
 
 const head = (fx, ref = 'integration') => lib.git(fx.alpha, ['rev-parse', ref]).trim()
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, intent, approve, commitOn, mergeOn, head, launches }
+/**
+ * Helpers for suites merging into `main` checked out in the project folder (#1351): the options, the folder's status
+ * (tracked files only), Hive's merge commits of a card on main (never two), a file's text as written (any line ending),
+ * a card by its title, screenshots in both themes, and a card's For you section in its dialog.
+ */
+function folderHelpers(fx) {
+  return {
+    options: (over = {}) => queueOptions(fx, { target: 'main', ...over }),
+    status: () => lib.git(fx.alpha, ['status', '--porcelain', '--untracked-files=no']).trim(),
+    merges: (key) => lib.git(fx.alpha, ['log', '--format=%s', 'main']).split(/\r?\n/).filter((s) => s.startsWith(`${key}:`)).length,
+    text: (file) => (fs.existsSync(path.join(fx.alpha, file)) ? fs.readFileSync(path.join(fx.alpha, file), 'utf8').replace(/\r\n/g, '\n') : null),
+    byTitle: async (h, title) => (await h.inv('tasks:list')).find((c) => c.title === title),
+    themes: async (page, shot, name) => {
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        await shot.screenshot({ path: path.join(fx.shots, `${name}-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    },
+    forYouSection: async (h, n) => {
+      await h.page.getByRole('button', { name: 'Task Board' }).click()
+      await h.page.locator(`.task-card[data-task="${n}"]`).click()
+      const d = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
+      await d.waitFor({ timeout: HUNG_MS })
+      return { dialog: d, section: d.locator('[data-section="for-you"]') }
+    }
+  }
+}
+
+module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers }

@@ -2040,9 +2040,10 @@ same revision goes straight back into the queue (at most twice); a target that m
 row pause it); a hand merge meanwhile is observed, never merged twice. The card's ruleset decides, never the project's
 options now: a card started under Hive merges is merged by the queue after the options moved to another finisher. With
 workflow rules off nothing reaches an advance: open entries pause (**rules off**) before it, an advance already begun
-finishes, and they carry on when the rules are on again. A target checked out in a folder pauses (**checked out**)
-until §16.9.2's advance is built (#1351). A card's test-merge ref goes once its entry has an outcome, and its
-submissions' pins once it is archived.
+finishes, and they carry on when the rules are on again. A target checked out in a folder is advanced there by
+§16.9.2's journaled update (**Built [#1351]**), automatically, or asked first while Merge into a checked-out branch
+says so (OP-40). A
+card's test-merge ref goes once its entry has an outcome, and its submissions' pins once it is archived.
 
 #### 16.9.1 An entry's way through
 
@@ -2222,6 +2223,86 @@ touched:
   way, and until they pass the checked-out case asks the user (**Update main now** on the queue card).
 - `git merge --ff-only` is not used: it has no expected value [HR2's round 1 finding 9].
 
+**Built [#1351]** (`mergeQueue.ts`, `queueHost.ts`):
+- **Where:** the target's folder is the one `git worktree list` names for it, read again under the repository lock
+  (switched while the queue waited for it: looked at again, the right way). Checked out nowhere by then, it is the
+  compare-and-swap above; a folder on another branch means exactly that.
+- **The authority** [HR4's #1351 round 1]: Hive writes to a target (`IntegrationStarted`, an `IntegrationPhase`,
+  `read-tree`, `update-ref`, recovery's `Integrated` or `IntegrationFailed`, the queue's pause) only inside the repository
+  lock and, for a checked-out target, its folder's fence, after deciding again there, from state read there, the
+  target's saved pause, Ask or Automatic with the matching approval, the rules, the card's open entry and approval, and
+  where the target is checked out. A check before the lock is an early-out only. A pause Hive writes for what it saw in
+  the lock (a condition, the terminal state, the ask) is written before the lock is released, and never in place of a
+  pause saved meanwhile (the user's Pause queue stands, and nothing is asked under it; decided in the pause's own
+  write), except the terminal state, which the user must settle anyway. Whoever caused the run
+  (the card's own queue, another card's enqueue, a workspace reopening, another Hive), the same holds. **A needs-you
+  pause naming a card freezes its target:** recovery reads it first, in the lock, and writes nothing until the user
+  lifts it (Resume, or the answer to its For you, which check first); other pauses (Pause queue, rules off, approval)
+  stop new advances but let a begun one finish or roll back.
+- **Under the lock and the fence:** the conditions, the journal and its rollback run holding the repository lock
+  (#1347) and the folder's fence (#646: `changingFolder`, so no line of Hive's is typed into an agent there and none
+  starts there meanwhile). The test merge and the merge checks run without either: a user's commit, or a Git view action
+  that takes the lock, during an hour of checks is never held up, and the swap's expected value catches the moved
+  target, which is tested again (S42).
+- **The conditions**, each a pause naming its files, nothing touched (the entry stays queued, never returned):
+  `folderBusy` (an agent holds file locks in the folder, or a run of an agent, the Assistant or a script is going with
+  it as its working folder: the locked files and the run's folder named; an idle agent, or one whose session lives
+  there but works in a review copy, doesn't count), `wrongBranch` (the folder named), the ref no longer at the expected
+  revision (tested again), `staged` (the staged files named), `unstagedChanges` (the listed files with a change in the
+  working copy or index, untracked ones included, from the folder's whole status, so a long list never makes a command
+  line too long). The user's other edits are left as they are. Resume (#1353) checks each again.
+- **The journal:** `IntegrationStarted` with the listed files and the folder, then `IntegrationPhase` `files`,
+  `read-tree -m -u <expected> <result>`, `IntegrationPhase` `ref`, `update-ref`; each phase's fact is written through
+  the runner's lease fence (#1360), and the lease is checked again just before each git step, so a runner that lost its
+  lease writes nothing more and touches nothing. A `read-tree` git refuses having written nothing (the index still at
+  the expected revision) fails the entry as target moved and queues it again, a file edited since the check pausing
+  `unstagedChanges`, named; anything else is the terminal state. A swap that finds the ref moved rolls back (`rollback`,
+  `read-tree -m -u <result> <expected>`) and tests again; a rollback git refuses is the terminal state. A rerun after a
+  restart begins a journal of its own: an earlier attempt's phases never count.
+- **After the swap:** HEAD is read again. Not naming the target (the race above): `Integrated` (the target did move,
+  so nothing is merged twice), then the terminal state with phase `done`, listing the merged files left in the other
+  branch's working copy and the command that puts them back.
+- **Recovery:** the table above, read from the journal's last phase, HEAD's branch, the ref and each listed file's side
+  (its index entry and working copy both at the expected revision, both at the result, or neither: `other`), under the
+  lock and the fence. Ref at the result: `Integrated` (observed), and the terminal state when the folder is on another
+  branch with merged files in it. Ref at the expected revision, on the target: phase `files` (or none, or `rollback`)
+  with the files at the expected revision runs again from the test merge; phase `files` or `ref` with the files at the
+  result finishes the swap from the journal (writing phase `ref` first), rolling back if the ref moved in that instant.
+  Ref elsewhere: files at the result are rolled back; files at the expected revision (read-tree never ran, or the
+  rollback finished) fail the entry as target moved and queue it again. Anything else is the terminal state.
+- **The terminal state** (`needsYou`, a typed record: the 1.0 group's 17th step adds the folder, HEAD's branch, the ref,
+  the revisions and the phase to `workflow_queue_pauses`, each file's side to `workflow_queue_pause_files`, and
+  `workflow_queue_pause_commands` with each command's arguments in `workflow_queue_pause_command_args`, never a shell
+  string): the commands are generated from the journal as the state allows, only revisions and ref names, each run in
+  the project folder or the target's folder, and shown as a PowerShell line (`shellLine`: an argument of anything but
+  letters, digits and `._/:=+-` single-quoted, `'` doubled, so a ref such as `topic$part` reaches git as written; a ref
+  with `"`, which Windows PowerShell can't hand a program as written, gets no command naming it): on the target with the ref at the expected
+  revision and every file at the result, **finish** `git update-ref refs/heads/<target> <result> <expected>` and **undo**
+  `git read-tree -m -u <result> <expected>`; the ref at the result and the files at the expected revision, finish
+  `git read-tree -m -u <expected> <result>`; the ref moved and the files at the result, or the merged files left in
+  another branch, undo; a file at neither side, none (git would refuse them). The queue's model (`queue:list`, `GET
+  /v1/queue` without the folder, `hive_queue`) carries it as the pause's `stuck`, for #1356 and #1357. The card also
+  asks the user (For you, Decide, gate `queueStuck`): its words say what to run, or to put the files right by hand;
+  answering looks again as Resume does (`recheckStuck`), lifting the pause once recovery can carry on, and any other
+  pause stays.
+- **Ask each time** (OP-40): Settings → Advanced, **Merge queue: merge into a checked-out branch**
+  (`hive.queue.checkedOutTarget`): *Ask each time* · *Automatically* (the default since the crash-injection tests
+  passed in #1351's review). Under Ask, an entry whose test merge and checks
+  are done, ready to advance into a target checked out in a folder, asks "<card> is tested and ready to merge: update
+  <target> in <folder> now?" (For you, Approve, gate `queueAdvance`, bound to the entry, the expected revision and the
+  result) and the queue pauses `approval`, naming the folder. The answer is an `enqueue` of its target: approved, the
+  advance runs at once on that test merge (the target moved meanwhile: tested again, and asked again, the earlier
+  request retired); declined, the entry leaves the queue as Remove from queue leaves it (Approved), and the queue goes
+  on. Resume doesn't stand in for the answer. The setting turned to *Automatically* wakes a queue waiting for its
+  Approve: it advances the asked test merge as an approval would, and the question is retired with the entry's
+  outcome. A target checked out nowhere never asks.
+- **Crash injection** (S34d): test copies (unpackaged) take `HIVE_TEST_QUEUE_CRASH` = `afterStarted`, `beforeFiles`,
+  `afterFiles`, `beforeRef`, `afterAdvance`, `inRollback` or `afterRollback` (Hive ends at that point, no quit handler)
+  and `HIVE_TEST_QUEUE_RACE=beforeRef` (the target moved by another client just before the swap, once per run): the
+  e2e suite `mergequeuecrash` restarts after each and checks the card is merged exactly once with the folder clean, and
+  the terminal state; `mergequeuefolder` has S27, S34a–c, S42 and Ask each time (the crash restarts in a suite of
+  their own, so a failure in one never hides the other's).
+
 #### 16.9.3 Around the queue
 
 **Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G; #1338's round 1 finding 3] **Built [#1347]**: a
@@ -2305,6 +2386,41 @@ target [note §9 alternative].
 
 **Observed merges:** a merge done by hand is observed (§16.4.4); the queue cancels that entry.
 
+**Agents under Hive merges** **Built [#1354]**: a builder never merges a card Hive merges, and is told at each queue
+outcome what to do. What decides is the card's own ruleset (the options it started under, or the user's change applied
+to it, OP-38), never the project's current options: a card started under Hive merges stays so after the project
+switches to "The agent merges", and one started afterwards reports its merge.
+- **Refusals** (`merge.hiveMerges`, three messages in 7 locales; agents get the English): `report merge` (and an
+  agent's `hive_update_task` move to Done, translated or not) and a merge-slot claim naming the card are refused with
+  where it is in the queue as the next step (`QUEUE_NEXT`: queued with its position, being merged, paused, returned,
+  merged; otherwise "once it is approved"), and "set in Version Control → Who merges. A card keeps the rules it started
+  with." The claim is refused before the slot is touched; one naming no card, or cards the agent merges, is unchanged,
+  and so is the Merge dialog's. Each is a `Refused` fact; `override` is none.
+- **Wakes**: a returned card's (`returnCard`) says what came back (a conflict: its files; checks: which check, `install`
+  for the install before them, its log's path and the output's last lines; a hook) and the next step (merge the target
+  in and resolve; fix, commit and submit; for a transient failure, submit the same revision again, at most twice in a
+  row), within 600 characters: a wake line quotes Hive's own note up to 600, a reviewer's request still 200. What came
+  back and the next step are always whole (a branch, check or code name in them cut at 80 characters, marked "…"),
+  fitted first; the rest takes the room left: the files, as many of the first 8 as fit and how many more; the log's
+  path whole, or else "Its log path: hive_read_task" (a card read has room for it); the output's last lines, cut from
+  their start ("…"). `IntegrationFailed` keeps `check` and `logPath`, and of the output (`log`) its start and its end
+  within 4,000 characters, the middle replaced by a line saying how many characters were left out, so the last lines
+  quoted are the output's own. A card that left the queue (`skip`)
+  says why: its pass stale (`IntegrationCancelled` reason `stale`), or a decision since its approval (`decision`, no
+  pass at the current generation).
+- **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (where a card is with the queue,
+  from its facts and `queueOrder`, the order #1353's window model (`queueView`) shows: the entry testing now at its
+  step, those waiting behind it): who merges it, and queued (position, 1 next after the one testing), testing (its
+  merge, its checks, or advancing the target), paused (why), returned (what came back and what to do), left the queue, or
+  not approved yet; absent once it is Done and for cards the agent merges. `hive_lane next` names the lane's passed
+  cards Hive merges with that line, and the next card waits for them.
+- **Skills**: work-on-card, card-loop and merge-ready say, where they tell an agent to merge a passed card, "unless the
+  card says Hive merges it (`hive_read_task`: its `merge`): then the merge queue merges it; wait for Done or a return"
+  (P8 rewrites the guidance whole).
+- **Workflow rules off** (Settings → Advanced): nothing refuses; a card Hive merges is reported as before 1.0, approved
+  or waiting in the queue, whose entry is cancelled (`integratedOutside`, as S7's hand merge); the card read says to
+  merge it and report the merge.
+
 **User controls:** **Pause queue** / **Resume** (the user; the Assistant within Control), saved and shown; **Remove
 from queue** on an entry, recorded as an override and as `IntegrationCancelled`. The slot's **Release** goes away
 [#1121 c].
@@ -2325,10 +2441,11 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   advance waits for the repository lock (decided again in `IntegrationStarted`'s write). A queue Hive paused already keeps
   its own pause, which says more.
 - **Resume** clears any pause once the user says its cause is fixed, and runs the queue, which starts again from a fresh
-  test merge. Where Hive can see the cause it checks first, and pauses again, saying so, when it still holds: the target
-  still checked out (`checkedOut`, until #1351), the rules still off, §16.9.2's conditions on the checked-out folder
-  (the branch, nothing staged, the listed files), an interrupted advance still in its terminal state (the recovery
-  table, read only), an earlier runner's process still running or its folder still there.
+  test merge. Where Hive can see the cause it checks first, and pauses again, saying so, when it still holds: the rules
+  still off, §16.9.2's conditions on the checked-out folder (the branch, nothing staged, the listed files), the user's
+  answer to "update it now" still awaited (#1351: Resume doesn't stand in for it), an interrupted advance still in its
+  terminal state (the recovery table, read only), an earlier runner's process still running or its folder still there.
+  A `checkedOut` pause, from before #1351, resumes.
 - **Remove from queue** (an override and `IntegrationCancelled`): the card back to Approved and its builder woken; never
   merged, after a restart too (S33a). Refused once its advance has begun (`queue.advancing`): it is being merged, and
   its recovery finishes it.
@@ -3277,7 +3394,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 Hive has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | **Agreed [#1117 20 Oct].** Yes. |
 | OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | **Agreed [#1117 20 Oct].** Yes, the user only, per change, with the cards listed first. |
 | OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | **Agreed [#1117 20 Oct].** No RC for P2: there's nothing to install that differs from 0.9.3. |
-| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). |
+| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). **Built [#1351]:** Settings → Advanced, Merge queue: merge into a checked-out branch (`hive.queue.checkedOutTarget`), *Ask each time* (the request in For you) or *Automatically*. **Automatic since 22 Oct**, when #1351's crash-injection tests passed in its review (HR4's round 2, on 156a53a0: the e2e suite `mergequeuecrash` three times in a row); the race stays documented and detected (§16.9.2), and *Ask each time* stays the switch. |
 | OP-41 | The migration detects a running 0.9 Hive by SQLite's exclusive lock (§16.17). If P3's two-process test shows that can't be relied on, add a workspace presence marker to 0.9.3 (a fix on main, merged forward)? | **Agreed [#1117 20 Oct].** Yes, only if needed; P3 reports which. |
 
 **Git support (P1's list)** [#1117 git]. Capabilities the spec needs, and where they go:

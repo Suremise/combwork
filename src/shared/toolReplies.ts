@@ -22,6 +22,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   stalled: string | null
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
+  /**
+   * Who merges it and where it is with the merge queue, when its own rules say Hive merges it (#1354): queued (its
+   * position), testing, paused, returned (what came back and what to do), left the queue, merged.
+   */
+  merge?: string
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
@@ -710,6 +715,13 @@ export function queueText(q: QueuePublic): string {
         ? 'running'
         : 'empty'
   const lines = [`Merge queue for ${q.target} in ${q.project}: ${state}.`]
+  const st = q.paused?.stuck
+  if (st) {
+    // An advance into the checked-out target left part way (#1351): where it stands, and how to settle it.
+    const files = st.files.slice(0, QUEUE_SHOWN).map((f) => `${f.path} (${f.side})`).join(', ')
+    const how = st.commands.map((c) => `to ${c.purpose}, in the ${c.place === 'project' ? 'project folder' : "target's folder"}: ${c.command}`).join('; ')
+    lines.push(`Stopped part way (${st.phase}): ${st.branch ? `the folder is on ${st.branch}` : 'the folder has no branch'}, ${q.target} at ${rev(st.ref)} (expected ${rev(st.expected)}, result ${rev(st.result)})${files ? `; files ${files}${st.files.length > QUEUE_SHOWN ? `, ${st.files.length - QUEUE_SHOWN} more` : ''}` : ''}.${how ? ` ${how.charAt(0).toUpperCase()}${how.slice(1)}.` : ''}`)
+  }
   if (q.testing) lines.push(`Testing: ${q.testing.key} ${clip(q.testing.title, 60)} at ${rev(q.testing.revision)}${q.testing.step ? ` (${q.testing.step})` : ''}.`)
   if (q.queued.length) {
     const more = q.queued.length - QUEUE_SHOWN

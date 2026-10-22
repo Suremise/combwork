@@ -16,6 +16,8 @@ interface HiveMessageValues {
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
+  'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
+  'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
   'workflow.forYouKind': { kind: string }
@@ -172,6 +174,14 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.roundLimit.message': { card: string | number }
   'workflow.refused.loop.roundLimit.next': undefined
+  'workflow.refused.merge.hiveMerges.change': undefined
+  'workflow.refused.merge.hiveMerges.message': { card: string | number }
+  'workflow.refused.merge.hiveMerges.next': undefined
+  'workflow.refused.merge.hiveMerges.nextMerged': undefined
+  'workflow.refused.merge.hiveMerges.nextPaused': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
+  'workflow.refused.merge.hiveMerges.nextReturned': undefined
+  'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': undefined

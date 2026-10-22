@@ -6,7 +6,7 @@ import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
-import { folderChanging, folderSteady } from './folderFence'
+import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
@@ -2486,6 +2486,11 @@ class SessionManager {
   locksFor(projectPath: string, agentId: string): string[] {
     const id = liveId(projectPath, agentId)
     return [...this.locks.values()].filter((x) => x.liveId === id).map((x) => x.path)
+  }
+
+  /** Files any agent holds a lock on in a folder (#1351: an agent builds there, so the merge queue doesn't update it). */
+  locksIn(folder: string): string[] {
+    return [...this.locks.values()].filter((x) => inFolder(x.path, folder)).map((x) => x.path)
   }
 
   /** Types a message into an agent's terminal and sends it. */

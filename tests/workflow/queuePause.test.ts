@@ -34,7 +34,7 @@ async function queued(e: Env, title = 'Change') {
 }
 
 const head = (e: Env) => sh(e.project, 'rev-parse', 'main')
-const pause = (e: Env) => e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })
+const pause = (e: Env): void => void e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })
 
 describe('Pause queue and Resume (#1353)', () => {
   it('paused: the queue takes no entry, and the pause is kept for a restarted Hive; resumed, it merges', async () => {
