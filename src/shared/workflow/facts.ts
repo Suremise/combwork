@@ -59,6 +59,11 @@ export interface StartedData {
   /** `Adopted` only: the column it was in at the upgrade (§16.17). */
   adoptedFrom?: 'doing' | 'review' | 'passed'
   passedBefore1_0?: boolean
+  /**
+   * Its target (G7) is one the project's own options name, not one inherited from the workspace's or Hive's defaults
+   * (#1419, OP-29): the merge queue merges a subfolder project's card only then.
+   */
+  targetOwn?: true
   platform?: Record<string, unknown>
 }
 

@@ -142,7 +142,8 @@ function writeProject(dir, cfg) {
 
     // --- gamma: the repository gone (S20), then git init.
     const g1 = await q.agent(fx, h, 'G1', { project: gamma })
-    const gr = await q.agent(fx, h, 'GR', { project: gamma })
+    // The lane's reviewer.
+    await q.agent(fx, h, 'GR', { project: gamma })
     const c1 = (await inv('tasks:create', { title: 'Gamma in flight', project: 'gamma' })).number
     const c2 = (await inv('tasks:create', { title: 'Gamma lane', project: 'gamma' })).number
     const c3 = (await inv('tasks:create', { title: 'Gamma next', project: 'gamma' })).number

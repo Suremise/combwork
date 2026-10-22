@@ -1220,8 +1220,9 @@ Everything is visible in the Version Control tab itself, not only through the As
 - **A subfolder of a larger repository (OP-29):** when Hive or the agent merges, the target branch (G7) must be set by
   the project itself, not inherited: the contradiction `subfolderTarget` ("This project is inside a larger repository:
   name the branch its work merges into"), checked when options are saved (the form, the settings tool), with the
-  project's folder among the check's inputs. The queue's backstop: an entry whose card's ruleset names no target in a
-  subfolder project pauses its queue (`subfolderTarget`), saying how to go on.
+  project's folder among the check's inputs. The queue's backstop: in a subfolder project, an entry whose card didn't
+  start with a target the project's own options name (its Started's `targetOwn`, never one inherited from the
+  workspace's or Hive's defaults) pauses its queue (`subfolderTarget`), saying how to go on.
 - `hive_project_status` gives `versionControl`: the platform, what is found, and any offer.
 
 ### 16.4 Facts
@@ -1711,8 +1712,9 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   that is a Git repository (the warning adds that Hive then records no commits or merges for its cards), or one with
   Mercurial or Jujutsu. **Git** only where a Git repository is found and no other version control is ("No Git
   repository here: Initialise repository… first"; "Mercurial found: not supported yet"). A switch whose `expected` (the
-  platform the window showed) isn't the one in force is refused ("Changed meanwhile"). The window greys Git out with
-  the same reason; `project:updateConfig` refuses `platform`.
+  platform the window showed) isn't the one in force is refused ("Changed meanwhile"), and so is an options save read
+  before a switch (`setWorkflowOptions` checks the platform under the lock). The window greys Git out with the same
+  reason; `project:updateConfig` refuses `platform`.
 - **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
   (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
   carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.

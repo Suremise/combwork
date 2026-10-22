@@ -144,6 +144,24 @@ describe('switching a project (#1419)', () => {
     }
   })
 
+  it("an options save that waited behind a switch is refused, both platforms' options kept (HR3's round 1, finding 1)", async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen' } })
+    // The save reads the project as Git, then waits for its lock while the switch to None is made.
+    const mutate = w.mutateProjectConfig.bind(w)
+    let first = true
+    w.mutateProjectConfig = async (path, fn) => {
+      if (first) {
+        first = false
+        w.mutateProjectConfig = mutate
+        await sw.setPlatform(w, repo, 'none', { expected: 'git' })
+      }
+      return mutate(path, fn)
+    }
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, style: 'squash' } })).rejects.toThrow('Changed meanwhile: this project uses None now. Look again before switching.')
+    expect(await w.projectConfig(repo)).toMatchObject({ platform: 'none', workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: pair, presetAsked: 'chosen' } } } })
+  })
+
   it('the round trip: each platform keeps its own preset, options and answer through the form and the tool', async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: null, options: allOff('git') } })
@@ -237,8 +255,9 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       env = null
     })
 
-    it('a card whose ruleset names no target pauses the queue in a subfolder project; merged where it names one', async () => {
-      const e = (env = setup({ ...preset('git', 'pair', { quick: [], tests: [] }), target: '', preChecks: [], mergeChecks: [] }))
+    /** A card approved and queued, its options' target as given, the project's own target as `own` says. */
+    async function queued(target: string, own: string | null) {
+      const e = (env = setup({ ...preset('git', 'pair', { quick: [], tests: [] }), target, preChecks: [], mergeChecks: [] }, { ownTarget: async () => own }))
       const card = e.wf.createCard({ title: 'Change' })
       const s = await e.wf.start(card.key, B1)
       moved(s)
@@ -246,10 +265,28 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
       moved(await e.wf.startReview(card.key, R1))
       moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+      return { e, card }
+    }
+
+    it('no target: the queue pauses in a subfolder project, and merges in a project at its root', async () => {
+      const { e, card } = await queued('', null)
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])
       expect(e.wf.state(card).stage).toBe('merging')
       e.store.setQueuePause('main', null)
       expect(await e.queue({ subfolder: () => false }).drain('main')).toMatchObject([{ outcome: 'integrated' }])
+    })
+
+    it("a target inherited from the workspace's or Hive's defaults pauses it too (HR3's round 1, finding 2)", async () => {
+      const { e, card } = await queued('main', null)
+      expect(e.wf.state(card).started).not.toHaveProperty('targetOwn')
+      expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])
+      expect(e.wf.state(card).stage).toBe('merging')
+    })
+
+    it("the project's own target, named when the card started: merged", async () => {
+      const { e, card } = await queued('main', 'main')
+      expect(e.wf.state(card).started).toMatchObject({ targetOwn: true })
+      expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'integrated' }])
     })
   })
 })

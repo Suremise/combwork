@@ -10,7 +10,9 @@ import { readFile } from 'original-fs/promises'
 import { join } from 'path'
 import { ADOPTION_UPTO, boardState, boardValue, boardWrite, setBoardValue } from '../boardStore'
 import { config } from '../config'
-import { HiveError } from '../hiveError'
+import { HiveError, hiveError } from '../hiveError'
+import { projectPlatform } from '../platform/registry'
+import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
@@ -210,6 +212,9 @@ export async function setWorkflowOptions(ws: WorkspaceService, projectPath: stri
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []
   await ws.mutateProjectConfig(project.path, (cfg) => {
+    // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
+    const now = projectPlatform(project.path, cfg.platform).id
+    if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
     const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)
     if (c.problems.length) throw new WorkflowRefused(c.problems)
     changed = c.changed
