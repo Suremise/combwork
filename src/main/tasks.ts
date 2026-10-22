@@ -1861,6 +1861,27 @@ export function endReviews(project: string, agentId: string, why: ReviewEnd, ws:
   return cardBatch(ws, () => endReviewsUnbatched(project, agentId, why, ws))
 }
 
+async function endReviewsUnbatched(project: string, agentId: string, why: ReviewEnd, ws: WorkspaceService): Promise<number[]> {
+  const mine = (await allTasks(ws, { reviewers: [agentId] })).filter((c) => c.review?.agent === agentId && c.project.toLowerCase() === project.toLowerCase())
+  const out: number[] = []
+  for (const c of mine) {
+    const ended = await (async () => {
+      const card = await getTask(c.number, ws)
+      if (card.review?.agent !== agentId) return false
+      note(card, BY.hive, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END[why] }))
+      delete card.review
+      await saveCard(ws, c.number, card)
+      return true
+    })().catch((e) => {
+      log.warn(`Could not end the review of #${c.number}`, e)
+      return false
+    })
+    if (ended) out.push(c.number)
+  }
+  if (out.length) changed(ws)
+  return out
+}
+
 /**
  * As a workspace opens (#1392): the reviews whose reviewer has no session running end, as its session's end would have
  * ended them. An end that came as its window closed the workspace (or after) didn't reach its board, which is fenced
@@ -1888,27 +1909,6 @@ export function endReviewsWithoutSession(ws: WorkspaceService, live: (project: s
     if (out.length) changed(ws)
     return out
   })
-}
-
-async function endReviewsUnbatched(project: string, agentId: string, why: ReviewEnd, ws: WorkspaceService): Promise<number[]> {
-  const mine = (await allTasks(ws, { reviewers: [agentId] })).filter((c) => c.review?.agent === agentId && c.project.toLowerCase() === project.toLowerCase())
-  const out: number[] = []
-  for (const c of mine) {
-    const ended = await (async () => {
-      const card = await getTask(c.number, ws)
-      if (card.review?.agent !== agentId) return false
-      note(card, BY.hive, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END[why] }))
-      delete card.review
-      await saveCard(ws, c.number, card)
-      return true
-    })().catch((e) => {
-      log.warn(`Could not end the review of #${c.number}`, e)
-      return false
-    })
-    if (ended) out.push(c.number)
-  }
-  if (out.length) changed(ws)
-  return out
 }
 
 /**
