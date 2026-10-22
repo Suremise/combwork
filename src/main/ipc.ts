@@ -102,7 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
-import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -735,7 +735,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
-    'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined),
+    'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
+    'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,

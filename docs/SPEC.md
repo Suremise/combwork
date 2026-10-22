@@ -2786,6 +2786,33 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
 - **P5** [#1121 c]: the merge slot card becomes the queue's summary per target (testing now, queued, just merged,
   returned with Open card and Show log), Pause/Resume and Remove from queue, the queue's runs attributed to Hive, the
   full queue view in the Version Control tab, state changes announced politely.
+  **Built [#1356]** (the panel; the card's Work section and the Git tab's section are #1357's): the **Merges** tab lists
+  a card per merge queue target and the merge slot's cards side by side, by project then target; the slot's keep
+  **Release**, the queue's have none. A queue's card (`ProgressQueue.tsx`, its model `shared/progressQueue.ts`, which
+  #1357 reuses) says, each state with its own icon and words: **testing now** (*HI-61 + main @ 1cd2592 → check:
+  unit*: the card, the target's head it is tested on, the step: test merge, merge checks or the check running by its
+  run's name, merging), the time so far against an **estimate**, the median of the target's last five merges' check
+  times from Hive's own runs (a merge's runs are those on its result revision, all passed; none shows no estimate);
+  **queued** in order, each with its approved revision (copies) and a link to its card, and **Remove** (a confirmation,
+  then #1353's intent); **just merged** (*✓ HI-61 merged as 9e1f0aa*) for 8 s; **returned** (*✗ HI-108 returned to
+  HB1: conflict in tasks.ts*, *checks failed: unit*), with **Open card** and **Show log** (the failed check's run log,
+  else the output the outcome kept), shown **until seen**: the Merges tab shown in a focused window marks it seen
+  (`queue:seen`, kept in hive.db for every window and Hive: `workflow_queue_seen`, 1.0 group step 18 `queue seen`),
+  then it goes 10 s later; **paused**, each pause reason a sentence (git's own message under it), with **Resume
+  queue**, and Open card for needs you; **run by <profile>** for another Hive's queue; and **Queue in Version
+  Control**, which opens the project's Git tab (#1357 points it at its Merge queue section). **When a queue shows**
+  (item 0, round 2 of #1338) is decided from its actual state, never the current options alone: an entry testing,
+  queued or paused, a return not seen (or seen in the last 10 s), a merge of the last 8 s, a lease, a pause, or a card
+  in flight (started, not Done, not archived) whose own ruleset has Hive merge into that target; and, empty (*Nothing
+  queued.*), while the project's current options have Hive merge into it (`queue:list` gives the window those targets
+  too, with `hiveMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
+  or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
+  out of flight, and their outcomes seen. Pulse has a line per queue testing or paused (*main: testing HI-61 · 2
+  queued*), which opens Merges; the Merges badge counts queued entries plus agents waiting for a slot; the project
+  filter offers the projects with a queue shown. A polite live region (`role="status"`) says each change once: a card
+  merged or returned (with why), a queue paused or resumed. The Runs tab's Agent filter has **Hive (merge queue)** for
+  Hive's own runs, which fold by card and check like any run. Display only: it follows the queue's state; the controls
+  are #1353's.
 - **P6** [#1122 c]: stage names in hovers and accessible names over the categories' colours and patterns; the legend
   by stage; Solo shows no lanes section unless a loop runs; links to the Version Control tab; "old rules" marks.
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review

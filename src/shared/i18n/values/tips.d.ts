@@ -210,6 +210,8 @@ interface HiveMessageValues {
   'tips.memorySnapshot.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
+  'tips.mergeQueuePanel.text': undefined
+  'tips.mergeQueuePanel.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
   'tips.messageReceipts.text': { minutes: number }

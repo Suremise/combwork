@@ -1889,7 +1889,7 @@
   },
   "board.progress.badgeMerges": {
     "defaultMessage": "{n, plural, one {# merge waiting} other {# merges waiting}}",
-    "description": "What the badge on the Progress panel's Merges tab means: how many agents wait for the merge slot."
+    "description": "What the badge on the Progress panel's Merges tab means: how many cards wait in the merge queues and agents wait for the merge slot."
   },
   "board.progress.badgeRuns": {
     "defaultMessage": "{n, plural, one {# failure nothing has passed since} other {# failures nothing has passed since}}",
@@ -1976,8 +1976,8 @@
     "description": "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none."
   },
   "board.progress.noMerges": {
-    "defaultMessage": "No merge is going on. While an agent merges its branch, it shows here with its cards, its checks and who waits.",
-    "description": "The Progress panel's Merges tab when no agent is merging."
+    "defaultMessage": "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.",
+    "description": "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue."
   },
   "board.progress.openCard": {
     "defaultMessage": "Open {card}",
@@ -2090,6 +2090,222 @@
   "board.progress.waiting": {
     "defaultMessage": "waiting",
     "description": "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)."
+  },
+  "board.queue.empty": {
+    "defaultMessage": "Nothing queued.",
+    "description": "A merge queue's card in the Progress panel when no card is waiting or being merged."
+  },
+  "board.queue.filesMore": {
+    "defaultMessage": "{files} and {n, plural, one {# more} other {# more}}",
+    "description": "Files a merge conflict named, when there are more than shown: the first few ({files}, a list) and how many more ({n})."
+  },
+  "board.queue.inVersionControl": {
+    "defaultMessage": "Queue in Version Control",
+    "description": "A link on a merge queue's card in the Progress panel: shows the project's Git tab, where its queue and history are."
+  },
+  "board.queue.merged": {
+    "defaultMessage": "{card} merged as {result}",
+    "description": "A merge queue's card in the Progress panel, for a few seconds after a card merged: its key ({card}, such as HI-61) and the target's new commit ({result}: a short commit id)."
+  },
+  "board.queue.openCard": {
+    "defaultMessage": "Open card",
+    "description": "A button on a merge queue's card in the Progress panel: opens the card it names (a return, a pause that needs the user)."
+  },
+  "board.queue.openNamed": {
+    "defaultMessage": "Open {card}",
+    "description": "Tooltip of a queued card's key on a merge queue's card in the Progress panel: opens the card ({card}: its key)."
+  },
+  "board.queue.pause": {
+    "defaultMessage": "Pause queue",
+    "description": "A button on a merge queue's card in the Progress panel: stops it before its next card (saved). Glossary 2.5: Pause queue."
+  },
+  "board.queue.pause.approval": {
+    "defaultMessage": "{card} is ready to merge into {target}, which is checked out: it waits for your OK in For you.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: a card ({card}: its key) waits for the user's approval to update the checked-out target ({target}: a branch). For you is the list of what waits on the user (glossary 2.3)."
+  },
+  "board.queue.pause.byAssistant": {
+    "defaultMessage": "Paused by the Assistant. The queue merges nothing until it is resumed.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the Hive Assistant paused it (Pause queue)."
+  },
+  "board.queue.pause.byYou": {
+    "defaultMessage": "Paused by you. The queue merges nothing until you resume it.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)."
+  },
+  "board.queue.pause.checkedOut": {
+    "defaultMessage": "{target} is checked out in a folder. Hive merges into it there now: resume to carry on.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Hive could merge into a checked-out branch ({target})."
+  },
+  "board.queue.pause.folderBusy": {
+    "defaultMessage": "The folder {target} is checked out in was busy (an operation such as a merge or rebase was going on there).",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out was in the middle of a git operation."
+  },
+  "board.queue.pause.hookTimedOut": {
+    "defaultMessage": "A hook of the merge commit was still running when signing's time ran out.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: a git hook kept running past the time limit."
+  },
+  "board.queue.pause.identity": {
+    "defaultMessage": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Git → Branches & remotes, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Git → Branches & remotes is a place in Hive."
+  },
+  "board.queue.pause.needsYou": {
+    "defaultMessage": "Needs you: Hive stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: something Hive couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it."
+  },
+  "board.queue.pause.other": {
+    "defaultMessage": "Paused ({reason}).",
+    "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Hive's code for it)."
+  },
+  "board.queue.pause.rulesOff": {
+    "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced."
+  },
+  "board.queue.pause.signing": {
+    "defaultMessage": "Signing the merge commit failed.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing failed (its message follows)."
+  },
+  "board.queue.pause.signingWaits": {
+    "defaultMessage": "Signing the merge commit waits for you (a passphrase or a PIN). Unlock your signing key, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Hive can't type."
+  },
+  "board.queue.pause.staged": {
+    "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes."
+  },
+  "board.queue.pause.targetMovesFast": {
+    "defaultMessage": "{target} kept moving during each test merge. Resume once it settles.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the target ({target}: a branch) moved during every test merge. Glossary 2.5: test merge."
+  },
+  "board.queue.pause.uncounted": {
+    "defaultMessage": "The merge checks passed but didn't count for the merge, several times in a row. The card's Work section says why.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: its checks passed but didn't count (the folder changed during them, say). Glossary 2.3: merge checks; 2.4: work."
+  },
+  "board.queue.pause.unstagedChanges": {
+    "defaultMessage": "{files, select, none {Files the merge changes} other {{files}}} have changes in the folder {target} is checked out in. Commit or undo them, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names) have changes in the folder where the target ({target}: a branch) is checked out. Keep the select keys and the word none."
+  },
+  "board.queue.pause.wrongBranch": {
+    "defaultMessage": "The folder {target} was checked out in is on another branch now.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder that had the target ({target}: a branch) checked out switched branch."
+  },
+  "board.queue.pauseFailed": {
+    "defaultMessage": "Couldn't pause the merge queue",
+    "description": "An error's title: Pause queue failed (Progress panel)."
+  },
+  "board.queue.pauseTip": {
+    "defaultMessage": "Stop before the next card. A card in its merge checks finishes them and waits, unmerged.",
+    "description": "Tooltip of Pause queue on a merge queue's card in the Progress panel. Glossary 2.3: merge checks."
+  },
+  "board.queue.pulse": {
+    "defaultMessage": "{target}: {state, select, paused {paused} other {testing {card}}}{n, plural, =0 {} other { · {n, number} queued}}",
+    "description": "A merge queue's line on the Progress panel's Pulse tab (a click shows the Merges tab): its target ({target}: a branch), paused or the card it tests ({card}: its key), and how many cards wait ({n}). Keep the select keys."
+  },
+  "board.queue.queued": {
+    "defaultMessage": "{n, plural, one {{cards} waiting} other {{cards} waiting}}",
+    "description": "The cards waiting in a merge queue, in order, on its card in the Progress panel: {cards} is their keys as a list (HI-107, HI-108), {n} how many."
+  },
+  "board.queue.remove": {
+    "defaultMessage": "Remove",
+    "description": "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short."
+  },
+  "board.queue.removeConfirm": {
+    "defaultMessage": "Remove from queue",
+    "description": "The button confirming Remove from queue. Keep it short."
+  },
+  "board.queue.removeFailed": {
+    "defaultMessage": "Couldn't remove the card from the queue",
+    "description": "An error's title: Remove from queue failed (Progress panel); its message says why (its merge has begun, say)."
+  },
+  "board.queue.removeMessage": {
+    "defaultMessage": "It goes back to Approved and isn't merged. Its builder is told. To merge it later, requeue it from the card.",
+    "description": "The confirmation before Remove from queue (Progress panel). Approved is a stage (glossary 2.2)."
+  },
+  "board.queue.removeNamed": {
+    "defaultMessage": "Remove {card} from the queue",
+    "description": "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel."
+  },
+  "board.queue.removeTitle": {
+    "defaultMessage": "Remove {card} from the merge queue?",
+    "description": "Title of the confirmation before Remove from queue ({card}: the card's key). Glossary 2.5: merge queue."
+  },
+  "board.queue.resume": {
+    "defaultMessage": "Resume queue",
+    "description": "A button on a paused merge queue's card in the Progress panel: clears the pause once its cause is fixed. Glossary 2.5: Resume queue."
+  },
+  "board.queue.resumeFailed": {
+    "defaultMessage": "Couldn't resume the merge queue",
+    "description": "An error's title: Resume queue failed (Progress panel)."
+  },
+  "board.queue.returnWhy": {
+    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} other {{why}}}",
+    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
+  },
+  "board.queue.returned": {
+    "defaultMessage": "{card} returned: {why}",
+    "description": "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned (glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)."
+  },
+  "board.queue.returnedTo": {
+    "defaultMessage": "{card} returned to {builder}: {why}",
+    "description": "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)."
+  },
+  "board.queue.runBy": {
+    "defaultMessage": "Run by {profile}",
+    "description": "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev)."
+  },
+  "board.queue.saidMerged": {
+    "defaultMessage": "{card} merged",
+    "description": "Announced to screen readers (politely) when the merge queue merged a card ({card}: its key, such as HI-61)."
+  },
+  "board.queue.saidPaused": {
+    "defaultMessage": "Merge queue for {target} paused",
+    "description": "Announced to screen readers (politely) when a merge queue paused ({target}: its branch). Glossary 2.5: merge queue."
+  },
+  "board.queue.saidResumed": {
+    "defaultMessage": "Merge queue for {target} resumed",
+    "description": "Announced to screen readers (politely) when a merge queue resumed ({target}: its branch). Glossary 2.5: merge queue."
+  },
+  "board.queue.saidReturned": {
+    "defaultMessage": "{card} returned: {why}",
+    "description": "Announced to screen readers (politely) when the merge queue returned a card ({card}: its key) to its builder, and why ({why}: conflict, checks failed: unit…). Glossary 2.4: returned."
+  },
+  "board.queue.showLog": {
+    "defaultMessage": "Show log",
+    "description": "A button on a merge queue's returned card in the Progress panel: shows the failed check's log (or the hook's output)."
+  },
+  "board.queue.showLogFailed": {
+    "defaultMessage": "Couldn't open the log",
+    "description": "An error's title: Show log on a merge queue's returned card failed (Progress panel)."
+  },
+  "board.queue.sofar": {
+    "defaultMessage": "{sofar} so far",
+    "description": "How long the merge queue has been testing its card ({sofar}: \"3 min\"), on its card in the Progress panel, with no estimate (no earlier merge checks to go by)."
+  },
+  "board.queue.sofarOf": {
+    "defaultMessage": "{sofar} so far · usually {estimate}",
+    "description": "How long the merge queue has been testing its card ({sofar}: \"3 min\") and how long its merge checks usually take ({estimate}: \"12 min\", the median of the last ones), on its card in the Progress panel."
+  },
+  "board.queue.step": {
+    "defaultMessage": "{step, select, testMerge {test merge} checks {merge checks} check {check: {check}} advance {merging into {target}} other {testing}}",
+    "description": "The step a merge queue's card is at now, in the Progress panel: the test merge, its merge checks (or the one running, {check}: its name, such as unit), merging into the target ({target}: a branch, such as main), or testing (step not known here). Lower case: it follows an arrow. Glossary 2.5: test merge; 2.3: merge checks. Keep the select keys."
+  },
+  "board.queue.stillPaused": {
+    "defaultMessage": "The merge queue is still paused",
+    "description": "A notification's title after Resume queue: what paused it still holds, so it paused again. Its message says why."
+  },
+  "board.queue.testing": {
+    "defaultMessage": "{card} + {target} @ {head} → {step}",
+    "description": "What a merge queue is testing now, on its card in the Progress panel: the card ({card}: its key, such as HI-61) merged with the target ({target}: a branch, such as main) at its head ({head}: a short commit id), and its step ({step}: test merge, check: unit…)."
+  },
+  "board.queue.testingNoHead": {
+    "defaultMessage": "{card} + {target} → {step}",
+    "description": "What a merge queue is testing now, on its card in the Progress panel: the card ({card}: its key, such as HI-61) merged with the target ({target}: a branch, such as main), and its step ({step}: test merge, check: unit…)."
+  },
+  "board.queue.title": {
+    "defaultMessage": "Merge queue · {target}",
+    "description": "The heading of a merge queue's card in the Progress panel ({target}: the branch it merges into, such as main). Glossary 2.5: merge queue."
+  },
+  "board.queue.transient": {
+    "defaultMessage": "{why} (temporary)",
+    "description": "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary."
   },
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Hive: it is read-only here.",

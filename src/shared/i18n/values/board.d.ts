@@ -524,6 +524,60 @@ interface HiveMessageValues {
   'board.progress.tabs': undefined
   'board.progress.title': undefined
   'board.progress.waiting': undefined
+  'board.queue.empty': undefined
+  'board.queue.filesMore': { files: string | number; n: number }
+  'board.queue.inVersionControl': undefined
+  'board.queue.merged': { card: string | number; result: string | number }
+  'board.queue.openCard': undefined
+  'board.queue.openNamed': { card: string | number }
+  'board.queue.pause': undefined
+  'board.queue.pause.approval': { card: string | number; target: string | number }
+  'board.queue.pause.byAssistant': undefined
+  'board.queue.pause.byYou': undefined
+  'board.queue.pause.checkedOut': { target: string | number }
+  'board.queue.pause.folderBusy': { target: string | number }
+  'board.queue.pause.hookTimedOut': undefined
+  'board.queue.pause.identity': undefined
+  'board.queue.pause.needsYou': undefined
+  'board.queue.pause.other': { reason: string | number }
+  'board.queue.pause.rulesOff': undefined
+  'board.queue.pause.signing': undefined
+  'board.queue.pause.signingWaits': undefined
+  'board.queue.pause.staged': { target: string | number }
+  'board.queue.pause.targetMovesFast': { target: string | number }
+  'board.queue.pause.uncounted': undefined
+  'board.queue.pause.unstagedChanges': { files: string; target: string | number }
+  'board.queue.pause.wrongBranch': { target: string | number }
+  'board.queue.pauseFailed': undefined
+  'board.queue.pauseTip': undefined
+  'board.queue.pulse': { target: string | number; state: string; card: string | number; n: number }
+  'board.queue.queued': { n: number; cards: string | number }
+  'board.queue.remove': undefined
+  'board.queue.removeConfirm': undefined
+  'board.queue.removeFailed': undefined
+  'board.queue.removeMessage': undefined
+  'board.queue.removeNamed': { card: string | number }
+  'board.queue.removeTitle': { card: string | number }
+  'board.queue.resume': undefined
+  'board.queue.resumeFailed': undefined
+  'board.queue.returnWhy': { reason: string; files: string; check: string; target: string | number; why: string | number }
+  'board.queue.returned': { card: string | number; why: string | number }
+  'board.queue.returnedTo': { card: string | number; builder: string | number; why: string | number }
+  'board.queue.runBy': { profile: string | number }
+  'board.queue.saidMerged': { card: string | number }
+  'board.queue.saidPaused': { target: string | number }
+  'board.queue.saidResumed': { target: string | number }
+  'board.queue.saidReturned': { card: string | number; why: string | number }
+  'board.queue.showLog': undefined
+  'board.queue.showLogFailed': undefined
+  'board.queue.sofar': { sofar: string | number }
+  'board.queue.sofarOf': { sofar: string | number; estimate: string | number }
+  'board.queue.step': { step: string; check: string | number; target: string | number }
+  'board.queue.stillPaused': undefined
+  'board.queue.testing': { card: string | number; target: string | number; head: string | number; step: string | number }
+  'board.queue.testingNoHead': { card: string | number; target: string | number; step: string | number }
+  'board.queue.title': { target: string | number }
+  'board.queue.transient': { why: string | number }
   'board.readOnly.newer': undefined
   'board.restore09.done': undefined
   'board.restore09.doneDetail': { file: string | number }

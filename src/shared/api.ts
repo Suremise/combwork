@@ -287,10 +287,13 @@ export interface HiveRequests {
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
   'workflow:presetsNoticeSaid': () => void
   /**
-   * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused. Each
-   * change comes as a `queue-changed` event.
+   * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused, or has
+   * cards in flight under Hive merges into, or its current options have Hive merge into (#1356: the panel decides which
+   * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** The user saw these returned entries of a target's queue (#1356, the Progress panel): they leave its card. */
+  'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
   /** Resume: clears the pause once its cause, where Hive can see it, is gone (`resumed`); else the queue is paused again, saying why. */

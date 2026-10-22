@@ -268,3 +268,46 @@ describe('Pause queue and Resume (#1353)', () => {
     expect(host.kicked).toEqual(['main', 'main', 'main', 'main', 'main'])
   })
 })
+
+describe("the window's listing (#1356: which queues the panel can show)", () => {
+  it("lists the current options' target, empty, and a card in flight under Hive merges keeps it after a switch to the agent merging", async () => {
+    const { w, wt, repo } = await workspace()
+    const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
+    // Nothing queued: the Agent API lists no queue; the window's listing has main, Hive merging into it.
+    expect(await inWorkspace(w, () => queueViews(w, repo))).toEqual([])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [], queued: [] }])
+    const card = await approved(w, wt)
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [card], queued: [{ card }] }])
+    // The next cards go to the agent: the queue isn't the current options' any more, but its card is still in flight under them.
+    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [card], queued: [{ card }] }])
+    // Merged: Done, nothing in flight; the merge stays in its outcomes.
+    expect(await drain(w, repo, true)).toMatchObject([{ outcome: 'integrated' }])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [], queued: [], recent: [{ card, outcome: 'merged' }] }])
+  })
+
+  it('a return is marked seen once, for every reader; an entry that was not returned there is ignored; the Agent API never says it', async () => {
+    const { w, wt, repo } = await workspace()
+    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
+    const card = await approved(w, wt)
+    await drain(w, repo, false)
+    const [v0] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
+    const entry = v0.recent[0].entry
+    expect(v0.recent[0]).toMatchObject({ card, outcome: 'returned' })
+    expect(v0.recent[0].seen).toBeUndefined()
+    host.changed.length = 0
+    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', [entry, 'p-9/e1']))
+    const [v1] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
+    expect(v1.recent[0].seen).toEqual(expect.any(String))
+    expect(host.changed).toEqual(['main'])
+    // Seen already: its time kept, nothing to tell.
+    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', [entry]))
+    expect((await inWorkspace(w, () => queueViews(w, repo, 'main', true)))[0].recent[0].seen).toBe(v1.recent[0].seen)
+    expect(host.changed).toEqual(['main'])
+    // Another target's queue doesn't mark this one's entries.
+    const s = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    expect([...s.queueSeen().keys()]).toEqual([entry])
+    await inWorkspace(w, () => markQueueSeen(w, repo, 'release', ['x']))
+    expect([...s.queueSeen().keys()]).toEqual([entry])
+  })
+})

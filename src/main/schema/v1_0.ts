@@ -780,8 +780,25 @@ export const QUEUE_PAUSE_STATE_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * When the user saw a merge queue's returned card (#1356, the Progress panel's Merges tab): a return shows on its queue's
+ * card until seen, like a failed run, and keeps the queue's card shown (an old ruleset's queue included) until then. One
+ * row per returned entry (its id, `<key>/e<n>`, unique in its project), shared by every window and Hive on the workspace.
+ */
+export const QUEUE_SEEN_STEP: SchemaStep = {
+  name: 'queue seen',
+  ddl: [
+    `CREATE TABLE workflow_queue_seen (
+      project TEXT NOT NULL COLLATE NOCASE,
+      entry   TEXT NOT NULL,
+      seen_at TEXT NOT NULL,
+      PRIMARY KEY (project, entry)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -877,6 +894,8 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'queuePauses.commandArgs': { sql: 'SELECT command, arg FROM workflow_queue_pause_command_args WHERE project = ? AND target = ? ORDER BY command, ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
   // queueControls.ts (#1353): a project's paused targets, for its queues' listing.
   'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
+  // queueControls.ts (#1356): when the user saw a project's returned entries.
+  'queueSeen.ofProject': { sql: 'SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
   'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },

@@ -208,6 +208,8 @@
   "tips.memorySnapshot.title": "Hive 因内存耗尽而关闭？",
   "tips.mergeQueueFolder.text": "当合并队列要合并进在某个文件夹中已检出的分支（例如项目文件夹的 main）时，它也会更新该文件夹，但宁可暂停也不会动你正在修改的文件。在“设置”→“高级”中可让它先在“待你处理”中询问你。",
   "tips.mergeQueueFolder.title": "合并到你正在工作的文件夹",
+  "tips.mergeQueuePanel.text": "进度面板的“合并”选项卡会显示每个合并队列：正在测试的卡片及其检查通常需要多长时间、正在等待的卡片，以及被退回的卡片（直到你看过为止）。“暂停队列”和“恢复队列”也在那里。",
+  "tips.mergeQueuePanel.title": "关注合并队列",
   "tips.mergeSlot.text": "多个智能体同时完成时，每个智能体在合并入 main、检查和合并之前都会先占用项目的合并槽位，这样谁的检查都不必运行两次。谁占用着、谁在等待，会显示在“概览”和进度面板中。",
   "tips.mergeSlot.title": "智能体轮流合并",
   "tips.messageReceipts.text": "助手给智能体留的每条消息都有 ID 并会保留，即使重启也不丢失：智能体读取收件箱后即为已接收，处理后确认即为已确认。{minutes, plural, other {# 分钟}}内未确认的消息会在其窗格中显示为逾期（✉）。",

@@ -208,6 +208,8 @@
   "tips.memorySnapshot.title": "Hive zamknął się z braku pamięci?",
   "tips.mergeQueueFolder.text": "Gdy kolejka scalania scala do gałęzi wybranej w folderze (main w folderze projektu), aktualizuje też ten folder, ale wstrzymuje się, zamiast ruszać plik, który właśnie zmieniasz. W Ustawienia → Zaawansowane możesz sprawić, by najpierw pytała w sekcji Dla Ciebie.",
   "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
+  "tips.mergeQueuePanel.text": "Karta Scalenia w panelu postępu pokazuje każdą kolejkę scalania: kartę, którą testuje, i ile zwykle trwają jej sprawdzenia, karty, które czekają, oraz kartę, którą zwróciła, dopóki jej nie zobaczysz. Są tam też Wstrzymaj kolejkę i Wznów kolejkę.",
+  "tips.mergeQueuePanel.title": "Śledź kolejkę scalania",
   "tips.mergeSlot.text": "Gdy kilku agentów kończy naraz, każdy zajmuje kolejkę scalania projektu, zanim scali do siebie main, sprawdzi i scali, więc niczyje testy nie muszą się wykonywać dwa razy. Kto ją zajmuje, a kto czeka, widać w Przeglądzie i w panelu Postęp.",
   "tips.mergeSlot.title": "Agenci scalają po kolei",
   "tips.messageReceipts.text": "Każda wiadomość, którą Asystent zostawia agentowi, ma identyfikator i jest przechowywana, nawet po ponownym uruchomieniu: jest odebrana, gdy agent przeczyta skrzynkę odbiorczą, i potwierdzona, gdy na nią zareaguje. Niepotwierdzona w ciągu {minutes, plural, one {# minuty} few {# minut} many {# minut} other {# minuty}} pokazuje się w jego panelu jako zaległa (✉).",

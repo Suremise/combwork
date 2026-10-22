@@ -588,6 +588,23 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT target FROM workflow_queue_pauses WHERE project = ?').all(this.scope.project) as { target: string }[]).map((r) => r.target))
   }
 
+  /** When the user saw this project's returned queue entries (#1356), by entry id. */
+  queueSeen(): Map<string, string> {
+    return this.conn.read((db) => new Map((db.prepare('SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ?').all(this.scope.project) as { entry: string; seen_at: string }[]).map((r) => [r.entry, r.seen_at])))
+  }
+
+  /** Marks returned entries seen (#1356), now; one seen already keeps its time. Whether any was new. */
+  markQueueSeen(entries: readonly string[]): boolean {
+    if (!entries.length) return false
+    const at = this.now().toISOString()
+    return this.conn.write((db) => {
+      const ins = db.prepare('INSERT OR IGNORE INTO workflow_queue_seen (project, entry, seen_at) VALUES (?, ?, ?)')
+      let n = 0
+      for (const e of entries) n += Number(ins.run(this.scope.project, e, at).changes)
+      return n > 0
+    })
+  }
+
   /**
    * Pauses a target's queue (`pause`), or resumes it (null). `keep`: only when it isn't paused already, decided in the same
    * write (HR4's #1351 round 1: Hive's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
