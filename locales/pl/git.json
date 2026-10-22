@@ -288,6 +288,7 @@
   "git.vc.step.details": "Co ustawia {preset}",
   "git.vc.step.hideDetails": "Ukryj, co ustawia {preset}",
   "git.vc.step.intro": "Ustawienie wstępne konfiguruje przepływ pracy tego projektu jednym kliknięciem: kto recenzuje pracę, które sprawdzenia muszą przejść najpierw i kto scala. Nic się nie zmieni, dopóki nie wybierzesz.",
+  "git.vc.step.introNone": "Ustawienie wstępne konfiguruje przepływ pracy tego projektu jednym kliknięciem: kto recenzuje pracę i które sprawdzenia muszą przejść najpierw. Nic się nie zmieni, dopóki nie wybierzesz.",
   "git.vc.step.keeps": "{n, plural, one {Rozpoczęta karta zachowuje reguły, z którymi wystartowała; opcje obowiązują od następnej karty.} few {# rozpoczęte karty zachowują reguły, z którymi wystartowały; opcje obowiązują od następnej karty.} many {# rozpoczętych kart zachowuje reguły, z którymi wystartowały; opcje obowiązują od następnej karty.} other {# rozpoczętej karty zachowuje reguły, z którymi wystartowała; opcje obowiązują od następnej karty.}}",
   "git.vc.step.notNow": "Nie teraz",
   "git.vc.step.nothing": "Nic jeszcze nie jest w trakcie: opcje obowiązują od pierwszej karty, która wystartuje.",

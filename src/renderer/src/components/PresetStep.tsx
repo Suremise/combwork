@@ -22,6 +22,7 @@ import { Icon } from './ui'
 const M = {
   title: msg({ id: 'git.vc.step.title', defaultMessage: 'How do you work?', description: 'The heading of the step that offers a new project a preset (Solo, Pair, Team), atop its Version Control tab.' }),
   intro: msg({ id: 'git.vc.step.intro', defaultMessage: 'A preset sets up this project’s workflow in one click: who reviews the work, which checks pass first and who merges. Nothing changes until you choose.', description: 'Under "How do you work?": what choosing a preset does (glossary 2.1: preset, workflow).' }),
+  introNone: msg({ id: 'git.vc.step.introNone', defaultMessage: 'A preset sets up this project’s workflow in one click: who reviews the work and which checks pass first. Nothing changes until you choose.', description: 'Under "How do you work?" for a project without version control (None): what choosing a preset does. None has no merging, so unlike the Git intro it names no merges (glossary 2.1: preset, workflow).' }),
   presets: msg({ id: 'git.vc.step.presets', defaultMessage: 'Presets', description: 'Accessible name of the row of presets (Solo, Pair, Team) in the "How do you work?" step.' }),
   suggested: msg({ id: 'git.vc.step.suggested', defaultMessage: 'Suggested', description: 'A tag on the preset Hive suggests for the project, in the "How do you work?" step.' }),
   why: msg({ id: 'git.vc.step.why', defaultMessage: '{why, select, solo {Suggested for one agent or none.} pair {Suggested for a builder and a reviewer.} other {Suggested for more agents than a builder and a reviewer.}}', description: 'Why Hive suggests the marked preset, from the project’s agents, in the "How do you work?" step. Keep the select keys.' }),
@@ -96,7 +97,7 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
     <div className="vc-step" data-preset-step={platform}>
       <div className="vc-step-head">
         <h3>{tr(M.title)}</h3>
-        <span className="s-desc">{tr(M.intro)}</span>
+        <span className="s-desc">{tr(platform === 'none' ? M.introNone : M.intro)}</span>
       </div>
       <div className="vc-step-presets" role="radiogroup" aria-label={tr(M.presets)}>
         {presets.map((p) => (

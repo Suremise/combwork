@@ -290,6 +290,7 @@ interface HiveMessageValues {
   'git.vc.step.details': { preset: string | number }
   'git.vc.step.hideDetails': { preset: string | number }
   'git.vc.step.intro': undefined
+  'git.vc.step.introNone': undefined
   'git.vc.step.keeps': { n: number }
   'git.vc.step.notNow': undefined
   'git.vc.step.nothing': undefined

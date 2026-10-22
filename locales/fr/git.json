@@ -288,6 +288,7 @@
   "git.vc.step.details": "Ce que règle {preset}",
   "git.vc.step.hideDetails": "Masquer ce que règle {preset}",
   "git.vc.step.intro": "Un préréglage met en place le flux de travail de ce projet en un clic : qui relit le travail, quelles vérifications doivent passer d’abord et qui fusionne. Rien ne change tant que tu n’as pas choisi.",
+  "git.vc.step.introNone": "Un préréglage met en place le flux de travail de ce projet en un clic : qui relit le travail et quelles vérifications doivent passer d’abord. Rien ne change tant que tu n’as pas choisi.",
   "git.vc.step.keeps": "{n, plural, one {La carte déjà lancée garde les règles avec lesquelles elle a démarré ; les options s’appliquent à partir de la prochaine carte.} many {Les # cartes déjà lancées gardent les règles avec lesquelles elles ont démarré ; les options s’appliquent à partir de la prochaine carte.} other {Les # cartes déjà lancées gardent les règles avec lesquelles elles ont démarré ; les options s’appliquent à partir de la prochaine carte.}}",
   "git.vc.step.notNow": "Pas maintenant",
   "git.vc.step.nothing": "Rien n’est encore lancé : ses options s’appliquent à partir de la première carte qui démarre.",

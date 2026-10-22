@@ -288,6 +288,7 @@
   "git.vc.step.details": "Was {preset} einstellt",
   "git.vc.step.hideDetails": "Ausblenden, was {preset} einstellt",
   "git.vc.step.intro": "Eine Voreinstellung richtet den Workflow dieses Projekts mit einem Klick ein: wer die Arbeit reviewt, welche Checks zuerst bestehen müssen und wer mergt. Nichts ändert sich, bis du wählst.",
+  "git.vc.step.introNone": "Eine Voreinstellung richtet den Workflow dieses Projekts mit einem Klick ein: wer die Arbeit reviewt und welche Checks zuerst bestehen müssen. Nichts ändert sich, bis du wählst.",
   "git.vc.step.keeps": "{n, plural, one {Die laufende Karte behält die Regeln, mit denen sie gestartet ist; die Optionen gelten ab der nächsten Karte.} other {Die # laufenden Karten behalten die Regeln, mit denen sie gestartet sind; die Optionen gelten ab der nächsten Karte.}}",
   "git.vc.step.notNow": "Nicht jetzt",
   "git.vc.step.nothing": "Noch läuft nichts: Die Optionen gelten ab der ersten Karte, die startet.",

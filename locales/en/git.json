@@ -1155,6 +1155,10 @@
     "defaultMessage": "A preset sets up this project’s workflow in one click: who reviews the work, which checks pass first and who merges. Nothing changes until you choose.",
     "description": "Under \"How do you work?\": what choosing a preset does (glossary 2.1: preset, workflow)."
   },
+  "git.vc.step.introNone": {
+    "defaultMessage": "A preset sets up this project’s workflow in one click: who reviews the work and which checks pass first. Nothing changes until you choose.",
+    "description": "Under \"How do you work?\" for a project without version control (None): what choosing a preset does. None has no merging, so unlike the Git intro it names no merges (glossary 2.1: preset, workflow)."
+  },
   "git.vc.step.keeps": {
     "defaultMessage": "{n, plural, one {The card in flight keeps the rules it started with; the options apply from the next card.} other {The # cards in flight keep the rules they started with; the options apply from the next card.}}",
     "description": "The confirmation after Choose in the \"How do you work?\" step, when cards have started (glossary: old rules)."

@@ -288,6 +288,7 @@
   "git.vc.step.details": "“{preset}”的设置内容",
   "git.vc.step.hideDetails": "隐藏“{preset}”的设置内容",
   "git.vc.step.intro": "预设只需一次点击即可设置此项目的工作流程：谁评审工作、哪些检查需先通过、由谁合并。在你选择之前，什么都不会改变。",
+  "git.vc.step.introNone": "预设只需一次点击即可设置此项目的工作流程：谁评审工作、哪些检查需先通过。在你选择之前，什么都不会改变。",
   "git.vc.step.keeps": "{n, plural, other {已开始的 # 张卡片保持开始时的规则；这些选项从下一张卡片起生效。}}",
   "git.vc.step.notNow": "暂不",
   "git.vc.step.nothing": "还没有已开始的工作：其选项从第一张开始的卡片起生效。",

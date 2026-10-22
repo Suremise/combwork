@@ -290,6 +290,7 @@
   "git.vc.step.details": "What {preset} sets",
   "git.vc.step.hideDetails": "Hide what {preset} sets",
   "git.vc.step.intro": "A preset sets up this project’s workflow in one click: who reviews the work, which checks pass first and who merges. Nothing changes until you choose.",
+  "git.vc.step.introNone": "A preset sets up this project’s workflow in one click: who reviews the work and which checks pass first. Nothing changes until you choose.",
   "git.vc.step.keeps": "{n, plural, one {The card in flight keeps the rules it started with; the options apply from the next card.} other {The # cards in flight keep the rules they started with; the options apply from the next card.}}",
   "git.vc.step.notNow": "Not Now",
   "git.vc.step.nothing": "Nothing is in flight yet: its options apply from the first card that starts.",

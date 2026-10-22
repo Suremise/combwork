@@ -288,6 +288,7 @@
   "git.vc.step.details": "Qué configura {preset}",
   "git.vc.step.hideDetails": "Ocultar qué configura {preset}",
   "git.vc.step.intro": "Un ajuste predefinido configura el flujo de trabajo de este proyecto con un clic: quién revisa el trabajo, qué comprobaciones pasan primero y quién fusiona. Nada cambia hasta que elijas.",
+  "git.vc.step.introNone": "Un ajuste predefinido configura el flujo de trabajo de este proyecto con un clic: quién revisa el trabajo y qué comprobaciones pasan primero. Nada cambia hasta que elijas.",
   "git.vc.step.keeps": "{n, plural, one {La tarjeta en marcha mantiene las reglas con las que empezó; las opciones se aplican desde la próxima tarjeta.} many {Las # tarjetas en marcha mantienen las reglas con las que empezaron; las opciones se aplican desde la próxima tarjeta.} other {Las # tarjetas en marcha mantienen las reglas con las que empezaron; las opciones se aplican desde la próxima tarjeta.}}",
   "git.vc.step.notNow": "Ahora no",
   "git.vc.step.nothing": "Todavía no hay nada en marcha: sus opciones se aplican desde la primera tarjeta que empiece.",

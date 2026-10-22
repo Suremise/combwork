@@ -288,6 +288,7 @@
   "git.vc.step.details": "O que {preset} define",
   "git.vc.step.hideDetails": "Ocultar o que {preset} define",
   "git.vc.step.intro": "Uma predefinição configura o fluxo de trabalho deste projeto com um clique: quem revisa o trabalho, quais verificações passam primeiro e quem faz o merge. Nada muda até você escolher.",
+  "git.vc.step.introNone": "Uma predefinição configura o fluxo de trabalho deste projeto com um clique: quem revisa o trabalho e quais verificações passam primeiro. Nada muda até você escolher.",
   "git.vc.step.keeps": "{n, plural, one {O cartão em andamento mantém as regras com que começou; as opções valem a partir do próximo cartão.} other {Os # cartões em andamento mantêm as regras com que começaram; as opções valem a partir do próximo cartão.}}",
   "git.vc.step.notNow": "Agora não",
   "git.vc.step.nothing": "Nada está em andamento ainda: as opções valem a partir do primeiro cartão que começar.",
