@@ -15,7 +15,8 @@ import { Icon, Tooltip } from '../components/ui'
  * the recorded platform only: Hive never switches it silently, and offers a switch when it detects another (#1419).
  */
 
-const M = {
+/** The tab's words (the board's workflow link, #1420, says it as the tab does). */
+export const M = {
   choice: msg({ id: 'git.vc.choice', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control).' }),
   none: msg({ id: 'git.vc.none', defaultMessage: 'None', description: 'The version control of a project without any, in the choice atop the Version Control tab and in "Workflow: None · Solo" (glossary 2.1: None).' }),
   git: msg({ id: 'git.vc.git', defaultMessage: 'Git', description: 'A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep).' }),
@@ -29,7 +30,7 @@ const M = {
   workflowTip: msg({ id: 'git.vc.workflowTip', defaultMessage: 'Show the workflow options', description: 'Tooltip of the "Workflow: Git · Team" link atop the Version Control tab.' })
 }
 
-const PLATFORM_TEXT: Record<PlatformId, Msg> = { none: M.none, git: M.git }
+export const PLATFORM_TEXT: Record<PlatformId, Msg> = { none: M.none, git: M.git }
 const CHOICES: PlatformId[] = ['none', 'git']
 
 /** What Hive finds in the folder, in the tab's words. */

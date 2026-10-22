@@ -20,6 +20,7 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
+import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
@@ -676,9 +677,13 @@ export interface HiddenProject {
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
+/** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
+export type BoardColumnId = TaskColumn | 'merging'
+
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
-  columns?: TaskColumn[]
+  /** A category's applies to its stage's column; Merging keeps its own. */
+  columns?: BoardColumnId[]
   cards?: number[]
 }
 
@@ -834,6 +839,11 @@ export interface ArchiveRequest {
   label: string
   /** The column it was for; null: the whole board. */
   column: TaskColumn | null
+  /**
+   * The stage it was for, where its category shows several (Approved beside Merging, #1420): a card in another stage
+   * of the column, as its facts say now, stays.
+   */
+  stage?: StageId
   /** The project the board showed (null: every project) and its search: a card that has left them stays. */
   project: string | null
   query: string
@@ -1000,6 +1010,8 @@ export type PresetAsked = 'chosen' | 'notNow'
 export interface ProjectStages {
   stages: StageDef[]
   names: Partial<Record<StageDef['id'], string>>
+  /** The preset its options started from (null: none chosen): Solo hides its ended lanes from Pulse (#1421). */
+  preset: PresetId | null
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
@@ -2784,6 +2796,16 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /**
+   * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
+   * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
+   */
+  oldRules: boolean
+  /**
+   * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
+   * too; null for an ended lane, or one with none recorded (its project's options now stand in).
+   */
+  stages: StageId[] | null
 }
 
 /**

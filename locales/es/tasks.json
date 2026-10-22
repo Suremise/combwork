@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "Terminó la vigilancia del agente {watcher}: {why, select, blocked {la tarjeta está bloqueada} reviewer {la revisa el agente {agent}} reviewTaken {se le quitó la revisión} reassigned {se reasignó al agente {agent}} unassigned {se quitó su agente} other {{why}}}",
   "tasks.skipped.movedColumn": "se movió a la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}",
   "tasks.skipped.movedProject": "se movió a otro proyecto",
+  "tasks.skipped.movedStage": "se movió a {stage}",
   "tasks.skipped.noMatch": "ya no coincide con la búsqueda",
   "tasks.skipped.unreadable": "no se pudo leer",
   "tasks.skipped.unsaved": "no se pudo guardar",

@@ -79,6 +79,7 @@ const check = (name, ok, extra = '') => {
 
   // The Board view, and a card added there.
   await page.getByRole('button', { name: 'Task Board' }).click()
+  // With the rules not enforced every category shows (#1420), as before 1.0.
   check('the Board shows six columns', !!(await until(async () => (await page.locator('.board-column').count()) === 6, 5000)))
   const dialog = page.locator('.dialog', { hasText: 'New Card' })
   await page.getByRole('button', { name: 'New Card', exact: true }).click()
