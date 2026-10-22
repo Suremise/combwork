@@ -14,6 +14,7 @@ import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { copyIgnored, createWorktree, currentBranch, GIT_FAILED, listWorktrees, uniqueFolder } from './worktrees'
+import { workflowFor } from './workflow/service'
 
 /**
  * An agent's worktree whose folder is gone (#146): deleted after its work was merged, or a workspace copied to another
@@ -37,6 +38,26 @@ export async function missingWorktree(projectPath: string, agentId: string): Pro
   const a = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === agentId)
   if (!a?.worktree || existsSync(a.worktree.path)) return null
   return { agentName: a.name, path: a.worktree.path, branch: a.worktree.branch, base: a.worktree.base, branchExists: await branchExists(projectPath, a.worktree.branch) }
+}
+
+/**
+ * Each card of the project whose folder is `from` follows it to `to` (#1343): a FolderMoved fact, so its fold, its view
+ * and its reconciliation read the worktree at its new place, and never take it for gone. Written before the agent's
+ * record: cut short between the two, the next Repair writes it again, which changes nothing once a card's folder is
+ * `to` (the fold only moves the folder it names). A board without the fact log (waiting for its 1.0 upgrade) has none.
+ */
+export async function moveCardFolders(projectPath: string, from: string, to: string): Promise<void> {
+  if (samePath(from, to)) return
+  const wf = await workflowFor(workspaceOf(projectPath), projectPath)
+  if (!wf) return
+  const on = (folder: string | undefined): boolean => !!folder && folder !== 'project' && samePath(folder, from)
+  for (const card of wf.store.cards()) {
+    if (!on(wf.state(card).started?.folder)) continue
+    // Checked again under the write's lock: a card another observer has already moved gets no second fact.
+    await wf.write(card, null, 'hive', (w) => {
+      if (on(w.state().started?.folder)) w.fact('FolderMoved', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
+    })
+  }
 }
 
 /**
@@ -121,6 +142,8 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   // At a new place, its sessions and the CLIs' data for the old folder are to follow it (workspaceMove.ts finishes
   // that): the move is recorded in the same locked change as the new path, so a failure or exit after it can't lose it.
   const moved = !samePath(dest, old.path)
+  // Its cards' work follows it first (#1343). Should that fail, reconciliation follows it later from the agent's record.
+  if (moved) await moveCardFolders(projectPath, old.path, dest).catch((e) => log.warn(`moving ${userText(a.name)}'s cards to its recreated worktree`, e))
   let next: AgentDef | undefined
   await workspace.mutateProjectConfig(projectPath, (now) => {
     const setup = !!now.worktreeSetup.trim()

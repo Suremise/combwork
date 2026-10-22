@@ -111,6 +111,11 @@ export interface WorkflowConfig {
    * null: reconciliation then follows the rename rather than take the line for gone.
    */
   pendingRename?: (line: string) => Promise<string | null>
+  /**
+   * Whether the project, or its workspace, moved and Repair hasn't recorded it yet (#1343: `lastPath` isn't where it is):
+   * an agent's worktree still recorded at its old place is Repair's to move then, not gone.
+   */
+  movePending?: () => Promise<boolean>
   /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
   locksOf?: (agent: string) => string[]
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */

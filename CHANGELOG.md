@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A card's work follows its worktree when a workspace moves.** A card started in an agent's worktree recorded the worktree's old folder. After the workspace moved, Hive took that folder for gone, even once Repair had relinked or recreated the worktree at its new place. The card now follows the worktree there, and nothing is marked gone while a move waits for Repair (#1343).
 - **Remove Project's "What it touches" is a table.** Each thing (the folder, by its name with the full path on hover; handovers, cards, worktrees, running agents) is a row, with what Hide, Remove from Hive or Delete does to it beside it, instead of bold sentences with the folder's full path (#1316).
 - **Load Template's plan is one table.** Instead of a Removed list repeating "(replaced by a new agent with the same name)" above a Created table, each agent is a row with a **Change** column (replaced, new or removed), the agents the template removes at the end, and what becomes of their worktrees beside them (#1315).
 - **Unused worktrees, a line each.** The Git tab's **Unused worktrees** is now a table: branch, state and who made it, folder (its name, the full path on hover), last commit and size, with the buttons aligned at the right; two lines each in a narrower pane. The paragraph over it is one sentence (the rest is in its ⓘ), and **Remove all merged** asks with a short Branch · Folder table instead of full paths (#1314).

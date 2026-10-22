@@ -13,6 +13,7 @@ import { join, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { boardSavepoint, boardWrite } from '../boardStore'
+import { samePlace } from '../fsutil'
 import { hiveError } from '../hiveError'
 import { observer } from '../platform/observe'
 import { isUnknown } from '../platform/types'
@@ -151,6 +152,11 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Before P7's slots, an agent's own worktree is a card's folder (SPEC §16.19.1), as project.json has it.
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
+    // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
+    movePending: async () => {
+      const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
+      return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)
+    },
     agentFolder: async (agent) => {
       const a = projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent)
       return a?.worktree?.path ? { path: a.worktree.path, base: a.worktree.base ?? null } : null
