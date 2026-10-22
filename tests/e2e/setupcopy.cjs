@@ -2,8 +2,9 @@
 // warning about the Microsoft Store's PowerShell 7 and its detail (the symptom's error text and the winget command, each
 // as code); Claude Code not installed, with its install note (the installer's command and folder). Each code span has
 // its own Copy button; it copies exactly that command (a fake clipboard in the page: the real one is never touched) and
-// says Copied for a moment. Sent to the window as main sends them: no CLI is run, installed or signed in. Screenshots in
-// both themes and in German. Throwaway profile; quiet.
+// says Copied for a moment. Sent to the window as main sends them, in the window's language (its catalogue's words):
+// no CLI is run, installed or signed in. In German, the install note is the German one (#1404), its commands still
+// copyable. Screenshots in both themes and in German. Throwaway profile; quiet.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -19,8 +20,13 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
+/** A message's words in a language, from its catalogue: what main sends the window (shownInstallInfo). */
+const words = (lang, area, id) => {
+  const v = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', lang, `${area}.json`), 'utf8'))[id]
+  return typeof v === 'string' ? v : v.defaultMessage
+}
 /** Codex found, signed in, with the Store PowerShell warning as main words it (storePwsh.ts). */
-const codex = {
+const codex = (lang) => ({
   provider: 'codex',
   found: true,
   checking: false,
@@ -37,18 +43,18 @@ const codex = {
     {
       id: 'store-pwsh',
       level: 'warning',
-      message: "The Microsoft Store's PowerShell 7 is installed",
-      detail: ['The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.', `To avoid it, install PowerShell 7 from its installer instead of the Store (\`${WINGET}\`) and uninstall the Store one, then restart Hive and its Codex agents. Hive leaves your shell as it is.`]
+      message: words(lang, 'providers', 'providers.codex.storePwsh.warning'),
+      detail: [words(lang, 'providers', 'providers.codex.storePwsh.symptom'), words(lang, 'providers', 'providers.codex.storePwsh.fix')]
     }
   ]
-}
+})
 /** Claude Code not installed: its install note shows. */
 const claude = { provider: 'claude-code', found: false, checking: false, path: null, version: null, source: null, latestVersion: null, updateAvailable: false, loggedIn: null, authMethod: null, account: null, rejected: [], readiness: [] }
 
-async function openSetup(app, page) {
+async function openSetup(app, page, lang = 'en') {
   const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
   // Hive has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
-  await sendEvent({ type: 'provider-install', provider: 'codex', info: codex })
+  await sendEvent({ type: 'provider-install', provider: 'codex', info: codex(lang) })
   await sendEvent({ type: 'provider-install', provider: 'claude-code', info: claude })
   // A fake clipboard in the page: what a Copy button writes, never the machine's.
   await page.evaluate(() => {
@@ -101,17 +107,25 @@ async function openSetup(app, page) {
       await app.close()
     }
   }
-  // In German: the button's name and Copied are translated; the command is as it is.
+  // In German: the install note is German (#1404), the button's name and Copied are translated; the command is as it is.
   {
     const { app, page } = await lib.launch({ userData, env: { HIVE_LANG: 'de' }, viewport: { width: 1200, height: 860 } })
     try {
-      const setup = await openSetup(app, page)
+      const setup = await openSetup(app, page, 'de')
       await setup.locator('.setup-tab', { hasText: 'Claude Code' }).click()
+      const note = setup.locator('[data-install-note]')
+      await lib.until(async () => (await note.count()) === 1, HUNG_MS)
+      const noteText = await note.innerText()
+      check("in German: Claude Code's install note is the German one", noteText.startsWith('Der Installer führt') && !noteText.includes('The installer runs'), noteText.slice(0, 80))
       const irm = setup.locator(`.copy-code-btn[data-copy-code="${IRM}"]`)
       await lib.until(async () => (await irm.count()) === 1, HUNG_MS)
       await irm.click()
       check('in German: the command copies as it is, and the button is named in German', !!(await lib.until(async () => (await page.evaluate(() => window.__copied.at(-1))) === IRM, HUNG_MS)) && (await irm.getAttribute('aria-label')) !== 'Copy', await irm.getAttribute('aria-label'))
       await page.screenshot({ path: path.join(lib.WORK, 'setupcopy-claude-de.png') })
+      // Codex's Store PowerShell warning as main sends it in German, its command still copyable.
+      await setup.locator('.setup-tab', { hasText: 'Codex' }).click()
+      check("in German: the Store PowerShell warning's winget command keeps its Copy button", !!(await lib.until(async () => (await setup.locator(`.copy-code-btn[data-copy-code="${WINGET}"]`).count()) === 1, HUNG_MS)))
+      await page.screenshot({ path: path.join(lib.WORK, 'setupcopy-codex-de.png') })
     } finally {
       await app.close()
     }
