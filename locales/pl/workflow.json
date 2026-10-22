@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "Ostrzegaj, gdy commit zawiera pliki innego agenta",
   "workflow.option.stopOwnRuns.desc": "Karta trafia do recenzji dopiero, gdy uruchomienia i polecenia w tle jej wykonawcy zostały zatrzymane.",
   "workflow.option.stopOwnRuns.title": "Agenci zatrzymują przed recenzją to, co uruchomili",
+  "workflow.option.strict.desc": "Jeśli gałąź docelowa przesunęła się od czasu recenzji, kolejka scalania Hive scala ją z pracą karty (albo, przy stylu scalania Squash, wykonuje rebase pracy) we własnym folderze, nigdy na gałęzi wykonawcy. Recenzja nadal się liczy, jeśli wynik jest tą samą zmianą; jeśli nie, albo przy konflikcie, karta wraca do wykonawcy.",
+  "workflow.option.strict.title": "Praca jest aktualna względem gałęzi docelowej przed scaleniem",
   "workflow.option.style.desc": "Jak praca karty jest scalana do gałęzi docelowej.",
   "workflow.option.style.title": "Sposób scalania",
   "workflow.option.target.desc": "Gałąź docelowa. Puste pole oznacza domyślną gałąź repozytorium.",
