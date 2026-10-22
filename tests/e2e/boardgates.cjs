@@ -3,7 +3,7 @@
 // Reason (optional), Move Anyway), and Move Anyway records the override and shows its mark with who, which rules and why
 // (S16's user part); Cancel leaves the card where it was, nothing recorded; a drag to Review with nothing to submit is
 // refused with the refusal's sentences and the card stays; the card dialog's Column moved part of the way says where the
-// card is (HR3's #1275 round 1); Move to Doing's Assign and start on a blocked card asks too, Cancel doing nothing (no
+// card is (HR3's #1275 round 1); Move to Active's Assign and start on a blocked card asks too, Cancel doing nothing (no
 // agent started) and Move Anyway starting it with one override and its reason (round 1); in a project with every rule
 // off (S39), nothing asks and a column its rules don't have (Review) takes no drop. Screenshots of the question and the
 // mark in both themes, and the question in Polish. Dev build, fake Claude Code, throwaway profile and workspace.
@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
     // --- A drag to Done with no merge asks; Move Anyway records the override, and the card shows its mark.
     const a = await create('Ship the names', 'alpha')
     await inv('tasks:move', a, 'doing', { agent: 'b1' })
-    check('the card starts with its agent (Move to Doing through the rules)', (await card(a))?.column === 'doing' && (await facts(a)).includes('Started'), JSON.stringify(await facts(a)))
+    check('the card starts with its agent (Move to Active through the rules)', (await card(a))?.column === 'doing' && (await facts(a)).includes('Started'), JSON.stringify(await facts(a)))
     await drag(a, 'Done')
     check('a drag to Done with no merge asks first', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
     const asked = (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
     await drag(b, 'Done')
     check('another drag past the rules asks', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
     await dialog.getByRole('button', { name: 'Cancel' }).click()
-    check('Cancel leaves the card where it was', !!(await lib.until(async () => (await dialog.count()) === 0 && (await column('Doing').locator(`.task-card[data-task="${b}"]`).count()) === 1, HUNG_MS)) && (await card(b))?.column === 'doing')
+    check('Cancel leaves the card where it was', !!(await lib.until(async () => (await dialog.count()) === 0 && (await column('Active').locator(`.task-card[data-task="${b}"]`).count()) === 1, HUNG_MS)) && (await card(b))?.column === 'doing')
     check('…with nothing recorded', JSON.stringify(await facts(b)) === JSON.stringify(before), JSON.stringify(await facts(b)))
 
     // --- A drag to Review with nothing to submit: refused for what no override makes true, said; the card stays.
@@ -136,7 +136,7 @@ const check = (name, ok, extra = '') => {
     check('a drag to Review with nothing to submit is refused, saying why', !!(await lib.until(async () => (await refusal.count()) > 0, HUNG_MS)))
     const said = (await refusal.first().innerText().catch(() => '')).replace(/\s+/g, ' ')
     check('…in its sentences: what, and what to do, the card named by its key', said.includes(`${(await card(b)).key} has no change to review`) && said.includes('Commit the work, then submit.'), said)
-    check('…and the card stays in Doing', (await card(b))?.column === 'doing' && (await column('Doing').locator(`.task-card[data-task="${b}"]`).count()) === 1)
+    check('…and the card stays in Active', (await card(b))?.column === 'doing' && (await column('Active').locator(`.task-card[data-task="${b}"]`).count()) === 1)
     await refusal.first().screenshot({ path: path.join(lib.WORK, 'boardgates-refused-dark.png') })
 
     // --- The card dialog's Column moved part of the way (HR3's #1275 round 1, finding 2): Todo → Review starts the card
@@ -148,21 +148,21 @@ const check = (name, ok, extra = '') => {
     await edit.waitFor({ timeout: HUNG_MS })
     await edit.locator('select:has(option[value="review"])').selectOption('review')
     await edit.getByRole('button', { name: 'Save', exact: true }).click()
-    const stoppedToast = page.locator('.toast', { hasText: 'stopped in Doing' })
-    check('the card dialog: a move stopped part way is said (stopped in Doing)', !!(await lib.until(async () => (await stoppedToast.count()) > 0, HUNG_MS)))
+    const stoppedToast = page.locator('.toast', { hasText: 'stopped in Active' })
+    check('the card dialog: a move stopped part way is said (stopped in Active)', !!(await lib.until(async () => (await stoppedToast.count()) > 0, HUNG_MS)))
     const dialogError = async () => (await edit.locator('.dialog-error').innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('…and the dialog says where the card is now, not where it was', !!(await lib.until(async () => (await dialogError()).includes('the card stays in Doing'), HUNG_MS)), await dialogError())
+    check('…and the dialog says where the card is now, not where it was', !!(await lib.until(async () => (await dialogError()).includes('the card stays in Active'), HUNG_MS)), await dialogError())
     check('…its Column shows it, as the board has it', (await edit.locator('select:has(option[value="review"])').inputValue()) === 'doing' && (await card(p))?.column === 'doing', `${await edit.locator('select:has(option[value="review"])').inputValue()} / ${(await card(p))?.column}`)
     await edit.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await edit.count()) === 0, HUNG_MS)
 
-    // --- Move to Doing's Assign and start on a blocked card (HR3's #1275 round 1, finding 1): it asks before anything
+    // --- Move to Active's Assign and start on a blocked card (HR3's #1275 round 1, finding 1): it asks before anything
     // is done; Cancel starts nothing, Move Anyway starts it with one override and the reason.
     const s = await create('Start the design', 'alpha')
     await inv('tasks:update', s, { blocked: 'Needs a design decision' })
-    const doingDialog = page.locator('.dialog', { hasText: 'to Doing' }).filter({ has: page.locator('label.choice') })
+    const doingDialog = page.locator('.dialog', { hasText: 'to Active' }).filter({ has: page.locator('label.choice') })
     const assignAndStart = async () => {
-      await drag(s, 'Doing')
+      await drag(s, 'Active')
       await doingDialog.waitFor({ timeout: HUNG_MS })
       await doingDialog.locator('label.choice', { hasText: 'Assign and start' }).first().click()
       await doingDialog.locator('label.choice', { has: page.locator('strong', { hasText: /^\s*B1$/ }) }).click()
@@ -170,7 +170,7 @@ const check = (name, ok, extra = '') => {
     }
     const live = async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === 'b1')
     await assignAndStart()
-    const startAsk = page.locator('.dialog', { hasText: 'to Doing anyway?' })
+    const startAsk = page.locator('.dialog', { hasText: 'to Active anyway?' })
     check('Assign and start on a blocked card asks first', !!(await lib.until(async () => (await startAsk.count()) === 1, HUNG_MS)))
     const startAsked = (await startAsk.innerText().catch(() => '')).replace(/\s+/g, ' ')
     check('…naming the rule it skips by its name', /This skips a rule of its project:/.test(startAsked) && !startAsked.includes('start.notBlocked'), startAsked)
@@ -179,7 +179,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await startAsk.count()) === 0, HUNG_MS)
     await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel.
     check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && !(await live()), JSON.stringify({ column: (await card(s))?.column, facts: await facts(s) }))
-    // The Move to Doing dialog may still be open behind it (the start didn't happen): close it.
+    // The Move to Active dialog may still be open behind it (the start didn't happen): close it.
     if (await doingDialog.count()) await doingDialog.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await doingDialog.count()) === 0, HUNG_MS)
     await assignAndStart()

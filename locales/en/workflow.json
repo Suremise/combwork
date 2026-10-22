@@ -515,6 +515,14 @@
     "defaultMessage": "Warn when a commit includes another agent’s files",
     "description": "A workflow option (glossary 2.6, G16)."
   },
+  "workflow.option.stageNames.desc": {
+    "defaultMessage": "Rename any stage the board shows. A name is only a name: renaming a stage changes no rule and applies at once.",
+    "description": "What the workflow option “Stage names” does (glossary 2.2: stage)."
+  },
+  "workflow.option.stageNames.title": {
+    "defaultMessage": "Stage names",
+    "description": "A workflow option (glossary 2.6, N5; glossary 2.2: stage): your own names for the board’s stages."
+  },
   "workflow.option.stopOwnRuns.desc": {
     "defaultMessage": "A card goes to review only once its builder’s own runs and background commands have stopped.",
     "description": "What the workflow option “Agents stop what they started before review” does."
@@ -1111,9 +1119,49 @@
     "defaultMessage": "A verdict follows a review",
     "description": "A rule of the workflow, named where a move skips or can't check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict)."
   },
-  "workflow.stage": {
-    "defaultMessage": "{stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} done {Done} other {{stage}}}",
-    "description": "A stage of the board, named in a refusal (glossary 2.2: On Hold, Todo, Active, Review, Approved, Merging, Done): translate each as the glossary does."
+  "workflow.stage.active": {
+    "defaultMessage": "Active",
+    "description": "A stage of the board (glossary 2.2: Active, was Doing): cards being worked on."
+  },
+  "workflow.stage.approved": {
+    "defaultMessage": "Approved",
+    "description": "A stage of the board (glossary 2.2: Approved, was Passed): cards whose work passed review (or your OK) and isn’t merged yet."
+  },
+  "workflow.stage.done": {
+    "defaultMessage": "Done",
+    "description": "A stage of the board (glossary 2.2: Done): cards whose work is merged, or accepted."
+  },
+  "workflow.stage.hold": {
+    "defaultMessage": "On Hold",
+    "description": "A stage of the board (glossary 2.2: On Hold): parked cards nobody picks up until the user moves them on."
+  },
+  "workflow.stage.merging": {
+    "defaultMessage": "Merging",
+    "description": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Hive's merge queue."
+  },
+  "workflow.stage.review": {
+    "defaultMessage": "Review",
+    "description": "A stage of the board (glossary 2.2: Review): cards waiting for, or in, review."
+  },
+  "workflow.stage.todo": {
+    "defaultMessage": "Todo",
+    "description": "A stage of the board (glossary 2.2: Todo): cards not started."
+  },
+  "workflow.stageName.control": {
+    "defaultMessage": "The name of {stage} has a character that can’t be shown (a line break or a tab).",
+    "description": "Why workflow options cannot be saved: a stage’s name has a control character. {stage} is the stage’s default name (glossary 2.2)."
+  },
+  "workflow.stageName.duplicate": {
+    "defaultMessage": "The name of {stage} is already another stage’s name.",
+    "description": "Why workflow options cannot be saved: two stages would have the same name. {stage} is the default name of the stage renamed (glossary 2.2)."
+  },
+  "workflow.stageName.empty": {
+    "defaultMessage": "The name of {stage} can’t be empty: remove it to use the default name.",
+    "description": "Why workflow options cannot be saved: a stage was given an empty name. {stage} is the stage’s default name (glossary 2.2)."
+  },
+  "workflow.stageName.long": {
+    "defaultMessage": "The name of {stage} is longer than {max, number} characters.",
+    "description": "Why workflow options cannot be saved: a stage’s name is too long. {stage} is the stage’s default name (glossary 2.2), {max} the most characters it takes."
   },
   "workflow.unreadable.branch": {
     "defaultMessage": "the branch checked out in {folder}",

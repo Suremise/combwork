@@ -267,7 +267,7 @@ const ancestor = (x, y) => {
     const one = await round(c1, 'one.txt', { merge: 'wait' })
     check("the queue tests One's merge (its check is running)", !!(await waitHung(() => fs.existsSync(fx.started))))
     const k1 = await keyOf(c1)
-    await shoot('2-one-testing', 'merges', async () => (await queueText()).includes(`${k1} + main`) && (await onBoard('Passed', c1)))
+    await shoot('2-one-testing', 'merges', async () => (await queueText()).includes(`${k1} + main`) && (await onBoard('Approved', c1)))
     const held = await intent('b1', c2, 'start')
     check('…Two still waits while One is merging', held.status === 409, JSON.stringify(held.body))
     const waiting = await waitHung(async () => ((await laneNow(a?.id))?.status?.reason === 'merging' ? (await laneNow(a.id)).status : null))
@@ -281,7 +281,7 @@ const ancestor = (x, y) => {
     const s2 = await start(c2)
     const base2 = git(alpha, 'merge-base', 'main', git(wt, 'rev-parse', 'HEAD'))
     check("only then does Two start; its base is the new merge base (One's revision, in main)", s2.s.status === 200 && s2.base === base2 && s2.base === one.rev, JSON.stringify(s2))
-    await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Doing', c2)))
+    await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Active', c2)))
 
     // --- Two: main moves while it is in review; strict brings it up to date on the queue's own ref.
     const two = await round(c2, 'two.txt', { meanwhile: () => userCommit('meanwhile.txt', 'meanwhile\n', 'the user commits on main') })
@@ -300,7 +300,7 @@ const ancestor = (x, y) => {
     check('Three is returned: notUpToDate, naming a.txt; nothing merged', back?.data?.reason === 'notUpToDate' && JSON.stringify(back.data.files) === '["a.txt"]' && head() === atThree, JSON.stringify(back))
     check("…B1's worktree untouched", untouched(three.was) && (await factsOf(c3, 'Updated')).length === 0, JSON.stringify(worktreeNow()))
     const k3 = await keyOf(c3)
-    await shoot('4-three-returned', 'merges', async () => (await queueText()).includes(`${k3} returned`) && (await onBoard('Doing', c3)))
+    await shoot('4-three-returned', 'merges', async () => (await queueText()).includes(`${k3} returned`) && (await onBoard('Active', c3)))
     // B1 brings its line up to date in its own worktree (its side kept), checks and submits again; the review passes.
     git(wt, 'merge', '-q', '-X', 'ours', '-m', 'main in', 'main')
     const resumed = await round(c3, 'a.txt', { commitIt: false })
@@ -330,7 +330,7 @@ const ancestor = (x, y) => {
     const s5 = await start(c5)
     check('Five starts on the moved branch: its base is main', s5.s.status === 200 && s5.base === main4, JSON.stringify(s5))
     const k5 = await keyOf(c5)
-    await shoot('6-four-squashed', 'lanes', async () => (await onBoard('Done', c4)) && (await onBoard('Doing', c5)))
+    await shoot('6-four-squashed', 'lanes', async () => (await onBoard('Done', c4)) && (await onBoard('Active', c5)))
 
     // --- Five: only its own work; squash-merged; the branch moved again; the lane ends verified.
     await round(c5, 'five.txt', { merge: 'wait' })

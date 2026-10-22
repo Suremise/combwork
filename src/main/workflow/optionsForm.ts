@@ -14,13 +14,16 @@ import { HiveError } from '../hiveError'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
-import { englishText, type Text } from '../../shared/advanced'
-import { CONTRADICTIONS, NOT_OFFERED, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import type { Text } from '../../shared/advanced'
+import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
+import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import type { ProjectStages, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import { compile, mustCompile } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
-import { checkOptions, resolvedOf, resolveOptions, type OptionLevels } from './rulesets'
+import { checkOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
 import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { queueChanged } from './queueHost'
@@ -107,30 +110,58 @@ export async function workflowSummary(ws: WorkspaceService, projectPath: string)
   const r = resolvedOf(ws, p.path, p.platform.id, cfg)
   const from: Record<string, string[]> = {}
   for (const [k, o] of Object.entries(r.origins)) if (o !== 'platform' && k !== 'platform') (from[o] ??= []).push(k)
-  const { platform, ...options } = r.options
-  return { platform, preset: cfg.workflow?.platform === platform ? cfg.workflow.preset : null, enforced: workflowEnforced(), options, setBy: from, ...(r.invalid ? { invalid: r.invalid } : {}) }
+  const { platform, stageNames, ...options } = r.options
+  // The stages the board shows, each with its category id (what agents move cards by) and the user's name for it (#1417).
+  const compiled = compile(r.options)
+  const stages = stagesOf(compiled.ok ? compiled.ruleset : mustCompile(allOff(platform)), stageNames).map((s) => ({ id: s.id, category: s.category, name: s.name }))
+  return { platform, preset: cfg.workflow?.platform === platform ? cfg.workflow.preset : null, enforced: workflowEnforced(), options, stages, setBy: from, ...(r.invalid ? { invalid: r.invalid } : {}) }
+}
+
+/**
+ * The project's stages as its options in force produce them (§16.5.2), and its own names for them (N5): what the board
+ * and the other views name stages by (#1417). Null while its version control isn't recorded.
+ */
+export async function projectStages(ws: WorkspaceService, projectPath: string): Promise<ProjectStages | null> {
+  const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
+  if (!p?.platform) return null
+  const cfg = await ws.projectConfig(p.path)
+  const r = resolvedOf(ws, p.path, p.platform.id, cfg)
+  const compiled = compile(r.options)
+  return { stages: compiled.ok ? compiled.ruleset.stages : mustCompile(allOff(p.platform.id)).stages, names: r.options.stageNames ?? {} }
 }
 
 /** A problem in English (the Assistant's tools, the log). */
-export const problemEnglish = (p: WorkflowProblem): string => (p.kind === 'bad' ? p.why : englishText(p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : NOT_OFFERED[p.id]))
+export const problemEnglish = (p: WorkflowProblem): string => problemText(p)
 
 /** A problem as text for the window (its message, in the user's language), or its English reason. */
-export const problemShown = (p: WorkflowProblem): Text => (p.kind === 'bad' ? { shown: p.why, english: p.why } : p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : NOT_OFFERED[p.id])
+export const problemShown = (p: WorkflowProblem): Text => problemShownOf(p)
 
 /** Checks a change's shape (it comes from the window or the API): a preset id and an object of options. */
 function shapeOf(change: unknown): WorkflowChange {
   const c = change as Partial<WorkflowChange> | null
   const presets: (PresetId | null)[] = ['solo', 'pair', 'team', 'pairAgent', null]
   if (!c || typeof c !== 'object' || !presets.includes(c.preset ?? null) || !c.options || typeof c.options !== 'object' || Array.isArray(c.options)) throw new HiveError({ lines: ['A workflow change is { preset, options }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
-  return { preset: c.preset ?? null, options: c.options }
+  return { preset: c.preset ?? null, options: keptNames(c.options) }
 }
+
+/** Options with each stage name (N5) as it is kept: trimmed. */
+export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
+  const names = options.stageNames
+  if (!names || typeof names !== 'object' || Array.isArray(names)) return options
+  return { ...options, stageNames: Object.fromEntries(Object.entries(names).map(([k, v]) => [k, typeof v === 'string' ? keptStageName(v) : v])) }
+}
+
+/** Whether a change of these options applies at once (#1417): only names (N5) changed, which aren't rules. */
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange) {
   const before = checkOptions(platform, levelsOf(ws, current))
   const after = checkOptions(platform, levelsOf(ws, change.options))
   const was = before.problems.length ? resolveOptions(platform, levelsOf(ws, current)).options : before.resolved.options
-  const changed = (Object.keys(after.resolved.options) as (keyof WorkflowOptions)[]).filter((k) => JSON.stringify(after.resolved.options[k]) !== JSON.stringify(was[k]))
+  // Every key either has: an optional option (the names, N5) set before and gone now is a change too.
+  const keys = [...new Set([...Object.keys(after.resolved.options), ...Object.keys(was)])] as (keyof WorkflowOptions)[]
+  const changed = keys.filter((k) => JSON.stringify(after.resolved.options[k]) !== JSON.stringify(was[k]))
   return { problems: after.problems, changed, options: after.resolved.options }
 }
 
@@ -154,8 +185,10 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const change = shapeOf(raw)
   const cfg = await ws.projectConfig(project.path)
   const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change)
-  const lanes = (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-  return { problems: c.problems, changed: c.changed, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length ? await cardsInFlight(ws, project) : [] }
+  // Names alone (N5) aren't rules: they apply at once, so no lane or card keeps old rules over them.
+  const appliesNow = namesOnly(c.changed)
+  const lanes = appliesNow ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
+  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [] }
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
@@ -180,9 +213,12 @@ export async function setWorkflowOptions(ws: WorkspaceService, projectPath: stri
     if (c.problems.length) throw new WorkflowRefused(c.problems)
     changed = c.changed
     const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
-    return { workflow: { platform: project.platform, preset: change.preset, options } }
+    return { workflow: writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }) }
   })
   log.info(`the workflow options of ${userText(project.name)} changed: ${changed.join(', ') || 'none'}`)
+  workflowChanged(ws, project.path)
+  // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
+  if (namesOnly(changed)) return workflowForm(ws, project.path)
   const applyTo = [...new Set(o.applyTo ?? [])]
   if (applyTo.length && changed.length) await applyToInFlight(ws, project, applyTo, changed)
   // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which

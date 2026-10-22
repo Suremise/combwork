@@ -92,6 +92,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   excluded: {
     title: msg({ id: 'workflow.option.excluded.title', defaultMessage: 'What the work is', description: 'A workflow option for a project without version control (glossary 2.6, N4).' }),
     desc: msg({ id: 'workflow.option.excluded.desc', defaultMessage: 'The whole project folder, apart from these folders and files (.hive always).', description: 'What the workflow option “What the work is” does: the folders and files listed are left out of a card’s work.' })
+  },
+  stageNames: {
+    title: msg({ id: 'workflow.option.stageNames.title', defaultMessage: 'Stage names', description: 'A workflow option (glossary 2.6, N5; glossary 2.2: stage): your own names for the board’s stages.' }),
+    desc: msg({ id: 'workflow.option.stageNames.desc', defaultMessage: 'Rename any stage the board shows. A name is only a name: renaming a stage changes no rule and applies at once.', description: 'What the workflow option “Stage names” does (glossary 2.2: stage).' })
   }
 }
 

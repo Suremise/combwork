@@ -130,6 +130,8 @@ interface HiveMessageValues {
   'workflow.option.sameness.title': undefined
   'workflow.option.sharedFolderWarning.desc': undefined
   'workflow.option.sharedFolderWarning.title': undefined
+  'workflow.option.stageNames.desc': undefined
+  'workflow.option.stageNames.title': undefined
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
   'workflow.option.strict.desc': undefined
@@ -279,7 +281,17 @@ interface HiveMessageValues {
   'workflow.rule.submit.trailer': undefined
   'workflow.rule.verdict.currentSubmission': undefined
   'workflow.rule.verdict.reviewing': undefined
-  'workflow.stage': { stage: string }
+  'workflow.stage.active': undefined
+  'workflow.stage.approved': undefined
+  'workflow.stage.done': undefined
+  'workflow.stage.hold': undefined
+  'workflow.stage.merging': undefined
+  'workflow.stage.review': undefined
+  'workflow.stage.todo': undefined
+  'workflow.stageName.control': { stage: string | number }
+  'workflow.stageName.duplicate': { stage: string | number }
+  'workflow.stageName.empty': { stage: string | number }
+  'workflow.stageName.long': { stage: string | number; max: number }
   'workflow.unreadable.branch': { folder: string | number }
   'workflow.unreadable.branchedOff': { a: string | number; b: string | number }
   'workflow.unreadable.branchedOffTarget': undefined

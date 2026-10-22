@@ -95,7 +95,7 @@
   "board.column.hold": "保留",
   "board.column.holdDescription": "一時保留中です。「未着手」に移動するまで、誰も取りかかりません。ここにカードを置けるのは自分とアシスタントだけです。",
   "board.column.passed": "承認済み",
-  "board.column.passedDescription": "レビューに合格し、マージを待っています。合格したカードはレビュアーがここに移動します。",
+  "board.column.passedDescription": "作業がレビューに合格し（またはあなたの承認を得て）、マージを待っています。合格したカードはレビュアーがここに移動します。",
   "board.column.review": "レビュー",
   "board.column.reviewDescription": "作業が終わり、レビューを待っています。",
   "board.column.todo": "未着手",

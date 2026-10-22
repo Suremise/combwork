@@ -7,7 +7,8 @@ import { fmt, setLanguage, tr } from '../../src/shared/i18n'
 import type { Msg } from '../../src/shared/i18n/msg'
 import { availableLanguages, loadCatalogue } from '../../src/shared/i18n/catalogues'
 import { REFUSALS, refusal, refusalLines, type RefusalFormat, type RefusalValues, type RuleId } from '../../src/shared/workflow/refusals'
-import { FOR_YOU, MOVE_NAMES, RULE_NAMES, STAGE_NAME, UNREADABLE, workflowEnglish, workflowLine, workflowText } from '../../src/shared/workflow/texts'
+import { FOR_YOU, MOVE_NAMES, RULE_NAMES, UNREADABLE, workflowEnglish, workflowLine, workflowText } from '../../src/shared/workflow/texts'
+import { STAGE_TEXT } from '../../src/shared/workflow/stages'
 import { unknown } from '../../src/main/platform/types'
 import { GUARDS } from '../../src/shared/workflow/pieces'
 import { B1, commit, moved, setup, type Env } from './harness'
@@ -94,7 +95,7 @@ describe('the workflow text in every locale', () => {
     const de = await loadCatalogue('de')
     setLanguage('de', de, 'de')
     const shown = refusalLines('move.notFromHere', SAMPLE, WINDOW)
-    expect(shown.message).toContain(tr(STAGE_NAME, { stage: 'approved' }))
+    expect(shown.message).toContain(tr(STAGE_TEXT.approved))
     expect(shown.message).toContain(tr(MOVE_NAMES['start review']))
     expect(shown.next).toContain(tr(MOVE_NAMES.submit))
     expect(refusalLines('move.needsOverride', SAMPLE, WINDOW).message).toContain(tr(RULE_NAMES['submit.checksPassed']))
@@ -105,14 +106,14 @@ describe('the workflow text in every locale', () => {
     for (const code of ['en', ...LOCALES]) {
       if (code !== 'en') setLanguage(code, await loadCatalogue(code), code)
       const next = refusalLines('move.noStage', SAMPLE, WINDOW).next
-      for (const stage of ['todo', 'active', 'done']) expect(next, `${code} ${stage}`).toContain(tr(STAGE_NAME, { stage }))
+      for (const stage of ['todo', 'active', 'done'] as const) expect(next, `${code} ${stage}`).toContain(tr(STAGE_TEXT[stage]))
       if (code !== 'en') expect(next, code).not.toMatch(/\btodo\b|\bactive\b/)
     }
   })
 
   it('names every guard, move and stage for the window', () => {
     for (const id of Object.keys(GUARDS)) expect(RULE_NAMES[id], id).toBeDefined()
-    for (const stage of ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']) expect(tr(STAGE_NAME, { stage })).not.toBe(stage)
+    for (const stage of ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done'] as const) expect(tr(STAGE_TEXT[stage])).not.toBe(stage)
   })
 })
 

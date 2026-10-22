@@ -248,7 +248,7 @@
     "description": "A tip's title."
   },
   "tips.board.text": {
-    "defaultMessage": "Cards in On Hold, Todo, Doing, Review, Passed and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",
+    "defaultMessage": "Cards in On Hold, Todo, Active, Review, Approved and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.board.title": {
@@ -272,19 +272,19 @@
     "description": "A tip's title."
   },
   "tips.boardDoing.text": {
-    "defaultMessage": "Drag a card into Doing and Hive asks: nobody yet, an agent without starting anything, or an agent that starts on it now.",
+    "defaultMessage": "Drag a card into Active and Hive asks: nobody yet, an agent without starting anything, or an agent that starts on it now.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardDoing.title": {
-    "defaultMessage": "Choose who works on a card in Doing",
+    "defaultMessage": "Choose who works on a card in Active",
     "description": "A tip's title."
   },
   "tips.boardDone.text": {
-    "defaultMessage": "A reviewer moves a card that passes its review to Passed; Done means merged, and an agent moves its cards there after merging its work. Say \"merged, move #65 to done\" and it does; the card's history shows who moved it.",
+    "defaultMessage": "A reviewer moves a card that passes its review to Approved; Done means merged, and an agent moves its cards there after merging its work. Say \"merged, move #65 to done\" and it does; the card's history shows who moved it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardDone.title": {
-    "defaultMessage": "Passed, then Done once merged",
+    "defaultMessage": "Approved, then Done once merged",
     "description": "A tip's title."
   },
   "tips.boardExport.text": {
@@ -320,7 +320,7 @@
     "description": "A tip's title."
   },
   "tips.boardReview.text": {
-    "defaultMessage": "Say \"review #87\" to another agent: the card stays in Review with the agent that did the work, shows who is reviewing it, and gets the verdict as a comment. When it passes, the reviewer moves it to Passed.",
+    "defaultMessage": "Say \"review #87\" to another agent: the card stays in Review with the agent that did the work, shows who is reviewing it, and gets the verdict as a comment. When it passes, the reviewer moves it to Approved.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardReview.title": {
@@ -334,6 +334,14 @@
   "tips.boardSetAside.title": {
     "defaultMessage": "Cards made by an older Hive",
     "description": "A tip's title."
+  },
+  "tips.boardStages.text": {
+    "defaultMessage": "Ask the Assistant to rename a stage of a project’s board, such as “call Active Building in web”. A name is only a name: it changes no rule, applies at once, and agents keep using the ids.",
+    "description": "A tip (glossary 2.2: stage). Active is a board column: use its name as the board shows it. The quoted request is what the user would ask the Assistant: translate it."
+  },
+  "tips.boardStages.title": {
+    "defaultMessage": "Name the board’s stages your way",
+    "description": "A tip's title (glossary 2.2: stage)."
   },
   "tips.boardUpgrade.text": {
     "defaultMessage": "Hive keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Hive can change it again.",

@@ -1466,11 +1466,31 @@ category the options don't use is hidden. The options produce the stages (§16.6
 | Active | Active | Always. |
 | Review | Review | A reviewer or the user's approval is required (G1/N1 not "No review"). |
 | Approved | Approved | Review exists and something follows it (a merge, or an approval before merging). |
+| Approved | Approved | Your OK before merging (G10) is asked, with or without review, and a merge follows [#1417, decided]. |
 | Merging | Approved | Hive merges (G5). Shown while the card is in the queue. |
 | Done | Done | Always. |
 
 A stage the options no longer produce stays visible while any card is in it (§16.17). Stage ids are stable strings (`active`, `review`, `approved`, `merging`…), the names messages. The panel and board
 keep the category's colour and pattern; hovers and accessible names use the stage name [#1122 c].
+
+**Built [#1417]:** the stage model is `src/shared/workflow/stages.ts`, which every view that names a stage reads
+(`stagesOf`, `stageName`, `stageOf`, `stagesShown`; IPC `workflow:stages`, with a `workflow-changed` event whenever a
+project's workflow is written). The stages are the ruleset's, compiled as the table says (decided on #1417): Review
+with any review; Approved when a review or your OK before merging (G10) approves the work and something follows it: in
+Git a merge (Hive merges, the agent merges, or Not checked), in None your OK after the reviewer agent (N1's "a reviewer
+agent, then you"); Merging when Hive merges. Committed is done has nothing after its review, and with neither a review
+nor G10 there is no Approved (the agent merging comes from Active). Before #1417 the engine gave None no Approved and gave "the agent merges"
+Approved without a review; 1.0 wasn't released, so no stored ruleset keeps that. A card keeps the stages of its own
+ruleset; a stage no longer produced is shown while a card is in it.
+**Names aren't rules** (N5, OP-30): `stageNames` is resolved global → workspace → project like the options, but left
+out of the compiled ruleset and its hash, so a rename never marks anything old rules and applies at once
+(`workflow:check` says `appliesNow`, removing the last rename too). Each name is trimmed, at most 24 characters, has no
+control character and differs (ignoring case) from every other stage's name, produced or not (a stage kept for a card
+under old rules is shown too): its rename, else its default name in English and in the language Hive shows (so Active
+can't be called *Erledigt* while Hive is in German); a bad one is refused with its reason. Categories keep their names:
+renaming the Active stage leaves the category Active. The user's names are for the user's side (the window, the
+project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
+**Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.
 
 #### 16.5.3 The piece library
 
@@ -1667,7 +1687,11 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 #### 16.6.6 Where options live
 
 - **Storage** (OP-5): the project's options in `project.json` (`workflow: { platform, preset, options }`), written with
-  `workspace.mutateProjectConfig()`; workspace defaults in `workspace.json`, global defaults in config — resolved
+  `workspace.mutateProjectConfig()`; **[#1417]** `workflow` also keeps `kept` (the other platforms' preset, options and
+  answer, #1419) and `presetAsked` (the answer to "How do you work?" for the platform in force, #1423), and has **one
+  writer**: `writeWorkflow` (`src/shared/workflow/projectWorkflow.ts`) sets the platform, preset and options and keeps
+  every other field, for the form's Save, presets and Paste and for `hive_update_setting`; `kept` and `presetAsked` are
+  written by helpers beside it, never by replacing the object; workspace defaults in `workspace.json`, global defaults in config — resolved
   global → workspace → project like other settings (§5; `loopRounds` resolves project → workspace → constant today,
   `src/shared/lanes.ts:58`) [note §11]. An option unset at a level inherits. **Built [#1263]:** the global and
   workspace defaults are per platform (`workflow: { git: {…}, none: {…} }` in Hive's config and in `workspace.json`),

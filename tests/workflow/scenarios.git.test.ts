@@ -38,6 +38,48 @@ async function approved(e: Env, title?: string, files?: Record<string, string>) 
   return c
 }
 
+describe('the agent merges with no review and no OK before merging (no Approved stage, #1417)', () => {
+  const noReview = () => agentMerges({ review: 'none', noSelfReview: false })
+  const inItsStages = (e: Env, card: { key: string; id: number }) => expect(e.wf.rulesetOf(e.wf.store.card(card.id)).stages.map((x) => x.id)).toContain(e.wf.state(e.wf.store.card(card.id)).stage)
+
+  it('submit leaves it in Active waiting for the merge; a report before merging is refused, after it Done; never a stage its rules lack', async () => {
+    const e = noReview()
+    expect(e.wf.currentRuleset(false).stages.map((x) => x.id)).toEqual(['hold', 'todo', 'active', 'done'])
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    expect(e.wf.state(card).stage).toBe('active')
+    inItsStages(e, card)
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('merge it and report the merge'))).toBe(true)
+    // The same revision again is a duplicate while it waits, as in Approved.
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'submit.notDuplicate')
+    refusedBy(await e.wf.reportMerge(card.key, B1), 'done.contained')
+    inItsStages(e, card)
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', `merge ${card.key}`, e.wf.state(card).approved!.revision!)
+    moved(await e.wf.reportMerge(card.key, B1))
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  it('a merge outside Hive while it waits in Active is found and makes it Done', async () => {
+    const e = noReview()
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', `merge ${card.key}`, e.wf.state(card).approved!.revision!)
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.wf.state(card).integrated).toBeTruthy()
+  })
+
+  it('with your OK before merging (G10) it waits in Approved for the OK, as before', async () => {
+    const e = noReview()
+    e.options.okBefore = { mode: 'every', labels: [] }
+    expect(e.wf.currentRuleset(false).stages.map((x) => x.id)).toContain('approved')
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    expect(e.wf.state(card).stage).toBe('approved')
+    expect(e.wf.state(card).requests).toEqual([expect.objectContaining({ gate: 'okBefore', stage: 'approved' })])
+  })
+})
+
 describe('workflow scenarios, Git', () => {
   it('S1: uncommitted changes refuse submit with the next step; the card stays Active', async () => {
     const e = pair()

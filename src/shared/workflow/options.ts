@@ -7,6 +7,7 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'
+import type { StageId } from './facts'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
@@ -67,7 +68,16 @@ export interface WorkflowOptions {
   excluded: string[]
   /** The command of each named check (G3, G9, N3): a run counts as a check only as that command (§16.13). */
   commands: Record<string, string>
+  /**
+   * N5: the project's own names for its stages (OP-30), resolved like the other options; a stage it doesn't name keeps
+   * its default. Names aren't rules: left out of the compiled ruleset and its hash (compile.ts), so a rename applies at
+   * once and never marks anything "old rules" (#1417). Checked by `stageNameProblems` (stages.ts) when saved.
+   */
+  stageNames?: Partial<Record<StageId, string>>
 }
+
+/** The options that are names, not rules (#1417): left out of a ruleset, so changing them alone applies at once. */
+export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
 
 /**
  * The presets: Solo, Pair and Team (§16.6.3), and P4's Pair, in which the agent merges (`pairAgent`, §16.19.1), kept
@@ -255,8 +265,12 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   slotsUpToDate: bool,
   sharedFolderWarning: bool,
   excluded: strings,
-  commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string')
+  commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string'),
+  stageNames: (v) => isRecord(v) && Object.entries(v).every(([k, x]) => (STAGE_IDS as readonly string[]).includes(k) && typeof x === 'string')
 }
+
+/** The stage ids a project may name (N5), as stages.ts orders them (kept here so options.ts needs nothing of it). */
+const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']
 
 /** Whether a value is one its option takes (false for anything that isn't an option). */
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)

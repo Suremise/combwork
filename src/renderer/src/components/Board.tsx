@@ -1473,7 +1473,7 @@ export function BoardView() {
           {tr(TASK_BOARD)}
           {project !== null && <span className="faint"> · {project || tr(msg({ id: 'board.view.workspaceCards', defaultMessage: 'workspace cards', description: "After the Task Board's title when the sidebar shows the cards of no project (about the whole workspace). Lower case." }))}</span>}
         </h1>
-        <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.', description: 'Under the Task Board\'s title. Review and Passed are board columns.' }))}</span>
+        <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Approved.', description: 'Under the Task Board\'s title. Review and Approved are board columns.' }))}</span>
       </div>
       <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
       <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />
@@ -1536,7 +1536,7 @@ export function BoardPanel() {
           <>
             <div className="section-header">
               {tr(STALLED)} <span className="count">{stalled.length}</span>
-              <InfoTip text={tr(msg({ id: 'board.panel.stalledInfo', defaultMessage: "Cards in Doing that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Doing or Review that an agent in a card loop left without waiting on them.", description: "The (i) beside the Board sidebar's Stalled heading. Doing and Review are board columns." }))} />
+              <InfoTip text={tr(msg({ id: 'board.panel.stalledInfo', defaultMessage: "Cards in Active that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Active or Review that an agent in a card loop left without waiting on them.", description: "The (i) beside the Board sidebar's Stalled heading. Active and Review are board columns." }))} />
             </div>
             {stalled.map((c) => (
               <Tooltip key={c.number} block content={cardStalled(projects, c, laneOf(c)) ?? ''}>
@@ -2330,7 +2330,7 @@ export function TaskStartDialog() {
         </>
       }
     >
-      <p style={{ marginTop: 0 }}>{tr(msg({ id: 'board.start.intro', defaultMessage: 'The agent gets the card as its prompt (title and description), and the card moves to Doing. A stopped agent starts a new conversation; an idle one gets it as its next message.', description: 'At the top of the Start dialog. Doing is a board column.' }))}</p>
+      <p style={{ marginTop: 0 }}>{tr(msg({ id: 'board.start.intro', defaultMessage: 'The agent gets the card as its prompt (title and description), and the card moves to Active. A stopped agent starts a new conversation; an idle one gets it as its next message.', description: 'At the top of the Start dialog. Active is a board column.' }))}</p>
       <StartChoices project={project} pick={pick} />
     </Modal>
   )
@@ -2427,11 +2427,11 @@ export function MoveToDoingDialog() {
       </div>
     </label>
   )
-  const label = action.error ? tr(TRY_AGAIN) : mode === 'start' ? tr(START) : tr(msg({ id: 'board.doing.button', defaultMessage: 'Move to Doing', description: 'The Move to Doing dialog\'s button: moves the card into the Doing column (a board column).' }))
+  const label = action.error ? tr(TRY_AGAIN) : mode === 'start' ? tr(START) : tr(msg({ id: 'board.doing.button', defaultMessage: 'Move to Active', description: 'The Move to Active dialog\'s button: moves the card into the Active column (a board column).' }))
 
   return (
     <Modal
-      title={tr(msg({ id: 'board.doing.title', defaultMessage: 'Move {card} to Doing', description: 'Title of the Move to Doing dialog: {card} is the card\'s name: its key, such as AM-12, or #12 for a card with none. Doing is a board column.' }), { card: cardLabel(card) })}
+      title={tr(msg({ id: 'board.doing.title', defaultMessage: 'Move {card} to Active', description: 'Title of the Move to Active dialog: {card} is the card\'s name: its key, such as AM-12, or #12 for a card with none. Active is a board column.' }), { card: cardLabel(card) })}
       icon="arrow-right"
       onClose={close}
       busy={!!action.busy}

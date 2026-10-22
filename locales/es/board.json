@@ -95,7 +95,7 @@
   "board.column.hold": "En espera",
   "board.column.holdDescription": "Aparcadas: nadie las toma hasta que pasan a Pendiente. Solo tú y el Asistente ponen tarjetas aquí.",
   "board.column.passed": "Aprobado",
-  "board.column.passedDescription": "Aprobada en la revisión, a la espera de fusionarse. Un revisor pasa aquí una tarjeta cuando se aprueba.",
+  "board.column.passedDescription": "Su trabajo superó la revisión (o tiene tu aprobación) y espera a fusionarse. Un revisor pasa aquí una tarjeta cuando se aprueba.",
   "board.column.review": "Revisión",
   "board.column.reviewDescription": "Trabajo hecho, a la espera de su revisión.",
   "board.column.todo": "Pendiente",

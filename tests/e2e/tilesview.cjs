@@ -9,7 +9,7 @@
 // order: a tile dragged onto another swaps them, onto a page button goes to that page's end, and Move Agent Left/Right
 // (the keys, an override without modifiers, the tile's menu) move the tile the keyboard is on, other shortcuts and chords
 // still working there; the order is saved and the panes show it; By urgency, no tile drags. The strip's card chips (#1021):
-// each agent's card (Doing, reviewing, held in Review or Passed) in its column's colour, blocked red, a long name cut
+// each agent's card (Active, reviewing, held in Review or Approved) in its column's colour, blocked red, a long name cut
 // before its chip, the chips in line, the status without the chip's number, a click opening the card; its edge resizes
 // it (within its bounds, saved, kept after a restart, double-click resets). Throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy.
@@ -353,7 +353,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('ArrowRight')
     check('an unbound → still moves the keyboard to the next tile (E), the order unchanged', !!(await lib.until(async () => (await focusedTile()) === 'E', HUNG_MS)) && saved() === order(f6), `${await focusedTile()} / ${saved()}`)
 
-    // --- The strip's card chips (#1021): what each agent works on (Doing), reviews, or holds in Review or Passed, tinted
+    // --- The strip's card chips (#1021): what each agent works on (Active), reviews, or holds in Review or Approved, tinted
     // with the column the card is in (blocked: red); a long name ends in an ellipsis before its chip, the chips in a
     // column; the status drops the number the chip shows; a click opens the card.
     const LONG = 'A builder with a really long name for the strip'
@@ -386,10 +386,10 @@ const check = (name, ok, extra = '') => {
     }
     check("…A's is the reviewer's chip (the eye)", (await chipInfo('A'))?.review && (await row('A').locator('.tile-strip-chip .codicon-eye').count()) === 1)
     const blocked = await chipInfo('E')
-    check("…E's blocked card: red, and said so", blocked?.blocked && blocked.col === 'var(--error)' && blocked.label === `Card ${L[blockedCard]}, Doing, blocked`, JSON.stringify(blocked))
-    check("…C's accessible name: the card and its column", (await chipInfo('C'))?.label === `Card ${L[passedCard]}, Passed`, (await chipInfo('C'))?.label)
+    check("…E's blocked card: red, and said so", blocked?.blocked && blocked.col === 'var(--error)' && blocked.label === `Card ${L[blockedCard]}, Active, blocked`, JSON.stringify(blocked))
+    check("…C's accessible name: the card and its column", (await chipInfo('C'))?.label === `Card ${L[passedCard]}, Approved`, (await chipInfo('C'))?.label)
     check('…no card, no chip (F)', (await row('F').locator('.card-chip').count()) === 0)
-    check("…A's status drops the number its chip shows: Waiting → Passed", (await row('A').locator('.tile-strip-status').innerText()) === 'Waiting → Passed', await row('A').locator('.tile-strip-status').innerText())
+    check("…A's status drops the number its chip shows: Waiting → Approved", (await row('A').locator('.tile-strip-status').innerText()) === 'Waiting → Approved', await row('A').locator('.tile-strip-status').innerText())
     // The layout: the long name cut before its chip, never under it; the chips' right edges in a column.
     const layout = () =>
       page.locator('.tile-strip-row').evaluateAll((rows) =>

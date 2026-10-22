@@ -30,7 +30,7 @@
   "performance.cards.reviewer": "Reviewer",
   "performance.cards.rounds": "Rounds",
   "performance.cards.roundsTip": "Review rounds: each failed review is one, and the one under way or passed the next. None before it first went to Review.",
-  "performance.cards.tip": "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Doing and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Hive's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.",
+  "performance.cards.tip": "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Active and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Hive's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.",
   "performance.cards.unknown": "+ {n, number} unknown",
   "performance.col.p50": "p50",
   "performance.col.p95": "p95",

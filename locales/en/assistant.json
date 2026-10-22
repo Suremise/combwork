@@ -1720,8 +1720,8 @@
     "description": "Why a template can't be loaded into this project: it has more agents than the project allows. Keep the setting's path as Settings shows it."
   },
   "assistant.templateLoad.afterLoad": {
-    "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Doing ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
-    "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Doing and Todo as Hive names them."
+    "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
+    "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Active and Todo as Hive names them."
   },
   "assistant.templateLoad.branchKeptTitle": {
     "defaultMessage": "{count, plural, one {An old worktree's branch was kept} other {# old worktrees' branches were kept}}",

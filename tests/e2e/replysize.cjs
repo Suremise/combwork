@@ -327,7 +327,8 @@ const prose = (seed, n) => {
   // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
   const compactList = measure('hive_list_settings (query)', tool('hive_list_settings', { query: 'compact' }, 'assistant'), 1800)
   check('query narrows it, saying what each does', compactList.split('\n').length <= 11 && /^assistant\.compactSuggestTokens = 500000 · Highlight Compact over: Context size/m.test(compactList), compactList)
-  const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3000)
+  // 3,100 since #1417's project.workflow.stageNames (one line, about 50 characters).
+  const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3100)
   check("a project's own settings, inheriting", /^project\.transcriptWarnMB = inherit · Warn when a transcript is over$/m.test(projectList), projectList.slice(0, 300))
   const one = measure('hive_read_setting', tool('hive_read_setting', { id: 'sessions.transcriptWarnMB' }, 'assistant'), 1500)
   check('a setting in full: where, what it takes, when it helps', one.includes('Where: Settings → Sessions → Warn when a transcript is over.') && /When it helps: /.test(one), one)

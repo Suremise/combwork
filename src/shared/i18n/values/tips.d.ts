@@ -85,6 +85,8 @@ interface HiveMessageValues {
   'tips.boardReview.title': undefined
   'tips.boardSetAside.text': undefined
   'tips.boardSetAside.title': undefined
+  'tips.boardStages.text': undefined
+  'tips.boardStages.title': undefined
   'tips.boardUpgrade.text': undefined
   'tips.boardUpgrade.title': undefined
   'tips.cardCost.text': { example: string | number }

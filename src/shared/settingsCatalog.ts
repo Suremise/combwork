@@ -20,6 +20,7 @@ import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvan
 import { language, msg } from './i18n'
 import { takesOption, type OptionKey } from './workflow/options'
 import { OPTION_TEXT, VALUE_TEXT } from './workflow/optionTexts'
+import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
@@ -741,7 +742,8 @@ function workflowRows(): Row[] {
     option('stopOwnRuns', 'boolean'),
     option('dependenciesDone', 'boolean'),
     option('sharedFolderWarning', 'boolean'),
-    option('excluded', 'custom')
+    option('excluded', 'custom'),
+    option('stageNames', 'custom')
   ]
 }
 
@@ -827,7 +829,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'assistant.mode': 'text',
   'project.defaultProvider': 'select',
   'project.worktreeCopy': 'text',
-  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
   ...Object.fromEntries(
     PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
@@ -1218,6 +1220,8 @@ function checkWorkflowValue(e: SettingEntry, kind: NonNullable<ReturnType<typeof
     v = e.workflow === 'reviewers' && hit ? Number(hit.value) : hit?.value
   } else if (kind === 'boolean') v = raw === 'on' || raw === 'true' ? true : raw === 'off' || raw === 'false' ? false : raw
   else if (kind === 'text' && typeof raw === 'string') v = raw.trim()
+  // A stage's name (N5) is kept trimmed (#1417).
+  if (e.workflow === 'stageNames' && v && typeof v === 'object' && !Array.isArray(v)) v = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' ? x.trim() : x]))
   if (v !== undefined && v !== 'inherit' && takesOption(e.workflow!, v)) return { value: v }
   return { error: `${e.title} takes ${workflowTakes(e, kind)}.` } // i18n-ignore: the Assistant's tools (English)
 }
@@ -1230,7 +1234,8 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
     commands: 'an object of check name → command, e.g. {"lint": "npm run lint"}', // i18n-ignore: the Assistant's tools (English)
     okBefore: 'an object {"mode": "never" | "labels" | "every", "labels": [...]}', // i18n-ignore: the Assistant's tools (English)
     identity: 'null (off) or {"name": ..., "email": ...}', // i18n-ignore: the Assistant's tools (English)
-    excluded: 'a list of folders and files left out of the work, e.g. ["node_modules"]' // i18n-ignore: the Assistant's tools (English)
+    excluded: 'a list of folders and files left out of the work, e.g. ["node_modules"]', // i18n-ignore: the Assistant's tools (English)
+    stageNames: 'an object of stage id → the name the user gives it, e.g. {"active": "Building"} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)' // i18n-ignore: the Assistant's tools (English)
   }
   const choices = (settingOptions(e) ?? []).filter((o) => o.value !== 'inherit').map((o) => o.value)
   const what = kind === 'boolean' ? 'true or false' : kind === 'select' ? `one of: ${choices.join(', ')}` : kind === 'text' ? `a branch name ("" for the repository's default branch)` : (shapes[e.workflow!] ?? 'a value') // i18n-ignore: the Assistant's tools (English)
@@ -1260,7 +1265,7 @@ export function settingPatch(
         const options: Record<string, unknown> = { ...cfg.workflow?.options }
         if (value === null) delete options[key]
         else options[key] = value
-        return { workflow: { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options } }
+        return { workflow: writeWorkflow(cfg.workflow, { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options }) }
       }
     }
   }

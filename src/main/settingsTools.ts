@@ -5,7 +5,7 @@ import { modelCaps } from '../shared/models'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
-import { checkOptions, problemText } from './workflow/rulesets'
+import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
@@ -211,6 +211,7 @@ export async function applySetting(
       if (e.workflow) checkWorkflowPatch(projectPath, patch)
       return patch
     })
+    if (e.workflow) workflowChanged(workspace, projectPath)
     return { old, new: settingValue(e, config.settings, next) }
   }
   if ('advanced' in change) {

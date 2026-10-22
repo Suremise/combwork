@@ -11,7 +11,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
@@ -422,7 +422,7 @@ export class Workflow {
       case 'todo':
         return ['start']
       case 'active':
-        return ['submit', 'put back'] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+        return ['submit', 'put back', ...(r && s && awaitsAgentMerge(r, s) ? ['report merge'] : [])] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       case 'review':
         return !o || reviewerAgent(o.review) ? ['start review', 'verdict'] : [] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       case 'approved':
@@ -771,7 +771,8 @@ export class Workflow {
     const s = w.state()
     if (!r || !s.latest || s.stale || s.requests.some((x) => x.gate === 'review' || x.gate === 'okBefore')) return
     const o = r.options
-    if (w.current === 'review' && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
+    const userReviews = w.current === 'review' || (w.current === 'approved' && o.finish === 'accept')
+    if (userReviews && reviewByYou(o.review) && !approvedByUser(s, 'review') && (o.review === 'you' || passingReviewers(s).length >= o.reviewers)) {
       this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: w.card.key }))
     } else if (w.current === 'approved' && this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore') && notApproved(s, r, w.card.labels)?.missing === 'userOk') {
       this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
@@ -861,7 +862,8 @@ export class Workflow {
         } else this.enqueue(w)
         return
       case 'agentMerges':
-        w.move('approved', 'derived')
+        // With no review and no OK before merging there is no Approved (§16.5.2): it waits for the merge in Active.
+        if (hasStage(r, 'approved')) w.move('approved', 'derived')
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         else this.wake(w, s.started?.builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
         return
@@ -926,7 +928,7 @@ export class Workflow {
     const g = await this.gatherSubmit(card, s, actor, args)
     if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
     // The same revision again: a new submission only with a note (§16.8.1).
-    const waiting = (from === 'review' || from === 'approved') && !g.s.stale
+    const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
     if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
 
     await this.cfg.hooks?.beforeWrite?.('submit')
@@ -1125,6 +1127,8 @@ export class Workflow {
       const now = w.state()
       if (passingReviewers(now).length < r.options.reviewers) return null
       if (reviewByYou(r.options.review) && !approvedByUser(now, 'review')) {
+        // None's "a reviewer agent, then you" (N1): your OK after the pass is asked in Approved (§16.5.2, #1417).
+        if (r.options.finish === 'accept' && hasStage(r, 'approved')) w.move('approved', 'derived')
         this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.passedReview, { card: card.key }))
         return null
       }
@@ -1220,7 +1224,7 @@ export class Workflow {
     if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // Only where the builder merges (or nothing is checked); with workflow rules off, a card Hive merges is reported as
     // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
-    const from = s.stage === 'approved' || (hive && s.stage === 'merging')
+    const from = s.stage === 'approved' || (hive && s.stage === 'merging') || awaitsAgentMerge(r, s)
     if (!from || (!hive && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const before = await this.evidenceOf(card, s, r.options)
     const target = s.started?.target ?? ''
@@ -1353,13 +1357,14 @@ export class Workflow {
       if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`) // i18n-ignore: a wake, agent-facing
       // The user's own review request was for the old generation (retired by the decision): asked again at once.
       if (r && now.stage === 'review' && r.options.review === 'you' && now.latest) this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.newDecision, { card: card.key }))
-      if (!r || (now.stage !== 'approved' && now.stage !== 'merging')) return
+      if (!r || (now.stage !== 'approved' && now.stage !== 'merging' && !awaitsAgentMerge(r, now))) return
       const entry = openEntry(now)
       // After IntegrationStarted it's too late to stop that merge: it completes, then For you (§16.4.6).
       if (entry?.state === 'started') return
       w.fact('Stale', { approved: now.approved?.revision ?? null, current: now.approved?.revision ?? null, why: 'decision' }) // i18n-ignore: a fact's kind and codes, not text
       if (entry) w.fact('IntegrationCancelled', { entry: entry.id, reason: 'decision' }) // i18n-ignore: a fact's kind and codes, not text
-      w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
+      const back = hasStage(r, 'review') ? 'review' : 'active'
+      if (now.stage !== back) w.move(back, 'derived')
     })
     return this.ok(card, from, this.state(card).stage)
   }

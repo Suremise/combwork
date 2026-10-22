@@ -29,8 +29,10 @@ describe('workflow scenarios, None', () => {
     moved(await e.wf.startReview(card.key, R1))
     moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
     let s = e.wf.state(card)
-    expect(s.stage).toBe('review')
+    // Your OK after the reviewer agent is asked in Approved (§16.5.2, N1; decided on #1417).
+    expect(s.stage).toBe('approved')
     const ask = s.requests[0]
+    expect(ask).toMatchObject({ gate: 'review', stage: 'approved' })
     // Outside its paths: nothing changes.
     put(e.project, 'docs/b.md', 'b edited\n')
     await reconcile(e.wf, card)
@@ -52,6 +54,20 @@ describe('workflow scenarios, None', () => {
     expect(s.accepted?.revision).toBe(s.latest!.revision)
   })
 
+  it('S18: your decline in Approved sends it back to its builder in Active (#1417)', async () => {
+    const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files }))
+    const card = e.wf.createCard({ title: 'Docs A', paths: ['docs/a.md'] })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'docs/a.md', 'a, written\n')
+    moved(await e.wf.submit(card.key, B1, { summary: 'a' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    expect(e.wf.state(card).stage).toBe('approved')
+    moved(await e.wf.answer(card.key, e.wf.state(card).requests[0].request, 'declined', { note: 'Not yet' }))
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.state(card).requests).toEqual([])
+  })
+
   it('S2, S6 (None): a comment never moves an approved card; the builder can\'t review its own', async () => {
     const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files }))
     const card = e.wf.createCard({ title: 'Docs', paths: ['docs/a.md'] })
@@ -62,7 +78,7 @@ describe('workflow scenarios, None', () => {
     moved(await e.wf.startReview(card.key, R1))
     moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
     moved(e.wf.comment(card.key, B1))
-    expect(e.wf.state(card).stage).toBe('review')
+    expect(e.wf.state(card).stage).toBe('approved')
     expect(e.wf.state(card).requests).toHaveLength(1)
   })
 

@@ -47,8 +47,8 @@ async function apiAs(ctx, token, method, route, body) {
 }
 
 /**
- * The task board with a card in every column: one On Hold with its reason, one blocked, one in Doing whose agent isn't
- * running (stalled), one in Review, Passed and Done, and one archived for the archive's screen.
+ * The task board with a card in every column: one On Hold with its reason, one blocked, one in Active whose agent isn't
+ * running (stalled), one in Review, Approved and Done, and one archived for the archive's screen.
  */
 async function board(ctx) {
   const { page, inv, agents, project } = ctx

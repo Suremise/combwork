@@ -55,7 +55,7 @@ const until = async (fn, ms = 8000) => {
   await make('W', '', 'todo')
 
   const strip = page.locator('.board-strip')
-  /** The strip's numbers by label, e.g. { Todo: 2, Doing: 1, … }, or its text when it has none. */
+  /** The strip's numbers by label, e.g. { Todo: 2, Active: 1, … }, or its text when it has none. */
   const read = async () => {
     if (!(await strip.count())) return null
     const items = await strip.first().locator('.board-strip-item').allInnerTexts()
@@ -79,12 +79,12 @@ const until = async (fn, ms = 8000) => {
 
   // --- The Workspace Overview: every card.
   await page.getByRole('button', { name: 'Workspace Overview' }).click()
-  check('the Workspace Overview counts every card', !!(await until(is({ Todo: 4, Doing: 1, 'Waiting for review': 1, Done: 2, Blocked: 1 }), HUNG_MS)), JSON.stringify(await read()))
+  check('the Workspace Overview counts every card', !!(await until(is({ Todo: 4, Active: 1, 'Waiting for review': 1, Done: 2, Blocked: 1 }), HUNG_MS)), JSON.stringify(await read()))
 
   // --- alpha's Overview: its cards only.
   await page.getByRole('button', { name: 'Projects' }).click()
   await showOverview('alpha')
-  check("alpha's Overview counts only alpha's cards", !!(await until(is({ Todo: 2, Doing: 1, 'Waiting for review': 1, Done: 0, Blocked: 0 }), HUNG_MS)), JSON.stringify(await read()))
+  check("alpha's Overview counts only alpha's cards", !!(await until(is({ Todo: 2, Active: 1, 'Waiting for review': 1, Done: 0, Blocked: 0 }), HUNG_MS)), JSON.stringify(await read()))
   check('the strip is for alpha', (await strip.first().getAttribute('data-project')) === 'alpha')
 
   // --- Switching to beta never shows alpha's counts, not even for a moment.
@@ -100,7 +100,7 @@ const until = async (fn, ms = 8000) => {
   })()
   await showOverview('beta')
   await watching
-  check("beta's Overview counts only beta's cards", !!(await until(is({ Todo: 1, Doing: 0, 'Waiting for review': 0, Done: 2, Blocked: 1 }), HUNG_MS)), JSON.stringify(await read()))
+  check("beta's Overview counts only beta's cards", !!(await until(is({ Todo: 1, Active: 0, 'Waiting for review': 0, Done: 2, Blocked: 1 }), HUNG_MS)), JSON.stringify(await read()))
   check("after the switch, beta's strip never shows alpha's counts", seen.filter((x) => x.p === 'beta').every((x) => x.r.Todo === 1 && x.r.Done === 2), JSON.stringify(seen.slice(-3)))
 
   // --- gamma: no cards, a clear empty state.

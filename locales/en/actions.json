@@ -108,8 +108,8 @@
     "description": "A removed agent's open cards, cut short: the first five ({cards}: \"#3 Title, #4 Title\") and how many more ({n})."
   },
   "actions.cards.detail": {
-    "defaultMessage": "{cards, plural, one {Move it back: nobody has it, and if it is in Doing it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Doing shows as stalled.} other {Move them back: nobody has them, and those in Doing go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Doing show as stalled.}}",
-    "description": "Under the question about a removed agent's open cards: what Move back and Leave do. Doing and Todo are board columns; {agent} is the agent's name (none when several agents are removed)."
+    "defaultMessage": "{cards, plural, one {Move it back: nobody has it, and if it is in Active it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Active shows as stalled.} other {Move them back: nobody has them, and those in Active go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Active show as stalled.}}",
+    "description": "Under the question about a removed agent's open cards: what Move back and Leave do. Active and Todo are board columns; {agent} is the agent's name (none when several agents are removed)."
   },
   "actions.cards.leave": {
     "defaultMessage": "{cards, plural, one {Leave it} other {Leave them}}",
@@ -117,7 +117,7 @@
   },
   "actions.cards.release": {
     "defaultMessage": "{cards, plural, one {Move it back} other {Move them back}}",
-    "description": "Button: takes a removed agent's open cards back (nobody has them; Doing ones go to Todo)."
+    "description": "Button: takes a removed agent's open cards back (nobody has them; Active ones go to Todo)."
   },
   "actions.cards.title": {
     "defaultMessage": "{agents, plural, one {{agent} has} other {The # agents have}} {cards, plural, one {# open card} other {# open cards}}",

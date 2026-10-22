@@ -127,14 +127,20 @@ describe('the board area', () => {
     }
   })
 
-  it("in English, the window's column names and stall reasons read as agents' do", () => {
+  it("in English, the window's column names and stall reasons read as agents' do, but Active and Approved (OP-1, #1417)", () => {
+    // The window names the doing and passed categories Active and Approved (glossary 2.2); agents keep Doing and Passed.
+    const window: Partial<Record<string, { label: string; description: string }>> = {
+      doing: { label: 'Active', description: 'Being worked on: its agent shows what it is doing now.' },
+      passed: { label: 'Approved', description: 'Its work passed review (or your OK) and waits to be merged. A reviewer moves a card here when it passes.' }
+    }
     for (const c of TASK_COLUMNS) {
-      expect(tr(COLUMN_TEXT[c.id].label)).toBe(c.label)
-      expect(tr(COLUMN_TEXT[c.id].description)).toBe(c.description)
-      expect(columnName(c.id, tr)).toBe(columnLabel(c.id))
+      expect(tr(COLUMN_TEXT[c.id].label)).toBe(window[c.id]?.label ?? c.label)
+      expect(tr(COLUMN_TEXT[c.id].description)).toBe(window[c.id]?.description ?? c.description)
+      expect(columnName(c.id, tr)).toBe(window[c.id]?.label ?? columnLabel(c.id))
     }
     const doing = card(4, 'doing', { agent: 'a-1', agentName: 'B1' })
-    expect(stalledReason(card(1, 'doing'), null, tr)).toBe(stalledReason(card(1, 'doing'), null))
+    expect(stalledReason(card(1, 'doing'), null, tr)).toBe('In Active, but no agent has it.')
+    expect(stalledReason(card(1, 'doing'), null)).toBe('In Doing, but no agent has it.')
     expect(stalledReason(doing, null, tr)).toBe(stalledReason(doing, null))
     expect(stalledReason({ ...doing, agentName: undefined }, null, tr)).toBe('Its agent was removed.')
     expect(stalledReason(doing, { name: 'B1', running: false }, tr)).toBe("B1 isn't running.")

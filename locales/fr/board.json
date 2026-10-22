@@ -95,7 +95,7 @@
   "board.column.hold": "Suspendu",
   "board.column.holdDescription": "Mises de côté : personne ne les prend tant qu’elles ne passent pas en À faire. Toi et l’Assistant êtes les seuls à y placer des cartes.",
   "board.column.passed": "Validé",
-  "board.column.passedDescription": "Relecture réussie, en attente de fusion. Un relecteur place une carte ici quand elle est validée.",
+  "board.column.passedDescription": "Son travail a passé la relecture (ou a reçu ton approbation) et attend la fusion. Un relecteur place une carte ici quand elle est validée.",
   "board.column.review": "Relecture",
   "board.column.reviewDescription": "Travail fait, en attente de relecture.",
   "board.column.todo": "À faire",
