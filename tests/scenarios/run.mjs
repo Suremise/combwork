@@ -22,7 +22,9 @@
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
 // overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 runs are kept): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
-// Performance page compares two) and summary.md. With a fake provider a failed check fails the run (exit 1); model
+// Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
+// what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
+// With a fake provider a failed check fails the run (exit 1); model
 // trials only report (models vary). A dev build that isn't from the source as it is now (tests/e2e/build.mjs) is rebuilt
 // first, so a run (and a baseline) never measures other code.
 //
@@ -38,7 +40,7 @@ import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane 
 import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
 import { autoClean } from '../e2e/clean.mjs'
-import { slotWaitProgress } from '../progressReport.mts'
+import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
 
 const require = createRequire(import.meta.url)
 const lib = require('../e2e/lib.cjs')
@@ -206,50 +208,64 @@ const noCostModels = new Set()
 // too, so they are skipped, said once.
 let environment = null
 let saidRest = false
-for (let sample = 1; sample <= repeats; sample++) {
-  for (const sc of chosen) {
-    if (environment) {
-      results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: `environment: ${environment.why}`, environment: environment.why })
-      if (!saidRest) console.log(`SKIP the other trials: ${environment.why}. To run them: ${environment.advice}.`)
-      saidRest = true
-      continue
-    }
-    const gate = budgetGate({ fake, budget, spentKnown: spent, unknownCostTrials, allowUnknownCost, noCostModels: [...noCostModels] })
-    if (!gate.ok) {
-      results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: gate.reason })
-      console.log(`SKIP ${sc.id}: ${gate.reason}`)
-      continue
-    }
-    process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-    const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
-    r.sample = sample
-    if (r.environment) {
-      // Not a result of the scenario: no checks, and no cost assumed.
-      environment = { why: r.environment, advice: environmentAdvice(r.environment, provider) }
-      results.push(r)
-      console.log(`SKIP environment: ${r.environment}, ${r.seconds}s${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
-      continue
-    }
-    // A trial's cost as reported; none reported is unknown (counted), never $0.
-    if (typeof r.usage?.costUsd === 'number') spent += r.usage.costUsd
-    else if (!fake) {
-      unknownCostTrials++
-      noCostModels.add(r.usage?.model ?? r.model)
-    }
-    results.push(r)
-    const failed = r.checks.filter((c) => c.ok === false)
-    console.log(`${r.error ? `ERROR (${r.error.split('\n')[0]})` : failed.length ? `${failed.length} failed` : 'ok'}, ${r.seconds}s${r.usage?.costUsd ? `, $${r.usage.costUsd.toFixed(3)}` : ''}${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
-    for (const c of r.checks) console.log(`  ${c.ok === null ? 'SKIP' : c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.ok === false && c.detail ? ` (${c.detail})` : ''}`)
+/** What the run has so far: its source and settings (`complete` once every trial has run, and checked again then). */
+const metaNow = (complete) => ({
+  fixturesVersion: FIXTURES_VERSION,
+  source: sourceAtStart,
+  ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
+  guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+// Each trial's result written as it ends (#1457): a run cut short keeps what it had.
+const keepSoFar = () => writeFileSync(join(out, 'results.json'), JSON.stringify({ meta: metaNow(false), results }, null, 2))
+// The Progress panel (#1457): a step per trial, named with the results so far, so a long run shows it moving.
+const trials = Array.from({ length: repeats }, (_, k) => chosen.map((sc) => ({ sc, sample: k + 1, name: repeats > 1 ? `${sc.id} (${k + 1}/${repeats})` : sc.id }))).flat()
+const progress = scenariosProgress(trials.map((t) => t.name), provider, argv)
+for (const [i, { sc, sample, name }] of trials.entries()) {
+  progress.start(i, name)
+  if (environment) {
+    results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: `environment: ${environment.why}`, environment: environment.why })
+    if (!saidRest) console.log(`SKIP the other trials: ${environment.why}. To run them: ${environment.advice}.`)
+    saidRest = true
+    progress.done(sc.id, 0, 'skipped')
+    keepSoFar()
+    continue
   }
+  const gate = budgetGate({ fake, budget, spentKnown: spent, unknownCostTrials, allowUnknownCost, noCostModels: [...noCostModels] })
+  if (!gate.ok) {
+    results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: gate.reason })
+    console.log(`SKIP ${sc.id}: ${gate.reason}`)
+    progress.done(sc.id, 0, 'skipped')
+    keepSoFar()
+    continue
+  }
+  process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
+  const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  r.sample = sample
+  if (r.environment) {
+    // Not a result of the scenario: no checks, and no cost assumed.
+    environment = { why: r.environment, advice: environmentAdvice(r.environment, provider) }
+    results.push(r)
+    console.log(`SKIP environment: ${r.environment}, ${r.seconds}s${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
+    progress.done(sc.id, r.seconds * 1000, 'skipped')
+    keepSoFar()
+    continue
+  }
+  // A trial's cost as reported; none reported is unknown (counted), never $0.
+  if (typeof r.usage?.costUsd === 'number') spent += r.usage.costUsd
+  else if (!fake) {
+    unknownCostTrials++
+    noCostModels.add(r.usage?.model ?? r.model)
+  }
+  results.push(r)
+  const failed = r.checks.filter((c) => c.ok === false)
+  console.log(`${r.error ? `ERROR (${r.error.split('\n')[0]})` : failed.length ? `${failed.length} failed` : 'ok'}, ${r.seconds}s${r.usage?.costUsd ? `, $${r.usage.costUsd.toFixed(3)}` : ''}${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
+  for (const c of r.checks) console.log(`  ${c.ok === null ? 'SKIP' : c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.ok === false && c.detail ? ` (${c.detail})` : ''}`)
+  progress.done(sc.id, r.seconds * 1000, r.error || failed.length ? 'failed' : 'ok')
+  keepSoFar()
 }
 
 const sourceAtEnd = sourceFingerprint()
-const meta = {
-  fixturesVersion: FIXTURES_VERSION,
-  source: sourceAtStart,
-  ...(sourceAtEnd.head !== sourceAtStart.head || sourceAtEnd.dirty !== sourceAtStart.dirty ? { sourceChangedDuringRun: sourceAtEnd } : {}),
-  guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials }
+const meta = { ...metaNow(true), ...(sourceAtEnd.head !== sourceAtStart.head || sourceAtEnd.dirty !== sourceAtStart.dirty ? { sourceChangedDuringRun: sourceAtEnd } : {}) }
 writeFileSync(join(out, 'results.json'), JSON.stringify({ meta, results }, null, 2))
 const appVersion = JSON.parse(readFileSync(join(lib.ROOT, 'package.json'), 'utf8')).version
 const benchmarkFile = join(out, 'benchmark.json')
@@ -279,6 +295,8 @@ writeFileSync(
 )
 console.log(`\nResults: ${out}`)
 const hardFailures = fake ? results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length : 0
+const failedTrials = results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length
+await progress.finish(!hardFailures, `${results.length - failedTrials - results.filter((r) => r.skipped).length} ok, ${failedTrials} failed${results.some((r) => r.skipped) ? `, ${results.filter((r) => r.skipped).length} skipped` : ''}`, join(out, 'summary.md'))
 codexLease?.release()
 // What tests left in hive-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
 lane.release()
