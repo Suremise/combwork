@@ -265,12 +265,29 @@ ruleset's platform, and never switch on a platform id (AGENTS.md's rule for prov
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
 with open entries) start it; it takes the target's lease (`QueueRunner.acquire`, with agents' process supervisor), runs
-`MergeQueue.recover(target)` once, then `drain(target)` with the runner's folder, its recording git and spawn, #1349's
+`MergeQueue.recover(target)` with each run's queue, then `drain(target)` with the runner's folder, its recording git and spawn, #1349's
 checks (`queueChecksApp.ts`, on `spawnNow`), the advance under #1347's `withRepoLock` (the lease checked again inside
 it) and `workflowEnforced` (off: entries pause `rulesOff` before the advance); a target checked out in a folder pauses
 `checkedOut` until #1351. It releases the runner when the queue is empty or paused; a workspace closing releases its
 runners first, so a check the close ends writes nothing. The action worker's runs and the hosts' run outside any write
 fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is a no-op until P7.
+
+**Hive's queue commits** (#1350, SPEC §16.9.1 step 4): `MergeQueue.testMerge` runs the merge (and a squash's commit)
+with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a
+bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
+`timeoutMs` and end the launcher's whole tree at the bound (`endTree`); without a config git, `gitTree` does the same.
+`commitEnv` sets `GIT_TRACE2_EVENT=2`, so git's trace2 events are in its stderr, in order with its hooks' and signer's
+text. `readCommitStream` splits that stream into validated events and text, and gives each piece of text to the top
+git's child running then (a hook, the signer) or to git. `commitFailed` decides from the source each decision is about,
+never from the whole output:
+- at the bound, a pause by what ran then (`errAtTimeout`, the stream as of the timeout): `hookTimedOut` or
+  `signingWaits`;
+- a hook that failed returns the card (`hook`);
+- a signer that failed pauses `signingWaits` or `signing`, by its own text;
+- anything else pauses `needsYou`.
+
+A pause keeps the message (`QueuePause.message`, `workflow_queue_pauses.message`). Recorded streams are in
+`tests/fixtures/queueCommits`.
 
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a

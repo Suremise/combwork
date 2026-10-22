@@ -30,6 +30,7 @@ import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunn
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
+import { QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 
 const log = createLogger('queue')
 
@@ -138,7 +139,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   const cfg: QueueConfig = {
     folder: runner.folder(),
     holds: () => runner.holds(),
-    git: (cwd, args) => runner.git(cwd, args),
+    git: (cwd, args, opts) => runner.git(cwd, args, 'testMerge', opts),
+    signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
     pauseCheckedOut: true,

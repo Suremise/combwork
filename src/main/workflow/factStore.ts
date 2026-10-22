@@ -76,6 +76,8 @@ export interface QueuePause {
   files?: string[]
   /** A process Hive couldn't end (a dead runner's, at a takeover: #1360). */
   pid?: number
+  /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
+  message?: string
 }
 
 /** A target's queue runner (#1360, queue_runners): who runs it, the holder process, when taken and last renewed. */
@@ -554,10 +556,10 @@ export class FactStore {
   queuePause(target: string): QueuePause | null {
     const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT reason, card, pid FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null } | undefined
+      const row = db.prepare('SELECT reason, card, pid, message FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null; message: string | null } | undefined
       if (!row) return null
       const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}) }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}) }
     })
   }
 
@@ -567,7 +569,7 @@ export class FactStore {
     this.conn.write((db) => {
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
       if (!pause) return
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid) VALUES (?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message) VALUES (?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
       pause.files?.forEach((f, i) => ins.run(p, target, i, f))
     })
