@@ -664,12 +664,14 @@ interface HiveMessageValues {
   'board.slots.waitingToMerge': { agent: string | number }
   'board.slots.youMerging': undefined
   'board.slots.youMergingStart': undefined
+  'board.stall.hintLaneOrder': undefined
   'board.stall.hintNobody': undefined
   'board.stall.hintNotWatching': undefined
   'board.stall.hintReviewSilent': undefined
   'board.stall.hintReviewVerdict': undefined
   'board.stall.hintReviewWait': undefined
   'board.stall.hintWakeUntaken': undefined
+  'board.stalled.laneOrderWait': { reviewer: string | number; other: string | number; card: string | number; builder: string | number; waited: string | number }
   'board.stalled.noAgent': undefined
   'board.stalled.notRunning': { agent: string | number }
   'board.stalled.notWatching': { agent: string | number; card: string | number }
