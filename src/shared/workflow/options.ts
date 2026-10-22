@@ -75,15 +75,18 @@ export interface WorkflowOptions {
  */
 export type PresetId = 'solo' | 'pair' | 'team' | 'pairAgent'
 
-/** Why a preset isn't offered yet: the piece it needs comes in a later version (§16.19.1). */
+/**
+ * Why a preset isn't offered yet: the piece it needs comes in a later version (§16.19.1). None does since P5 (#1361:
+ * Team on agent worktrees); kept for a preset a later phase adds.
+ */
 export type PresetNeeds = 'slots'
 
 /**
  * The presets the form offers for a platform, in order, and those it shows unavailable with why (§16.19.1: no RC's preset
- * needs a later phase; shown, not hidden, so the choice reads as P6's will). Team is #1361's.
+ * needs a later phase; shown, not hidden, so the choice reads as P6's will).
  */
 export const PRESETS: Record<PlatformId, { id: PresetId; needs?: PresetNeeds }[]> = {
-  git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team', needs: 'slots' }],
+  git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team' }],
   none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
 }
 
@@ -179,6 +182,9 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     commands: commandsOf(checks.quick)
   }
   if (id === 'pair') return pair
+  // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result
+  // (each card's own focused tests come later: #1367), installed from scratch before every merge, and your OK for cards
+  // labelled ui or release. G15 and G17 wait for slots (P7).
   return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: commandsOf(quickAndTests) }
 }
 

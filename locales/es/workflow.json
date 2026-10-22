@@ -134,6 +134,7 @@
   "workflow.option.target.title": "El trabajo se fusiona en",
   "workflow.preset.custom": "Personalizado",
   "workflow.preset.needs.slots": "Necesita una carpeta propia para cada tarjeta, algo que llega en una versión posterior.",
+  "workflow.preset.note.team": "Equipo comprueba el resultado fusionado con las comprobaciones rápidas y las pruebas unitarias. Ejecutar ahí también las pruebas específicas de cada tarjeta llega en una versión posterior.",
   "workflow.preset.pair": "Pareja",
   "workflow.preset.pairAgent": "Pareja (fusiona el agente)",
   "workflow.preset.solo": "Individual",

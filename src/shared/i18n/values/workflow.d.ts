@@ -136,6 +136,7 @@ interface HiveMessageValues {
   'workflow.option.target.title': undefined
   'workflow.preset.custom': undefined
   'workflow.preset.needs.slots': undefined
+  'workflow.preset.note.team': undefined
   'workflow.preset.pair': undefined
   'workflow.preset.pairAgent': undefined
   'workflow.preset.solo': undefined

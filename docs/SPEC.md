@@ -1612,7 +1612,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G6 style | — | Merge commit | Merge commit | Today's default (§5 Agents, §15.12). |
 | G7 target | The branch the project is on | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
 | G8 strict | — | Off | Off | The queue tests target + change anyway and a clean update keeps the pass, so strict mostly changes the history's shape; it is on offer for teams that want every merge up to date (OP-18; HB3's round 1 finding 4). |
-| G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). |
+| G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). **Built [#1361], narrowed for now** (Darren, point 1 on #1121): Team's G9 is quick checks + unit tests, installed from scratch before every merge (`mergeInstall: always`); each card's focused tests come with #1367. |
 | G10 your OK | Never | Never | Cards labelled `ui` or `release` | Darren's practice (screenshots, release steps). |
 | G11 where | Project folder | Slots | Slots | Pairs and teams build in parallel. |
 | G12 identity | Off | On | On | #809. |
@@ -1671,13 +1671,19 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     worktree), None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link
     to their owner. N5 (stage names), G8, G15 and G17 wait for later phases.
   - **P5 [#1355]:** G5 offers **Hive merges**, and the presets **Pair** (Hive merges: §16.6.3's Pair, with G15 off and
-    G7 the project's default branch by name) beside Pair (the agent merges); Team stays shown unavailable until #1361. G9's row (**Checks
+    G7 the project's default branch by name) beside Pair (the agent merges). G9's row (**Checks
     pass on the merged result**, named commands in G3's editor, both lists sharing `commands`; a preset suggests them
     from the project's scripts, OP-24) shows only while G5 is Hive merges, and under it, only with merge checks, the
     install from scratch (`mergeInstall`: *When the lock file or manifests change*, the default, or *Before every
     merge*; its description says a changed manifest always installs, §16.9.1). Their off switches: another G5, an
     empty G9. `hive_update_setting` takes `finish: hiveMerges`, `mergeChecks` and `mergeInstall`, and
     `hive_project_status` shows them.
+  - **Team [#1361]** (Darren, point 1 on #1121): offered in P5, agent worktrees standing in for slots as for Pair. Its
+    values are §16.6.3's Team column with G9 narrowed to quick checks + unit tests (the same as G3), installed from
+    scratch before every merge, and G10 *Cards labelled `ui` or `release`*; G15 off and G17 not shown until P7. While
+    Team is chosen (or the options started from it), a note under the preset says each card's own focused tests on the
+    merged result come in a later version (#1367). No preset is shown unavailable any more (`PresetNeeds` is kept for
+    a later phase's).
   - Each row shows its origin (the preset, the project, the workspace, Hive's settings, or the platform's all-off). An
     option the project sets has **Inherit**: project.json keeps only the options the project sets (`workflow.options`
     is partial), and the runtime, the recorder's start and the adoption resolve them over the other levels.
@@ -3157,7 +3163,7 @@ later phase. Lanes keep working, and everything works with the Assistant off, in
 | P3 | (no rules yet: facts only) | (no rules yet) | — | S53 |
 | P4 | **An agent's worktree stands in for a slot**: a builder's existing worktree (one branch per agent, as today) is the card's folder; a card's base is the merge base of that branch with the target when the card starts, which is sound because a lane's next card starts only once the previous one is Done (§16.11.2). Or everyone in the project folder. | Not checked · Committed is done · **The agent merges, Hive checks** (the builder merges each card through today's merge-ready, then reports it; `done.contained` checks it). Hive merges isn't offered. After a squash merge (by the agent or the Merge dialog), Hive brings the agent's branch to the target before the next card starts (§16.19.2). | "Pair (the agent merges)": a reviewer agent, the agent merges, agent worktrees, quick checks before review | S54 |
 | P5 | As P4. | Adds **Hive merges**: the queue merges the agent's branch at the approved revision; after Done the agent's branch carries on, and the next card's base is the new merge base. After a **squash** (G6) the branch isn't an ancestor of the target, so the next card's base would still include the squashed work: before the next card starts, Hive **brings the agent's branch to the target** (§16.19.2) [HB3's round 3 finding 2, HR2's round 3 finding 3]. **Built [#1355]:** the form offers Hive merges and G9 with its install (§16.6.6). | Pair (Hive merges), offered in the form beside Pair (the agent merges) [#1355]; the hive project keeps its options until an RC is installed (Darren, #1121 point 2) | S55 |
-| P6 | As P4. | As P5. | Pair, set through the Version Control tab; Team offered | — |
+| P6 | As P4. | As P5. | Pair, set through the Version Control tab; Team offered (in the plain form since P5: #1361) | — |
 | P7 | **Slots**: per-card lines in leased slots; agent worktrees become slots (§16.10.8): a running lane keeps its folder until it ends. | As P5. | Team (6×6) | S56 |
 
 #### 16.19.2 Agent worktrees between cards (P4–P6)

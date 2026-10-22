@@ -1267,6 +1267,14 @@
     "defaultMessage": "Glance at the taskbar",
     "description": "A tip's title."
   },
+  "tips.teamPreset.text": {
+    "defaultMessage": "Team, in Project Settings → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Team, Pair)."
+  },
+  "tips.teamPreset.title": {
+    "defaultMessage": "Several builders? Try the Team preset",
+    "description": "A tip's title (glossary 2.1: Team, preset)."
+  },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

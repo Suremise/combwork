@@ -138,6 +138,11 @@ export const PRESET_TEXT: Record<PresetId | 'custom', Msg> = {
   custom: msg({ id: 'workflow.preset.custom', defaultMessage: 'Custom', description: 'The workflow preset shown when the options no longer match a preset (glossary 2.1).' })
 }
 
+/** What a preset leaves for a later version, said under the preset choice while it is chosen (#1361). */
+export const PRESET_NOTE_TEXT: Partial<Record<PresetId, Msg>> = {
+  team: msg({ id: 'workflow.preset.note.team', defaultMessage: 'Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.', description: 'Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result).' })
+}
+
 /** Why a preset is shown unavailable (§16.19.1). */
 export const PRESET_NEEDS_TEXT: Record<PresetNeeds, Msg> = {
   slots: msg({ id: 'workflow.preset.needs.slots', defaultMessage: 'Needs a folder of its own for every card, which comes in a later version.', description: 'Why a workflow preset can’t be chosen yet.' })

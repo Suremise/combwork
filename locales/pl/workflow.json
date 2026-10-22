@@ -134,6 +134,7 @@
   "workflow.option.target.title": "Praca jest scalana do",
   "workflow.preset.custom": "Własne",
   "workflow.preset.needs.slots": "Wymaga osobnego folderu dla każdej karty, który pojawi się w późniejszej wersji.",
+  "workflow.preset.note.team": "Zespół sprawdza scalony wynik szybkimi sprawdzeniami i testami jednostkowymi. Uruchamianie tam także testów ukierunkowanych każdej karty pojawi się w późniejszej wersji.",
   "workflow.preset.pair": "Para",
   "workflow.preset.pairAgent": "Para (scala agent)",
   "workflow.preset.solo": "Solo",

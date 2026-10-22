@@ -134,6 +134,7 @@
   "workflow.option.target.title": "Arbeit wird gemergt in",
   "workflow.preset.custom": "Benutzerdefiniert",
   "workflow.preset.needs.slots": "Braucht für jede Karte einen eigenen Ordner, was in einer späteren Version kommt.",
+  "workflow.preset.note.team": "Team prüft das gemergte Ergebnis mit den schnellen Checks und den Unit-Tests. Auch die gezielten Tests jeder einzelnen Karte dort auszuführen, kommt in einer späteren Version.",
   "workflow.preset.pair": "Paar",
   "workflow.preset.pairAgent": "Paar (der Agent mergt)",
   "workflow.preset.solo": "Solo",

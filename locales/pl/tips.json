@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "Wyczyść całkowicie to, co przechowuje Hive",
   "tips.taskbarBadge.text": "Przycisk Hive na pasku zadań pokazuje, ilu agentów Cię potrzebuje, i miga, gdy któryś o coś pyta, a Hive jest w tle.",
   "tips.taskbarBadge.title": "Rzuć okiem na pasek zadań",
+  "tips.teamPreset.text": "Zespół w Ustawienia projektu → Przepływ pracy to Para z surowszymi sprawdzeniami: testy jednostkowe przechodzą przed recenzją i na scalonym wyniku, zależności są instalowane od zera przed każdym scaleniem, a karty z etykietą ui lub release czekają na Twoją zgodę.",
+  "tips.teamPreset.title": "Kilku wykonawców? Wypróbuj ustawienie wstępne Zespół",
   "tips.templateNames.text": "Nazwy agentów są unikalne w całym obszarze roboczym. Wczytując szablon z innego projektu, nadaj jego agentom nowe nazwy na liście obok nazw z szablonu: Wczytaj szablon czeka, aż żadna nie będzie zajęta.",
   "tips.templateNames.title": "Nazwij agentów szablonu przy wczytywaniu",
   "tips.templateWorktrees.text": "Wczytanie szablonu umieszcza agenta z powrotem w czystym worktree o jego nazwie, z gałęzią bez zmian, zamiast tworzyć nowy. Stare worktree, które są scalone i czyste, też mogą zniknąć: zaznacz pole w oknie Wczytaj.",

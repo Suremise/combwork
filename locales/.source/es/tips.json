@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "Purge what Hive keeps",
   "tips.taskbarBadge.text": "Hive's taskbar button shows how many agents need you, and flashes when one asks you something while Hive is in the background.",
   "tips.taskbarBadge.title": "Glance at the taskbar",
+  "tips.teamPreset.text": "Team, in Project Settings → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
+  "tips.teamPreset.title": "Several builders? Try the Team preset",
   "tips.templateNames.text": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
   "tips.templateNames.title": "Name a template's agents as you load it",
   "tips.templateWorktrees.text": "Loading a template puts an agent back in the clean worktree of its name, its branch left as it is, instead of making a new one. Old worktrees that are merged and clean can go too: tick the box in the Load dialog.",
