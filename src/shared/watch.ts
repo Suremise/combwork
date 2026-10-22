@@ -449,11 +449,17 @@ export function wakeLine(change: CardChange, more = 0): string {
  * reviewer (`review`), or its review's verdict for its builder (`verdict`). Worded as a card watch's line, so the
  * card-loop skill reads it the same way.
  */
+/** How much of a reviewer's request a wake line quotes, and of Hive's own note (a returned card's needs its next step). */
+const REQUEST_MAX = 200
+const NOTE_MAX = 600
+
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
   const who = kind === 'review' ? "You review this card in its loop: carry on with it" : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
-  // A reviewer's request (#912) or Hive's own note (stale, an answer): what it says, short, before what to do.
+  // A reviewer's request (#912) or Hive's own note (stale, an answer, what came back from the merge queue and what to do
+  // next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
-  const what = !said.length ? '' : `. ${kind === 'request' ? 'The reviewer asks' : 'Hive'}: "${said.length > 200 ? `${said.slice(0, 199).join('')}…` : said.join('')}"`
+  const max = kind === 'request' ? REQUEST_MAX : NOTE_MAX
+  const what = !said.length ? '' : `. ${kind === 'request' ? 'The reviewer asks' : 'Hive'}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
 }
 

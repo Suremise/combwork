@@ -634,6 +634,8 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
       output,
       command,
       run: id ?? randomUUID(),
+      // Its whole log, for a returned card's builder (#1354): only one that holds its output.
+      ...(log.usable && logPath ? { logPath } : {}),
       ...(id ? { note: (c: RunCheck) => deps.runs?.counts(id, c) } : {})
     }
   }

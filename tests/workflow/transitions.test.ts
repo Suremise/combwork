@@ -38,9 +38,10 @@ describe('intents only where the compiled table has them', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     await passed(e, card.key)
     expect(e.wf.state(card).stage).toBe('approved')
-    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'move.notFromHere')
-    expect(r.next).toBe('Nothing waits to be done there now.')
-    refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'move.notFromHere')
+    // The queue merges it (#1354): the refusal says so, not where a report would be possible.
+    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
+    expect(r.message).toBe(`Hive merges ${card.key}: agents don't merge it or report its merge.`)
+    refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'merge.hiveMerges')
     expect(e.wf.state(card)).toMatchObject({ stage: 'approved', integrated: null })
   })
 

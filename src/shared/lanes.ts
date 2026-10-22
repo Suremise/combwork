@@ -368,11 +368,17 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
   return `Lane ${l.state === 'ended' ? 'ended' : 'abandoned'}: ${laneLine(l)}${l.note ? ` ${l.note}` : ''}`
 }
 
-/** What hive_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done. */
-export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null }): string {
+/**
+ * What hive_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done.
+ * `queue`: the lane's passed cards Hive merges, each with where it is in the merge queue (#1354): the lane takes one card
+ * at a time, so the next waits for them to be Done.
+ */
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[] }): string {
   if (r.lane.state === 'paused' && r.waits) return `The lane waits: ${laneStatusText(r.waits)}. Start nothing new meanwhile.`
-  if (!r.next) return 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
+  const queued = r.queue?.length ? r.queue.map((q) => `${cardRef(q.card)}: ${q.line}`).join(' ') : ''
+  if (!r.next) return queued ? `${queued} Nothing else to start: the lane ends by itself once all are Done.` : 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
   const card = `${cardRef(r.next.card)} ${r.next.title}`
   const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
-  return r.next.carryOn ? `Carry on with ${card}${also}.` : `Next: ${card}. Start it.`
+  if (r.next.carryOn) return `Carry on with ${card}${also}.`
+  return queued ? `${queued} Next: ${card}, once ${r.queue!.length > 1 ? 'they are' : 'it is'} Done.` : `Next: ${card}. Start it.`
 }

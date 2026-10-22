@@ -28,6 +28,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+import { queueLine, queueStateOf } from './queueState'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -1161,8 +1162,14 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
-    // Only where the builder merges (or nothing is checked): under Hive merges the queue merges, never a report.
-    if (s.stage !== 'approved' || (r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // Under Hive merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
+    const hive = r.options.finish === 'hiveMerges'
+    const queued = this.hiveMergesRefusal(card, s)
+    if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // Only where the builder merges (or nothing is checked); with workflow rules off, a card Hive merges is reported as
+    // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
+    const from = s.stage === 'approved' || (hive && s.stage === 'merging')
+    if (!from || (!hive && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const before = await this.evidenceOf(card, s, r.options)
     const target = s.started?.target ?? ''
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
@@ -1184,13 +1191,47 @@ export class Workflow {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
+      const open = hive ? openEntry(w.state()) : undefined
+      if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'intent')
       w.action('endLaneIfDone', {})
       w.action('releaseSlot', {})
       return null
     })
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'approved', 'done')
+    return this.ok(card, s.stage, 'done')
+  }
+
+  /**
+   * A card Hive merges (its own ruleset: the options it started under, or a change applied to it, never the project's
+   * current options) while the rules are enforced: an agent's merge of it is refused, its next step where it is in the
+   * merge queue (#1354, queueState.ts). Null otherwise: the agent merges, nobody checks, or the rules are off.
+   */
+  hiveMergesRefusal(card: CardRecord, s: CardState = this.state(card)): GuardRefusal | null {
+    if (!this.enforced()) return null
+    const q = queueStateOf(this, card, s)
+    if (!q) return null
+    const values: Record<string, string | number> = { card: card.key, queue: q.state }
+    if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
+    if (q.state === 'queued') values.n = q.position
+    return { rule: 'merge.hiveMerges', values }
+  }
+
+  /** Who merges a card and where it is with the merge queue, in a sentence for agents (#1354); null unless Hive merges it. */
+  queueLineOf(ref: unknown): string | null {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return null
+    const q = queueStateOf(this, card)
+    // Merged, it is Done: nothing more to say.
+    return q && q.state !== 'merged' ? queueLine(q, this.enforced()) : null
+  }
+
+  /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Hive merges it. */
+  async refuseHiveMerge(ref: unknown, actor: Actor, move: string): Promise<Refusal | null> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return null
+    const g = this.hiveMergesRefusal(card)
+    return g ? this.refuse(card, actor, move, g, null) : null
   }
 
   /** ask the user (§16.8.1): For you of a kind. */
@@ -1491,7 +1532,9 @@ export class Workflow {
     const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     if (!opts.translate) {
       const card = this.resolve(ref, actor)
-      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      // Done for a card Hive merges: no intent of the agent's does it, so the refusal names the queue (#1354).
+      const queued = column === 'done' && !isRefusal(card) ? this.hiveMergesRefusal(card) : null
+      return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, queued ?? { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     }
     const reply = await (column === 'doing'
       ? this.start(ref, actor, { reopen: true, ...(opts.builder ? { builder: opts.builder } : {}) })

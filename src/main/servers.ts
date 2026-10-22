@@ -78,7 +78,8 @@ import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId } from '../shared/platform/descriptors'
 import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
-import { recordDecisionsReceived } from './workflow/recorder'
+import { actorOf, recordDecisionsReceived } from './workflow/recorder'
+import { workflowFor } from './workflow/service'
 import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -1517,6 +1518,22 @@ async function slotAgent(p: string): Promise<SlotAgent> {
   return { projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, runId: live.runId }
 }
 
+/**
+ * A claim naming cards Hive merges (each card's own rules, #1354): refused before the slot is touched, as the card's
+ * report merge would be (`merge.hiveMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
+ * no card, or cards the agent merges, is unchanged: the slot stays for agents' merges and the user's own.
+ */
+async function refuseHiveMerges(projectPath: string, cards: number[]): Promise<void> {
+  if (!cards.length) return
+  const wf = await workflowFor(workspace, projectPath).catch(() => null)
+  if (!wf) return
+  const actor = actorOf(await taskActor())
+  for (const n of cards) {
+    const refused = await wf.refuseHiveMerge(`#${n}`, actor, 'merge slot') // i18n-ignore: the refused move's name, agent-facing
+    if (refused) throw new tasks.WorkflowRefusedError(refused)
+  }
+}
+
 /** The branch a slot call names, or the one the project folder is on (what Hive's Merge dialog merges into). */
 async function slotBranchFor(p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null) return slotBranch(v)
@@ -1548,6 +1565,7 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const agent = await slotAgent(p)
     const branch = await slotBranchFor(p, body?.branch)
     const cards = slotCards(cardRefsIn(body?.cards))
+    await refuseHiveMerges(p, cards)
     const t = body?.timeoutSeconds
     if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, 'timeoutSeconds must be a number of seconds')
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
@@ -1644,7 +1662,14 @@ route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
     if (!a) throw new HttpError(400, "next is a lane agent's: read a lane with GET /v1/lanes/{id}")
-    return lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    // Its passed cards Hive merges, each with where it is in the merge queue (#1354): the next waits for them.
+    const queue: { card: number; line: string }[] = []
+    for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
+      const line = await queueLineFor(r.lane.project, c.number)
+      if (line) queue.push({ card: c.number, line })
+    }
+    return queue.length ? { ...r, queue } : r
   })
 )
 
@@ -1918,6 +1943,16 @@ async function taskActor(): Promise<tasks.TaskActor> {
  * A card with what its agent is doing now (and its name now), for callers deciding what to do next. `agents` keeps
  * each project's agents for a whole list, so a long board reads each project.json once.
  */
+/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Hive merges it. */
+async function queueLineFor(project: string, n: number): Promise<string | null> {
+  try {
+    const wf = await workflowFor(workspace, projectByName(project))
+    return wf?.queueLineOf(`#${n}`) ?? null
+  } catch {
+    return null
+  }
+}
+
 async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: { name: string; running: boolean } | null = null
@@ -1971,7 +2006,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
   // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
   const k = cardKind(workspace, c.number)
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage }
+  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
+  const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage, ...(merge ? { merge } : {}) }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */

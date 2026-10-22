@@ -21,6 +21,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   stalled: string | null
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
+  /**
+   * Who merges it and where it is with the merge queue, when its own rules say Hive merges it (#1354): queued (its
+   * position), testing, paused, returned (what came back and what to do), left the queue, merged.
+   */
+  merge?: string
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */

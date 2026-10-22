@@ -22,6 +22,7 @@ import { isUnknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
+import { leftWake, returnedWake } from './queueState'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
@@ -34,6 +35,8 @@ export interface CheckResult {
   /** Why it was (#1362): recorded on the card's IntegrationFailed. */
   cause?: TransientFailure
   output: string
+  /** Its log's path, when the log holds its output (#1354: a returned card's wake names it). */
+  logPath?: string
   /** The command that ran, and its run's id (a progress run's, when Hive keeps runs). */
   command?: string
   run?: string
@@ -51,7 +54,8 @@ export interface CheckContext {
 }
 
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string } | { kind: 'uncounted' }
+/** A red outcome names the check (`install` for the install before them) and its log, when it holds its output (#1354). */
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -263,7 +267,7 @@ export class MergeQueue {
       // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
       // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
       const checks = await this.mergeChecks(card, result)
-      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause)
+      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
       if (checks.kind === 'uncounted') {
         if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
         continue
@@ -313,9 +317,13 @@ export class MergeQueue {
   private async skip(card: CardRecord, entry: QueueEntry, cancelled: boolean): Promise<QueueOutcome> {
     if (!cancelled) {
       await this.write(card, (w) => {
-        w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
-        w.move(w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active', 'derived')
-        this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`) // i18n-ignore: a wake, agent-facing
+        const s = w.state()
+        // Why (#1354): its pass is stale, or a decision since needs its passes again (none at the current generation).
+        const why = !s.stale && s.generation > 0 && !s.verdicts.some((v) => v.pass && v.generation === s.generation) ? 'decision' : 'stale'
+        w.fact('IntegrationCancelled', { entry: entry.id, reason: why }) // i18n-ignore: a fact's kind and codes, not text
+        const to = w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active'
+        w.move(to, 'derived')
+        this.wf.wake(w, s.started?.builder, leftWake(card.key, why, to))
       })
     }
     return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
@@ -384,7 +392,7 @@ export class MergeQueue {
     let noInstall = false
     if (this.cfg.install && (o.mergeInstall === 'always' || this.wf.store.meta(key) !== now)) {
       const i = await this.cfg.install(f, true, ctx)
-      if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output }
+      if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output, check: 'install', ...(i.logPath ? { logPath: i.logPath } : {}) }
       noInstall = !!i.skipped
       await this.wf.locked(() => this.wf.store.setMeta(key, now))
     }
@@ -408,7 +416,7 @@ export class MergeQueue {
       }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
-      if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output }
+      if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output, check: name, ...(r.logPath ? { logPath: r.logPath } : {}) }
       if (!b.counted) return { kind: 'uncounted' }
     }
     return { kind: 'green' }
@@ -516,13 +524,15 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }): Promise<QueueOutcome> {
     await this.write(card, (w) => {
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}), ...check }
+      w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
-      this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`) // i18n-ignore: a wake, agent-facing
+      // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
+      this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
     })
     return { card: card.key, entry: entry.id, outcome: 'returned', reason, transient }
   }

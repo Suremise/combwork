@@ -2250,6 +2250,35 @@ target [note §9 alternative].
 
 **Observed merges:** a merge done by hand is observed (§16.4.4); the queue cancels that entry.
 
+**Agents under Hive merges** **Built [#1354]**: a builder never merges a card Hive merges, and is told at each queue
+outcome what to do. What decides is the card's own ruleset (the options it started under, or the user's change applied
+to it, OP-38), never the project's current options: a card started under Hive merges stays so after the project
+switches to "The agent merges", and one started afterwards reports its merge.
+- **Refusals** (`merge.hiveMerges`, three messages in 7 locales; agents get the English): `report merge` (and an
+  agent's `hive_update_task` move to Done, translated or not) and a merge-slot claim naming the card are refused with
+  where it is in the queue as the next step (`QUEUE_NEXT`: queued with its position, being merged, paused, returned,
+  merged; otherwise "once it is approved"), and "set in Version Control → Who merges. A card keeps the rules it started
+  with." The claim is refused before the slot is touched; one naming no card, or cards the agent merges, is unchanged,
+  and so is the Merge dialog's. Each is a `Refused` fact; `override` is none.
+- **Wakes**: a returned card's (`returnCard`) says what came back (a conflict: its files, the first 8 and how many more;
+  checks: which check, `install` for the install before them, its log's path and the output's last lines; a hook) and
+  the next step (merge the target in and resolve; fix, commit and submit; for a transient failure, submit the same
+  revision again, at most twice in a row), within 600 characters: a wake line quotes Hive's own note up to 600, a
+  reviewer's request still 200. `IntegrationFailed` keeps `check` and `logPath`. A card that left the queue (`skip`)
+  says why: its pass stale (`IntegrationCancelled` reason `stale`), or a decision since its approval (`decision`, no
+  pass at the current generation).
+- **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (the one helper for where a card is
+  with the queue, from its facts and the queue's request order: #1353's window model shares it): who merges it, and
+  queued (position), testing or advancing, paused (why), returned (what came back and what to do), left the queue, or
+  not approved yet; absent once it is Done and for cards the agent merges. `hive_lane next` names the lane's passed
+  cards Hive merges with that line, and the next card waits for them.
+- **Skills**: work-on-card, card-loop and merge-ready say, where they tell an agent to merge a passed card, "unless the
+  card says Hive merges it (`hive_read_task`: its `merge`): then the merge queue merges it; wait for Done or a return"
+  (P8 rewrites the guidance whole).
+- **Workflow rules off** (Settings → Advanced): nothing refuses; a card Hive merges is reported as before 1.0, approved
+  or waiting in the queue, whose entry is cancelled (`integratedOutside`, as S7's hand merge); the card read says to
+  merge it and report the merge.
+
 **User controls:** **Pause queue** / **Resume** (the user; the Assistant within Control), saved and shown; **Remove
 from queue** on an entry, recorded as an override and as `IntegrationCancelled`. The slot's **Release** goes away
 [#1121 c].

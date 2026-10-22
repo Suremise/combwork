@@ -1,0 +1,202 @@
+// Agents under Hive merges (#1354, SPEC §16.9.3): a builder never merges a card Hive merges, and is told at each queue
+// outcome what to do. What decides is the card's own ruleset (the options it started under), never the project's
+// current options; with workflow rules off (Settings → Advanced) nothing here refuses: agents merge and report as before
+// 1.0, and the queue drops the entry. On real temporary repositories (harness.ts).
+import { afterEach, describe, expect, it } from 'vitest'
+import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
+import { preset } from '../../src/shared/workflow/options'
+import { leftWake, queueLine, queueStateOf, returnedText, WAKE_NOTE_MAX } from '../../src/main/workflow/queueState'
+import { refusalLines } from '../../src/shared/workflow/refusals'
+import { laneNextText } from '../../src/shared/lanes'
+import { cardChange, loopWakeLine } from '../../src/shared/watch'
+import type { FactData } from '../../src/shared/workflow/facts'
+import type { TaskCard } from '../../src/shared/types'
+
+let env: Env | null = null
+afterEach(() => {
+  env?.close()
+  env = null
+})
+
+const team = (extra: Parameters<typeof setup>[1] = {}) => (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } }, extra))
+
+/** A card approved and queued: started by B1, committed, submitted, passed by R1. */
+async function queued(e: Env, title = 'Change', files: Record<string, string> = { [`src/${title}.txt`]: `${title}\n` }) {
+  const card = e.wf.createCard({ title })
+  const s = await e.wf.start(card.key, B1)
+  moved(s)
+  const folder = s.data!.folder as string
+  commit(folder, files, `${card.key}: ${title}`)
+  moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  moved(await e.wf.startReview(card.key, R1))
+  moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+  return { card, folder }
+}
+
+describe('refusals under Hive merges (the card says what to do)', () => {
+  it("report merge on a queued card: refused with its place in the queue and where the rule is set; the card untouched; Refused recorded", async () => {
+    const e = team()
+    const { card: first } = await queued(e, 'One')
+    const { card } = await queued(e, 'Two')
+    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
+    expect(r.message).toBe(`Hive merges ${card.key}: agents don't merge it or report its merge.`)
+    expect(r.next).toBe('It is in the merge queue for main (position 2) and moves to Done once merged: wait for that, or for it to come back.')
+    expect(r.change).toBe('This rule is set in Version Control → Who merges. A card keeps the rules it started with.')
+    expect(r.override).toBeNull()
+    expect(e.wf.state(card).stage).toBe('merging')
+    expect(e.wf.state(first).stage).toBe('merging')
+    expect(e.kinds(card.id)).toContain('Refused')
+    // The first is next in line.
+    expect(refusedBy(await e.wf.reportMerge(first.key, B1), 'merge.hiveMerges').next).toContain('(position 1)')
+  })
+
+  it('before approval, and after a return: the next step fits where it is', async () => {
+    const e = team()
+    const card = e.wf.createCard({ title: 'Early' })
+    moved(await e.wf.start(card.key, B1))
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe('Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.')
+    const { card: red } = await queued(e, 'Red')
+    await e.queue({ runCheck: async () => ({ ok: false, output: '1 failing' }) }).drain('main')
+    expect(refusedBy(await e.wf.reportMerge(red.key, B1), 'merge.hiveMerges').next).toBe('It came back from the merge queue: fix it in your worktree, commit and submit again.')
+  })
+
+  it("an agent's move to Done names the queue, not report merge", async () => {
+    const e = team()
+    const { card } = await queued(e)
+    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.hiveMerges')
+    expect(r.next).toContain('merge queue for main')
+    // Translated into report merge (P4 to P8): the same refusal.
+    refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'merge.hiveMerges')
+    expect(e.wf.state(card).stage).toBe('merging')
+    // Where the agent merges, the refusal names the intent to use, as before.
+    e.options.finish = 'agentMerges'
+    const theirs = e.wf.createCard({ title: 'Theirs' })
+    expect(refusedBy(await e.wf.agentColumnMove(theirs.key, B1, 'done'), 'move.useIntent').next).toBe('Use the report merge intent instead.')
+  })
+
+  it('the merge slot: refused for a card Hive merges (refuseHiveMerge), nothing for an unknown card', async () => {
+    const e = team()
+    const { card } = await queued(e)
+    const r = await e.wf.refuseHiveMerge(card.key, B1, 'merge slot')
+    expect(r).toMatchObject({ refused: true, rule: 'merge.hiveMerges', override: null })
+    expect(await e.wf.refuseHiveMerge('AM-999', B1, 'merge slot')).toBeNull()
+  })
+
+  it('the window shows the refusal in its own words, its next step by where the card is', async () => {
+    const lines = refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'testing', target: 'main' }, { one: (m, v) => `${m.id}${v ? JSON.stringify(v) : ''}`, list: (x) => x.join(', '), names: true })
+    expect(lines.next).toContain('workflow.refused.merge.hiveMerges.nextTesting')
+    expect(refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'notYet' }, { one: (m) => m.id, list: (x) => x.join(', '), names: true }).next).toBe('workflow.refused.merge.hiveMerges.next')
+  })
+})
+
+describe('old rules: the card keeps the ruleset it started under', () => {
+  it('started under Hive merges, the project switched to "The agent merges": still refused and still queued; a card started afterwards reports its merge', async () => {
+    const e = team()
+    const { card: old } = await queued(e, 'Old')
+    e.options.finish = 'agentMerges'
+    refusedBy(await e.wf.reportMerge(old.key, B1), 'merge.hiveMerges')
+    expect(e.wf.state(old).stage).toBe('merging')
+    expect(queueStateOf(e.wf, old)).toMatchObject({ state: 'queued', position: 1 })
+    // A card started now: the agent merges it, and its report is taken.
+    const { card: now, folder } = await queued(e, 'New')
+    expect(e.wf.state(now).stage).toBe('approved')
+    expect(queueStateOf(e.wf, now)).toBeNull()
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by the agent', sh(folder, 'rev-parse', 'HEAD'))
+    moved(await e.wf.reportMerge(now.key, B1))
+    expect(e.wf.state(now).stage).toBe('done')
+  })
+})
+
+describe('with workflow rules off (Settings → Advanced)', () => {
+  it('report merge of a queued Hive-merges card works as before 1.0: Done, and the queue drops its entry', async () => {
+    let enforced = true
+    const e = team({ enforced: () => enforced })
+    const { card, folder } = await queued(e)
+    enforced = false
+    expect(e.wf.hiveMergesRefusal(card)).toBeNull()
+    expect(await e.wf.refuseHiveMerge(card.key, B1, 'merge slot')).toBeNull()
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(folder, 'rev-parse', 'HEAD'))
+    moved(await e.wf.reportMerge(card.key, B1))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('done')
+    expect(s.entries.at(-1)?.state).toBe('cancelled')
+    expect(s.entries.at(-1)?.cancelled).toBe('integratedOutside')
+    enforced = true
+    expect(await e.queue().runOnce('main')).toBeNull()
+    expect(queueLine({ state: 'queued', target: 'main', position: 1 }, false)).toContain("workflow rules aren't enforced")
+  })
+})
+
+describe('wakes at each queue outcome (what came back and what to do)', () => {
+  it('red checks: the check, its log, its last lines and the next step; within the wake line', async () => {
+    const e = team()
+    const { card } = await queued(e)
+    const output = ['ok 1', 'ok 2', 'not ok 3 - adds', '# 1 failing'].join('\n')
+    await e.queue({ runCheck: async () => ({ ok: false, output, logPath: 'C:\\logs\\check.log' }) }).drain('main')
+    const wake = e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why
+    expect(wake).toBe(`${card.key} came back from the merge queue: the merge check quick failed on the merged result. Its log: C:\\logs\\check.log. Its last lines: "ok 1 | ok 2 | not ok 3 - adds | # 1 failing". Fix it in your worktree, commit and submit again (hive_submit).`)
+    expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ check: 'quick', logPath: 'C:\\logs\\check.log' })
+    // The card read says it too.
+    expect(e.wf.queueLineOf(card.key)).toContain('Its log: C:\\logs\\check.log.')
+  })
+
+  it('a transient failure: submit the same revision again, at most twice', async () => {
+    const e = team()
+    const { card } = await queued(e)
+    await e.queue({ runCheck: async () => ({ ok: false, transient: true, cause: { cause: 'network', code: 'ENOTFOUND' }, output: 'npm error code ENOTFOUND' }) }).drain('main')
+    const wake = e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why
+    expect(wake).toContain('the merge check quick failed for the environment, not the work (network: ENOTFOUND)')
+    expect(wake).toContain('Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.')
+  })
+
+  it('a conflict: the files, and merging the target in', () => {
+    const f: FactData['IntegrationFailed'] = { entry: 'AM-1/e1', revision: 'a', target: 'main', reason: 'conflict', transient: false, files: Array.from({ length: 10 }, (_, i) => `f${i}.ts`) }
+    expect(returnedText('AM-1', f)).toBe('AM-1 came back from the merge queue: a conflict with main in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).')
+  })
+
+  it('a long log: its end kept, the next step always there, the whole within the wake note', () => {
+    const f: FactData['IntegrationFailed'] = { entry: 'AM-1/e1', revision: 'a', target: 'main', reason: 'checks', transient: false, check: 'tests', logPath: 'C:\\l.log', log: Array.from({ length: 50 }, (_, i) => `line ${i} ${'x'.repeat(150)}`).join('\n') }
+    const t = returnedText('AM-1', f)
+    expect(t.length).toBeLessThanOrEqual(WAKE_NOTE_MAX)
+    expect(t).toContain('line 49')
+    expect(t.endsWith('Fix it in your worktree, commit and submit again (hive_submit).')).toBe(true)
+    // The wake line quotes Hive's note whole (up to 600), a reviewer's request still at 200.
+    const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
+    expect(loopWakeLine(change, 'note', t)).toContain(t.slice(-60))
+    expect(loopWakeLine(change, 'request', t)).not.toContain(t.slice(-60))
+  })
+
+  it('left the queue: why (its pass stale, or a decision since) and what to do', async () => {
+    const e = team()
+    const { card } = await queued(e, 'Decided')
+    // A decision while queued: the runtime cancels the entry itself (its own wake).
+    moved(await e.wf.recordDecision(card.key, 'Use the other name'))
+    expect(queueStateOf(e.wf, card)).toMatchObject({ state: 'left', why: 'decision' })
+    expect(e.wf.queueLineOf(card.key)).toContain('a decision since its approval needs it reviewed again')
+    // The queue's own skip says the same, by why and where the card went.
+    expect(leftWake('AM-4', 'stale', 'review')).toBe('AM-4 left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.')
+    expect(leftWake('AM-4', 'decision', 'review')).toBe('AM-4 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task); it is back in Review, and queued again once approved.')
+    expect(leftWake('AM-4', 'decision', 'active')).toContain('then submit again (hive_submit).')
+  })
+})
+
+describe('where a card is, for its readers (queueState.ts)', () => {
+  it('queued, testing, merged; nothing for a card the agent merges', async () => {
+    const e = team()
+    const { card } = await queued(e)
+    expect(e.wf.queueLineOf(card.key)).toBe("Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 1; it moves to Done once merged.")
+    await e.queue().drain('main')
+    expect(queueStateOf(e.wf, card)).toEqual({ state: 'merged' })
+    // Done: nothing more to say on a card read.
+    expect(e.wf.queueLineOf(card.key)).toBeNull()
+    expect(queueLine({ state: 'testing', target: 'main', step: 'merge' })).toContain('testing its merge into main now')
+    expect(queueLine({ state: 'paused', target: 'main', reason: 'folderBusy', card: 'AM-2' })).toContain('which is paused (folderBusy, on AM-2)')
+  })
+
+  it("hive_lane next: a passed card Hive merges is named with where it is, and the next card waits for it", () => {
+    const lane = { state: 'running' } as unknown as Parameters<typeof laneNextText>[0]['lane']
+    expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null, queue: [{ card: 8, line: 'Hive merges this card (its rules): queued.' }] })).toBe('#8: Hive merges this card (its rules): queued. Next: #9 Next one, once it is Done.')
+    expect(laneNextText({ lane, next: null, waits: null, queue: [{ card: 8, line: 'Queued.' }] })).toBe('#8: Queued. Nothing else to start: the lane ends by itself once all are Done.')
+    expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null })).toBe('Next: #9 Next one. Start it.')
+  })
+})
