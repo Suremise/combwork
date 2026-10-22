@@ -3846,16 +3846,18 @@ h2.section#unused-worktrees {
   color: var(--fg-muted);
   vertical-align: text-bottom;
 }
-/* The state and who made it, badges in a row: each cut rather than wrapped, its full text on hover. */
-.unused-wt-table .unused-wt-badges {
+/* The state and who made it, badges in a row: never cut (the Assistant's OK on #1314); a badge that doesn't fit beside
+   the other goes under it, and one wider than its cell wraps inside itself. */
+.unused-wt-table td > span.unused-wt-badges {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  overflow: visible;
 }
 .unused-wt-badges .badge {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .unused-wt-table .item-table-actions .btn + .btn,
 .unused-wt-table .item-table-actions .btn + .tip-wrap,

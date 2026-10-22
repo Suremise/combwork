@@ -94,6 +94,20 @@ function pathWithoutGit() {
   check('…Give to an agent… and Remove anyway…', (await aheadRow.getByRole('button', { name: 'Give to an agent…' }).count()) === 1 && (await aheadRow.getByRole('button', { name: 'Remove anyway…' }).count()) === 1)
   check('sizes are measured', !!(await lib.until(async () => /\d+(\.\d+)? (B|KB|MB)/.test(await mergedRow.innerText()), 15000)), await mergedRow.innerText())
   check('Remove all merged (1)…', (await section.getByRole('button', { name: 'Remove all merged (1)…' }).count()) === 1)
+  // No badge is ever cut (the Assistant's OK on #1314): each shows its whole text inside its cell, at every width.
+  const badgesWhole = () =>
+    page.evaluate(() => {
+      const badges = [...document.querySelectorAll('.unused-wt .unused-wt-badges .badge')]
+      return (
+        badges.length > 0 &&
+        badges.every((b) => {
+          const cell = b.closest('td').getBoundingClientRect()
+          const r = b.getBoundingClientRect()
+          return b.scrollWidth <= b.clientWidth + 1 && r.left >= cell.left - 0.5 && r.right <= cell.right + 0.5
+        })
+      )
+    })
+  check('…every state badge whole, none cut (1400 px)', !!(await lib.until(badgesWhole, HUNG_MS)))
   await shot('changes-list-dark')
   await theme('light')
   await shot('changes-list-light')
@@ -125,6 +139,7 @@ function pathWithoutGit() {
       return !!pane && buttons.length > 0 && buttons.every((b) => b.left >= pane.left - 0.5 && b.right <= pane.right + 0.5)
     })
   check('…every row’s buttons inside the pane', !!(await lib.until(buttonsInside, HUNG_MS)))
+  check('…every state badge whole there too', !!(await lib.until(badgesWhole, HUNG_MS)))
   await shot('changes-list-narrow')
   await command('progress.toggle')
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
@@ -140,6 +155,7 @@ function pathWithoutGit() {
       return rows.length === 2 && rows.every((r) => r.height < 36) && !!head && getComputedStyle(head).display !== 'none' && new Set(actions).size === 1
     })
   check('…wider still: a line a worktree under the column headings, actions aligned at the right', !!(await lib.until(oneLine, HUNG_MS)))
+  check('…every state badge whole there too', !!(await lib.until(badgesWhole, HUNG_MS)))
   await shot('changes-list-wide-dark')
   await theme('light')
   await shot('changes-list-wide-light')
