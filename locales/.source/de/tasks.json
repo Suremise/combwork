@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} other {{why}}}",
   "tasks.skipped.movedColumn": "moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
   "tasks.skipped.movedProject": "moved to another project",
+  "tasks.skipped.movedStage": "moved to {stage}",
   "tasks.skipped.noMatch": "no longer matches the search",
   "tasks.skipped.unreadable": "couldn't be read",
   "tasks.skipped.unsaved": "couldn't be saved",

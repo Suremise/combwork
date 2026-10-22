@@ -528,6 +528,26 @@ describe('archiving in batches', () => {
     expect(included.archived).toEqual([taken])
   })
 
+  it("a stage column's batch (Approved beside Merging, #1420) takes only the cards in that stage now, by their facts", async () => {
+    const [approved, merging, plain] = [await make('Approved card', 'done'), await make('Merging card', 'done'), await make('Old card', 'done')]
+    // Their stages as their facts say (here: a card moved into Merging while the dialog was open).
+    const stages: Record<number, 'approved' | 'merging' | null> = { [approved]: 'approved', [merging]: 'merging', [plain]: null }
+    await run(() => Promise.all([approved, merging, plain].map((n) => tasks.updateTask(n, { column: 'passed' as never }, user))))
+    const stageOf = (c: { number: number }) => stages[c.number] ?? null
+    const r = await run(() => tasks.archiveBatch([approved, merging, plain], req('All in Passed', { column: 'passed', stage: 'approved' }), user, { stageOf }))
+    // A card with no stage of its own stands in its column's (Approved).
+    expect(r.archived.sort()).toEqual([approved, plain].sort())
+    expect(r.skipped).toEqual([{ number: merging, why: 'moved to Merging' }])
+    // A stage of another column is ignored: the column alone decides.
+    const odd = await run(() => tasks.archiveBatch([merging], req('All in Passed', { column: 'passed', stage: 'active' }), user, { stageOf }))
+    expect(odd.archived).toEqual([merging])
+    // A card whose facts say a stage of another category stands in its column's default stage, as the board shows it.
+    const stray = await make('Stray', 'done')
+    await run(() => tasks.updateTask(stray, { column: 'passed' as never }, user))
+    const strayIn = await run(() => tasks.archiveBatch([stray], req('All in Passed', { column: 'passed', stage: 'approved' }), user, { stageOf: () => 'review' }))
+    expect(strayIn.archived).toEqual([stray])
+  })
+
   it('a card an agent takes while the archive waits is left on the board (race)', async () => {
     const [idle, alsoIdle] = [await make('Idle'), await make('Also idle')]
     const busy = (c: { column: string; agent: string | null }): string | null => (c.column === 'doing' && c.agent ? 'Agent 1 is working on it' : null)

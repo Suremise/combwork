@@ -1492,6 +1492,20 @@ renaming the Active stage leaves the category Active. The user's names are for t
 project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
 **Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.
 
+**Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from `workflow:stages`
+and each card's stage from its facts). Each category in its fixed order shows its stages as columns: those the shown
+projects' current options produce, and any a card of theirs is in (a card under old rules keeps its stage shown).
+On Hold, Todo, Active and Done always show; Review and Approved only with a stage, or all six while Settings →
+Advanced → *Workflow rules are enforced* is off (cards move freely then). Approved with Merging is two columns
+under one Approved heading, in the category's colour. With several projects shown the columns are the union of their
+stages; a column takes a project's rename when one project is shown or every shown project names it alike, else its
+default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
+category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in
+Merging leaves it by Remove from queue, never by a drag into Approved; Approved's Archive All takes Approved's cards only (a
+card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. Folds are kept per column id: a category's
+apply to its stage, Merging keeps its own (`merging`). The toolbar links each shown project's workflow ("Workflow: Git ·
+Team", or a **Workflows** menu with a line per project), opening its Version Control tab at Workflow.
+
 #### 16.5.3 The piece library
 
 [#1112 D] Rules are built only from these pieces, implemented and unit-tested in code. A piece declares the

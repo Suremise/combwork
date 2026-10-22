@@ -50,6 +50,7 @@ export const SUITES = [
   { name: 'boardgates' },
   { name: 'boardscope' },
   { name: 'boardscroll' },
+  { name: 'boardstages' },
   { name: 'boardupgrade' },
   { name: 'bridgereport' },
   { name: 'bursts' },

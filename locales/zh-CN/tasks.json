@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "结束了 {watcher} 对它的监视：{why, select, blocked {卡片受阻} reviewer {由 {agent} 评审} reviewTaken {它的评审已被收回} reassigned {已改派给 {agent}} unassigned {已取消指派} other {{why}}}",
   "tasks.skipped.movedColumn": "已移到“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已通过} done {已完成} other {{column}}}”",
   "tasks.skipped.movedProject": "已移到其他项目",
+  "tasks.skipped.movedStage": "已移到“{stage}”",
   "tasks.skipped.noMatch": "不再匹配搜索",
   "tasks.skipped.unreadable": "无法读取",
   "tasks.skipped.unsaved": "无法保存",

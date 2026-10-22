@@ -1,5 +1,5 @@
 import { msg, type Msg } from './i18n/msg'
-import type { BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
+import type { BoardColumnId, BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 
 /**
@@ -25,6 +25,8 @@ export const TASK_COLUMNS: { id: TaskColumn; label: string; description: string 
 ]
 
 export const isTaskColumn = (v: unknown): v is TaskColumn => typeof v === 'string' && TASK_COLUMNS.some((c) => c.id === v)
+/** A board column's id (#1420): a category's, or Merging's own. */
+export const isBoardColumn = (v: unknown): v is BoardColumnId => v === 'merging' || isTaskColumn(v)
 
 export const columnLabel = (c: TaskColumn): string => TASK_COLUMNS.find((x) => x.id === c)?.label ?? c
 
@@ -101,7 +103,7 @@ export const BOARD_FOLD_CARDS = 5000
  * writes back what it read before another window changed it.
  */
 export interface BoardFoldChange {
-  columns?: { ids: TaskColumn[]; collapsed: boolean }
+  columns?: { ids: BoardColumnId[]; collapsed: boolean }
   cards?: { numbers: number[]; folded: boolean }
   known?: number[]
 }
@@ -117,10 +119,10 @@ export function applyBoardFold(all: Record<string, BoardFold> | undefined, works
   const key = workspace.toLowerCase()
   const out = { ...all }
   const now = out[key] ?? {}
-  const columns = new Set((Array.isArray(now.columns) ? now.columns : []).filter(isTaskColumn))
+  const columns = new Set<BoardColumnId>((Array.isArray(now.columns) ? now.columns : []).filter(isBoardColumn))
   const cards = new Set(cardNumbers(now.cards))
   if (change.columns) {
-    for (const c of (Array.isArray(change.columns.ids) ? change.columns.ids : []).filter(isTaskColumn)) {
+    for (const c of (Array.isArray(change.columns.ids) ? change.columns.ids : []).filter(isBoardColumn)) {
       if (change.columns.collapsed) columns.add(c)
       else columns.delete(c)
     }

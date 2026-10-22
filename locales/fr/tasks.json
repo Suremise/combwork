@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "Fin de la surveillance de l’agent {watcher} : {why, select, blocked {la carte est bloquée} reviewer {l’agent {agent} la relit} reviewTaken {sa relecture lui a été retirée} reassigned {réassignée à l’agent {agent}} unassigned {plus assignée à aucun agent} other {{why}}}",
   "tasks.skipped.movedColumn": "déplacée vers {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
   "tasks.skipped.movedProject": "déplacée vers un autre projet",
+  "tasks.skipped.movedStage": "déplacée vers {stage}",
   "tasks.skipped.noMatch": "ne correspond plus à la recherche",
   "tasks.skipped.unreadable": "illisible",
   "tasks.skipped.unsaved": "impossible à enregistrer",

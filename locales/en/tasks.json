@@ -539,6 +539,10 @@
     "defaultMessage": "moved to another project",
     "description": "Why Archive All left a card on the board (after its number, \"#12 moved to another project\"): it moved to another project meanwhile. Lower case: it follows the number."
   },
+  "tasks.skipped.movedStage": {
+    "defaultMessage": "moved to {stage}",
+    "description": "Why Archive All of a stage column (Approved beside Merging) left a card on the board (after its number, \"#12 moved to Merging\"): it moved to another stage of the column meanwhile. {stage} is the stage’s name (glossary 2.2). Lower case: it follows the number."
+  },
   "tasks.skipped.noMatch": {
     "defaultMessage": "no longer matches the search",
     "description": "Why Archive All left a card on the board (after its number, \"#12 no longer matches the search\"): it changed meanwhile, and the board's search no longer finds it. Lower case: it follows the number."

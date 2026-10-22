@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { AgentInfo, ArchiveBatch, BoardFold, ProjectInfo, ProviderId, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
+import type { AgentInfo, ArchiveBatch, BoardColumnId, BoardFold, ProjectInfo, ProviderId, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
@@ -25,7 +25,7 @@ import { cx, timeAgo } from '../util'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { formatDateTime } from '@shared/dates'
 import { returnRound } from '@shared/watch'
-import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useClipped, useContextMenu, type MenuEntry } from './ui'
+import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useContextMenu, type MenuEntry } from './ui'
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { openLaneStart } from './LaneStartDialog'
@@ -37,6 +37,10 @@ import { ProviderIcon } from './ProviderIcon'
 import { CardCostLine } from './CardCost'
 import { useLaneOf, useLanes } from '../laneSource'
 import { DocRefViewer, problemLines } from './DocRefViewer'
+import { boardLayout, cardColumn, cardStage, ownStageName, type BoardStageColumn } from '../boardStages'
+import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
+import { useAdvancedValue } from '../advanced'
+import type { StageId } from '@shared/workflow/facts'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
 
 const NO_TASKS: TaskCard[] = []
@@ -71,7 +75,7 @@ function loadBoardFold(): void {
     .catch(() => undefined)
 }
 
-const collapseColumn = (col: TaskColumn, collapsed: boolean): void => saveFold({ columns: { ids: [col], collapsed } })
+const collapseColumn = (col: BoardColumnId, collapsed: boolean): void => saveFold({ columns: { ids: [col], collapsed } })
 
 const foldCards = (numbers: number[], folded: boolean): void => saveFold({ cards: { numbers, folded } })
 
@@ -146,16 +150,19 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
   return null
 }
 
-/** The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. */
-function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'project' | 'scope' | 'query'>): { shown: TaskCard[]; total: number } {
-  const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && inProject(c, r.scope))
+/**
+ * The cards Archive All would take (#351): those of the column (or board) shown, and how many there are in all. A stage
+ * column's (Approved beside Merging, #1420) only its stage's, as `stageOf` places each card.
+ */
+function archiveScope(all: TaskCard[], r: Pick<ArchiveAllRequest, 'column' | 'stage' | 'project' | 'scope' | 'query'>, stageOf?: (c: TaskCard) => StageId): { shown: TaskCard[]; total: number } {
+  const there = all.filter((c) => !c.archived && (r.column === null || c.column === r.column) && (!r.stage || stageOf?.(c) === r.stage) && inProject(c, r.scope))
   return { shown: there.filter((c) => inProject(c, r.project) && cardMatches(c, r.query, get().projectKeys, get().movedCardNames)), total: there.length }
 }
 
 /** The menu item that opens Archive All: a column's, or the board's (column null). Counted, and off with nothing shown. */
-function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest, readOnly: string | null): MenuEntry {
-  const { shown, total } = archiveScope(all, r)
-  const where = r.column === null ? null : columnName(r.column, tr)
+function archiveAllItem(all: TaskCard[], r: ArchiveAllRequest, readOnly: string | null, stageOf?: (c: TaskCard) => StageId): MenuEntry {
+  const { shown, total } = archiveScope(all, r, stageOf)
+  const where = r.column === null ? null : (r.name ?? columnName(r.column, tr))
   let label: string
   if (shown.length < total && where) label = tr(msg({ id: 'board.archiveAll.menuShownIn', defaultMessage: 'Archive the {n, number} Shown (of {total, number})…', description: "Menu item in a board column's ⋯ menu, when a search hides some of its cards: archive the {n} cards shown, of the column's {total}. Opens a dialog (…)." }), { n: shown.length, total })
   else if (shown.length < total) label = tr(msg({ id: 'board.archiveAll.menuShown', defaultMessage: '{n, plural, one {Archive the # Shown Card (of {total, number})…} other {Archive the # Shown Cards (of {total, number})…}}', description: "Menu item in the board's ⋯ menu, when a search hides some cards: archive the {n} cards shown, of the board's {total}. Opens a dialog (…)." }), { n: shown.length, total })
@@ -466,11 +473,14 @@ function CardTile({
   dropHere,
   readOnly,
   work,
-  forYou
+  forYou,
+  stageNote = null
 }: {
   c: TaskCard
   projects: ProjectInfo[]
   showProject: boolean
+  /** Its own project's name for its stage, where the column shows another (several projects naming it differently). */
+  stageNote?: string | null
   /** Folded to one line (#170): its number, title, agent and any stalled or blocked marker. */
   folded: boolean
   onDragStart: (e: React.DragEvent) => void
@@ -553,7 +563,13 @@ function CardTile({
         <div className="task-card-top">
           {fold}
           <span className="task-number">{cardLabel(c)}</span>
-          {showProject && c.project && <span className="task-project">{c.project}</span>}
+          {showProject && c.project && (stageNote ? (
+            <Tooltip content={tr(msg({ id: 'board.card.stageInProject', defaultMessage: 'In {project}, this stage is {stage}', description: "Tooltip on a card's project name on the board when its project names the card's stage differently from the column's heading (glossary 2.2: stage). {project} is the project, {stage} its own name for the stage." }), { project: c.project, stage: stageNote })}>
+              <span className="task-project" data-stage-note={stageNote}>{c.project}</span>
+            </Tooltip>
+          ) : (
+            <span className="task-project">{c.project}</span>
+          ))}
           {!c.project && <span className="task-project faint">{tr(WORKSPACE_CARD)}</span>}
         </div>
         <div className="task-title">{c.title}</div>
@@ -628,7 +644,7 @@ function CardTile({
   )
 }
 
-type DragState = { n: number; column: TaskColumn; before: number | null }
+type DragState = { n: number; column: BoardColumnId; before: number | null }
 
 /**
  * The board: six columns of cards (one project's, or all of them). Cards drag between and within columns;
@@ -653,6 +669,13 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const colors = useStore((s) => s.settings?.board.colors)
   const fold = useBoardFold()
   const headerMenu = useContextMenu()
+  // Its columns from the shown projects' stages (#1420): their options' stages and any a card of theirs is in.
+  const shownProjects = useBoardProjects(project)
+  const live = useMemo(() => all.filter((c) => !c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())), [all, project])
+  const stageOf = (c: TaskCard) => cardStage(c.column, workBadges.get(c.number)?.stage)
+  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
+  const layout = boardLayout(shownProjects, live.map((c) => ({ project: c.project, stage: stageOf(c) })), tr, enforced)
+  const columnOf = (c: TaskCard): BoardColumnId => cardColumn(c.column, stageOf(c), layout)
   const [drag, showDrag] = useState<DragState | null>(null)
   // The handlers read the drag from here, not from the last render: a dragover or drop can come before React has
   // drawn the drag's start (a quick drag), and would then be refused.
@@ -664,7 +687,10 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   // The columns the dragged card can be dropped in under its rules (#1275: tasks:columns, asked as the drag starts);
   // null until known, or when no rule applies: every column. A column its rules lack is no drop target.
   const dropsNow = useRef<{ n: number; columns: Set<TaskColumn> | null } | null>(null)
-  const droppable = (column: TaskColumn): boolean => {
+  const droppable = (column: BoardColumnId): boolean => {
+    // Merging takes no drop (its cards come through the merge queue), and a card in Merging leaves it only by Remove
+    // from queue, never by a drag into Approved (#1420).
+    if (column === 'merging' || (column === 'passed' && dragNow.current?.column === 'merging')) return false
     const d = dropsNow.current
     return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
   }
@@ -687,15 +713,15 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     if (!d) return
     const at = document.elementFromPoint(x, y) as HTMLElement | null
     const colEl = at?.closest<HTMLElement>('.board-column')
-    const column = colEl?.dataset.column as TaskColumn | undefined
+    const column = colEl?.dataset.column as BoardColumnId | undefined
     if (!at || !colEl || !column || !boardRef.current?.contains(colEl)) return
     if (!droppable(column)) return
-    const list = cards.filter((c) => c.column === column)
+    const list = cards.filter((c) => columnOf(c) === column)
     const tile = at.closest<HTMLElement>('.task-card')
     let before: number | null
     // A collapsed column's strip: at its top, the true top of the board's cards there (#263), not the top of those the
     // search shows: a card the search hides would otherwise stay above it.
-    if (colEl.classList.contains('collapsed')) before = all.find((c) => !c.archived && c.column === column && c.number !== d.n && (project === null || c.project.toLowerCase() === project.toLowerCase()))?.number ?? null
+    if (colEl.classList.contains('collapsed')) before = live.find((c) => columnOf(c) === column && c.number !== d.n)?.number ?? null
     else if (tile) {
       const n = Number(tile.dataset.task)
       const r = tile.getBoundingClientRect()
@@ -781,10 +807,12 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
 
   if (archived) return <ArchivedTable cards={cards} project={project} query={query} />
 
-  const drop = async (column: TaskColumn): Promise<void> => {
+  const drop = async (into: BoardColumnId): Promise<void> => {
     const d = dragNow.current
     setDrag(null)
     if (!d) return
+    // A drop into a stage is its category's move (#1420).
+    const column: TaskColumn = into === 'merging' ? 'passed' : into
     const card = all.find((c) => c.number === d.n)
     if (!card || (card.column === column && d.before === d.n)) return
     // Into Doing from another column: who works on it is asked first, and the card stays put until then (Cancel).
@@ -798,11 +826,11 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
 
   const folded = new Set(fold.cards ?? [])
   const collapseLabel = (name: string): string => tr(msg({ id: 'board.columns.collapse', defaultMessage: 'Collapse {column}', description: "Tooltip, accessible name and menu item: folds a board column ({column}, its name) sideways into a narrow strip." }), { column: name })
-  const columnMenu = (col: (typeof TASK_COLUMNS)[number], list: TaskCard[]): MenuEntry[] => [
+  const columnMenu = (col: BoardStageColumn, list: TaskCard[]): MenuEntry[] => [
     { label: tr(msg({ id: 'board.columns.collapseCards', defaultMessage: 'Collapse All Cards', description: "Menu item in a board column's menu: folds each of its cards to one line." })), icon: 'collapse-all', disabled: !list.some((c) => !folded.has(c.number)), onClick: () => foldCards(list.map((c) => c.number), true) },
     { label: tr(msg({ id: 'board.columns.expandCards', defaultMessage: 'Expand All Cards', description: "Menu item in a board column's menu: shows each of its folded cards in full." })), icon: 'expand-all', disabled: !list.some((c) => folded.has(c.number)), onClick: () => foldCards(list.map((c) => c.number), false) },
     { separator: true },
-    { label: collapseLabel(tr(COLUMN_TEXT[col.id].label)), icon: 'chevron-left', onClick: () => collapseColumn(col.id, true) },
+    { label: collapseLabel(col.name), icon: 'chevron-left', onClick: () => collapseColumn(col.id, true) },
     { separator: true },
     // Todo's cards as a lane (#1280), in the column's order: the first card's project's (a lane is one project's).
     ...(col.id === 'todo' && list.some((c) => c.project)
@@ -819,18 +847,20 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
           { separator: true }
         ]
       : []),
-    archiveAllItem(all, { column: col.id, project, scope, query }, readOnly)
+    // Merging's cards are the merge queue's: no Archive All there. A column's archives its own stage's cards only, whether
+    // or not another stage of its category shows now: a card can move on to Merging while the dialog is open (HR2's
+    // #1420 rounds 1 and 2), and main checks each card's stage again.
+    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
   ]
 
-  return (
-    <div ref={boardRef} className={cx('board', colored && 'colored')} onDragEnd={() => setDrag(null)}>
-      {TASK_COLUMNS.map((col) => {
-        const list = cards.filter((c) => c.column === col.id)
-        const name = tr(COLUMN_TEXT[col.id].label)
-        const description = tr(COLUMN_TEXT[col.id].description)
+  const column = (col: BoardStageColumn) => {
+        const list = cards.filter((c) => columnOf(c) === col.id)
+        const name = col.name
+        const description = col.id === 'merging' ? tr(MERGING_TIP) : tr(COLUMN_TEXT[col.category].description)
         const columnProps = {
           'data-column': col.id,
-          style: colored ? ({ '--col': columnColor(colors, col.id) } as React.CSSProperties) : undefined,
+          'data-stage': col.stage,
+          style: colored ? ({ '--col': columnColor(colors, col.category) } as React.CSSProperties) : undefined,
           onDragOver: (e: React.DragEvent) => {
             // A column the card's rules don't have takes no drop (no highlight: the drag shows it can't go there).
             if (!dragNow.current || !droppable(col.id)) return
@@ -885,6 +915,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
                   c={c}
                   projects={projects}
                   showProject={project === null}
+                  stageNote={c.project ? ownStageName(shownProjects, c.project, stageOf(c), name, tr) : null}
                   folded={folded.has(c.number)}
                   dropHere={!!drag && drag.column === col.id && drag.before === c.number && drag.n !== c.number}
                   readOnly={readOnly}
@@ -893,7 +924,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move'
                     e.dataTransfer.setData('text/plain', cardLabel(c))
-                    setDrag({ n: c.number, column: c.column, before: c.number })
+                    setDrag({ n: c.number, column: col.id, before: c.number })
                     dropsNow.current = { n: c.number, columns: null }
                     void call('tasks:columns', c.number)
                       .then((cols) => {
@@ -908,31 +939,45 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
             </div>
           </div>
         )
+  }
+
+  const grouped = layout.some((g) => g.columns.length > 1)
+  return (
+    <div ref={boardRef} className={cx('board', colored && 'colored', grouped && 'grouped')} onDragEnd={() => setDrag(null)}>
+      {layout.map((g) => {
+        if (g.columns.length === 1) return column(g.columns[0])
+        // A category with several stages (Approved with Merging): one heading over its stages' columns (#1420).
+        const open = g.columns.filter((c) => !fold.columns?.includes(c.id)).length
+        return (
+          <div key={g.category} className={cx('board-category', !open && 'collapsed')} data-category={g.category} style={{ flexGrow: open, ...(colored ? ({ '--col': columnColor(colors, g.category) } as React.CSSProperties) : {}) }}>
+            <div className="board-category-head">{tr(COLUMN_TEXT[g.category].label)}</div>
+            <div className="board-category-columns">{g.columns.map(column)}</div>
+          </div>
+        )
       })}
       {headerMenu.element}
     </div>
   )
 }
 
-/** A board column's name in its header: cut with "…" when the column is narrow, and then given in full in its tooltip (#886). */
+/** Merging's description (its hover): no drop there (#1420). */
+const MERGING_TIP = msg({ id: 'board.columns.mergingTip', defaultMessage: "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.", description: "The Merging column's description (its hover; glossary 2.2: Merging, a stage inside Approved). Remove from queue is the button on the card's Work section and in the Progress panel." })
+
+/**
+ * A board column's name in its header: wrapped to two lines when the column is narrow (cut with "…" only past them), and
+ * always given in full in its tooltip with what the column is for (#886, #1420).
+ */
 function ColumnLabel({ name, description }: { name: string; description: string }) {
-  const [ref, clipped] = useClipped<HTMLSpanElement>()
   return (
     <Tooltip
       content={
-        clipped ? (
-          <>
-            <strong>{name}</strong>
-            <div>{description}</div>
-          </>
-        ) : (
-          description
-        )
+        <>
+          <strong>{name}</strong>
+          <div>{description}</div>
+        </>
       }
     >
-      <span className="board-column-label" ref={ref}>
-        {name}
-      </span>
+      <span className="board-column-label">{name}</span>
     </Tooltip>
   )
 }
@@ -1148,6 +1193,7 @@ export function BoardToolbar({
       <label className="flex muted" style={{ cursor: 'pointer' }}>
         <input type="checkbox" className="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {tr(msg({ id: 'board.toolbar.archived', defaultMessage: 'Archived ({n, number})', description: "A checkbox in the board's toolbar: shows the archived cards instead (how many there are: {n})." }), { n: count })}
       </label>
+      <BoardWorkflowLink project={project} />
       <div className="grow" />
       <button className="btn primary" disabled={!!readOnly} title={readOnly ?? undefined} onClick={() => set({ taskOpen: { project: project ?? '' } })}>
         <Icon name="add" /> {tr(NEW_CARD)}
@@ -1238,6 +1284,8 @@ export function ArchiveAllDialog() {
   useLanguage()
   const req = useStore((s) => s.boardArchiveAll)
   const all = useStore((s) => s.tasks)
+  // Each card's stage from its facts: a stage column's Archive All takes its own (#1420).
+  const badges = useWorkBadges()
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const assistant = useStore((s) => s.workspace?.assistant ?? null)
   const [include, setInclude] = useState(false)
@@ -1249,14 +1297,14 @@ export function ArchiveAllDialog() {
   }, [req, setError])
   if (!req) return null
   const close = (): void => set({ boardArchiveAll: null })
-  const { shown, total } = archiveScope(all, req)
+  const { shown, total } = archiveScope(all, req, (c) => cardStage(c.column, badges.get(c.number)?.stage))
   const held = shown.flatMap((c) => {
     const why = cardBusy(c, projects, assistant)
     return why ? [{ c, why }] : []
   })
   const going = include ? shown : shown.filter((c) => !held.some((h) => h.c === c))
   const filtered = shown.length < total
-  const where = req.column === null ? null : columnName(req.column, tr)
+  const where = req.column === null ? null : (req.name ?? columnName(req.column, tr))
   const n = going.length
   let title: string
   if (where && filtered) title = tr(msg({ id: 'board.archiveAll.titleShownIn', defaultMessage: 'Archive the {n, number} Shown in {column}?', description: "Title of the Archive All dialog for a column whose cards a search narrows: the {n} cards shown in the column ({column}, its name)." }), { n: shown.length, column: where })
@@ -1281,7 +1329,7 @@ export function ArchiveAllDialog() {
     const r = await call(
       'tasks:archiveBatch',
       going.map((c) => c.number),
-      { label, column: req.column, project: req.project, query: req.query, includeBusy: include }
+      { label, column: req.column, ...(req.stage ? { stage: req.stage } : {}), project: req.project, query: req.query, includeBusy: include }
     )
     await loadTasks()
     close()

@@ -20,8 +20,8 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
-import type { StageDef } from './workflow/compile'
 import type { StageId } from './workflow/facts'
+import type { StageDef } from './workflow/compile'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -677,9 +677,13 @@ export interface HiddenProject {
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
+/** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
+export type BoardColumnId = TaskColumn | 'merging'
+
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
-  columns?: TaskColumn[]
+  /** A category's applies to its stage's column; Merging keeps its own. */
+  columns?: BoardColumnId[]
   cards?: number[]
 }
 
@@ -835,6 +839,11 @@ export interface ArchiveRequest {
   label: string
   /** The column it was for; null: the whole board. */
   column: TaskColumn | null
+  /**
+   * The stage it was for, where its category shows several (Approved beside Merging, #1420): a card in another stage
+   * of the column, as its facts say now, stays.
+   */
+  stage?: StageId
   /** The project the board showed (null: every project) and its search: a card that has left them stays. */
   project: string | null
   query: string

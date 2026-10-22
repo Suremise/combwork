@@ -662,7 +662,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:archiveBatch': (numbers, req) => {
       // Who is on a card is checked again as each is archived (#351), in this window's workspace.
       const ws = currentWorkspace()
-      return tasks.archiveBatch(numbers, req, { kind: 'user' }, { busy: (c) => cardBusy(ws, c) })
+      // A stage column's batch (#1420): each card's stage as its facts say now.
+      return tasks.archiveBatch(numbers, req, { kind: 'user' }, { busy: (c) => cardBusy(ws, c), stageOf: (c) => cardWork(ws, c.number)?.stage ?? null })
     },
     'tasks:unarchiveBatch': (id) => tasks.unarchiveBatch(id, { kind: 'user' }),
     'tasks:archiveBatches': () => tasks.archiveBatches(),
