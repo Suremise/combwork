@@ -212,4 +212,53 @@ function folderHelpers(fx) {
   }
 }
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers }
+/**
+ * The merge check as a script of the suite's (#1358: one that reads the merged result, S4's and S13's), in place of
+ * check.js until `restoreCheck`. It still writes its pid to started.txt.
+ */
+function checkWith(fx, name, js) {
+  const file = path.join(fx.tools, `${name}.js`)
+  fs.writeFileSync(file, `require('fs').writeFileSync(${JSON.stringify(fx.started)}, String(process.pid))\n${js}\n`)
+  fs.writeFileSync(fx.tool, `@node "${file}"\r\n`)
+}
+
+/** The merge check back to check.js (steered by control.json). */
+function restoreCheck(fx) {
+  fs.writeFileSync(fx.tool, `@node "${path.join(fx.tools, 'check.js')}"\r\n`)
+}
+
+/**
+ * The Progress panel's Merges tab, opened (#1358): its panel, a target's queue card (`card(target)`) and that card's
+ * text with its spaces folded.
+ */
+async function mergesTab(h, project = 'alpha') {
+  const panel = h.page.locator('.progress-panel')
+  if (!(await panel.count())) await h.page.locator('.progress-rail').click()
+  await lib.until(async () => (await panel.count()) === 1, HUNG_MS, 200)
+  await panel.locator('.progress-tab[data-tab="merges"]').click()
+  await lib.until(async () => (await panel.locator('.progress-tab-merges').count()) === 1, HUNG_MS, 200)
+  const card = (target) => panel.locator(`.progress-queue-card[data-queue="${project}#${target}"]`)
+  const text = async (target) => ((await card(target).innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  return { panel, card, text }
+}
+
+/**
+ * Another Hive's profile on the fixture's workspace (#1358's queuelease: S50, two Hives on one hive.db), set up as
+ * prepare sets the fixture's own: the fake Claude Code, quiet, the Agent API on. Returns the fixture with that profile,
+ * for startHive.
+ */
+function otherProfile(fx, suffix) {
+  const userData = `${fx.userData}-${suffix}`
+  fs.rmSync(userData, { recursive: true, force: true })
+  lib.enableProviders(userData)
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
+  cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
+  cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  return { ...fx, userData }
+}
+
+module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, checkWith, restoreCheck, mergesTab, otherProfile }
