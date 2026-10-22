@@ -87,6 +87,8 @@
   "tips.boardStages.title": "Pon a las etapas del tablero tus propios nombres",
   "tips.boardUpgrade.text": "Hive guarda el tablero 0.9 que actualizó a 1.0. Ayuda → Restaurar la copia de seguridad del tablero 0.9… lo devuelve, tras guardar una copia del tablero tal como está, para que un Hive 0.9 pueda cambiarlo de nuevo.",
   "tips.boardUpgrade.title": "Volver a 0.9 después de actualizar",
+  "tips.branchCards.text": "En Control de versiones → Ramas y remotos, una rama en la que trabaja una tarjeta muestra la tarjeta y su etapa, y en Revisión la versión en revisión. Haz clic en la tarjeta para abrirla.",
+  "tips.branchCards.title": "Mira para qué tarjeta es una rama",
   "tips.cardCost.text": "El panel de una tarjeta dice lo que usaron sus agentes mientras la tenían, “{example}”, con las partes del autor y del revisor y los tokens al pasar el puntero. Rendimiento muestra el costo de cada tarjeta, y al pasar el puntero por un carril en el panel Progreso, sus gastos generales.",
   "tips.cardCost.title": "Lo que costó una tarjeta",
   "tips.cardDecisions.text": "Las Decisiones de una tarjeta, encima de sus comentarios, guardan lo que decidiste: los agentes comprueban su trabajo con ellas antes de Revisión, y los revisores rechazan el trabajo que ignore alguna. Dile una decisión al Asistente y la anota ahí; si un agente espera tu respuesta, se le avisa.",

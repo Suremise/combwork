@@ -429,6 +429,13 @@ export interface WorkBadge {
    * are for it, whatever its project's options produce now; null when it keeps none (in Todo, Done, none recorded).
    */
   stages: StageId[] | null
+  /** The line it works on this cycle (Git: its branch, from its Started or Adopted; #1424); null for None or none. */
+  line: string | null
+  /**
+   * In Review: the revision submitted for it, which its review waits on or runs on (its latest submission's; #1424). Whole,
+   * the window shows it through its platform's short form. Null outside Review, or for a no-code card.
+   */
+  underReview: string | null
   lastSeq: number
 }
 
@@ -475,6 +482,8 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
     stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
+    line: v.line,
+    underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     lastSeq: v.lastSeq
   }
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import {
@@ -18,7 +18,13 @@ import {
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
 import { attempt } from '../actions'
-import { bumpGit, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT } from '../store'
+import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
+import { branchCards, type BranchCard } from '@shared/branchCards'
+import { revisionShort } from '@shared/platform/descriptors'
+import { stageName } from '@shared/workflow/stages'
+import { stageLook } from '@shared/laneStages'
+import { useWorkBadges } from '../cardWork'
+import { useProjectStages } from '../projectStages'
 import { useNow } from '../usage'
 import { cx } from '../util'
 import { BusyButton, Icon, IconButton, Tooltip, useBusy } from '../components/ui'
@@ -163,6 +169,10 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   const [showRemote, setShowRemote] = useState(false)
   // The info as last read: an open form (Track…'s note) reads it, not what was read when it opened (#1385).
   const latest = useRef<GitRepoInfo | null>(null)
+  // Each branch's cards (#1424): from the badges the window reads of every live card, by the line each works on.
+  const tasks = useStore((st) => st.tasks)
+  const badges = useWorkBadges()
+  const onBranch = useMemo(() => branchCards(project.name, tasks, badges), [project.name, tasks, badges])
   useNow(60000)
 
   const act = (name: string, title: string, fn: () => Promise<string>): void => void run(name, () => gitAction(project, title, fn))
@@ -270,6 +280,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const remoteOnly = info.remoteBranches.filter((r) => !info.branches.some((b) => b.name === r.slice(r.indexOf('/') + 1)))
         const warnings = identityWarnings(info.identity, info.remotes)
         const agentOf = (path: string | null) => (path ? project.agents.find((a) => a.worktree && samePath(a.worktree.path, path)) : undefined)
+        const cardsOf = (branch: string | null) => (branch ? (onBranch.get(branch) ?? []) : [])
         return (
           <div className="git-branches" data-git-branches="">
             <h2 className="section git-section-head">
@@ -363,6 +374,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     <Icon name={b.current ? 'check' : b.worktree ? 'repo' : 'git-branch'} />
                     <span className="git-name">{b.name}</span>
                     {b.worktree && <span className="badge" data-worktree="">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.worktreeBadge)}</span>}
+                    <BranchCards cards={cardsOf(b.name)} project={project} />
                     {b.upstream && (
                       <span className="faint git-track">
                         {b.upstream} · {aheadBehindText(b)}
@@ -451,6 +463,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         <Icon name="repo" />
                         <span className="git-name">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.unusedWorktree)}</span>
                         <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
+                        <BranchCards cards={cardsOf(w.branch)} project={project} />
                         <span className="git-url faint">{w.path}</span>
                         <button
                           className="btn small subtle"
@@ -590,4 +603,72 @@ function identityForm(project: ProjectInfo, info: GitRepoInfo): FormSpec {
     validate: (v) => identityProblem(v.name, v.email),
     submit: (v) => call('git:setIdentity', project.path, v.name.trim(), v.email.trim())
   }
+}
+
+const CARDS = {
+  open: msg({ id: 'git.branches.cardOpen', defaultMessage: '{card}: {stage}. Open the card', description: "Tooltip and accessible name of a card's key beside the branch it works on (Version Control → Branches & remotes): the card ({card}: its key, such as AL-12) and its stage ({stage}: the board's name for it, glossary 2.2); a click opens the card." }),
+  underReview: msg({ id: 'git.branches.underReview', defaultMessage: 'under review: {revision}', description: "Beside a branch's card in Review (Version Control → Branches & remotes), lower case: the revision submitted for review ({revision}: a short commit id, a3f2c1d)." }),
+  copy: msg({ id: 'git.branches.copyRevision', defaultMessage: 'Copy revision {revision}', description: "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)." }),
+  copied: msg({ id: 'git.branches.revisionCopied', defaultMessage: 'Copied', description: 'Shown for a moment after copying a revision beside a branch (Version Control → Branches & remotes).' }),
+  merged: msg({ id: 'git.branches.merged', defaultMessage: '{has, select, yes {merged: {revision}} other {merged}}', description: "Beside a branch's card that is Done (Version Control → Branches & remotes), lower case: its work was merged, with the commit that merged it ({revision}: a short commit id) when it is known (has yes). Keep the select keys." }),
+  earlier: msg({ id: 'git.branches.earlierCards', defaultMessage: '{n, plural, one {+# earlier card} other {+# earlier cards}}', description: "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them." })
+}
+
+/**
+ * A branch's cards (#1424): the card its line belongs to now (in flight first, else the latest), by key, a link that opens
+ * it, with its stage in its category's colour (the project's name for it), its revision under review (with a copy button)
+ * or, Done, that it was merged and as what; and how many earlier cards worked on the same branch.
+ */
+function BranchCards({ cards, project }: { cards: BranchCard[]; project: ProjectInfo }) {
+  const tasks = useStore((st) => st.tasks)
+  const names = useProjectStages().get(project.path.toLowerCase())?.names
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+  const c = cards[0]
+  if (!c) return null
+  const key = cardLabelOf({ tasks }, c.card)
+  const stage = stageName(c.stage, names, tr)
+  const short = (id: string): string => (project.platform ? revisionShort(project.platform.id, id) : id.slice(0, 7))
+  const earlier = cards.slice(1)
+  const review = c.underReview
+  return (
+    <span className="git-branch-card" data-branch-card={c.card} data-stage={c.stage}>
+      <button type="button" className="link git-branch-card-key" aria-label={tr(CARDS.open, { card: key, stage })} title={tr(CARDS.open, { card: key, stage })} onClick={() => set({ taskOpen: c.card })}>
+        {key}
+      </button>
+      <span className="git-branch-card-stage">
+        <span className={cx('lane-seg', 'git-branch-card-swatch', stageLook(c.stage))} aria-hidden="true" />
+        {stage}
+      </span>
+      {review && (
+        <span className="git-branch-card-review faint" data-under-review={review}>
+          {tr(CARDS.underReview, { revision: short(review) })}
+          <button type="button" className="copy-code-btn" data-copy-revision={review} aria-label={tr(CARDS.copy, { revision: short(review) })} title={tr(CARDS.copy, { revision: short(review) })} onClick={() => void navigator.clipboard.writeText(review).then(() => setCopied(true), () => undefined)}>
+            <Icon name={copied ? 'check' : 'copy'} />
+          </button>
+          {copied && (
+            <span className="copy-code-done" role="status">
+              {tr(CARDS.copied)}
+            </span>
+          )}
+        </span>
+      )}
+      {c.stage === 'done' && (
+        <span className="git-branch-card-merged faint" data-merged={c.merged ?? ''}>
+          {tr(CARDS.merged, { has: c.merged ? 'yes' : 'no', revision: c.merged ? short(c.merged) : '' })}
+        </span>
+      )}
+      {earlier.length > 0 && (
+        <Tooltip content={fmt.list(earlier.map((x) => cardLabelOf({ tasks }, x.card)), 'unit')}>
+          <span className="git-branch-card-earlier faint" data-earlier={earlier.length}>
+            {tr(CARDS.earlier, { n: earlier.length })}
+          </span>
+        </Tooltip>
+      )}
+    </span>
+  )
 }

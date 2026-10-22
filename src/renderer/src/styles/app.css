@@ -11554,6 +11554,48 @@ button.progress-run-show:focus-visible {
 .git-ref {
   flex-shrink: 0;
 }
+/* A branch's card (#1424): its key (a link), its stage with its category's swatch, under review or merged. */
+.git-branch-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.git-branch-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.git-branch-card-key:hover {
+  text-decoration: underline;
+}
+.git-branch-card-key:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+.git-branch-card-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.git-branch-card-swatch.lane-seg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 10px;
+  animation: none;
+  cursor: default;
+}
+.git-branch-card-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 /* A branch row's Track… and Stop tracking (#1385): kept whole at its end, before Switch. */
 .git-row-actions {
   display: inline-flex;

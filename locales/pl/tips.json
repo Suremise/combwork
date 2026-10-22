@@ -87,6 +87,8 @@
   "tips.boardStages.title": "Nazwij etapy tablicy po swojemu",
   "tips.boardUpgrade.text": "Hive zachowuje tablicę z 0.9, którą uaktualnił do 1.0. Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją po zachowaniu kopii tablicy w obecnym stanie, aby Hive 0.9 mógł ją znowu zmieniać.",
   "tips.boardUpgrade.title": "Powrót do 0.9 po uaktualnieniu",
+  "tips.branchCards.text": "W Kontroli wersji → Gałęzie i zdalne repozytoria gałąź, na której pracuje karta, pokazuje tę kartę i jej etap, a w Recenzji rewizję w recenzji. Kliknij kartę, aby ją otworzyć.",
+  "tips.branchCards.title": "Zobacz, do której karty należy gałąź",
   "tips.cardCost.text": "Panel karty pokazuje, ile zużyli jej agenci, gdy nad nią pracowali: „{example}”, a po najechaniu kursorem części wykonawcy i recenzenta oraz tokeny. Wydajność pokazuje koszt każdej karty, a dymek toru w panelu Postęp – jego narzut.",
   "tips.cardCost.title": "Ile kosztowała karta",
   "tips.cardDecisions.text": "Decyzje karty, nad jej komentarzami, zawierają to, co postanowiono: agenci sprawdzają z nimi swoją pracę przed Recenzją, a recenzenci odrzucają pracę, która którąś pomija. Powiedz Asystentowi o decyzji, a zapisze ją tam; agent czekający na Twoją odpowiedź dostanie informację.",
