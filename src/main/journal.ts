@@ -7,7 +7,7 @@ import { app } from 'electron'
 import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES, inScope, isoWeek, weekStart, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalKind, type JournalPage, type JournalRow, type JournalSettings, type JournalSource, type LinkType } from '../shared/journal'
 import { openDb, transaction, type Db, type Migration } from './db'
 import { createLogger, userText } from './logger'
-import { assertNotFencedOut } from './openingFence'
+import { assertAdmitted, assertPlaceAdmitted, isAdmitted, ownerOf, refusal } from './openingFence'
 import { trash } from './trash'
 
 const log = createLogger('journal')
@@ -112,6 +112,8 @@ const hiveVersion = (): string => {
 }
 
 const open = new Map<string, Db>()
+/** Each open journal's workspace (its place, `ownerOf` as it opened): it stays usable only while that is admitted (#1395). */
+const owners = new Map<string, string | null>()
 const keyOf = (file: string): string => file.toLowerCase()
 
 /** The journal file of an Assistant home (`<workspace>/.hive/assistant`). */
@@ -125,14 +127,23 @@ function journalOf(home: string): Db {
   const file = journalFile(home)
   const k = keyOf(file)
   if (deleting.has(k)) throw new JournalBusy('The journal is being deleted: try again in a moment.')
+  // Kept open only for a workspace a window holds (#1395): late work of one closed, or never opened, is refused, also
+  // while its connection is still open (before the close has closed it).
   const was = open.get(k)
-  if (was) return was
-  // Not opened again by work of its workspace's opening that has closed (#1379): it would hold the folder.
-  assertNotFencedOut(file)
-  const db = openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(home, 'backups'), setup })
+  if (was) {
+    const owner = owners.get(k)
+    if (owner == null) throw refusal(file)!
+    assertPlaceAdmitted(owner)
+    return was
+  }
+  assertAdmitted(file)
+  const db = openJournalDb(home)
   open.set(k, db)
+  owners.set(k, ownerOf(file))
   return db
 }
+
+const openJournalDb = (home: string): Db => openDb(journalFile(home), { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(home, 'backups'), setup })
 
 /** Closes a home's journal (its workspace closed, or before it is deleted). */
 export function closeJournal(home: string): void {
@@ -140,12 +151,14 @@ export function closeJournal(home: string): void {
   const db = open.get(k)
   if (!db) return
   open.delete(k)
+  owners.delete(k)
   db.close()
 }
 
 export function closeAllJournals(): void {
   for (const db of [...open.values()]) db.close()
   open.clear()
+  owners.clear()
 }
 
 /** An error the tools return as their reply: the caller's mistake, said plainly. */
@@ -229,21 +242,56 @@ function checkTags(v: unknown): string[] {
  * transaction with its links and tags; the index follows by trigger.
  */
 export function writeEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
+  const e = entryOf(settings, input)
+  const id = insertEntry(journalOf(home).writer, e, source)
+  pruneSoon(home, settings)
+  told(home)
+  return id
+}
+
+/**
+ * Writes an entry into a journal whose workspace no window may hold now (#1395: the unexpected close Hive finds as it
+ * starts, for each workspace of the last run): as writeEntry while a window holds it; else on a connection of its own,
+ * opened, written and closed here (a transient open), never kept nor made the journal's, so a window opening the
+ * workspace meanwhile keeps its own (pruned and shown once it is opened). Refused while the journal is being deleted.
+ */
+export function leaveEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
+  const file = journalFile(home)
+  const owner = ownerOf(file)
+  if (owner !== null && isAdmitted(owner)) return writeEntry(home, settings, input, source)
+  const e = entryOf(settings, input)
+  if (deleting.has(keyOf(file))) throw new JournalBusy('The journal is being deleted: try again in a moment.')
+  const db = openJournalDb(home)
+  try {
+    return insertEntry(db.writer, e, source)
+  } finally {
+    db.close()
+  }
+}
+
+/** An entry as it is stored, checked (the scope decides which kinds may be: the caller says why not). */
+function entryOf(settings: JournalSettings, input: EntryInput) {
   if (!JOURNAL_KINDS.includes(input.kind as JournalKind)) fail(`kind is one of: ${JOURNAL_KINDS.join(', ')}.`)
   const kind = input.kind as JournalKind
   if (!inScope(settings, kind)) fail(`The user's journal scope doesn't include ${kind} entries (Settings → Assistant → Journal allows: ${settings.scope.join(', ') || 'none'}). Don't store it.`)
-  const summary = oneLine(checkText('summary', input.summary, ENTRY_LIMITS.summary, true)!)
-  const detail = checkText('detail', input.detail, ENTRY_LIMITS.detail)
-  const why = checkText('why', input.why, ENTRY_LIMITS.why)
-  const project = checkText('project', input.project, ENTRY_LIMITS.project)
-  const digestOf = checkText('digestOf', input.digestOf, 100)
-  const importance = checkImportance(input.importance)
-  const links = checkLinks(input.links)
-  const tags = checkTags(input.tags)
-  const db = journalOf(home)
-  const w = db.writer
+  return {
+    kind,
+    summary: oneLine(checkText('summary', input.summary, ENTRY_LIMITS.summary, true)!),
+    detail: checkText('detail', input.detail, ENTRY_LIMITS.detail),
+    why: checkText('why', input.why, ENTRY_LIMITS.why),
+    project: checkText('project', input.project, ENTRY_LIMITS.project),
+    digestOf: checkText('digestOf', input.digestOf, 100),
+    importance: checkImportance(input.importance),
+    links: checkLinks(input.links),
+    tags: checkTags(input.tags)
+  }
+}
+
+/** writeEntry's transaction, on the connection given: the entry with its links and tags; returns its id. */
+function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: JournalSource): number {
+  const { kind, summary, detail, why, project, digestOf, importance, links, tags } = e
   const d = storedDetail(detail)
-  const id = transaction(w, () => {
+  return transaction(w, () => {
     for (const l of links.filter((x) => x.type === 'entry')) if (!w.prepare('SELECT 1 FROM entries WHERE id = ?').get(Number(l.ref))) fail(`There is no entry ${l.ref} to link to.`)
     const r = w
       .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -255,9 +303,6 @@ export function writeEntry(home: string, settings: JournalSettings, input: Entry
     for (const t of tags) tag.run(n, t)
     return n
   })
-  pruneSoon(home, settings)
-  told(home)
-  return id
 }
 
 /** What recall looks for; everything is optional. */

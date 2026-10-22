@@ -10,7 +10,7 @@ import type { ToastAction } from '../shared/types'
 import { endProcessesExactly, endTreesExactly, onLaunchProcessJoined, runningProcesses, stillRunningOf } from './agentProcesses'
 import { assistantHome } from './assistantControl'
 import { config } from './config'
-import { createDelivery } from './deliveries'
+import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
 import { emit, onHiveEvent, toast } from './events'
 import { crashDumps, type CrashDump } from './exitLog'
@@ -276,7 +276,8 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
     await journalFactAt(ws, { summary: `Hive closed unexpectedly (last seen ${c.lastSeen}); ${c.agents.filter((a) => a.workspace.toLowerCase() === ws).length} agent(s) of this workspace were running`, importance: 2, tags: ['incident', 'unexpected-close'] }) // i18n-ignore: a journal fact (the Assistant's, English)
     // A session host's own config is in its .hive folder: none, the workspace has no Assistant to tell.
     if (!existsSync(join(home, '.hive', 'project.json'))) continue
-    await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: assistantLine(c, r, still) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
+    // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: assistantLine(c, r, still) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
   }
 }
 

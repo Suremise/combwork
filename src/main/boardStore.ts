@@ -16,11 +16,11 @@ import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
-import { withFileLock } from './fsutil'
+import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { assertNotFencedOut } from './openingFence'
+import { assertAdmitted, assertPlaceAdmitted, isAdmitted, isRefusal } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
@@ -270,6 +270,13 @@ interface Imported {
 interface Board {
   /** The workspace folder, as the workspace has it. */
   path: string
+  /** Its real location (`placeKey`) as it opened: another spelling's board of the same folder is closed with it (#1402). */
+  place: string
+  /**
+   * Its `.hive` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
+   * presence marker's removal) goes there, never through a spelling that may point elsewhere by then (#1402).
+   */
+  hive: string
   db: Db
   /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
   legacy: boolean
@@ -606,8 +613,11 @@ const hiveVersion = (): string => {
   }
 }
 
-/** Why a workspace's board couldn't be opened (its import failed): every use says so, and nothing was moved. */
-const failures = new Map<string, Error>()
+/**
+ * Why a workspace's board couldn't be opened (its import failed): every use says so, and nothing was moved. With the place
+ * it was tried at, as it was (#1395: closing the workspace clears it by that, never by its spelling resolved again).
+ */
+const failures = new Map<string, { error: Error; place: string }>()
 
 /**
  * The workspace's board, opened (and moved in from its files, the first time) when first used. Synchronous, so nothing
@@ -617,10 +627,14 @@ const failures = new Map<string, Error>()
 function boardOf(path: string, transient = false): Board {
   const key = keyOf(path)
   const open = boards.get(key)
-  if (open) return open
-  // Not opened again by work of an opening of it that has closed (#1379): it would stay open, holding the folder.
-  if (!transient) assertNotFencedOut(join(path, HIVE_DIR, DB_FILE))
-  const failed = failures.get(key)
+  // Kept open only for a workspace a window holds (#1395): late work of one closed (or never opened) is refused, also
+  // when a lease has its connection open now (a store's last save), which it neither borrows nor comes to own.
+  if (open) {
+    if (!transient) assertPlaceAdmitted(open.place)
+    return open
+  }
+  if (!transient) assertAdmitted(join(path, HIVE_DIR, DB_FILE))
+  const failed = failures.get(key)?.error
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
     const b = openBoard(path, false)
@@ -628,7 +642,7 @@ function boardOf(path: string, transient = false): Board {
     return b
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
-    failures.set(key, err)
+    failures.set(key, { error: err, place: placeKey(path) })
     log.error(`opening the board of ${userText(path)}`, e)
     throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
@@ -641,13 +655,16 @@ function boardOf(path: string, transient = false): Board {
  */
 function openBoard(path: string, upgrade: boolean): Board {
   const key = keyOf(path)
-  const hive = join(path, HIVE_DIR)
+  // The folder's `.hive` where it really is, now: what every later write and removal for this board uses (#1402), the
+  // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
+  const real = realPath(path)
+  const hive = join(real, HIVE_DIR)
   let db: Db | null = null
   try {
-    db = openDb(join(hive, DB_FILE), {
+    db = openDb(join(path, HIVE_DIR, DB_FILE), {
       migrations: BOARD_MIGRATIONS,
       hiveVersion: hiveVersion(),
-      backupDir: join(hive, BACKUPS),
+      backupDir: join(path, HIVE_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
@@ -657,6 +674,8 @@ function openBoard(path: string, upgrade: boolean): Board {
     const w = db.writer
     const b: Board = {
       path,
+      place: real.toLowerCase(),
+      hive,
       db,
       legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
@@ -786,7 +805,7 @@ function pollOther(key: string): void {
 export function boardRevision(ws: WorkspaceService): string {
   const path = pathOf(ws)
   const b = boardOf(path)
-  return `${dbGeneration(path)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
+  return `${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
 }
 
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
@@ -795,22 +814,35 @@ export function noteLanesSaved(path: string): void {
   if (b) b.revision++
 }
 
-/** Closes a workspace's board (it closed): the stub's next number brought up to date for older versions. */
-export function closeBoard(path: string): void {
+/**
+ * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
+ * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
+ * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits). The folder is `place`, its real
+ * location as its window opened it, else as this spelling's board opened: never what the spelling resolves to now, so a
+ * junction removed or pointed at another workspace since neither keeps this one's boards open nor closes another's.
+ */
+export function closeBoard(path: string, place?: string): void {
   const key = keyOf(path)
-  failures.delete(key)
-  const b = boards.get(key)
-  if (!b) return
+  const others = [...boards.keys(), ...failures.keys()].some((k) => k !== key)
+  const at = others ? (place ?? boards.get(key)?.place ?? placeKey(path)) : ''
+  for (const [k, f] of [...failures]) if (k === key || (others && f.place === at)) failures.delete(k)
+  for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
+}
+
+/** Closes the board under that spelling only (a lease's own, Hive quitting). */
+function closeOne(key: string, b: Board): void {
+  if (boards.get(key) !== b) return
   boards.delete(key)
   clearInterval(b.poll)
   clearInterval(b.presence)
+  // The profile's marker at the place is every open board's of it here (another spelling's too): it goes with the last.
   try {
-    removePresence(join(path, HIVE_DIR), presenceId())
+    if (![...boards.values()].some((o) => o.place === b.place)) removePresence(b.hive, presenceId())
   } catch (e) {
     log.warn('removing the workspace presence marker', e)
   }
   try {
-    if (writable(b.db) && existsSync(join(path, HIVE_DIR, TASKS))) writeStub(join(path, HIVE_DIR), nextOf(b.db.writer))
+    if (writable(b.db) && existsSync(join(b.hive, TASKS))) writeStub(b.hive, nextOf(b.db.writer))
   } catch (e) {
     log.warn('bringing the board folder up to date', e)
   }
@@ -821,7 +853,7 @@ export function closeBoard(path: string): void {
 
 /** Closes every board (Hive quits). */
 export function closeAllBoards(): void {
-  for (const b of [...boards.values()]) closeBoard(b.path)
+  for (const [k, b] of [...boards]) closeOne(k, b)
 }
 
 // ---------------------------------------------------------------------------
@@ -1460,7 +1492,7 @@ export function deleteCard(ws: WorkspaceService, n: number): boolean {
 export function takeNumber(ws: WorkspaceService): number {
   return writeOp(ws, (b) => {
     const n = takeNumberIn(b.db.writer)
-    writeStubNext(join(b.path, HIVE_DIR), n + 1)
+    writeStubNext(b.hive, n + 1)
     return n
   })
 }
@@ -1503,9 +1535,10 @@ export interface DbLease {
 }
 
 /**
- * The workspace database's connection for a save that may come as its workspace closes (a store's last save): not fenced
- * (#1379), so it still lands, leaving nothing open. The lease owns that exact connection (#1383): a board opened for it
- * is closed as its last lease ends unless a window has the workspace open by then (keepBoard), and a board closed meanwhile (its
+ * The workspace database's connection for a save that may come as its workspace closes (a store's last save): a
+ * transient open, needing no admission (#1395), so it still lands, leaving nothing open. The lease owns that exact
+ * connection (#1383): a board opened for it is closed as its last lease ends unless a window has the workspace open by
+ * then (admitted, by the place the board recorded), and a board closed meanwhile (its
  * window closed, or closed and opened again) keeps this connection open for the lease, so its writer is never closed
  * under it, and the lease never closes another opening's board.
  */
@@ -1516,7 +1549,7 @@ export function leaseDb(workspacePath: string): DbLease {
   return {
     db: b.db,
     get kept() {
-      return !b.detached && (!b.transient || held.has(keyOf(b.path)))
+      return !b.detached && (!b.transient || isAdmitted(b.place))
     },
     release() {
       if (ended) return
@@ -1525,22 +1558,9 @@ export function leaseDb(workspacePath: string): DbLease {
       if (b.detached) b.db.close()
       // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
       // before or after this board was opened, and uses this connection as its board.
-      else if (b.transient && !held.has(keyOf(b.path)) && boards.get(keyOf(b.path)) === b) closeBoard(b.path)
+      else if (b.transient && !isAdmitted(b.place)) closeOne(keyOf(b.path), b)
     }
   }
-}
-
-/** The workspaces a window has open (keepBoard): their boards are theirs, whoever opened them, and stay open as leases end. */
-const held = new Set<string>()
-
-/** A window opens the workspace (#1383): its board, open now or opened later by a lease, stays open as leases end. */
-export function keepBoard(workspacePath: string): void {
-  held.add(keyOf(workspacePath))
-}
-
-/** The window closes the workspace: its board is closed (closeBoard), and a lease from now on closes what it opens. */
-export function letGoBoard(workspacePath: string): void {
-  held.delete(keyOf(workspacePath))
 }
 
 /** Runs `fn` with a lease on the workspace database (leaseDb), ended after it, however it ends. */
@@ -1596,21 +1616,27 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
  * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
  * so nothing written meanwhile (by a 0.9 Hive while the upgrade waited) is overwritten from an old snapshot.
  */
+/** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
-export const dbGeneration = (workspacePath: string): number => generations.get(keyOf(workspacePath)) ?? 0
-const replacedListeners = new Set<(workspacePath: string) => void>()
+/** The generation of a workspace's database by a path entering now (its place resolved here). */
+export const dbGeneration = (workspacePath: string): number => dbGenerationAt(placeKey(workspacePath))
+/** The generation of a workspace's database by the place a caller recorded as it entered. */
+export const dbGenerationAt = (place: string): number => generations.get(place) ?? 0
+const replacedListeners = new Set<(workspacePath: string, place: string) => void>()
 /**
  * Called, under the board's lock and with nothing awaited, once a workspace's database file was replaced: a service
- * drops (or reads again) what it keeps from it. Its saves begun before are refused by their generation.
+ * drops (or reads again) what it keeps from it, matching by `place` (the replaced board's, as it opened) what it keeps
+ * under any spelling. Its saves begun before are refused by their generation.
  */
-export function onDbReplaced(fn: (workspacePath: string) => void): void {
+export function onDbReplaced(fn: (workspacePath: string, place: string) => void): void {
   replacedListeners.add(fn)
 }
 function replaced(path: string): void {
-  generations.set(keyOf(path), dbGeneration(path) + 1)
+  const place = boards.get(keyOf(path))?.place ?? placeKey(path)
+  generations.set(place, dbGenerationAt(place) + 1)
   for (const fn of replacedListeners) {
     try {
-      fn(path)
+      fn(path, place)
     } catch (e) {
       log.warn('a service following the replaced workspace database', e)
     }
@@ -1620,12 +1646,14 @@ function replaced(path: string): void {
 /**
  * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
  * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
- * all: that is told where it is used.
+ * all: that is told where it is used. Throws the refusal for a workspace no window holds (#1395).
  */
 export function upgradeWaiting(workspacePath: string): boolean {
   try {
     return !!boardOf(workspacePath).db.pending
-  } catch {
+  } catch (e) {
+    // A workspace no window holds (#1395) is refused, never taken for one with nothing pending.
+    if (isRefusal(e)) throw e
     return false
   }
 }
@@ -1654,6 +1682,8 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
+    // Opened for keeps: only while a window holds it (#1395), as boardOf above checked, nothing awaited since.
+    assertAdmitted(join(path, HIVE_DIR, DB_FILE))
     closeBoard(path)
     try {
       openBoard(path, true)

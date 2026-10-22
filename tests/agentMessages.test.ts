@@ -11,13 +11,17 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { DeliverySender } from '../src/shared/deliveries'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
 describe('messages left for agents (#530, #647)', async () => {
   const base = tempDir('hive-messages-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+  // The hosts' workspace (each host a folder in it), as a window holding it would admit it (#1395).
+  const dismiss = admitted(base)
   afterAll(async () => {
+    dismiss()
     // The workspace database (#1018) is open until its board closes.
     ;(await import('../src/main/boardStore')).closeAllBoards()
     rmSync(base, { recursive: true, force: true })

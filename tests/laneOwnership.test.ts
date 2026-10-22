@@ -3,6 +3,7 @@
 // one card at a time (a lane's card starts only once the ones before it are Done: S43's P4 form); a lane ends by itself
 // once its cards are Done, its merge commit from their facts (an agent's ignored) and a verified lane-end event fired
 // once; why a lane waits, as data; hive_lane next. With workflow rules off, a lane is bookkeeping, as before 1.0.
+import { AsyncLocalStorage } from 'async_hooks'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -268,11 +269,14 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
   it("a card started while a list change is decided: the change is queued, the card stays the lane's (HR6 round 2)", async () => {
     const [a, b] = [await make('Started a'), await make('Started b')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
-    // The change reads A in Todo (between cards); at its names lookup A starts.
+    // The change reads A in Todo (between cards); at its names lookup A starts. Only the change's own lookup (#1414): the
+    // lanes' following refreshes 300 ms after a change and looks the names up too, and a move made there under load isn't
+    // one the change waits for, so the change applied B before A's start had landed.
     const real = w.projectConfig.bind(w)
+    const change = new AsyncLocalStorage<true>()
     let started = false
     const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
-      if (!started && (new Error().stack ?? '').includes('namesOf')) {
+      if (!started && change.getStore() && (new Error().stack ?? '').includes('namesOf')) {
         started = true
         await move(a, 'doing')
       }
@@ -280,7 +284,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     })
     let r: Awaited<ReturnType<typeof lanes.startLane>>
     try {
-      r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b], by: 'B1 (alpha)' })
+      r = await change.run(true, () => lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [b], by: 'B1 (alpha)' }))
     } finally {
       spy.mockRestore()
     }
