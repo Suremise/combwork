@@ -11044,6 +11044,14 @@ button.progress-run-show:focus-visible {
 .git-ref {
   flex-shrink: 0;
 }
+/* A branch row's Track… and Stop tracking (#1385): kept whole at its end, before Switch. */
+.git-row-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.git-form-note {
+  margin-top: 8px;
+}
 .git-ref.git-tag {
   background: rgba(245, 196, 81, 0.16);
   color: var(--warning);

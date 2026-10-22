@@ -79,14 +79,24 @@ interface HiveMessageValues {
   'service.gitRepo.noRemotes': undefined
   'service.gitRepo.noRemotesFetch': undefined
   'service.gitRepo.noUpstream': { branch: string | number }
+  'service.gitRepo.notOnRemote': { remote: string | number; branch: string | number }
   'service.gitRepo.notRepo': { folder: string | number }
   'service.gitRepo.nothingToPush': undefined
   'service.gitRepo.nothingToTag': undefined
   'service.gitRepo.pullFailed': { why: string | number }
   'service.gitRepo.pulled': { n: number; upstream: string | number }
+  'service.gitRepo.pushAllRefused': { remote: string | number; n: number; refs: string | number; pushed: number; same: number; tags: number }
   'service.gitRepo.pushFailed': { to: string | number; why: string | number }
+  'service.gitRepo.pushUpToDate': { to: string | number; branch: string | number }
   'service.gitRepo.pushed': { branch: string | number; to: string | number }
+  'service.gitRepo.pushedAll': { remote: string | number; pushed: number; same: number; tags: number }
   'service.gitRepo.rejected': { to: string | number; branch: string | number }
+  'service.gitRepo.remoteRemoved': { n: number; remote: string | number; branches: string | number }
+  'service.gitRepo.remoteRenamed': { n: number; from: string | number; to: string | number; branches: string | number }
+  'service.gitRepo.remoteSameName': { remote: string | number }
+  'service.gitRepo.remoteTaken': { remote: string | number }
+  'service.gitRepo.removeRemoteFailed': { remote: string | number; why: string | number }
+  'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.switchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.switched': { branch: string | number }
@@ -94,6 +104,9 @@ interface HiveMessageValues {
   'service.gitRepo.tagPushFailed': { commit: string | number; name: string | number; remote: string | number; why: string | number }
   'service.gitRepo.tagged': { commit: string | number; name: string | number }
   'service.gitRepo.taggedPushed': { commit: string | number; name: string | number; remote: string | number }
+  'service.gitRepo.trackedNothing': { branch: string | number }
+  'service.gitRepo.tracking': { pushed: string; branch: string | number; upstream: string | number }
+  'service.gitRepo.untracked': { branch: string | number; upstream: string | number }
   'service.gitRepo.upToDate': { branch: string | number; upstream: string | number }
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }

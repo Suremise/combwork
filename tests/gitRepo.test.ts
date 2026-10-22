@@ -8,7 +8,7 @@ import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
+import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, parsePushPorcelain, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
 import type { MergeSlotInfo } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -186,6 +186,99 @@ describe('pull and push', () => {
     expect(gitStatusText(await repo.repoSummary(proj))).toBe('feature/x · no upstream')
     expect(await repo.push(proj, 'origin')).toBe('Pushed feature/x to origin/feature/x.')
     expect((await repo.repoSummary(proj)).upstream).toMatchObject({ name: 'origin/feature/x', ahead: 0, behind: 0 })
+  })
+})
+
+describe('Push to…, remotes and tracking (#1385)', () => {
+  /** A second bare remote, `backup`, as Darren's NAS. */
+  const addBackup = (): string => {
+    const backup = join(outer, 'backup.git')
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', backup])
+    git(proj, 'remote', 'add', 'backup', backup)
+    return backup
+  }
+  const upstreamOf = (branch: string): string => git(proj, 'for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`)
+
+  it('reads git’s porcelain push lines: pushed, up to date, refused, by branch or tag', () => {
+    const out = ['To ../remote.git', ' \trefs/heads/main:refs/heads/main\t0e1eae2..dad582d', '*\trefs/heads/other:refs/heads/other\t[new branch]', '!\trefs/heads/feat:refs/heads/feat\t[rejected] (fetch first)', '=\trefs/tags/v1:refs/tags/v1\t[up to date]', 'Done'].join('\n')
+    expect(parsePushPorcelain(out)).toEqual([
+      { name: 'main', kind: 'branch', result: 'pushed' },
+      { name: 'other', kind: 'branch', result: 'pushed' },
+      { name: 'feat', kind: 'branch', result: 'refused' },
+      { name: 'v1', kind: 'tag', result: 'upToDate' }
+    ])
+  })
+
+  it('pushes this branch, or every branch and tag, to another remote without changing what a branch tracks', async () => {
+    const backup = addBackup()
+    git(proj, 'branch', 'feature/a')
+    git(proj, 'tag', 'v1')
+    expect(await repo.pushToRemote(proj, 'backup', 'branch')).toBe('Pushed main to backup/main.')
+    expect(await repo.pushToRemote(proj, 'backup', 'branch')).toBe('backup/main already has main: nothing to push.')
+    expect(await repo.pushToRemote(proj, 'backup', 'all')).toBe('Pushed every branch and tag to backup: 1 branch pushed, 1 already up to date, 1 tag pushed.')
+    expect([git(backup, 'rev-parse', 'feature/a'), git(backup, 'rev-parse', 'v1')]).toEqual([git(proj, 'rev-parse', 'feature/a'), git(proj, 'rev-parse', 'v1')])
+    // Push still goes where it went: no branch tracks backup.
+    expect([upstreamOf('main'), upstreamOf('feature/a')]).toEqual(['origin/main', ''])
+    await expect(repo.pushToRemote(proj, 'nowhere', 'all')).rejects.toThrow("There's no remote nowhere.")
+  })
+
+  it('with every branch, one the remote has newer commits on is refused by name, never forced, and the rest still go', async () => {
+    const backup = addBackup()
+    git(proj, 'branch', 'feature/a')
+    await repo.pushToRemote(proj, 'backup', 'all')
+    // Someone pushed to backup's feature/a; here, main and a new branch move on.
+    const elsewhere = join(outer, 'elsewhere')
+    execFileSync('git', ['clone', '-q', '-b', 'feature/a', backup, elsewhere])
+    commit(elsewhere, 'theirs.txt')
+    git(elsewhere, 'push', '-q', 'origin', 'feature/a')
+    const theirs = git(backup, 'rev-parse', 'feature/a')
+    commit(proj, 'mine.txt')
+    git(proj, 'branch', 'feature/b')
+    await expect(repo.pushToRemote(proj, 'backup', 'all')).rejects.toThrow('backup refused 1 (Hive never forces a push): feature/a. It has commits they haven\'t: pull or merge them first. The rest: 2 branches pushed, 0 already up to date, 0 tags pushed.')
+    expect(git(backup, 'rev-parse', 'feature/a')).toBe(theirs)
+    expect(git(backup, 'rev-parse', 'feature/b')).toBe(git(proj, 'rev-parse', 'HEAD'))
+    // This branch alone: named as Push names it.
+    git(proj, 'checkout', '-q', 'feature/a')
+    commit(proj, 'mine2.txt')
+    await expect(repo.pushToRemote(proj, 'backup', 'branch')).rejects.toThrow(/backup\/feature\/a has commits feature\/a hasn't, so the push was refused/)
+  })
+
+  it('removes a remote, naming the branches that stop tracking it; renames one, its branches following; refuses a name taken or invalid', async () => {
+    addBackup()
+    await repo.pushToRemote(proj, 'backup', 'branch')
+    git(proj, 'branch', 'feature/a')
+    await repo.setUpstream(proj, 'feature/a', 'backup', 'main')
+    expect((await repo.repoInfo(proj)).branches.find((b) => b.name === 'feature/a')?.upstreamRemote).toBe('backup')
+    expect(await repo.renameRemote(proj, 'backup', 'nas')).toBe('Renamed backup to nas: feature/a tracks it by its new name.')
+    expect(upstreamOf('feature/a')).toBe('nas/main')
+    await expect(repo.renameRemote(proj, 'nas', 'Origin')).rejects.toThrow('There is a remote called Origin already.')
+    await expect(repo.renameRemote(proj, 'nas', '-x')).rejects.toThrow(/letters, digits/)
+    await expect(repo.renameRemote(proj, 'gone', 'x')).rejects.toThrow("There's no remote gone.")
+    expect(await repo.removeRemote(proj, 'nas')).toBe('Removed nas: feature/a no longer tracks a remote branch.')
+    expect([upstreamOf('feature/a'), upstreamOf('main')]).toEqual(['', 'origin/main'])
+    expect(git(proj, 'remote')).toBe('origin')
+    expect(git(proj, 'for-each-ref', 'refs/remotes/nas')).toBe('')
+    await expect(repo.removeRemote(proj, 'nas')).rejects.toThrow("There's no remote nas.")
+  })
+
+  it('changes what a branch tracks: another remote’s branch (Push goes there then), a new one pushed first only when asked, or nothing', async () => {
+    const backup = addBackup()
+    await repo.pushToRemote(proj, 'backup', 'branch')
+    expect(await repo.setUpstream(proj, 'main', 'backup', 'main')).toBe('main tracks backup/main now.')
+    commit(proj, 'b.txt')
+    expect(await repo.push(proj)).toBe('Pushed main to backup/main.')
+    expect(git(backup, 'rev-parse', 'main')).toBe(git(proj, 'rev-parse', 'HEAD'))
+    expect(git(remote, 'rev-parse', 'main')).not.toBe(git(proj, 'rev-parse', 'HEAD'))
+    // A remote branch not there yet: refused, unless the user agreed to push it there first.
+    git(proj, 'branch', 'feature/c')
+    await expect(repo.setUpstream(proj, 'feature/c', 'origin', 'feature/c')).rejects.toThrow('origin has no feature/c (as of the last fetch): push it there first, or fetch.')
+    expect(upstreamOf('feature/c')).toBe('')
+    expect(await repo.setUpstream(proj, 'feature/c', 'origin', 'feature/c', true)).toBe('Pushed feature/c to origin/feature/c, and it tracks it now.')
+    expect([upstreamOf('feature/c'), git(remote, 'rev-parse', 'feature/c')]).toEqual(['origin/feature/c', git(proj, 'rev-parse', 'feature/c')])
+    expect(await repo.setUpstream(proj, 'feature/c', null)).toBe('feature/c no longer tracks origin/feature/c.')
+    expect(await repo.setUpstream(proj, 'feature/c', null)).toBe('feature/c tracks no remote branch already.')
+    await expect(repo.setUpstream(proj, 'nope', null)).rejects.toThrow("There's no branch nope.")
+    await expect(repo.setUpstream(proj, 'main', 'origin', 'bad name')).rejects.toThrow(/isn't a valid branch name/)
   })
 })
 
