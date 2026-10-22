@@ -1,5 +1,5 @@
 // The Version Control tab (#1416, SPEC §16.6): the Git tab renamed, Alt+8 and "Go to Version Control" kept on its id.
-// A Git project: the header (None · Git with Git chosen and None disabled, its tooltip; the fact line naming the
+// A Git project: the header (None · Git with Git chosen and None available, its tooltip (#1419); the fact line naming the
 // repository's root; "Workflow: Git · …" with no preset chosen, then Solo, then Custom (from Solo) as the options are saved,
 // which opens Workflow), the five sections in order, opening at Changes; Project Settings → Workflow's Open Version
 // Control and the presets notice's Choose… land on Workflow. A None project (no repository): Workflow only, where it
@@ -82,9 +82,10 @@ function board(sql, ...args) {
     await page.getByText('alpha', { exact: true }).first().click()
     check('the tab reads Version Control', !!(await lib.until(async () => (await vcTab.count()) === 1, HUNG_MS)))
     await vcTab.click()
-    check('Git is chosen, None disabled', !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="none"]').getAttribute('aria-disabled')) === 'true', HUNG_MS)), await text(head))
-    const tip = await lib.hoverTip(page, head.locator('[data-platform="none"]'), (t) => /offers to switch/.test(t))
-    check("None's tooltip says Hive offers a switch when it detects one", /offers to switch/.test(tip ?? ''), tip)
+    // None can always be chosen (#1419): its tooltip says what clicking it does; vcswitch switches.
+    check('Git is chosen, None can be chosen', !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="none"]').getAttribute('aria-disabled')) === 'false', HUNG_MS)), await text(head))
+    const tip = await lib.hoverTip(page, head.locator('[data-platform="none"]'), (t) => /from its next card/.test(t))
+    check("None's tooltip says it switches from the next card, asking first", tip === 'Switch this project to None, from its next card. Hive shows what changes first.', tip)
     check('the fact line names the repository root', !!(await lib.until(async () => (await text(fact)) === `This folder is a Git repository at ${alpha}.`, HUNG_MS)), await text(fact))
     check('the workflow link says no preset is chosen', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · no preset chosen', HUNG_MS)), await text(link))
     check('the five sections, Workflow first', JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), JSON.stringify(await sections()))
@@ -117,6 +118,8 @@ function board(sql, ...args) {
     await page.getByText('plain', { exact: true }).first().click()
     await vcTab.click()
     check('None is chosen, Git disabled', !!(await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="git"]').getAttribute('aria-disabled')) === 'true', HUNG_MS)), await text(head))
+    const gitTip = await lib.hoverTip(page, head.locator('[data-platform="git"]'), (t) => /Initialise/.test(t))
+    check("Git's tooltip says why: no Git repository here (#1419)", gitTip === 'No Git repository here: Initialise repository… first.', gitTip)
     check('the fact line says the folder has no version control', !!(await lib.until(async () => (await text(fact)) === 'This folder has no version control.', HUNG_MS)), await text(fact))
     check('None: Workflow only, where it opens', !!(await lib.until(async () => JSON.stringify(await sections()) === '["workflow"]' && (await selected()) === 'workflow', HUNG_MS)), JSON.stringify(await sections()))
     check('Initialise repository… under the header', !!(await lib.until(async () => (await page.locator('[data-vc-init] [data-git-init]').count()) === 1, HUNG_MS)))

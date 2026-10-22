@@ -77,6 +77,7 @@
   "shell.command.project.next": "下一个项目",
   "shell.command.project.openExplorer": "在文件资源管理器中显示项目",
   "shell.command.project.openTerminal": "在此处打开外部终端",
+  "shell.command.project.openVersionControl": "打开版本控制",
   "shell.command.project.previous": "上一个项目",
   "shell.command.project.remove": "移除项目…",
   "shell.command.project.storage": "项目存储与清理…",

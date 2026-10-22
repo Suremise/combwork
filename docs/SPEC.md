@@ -1206,6 +1206,24 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
 
+**Built [#1419]:**
+- **Offers** (`ProjectPlatform.offer`) show under the tab's header: `gitFound` "Git found at <root>: switch to Git?"
+  with **Switch…** and **Not Now**; `repositoryGone` "The Git repository is gone. Git's rules hold until you switch…"
+  with **Switch to None…**; `otherFound` "Mercurial found: not supported yet, so this project can only use None" with
+  **Switch to None…**. Not Now hides an offer until Hive starts again (in memory); the fact line still says it. The
+  once-per-start notice (`sayPlatform`) gains **Open Version Control**. Initialise repository… on None's page brings the
+  `gitFound` offer without a restart (the refresh after it). Each switch goes through §16.6.5's warning.
+- **The repository gone (S20):** Git's rules hold. A Git card's start or submit refused for what can't be read
+  (`platform.unknown`) carries `offer: repositoryGone` while detection finds no Git repository, and its next step is
+  the offer: "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its
+  Version Control tab (from the next card)."
+- **A subfolder of a larger repository (OP-29):** when Hive or the agent merges, the target branch (G7) must be set by
+  the project itself, not inherited: the contradiction `subfolderTarget` ("This project is inside a larger repository:
+  name the branch its work merges into"), checked when options are saved (the form, the settings tool), with the
+  project's folder among the check's inputs. The queue's backstop: an entry whose card's ruleset names no target in a
+  subfolder project pauses its queue (`subfolderTarget`), saying how to go on.
+- `hive_project_status` gives `versionControl`: the platform, what is found, and any offer.
+
 ### 16.4 Facts
 
 #### 16.4.1 The log
@@ -1683,6 +1701,31 @@ The Version Control tab documents each preset's choices and why (P6, from this t
 it applies from the next card, and the running lanes and cards in flight it won't affect yet (they finish under their
 ruleset, marked "old rules"). Confirming saves the options; nothing running is changed. Switching Git → None (or
 back) works the same: cards in flight keep their platform's ruleset; a Git card can't finish under None's rules.
+
+**Built [#1419], switching the version control:**
+- **Where:** the header's None · Git choice (`VersionControlHeader.tsx`), the offers (§16.3.5), and the Assistant's
+  settings tool (`project.workflow.platform`, within Control, never project agents). One switch for all of them,
+  `workflow:setPlatform(projectPath, to, { expected })` (`src/main/workflow/platformSwitch.ts`), under the project's lock
+  (`mutateProjectConfig`), with the detection read again there. `workflow:checkPlatform` gives the warning first.
+- **Who can pick what** (Darren, 22 Oct, on #1419): **None is never refused for what is detected**, also for a folder
+  that is a Git repository (the warning adds that Hive then records no commits or merges for its cards), or one with
+  Mercurial or Jujutsu. **Git** only where a Git repository is found and no other version control is ("No Git
+  repository here: Initialise repository… first"; "Mercurial found: not supported yet"). A switch whose `expected` (the
+  platform the window showed) isn't the one in force is refused ("Changed meanwhile"). The window greys Git out with
+  the same reason; `project:updateConfig` refuses `platform`.
+- **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
+  (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
+  carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.
+- **Each platform keeps its own options and answer:** project.json's `platform` and `workflow.platform` change together;
+  `setKept` (`projectWorkflow.ts`, beside `writeWorkflow`) puts the platform left into `workflow.kept[<it>]` (its
+  preset, options and `presetAsked`, when it has any) and brings the one chosen back from `kept` (its entry removed),
+  else no preset, no options and no answer, so #1423's step offers its presets. Ordinary saves change only the platform
+  in force and keep `kept`. A project the upgrade hasn't given `workflow` yet changes only its `platform`.
+- **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
+  windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
+  the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains
+  after Git → None (its merge commit's identity: the project's options in force, G12, else git's own). The tab's Merge queue section stays while
+  #1356's actual-state rule shows a queue (§16.6, #1416).
 
 #### 16.6.6 Where options live
 
@@ -3519,7 +3562,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | OP-26 | A stale pass: stays in Approved with a mark until resubmitted (not moved back to Review), its builder woken and the lane paused "stale: submit again"? | **Agreed [#1117 20 Oct].** Yes (#1120's panel comment; HB3's finding 8). |
 | OP-27 | Pre-review checks: the agent runs them through hive-progress and Hive verifies, rather than Hive running them? | **Agreed [#1117 20 Oct].** Yes; Hive runs only the merge checks. |
 | OP-28 | Lane overlap warnings (§16.11.4): advice only, never a rule? | **Agreed [#1117 20 Oct].** Yes. |
-| OP-29 | A project inside a larger repository: Hive's merges into the parent's branches? | **Agreed [#1117 20 Oct].** Allowed only when the options name the target explicitly; the tab warns it's the whole repository. |
+| OP-29 | A project inside a larger repository: Hive's merges into the parent's branches? | **Agreed [#1117 20 Oct].** Allowed only when the options name the target explicitly; the tab warns it's the whole repository. **Built [#1419]** (§16.3.5). |
 | OP-30 | Users may rename stages? | **Agreed [#1117 20 Oct].** Yes, per project; categories can't be renamed. |
 | OP-31 | Slot names? | **Agreed [#1117 20 Oct].** `slot-a`, `slot-b`… |
 | OP-32 | Review and check copies per project (one pool serves reviewers' review copies and isolated checks, §16.13)? | **Agreed [#1117 20 Oct].** The larger of 2 and the number of reviewer agents plus one, configurable; a run or review that waits for one shows "waiting for a check copy" [HB3's round 3]. |

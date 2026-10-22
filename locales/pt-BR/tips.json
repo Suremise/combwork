@@ -359,6 +359,8 @@
   "tips.unmerged.title": "Veja o que um agente em worktree ainda precisa mesclar",
   "tips.unusedWorktrees.text": "Removeu um agente, mas manteve o worktree dele? Git → Alterações abre nos worktrees que nenhum agente usa, dizendo quem fez cada um: abra um para ver o trabalho e fazer merge, remova os mesclados com os branches deles, ou devolva um a um agente.",
   "tips.unusedWorktrees.title": "Organize os worktrees mantidos",
+  "tips.versionControlSwitch.text": "Clique em Nenhum ou Git no topo da aba Controle de versão para mudar a partir do próximo cartão; cartões em andamento mantêm as regras antigas. Cada um guarda suas opções do fluxo de trabalho, e se a pasta mudar (git init), o Hive oferece a troca ali.",
+  "tips.versionControlSwitch.title": "Alternar entre Nenhum e Git",
   "tips.versionControlTab.text": "A aba Controle de versão de um projeto diz o que o Hive encontrou na pasta e começa por Fluxo de trabalho: quem revisa, quais verificações passam antes e quem faz o merge. O cabeçalho mostra a predefinição, e um clique nele abre as opções.",
   "tips.versionControlTab.title": "Uma aba para o controle de versão e o fluxo de trabalho",
   "tips.viewerTokens.text": "Um app que mostra o que seus agentes estão fazendo, como o Apiary, precisa só de um token de leitura: Configurações → Agent API → Tokens de leitura cria um que pode ler tudo e não alterar nada, e o revoga depois.",

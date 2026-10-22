@@ -4,8 +4,10 @@ import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId
 import { modelCaps } from '../shared/models'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
-import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
+import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
+import { englishError, HiveError } from './hiveError'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
@@ -197,9 +199,10 @@ export async function applySetting(
   projectPath: string | null,
   guard?: (current: unknown) => void,
   removed?: string[]
-): Promise<{ old: unknown; new: unknown; removed?: { old: string[]; new: string[] } }> {
+): Promise<{ old: unknown; new: unknown; removed?: { old: string[]; new: string[] }; note?: string }> {
   if (e.sensitive) throw new SettingRefused(403, e.readOnly ?? `${settingPath(e)} is the user's to change.`)
   const value = await checkedValue(e, raw, e.scope === 'project' ? projectPath : null)
+  if (e.scope === 'project' && e.key === PLATFORM_SETTING_KEY) return switchSetting(value, projectPath, guard)
   const change = settingPatch(e, value)
   if ('project' in change) {
     if (!projectPath) throw new SettingRefused(400, `${e.id} is a project's setting: say which project.`)
@@ -264,13 +267,29 @@ export async function applySetting(
 }
 
 /**
+ * The project's version control (#1419): switched as the tab switches it, from the next card, with the same checks under
+ * the project's lock (Git only where a Git repository is found and nothing else is), each platform's options kept. The
+ * reply says which lanes and cards in flight keep the old rules.
+ */
+async function switchSetting(value: unknown, projectPath: string | null, guard?: (current: unknown) => void): Promise<{ old: unknown; new: unknown; note?: string }> {
+  if (!projectPath) throw new SettingRefused(400, `project.workflow.platform is a project's setting: say which project.`) // i18n-ignore: the Assistant's tools (English)
+  const note = oldRulesLine(await checkPlatformSwitch(workspace, projectPath, value))
+  try {
+    const r = await setPlatform(workspace, projectPath, value, { ...(guard ? { guard } : {}) })
+    return { old: r.from, new: r.to, ...(note && r.from !== r.to ? { note } : {}) }
+  } catch (err) {
+    throw err instanceof HiveError ? new SettingRefused(409, `${englishError(err)} Tell the user, or leave it as it is.`) : err // i18n-ignore: the Assistant's tools (English)
+  }
+}
+
+/**
  * A workflow option changed alone (#1278), as Project Settings → Workflow saves the options: with the others it would
  * make, refused with every reason (a contradiction, a value this version doesn't offer yet), under the project's lock.
  */
 function checkWorkflowPatch(projectPath: string, patch: Partial<ProjectConfig>): void {
   const wf = patch.workflow
   if (!wf?.platform) throw new SettingRefused(409, `${basename(projectPath)} has no version control recorded yet: its workflow options can be set once Hive has detected it (reopen the project).`)
-  const { problems } = checkOptions(wf.platform, { global: config.settings.workflow, workspace: workspace.config.workflow, project: wf.options })
+  const { problems } = checkOptions(wf.platform, { global: config.settings.workflow, workspace: workspace.config.workflow, project: wf.options, folder: projectPath })
   if (problems.length) throw new SettingRefused(400, `These workflow options can't be saved: ${problems.map(problemText).join(' ')} Change the other options first, or tell the user.`)
 }
 

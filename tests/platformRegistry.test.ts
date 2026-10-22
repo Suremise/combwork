@@ -145,7 +145,8 @@ describe('in ProjectInfo', () => {
     expect(after).toMatchObject({ id: 'none', detected: { platform: 'git' }, offer: { offer: 'git', why: 'gitFound' } })
     expect(recorded(p)).toBe('none')
     expect(notices(p)).toHaveLength(1)
-    expect(notices(p)[0]).toMatchObject({ level: 'info', title: 'Version control changed in alpha' })
+    // With Open Version Control, the tab that offers the switch (#1419).
+    expect(notices(p)[0]).toMatchObject({ level: 'info', title: 'Version control changed in alpha', actions: [{ label: 'Open Version Control', command: 'project.openVersionControl', args: [p] }] })
     // Said once while it lasts.
     await info(p)
     expect(notices(p)).toHaveLength(1)
@@ -157,7 +158,7 @@ describe('in ProjectInfo', () => {
     expect((await info(p)).platform?.id).toBe('git')
     renameSync(join(p, '.git'), join(p, 'moved.git'))
     expect((await info(p)).platform).toMatchObject({ id: 'git', capabilities: PLATFORMS.git.capabilities, offer: { why: 'repositoryGone' } })
-    expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back."])
+    expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab."])
   })
 
   it('a project.json naming no platform stays readable, with a warning said once', async () => {

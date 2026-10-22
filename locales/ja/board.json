@@ -544,6 +544,7 @@
   "board.queue.pause.signing": "マージコミットの署名に失敗しました。",
   "board.queue.pause.signingWaits": "マージコミットの署名があなたを待っています（パスフレーズまたは PIN）。署名キーのロックを解除してから再開してください。",
   "board.queue.pause.staged": "{target} がチェックアウトされているフォルダーにステージされた変更があります。コミットするかステージを解除してから再開してください。",
+  "board.queue.pause.subfolderTarget": "このプロジェクトはより大きなリポジトリの中にあるため、キューはカードのオプションで指定されたブランチにだけマージします。「バージョン管理 → ワークフロー」でブランチを指定し、保存時に {card} に適用してから再開してください。または {card} をキューから外してください。",
   "board.queue.pause.targetMovesFast": "テストマージのたびに {target} が進みました。落ち着いたら再開してください。",
   "board.queue.pause.uncounted": "マージ前のチェックは合格しましたが、何度か続けてマージには数えられませんでした。理由はカードの作業セクションにあります。",
   "board.queue.pause.unstagedChanges": "{files, select, none {マージで変更されるファイル} other {{files}}} に、{target} がチェックアウトされているフォルダーで変更があります。コミットするか元に戻してから再開してください。",

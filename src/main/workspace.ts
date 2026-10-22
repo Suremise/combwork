@@ -41,11 +41,12 @@ const M = {
   noWorkspace: msg({ id: 'service.workspace.none', defaultMessage: 'No workspace is open', description: 'An error: the action needs a workspace, and none is open in this window.' }),
   closed: msg({ id: 'service.workspace.closed', defaultMessage: 'The workspace was closed', description: 'An error: the workspace was closed (or the window opened another) while the action was under way.' }),
   platformTitle: msg({ id: 'service.workspace.platformTitle', defaultMessage: 'Version control changed in {project}', description: "A notice's title: the version control found in the project {project}'s folder is no longer the one Hive recorded for it." }),
-  gitFound: msg({ id: 'service.workspace.platformGitFound', defaultMessage: '{project} is a Git repository now. Hive goes on treating it as a project without version control: Hive never switches it by itself.', description: 'A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it.' }),
-  repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Hive goes on treating it as a Git project, so what needs Git can't be read until the repository is back.", description: "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it." }),
+  gitFound: msg({ id: 'service.workspace.platformGitFound', defaultMessage: '{project} is a Git repository now. Hive goes on treating it as a project without version control until you switch it in its Version Control tab.', description: 'A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it by itself: the Version Control tab offers the switch (glossary 2.1: Version Control).' }),
+  repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.", description: "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)." }),
   platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Hive doesn't have." }),
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
-  otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it.' })
+  otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
+  openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)." })
 }
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
 setFenceReason(() => hiveError(M.closed, undefined, { kind: 'conflict' }))
@@ -1099,7 +1100,7 @@ export class WorkspaceService {
       unmanagedMcp: await this.unmanagedMcp(projectPath),
       removedData: await removedData(projectPath),
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await hiveVcs(projectPath).catch(() => undefined), platform: projectPlatform(projectPath, cfg.platform) })
+      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await hiveVcs(projectPath).catch(() => undefined), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
     }
     this.readAt.set(info, ticket)
     // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's.
@@ -1124,7 +1125,9 @@ export class WorkspaceService {
     if (!why) return
     if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
-    this.emit({ type: 'toast', toast: { id: randomUUID(), level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), source: projectPath, timestamp: new Date().toISOString() } })
+    // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
+    const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : undefined
+    this.emit({ type: 'toast', toast: { id: randomUUID(), level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), ...(actions ? { actions } : {}), source: projectPath, timestamp: new Date().toISOString() } })
   }
 
   /** Whether project.json was written after this read of it began (#999). */

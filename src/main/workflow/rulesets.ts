@@ -6,7 +6,8 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, subfolderNeedsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
 import { tr } from '../../shared/i18n'
@@ -25,6 +26,8 @@ export interface OptionLevels {
   global?: WorkflowDefaults | null
   workspace?: WorkflowDefaults | null
   project?: Partial<WorkflowOptions> | null
+  /** The project's folder, when a save is checked: inside a larger repository, its merges need its own target (OP-29). */
+  folder?: string | null
 }
 
 export interface ResolvedOptions {
@@ -115,8 +118,11 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   const options = { ...resolved.options, ...own.set }
   const origins = { ...resolved.origins }
   for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
+  // A project inside a larger repository (OP-29, #1419): Hive's or the agent's merges only into a branch it names itself.
+  const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [
     ...contradictions(options).map((id) => ({ kind: 'contradiction' as const, id })),
+    ...(subfolderNeedsTarget(options, own.set, subfolder) ? [{ kind: 'contradiction' as const, id: 'subfolderTarget' as const }] : []),
     ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id })),
     // Each stage's name (N5) against every other's, in English and in the language Hive shows.
     ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))

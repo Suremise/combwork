@@ -719,11 +719,16 @@ export const PROJECT_KEY_DESC = msg({ id: 'settings.project.key.desc', defaultMe
  * row of its own for the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
  * refused when saved (options.ts `notOffered`), as contradictions are.
  */
+/** The project's version control as the Assistant's settings tool names it (`project.workflow.platform`, #1419). */
+export const PLATFORM_SETTING_KEY = 'workflow.platform'
+
 function workflowRows(): Row[] {
   const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ section: 'workflow', key: `workflow.${key}`, workflow: key, title: OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
   const V = VALUE_TEXT
   return [
     { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.moved', defaultMessage: 'Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1.' }), type: 'custom' },
+    // The version control (#1419): the Assistant's settings tool switches it as the tab does, after the same checks.
+    { section: 'workflow', key: PLATFORM_SETTING_KEY, title: msg({ id: 'settings.project.workflow.platform.title', defaultMessage: 'Version control', description: "A setting's title (the project's Version Control tab): None or Git (glossary 2.1)." }), desc: msg({ id: 'settings.project.workflow.platform.desc', defaultMessage: 'None or Git, from the next card: Git only where a Git repository is found and no other version control is. Each keeps its own workflow options.', description: 'What the setting "Version control" does (the project’s Version Control tab): switching applies from the next card; cards started keep their rules. None and Git: glossary 2.1.' }), type: 'select', options: [{ value: 'none', label: msg({ id: 'settings.project.workflow.platform.none', defaultMessage: 'None', description: 'A value of the setting "Version control": no version control (glossary 2.1: None).' }) }, { value: 'git', label: msg({ id: 'settings.project.workflow.platform.git', defaultMessage: 'Git', description: 'A value of the setting "Version control": Git (glossary 2.1: keep).' }) }], hidden: true },
     option('review', 'select', [['none', V.review.none], ['agent', V.review.agent], ['agentThenYou', V.review.agentThenYou], ['you', V.review.you]]),
     option('reviewers', 'select', [['1', '1'], ['2', '2']]),
     option('noSelfReview', 'boolean'),
@@ -1041,6 +1046,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
     if (!project) return undefined
     // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
     if (e.workflow) return project.workflow?.options?.[e.workflow] ?? 'inherit'
+    if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
     if (e.provider) return (projectProviderConfig(project, e.provider) as unknown as Record<string, unknown>)[e.key] ?? 'inherit'
     return (project as unknown as Record<string, unknown>)[e.key]
   }

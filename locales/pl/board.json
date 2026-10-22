@@ -544,6 +544,7 @@
   "board.queue.pause.signing": "Podpisanie commita scalającego nie powiodło się.",
   "board.queue.pause.signingWaits": "Podpisanie commita scalającego czeka na Ciebie (hasło lub PIN). Odblokuj klucz do podpisywania, a potem wznów.",
   "board.queue.pause.staged": "W folderze, w którym wybrana jest {target}, są zmiany w poczekalni. Zatwierdź je lub wycofaj z poczekalni, a potem wznów.",
+  "board.queue.pause.subfolderTarget": "Ten projekt jest wewnątrz większego repozytorium, więc kolejka scala tylko do gałęzi wskazanej w opcjach karty. Wskaż ją w Kontrola wersji → Przepływ pracy, przy zapisie zastosuj ją do karty {card}, a potem wznów; albo usuń kartę {card} z kolejki.",
   "board.queue.pause.targetMovesFast": "{target} zmieniała się podczas każdego scalania próbnego. Wznów, gdy się ustabilizuje.",
   "board.queue.pause.uncounted": "Sprawdzenia przed scaleniem przeszły, ale kilka razy z rzędu nie zostały zaliczone dla scalenia. Sekcja Praca karty wyjaśnia dlaczego.",
   "board.queue.pause.unstagedChanges": "{files, select, none {Pliki zmieniane przez scalenie} other {{files}}} mają zmiany w folderze, w którym wybrana jest {target}. Zatwierdź je lub cofnij, a potem wznów.",

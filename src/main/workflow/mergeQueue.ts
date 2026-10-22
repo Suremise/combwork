@@ -63,6 +63,11 @@ type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; caus
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
   folder: string
+  /**
+   * Whether the project is a subfolder of a larger repository (OP-29, #1419): a card whose ruleset names no target then
+   * pauses the queue rather than merge into the whole repository's default branch (a backstop: the options refuse it).
+   */
+  subfolder?: () => boolean
   /** Runs a named merge check (its configured command) in a folder, on the test merge's result. */
   runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
   /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
@@ -194,7 +199,7 @@ export interface QueueStepInfo {
  * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
  * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget'
 
 /** What an entry's steps read of the repository's config once (#1386): the identity Hive commits as, and signing. */
 interface EntryReads {
@@ -629,6 +634,8 @@ export class MergeQueue {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
+      // OP-29's backstop (#1419): inside a larger repository, only into a branch the card's ruleset names.
+      if (!this.wf.rulesetOf(card, s).options.target && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
       const revision = s.approved?.revision ?? entry.revision
       const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
       let expected: string

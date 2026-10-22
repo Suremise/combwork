@@ -27,16 +27,21 @@ export function offer(current: PlatformId, found: Detection): PlatformOffer | nu
   return { offer: 'none', why: found.other ? 'otherFound' : 'repositoryGone' } // i18n-ignore: a reason's key, not text
 }
 
+/** What detection found, as project.json keeps it when the user switches (`platformFound`, #1419). */
+export const foundKey = (d: Detection): string => (d.other ? `other:${d.other}` : d.platform)
+
 /**
  * A project's platform for ProjectInfo: the recorded one (`recorded`, project.json's, as read: a project Hive hasn't
  * recorded yet takes what detection finds), its descriptor's capabilities, the detection, and the offer when they
  * differ. A recorded value that is no platform is said (`invalid`) and detection used meanwhile, with no offer.
+ * `found`: what detection found when the user last switched (#1419): while the folder shows that still, the user chose
+ * this platform knowing it (None for a Git folder), so nothing is offered until the folder changes.
  */
-export function projectPlatform(folder: string, recorded: unknown): ProjectPlatform {
+export function projectPlatform(folder: string, recorded: unknown, found?: unknown): ProjectPlatform {
   const detected = detect(folder)
   const valid = isPlatformId(recorded)
   const id = valid ? recorded : detected.platform
-  const o = valid ? offer(id, detected) : null
+  const o = valid && found !== foundKey(detected) ? offer(id, detected) : null
   const invalid = recorded === undefined || recorded === null || valid ? undefined : typeof recorded === 'string' ? recorded : JSON.stringify(recorded)
   return { id, capabilities: PLATFORMS[id].capabilities, detected, ...(o ? { offer: o } : {}), ...(invalid !== undefined ? { invalid } : {}) }
 }

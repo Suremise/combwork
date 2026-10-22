@@ -206,10 +206,17 @@ export const CONTRADICTIONS = {
   okWithReview: msg({ id: 'workflow.contradiction.okWithReview', defaultMessage: 'Your OK before merging is already part of review by you.', description: "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews." }),
   hiveMergesNeedsGit: msg({ id: 'workflow.contradiction.hiveMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
+  subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' })
 } satisfies Record<string, Msg>
 
 export type Contradiction = keyof typeof CONTRADICTIONS
+
+/**
+ * OP-29 (#1419): a project inside a larger repository merges (Hive or the agent) only into a branch it names itself (G7
+ * set by the project, not inherited), since its merges change that whole repository. `own`: what the project sets.
+ */
+export const subfolderNeedsTarget = (o: WorkflowOptions, own: Partial<WorkflowOptions>, subfolder: boolean): boolean => subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !(typeof own.target === 'string' && own.target.trim())
 
 export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'agentThenYou'
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'

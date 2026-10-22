@@ -359,6 +359,8 @@
   "tips.unmerged.title": "Voir ce qu’un agent en worktree a à fusionner",
   "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Git → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvre-en un pour voir son travail et le fusionner, retire ceux qui sont fusionnés avec leurs branches, ou rends-en un à un agent.",
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
+  "tips.versionControlSwitch.text": "Clique sur Aucune ou Git en haut de l’onglet Gestion de versions pour changer dès la prochaine carte ; les cartes lancées gardent les anciennes règles. Chacune a ses options du flux de travail, et si le dossier change (git init), Hive y propose de changer.",
+  "tips.versionControlSwitch.title": "Basculer entre Aucune et Git",
   "tips.versionControlTab.text": "L’onglet Gestion de versions d’un projet indique ce que Hive a trouvé dans son dossier et commence par Flux de travail : qui relit, quelles vérifications passent d’abord et qui fusionne. Son en-tête nomme le préréglage ; un clic dessus ouvre les options.",
   "tips.versionControlTab.title": "Un onglet pour la gestion de versions et le flux de travail",
   "tips.viewerTokens.text": "Une application qui montre ce que font tes agents, comme Apiary, n’a besoin que d’un jeton de lecture : Paramètres → Agent API → Jetons de lecture en crée un qui peut tout lire et ne rien modifier, et le révoque ensuite.",

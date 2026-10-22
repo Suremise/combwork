@@ -1109,13 +1109,33 @@ This tab was called **Images**, and the folder `.hive/images`, before attachment
 
 ## Version Control tab
 
-A project's **Version Control** tab (**Alt+8**; before 1.0 it was the **Git** tab) starts with the project's version control, **None** or **Git**, as Hive found it when it first saw the project. Hive never switches it by itself: the other choice is greyed out, and Hive offers a switch when it finds another version control in the folder. Beside it, a line says what Hive finds in the folder now: *This folder is a Git repository at …*; a folder inside a larger repository, whose branch and merge actions affect that whole repository; a folder with no version control; one kept in Mercurial or Jujutsu, not supported yet, so the project uses None; or a Git repository that is gone. **Workflow: Git · Team** names the project's preset (**Custom (from Team)** once an option differs from it, **no preset chosen** when there is none): click it to see the options.
+A project's **Version Control** tab (**Alt+8**; before 1.0 it was the **Git** tab) starts with the project's version control, **None** or **Git**, as Hive found it when it first saw the project. Hive never switches it by itself: you switch it by clicking the other one, and Hive offers a switch when it finds another version control in the folder (see [Switching version control](#switching-version-control)). Beside it, a line says what Hive finds in the folder now: *This folder is a Git repository at …*; a folder inside a larger repository, whose branch and merge actions affect that whole repository; a folder with no version control; one kept in Mercurial or Jujutsu, not supported yet, so the project uses None; or a Git repository that is gone. **Workflow: Git · Team** names the project's preset (**Custom (from Team)** once an option differs from it, **no preset chosen** when there is none): click it to see the options.
 
 Its sections start with **Workflow**, the project's workflow options (see [Workflow options](#workflow-options)). A Git project then has **Changes**, where it opens, **History**, **Branches & remotes** and **Merge queue**. A project without version control (**None**) has only **Workflow**, where it opens, with **Initialise repository…** under the header while its folder has no repository. If it used Git before and a merge queue from those options still has something going on (a card testing, queued or paused, or a return you haven't seen), its **Merge queue** section stays, with **Pause queue**, **Resume queue** and **Remove**, until that's clear. The tab remembers each project's section while Hive runs.
 
 The status bar shows the selected project's git in one item, such as **main · origin · ↑2 ↓0**: its branch, the remote its branch tracks, and how many commits are to push (↑) and to pull (↓). Click it for **Branches & remotes**. It says **no upstream** for a branch that tracks no remote branch yet, and **detached at abc1234** or **rebasing** when git is in that state.
 
 Everything here is yours: agents have no tool for any of it, and only the project folder changes here. Agents' worktrees are shown, read-only: their work comes into the project folder through **Merge**.
+
+### Switching version control
+
+Click the version control the project doesn't use, **None** or **Git**, atop the tab to switch it. A dialog says first what changes:
+
+- the switch applies **from the project's next card**: cards already started finish under the rules they started with (*old rules*), and a running lane keeps its rules until it ends. They are listed. Unlike a change of options, a switch can't be applied to cards in flight: a Git card can't finish under None's rules. A Git card in the merge queue carries on there after a switch to None, and the **Merge queue** section and the Progress panel's queue card stay until the queue is clear;
+- each version control keeps **its own workflow options**: switching back brings back the preset, the options and your answer to *How do you work?* the project had for it, and one it never had starts with none of its own (it inherits the workspace's and Hive's defaults);
+- **None** can always be chosen, also for a folder that is a Git repository: Hive then records no commits or merges for its cards, and the dialog says so. **Git** can only be chosen where Hive finds a Git repository and no other version control: otherwise its button is greyed out, and hovering it says why (*No Git repository here: Initialise repository… first*, or *Mercurial found: not supported yet*).
+
+If the version control changed while the dialog was open (switched in another window, or by the Assistant), the switch is refused: look again. The Assistant can switch it too, within Settings → Assistant → Control → Change settings (`project.workflow.platform`), with the same checks; its reply names the lanes and cards that keep the old rules.
+
+**When the folder changes**, Hive notices on its next look at the project (opening it, a refresh, switching back to Hive) and offers the switch in the tab, under the header, with a notice once while Hive runs (**Open Version Control** shows the tab):
+
+- **Git found** (someone ran `git init`, or you used **Initialise repository…**): *Git found at …: switch to Git?* with **Switch…** and **Not Now**.
+- **The Git repository is gone** (`.git` removed or moved): Git's rules hold until you switch, because what they check can't be read: a card's start or submit is refused, saying so, with the switch to None as the next step. **Switch to None…**, or put the repository back.
+- **Mercurial or Jujutsu found** in a Git project (a colocated `.jj` beside `.git` counts as Jujutsu): not supported yet, so **Switch to None…** is offered and Git can't be chosen.
+
+**Not Now** hides the offer until Hive starts again; the line beside the choice still says what Hive finds.
+
+**A project inside a larger repository** (its folder is a subfolder of a Git repository) is Git, and the tab says that branch and merge actions affect that whole repository. So when Hive or the agent merges, the project must name the branch its work merges into itself (**Target branch** in Workflow): options that would merge into the whole repository's default branch are refused when you save them, saying so. If a card's options name none anyway (from before), the merge queue pauses at it, saying how to go on.
 
 ### Changes
 
@@ -1150,7 +1170,7 @@ Fetch, pull, push and Push to… use your git's own sign-in (Git Credential Mana
 
 A project that isn't a git repository keeps working in its project folder, without worktrees or merging: its **Version Control** tab says so, with **Initialise repository…** to make it one. Without git itself, the tab says so, with the fix (see [Git](#git)).
 
-Git isn't required: each project has a **version control**, found when Hive first sees it. A Git repository (the project's own, or one in a folder above) is **Git**; any other folder, or one kept in Mercurial or Jujutsu (not supported yet), works **without version control**. Hive never switches it by itself: when a project's folder changes (you run `git init` in it, or its repository goes), a notice says so and the project keeps the version control it had.
+Git isn't required: each project has a **version control**, found when Hive first sees it. A Git repository (the project's own, or one in a folder above) is **Git**; any other folder, or one kept in Mercurial or Jujutsu (not supported yet), works **without version control**. Hive never switches it by itself: when a project's folder changes (you run `git init` in it, or its repository goes), a notice says so, the project keeps the version control it had, and its Version Control tab offers the switch (see [Switching version control](#switching-version-control)).
 
 ### Initialise repository
 

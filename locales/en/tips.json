@@ -1439,6 +1439,14 @@
     "defaultMessage": "Tidy kept worktrees",
     "description": "A tip's title."
   },
+  "tips.versionControlSwitch.text": {
+    "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."
+  },
+  "tips.versionControlSwitch.title": {
+    "defaultMessage": "Switch between None and Git",
+    "description": "A tip's title (glossary 2.1: None, Git)."
+  },
   "tips.versionControlTab.text": {
     "defaultMessage": "A project’s Version Control tab says what Hive found in its folder, and starts with Workflow: who reviews, which checks pass first and who merges. Its header names the preset, and a click on it opens them.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, Workflow, preset)."

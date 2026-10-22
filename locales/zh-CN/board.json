@@ -544,6 +544,7 @@
   "board.queue.pause.signing": "合并提交签名失败。",
   "board.queue.pause.signingWaits": "合并提交的签名正在等待你（密码短语或 PIN）。请解锁你的签名密钥，然后恢复。",
   "board.queue.pause.staged": "检出 {target} 的文件夹中有已暂存的更改。请提交或取消暂存，然后恢复。",
+  "board.queue.pause.subfolderTarget": "此项目位于更大的仓库内，因此队列只合并到卡片选项所指定的分支。请在“版本控制 → 工作流程”中指定该分支，保存时将其应用到 {card}，然后恢复；或将 {card} 移出队列。",
   "board.queue.pause.targetMovesFast": "每次试合并期间 {target} 都有变化。等它稳定后再恢复。",
   "board.queue.pause.uncounted": "合并前检查已通过，但连续几次都没有计入合并。卡片的工作记录部分说明了原因。",
   "board.queue.pause.unstagedChanges": "{files, select, none {合并要更改的文件} other {{files}}} 在检出 {target} 的文件夹中有更改。请提交或撤销这些更改，然后恢复。",

@@ -226,6 +226,12 @@ export const PAUSED_NEXT = {
   rules: msg({ id: 'workflow.refused.merge.hiveMerges.nextPausedRules', defaultMessage: 'It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.', description: 'The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name.' })
 } satisfies Record<string, Msg>
 
+/**
+ * The next step of `platform.unknown` for a Git card whose repository is gone (#1419, S20: its `offer` value): Git's
+ * rules hold until the repository is back or the project is switched to None, which applies from the next card.
+ */
+export const REPOSITORY_GONE_NEXT = msg({ id: 'workflow.refused.platform.unknown.nextGone', defaultMessage: "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).", description: 'The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window.' })
+
 /** The next step of `move.notFromHere` when nothing can be done from the stage (a request answered meanwhile). */
 export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.nextNone', defaultMessage: 'Nothing waits to be done there now.', description: "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)." })
 
@@ -282,7 +288,7 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
   const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
-  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : (queued ?? t.next)
+  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next)
   return { message: f.one(t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 

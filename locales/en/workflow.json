@@ -27,6 +27,10 @@
     "defaultMessage": "“Nobody reviews their own work” can't be off while a reviewer agent checks the work.",
     "description": "Why workflow options in the Version Control tab cannot be saved: the no-self-review option was turned off while a reviewer agent is required."
   },
+  "workflow.contradiction.subfolderTarget": {
+    "defaultMessage": "This project is inside a larger repository: name the branch its work merges into.",
+    "description": "Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository)."
+  },
   "workflow.forYou.decidedAfterMerge": {
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
     "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
@@ -806,6 +810,10 @@
   "workflow.refused.platform.unknown.next": {
     "defaultMessage": "Check Agent Setup or the folder, then try again.",
     "description": "The next step when Hive could not read what a rule needs."
+  },
+  "workflow.refused.platform.unknown.nextGone": {
+    "defaultMessage": "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).",
+    "description": "The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window."
   },
   "workflow.refused.queue.advancing.message": {
     "defaultMessage": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",

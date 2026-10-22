@@ -79,6 +79,7 @@ interface HiveMessageValues {
   'shell.command.project.next': undefined
   'shell.command.project.openExplorer': undefined
   'shell.command.project.openTerminal': undefined
+  'shell.command.project.openVersionControl': undefined
   'shell.command.project.previous': undefined
   'shell.command.project.remove': undefined
   'shell.command.project.storage': undefined

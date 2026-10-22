@@ -1051,6 +1051,10 @@
     "defaultMessage": "{vcs} found: not supported yet, so this project uses None.",
     "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1."
   },
+  "git.vc.fact.otherGit": {
+    "defaultMessage": "{vcs} found in this folder: not supported yet.",
+    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do."
+  },
   "git.vc.fact.repo": {
     "defaultMessage": "This folder is a Git repository at {root}.",
     "description": "Atop the Version Control tab: what Hive found in the project folder. {root} is the repository root (glossary 2.1: repository root)."
@@ -1071,13 +1075,101 @@
     "defaultMessage": "None",
     "description": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None)."
   },
-  "git.vc.otherTip": {
-    "defaultMessage": "Hive detects the version control in this folder. When it finds a different one, it offers to switch.",
-    "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab (disabled: Hive offers the switch itself)."
+  "git.vc.offer.gitFound": {
+    "defaultMessage": "Git found at {root}: switch to Git?",
+    "description": "An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Hive never switches by itself."
+  },
+  "git.vc.offer.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the offer to switch version control (atop the Version Control tab): hides the offer until Hive starts again."
+  },
+  "git.vc.offer.otherFound": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
+    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1."
+  },
+  "git.vc.offer.repositoryGone": {
+    "defaultMessage": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",
+    "description": "An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back."
+  },
+  "git.vc.offer.switchGit": {
+    "defaultMessage": "Switch…",
+    "description": "A button of the offer to switch a project to Git (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it."
+  },
+  "git.vc.offer.switchNone": {
+    "defaultMessage": "Switch to None…",
+    "description": "A button of the offer to switch a project to None, no version control (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it. None: glossary 2.1."
   },
   "git.vc.sections": {
     "defaultMessage": "Version Control",
     "description": "Accessible name of the Version Control tab's row of sections (Workflow, Changes, History…). Glossary 2.1: Version Control (the tab)."
+  },
+  "git.vc.switch.changed": {
+    "defaultMessage": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
+    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git."
+  },
+  "git.vc.switch.confirm": {
+    "defaultMessage": "Switch",
+    "description": "The confirm button of the warning before switching a project’s version control."
+  },
+  "git.vc.switch.done": {
+    "defaultMessage": "{project} uses {platform} from its next card",
+    "description": "A notice after switching a project’s version control. {project} is its name, {platform} None or Git."
+  },
+  "git.vc.switch.fresh": {
+    "defaultMessage": "It has no {to} options of its own yet: they come from the workspace’s and Hive’s defaults until you choose some. {from}’s are kept for a switch back.",
+    "description": "In the warning before switching version control, when the project never used the other one: it starts with no options of its own (inherited). {to} and {from} are None or Git."
+  },
+  "git.vc.switch.gitFolder": {
+    "defaultMessage": "This folder is still a Git repository, but with None Hive records no commits or merges for its cards.",
+    "description": "In the warning before switching a project to None (no version control) while its folder is a Git repository. None: glossary 2.1."
+  },
+  "git.vc.switch.inFlight": {
+    "defaultMessage": "{n, plural, one {This card in flight finishes under {from}’s rules (old rules):} other {These cards in flight finish under {from}’s rules (old rules):}}",
+    "description": "In the warning before switching version control, above the cards already started (glossary: old rules). {from} is None or Git. Unlike other option changes, a switch can’t be applied to them."
+  },
+  "git.vc.switch.lane": {
+    "defaultMessage": "{builder}’s lane “{name}”",
+    "description": "A running lane in the warning before switching version control. {builder} is the agent building its cards, {name} the lane’s name."
+  },
+  "git.vc.switch.laneUnnamed": {
+    "defaultMessage": "{builder}’s lane",
+    "description": "A running lane with no name in the warning before switching version control. {builder} is the agent building its cards."
+  },
+  "git.vc.switch.lanes": {
+    "defaultMessage": "{n, plural, one {This running lane keeps {from}’s rules until it ends:} other {These running lanes keep {from}’s rules until they end:}}",
+    "description": "In the warning before switching version control, above the lanes running now (glossary: lane, old rules). {from} is None or Git."
+  },
+  "git.vc.switch.noGit": {
+    "defaultMessage": "No Git repository here: Initialise repository… first.",
+    "description": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there."
+  },
+  "git.vc.switch.nothing": {
+    "defaultMessage": "Nothing is in flight: every card works under {to} from now.",
+    "description": "In the warning before switching version control when no card has started and no lane runs. {to} is None or Git."
+  },
+  "git.vc.switch.otherFound": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
+    "description": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Jujutsu) was found in its folder. None: glossary 2.1."
+  },
+  "git.vc.switch.queue": {
+    "defaultMessage": "Their merge queue carries on, and stays in this tab and the Progress panel until it’s clear.",
+    "description": "In the warning before switching from Git to None, under the Git cards in flight: their merge queue goes on until it is empty."
+  },
+  "git.vc.switch.restored": {
+    "defaultMessage": "The {to} options it had before come back as they were; {from}’s are kept for a switch back.",
+    "description": "In the warning before switching version control, when the project used the other one before: its options for it are restored. {to} and {from} are None or Git."
+  },
+  "git.vc.switch.title": {
+    "defaultMessage": "Switch {project} to {platform}?",
+    "description": "Title of the warning before switching a project’s version control. {project} is its name, {platform} None or Git."
+  },
+  "git.vc.switch.what": {
+    "defaultMessage": "From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.",
+    "description": "The warning before switching a project’s version control: what changes. {to} and {from} are None or Git."
+  },
+  "git.vc.switchTip": {
+    "defaultMessage": "Switch this project to {platform}, from its next card. Hive shows what changes first.",
+    "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git."
   },
   "git.vc.workflow": {
     "defaultMessage": "Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}",

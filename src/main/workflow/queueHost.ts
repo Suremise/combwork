@@ -21,6 +21,7 @@
 
 import { basename, join } from 'path'
 import { app } from 'electron'
+import { detect } from '../platform/registry'
 import { boardRead, boardWrite } from '../boardStore'
 import { onHiveEvent } from '../events'
 import { exitBy } from '../exitLog'
@@ -272,6 +273,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   })
   const cfg: QueueConfig = {
     folder: runner.folder(),
+    subfolder: () => !!detect(h.projectPath).subfolder,
     holds: () => runner.holds(),
     git: (cwd, args, opts) => runner.git(cwd, args, 'testMerge', opts),
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
@@ -381,7 +383,8 @@ function openTargets(wf: Workflow): string[] {
 /** Starts the hosts of a workspace's projects that have open entries (as it opens, or when the rules come back on). */
 async function startOpen(ws: WorkspaceService, resumeRulesOff = false): Promise<void> {
   for (const p of ws.info()?.projects ?? []) {
-    if (p.platform?.id !== 'git') continue
+    // A None project too: its Git cards switched from may still have entries (#1419: they keep Git's rules).
+    if (!p.platform) continue
     const wf = await workflowFor(ws, p.path).catch(() => null)
     if (!wf) continue
     for (const target of openTargets(wf)) {
