@@ -613,8 +613,11 @@ const hiveVersion = (): string => {
   }
 }
 
-/** Why a workspace's board couldn't be opened (its import failed): every use says so, and nothing was moved. */
-const failures = new Map<string, Error>()
+/**
+ * Why a workspace's board couldn't be opened (its import failed): every use says so, and nothing was moved. With the place
+ * it was tried at, as it was (#1395: closing the workspace clears it by that, never by its spelling resolved again).
+ */
+const failures = new Map<string, { error: Error; place: string }>()
 
 /**
  * The workspace's board, opened (and moved in from its files, the first time) when first used. Synchronous, so nothing
@@ -631,7 +634,7 @@ function boardOf(path: string, transient = false): Board {
     return open
   }
   if (!transient) assertAdmitted(join(path, HIVE_DIR, DB_FILE))
-  const failed = failures.get(key)
+  const failed = failures.get(key)?.error
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
     const b = openBoard(path, false)
@@ -639,7 +642,7 @@ function boardOf(path: string, transient = false): Board {
     return b
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
-    failures.set(key, err)
+    failures.set(key, { error: err, place: placeKey(path) })
     log.error(`opening the board of ${userText(path)}`, e)
     throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
@@ -802,7 +805,7 @@ function pollOther(key: string): void {
 export function boardRevision(ws: WorkspaceService): string {
   const path = pathOf(ws)
   const b = boardOf(path)
-  return `${dbGeneration(path)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
+  return `${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
 }
 
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
@@ -822,7 +825,7 @@ export function closeBoard(path: string, place?: string): void {
   const key = keyOf(path)
   const others = [...boards.keys(), ...failures.keys()].some((k) => k !== key)
   const at = others ? (place ?? boards.get(key)?.place ?? placeKey(path)) : ''
-  for (const k of [...failures.keys()]) if (k === key || (others && placeKey(k) === at)) failures.delete(k)
+  for (const [k, f] of [...failures]) if (k === key || (others && f.place === at)) failures.delete(k)
   for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
 }
 
@@ -1613,21 +1616,27 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
  * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
  * so nothing written meanwhile (by a 0.9 Hive while the upgrade waited) is overwritten from an old snapshot.
  */
+/** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
-export const dbGeneration = (workspacePath: string): number => generations.get(keyOf(workspacePath)) ?? 0
-const replacedListeners = new Set<(workspacePath: string) => void>()
+/** The generation of a workspace's database by a path entering now (its place resolved here). */
+export const dbGeneration = (workspacePath: string): number => dbGenerationAt(placeKey(workspacePath))
+/** The generation of a workspace's database by the place a caller recorded as it entered. */
+export const dbGenerationAt = (place: string): number => generations.get(place) ?? 0
+const replacedListeners = new Set<(workspacePath: string, place: string) => void>()
 /**
  * Called, under the board's lock and with nothing awaited, once a workspace's database file was replaced: a service
- * drops (or reads again) what it keeps from it. Its saves begun before are refused by their generation.
+ * drops (or reads again) what it keeps from it, matching by `place` (the replaced board's, as it opened) what it keeps
+ * under any spelling. Its saves begun before are refused by their generation.
  */
-export function onDbReplaced(fn: (workspacePath: string) => void): void {
+export function onDbReplaced(fn: (workspacePath: string, place: string) => void): void {
   replacedListeners.add(fn)
 }
 function replaced(path: string): void {
-  generations.set(keyOf(path), dbGeneration(path) + 1)
+  const place = boards.get(keyOf(path))?.place ?? placeKey(path)
+  generations.set(place, dbGenerationAt(place) + 1)
   for (const fn of replacedListeners) {
     try {
-      fn(path)
+      fn(path, place)
     } catch (e) {
       log.warn('a service following the replaced workspace database', e)
     }

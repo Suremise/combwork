@@ -148,8 +148,11 @@ export class WorkspaceService {
   static onOpened: ((fresh: boolean) => Promise<unknown>) | null = null
   /** Each read of the projects' ids (#514): the workspace's record of their names follows it (projectNames.ts). Never awaited. */
   static onIdsRead: ((ws: WorkspaceService, seen: ProjectSeen[]) => void) | null = null
-  /** Told when a workspace starts closing (its path still set), so services drop what they keep for it. */
-  static readonly closingListeners = new Set<(path: string) => void>()
+  /**
+   * Told when a workspace starts closing (its path still set), so services drop what they keep for it: `place` is the
+   * place its window recorded as it opened (#1395: what they kept under any spelling of it, matched by what they recorded).
+   */
+  static readonly closingListeners = new Set<(path: string, place: string) => void>()
   /** Told each time a workspace has opened (after onOpened), so services repair what a close left (#1392). Never awaited. */
   static readonly openedListeners = new Set<(ws: WorkspaceService) => void>()
   /**
@@ -366,7 +369,7 @@ export class WorkspaceService {
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
-          l(closing)
+          l(closing, place ?? placeKey(closing))
         } catch (e) {
           log.warn('closing the workspace', e)
         }

@@ -39,6 +39,9 @@ function refused(): Error {
   return e
 }
 
+/** The refusal, for a caller judging by a place it recorded (isAdmitted) rather than by a file. */
+export const refusedOpen = (): Error => refused()
+
 /** A window opens a workspace: `place` is the place it recorded (`placeKey`), its databases open as they're used. */
 export function admit(place: string): void {
   admitted.add(place)

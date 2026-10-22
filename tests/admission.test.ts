@@ -235,6 +235,42 @@ describe('deliveries (#1395)', () => {
     })
   }
 
+  it('a junction pointed at another workspace once a delivery was left by it redirects neither the write nor its reconciliation (HR6 round 2)', async () => {
+    const [ws, other] = [workspace(), workspace()]
+    const via = junction(ws, join(base, `via-${++n}`))
+    try {
+      deliveries.setInLeaveForTests(async () => {
+        deliveries.setInLeaveForTests(null)
+        unlinkSync(via)
+        junction(other, via)
+        // The other workspace opened and its host loaded meanwhile: not the one this delivery is for.
+        await w.open(other)
+        await deliveries.load(join(other, 'proj'))
+      })
+      const r = (await deliveries.leaveDelivery(join(via, 'proj'), delivery('for ws')))!
+      expect(await deliveries.deliveriesOf(join(other, 'proj'), 'b1')).toEqual([])
+      await w.open(ws)
+      expect((await deliveries.deliveriesOf(join(ws, 'proj'), 'b1')).map((x) => [x.id, x.body])).toEqual([[r.id, 'for ws']])
+      await w.close()
+    } finally {
+      unlinkSync(via)
+    }
+    expect([nothingOpen(ws), nothingOpen(other)]).toEqual([true, true])
+  })
+
+  it("a host loaded through a junction goes as its window closes, the junction removed since: by the place its store recorded", async () => {
+    const ws = workspace()
+    const via = junction(ws, join(base, `via-${++n}`))
+    const host = join(via, 'proj')
+    await w.open(ws)
+    const r = await deliveries.createDelivery(host, delivery('by the junction'))
+    expect(deliveries.deliveryNow(host, r.id)?.state).toBe('queued')
+    unlinkSync(via)
+    await w.close()
+    expect(deliveries.deliveryNow(host, r.id)).toBeNull()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+
   it("a delivery left for one project's host isn't given to, nor read again by, another project's in the same workspace (control)", async () => {
     const ws = workspace()
     mkdirSync(join(ws, 'other', '.hive'), { recursive: true })
