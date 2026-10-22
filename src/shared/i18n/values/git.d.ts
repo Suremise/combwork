@@ -283,6 +283,25 @@ interface HiveMessageValues {
   'git.vc.offer.switchGit': undefined
   'git.vc.offer.switchNone': undefined
   'git.vc.sections': undefined
+  'git.vc.step.cantSave': undefined
+  'git.vc.step.choose': { preset: string | number }
+  'git.vc.step.confirmTitle': { preset: string | number; project: string | number }
+  'git.vc.step.customise': undefined
+  'git.vc.step.details': { preset: string | number }
+  'git.vc.step.hideDetails': { preset: string | number }
+  'git.vc.step.intro': undefined
+  'git.vc.step.keeps': { n: number }
+  'git.vc.step.notNow': undefined
+  'git.vc.step.nothing': undefined
+  'git.vc.step.presets': undefined
+  'git.vc.step.saved': { project: string | number; preset: string | number }
+  'git.vc.step.suggested': undefined
+  'git.vc.step.title': undefined
+  'git.vc.step.use': { preset: string | number }
+  'git.vc.step.why': { why: string }
+  'git.vc.stepNotice.choose': undefined
+  'git.vc.stepNotice.notNow': undefined
+  'git.vc.stepNotice.text': { n: number; projects: string | number }
   'git.vc.switch.changed': { platform: string | number }
   'git.vc.switch.confirm': undefined
   'git.vc.switch.done': { project: string | number; platform: string | number }

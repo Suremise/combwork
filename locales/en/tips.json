@@ -707,6 +707,14 @@
     "defaultMessage": "When an agent’s hooks stop arriving",
     "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
   },
+  "tips.howDoYouWork.text": {
+    "defaultMessage": "A new project’s Version Control tab asks “How do you work?”: Solo, Pair or Team, the one that fits its agents suggested. Choose sets it up in one click; Not Now keeps your defaults.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, preset). The quoted question is the step's heading: use it as Hive shows it."
+  },
+  "tips.howDoYouWork.title": {
+    "defaultMessage": "Start a new project with a preset",
+    "description": "A tip's title (glossary 2.1: preset)."
+  },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "Des compétences pour travailler avec Hive",
   "tips.hooksMissing.text": "Si une mise à jour de la CLI ou une stratégie empêche les hooks d’un agent d’atteindre Hive, son volet affiche Statut inconnu au lieu d’un statut peut-être faux, rien n’y est tapé et son couloir se met en pause. La bannière au-dessus de son volet dit pourquoi quand Hive le sait.",
   "tips.hooksMissing.title": "Quand les hooks d’un agent n’arrivent plus",
+  "tips.howDoYouWork.text": "L’onglet Gestion de versions d’un nouveau projet demande « Comment travailles-tu ? » : Solo, Binôme ou Équipe, et suggère celui qui convient à ses agents. Choisir le met en place en un clic ; Pas maintenant garde tes valeurs par défaut.",
+  "tips.howDoYouWork.title": "Démarre un nouveau projet avec un préréglage",
   "tips.imagesTab.text": "L’onglet Pièces jointes garde chaque capture d’écran et chaque fichier collé ou déposé dans les sessions du projet, groupés par session, avec des aperçus et un filtre par type, prêts à être réinsérés.",
   "tips.imagesTab.title": "Tout ce que tu as joint, au même endroit",
   "tips.improveTranslation.text": "Un mot maladroit ou faux dans ta langue ? Aide → Améliorer cette traduction explique comment le corriger, ou ajouter une langue, avec une pull request sur GitHub.",

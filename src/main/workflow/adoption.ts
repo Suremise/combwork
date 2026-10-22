@@ -13,6 +13,7 @@
 
 import { basename } from 'path'
 import { compile } from '../../shared/workflow/compile'
+import { isReviewer } from '../../shared/workflow/presetStep'
 import type { StageId } from '../../shared/workflow/facts'
 import type { ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -36,8 +37,6 @@ const DONE_KEY = 'adoption'
 /** The columns of cards in flight at the upgrade. */
 const IN_FLIGHT = new Set<string>(['doing', 'review', 'passed'])
 
-/** Whether an agent is a reviewer (its role or, without one, its name says so: "Reviewer", "HR1 (reviewer)"). */
-const isReviewer = (a: { name: string; role?: string }): boolean => /review/i.test(a.role || a.name)
 
 export interface AdoptionResult {
   /** Cards adopted (in flight). */
@@ -97,7 +96,10 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
     else byProject.set(folder, [...(byProject.get(folder) ?? []), c])
   }
   // Every project gets its options, cards in flight or not (the ruleset its next card starts under).
-  for (const folder of new Set(folders.values())) {
+  // A board made by 1.0 (no card from before it) has no project from before it either: its projects keep no options of
+  // the upgrade's, and ask "How do you work?" instead (#1423, §16.3.5). Upgraded boards' projects get theirs.
+  const upgraded = Number(boardValue(ws, ADOPTION_UPTO) ?? 0) > 0
+  for (const folder of upgraded ? new Set(folders.values()) : new Set<string>()) {
     const name = basename(folder)
     const r = await projectOptions(ws, folder, lanes.some((l) => l.project.toLowerCase() === name.toLowerCase()), alive)
     if (!r) return null

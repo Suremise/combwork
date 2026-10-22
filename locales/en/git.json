@@ -1127,6 +1127,82 @@
     "defaultMessage": "Version Control",
     "description": "Accessible name of the Version Control tab's row of sections (Workflow, Changes, History…). Glossary 2.1: Version Control (the tab)."
   },
+  "git.vc.step.cantSave": {
+    "defaultMessage": "This preset can’t be saved for the project:",
+    "description": "Before the reasons a preset can’t be saved (it contradicts the workspace’s options, say), in the \"How do you work?\" step."
+  },
+  "git.vc.step.choose": {
+    "defaultMessage": "Choose {preset}",
+    "description": "The step’s main button: saves the preset shown ({preset}: Solo, Pair, Team) as the project’s workflow options, after a confirmation."
+  },
+  "git.vc.step.confirmTitle": {
+    "defaultMessage": "Use {preset} for {project}?",
+    "description": "Title of the confirmation after Choose in the \"How do you work?\" step. {preset} is Solo, Pair or Team; {project} the project’s name."
+  },
+  "git.vc.step.customise": {
+    "defaultMessage": "Customise…",
+    "description": "A button of the \"How do you work?\" step: opens the Workflow section with the preset shown filled in, not saved. The … says more follows: keep it."
+  },
+  "git.vc.step.details": {
+    "defaultMessage": "What {preset} sets",
+    "description": "A link in the \"How do you work?\" step: shows each option the preset shown ({preset}: Solo, Pair, Team) sets, and why."
+  },
+  "git.vc.step.hideDetails": {
+    "defaultMessage": "Hide what {preset} sets",
+    "description": "The link in the \"How do you work?\" step once the preset’s options are shown: hides them again. {preset} is Solo, Pair or Team."
+  },
+  "git.vc.step.intro": {
+    "defaultMessage": "A preset sets up this project’s workflow in one click: who reviews the work, which checks pass first and who merges. Nothing changes until you choose.",
+    "description": "Under \"How do you work?\": what choosing a preset does (glossary 2.1: preset, workflow)."
+  },
+  "git.vc.step.keeps": {
+    "defaultMessage": "{n, plural, one {The card in flight keeps the rules it started with; the options apply from the next card.} other {The # cards in flight keep the rules they started with; the options apply from the next card.}}",
+    "description": "The confirmation after Choose in the \"How do you work?\" step, when cards have started (glossary: old rules)."
+  },
+  "git.vc.step.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the \"How do you work?\" step: no preset; the options stay inherited and the step isn’t offered again for this version control."
+  },
+  "git.vc.step.nothing": {
+    "defaultMessage": "Nothing is in flight yet: its options apply from the first card that starts.",
+    "description": "The confirmation after Choose in the \"How do you work?\" step, when no card has started and no lane runs."
+  },
+  "git.vc.step.presets": {
+    "defaultMessage": "Presets",
+    "description": "Accessible name of the row of presets (Solo, Pair, Team) in the \"How do you work?\" step."
+  },
+  "git.vc.step.saved": {
+    "defaultMessage": "{project} uses {preset}",
+    "description": "A notice after a preset was chosen in the \"How do you work?\" step."
+  },
+  "git.vc.step.suggested": {
+    "defaultMessage": "Suggested",
+    "description": "A tag on the preset Hive suggests for the project, in the \"How do you work?\" step."
+  },
+  "git.vc.step.title": {
+    "defaultMessage": "How do you work?",
+    "description": "The heading of the step that offers a new project a preset (Solo, Pair, Team), atop its Version Control tab."
+  },
+  "git.vc.step.use": {
+    "defaultMessage": "Use {preset}",
+    "description": "The confirm button after Choose in the \"How do you work?\" step. {preset} is Solo, Pair or Team."
+  },
+  "git.vc.step.why": {
+    "defaultMessage": "{why, select, solo {Suggested for one agent or none.} pair {Suggested for a builder and a reviewer.} other {Suggested for more agents than a builder and a reviewer.}}",
+    "description": "Why Hive suggests the marked preset, from the project’s agents, in the \"How do you work?\" step. Keep the select keys."
+  },
+  "git.vc.stepNotice.choose": {
+    "defaultMessage": "Choose…",
+    "description": "A button of the notice for projects added without a workflow: opens the first one’s Version Control tab at \"How do you work?\". The … says more follows: keep it."
+  },
+  "git.vc.stepNotice.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the notice for projects added without a workflow: answers \"How do you work?\" with Not now for each (their options stay inherited), so it isn’t shown again."
+  },
+  "git.vc.stepNotice.text": {
+    "defaultMessage": "{n, plural, one {{projects} was added: how do you work?} other {{projects} were added: how do you work?}} A preset sets up a workflow in one click.",
+    "description": "A notice for projects Hive found in the workspace (or the Assistant added) that have no workflow yet: it offers the \"How do you work?\" step (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
+  },
   "git.vc.switch.changed": {
     "defaultMessage": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
     "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git."

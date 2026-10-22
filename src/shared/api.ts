@@ -299,6 +299,8 @@ export interface HiveRequests {
    * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
    */
   'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
+  /** "How do you work?" answered Not now (#1423): no preset, the options inherited, not asked again for the platform in force. */
+  'workflow:presetNotNow': (projectPath: string) => void
   /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
