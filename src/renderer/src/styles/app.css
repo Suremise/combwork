@@ -237,6 +237,39 @@ pre,
   font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 
+/* A command or path with its Copy button (#1204, CopyableCode): the code may wrap, the button stays beside its end. */
+.copy-code {
+  overflow-wrap: anywhere;
+}
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 3px;
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.copy-code-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-strong);
+}
+.copy-code-btn:focus-visible {
+  outline: 1px solid var(--accent);
+}
+.copy-code-btn .codicon {
+  font-size: 13px;
+}
+.copy-code-done {
+  margin-left: 4px;
+  color: var(--success);
+  font-size: 11px;
+}
+
 kbd {
   display: inline-block;
   padding: 1px 6px;

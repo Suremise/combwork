@@ -212,6 +212,7 @@ export const SUITES = [
   { name: 'sessiontoolbar' },
   { name: 'sessiontree' },
   { name: 'setaside' },
+  { name: 'setupcopy' },
   { name: 'setuplayout' },
   { name: 'signin' },
   { name: 'skillaudience' },
