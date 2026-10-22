@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { changeOutcome, covered, defenderMovePlan, devDriveOf, emptyStatus, folderPlan, normPath, parseProbe, pathList, productOn, readableList, statusOf, testsEligible, unsafeFolder, type AvPathKind } from '../src/shared/antivirus'
+import { changeOutcome, covered, defenderMovePlan, devDriveOf, emptyStatus, folderPlan, goneExclusions, normPath, parseProbe, pathList, productOn, readableList, statusOf, testsEligible, unsafeFolder, type AvPathKind } from '../src/shared/antivirus'
 import { tempDir } from './tempDir'
 
 // Fixtures in the shape main/antivirus.ts's probe prints (Get-MpComputerStatus, Get-MpPreference, Security Center, Get-Volume).
@@ -186,6 +186,31 @@ describe('antivirus: Defender’s hidden-list answer (#316 round 3)', () => {
     const s = status(probe(), { adminCheck: { at: 'x', exclusions: [HIDDEN] } })
     expect([s.exclusionsFrom, s.paths.map((p) => p.state)]).toEqual([null, ['unknown', 'unknown', 'unknown']])
     expect(status(probe(), { adminCheck: { at: 'x', exclusions: [] } }).paths.map((p) => p.state)).toEqual(['not-excluded', 'not-excluded', 'not-excluded'])
+  })
+})
+
+describe('antivirus: Hive’s exclusions of folders that are gone (#1389)', () => {
+  const OLD = 'E:\\Old\\HIVE'
+  const gone = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; missing: string[] }) =>
+    statusOf('D:\\Development\\HIVE', parseProbe(raw), folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now, missing: opts.missing }).gone
+
+  it('with Defender’s list known, only those it lists itself; with it hidden, every one Hive recorded, unconfirmed', () => {
+    const added = [OLD, 'E:\\Old\\HIVE.worktrees', 'F:\\Gone']
+    // Listed now: Hive's entries for OLD and F:\Gone; the worktrees' was taken away (in Windows Security, say).
+    expect(gone(probe({ exclusions: [OLD, 'f:\\gone\\', 'E:\\Old'] }), { added, missing: added })).toEqual([{ path: OLD, state: 'excluded' }, { path: 'F:\\Gone', state: 'excluded' }])
+    // A parent the user excluded isn't Hive's entry: not listed itself, not shown.
+    expect(gone(probe({ exclusions: ['E:\\Old'] }), { added, missing: added })).toBeUndefined()
+    // Hidden, with Hive's administrator read: as that read lists them.
+    expect(gone(probe(), { added, missing: added, adminCheck: { at: 'x', exclusions: [OLD] } })).toEqual([{ path: OLD, state: 'excluded' }])
+    // Hidden, no read: every one, unconfirmed.
+    expect(gone(probe(), { added, missing: added })?.map((g) => g.state)).toEqual(['added', 'added', 'added'])
+  })
+
+  it('never the workspace’s own folders, a folder twice, one that exists, nor without Defender', () => {
+    expect(goneExclusions(['D:\\Development\\HIVE', OLD, 'e:\\old\\hive\\'], folders, null)).toEqual([{ path: OLD, state: 'added' }])
+    // Only what the caller found missing: an existing folder Hive excluded is the workspace's business, not here.
+    expect(gone(probe(), { added: [OLD, 'E:\\There'], missing: [OLD] })?.map((g) => g.path)).toEqual([OLD])
+    expect(gone(probe({ defender: { antivirus: true, realTime: true, mode: 'Passive' } }), { added: [OLD], missing: [OLD] })).toBeUndefined()
   })
 })
 

@@ -45,6 +45,8 @@
   "workspace.antivirus.devUntrustedTip": "Um Dev Drive não confiável: o Defender o verifica como qualquer outra unidade.",
   "workspace.antivirus.dontAsk": "Não perguntar de novo",
   "workspace.antivirus.folder": "Pasta",
+  "workspace.antivirus.goneHint": "{n, plural, one {O Hive excluiu esta pasta, que não existe mais (movida ou excluída). “Remover exclusões do Hive…” também a remove.} other {O Hive excluiu estas pastas, que não existem mais (movidas ou excluídas). “Remover exclusões do Hive…” também as remove.}}",
+  "workspace.antivirus.goneTitle": "Exclusões do Hive de pastas que não existem mais",
   "workspace.antivirus.hidden": "O Defender mostra as exclusões só para administradores, então o Hive não consegue vê-las sem pedir.",
   "workspace.antivirus.holdsHome": "é ou contém sua pasta pessoal, seu perfil ou uma pasta do sistema",
   "workspace.antivirus.kindTests": "Área de testes do Hive (para quem desenvolve o Hive)",

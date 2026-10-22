@@ -32,6 +32,7 @@ const git = (cwd, args) => execFileSync('git', args, { cwd, env: baseEnv(), enco
 const branches = (cwd) => git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split(/\r?\n/)
 const configOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
 const agentsOf = (project) => configOf(project).agents
+const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 
 ;(async () => {
   for (const d of [userData, root, home]) fs.rmSync(d, { recursive: true, force: true })
@@ -116,8 +117,10 @@ const agentsOf = (project) => configOf(project).agents
       git(wt('JB1').path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'work'])
       const head = git(wt('JB1').path, ['rev-parse', 'HEAD'])
       check('…its reconciliation sees the commit on hive/Tools/juniper/jb1', !!(await lib.until(async () => (await inv('tasks:facts', card)).some((f) => f.kind === 'HeadMoved' && f.data.line === 'hive/Tools/juniper/jb1' && f.data.to === head), HUNG_MS)), JSON.stringify((await inv('tasks:facts', card)).map((f) => f.kind)))
-      // Its folder (the worktree, by its old path) is another matter: that the card follows the moved folder is #1343's.
       check('…and never took its branch for gone', !(await inv('tasks:facts', card)).some((f) => f.kind === 'Gone' && f.data.what === 'line'), JSON.stringify((await inv('tasks:facts', card)).filter((f) => f.kind === 'Gone')))
+      // Its folder follows the worktree's move too (#1343: FolderMoved), and was never taken for gone, before Repair either.
+      check("JB1's card follows its worktree to Tools (FolderMoved)", samePath((await inv('tasks:work', card))?.folder ?? '', wt('JB1').path) && (await inv('tasks:facts', card)).some((f) => f.kind === 'FolderMoved' && samePath(f.data.to, wt('JB1').path)), JSON.stringify(await inv('tasks:work', card)))
+      check('…and never took its folder for gone', !(await inv('tasks:facts', card)).some((f) => f.kind === 'Gone'), JSON.stringify((await inv('tasks:facts', card)).filter((f) => f.kind === 'Gone')))
       await dialog.locator('.btn.primary', { hasText: 'Close' }).click()
       check('the banner goes: a branch kept for its taken name is nothing left to do', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
       const again = await inv('workspace:moveRepair')

@@ -237,6 +237,39 @@ pre,
   font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 
+/* A command or path with its Copy button (#1204, CopyableCode): the code may wrap, the button stays beside its end. */
+.copy-code {
+  overflow-wrap: anywhere;
+}
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 3px;
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.copy-code-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-strong);
+}
+.copy-code-btn:focus-visible {
+  outline: 1px solid var(--accent);
+}
+.copy-code-btn .codicon {
+  font-size: 13px;
+}
+.copy-code-done {
+  margin-left: 4px;
+  color: var(--success);
+  font-size: 11px;
+}
+
 kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -2959,6 +2992,9 @@ p.hint {
   border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
   white-space: pre-line;
   user-select: text;
+  /* A long one (Push to…'s every branch by name, #1385) scrolls in its own box, the buttons staying in view. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .field-error {
   color: var(--error);
@@ -3208,6 +3244,9 @@ p.hint {
   margin-top: 2px;
   word-break: break-word;
   white-space: pre-line;
+  /* A long message (Push to…'s every branch by name, #1385) scrolls rather than run off the screen. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .toast-actions {
   display: flex;
@@ -6657,6 +6696,14 @@ body.pane-resizing .monaco-editor {
 }
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
+}
+/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+.antivirus-gone h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: inherit;
+}
+.antivirus-gone td.mono {
+  overflow-wrap: anywhere;
 }
 .perf-antivirus a {
   cursor: pointer;
@@ -11035,6 +11082,14 @@ button.progress-run-show:focus-visible {
 }
 .git-ref {
   flex-shrink: 0;
+}
+/* A branch row's Track… and Stop tracking (#1385): kept whole at its end, before Switch. */
+.git-row-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.git-form-note {
+  margin-top: 8px;
 }
 .git-ref.git-tag {
   background: rgba(245, 196, 81, 0.16);

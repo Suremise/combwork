@@ -148,6 +148,8 @@
   "tips.gitCheck.title": "Czy git jest gotowy na worktree?",
   "tips.gitInit.text": "Projekt bez gita? Zainicjuj repozytorium… w jego zakładce Git tworzy repozytorium na gałęzi main, wyklucza .hive, jeśli chcesz, dodaje startowy .gitignore i robi pierwszy commit, więc agenci od razu mogą pracować w worktree.",
   "tips.gitInit.title": "Repozytorium git z projektu jednym kliknięciem",
+  "tips.gitRemotes.text": "Git → Gałęzie i zdalne repozytoria: „Wypchnij do…” wysyła tę gałąź albo wszystkie gałęzie i tagi do dowolnego zdalnego repozytorium, nie zmieniając tego, co śledzi gałąź. Można tam też zmienić nazwę zdalnego repozytorium lub je usunąć, a „Śledź” przy gałęzi wybiera, czego używają „Ściągnij” i „Wypchnij”.",
+  "tips.gitRemotes.title": "Wypychanie do zapasowego zdalnego repozytorium",
   "tips.gitView.text": "Zakładka Git pokazuje gałąź, zdalne repozytoria, historię i tagi projektu i pozwala przełączyć lub utworzyć gałąź, pobrać, ściągnąć, wypchnąć, dodać tag i ustawić autora commitów. Pasek stanu pokazuje „{example}”: kliknij, żeby tam przejść.",
   "tips.gitView.title": "Zobacz i zmień gita projektu",
   "tips.gotoProject.text": "Naciśnij {key} i wpisz kilka liter nazwy projektu.",
