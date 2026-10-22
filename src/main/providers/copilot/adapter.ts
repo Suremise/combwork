@@ -12,10 +12,11 @@ import { config } from '../../config'
 import { writeJsonAtomic } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { AGENTS_SKILLS, agentsSkillCopyPath, compareVersions, exportSubtitleText, hookIds, promptArg, runsThroughCmd, syncAgentsSkills, toSpawnable, userMemoryLabel } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
 import { launchOverrides } from '../../advancedValues'
 import { overrideId } from '../../../shared/advanced'
+import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
 import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
@@ -429,6 +430,13 @@ export class CopilotAdapter implements ProviderAdapter {
   transcriptDetails(appended: string, memo: Record<string, unknown>): LiveDetails {
     return eventsDetails(appended, (memo.copilot ??= copilotDetailsMemo()) as CopilotDetailsMemo)
   }
+
+  /** Turns by interaction (its hooks carry no turn id: joined by time), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return copilotTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'time'
 
   // -------------------------------------------------------------------------
   // Transcripts: COPILOT_HOME/session-state/<id>/events.jsonl, with workspace.yaml beside it

@@ -715,6 +715,14 @@
     "defaultMessage": "Merge queue: network errors that count as temporary",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again."
   },
+  "settings.advanced.hive.queue.signSeconds.desc": {
+    "defaultMessage": "When a repository signs its commits, how long the merge queue waits for its merge commit, hooks included, before it takes the signer to be waiting for a passphrase. It then ends the commit, changes nothing in the target and pauses the queue with “signing waits for you”. Raise it when signing or the repository’s commit hooks really take longer; too long, and a signer waiting for you holds the queue up that long.",
+    "description": "What the advanced setting \"Merge queue: longest a signed merge commit takes\" does, and what goes wrong when it is wrong (Settings → Advanced). “signing waits for you” is how the queue’s pause reads."
+  },
+  "settings.advanced.hive.queue.signSeconds.title": {
+    "defaultMessage": "Merge queue: longest a signed merge commit takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds (\"60 s\"). The merge commit is the commit Hive's merge queue makes when it merges a card; signed means the repository is set to sign commits (GPG or SSH)."
+  },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
     "description": "What the advanced setting \"Flight recorder: wait after a trigger\" does (Settings → Advanced)."
