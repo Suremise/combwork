@@ -2569,19 +2569,9 @@ p.hint {
   .changes-split > .split > .split-main {
     min-height: 0;
   }
-  /* The unused worktrees' heading and rows wrap rather than run out of the pane: its buttons go under the title, a
-     row's buttons under its text, and a long path breaks anywhere. */
-  .changes-split #unused-worktrees,
-  .changes-split .unused-wt,
-  .changes-split .unused-wt > .flex {
+  /* The unused worktrees' heading wraps rather than run out of the pane: its buttons go under the title. */
+  .changes-split #unused-worktrees {
     flex-wrap: wrap;
-  }
-  .changes-split .unused-wt .mono {
-    overflow-wrap: anywhere;
-  }
-  .changes-split .unused-wt > .grow {
-    flex: 1 1 160px;
-    min-width: 0;
   }
 }
 @container templates-split (max-width: 399px) {
@@ -3810,19 +3800,142 @@ h2.section#unused-worktrees {
 .unused-worktrees-line a {
   cursor: pointer;
 }
-.unused-wt {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-sidebar);
-  margin-bottom: 8px;
+
+/* Unused worktrees as a table (#1314, ItemTable): a line a worktree, Branch · State · Folder · Last commit · Size, its
+   actions at the right edge, aligned down the table; a cell too long is cut with an ellipsis (the full text on hover).
+   Sized by the list's own width: under 1000px each row is two lines (branch, state and actions; under them folder, last
+   commit and size, muted), under 520px it stacks, its actions on a line of their own. */
+.unused-worktrees {
+  container: unused-list / inline-size;
 }
-.unused-wt > .codicon {
-  font-size: 18px;
+.table.item-table.unused-wt-table {
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 4px;
+  --item-actions: 128px;
+}
+.table.item-table.unused-wt-table.has-work {
+  --item-actions: 290px;
+}
+.unused-wt-table th:nth-child(1) {
+  width: 18%;
+}
+.unused-wt-table th:nth-child(3) {
+  width: 9%;
+}
+.unused-wt-table th:nth-child(4) {
+  width: 20%;
+}
+.unused-wt-table th:nth-child(5) {
+  width: 64px;
+}
+.table.item-table.unused-wt-table .item-table-actions {
+  width: var(--item-actions);
+}
+.unused-wt-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-table td > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-branch .codicon {
+  margin-right: 2px;
   color: var(--fg-muted);
+  vertical-align: text-bottom;
+}
+/* The state and who made it, badges in a row: each cut rather than wrapped, its full text on hover. */
+.unused-wt-table .unused-wt-badges {
+  display: flex;
+  gap: 4px;
+}
+.unused-wt-badges .badge {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.unused-wt-table .item-table-actions .btn + .btn,
+.unused-wt-table .item-table-actions .btn + .tip-wrap,
+.unused-wt-table .item-table-actions .tip-wrap + .btn {
+  margin-left: 4px;
+}
+@container unused-list (max-width: 999px) {
+  .unused-wt-table,
+  .unused-wt-table tbody {
+    display: block;
+  }
+  .unused-wt-table thead {
+    display: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt {
+    display: grid;
+    grid-template-columns: minmax(0, 32%) minmax(0, 1fr) auto;
+    grid-template-areas: 'branch state actions' 'folder last size';
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 1px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .table.item-table.unused-wt-table tr.unused-wt:last-child {
+    border-bottom: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt td {
+    padding: 0;
+    border: none;
+    width: auto;
+    min-width: 0;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(1) {
+    grid-area: branch;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(2) {
+    grid-area: state;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(3) {
+    grid-area: folder;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(4) {
+    grid-area: last;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(5) {
+    grid-area: size;
+    justify-self: end;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td.item-table-actions {
+    grid-area: actions;
+  }
+}
+@container unused-list (max-width: 519px) {
+  .table.item-table.unused-wt-table tr.unused-wt {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'branch branch' 'state state' 'folder size' 'last last' 'actions actions';
+    row-gap: 3px;
+  }
+  /* Its buttons wrap rather than run out of the pane, from the right. */
+  .table.item-table.unused-wt-table tr.unused-wt td.item-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    padding-top: 2px;
+    white-space: normal;
+  }
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .btn,
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .tip-wrap,
+  .unused-wt-table tr.unused-wt .item-table-actions .tip-wrap + .btn {
+    margin-left: 0;
+  }
+}
+/* Remove all merged's confirmation (#1314): Branch · Folder. */
+.unused-merged-table th:nth-child(1) {
+  width: 65%;
 }
 /* What a page of changes shows, at the top of its right side (#476); the list being checked again over it. */
 .changes-page-head {

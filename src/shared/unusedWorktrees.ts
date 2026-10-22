@@ -22,7 +22,8 @@ const M = {
   pickMerged: msg({ id: 'workspace.unused.pickMerged', defaultMessage: 'merged, clean', description: "An unused worktree in the Changes tab's picker: merged and with no changes. Lower case." }),
   pickWork: msg({ id: 'workspace.unused.pickWork', defaultMessage: 'holds work', description: "An unused worktree in the Changes tab's picker: it holds work that is nowhere else. Lower case." }),
   pickNotChecked: msg({ id: 'workspace.unused.pickNotChecked', defaultMessage: 'not checked', description: "An unused worktree in the Changes tab's picker: git couldn't check it. Lower case." }),
-  aboutUnused: msg({ id: 'workspace.changes.aboutUnused', defaultMessage: "Worktrees no agent of {project} works in: kept when their agent was removed, or made outside Hive (by an agent's own git worktree add, say). Open one to see its changes and merge them, or give it to an agent.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The Changes tab's Unused worktrees page, at the top. Keep git worktree add as it is; {into} is the main branch." }),
+  aboutUnused: msg({ id: 'workspace.changes.aboutUnusedShort', defaultMessage: 'Worktrees no agent of {project} works in: open one to see its changes and merge them, or give it to an agent.', description: "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)." }),
+  aboutUnusedTip: msg({ id: 'workspace.changes.aboutUnusedTip', defaultMessage: "Kept when their agent was removed, made outside Hive (by an agent's own git worktree add, say), or from another template (loading that template gives them back to its agents).{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch." }),
   aboutUnusedOne: msg({ id: 'workspace.changes.aboutUnusedOne', defaultMessage: "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to give it to an agent or remove it.", description: "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name." }),
   aboutAgent: msg({ id: 'workspace.changes.aboutAgent', defaultMessage: "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.", description: "The Changes tab, over an agent's worktree's changes. Merge… is the button." }),
   aboutProject: msg({ id: 'workspace.changes.aboutProject', defaultMessage: "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).", description: "The Changes tab, over the project folder's changes." }),
@@ -70,7 +71,9 @@ export function unusedPickerLabel(w: UnusedWorktree): string {
 
 /** What each page of the Changes tab shows, in one sentence at the top of the page's right side (#476). */
 export const CHANGES_ABOUT = {
-  unused: (project: string, into: string | null): string => tr(M.aboutUnused, { project, known: into ? 'yes' : 'no', into: into ?? '' }),
+  unused: (project: string): string => tr(M.aboutUnused, { project }),
+  /** Where unused worktrees come from and which can go (#1314: the ⓘ beside the heading, the page saying one sentence). */
+  unusedTip: (into: string | null): string => tr(M.aboutUnusedTip, { known: into ? 'yes' : 'no', into: into ?? '' }),
   unusedOne: (branch: string, into: string): string => tr(M.aboutUnusedOne, { branch, into }),
   agent: (name: string, branch: string, base: string): string => tr(M.aboutAgent, { agent: name, branch, base }),
   get project(): string {

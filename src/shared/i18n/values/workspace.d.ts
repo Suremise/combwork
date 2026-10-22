@@ -107,8 +107,9 @@ interface HiveMessageValues {
   'workspace.banners.showProjectLabel': { title: string | number }
   'workspace.changes.aboutAgent': { agent: string | number; branch: string | number; base: string | number }
   'workspace.changes.aboutProject': undefined
-  'workspace.changes.aboutUnused': { project: string | number; known: string; into: string | number }
   'workspace.changes.aboutUnusedOne': { branch: string | number; into: string | number }
+  'workspace.changes.aboutUnusedShort': { project: string | number }
+  'workspace.changes.aboutUnusedTip': { known: string; into: string | number }
   'workspace.docs.about': { app: string | number }
   'workspace.docs.api': undefined
   'workspace.docs.changelog': undefined
@@ -487,11 +488,15 @@ interface HiveMessageValues {
   'workspace.unusedList.changed': undefined
   'workspace.unusedList.checkFailed': { refused: string | number; error: string | number }
   'workspace.unusedList.checking': undefined
+  'workspace.unusedList.colBranch': undefined
+  'workspace.unusedList.colFolder': undefined
+  'workspace.unusedList.colLast': undefined
+  'workspace.unusedList.colSize': undefined
+  'workspace.unusedList.colState': undefined
   'workspace.unusedList.detached': undefined
   'workspace.unusedList.gitProblem': { problem: string | number }
   'workspace.unusedList.give': undefined
   'workspace.unusedList.heading': undefined
-  'workspace.unusedList.headingTip': undefined
   'workspace.unusedList.keptMany': { count: number }
   'workspace.unusedList.keptReason': undefined
   'workspace.unusedList.keptTitle': { name: string | number }
