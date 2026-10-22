@@ -1523,8 +1523,10 @@ export interface InboxSummary {
 /** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Hive can tell. */
 export interface HooksMissing {
   since: string
-  /** start: no hook since its start; prompt: none after a prompt its CLI took. */
-  after: 'start' | 'prompt'
+  /** start: no hook since its start; prompt: none after a prompt its CLI took; transcript: none for a turn its transcript shows it took (#1371). */
+  after: 'start' | 'prompt' | 'transcript'
+  /** transcript: the turn that showed it, by the transcript's id for it (Claude Code's promptId, Codex's turn_id, Copilot's interactionId). */
+  turn?: string
   why?: 'refused' | 'off' | 'newer'
   /** off: the settings that turn them off, as the CLI's adapter names them. */
   offIn?: string

@@ -239,6 +239,15 @@ export interface LiveDetails {
 /** `stopped`: an end the agent made itself (Claude Code's TaskStop, #640): its CLI isn't told, so no turn follows. */
 export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number } | { kind: 'end'; id: string; at: number; stopped?: true }
 
+/** A turn as the transcript identifies it (#1371): its id, when its prompt was written (Unix ms), whether the model took it up. */
+export interface TranscriptTurn {
+  id: string
+  at: number
+  worked: boolean
+  /** With no turn ids in its hooks: its prompt's text as compared with a prompt hook's (hooksHealth's promptKey). */
+  prompt?: string
+}
+
 /** Where an image's data sits in a transcript: the line's byte range and the path to it inside the entry. */
 export interface ImageLocation {
   offset: number
@@ -393,6 +402,16 @@ export interface ProviderAdapter {
    * detect them for this CLI (descriptor.safeguardHelp is null).
    */
   safeguards?(appended: string, memo: Record<string, unknown>): SafeguardEvent[]
+  /**
+   * Turns the session's transcript identifies in lines appended to it (whole lines; #1371, hooks health): each by the
+   * id its hooks carry for it (`turnsJoin: 'id'`), or by the transcript's own id when its hooks carry none (`'time'`),
+   * with when its prompt was written and whether the model took it up. Only turns a person's (or Hive's) prompt began,
+   * never a sub-agent's, a compaction or a local command. `memo` is kept between reads of one file (emptied when the
+   * reading starts again); a turn whose prompt wasn't read (before the reading began, or in a gap) isn't returned.
+   */
+  transcriptTurns?(appended: string, memo: Record<string, unknown>): TranscriptTurn[]
+  /** How transcriptTurns' ids meet its hooks: the same id ('id'), or only by when its hooks came ('time'). */
+  turnsJoin?: 'id' | 'time'
   /**
    * Whether an ask is the CLI's prompt about a safeguard stop (Claude Code asks whether to switch models), from the ask
    * and the terminal's screen as it shows it.
