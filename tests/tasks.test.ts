@@ -569,7 +569,7 @@ describe('archiving in batches', () => {
       }
     }
     const inTodo = await takeThenArchive(idle, () => tasks.archiveBatch([idle], req('All in Todo', { column: 'todo' }), user, { busy }))
-    expect([inTodo.archived, inTodo.skipped]).toEqual([[], [{ number: idle, why: 'moved to Doing' }]])
+    expect([inTodo.archived, inTodo.skipped]).toEqual([[], [{ number: idle, why: 'moved to Active' }]])
     const board = await takeThenArchive(alsoIdle, () => tasks.archiveBatch([alsoIdle], req('All Cards'), user, { busy }))
     expect([board.archived, board.skipped]).toEqual([[], [{ number: alsoIdle, why: 'Agent 1 is working on it' }]])
     for (const n of [idle, alsoIdle]) expect((await run(() => tasks.getTask(n))).archived).toBe(false)

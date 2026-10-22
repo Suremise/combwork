@@ -1514,6 +1514,10 @@ can't be called *Erledigt* while Hive is in German); a bad one is refused with i
 renaming the Active stage leaves the category Active. The user's names are for the user's side (the window, the
 project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
 **Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.
+That includes a card's history and the board's messages the window shows (#1458): a history line is stored in agents'
+English ("Moved to Doing", which agents, Hive's code and the scenarios read) and as its message, which the card dialog
+shows as "Moved to Active"; Archive All's reasons and Start's refusals say Active and Approved. Refusals only agents get
+(an agent's placement, ordering or review of a card) keep Doing and Passed.
 
 **Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from `workflow:stages`
 and each card's stage from its facts). Each category in its fixed order shows its stages as columns: those the shown

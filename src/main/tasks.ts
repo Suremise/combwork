@@ -3,14 +3,14 @@ import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
-import { englishText, forAgents, withValues, type Text } from '../shared/advanced'
+import { englishText, forAgents, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
 import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
-import type { TaskMoveResult } from '../shared/types'
+import type { HiveErrorKind, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -902,7 +902,7 @@ const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowM
 
 /** A history line's English, from its message and values: what agents read and Hive's own code matches (`what`). */
 const englishSaid = (s: StoredText): string => {
-  const t = storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), lineMessage)
+  const t = storedLineText(s, agentEnglish, lineMessage)
   if (t === null) throw new Error(`No history line ${s.id}`) // i18n-ignore: a mistake in Hive's code, never shown
   return t
 }
@@ -922,6 +922,20 @@ const entryOf = (at: string, by: string, said: StoredText | string): TaskHistory
 
 /** Column names in English, for the log. */
 const COLUMN_WORD = Object.fromEntries(TASK_COLUMNS.map((c) => [c.id, c.label])) as Record<TaskColumn, string>
+
+/**
+ * A board message in agents' English (#1458): the window's words say Active and Approved for doing and passed, while
+ * agents read the columns' own names (TASK_COLUMNS: Doing, Passed). Each column value (`column`, `other`) is given as
+ * that name, which the message's column select says through its `other {{column}}`, as every board message's does.
+ */
+export function agentEnglish(m: Msg, values?: TextValues): string {
+  if (!values) return englishText(m)
+  const named = (k: string, v: TextPart): TextPart => ((k === 'column' || k === 'other') && isTaskColumn(v) ? COLUMN_WORD[v] : v)
+  return englishText(withValues(m, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, named(k, v)]))))
+}
+
+/** A board error naming columns: the window's words in its language, agents' English as before (agentEnglish). */
+export const columnError = (m: Msg, values: TextValues, options?: { kind?: HiveErrorKind }): HiveError => new HiveError(forAgents(withValues(m, values), agentEnglish(m, values)), options)
 
 const unknownColumn = (column: unknown): HiveError => hiveError(ERR.unknownColumn, { column: String(column), choices: COLUMN_CHOICES }, { kind: 'invalid' })
 
@@ -2118,7 +2132,7 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
   // Why a card, as it is now, isn't one the user asked to archive (null: it is). Only the window reads it: in its language.
   const outside = (c: TaskCard): string | null =>
     req.column !== null && c.column !== req.column
-      ? tr(msg({ id: 'tasks.skipped.movedColumn', defaultMessage: 'moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}', description: 'Why Archive All left a card on the board (after its number, "#12 moved to Doing"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number.' }), { column: c.column })
+      ? tr(msg({ id: 'tasks.skipped.movedColumn', defaultMessage: 'moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: 'Why Archive All left a card on the board (after its number, "#12 moved to Active"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number.' }), { column: c.column })
       : stage && stageNow(c) !== stage
         ? tr(msg({ id: 'tasks.skipped.movedStage', defaultMessage: 'moved to {stage}', description: 'Why Archive All of a stage column (Approved beside Merging) left a card on the board (after its number, "#12 moved to Merging"): it moved to another stage of the column meanwhile. {stage} is the stage’s name (glossary 2.2). Lower case: it follows the number.' }), { stage: tr(STAGE_TEXT[stageNow(c)]) })
       : project !== null && c.project.toLowerCase() !== project.toLowerCase()
