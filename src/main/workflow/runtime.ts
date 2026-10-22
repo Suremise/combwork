@@ -1525,45 +1525,51 @@ export class Workflow {
     return this.verdict(ref, actor, { pass, comment, ...(startReview ? { startReview } : {}) })
   }
 
-  /** Remove from queue (the user's): `IntegrationCancelled`, recorded as an override; a rebuilt queue skips it. */
-  async removeFromQueue(ref: unknown, reason = ''): Promise<Reply> {
+  /**
+   * Remove from queue (the user's, or the Assistant's within Control with a reason: OP-9): `IntegrationCancelled`,
+   * recorded as an override; a rebuilt queue skips it; the card back to Approved and its builder woken. An entry whose
+   * advance has begun is being merged: refused (its recovery finishes it).
+   */
+  async removeFromQueue(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user'): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    const e = openEntry(s)
     const r = this.rulesetOf(card, s)
     await this.cfg.hooks?.beforeWrite?.('remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    const out = await this.write(card, r, 'user', (w) => {
+    const out = await this.write(card, r, by, (w) => {
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
+      const e = openEntry(w.state())
       if (!e) return null
-      w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by: 'user', reason }) // i18n-ignore: a fact's kind and codes, not text
+      if (e.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+      w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
+      this.wake(w, w.state().started?.builder, `${card.key} was taken out of the merge queue by ${by === 'user' ? 'the user' : 'the Assistant'}${reason ? `: ${reason}` : ''}. It isn't merged; it is queued again only if the user retries it or it is approved again.`) // i18n-ignore: a wake, agent-facing
       return null
     })
-    if (out) return this.refuse(card, 'user', 'remove from queue', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    if (out) return this.refuse(card, by, 'remove from queue', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
-  /** Retry merge (the user's override): requeues an unchanged revision once, even after a red check (§16.8.1). */
-  async retryMerge(ref: unknown, reason = ''): Promise<Reply> {
+  /** Retry merge (the user's override, or the Assistant's with a reason): requeues an unchanged revision once, even after a red check (§16.8.1). */
+  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user'): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
-    const out = await this.write(card, r, 'user', (w) => {
+    const out = await this.write(card, r, by, (w) => {
       // Only for a card the queue returned (Active, its last entry failed), approved and unstale, once per revision.
       const st = w.state()
       const last = st.entries.at(-1)
       const retries = st.entries.filter((x) => x.seq > (st.latest?.id ?? 0) && x.requeue === 'retry').length
       if (st.stage !== 'active' || last?.state !== 'failed' || st.stale || notApproved(st, r, card.labels) || retries >= 1) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-      w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by: 'user', reason }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
       this.enqueue(w, 'retry')
       return null
     })
-    if (out) return this.refuse(card, 'user', 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    if (out) return this.refuse(card, by, 'retry merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, this.state(card).stage)
   }
 

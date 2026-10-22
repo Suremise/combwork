@@ -726,8 +726,17 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * Who paused a merge queue, and when (#1353, SPEC §16.9.3 User controls): `paused_by` the user or the Assistant (null:
+ * Hive's own pause, with its reason), `paused_at` an ISO time (null: a pause from before this step).
+ */
+export const QUEUE_PAUSE_BY_STEP: SchemaStep = {
+  name: 'queue pause by',
+  ddl: ["ALTER TABLE workflow_queue_pauses ADD COLUMN paused_by TEXT CHECK (paused_by IN ('user', 'assistant'))", 'ALTER TABLE workflow_queue_pauses ADD COLUMN paused_at TEXT']
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_BY_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -817,7 +826,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
     args: [1, 'p'],
     index: ['lane_cards_card', 'lane_pending_card']
   },
-  'queuePauses.of': { sql: 'SELECT reason, card, pid FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.of': { sql: 'SELECT reason, card, pid, paused_by, paused_at FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  // queueControls.ts (#1353): a project's paused targets, for its queues' listing.
+  'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
   'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },

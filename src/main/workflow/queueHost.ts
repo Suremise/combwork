@@ -10,6 +10,9 @@
 // options moved to another finisher. With workflow rules off (`hive.workflow.enforce`), nothing runs to an advance: open
 // entries pause `rulesOff` (once an advance has begun, recovery finishes it), and carry on when the rules are on again.
 // A target checked out in a folder pauses `checkedOut` until #1351.
+//
+// Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
+// (queueControls.ts), and tells the window of each change (`queue-changed`).
 
 import { basename, join } from 'path'
 import { app } from 'electron'
@@ -24,7 +27,7 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, type QueueConfig } from './mergeQueue'
+import { MergeQueue, type QueueConfig, type QueueStepInfo } from './mergeQueue'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
 import { workflowEnforced, workflowFor } from './service'
@@ -45,6 +48,9 @@ interface Host {
   target: string
   running: Promise<void> | null
   again: boolean
+  /** The entry its queue is taking through its steps now, and the progress run of the check running for it. */
+  now: QueueStepInfo | null
+  run: string | null
 }
 
 const hosts = new Map<string, Host>()
@@ -60,7 +66,7 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
   const key = hostKey(ws.path, projectPath, target)
   let h = hosts.get(key)
   if (!h || !alive(h)) {
-    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false }
+    h = { ws, wsPath: ws.path, life: ws.lifetime, projectPath, target, running: null, again: false, now: null, run: null }
     hosts.set(key, h)
   }
   if (h.running) {
@@ -73,6 +79,9 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
     .catch((e) => log.warn(`running the merge queue for ${userText(target)} in ${userText(basename(projectPath))}`, e))
     .finally(() => {
       host.running = null
+      host.now = null
+      host.run = null
+      queueChanged(ws, projectPath, target)
       if (!alive(host)) hosts.delete(key)
       // Asked again after its loop had ended (while it released its runner): run once more.
       else if (host.again) void kickQueue(ws, projectPath, target)
@@ -81,7 +90,22 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
 }
 
 /** This profile's name, as another Hive's panel says who runs a queue ("run by Hive-Dev"). */
-const profileName = (): string => basename(app.getPath('userData'))
+export const profileName = (): string => basename(app.getPath('userData'))
+
+/** Tells the workspace's window that a target's queue changed (its model: queueControls.ts), for the panel and the card. */
+export function queueChanged(ws: WorkspaceService, projectPath: string, target: string): void {
+  if (ws.path) ws.emit({ type: 'queue-changed', workspacePath: ws.path, projectPath, target })
+}
+
+/**
+ * What this Hive's host of a target is doing now: running (a run going), the entry's step and the check's run. Nothing
+ * running here: all null (another Hive may run it: its lease says).
+ */
+export function queueLive(ws: WorkspaceService, projectPath: string, target: string): { running: boolean; now: QueueStepInfo | null; run: string | null } {
+  const h = ws.path ? hosts.get(hostKey(ws.path, projectPath, target)) : undefined
+  if (!h || !alive(h)) return { running: false, now: null, run: null }
+  return { running: !!h.running, now: h.now, run: h.run }
+}
 
 async function runHost(h: Host): Promise<void> {
   let runner: QueueRunner | null = null
@@ -134,7 +158,10 @@ async function runHost(h: Host): Promise<void> {
 
 /** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Hive's checks. */
 function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
-  const checks = appQueueChecks(h.ws, h.projectPath, (file, args, opts) => runner.spawnNow('check', file, args, opts))
+  const checks = appQueueChecks(h.ws, h.projectPath, (file, args, opts) => runner.spawnNow('check', file, args, opts), (run) => {
+    h.run = run
+    queueChanged(h.ws, h.projectPath, h.target)
+  })
   const cfg: QueueConfig = {
     folder: runner.folder(),
     holds: () => runner.holds(),
@@ -144,6 +171,11 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     pauseCheckedOut: true,
     runCheck: checks.runCheck,
     install: checks.install,
+    onStep: (step) => {
+      if (step?.step !== h.now?.step || step?.entry !== h.now?.entry) h.run = null
+      h.now = step
+      queueChanged(h.ws, h.projectPath, h.target)
+    },
     // Test copies (unpackaged): HIVE_TEST_QUEUE_CRASH=afterAdvance ends Hive at once once the target has moved, before
     // `Integrated` is written (S33c: the next start's recovery observes it); no quit handler runs, nothing is released.
     ...(!app.isPackaged && process.env.HIVE_TEST_QUEUE_CRASH === 'afterAdvance' ? { hooks: { afterAdvance: () => (exitBy('app.exit', 'a test crash after the merge queue advanced', () => app.exit(1)), new Promise<void>(() => undefined)) } } : {})
@@ -223,7 +255,9 @@ export function startQueueHosts(): void {
   onAction('enqueue', (a, ws) => {
     const project = projectOfCard(ws, a.card)
     const target = typeof a.payload.target === 'string' ? a.payload.target : ''
-    if (project && target) void kickQueue(ws, project, target)
+    if (!project || !target) return
+    queueChanged(ws, project, target)
+    void kickQueue(ws, project, target)
   })
   onAction('releaseSlot', () => undefined)
   // A submission's pin (§16.9.3): what was reviewed is kept until its card is archived (prunePins).

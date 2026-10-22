@@ -64,6 +64,8 @@ import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
+import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
@@ -559,7 +561,9 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'stop-agent': UNDO_FINAL.agentStopped,
   'reorder-tasks': UNDO_FINAL.cardsOrder,
   'cancel-messages': UNDO_FINAL.withdrawn,
-  'lane-end': UNDO_FINAL.laneEnded
+  'lane-end': UNDO_FINAL.laneEnded,
+  'queue-pause': UNDO_FINAL.queuePaused,
+  'queue-resume': UNDO_FINAL.queueResumed
 }
 
 /**
@@ -612,7 +616,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 8
+export const API_VERSION = 9
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1723,6 +1727,90 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
   })
 )
 
+// --- The merge queue (#1353, SPEC §16.9.3): its model for whoever may read the project (an agent its own project's);
+// Pause queue, Resume, Remove from queue and Retry merge are the user's (the window) and the Assistant's within
+// Settings → Assistant → Control (assistantChange), never a project agent's or a script's.
+
+/** The project a queue call is about: an agent's own (another's refused), anyone else's named. */
+function queueProject(v: unknown): string {
+  const a = agentCaller()
+  if (a) {
+    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), 'A merge queue')
+    return a.projectPath
+  }
+  if (typeof v !== 'string' || !v) throw new HttpError(400, 'project is required')
+  return projectByName(v)
+}
+
+/** A queue's target from a request: the one given, else the project's only queue's (several or none: say which). */
+async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promise<string> {
+  if (v !== undefined && v !== null && v !== '') {
+    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, 'target is a branch name')
+    return v
+  }
+  const views = await queueViews(ws, p)
+  if (views.length === 1) return views[0].target
+  throw new HttpError(400, `target is required: the branch the queue merges into${views.length ? ` (${views.map((x) => x.target).join(', ')})` : ''}`)
+}
+
+/** A queue as the Agent API gives it: no folder, and whether an outcome has a log rather than the log itself (lean). */
+const publicQueue = ({ projectPath: _p, ...v }: QueueView): QueuePublic => ({
+  ...v,
+  recent: v.recent.map(({ log: output, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+})
+
+/** A project agent asking to change a queue: refused, saying whose controls these are. */
+function notAgents(what: string): void {
+  if (agentCaller()) throw new HttpError(403, `Project agents can't ${what}: the merge queue's controls are the user's, and the Hive Assistant's within Settings → Assistant → Control. Tell the user if it should be done.`)
+}
+
+route('GET', '/v1/queue', async ({ query }) => {
+  const ws = requireWorkspace()
+  const p = queueProject(query.get('project'))
+  const target = query.get('target') || undefined
+  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, 'target is a branch name')
+  return (await queueViews(ws, p, target)).map(publicQueue)
+})
+
+route('POST', '/v1/queue/pause', async ({ body }) => {
+  notAgents('pause a merge queue')
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  return assistantChange('agents', `pause the merge queue of ${basename(p)}`, { kind: 'queue-pause', project: basename(p) }, async () => {
+    const target = await queueTargetOf(ws, p, body?.target)
+    const v = await pauseQueue(ws, p, target, 'assistant')
+    return { done: `Paused the merge queue for ${target} in ${basename(p)}`, result: publicQueue(v) }
+  })
+})
+
+route('POST', '/v1/queue/resume', async ({ body }) => {
+  notAgents('resume a merge queue')
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  return assistantChange('agents', `resume the merge queue of ${basename(p)}`, { kind: 'queue-resume', project: basename(p) }, async () => {
+    const target = await queueTargetOf(ws, p, body?.target)
+    const r = await resumeQueue(ws, p, target)
+    return { done: r.resumed ? `Resumed the merge queue for ${target} in ${basename(p)}` : `The merge queue for ${target} in ${basename(p)} is still paused (${r.view.paused?.reason ?? 'paused'})`, result: { resumed: r.resumed, queue: publicQueue(r.view) } }
+  })
+})
+
+/** Remove from queue or Retry merge, the Assistant's: its reason required, run as the card's intent (#1353). */
+async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Promise<IntentDone> {
+  notAgents(kind === 'removeFromQueue' ? 'take a card out of the merge queue' : "retry a card's merge")
+  const ws = requireWorkspace()
+  const ref = intentRef(String(body?.card ?? ''))
+  const reason = textField(body, 'reason', true)
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', `${INTENT_WORDS[kind]} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
+    const { done, card } = await queueCardChange(ws, ref.n, await taskActor(), kind, reason)
+    const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
+    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, stays: INTENT_STAYS[kind] }
+  })
+}
+
+route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge'))
+
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))
 
 // A project's handovers, newest first (under its earlier folder names too, #514); no project: every one. Their paths
@@ -2482,7 +2570,9 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   reportMerge: 'report the merge of',
   ask: 'ask the user about',
   cannot: 'report a rule blocking',
-  request: 'ask the builder of'
+  request: 'ask the builder of',
+  removeFromQueue: 'take out of the merge queue',
+  retryMerge: 'retry the merge of'
 }
 
 /** What an intent did, in the Assistant's activity line. */
@@ -2496,7 +2586,9 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   reportMerge: 'reported its merge',
   ask: 'asked the user',
   cannot: 'reported a rule blocking it',
-  request: 'asked its builder'
+  request: 'asked its builder',
+  removeFromQueue: 'taken out of the merge queue',
+  retryMerge: 'queued again (Retry merge)'
 }
 
 /**
@@ -2532,7 +2624,9 @@ const INTENT_STAYS: Partial<Record<CardIntent['kind'], string>> = {
   reportMerge: UNDO_FINAL.reportMerge,
   ask: UNDO_FINAL.ask,
   cannot: UNDO_FINAL.cannot,
-  request: UNDO_FINAL.request
+  request: UNDO_FINAL.request,
+  removeFromQueue: UNDO_FINAL.removedFromQueue,
+  retryMerge: UNDO_FINAL.retriedMerge
 }
 
 /** A body's text field, trimmed; required ones refused when missing or empty. */

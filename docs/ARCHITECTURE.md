@@ -270,6 +270,17 @@ it) and `workflowEnforced` (off: entries pause `rulesOff` before the advance); a
 runners first, so a check the close ends writes nothing. The action worker's runs and the hosts' run outside any write
 fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is a no-op until P7.
 
+**The queue's controls** (#1353, SPEC §16.9.3): `workflow/queueControls.ts` builds the one model of a target's queue
+(`shared/workflow/queue.ts`: testing, queued, the latest outcomes from the cards' facts, the pause, the lease's
+profile) and does Pause queue and Resume; a card's Remove from queue and Retry merge are intents on the board's intent
+path (`cardIntents.ts`, the runtime's `removeFromQueue` and `retryMerge`, by the user or the Assistant only). Each host
+keeps its entry's step (`QueueConfig.onStep`) and its check's run (`appQueueChecks`' `onRun`) for the model
+(`queueLive`), and every change is a `queue-changed` event. The window's `queue:*` IPC is the user's; the Agent API's
+`/v1/queue` routes are readable by the project's agents and changeable only by the Assistant (`assistantChange`); the
+Assistant's `hive_queue` wraps them. A user pause is checked again inside `IntegrationStarted`'s write, so a pause that
+lands while the advance waits for the repository lock stops it; Resume reads the recovery table without writing
+(`MergeQueue.stillStuck`) before it clears a needs-you pause.
+
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
 holder whose process is gone (`queueProcs.ts` asks Windows for a pid's start time; renewal is display only). Each lease

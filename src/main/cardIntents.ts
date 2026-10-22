@@ -33,8 +33,12 @@ export type CardIntent =
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
+  /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
+  | { kind: 'removeFromQueue'; reason: string }
+  | { kind: 'retryMerge'; reason: string }
 
 const M = {
+  queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do." }),
   noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {n} is the card's number." })
 }
 
@@ -59,6 +63,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
   if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}`, alias: `#${ref.n}` }, null))
   const named = `#${ref.n}`
+  if ((intent.kind === 'removeFromQueue' || intent.kind === 'retryMerge') && who !== 'user' && who !== 'assistant') throw hiveError(M.queueNotAgents, undefined, { kind: 'forbidden' })
+  const by = who === 'assistant' ? 'assistant' : 'user'
   const call = (w: Workflow): Promise<Reply> => {
     switch (intent.kind) {
       case 'start':
@@ -79,6 +85,10 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
       case 'request':
         return w.requestToBuilder(named, who, intent.text)
+      case 'removeFromQueue':
+        return w.removeFromQueue(named, intent.reason, by)
+      case 'retryMerge':
+        return w.retryMerge(named, intent.reason, by)
       default:
         throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Hive's code, never shown
     }
