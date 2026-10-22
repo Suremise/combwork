@@ -89,6 +89,20 @@ export function nextFold(v: QueueView): number | null {
   return times.length ? Math.min(...times) : null
 }
 
+/**
+ * When what a queue shows next changes by time alone (#1416): the first future moment a seen return folds or a merge
+ * stops being just merged. Null when nothing shown waits on the clock. The window renders again then, without another
+ * queue event, so an old queue's section goes once its last outcome is seen.
+ */
+export function nextChange(views: readonly QueueView[], now: number): number | null {
+  const times = views.flatMap((v) => [
+    ...shownReturns(v, now).filter((r) => r.seen).map((r) => at(r.seen!) + RETURN_SEEN_SHOWN_MS),
+    ...justMerged(v, now).map((r) => at(r.at) + JUST_MERGED_MS)
+  ])
+  const later = times.filter((t) => t > now)
+  return later.length ? Math.min(...later) : null
+}
+
 /** The merges of the last few seconds, newest first. */
 export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent.filter((r) => r.outcome === 'merged' && now - at(r.at) < JUST_MERGED_MS)
 

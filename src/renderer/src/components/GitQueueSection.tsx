@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { revisionShort } from '@shared/platform/descriptors'
-import { queueShown, returnRun, returnWhy, runCheckName } from '@shared/progressQueue'
+import { nextChange, queueShown, returnRun, returnWhy, runCheckName } from '@shared/progressQueue'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call } from '../api'
@@ -35,21 +35,33 @@ const M = {
   cancelled: msg({ id: 'git.queue.cancelled', defaultMessage: 'Taken out ({reason, select, removed {Remove from queue} stale {its pass no longer counts} hold {On Hold} decision {a decision} integratedOutside {merged outside Hive} other {cancelled}})', description: "An outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys." })
 }
 
-/** The project's queues, read for themselves (the Progress panel on or off), again on each `queue-changed`. */
+/**
+ * The project's queues, read for themselves (the Progress panel on or off), again on each `queue-changed`. Only this
+ * project's answer is returned (null until it has one: another project's never shows here, #1416's round 1), and the
+ * caller renders again when a return or a merge it shows expires by time alone (`nextChange`).
+ */
 export function useProjectQueues(projectPath: string): QueueView[] | null {
   const version = useStore((s) => s.queueVersion)
   const tasks = useStore((s) => s.tasks)
-  const [views, setViews] = useState<QueueView[] | null>(null)
+  const [read, setRead] = useState<{ for: string; views: QueueView[] } | null>(null)
+  const [, tick] = useState(0)
   useEffect(() => {
     let live = true
     void call('queue:list', projectPath).then(
-      (v) => live && setViews(v),
-      () => live && setViews([])
+      (v) => live && setRead({ for: projectPath, views: v }),
+      () => live && setRead({ for: projectPath, views: [] })
     )
     return () => {
       live = false
     }
   }, [projectPath, version, tasks])
+  const views = read?.for === projectPath ? read.views : null
+  const next = views ? nextChange(views, Date.now()) : null
+  useEffect(() => {
+    if (next === null) return
+    const t = setTimeout(() => tick((n) => n + 1), Math.max(0, next - Date.now()) + 50)
+    return () => clearTimeout(t)
+  }, [next])
   return views
 }
 

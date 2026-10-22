@@ -6,7 +6,7 @@ import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { fmt, msg, tr } from '@shared/i18n'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { cardLabelOf, confirm, findProject, notify, set, showVersionControl, useLanguage, useStore } from '../store'
+import { cardLabelOf, confirm, findProject, notify, openVersionControl, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
@@ -142,7 +142,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         </div>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
-      <button type="button" className="progress-queue-link" onClick={() => showVersionControl(v.projectPath, 'queue')}>
+      <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
         {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
       </button>
     </div>

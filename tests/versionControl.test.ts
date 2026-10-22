@@ -4,6 +4,7 @@
 // project opens at, and a kept one no longer shown.
 import { describe, expect, it } from 'vitest'
 import { vcSections, vcSectionShown } from '../src/shared/gitRepo'
+import { JUST_MERGED_MS, nextChange } from '../src/shared/progressQueue'
 import { RETURN_SEEN_SHOWN_MS, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
 
 const NOW = new Date(2026, 9, 22, 12, 0, 0).getTime()
@@ -59,5 +60,23 @@ describe('the Version Control tab’s sections', () => {
     expect(vcSectionShown('branches', vcSections('none', [], NOW))).toBe('workflow')
     expect(vcSectionShown('queue', vcSections('none', [view({ testing })], NOW))).toBe('queue')
     expect(vcSectionShown('queue', vcSections('none', [], NOW))).toBe('workflow')
+  })
+})
+
+describe('when a queue changes by time alone (#1416: the window renders again then)', () => {
+  it('nothing shown waits on the clock: no time', () => {
+    expect(nextChange([], NOW)).toBeNull()
+    expect(nextChange([view({ testing }), view({ returns: [returned()] })], NOW)).toBeNull()
+  })
+
+  it('a seen return folds RETURN_SEEN_SHOWN_MS after it was seen; a merge stops being just merged after JUST_MERGED_MS', () => {
+    const seen = NOW - 2_000
+    expect(nextChange([view({ returns: [returned({ seen: iso(seen) })] })], NOW)).toBe(seen + RETURN_SEEN_SHOWN_MS)
+    const merged: QueueRecent = { card: 62, key: 'HI-62', title: 'Merge', entry: 'HI-62/e1', outcome: 'merged', result: 'b'.repeat(40), at: iso(NOW - 1_000) }
+    expect(nextChange([view({ recent: [merged] }), view({ returns: [returned({ seen: iso(seen) })] })], NOW)).toBe(NOW - 1_000 + JUST_MERGED_MS)
+  })
+
+  it('a return seen long ago, folded already: no time', () => {
+    expect(nextChange([view({ returns: [returned({ seen: iso(NOW - RETURN_SEEN_SHOWN_MS - 1) })] })], NOW)).toBeNull()
   })
 })

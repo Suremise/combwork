@@ -141,6 +141,68 @@ function board(sql, ...args) {
     await notice.getByRole('button', { name: 'Choose…' }).click()
     check('Choose… opens alpha’s Version Control tab at Workflow', !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'alpha' }).count()) > 0 && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await selected()) === 'workflow' && (await page.locator('[data-vc-workflow] .workflow-form').count()) === 1, HUNG_MS)))
 
+    // --- The queues, from models main gives in place of its own (#1416's round 1): alpha's queue paused; plain's (None)
+    // as each step sets it. A read of plain's can be held, to see what shows meanwhile.
+    await app.evaluate(({ ipcMain }, d) => {
+      const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, hiveMerges: false, inFlight: [], ...over })
+      globalThis.__vc = { hold: false, held: [], asked: 0, plain: [] }
+      ipcMain.removeHandler('queue:list')
+      ipcMain.handle('queue:list', (_e, p) => {
+        const s = globalThis.__vc
+        if (p === d.alpha) return [view(p, { paused: { reason: 'user', card: null, files: [], by: 'user', at: new Date().toISOString() } })]
+        if (p !== d.plain) return []
+        if (s.hold) {
+          s.asked++
+          return new Promise((r) => s.held.push(r))
+        }
+        return s.plain.map((o) => view(p, o))
+      })
+      ipcMain.removeHandler('queue:history')
+      ipcMain.handle('queue:history', () => [])
+    }, { alpha, plain })
+    const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
+    const plainQueue = (models) => app.evaluate((_, m) => (globalThis.__vc.plain = m), models)
+    const queueTab = page.locator('.git-sections [data-section="queue"]')
+    const pick = async (name) => {
+      await page.getByText(name, { exact: true }).first().click()
+      await vcTab.click()
+    }
+    await said(alpha)
+    await pick('alpha')
+    await queueTab.click()
+    check("alpha's queue shows in its Merge queue section", !!(await lib.until(async () => (await page.locator('.vc-view [data-queue="alpha#main"]').count()) === 1, HUNG_MS)))
+
+    // Another project's queues never show while its own read is pending: plain shows none of alpha's, and only Workflow.
+    await app.evaluate(() => (globalThis.__vc.hold = true))
+    await pick('plain')
+    check("plain's read is held", !!(await lib.until(() => app.evaluate(() => globalThis.__vc.asked > 0), HUNG_MS)))
+    check("meanwhile plain shows none of alpha's queue, and Workflow only", !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'plain' }).count()) > 0 && (await page.locator('.vc-view [data-queue]').count()) === 0 && JSON.stringify(await sections()) === '["workflow"]', HUNG_MS)), JSON.stringify(await sections()))
+    await app.evaluate(() => {
+      const s = globalThis.__vc
+      s.hold = false
+      for (const r of s.held) r([])
+      s.held = []
+    })
+
+    // Queue in Version Control, from the Progress panel with another project selected: it selects alpha, at Merge queue.
+    await page.locator('.progress-rail').click()
+    const panel = page.locator('.progress-panel')
+    await panel.locator('.progress-tab[data-tab="merges"]').click()
+    const card = panel.locator('[data-queue="alpha#main"]')
+    check("the Merges tab has alpha's queue", !!(await lib.until(async () => (await card.count()) === 1, HUNG_MS)))
+    await card.locator('.progress-queue-link').click()
+    check("Queue in Version Control selects alpha and opens its Merge queue", !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'alpha' }).count()) > 0 && (await page.locator('.vc-view').getAttribute('data-platform')) === 'git' && (await selected()) === 'queue', HUNG_MS)))
+
+    // None with an old Git queue whose only state is a return just seen: its section shows, then goes by itself once the
+    // return folds (no queue event meanwhile), falling back to Workflow.
+    await plainQueue([{ returns: [{ card: 9, key: 'PL-9', title: 'Seen', entry: 'pl/9', outcome: 'returned', reason: 'checks', at: new Date(Date.now() - 60_000).toISOString(), seen: new Date().toISOString() }] }])
+    await said(plain)
+    await pick('plain')
+    check("None keeps the old queue's section while its return shows", !!(await lib.until(async () => (await queueTab.count()) === 1, HUNG_MS)))
+    await queueTab.click()
+    check('…with the return in it', !!(await lib.until(async () => (await page.locator('.vc-view .progress-queue-returned').count()) === 1, HUNG_MS)))
+    check('…and both go once it folds, back to Workflow, with no queue event', !!(await lib.until(async () => (await queueTab.count()) === 0 && (await page.locator('.vc-view .progress-queue-returned').count()) === 0 && (await selected()) === 'workflow', HUNG_MS)), JSON.stringify(await sections()))
+
     // --- A subfolder of a larger repository: the whole-repository line.
     await lib.openWorkspace(inv, page, outer)
     await page.getByText('app', { exact: true }).first().click()
