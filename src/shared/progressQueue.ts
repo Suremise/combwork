@@ -56,16 +56,23 @@ export const queueKey = (v: Pick<QueueView, 'projectPath' | 'target'>): string =
 /**
  * The rows this window showed and marked seen, added to main's list while their own 10 s last (#1356 round 6, the
  * Assistant's call: two windows marking different snapshots can leave main's bounded list without a row one of them
- * showed; that window still keeps it for its interval). A row main lists already is main's; `shownReturns` drops a kept
- * row once its 10 s are up, or its card is queued or testing again.
+ * showed; that window still keeps it for its interval). A row main lists already is main's, except that a seen one shows
+ * until the later of main's 10 s and this window's (#1427: another window saw it earlier); one main hasn't seen yet stays
+ * unseen. `shownReturns` drops a kept row once its 10 s are up, or its card is queued or testing again.
  */
 export function withKept(views: readonly QueueView[], kept: readonly KeptReturn[]): QueueView[] {
   if (!kept.length) return [...views]
   return views.map((v) => {
     const k = queueKey(v)
+    const ours = new Map(kept.filter((x) => x.queue === k).map((x) => [x.row.entry, x.row.seen]))
+    if (!ours.size) return v
+    const returns = v.returns.map((r) => {
+      const local = ours.get(r.entry)
+      return r.seen && local && at(local) > at(r.seen) ? { ...r, seen: local } : r
+    })
     const listed = new Set(v.returns.map((r) => r.entry))
     const mine = kept.filter((x) => x.queue === k && !listed.has(x.row.entry)).map((x) => x.row)
-    return mine.length ? { ...v, returns: [...v.returns, ...mine] } : v
+    return { ...v, returns: [...returns, ...mine] }
   })
 }
 

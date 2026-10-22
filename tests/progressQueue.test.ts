@@ -131,6 +131,27 @@ describe('returns on a queue card', () => {
     expect(shownReturns({ ...merged, queued: [queued(2)] }, NOW).map((r) => r.entry)).toEqual(['k1'])
   })
 
+  it("a row main lists as seen earlier (another window) shows until this window's own 10 s are up; main's row data, scope and suppression kept (#1427)", () => {
+    const row = (entry: string, seen?: string): QueueRecent => recent({ outcome: 'returned', reason: 'checks', card: Number(entry.slice(1)), key: entry, entry, ...(seen ? { seen } : {}) })
+    // Main: E seen 9 s ago by another window, with its latest data; this window kept E as seen now from an older snapshot.
+    const v = view({ returns: [{ ...row('e1', iso(NOW - 9_000)), reason: 'conflict', files: ['tasks.ts'] }] })
+    const kept: KeptReturn[] = [{ queue: queueKey(v), row: row('e1', iso(NOW)) }, { queue: queueKey({ ...v, target: 'release' }), row: row('e2', iso(NOW)) }]
+    const at = (t: number) => shownReturns(withKept([v], keptLive(kept, t))[0], t)
+    expect(at(NOW + 2_000).map((r) => [r.entry, r.reason, r.files])).toEqual([['e1', 'conflict', ['tasks.ts']]])
+    expect(at(NOW + RETURN_SEEN_SHOWN_MS - 1).map((r) => r.entry)).toEqual(['e1'])
+    expect(at(NOW + RETURN_SEEN_SHOWN_MS)).toEqual([])
+    // Queued or testing again: hidden whatever its deadline.
+    const [merged] = withKept([v], keptLive(kept, NOW + 2_000))
+    expect(shownReturns({ ...merged, queued: [queued(1)] }, NOW + 2_000)).toEqual([])
+    expect(shownReturns({ ...merged, testing: { ...testing, card: 1 } }, NOW + 2_000)).toEqual([])
+    // Another queue's kept row doesn't leak in; its own queue shows it.
+    expect(withKept([v], kept)[0].returns.map((r) => r.entry)).toEqual(['e1'])
+    expect(withKept([{ ...v, target: 'release', returns: [] }], kept)[0].returns.map((r) => r.entry)).toEqual(['e2'])
+    // One main hasn't seen yet stays unseen (main's fact), so it shows until seen there.
+    const unseen = view({ returns: [row('e1')] })
+    expect(unseenReturns(withKept([unseen], kept)[0], NOW + RETURN_SEEN_SHOWN_MS).map((r) => r.entry)).toEqual(['e1'])
+  })
+
   it('reads again just after the first shown return seen folds, only while more wait beyond the list', () => {
     const seen = (i: number, ago: number): QueueRecent => recent({ outcome: 'returned', card: 200 + i, entry: `HI-${200 + i}/e1`, seen: iso(NOW - ago) })
     expect(nextFold(view({ returns: [seen(1, 1_000)], returnsMore: 0 }))).toBeNull()
