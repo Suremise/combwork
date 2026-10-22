@@ -221,7 +221,8 @@ export function AntivirusPanel() {
                   <tr key={g.path}>
                     <td className="mono small">{g.path}</td>
                     <td className="nowrap">
-                      <span className={AV_STATE[g.state].tone} title={tr(AV_STATE[g.state].tip)}>
+                      {/* Muted, never the good colour: a leftover exclusion isn't good news (the Assistant's call). */}
+                      <span className="faint" title={tr(AV_STATE[g.state].tip)}>
                         {tr(AV_STATE[g.state].label)}
                       </span>
                     </td>
