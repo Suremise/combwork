@@ -1533,6 +1533,7 @@ let started = false
 export function initDeliveries(): void {
   if (started) return
   started = true
+  followWorkspaceCloses()
   onHiveEvent((e) => {
     if (e.type === 'workspace-changed') {
       // Restored as a workspace opens: its projects' and its Assistant's (refusals shown, panes filled in).
@@ -1580,16 +1581,22 @@ onDbReplaced((workspacePath) => {
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
 // leased its closed hive.db at each change. They stay in the database and are restored when a window opens it again. A
 // save already under way holds its store and lease, and finishes. By real location (`placeKey`), as the fence tells
-// workspaces apart: a host loaded through a junction or an 8.3 name to the folder is the same workspace's.
-WorkspaceService.closingListeners.add((workspacePath) => {
-  const ws = placeKey(workspacePath)
-  for (const [k, store] of stores) if (placeKey(store.place.workspace) === ws) stores.delete(k)
-  for (const [k, t] of retrying)
-    if (placeKey(hostWorkspace(k.slice(0, k.lastIndexOf('#')))) === ws) {
-      clearTimeout(t)
-      retrying.delete(k)
-    }
-})
+// workspaces apart: a host loaded through a junction or an 8.3 name to the folder is the same workspace's. Followed from
+// initDeliveries (once).
+let followingCloses = false
+export function followWorkspaceCloses(): void {
+  if (followingCloses) return
+  followingCloses = true
+  WorkspaceService.closingListeners.add((workspacePath) => {
+    const ws = placeKey(workspacePath)
+    for (const [k, store] of stores) if (placeKey(store.place.workspace) === ws) stores.delete(k)
+    for (const [k, t] of retrying)
+      if (placeKey(hostWorkspace(k.slice(0, k.lastIndexOf('#')))) === ws) {
+        clearTimeout(t)
+        retrying.delete(k)
+      }
+  })
+}
 
 // Sessions give their own lines through the service (#649: a lock's go-ahead, the carry-on after a sign-in, a handover's
 // steps): it is set as this loads.

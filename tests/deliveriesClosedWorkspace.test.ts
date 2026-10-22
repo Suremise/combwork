@@ -36,6 +36,8 @@ describe("a closed workspace's deliveries", () => {
     mkdirSync(join(base, 'profile'), { recursive: true })
     // No agent runs: nothing is typed, deliveries only wait.
     Object.assign(sessions, { liveFor: () => null, setInbox: () => undefined })
+    // What initDeliveries follows of workspaces closing (its tick and loads as they open aren't wanted here).
+    deliveries.followWorkspaceCloses()
     w = createWorkspaceService()
   })
   afterAll(async () => {
