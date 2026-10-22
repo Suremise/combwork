@@ -32,7 +32,7 @@ import type { TaskCard } from '../shared/types'
 import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
-import { readCapped, readJson, renameRetrying } from './fsutil'
+import { placeKey, readCapped, readJson, renameRetrying } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
@@ -1579,12 +1579,13 @@ onDbReplaced((workspacePath) => {
 
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
 // leased its closed hive.db at each change. They stay in the database and are restored when a window opens it again. A
-// save already under way holds its store and lease, and finishes.
+// save already under way holds its store and lease, and finishes. By real location (`placeKey`), as the fence tells
+// workspaces apart: a host loaded through a junction or an 8.3 name to the folder is the same workspace's.
 WorkspaceService.closingListeners.add((workspacePath) => {
-  const ws = workspacePath.toLowerCase()
-  for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === ws) stores.delete(k)
+  const ws = placeKey(workspacePath)
+  for (const [k, store] of stores) if (placeKey(store.place.workspace) === ws) stores.delete(k)
   for (const [k, t] of retrying)
-    if (hostWorkspace(k.slice(0, k.lastIndexOf('#'))).toLowerCase() === ws) {
+    if (placeKey(hostWorkspace(k.slice(0, k.lastIndexOf('#')))) === ws) {
       clearTimeout(t)
       retrying.delete(k)
     }

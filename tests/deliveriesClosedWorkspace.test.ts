@@ -1,18 +1,19 @@
 // A closed workspace's deliveries (#1391): once a window closes it (switches away), its hosts' stores go from memory, so
 // the tick no longer rechecks them, each change of which leased its closed hive.db again, and nothing reads them again
 // until a window opens it; a read the close caught isn't kept. They stay in its database and come back as it opens.
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { junction } from './pathAliases'
 
 const base = tempDir('hive-deliveries-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const deliveries = await import('../src/main/deliveries')
-const { boardOpen } = await import('../src/main/boardStore')
+const { boardOpen, closeBoard } = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 
 const [wsA, wsB] = ['alpha', 'beta'].map((n) => join(base, n))
@@ -65,6 +66,24 @@ describe("a closed workspace's deliveries", () => {
     await w.open(wsA)
     await deliveries.loadsForTests()
     expect((await deliveries.load(host)).records.map((r) => `${r.id} ${r.state}`)).toEqual([`${made.id} queued`])
+  })
+
+  it('go however their host was spelt: one loaded through a junction to the folder goes as the window switches away (round 2)', async () => {
+    await w.open(wsA)
+    await deliveries.loadsForTests()
+    const alias = junction(wsA, join(base, 'alpha-alias'))
+    const aliasHost = join(alias, 'proj')
+    try {
+      expect((await deliveries.load(aliasHost)).records.map((r) => r.id)).toEqual(['m1'])
+      await w.open(wsB)
+      expect(deliveries.deliveryNow(aliasHost, 'm1')).toBeNull()
+      expect(deliveries.deliveryNow(host, 'm1')).toBeNull()
+      expect(await deliveries.offerNow(aliasHost, 'b1')).toBe(false)
+    } finally {
+      // Its board was opened under the alias's spelling: closed here so the junction can go.
+      closeBoard(alias)
+      unlinkSync(alias)
+    }
   })
 
   it('a read under way as the window switches away is kept by nobody', async () => {
