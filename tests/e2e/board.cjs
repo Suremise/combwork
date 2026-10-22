@@ -433,6 +433,25 @@ const check = (name, ok, extra = '') => {
   }
   await inv('tasks:create', { title: 'Delta work', project: 'delta' })
   let d = await removeVia('delta', 'Hide')
+  // What it touches is a table (#1316): a thing and what happens to it, for the choice made; the folder by its name, its
+  // full path behind it (on hover, and copied whole). Each choice shown in both themes, then back to Hide.
+  const touched = () => d.locator('.removal-list tbody tr').evaluateAll((rows) => rows.map((r) => [...r.children].map((c) => c.textContent.replace(/\s+/g, ' ').trim())))
+  const folderRow = async () => (await touched()).find((cells) => cells[0].startsWith('Folder')) ?? []
+  check('What it touches is a table, What · What happens, the folder by name', (await d.locator('.removal-list thead th').allInnerTexts()).slice(0, 2).join('|') === 'WHAT|WHAT HAPPENS' && (await d.locator('.removal-list .short-path[data-path]').getAttribute('data-path')).toLowerCase() === path.join(ws, 'delta').toLowerCase() && (await d.locator('.removal-list .short-path-text').innerText()) === 'delta', JSON.stringify(await touched()))
+  const themed = async (theme) => {
+    await inv('settings:update', { appearance: { theme } })
+    if (!(await until(() => themeIs(theme), HUNG_MS))) throw new Error(`the window didn't show the ${theme} theme`)
+  }
+  for (const [choice, happens] of [['Hide', 'stays, hidden from Hive'], ['Remove from Hive', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
+    await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
+    check(`…${choice}: the folder ${happens}`, !!(await until(async () => (await folderRow())[1] === happens, HUNG_MS)), JSON.stringify(await touched()))
+    for (const theme of ['dark', 'light']) {
+      await themed(theme)
+      await page.screenshot({ path: path.join(lib.WORK, `board-remove-${choice.toLowerCase().replace(/ /g, '-')}-${theme}.png`) })
+    }
+    await themed('dark')
+  }
+  await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
   check('Hide takes the project out of Hive', !!(await until(async () => !(await names()).includes('delta'), 8000)))

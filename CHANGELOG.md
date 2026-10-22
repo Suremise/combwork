@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Remove Project's "What it touches" is a table.** Each thing (the folder, by its name with the full path on hover; handovers, cards, worktrees, running agents) is a row, with what Hide, Remove from Hive or Delete does to it beside it, instead of bold sentences with the folder's full path (#1316).
 - **Load Template's plan is one table.** Instead of a Removed list repeating "(replaced by a new agent with the same name)" above a Created table, each agent is a row with a **Change** column (replaced, new or removed), the agents the template removes at the end, and what becomes of their worktrees beside them (#1315).
 - **Unused worktrees, a line each.** The Git tab's **Unused worktrees** is now a table: branch, state and who made it, folder (its name, the full path on hover), last commit and size, with the buttons aligned at the right; two lines each in a narrower pane. The paragraph over it is one sentence (the rest is in its ⓘ), and **Remove all merged** asks with a short Branch · Folder table instead of full paths (#1314).
 - **Repair's report is a table too.** After Repair a Moved Workspace runs, what it did is the plan's table with a **Result** column: ✓ done, a problem in the warning colour with its reason, or ⓘ a choice still to make, a group a project with problems first, paths shortened to the part that differs (the full sentence on hover), instead of a long sentence with full paths per step (#1313).

@@ -196,7 +196,7 @@ A project's tabs (Session, Overview, Performance, Tasks and the rest) shrink to 
 
 ### Removing a project
 
-**Project → Remove Project…** (also in a project's right-click menu and the **⋯** at the top of a project) offers three ways. The dialog lists what each one touches: running agents (stopped first; their conversations are kept), the folder, the project's handovers, its cards on the task board and its worktrees.
+**Project → Remove Project…** (also in a project's right-click menu and the **⋯** at the top of a project) offers three ways. The dialog lists what each one touches as a table, **What** and **What happens** for the way you pick: running agents (stopped first; their conversations are kept), the folder (by its name; point at it for the full path), the project's handovers, its cards on the task board and its worktrees, each with any work not merged.
 
 - **Hide**: Hive leaves the project out until you restore it. Nothing is moved or deleted; its cards are archived meanwhile.
 - **Remove from Hive**: the folder stays on disk, and its handovers and cards are packed into it (`.hive/removed`), with its list of sessions, so you can move it somewhere else, or into another workspace. Wherever Hive sees the folder again, the project shows a banner offering to **Restore** them (or **Discard** them). A worktree can't go with the folder: if one has work that isn't merged yet, merge or discard it first.

@@ -492,7 +492,7 @@ codex [resume <id>] --no-daemon          # options must follow "resume <id>"
 
 ### 6.7 Removing projects
 
-**Project → Remove Project…** (also the project's right-click menu and the project header's ⋯) offers three ways, each described in the dialog with what it will touch: running agents (stopped first, conversations kept), the folder, the project's handovers (files named for it, §7.3), its board cards (and archived ones) and its worktrees with any work not merged. The CLIs' own transcripts (`~/.claude`, `~/.codex`) are never touched.
+**Project → Remove Project…** (also the project's right-click menu and the project header's ⋯) offers three ways, each described in the dialog with what it will touch: running agents (stopped first, conversations kept), the folder, the project's handovers (files named for it, §7.3), its board cards (and archived ones) and its worktrees with any work not merged. The CLIs' own transcripts (`~/.claude`, `~/.codex`) are never touched. What it touches is an item table (#1316, `touchRows` in `ProjectRemoval.tsx`), What · What happens: a row a thing, its count in the left cell (the folder by its name, `ShortPath`, its full path on hover and copied whole), what the choice made does to it on the right (wrapping, never cut); each agent's worktree on a row under the worktrees', its unmerged work in the warning colour when it matters.
 
 | | **Hide** | **Remove from Hive** | **Delete** |
 |---|---|---|---|

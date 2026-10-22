@@ -9046,14 +9046,27 @@ textarea.input.task-blocked-input {
   gap: 4px;
   max-width: 420px;
 }
-/* Remove Project: what each choice touches. */
-.removal-list {
-  margin: 0 0 10px;
-  padding-left: 20px;
-  font-size: 13px;
+/* Remove Project: what each choice touches (#1316), an item table: a thing (its count, or the folder by its name) and
+   what happens to it, both wrapping rather than being cut (only the folder's name is cut, its full path on hover); an
+   agent's worktree indented under the worktrees' row. */
+.table.item-table.removal-list {
+  margin: 2px 0 10px;
+  font-size: 12.5px;
 }
-.removal-list ul {
-  padding-left: 18px;
+.removal-list th:first-child {
+  width: 42%;
+}
+.item-table.fill.removal-list td {
+  white-space: normal;
+}
+/* "Folder" and its name on one line (the shared table makes a path's tooltip a block of its own). */
+.item-table.removal-list td > .tip-wrap:has(> .short-path) {
+  display: inline-block;
+  max-width: calc(100% - 60px);
+  vertical-align: bottom;
+}
+.removal-list tr.removal-sub td:first-child {
+  padding-left: 16px;
 }
 .warn-text {
   color: var(--warning);

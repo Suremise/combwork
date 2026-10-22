@@ -271,7 +271,10 @@ interface HiveMessageValues {
   'workspace.removal.banner': { what: string | number; when: string | number }
   'workspace.removal.blocked': { agents: string | number; unchecked: string }
   'workspace.removal.cancel': undefined
-  'workspace.removal.cards': { count: number; archived: number; how: string }
+  'workspace.removal.cardsHow': { how: string }
+  'workspace.removal.cardsThing': { count: number; archived: number }
+  'workspace.removal.colHappens': undefined
+  'workspace.removal.colWhat': undefined
   'workspace.removal.delete': undefined
   'workspace.removal.deleteSummary': undefined
   'workspace.removal.deletedDone': { name: string | number }
@@ -279,11 +282,13 @@ interface HiveMessageValues {
   'workspace.removal.discard': undefined
   'workspace.removal.discardFailed': undefined
   'workspace.removal.drafts': undefined
-  'workspace.removal.folder': { path: string | number; how: string }
   'workspace.removal.folderGone': undefined
+  'workspace.removal.folderHow': { how: string }
+  'workspace.removal.folderThing': undefined
   'workspace.removal.forget': undefined
   'workspace.removal.forgetFailed': { name: string | number }
-  'workspace.removal.handovers': { count: number; how: string }
+  'workspace.removal.handoversHow': { how: string }
+  'workspace.removal.handoversThing': { count: number }
   'workspace.removal.hiddenDone': { name: string | number }
   'workspace.removal.hide': undefined
   'workspace.removal.hideSummary': undefined
@@ -294,8 +299,6 @@ interface HiveMessageValues {
   'workspace.removal.looking': undefined
   'workspace.removal.modeHidden': undefined
   'workspace.removal.modeRemoved': undefined
-  'workspace.removal.noCards': undefined
-  'workspace.removal.noHandovers': undefined
   'workspace.removal.noWorkspace': undefined
   'workspace.removal.none': undefined
   'workspace.removal.notAll': { name: string | number }
@@ -309,16 +312,20 @@ interface HiveMessageValues {
   'workspace.removal.restoreIn': undefined
   'workspace.removal.restoreThemFailed': undefined
   'workspace.removal.restored': { project: string | number; what: string | number }
-  'workspace.removal.running': { count: number }
+  'workspace.removal.runningAgents': { count: number }
+  'workspace.removal.runningHow': undefined
   'workspace.removal.title': { name: string | number }
   'workspace.removal.touches': undefined
-  'workspace.removal.transcripts': undefined
+  'workspace.removal.transcriptsHow': undefined
+  'workspace.removal.transcriptsThing': undefined
   'workspace.removal.typeName': { name: string | number }
   'workspace.removal.what': { which: string; handovers: number; cards: number }
   'workspace.removal.when': undefined
   'workspace.removal.with': { which: string; handovers: number; cards: number }
-  'workspace.removal.worktree': { agent: string | number; branch: string | number; hasError: string; error: string | number; ahead: number; dirty: number }
-  'workspace.removal.worktrees': { count: number; how: string }
+  'workspace.removal.worktreeThing': { agent: string | number; branch: string | number }
+  'workspace.removal.worktreeWork': { hasError: string; error: string | number; ahead: number; dirty: number }
+  'workspace.removal.worktreesHow': { how: string }
+  'workspace.removal.worktreesThing': { count: number }
   'workspace.repair.addLater': undefined
   'workspace.repair.board': { from: string | number }
   'workspace.repair.branch': { agent: string | number }
