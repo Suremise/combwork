@@ -358,13 +358,14 @@ export class WorkspaceService {
     this.scheduled = null
     if (this.idsTimer) clearTimeout(this.idsTimer)
     this.idsTimer = null
-    // A scheduled refresh already running reads the projects' files until it sees the close (at the next project): closed
-    // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it).
-    await Promise.allSettled([...this.scheduledRuns])
     if (this.rootRetry) clearTimeout(this.rootRetry)
     this.rootRetry = null
     this.rootWatcher?.close()
     this.rootWatcher = null
+    // A scheduled refresh already running reads the projects' files until it sees the close (at the next project): closed
+    // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it). No
+    // new one is scheduled from the abort on (scheduleRefresh).
+    while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) letGoBoard(closing)
     if (closing) closeBoard(closing)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR))
@@ -597,6 +598,9 @@ export class WorkspaceService {
   }
 
   scheduleRefresh(): void {
+    // Closing (or closed): nothing more is read of it (#1341: close waits for the refreshes under way, not new ones).
+    const life = this.life.signal
+    if (life.aborted) return
     if (this.refreshTimer) clearTimeout(this.refreshTimer)
     if (!this.scheduled) {
       let tell = (): void => undefined
@@ -609,7 +613,7 @@ export class WorkspaceService {
       this.refreshTimer = null
       if (this.scheduled === scheduled) this.scheduled = null
       // Running, it is still the scheduled one's until it has finished: a refreshesSettled from now on waits for it.
-      const run = (this.path ? this.refresh().then(() => undefined, (e) => log.warn('refresh failed', e)) : Promise.resolve()).finally(() => {
+      const run = (this.path && !life.aborted ? this.refresh().then(() => undefined, (e) => log.warn('refresh failed', e)) : Promise.resolve()).finally(() => {
         this.scheduledRuns.delete(run)
         scheduled.tell()
       })
@@ -1111,6 +1115,9 @@ export class WorkspaceService {
 
   async refresh(): Promise<WorkspaceInfo> {
     if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    // Closing: its generation is already the next one's, so the lifetime says it (#1341).
+    const life = this.life.signal
+    if (life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
     const gen = this.generation
     const seq = ++this.refreshes
     // Before the folders are listed: a project the listing misses was gone by then.
@@ -1118,7 +1125,7 @@ export class WorkspaceService {
     const projects: ProjectInfo[] = []
     // Closed or switched meanwhile: the new workspace's own refresh reports it. Each read is the refresh's lifetime's
     // (#784): one begun after a switch would otherwise record the old workspace's worktrees in the new one.
-    const closed = (): boolean => gen !== this.generation || !this.path
+    const closed = (): boolean => gen !== this.generation || !this.path || life.aborted
     // What the projects' running agents' settings need of the workspace (its skills and servers), read once (#1002).
     const scope = {}
     for (const p of await this.listProjectPaths()) {
