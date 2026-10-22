@@ -255,6 +255,8 @@ export interface QueueEntry {
   cancelled?: FactData['IntegrationCancelled']['reason']
   started?: FactData['IntegrationStarted']
   phases: FactData['IntegrationPhase']['phase'][]
+  /** G8 (#1352): the reviewed revision brought up to date with the target for this entry, the change the same. */
+  updated?: Pick<FactData['Updated'], 'from' | 'to' | 'how'>
 }
 
 export interface CardState {
@@ -399,8 +401,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       }
       case 'Updated': {
+        // The queue brought the reviewed revision up to date for one entry (G8, #1352): that entry's, never the card's
+        // approved revision, which stays the reviewed one (the builder's line; reconciliation and requeues read it).
         const d = f.data as FactData['Updated']
-        if (d.carried && s.approved) s.approved = { ...s.approved, revision: d.to }
+        const e = s.entries.find((x) => x.id === d.entry)
+        if (e && d.carried) e.updated = { from: d.from, to: d.to, how: d.how }
         break
       }
       case 'Stale': {

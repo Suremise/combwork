@@ -144,11 +144,13 @@ describe('checking options for a save (#1278)', () => {
       { kind: 'contradiction', id: 'selfReview' },
       { kind: 'contradiction', id: 'committedNeedsFolder' }
     ])
-    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', strict: true } }).problems).toEqual([
+    // Strict (G8) is offered since #1352; slots kept up to date still wait for a later version.
+    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', strict: true } }).problems).toEqual([])
+    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', slotsUpToDate: true } }).problems).toEqual([
       { kind: 'notOffered', id: 'later' }
     ])
     // The workspace's defaults aren't the project's to answer for.
-    expect(checkOptions('git', { workspace: { git: { strict: true } }, project: { review: 'none' } }).problems).toEqual([])
+    expect(checkOptions('git', { workspace: { git: { slotsUpToDate: true } }, project: { review: 'none' } }).problems).toEqual([])
     expect(checkOptions('git', { project: { colour: 'red' } as never }).problems).toEqual([{ kind: 'bad', why: 'project options: unknown option colour' }])
   })
 

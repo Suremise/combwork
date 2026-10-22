@@ -1671,7 +1671,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per
     option this version offers (§16.19.1): Git's G1–G7, G9 and G10–G14 and G16 (G11's own folder is the builder's
     worktree), None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link
-    to their owner. N5 (stage names), G8, G15 and G17 wait for later phases.
+    to their owner. N5 (stage names), G15 and G17 wait for later phases. **G8 (strict) [#1352]**: offered as
+    **Work is up to date with its target branch before it merges** (On / Off), its row beside G9's and, like it, shown
+    only when Hive merges (`formShows`); savable from the form and the Assistant's settings tool
+    (`project.workflow.strict`). Off in every preset.
   - **P5 [#1355]:** G5 offers **Hive merges**, and the presets **Pair** (Hive merges: §16.6.3's Pair, with G15 off and
     G7 the project's default branch by name) beside Pair (the agent merges). G9's row (**Checks
     pass on the merged result**, named commands in G3's editor, both lists sharing `commands`; a preset suggests them
@@ -2060,6 +2063,21 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    slot. If the result replays to the approved change (§16.3.2), the pass carries over (an `Updated` fact records the
    new revision and why) and the entry goes on with it; a conflict returns the card. The builder's slot is unchanged,
    and when the card is Done its line is no longer needed. (OP-18: Team's default.)
+   **Built [#1352]** (`MergeQueue.upToDate`): with the card's ruleset strict and the reviewed revision not containing the
+   expected head (`merge-base --is-ancestor`), the queue's worktree is set at the reviewed revision and the target merged
+   into it (`Merge <target> into <card>`, with `Hive-Card` and `Hive-Revision`), or with merge style Squash the change
+   rebased onto it, made as Hive's commits are (#1350: the project's identity, the repository's hooks and signing, no
+   prompt). The result must be the same change (§16.3.2's `sameChange`: the candidate key, then the replay's tree), else
+   the card returns (`IntegrationFailed`, reason `notUpToDate`: a conflict with its files, or a different change, such as
+   a target that already holds part of it, with a line saying so); a failing hook returns it as `hook`, and the other
+   failures pause as the test merge's do. The same: kept on `refs/hive/queue/<entry>` (dropped with its card's queue ref
+   once the entry has its outcome) and recorded as `Updated` (`how` `mergedTarget` or `rebased`, `carried`), which
+   folds onto **its entry** (`QueueEntry.updated`), never the card's approved revision: that stays the reviewed one, the
+   builder's line, which reconciliation compares with and a requeue queues, so an update never makes the pass stale.
+   Each test merge updates afresh from the reviewed revision (a retest after the target moved never builds on an earlier
+   update); its message keeps `Hive-Revision:` as the reviewed revision and adds `Hive-Updated:`. The containment check
+   (merged by hand meanwhile) uses the reviewed revision. G8's `integrate.upToDate` guard has no input from the queue:
+   the queue brings the work up to date instead of refusing it.
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
    at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
    message `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`;

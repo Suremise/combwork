@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "提交包含其他智能体的文件时发出警告",
   "workflow.option.stopOwnRuns.desc": "只有构建者自己的运行和后台命令都停止后，卡片才会进入评审。",
   "workflow.option.stopOwnRuns.title": "评审前智能体停止自己启动的任务",
+  "workflow.option.strict.desc": "如果目标分支在评审后有了新提交，Hive 的合并队列会在它自己的文件夹中把目标分支合并进卡片的工作（合并方式为压缩合并时则对工作进行变基），绝不在构建者的分支上操作。如果结果是相同的改动，评审仍然有效；否则，或出现冲突时，卡片会退回给构建者。",
+  "workflow.option.strict.title": "合并前工作已与目标分支保持最新",
   "workflow.option.style.desc": "卡片的工作如何合并到目标分支。",
   "workflow.option.style.title": "合并方式",
   "workflow.option.target.desc": "目标分支。留空则为仓库的默认分支。",

@@ -641,9 +641,17 @@ export class MergeQueue {
         if (isUnknown(head) || !head) return this.pause(target, card, entry, 'needsYou')
         expected = head
 
-        // The test merge, in the queue's own worktree, at the expected revision.
+        // The test merge, in the queue's own worktree, at the expected revision; under strict (G8) of the reviewed revision
+        // brought up to date with it there first (#1352), the card's line untouched.
         step('testMerge', expected)
-        const test = await this.testMerge(card, s, revision, expected)
+        let updated: string | undefined
+        if (this.wf.rulesetOf(card, s).options.strict) {
+          const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected)
+          if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
+          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log)
+          updated = up.updated ?? undefined
+        }
+        const test = await this.testMerge(card, s, revision, expected, updated)
         if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
         if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
         result = test.result
@@ -762,22 +770,87 @@ export class MergeQueue {
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
    */
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  /** Where two revisions' histories meet ('' when git can't say: an update then fails as git refuses it). */
+  private async mergeBaseOf(a: string, b: string): Promise<string> {
+    const r = await this.git(this.project, ['merge-base', a, b])
+    return r.ok ? r.out.trim() : ''
+  }
+
+  /** The queue's own worktree, made or reused, detached and clean at `at`; a pause when git can't. */
+  private async folderAt(at: string): Promise<{ pause: PauseReason; message?: string } | null> {
+    const f = this.cfg.folder
+    if (!existsSync(f)) {
+      const add = await this.git(this.project, ['worktree', 'add', '--detach', f, at])
+      return add.ok ? null : { pause: 'needsYou', message: add.err }
+    }
+    const co = await this.git(f, ['checkout', '--detach', '-f', at])
+    if (!co.ok) return { pause: 'needsYou', message: co.err }
+    await this.git(f, ['clean', '-fdq'])
+    return null
+  }
+
+  /**
+   * Strict, G8 (§16.9.1 step 3, #1352): a reviewed revision that doesn't contain the target's head is brought up to date
+   * in the queue's own worktree only, never on the card's line (the builder's branch, in its worktree): the target merged
+   * into it, or, with merge style Squash, it rebased onto the target, as Hive's commits are made (#1350: the project's
+   * identity, the repository's hooks and signing, never a prompt). The result is the same change (§16.3.2's replay:
+   * `sameChange`) or the card goes back to its builder: a conflict with the files, or a different change, both
+   * `notUpToDate`. The same: kept on `refs/hive/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
+   * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
+   * after the target moved updates afresh, never on an earlier update.
+   */
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+    const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
+    if (anc.code === 0) return { updated: null }
+    if (anc.code !== 1) return { pause: 'needsYou', message: anc.err }
+    const id = await this.identity()
+    if (!id) return { pause: 'identity', files: [this.project] }
+    const at = await this.folderAt(revision)
+    if (at) return at
+    const f = this.cfg.folder
+    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const rebase = this.wf.rulesetOf(card, s).options.style === 'squash'
+    const signs = (await this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign'])).out.trim() === 'true'
+    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
+    const target = entry.target
+    const message = `Merge ${target} into ${card.key}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}` // i18n-ignore: a commit message, in English
+    // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
+    // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
+    // Overridden for this command only; the repository's config is left as it is.
+    const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
+    if (!u.ok) {
+      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+      const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
+      await this.folderAt(expected)
+      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text) }
+      return commitFailed(u, signs)
+    }
+    const h = await G.head(f)
+    if (isUnknown(h)) return { pause: 'needsYou' }
+    // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
+    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: h }))) {
+      return { fail: 'notSame', log: `${card.key}: ${revision.slice(0, 7)} brought up to date with ${target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
+    }
+    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(entry.id)}`, h])
+    await this.write(card, (w) => {
+      if (this.isOpen(w, entry)) w.fact('Updated', { entry: entry.id, from: revision, to: h, how: rebase ? 'rebased' : 'mergedTarget', carried: true }) // i18n-ignore: a fact's kind and codes, not text
+    })
+    return { updated: h }
+  }
+
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, updated?: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity()
     if (!id) return { pause: 'identity', files: [this.project] }
     const f = this.cfg.folder
-    if (!existsSync(f)) {
-      const add = await this.git(this.project, ['worktree', 'add', '--detach', f, expected])
-      if (!add.ok) return { pause: 'needsYou', message: add.err }
-    } else {
-      const co = await this.git(f, ['checkout', '--detach', '-f', expected])
-      if (!co.ok) return { pause: 'needsYou', message: co.err }
-      await this.git(f, ['clean', '-fdq'])
-    }
+    const at = await this.folderAt(expected)
+    if (at) return at
     const r = this.wf.rulesetOf(card, s)
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
-    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
+    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${updated ? `\nHive-Updated: ${updated}` : ''}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
     // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
