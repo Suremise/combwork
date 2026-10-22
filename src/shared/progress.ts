@@ -402,6 +402,21 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   // The merge queue's checks with nothing installed before them (#1349): said once, on the first check after it.
   if (r.installAsWritten) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.installAsWritten', defaultMessage: 'The setup command as written, after removing node_modules: Hive has no clean form of it', description: "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch." })) })
   if (r.noInstall) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.noInstall', defaultMessage: 'Nothing installed: the project has no setup command and no lock file', description: "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents & Worktrees) nor a package lock file." })) })
+  // A failed merge check or install that counts as temporary (#1362): why, so a network error or a project's exit 75 is visible.
+  if (r.transient) {
+    out.push({
+      label: tr(msg({ id: 'board.details.temporary', defaultMessage: 'Temporary', description: "A label in a run's details (Progress panel), on one of the merge queue's failed checks: why the failure counts as temporary (the environment's, not the work's) follows." })),
+      text: tr(
+        msg({
+          id: 'board.details.transient',
+          defaultMessage:
+            "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.",
+          description: "A run's details in the Progress panel: why a failed merge check counts as temporary, picked by {cause} (keep each branch's key as it is); {code} is the network error code found in its output (ENOTFOUND, ECONNRESET…: keep it as it is). Code 75 is a number: keep it."
+        }),
+        { cause: r.transient.cause, code: r.transient.code ?? '' } // i18n-ignore: a select's key and an error code, never translated
+      )
+    })
+  }
   out.push({ label: tr(msg({ id: 'board.details.agent', defaultMessage: 'Agent', description: "A label in a run's details (Progress panel): the agent that ran it (and its project) follows." })), text: `${runAgentName(r, tr)}${project ? ` · ${project}` : ''}` })
   if (r.provider) out.push({ label: tr(msg({ id: 'board.details.provider', defaultMessage: 'Provider', description: "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)." })), text: providerName(r.provider) })
   out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt), at: r.startedAt })

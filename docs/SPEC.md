@@ -2093,8 +2093,23 @@ submissions' pins once it is archived.
    that couldn't start (a spawn error, or its program not found, told before it starts on Windows, where cmd exits 1 for
    it), one ended by its time limit, or one killed from outside (a signal, Windows' interrupt status) is transient;
    anything else is red. A process another program ends with TerminateProcess exits with the code that program gave,
-   which can't be told from the check's own, so it counts as red. Network errors are #1362's (Darren, 21 Oct: exit 75,
-   or Node's and npm's network error codes in the last 40 lines, an Advanced list). **Pauses are not failures:** a busy or dirty target folder, a missing
+   which can't be told from the check's own, so it counts as red. **Built [#1362]** (Darren, 21 Oct, #1121 point 3:
+   (a) and (b)): a check that exits **75** (EX_TEMPFAIL: the project's own script saying "a temporary failure, try
+   again", a way to mark its own environment failures) is transient, and so is a failed check whose **last 40 lines**
+   (trailing blank lines aside) have one of Node's and npm's network error codes (`ENOTFOUND`, `EAI_AGAIN`,
+   `ECONNRESET`, `ECONNREFUSED`, `ETIMEDOUT` as whole words: Settings → Advanced, **Merge queue: network errors that
+   count as temporary**, a pattern with samples recorded from npm 11.17.0 and Node 24.19.0; `(?!)` turns it off). A code
+   only earlier in the output, or in a check that passed, is nothing. Why is recorded as codes, never text: the
+   `IntegrationFailed` fact's `cause` (`spawn`, `notFound`, `timeout`, `killed`, `exit75`, `network`) and `code` (the
+   network error code found), and the check's run says it in its details. Transient only permits: the card is still
+   returned to its builder (`returnCard`), and the builder's resubmission puts the same revision back; nothing retries by
+   itself. Codes are looked for as the output comes (`TailCodes`), each line whole as it ends, so the 40 lines are the
+   check's real last lines, not the short output a result carries. The answer depends on the output, never on how it was
+   chunked: a line still being written past 64 KB is settled only as far as its text decides (a match counts once 256
+   real characters follow it; one running closer to the unfinished end is searched again from its start), and only the
+   undecided part is kept, after 512 real characters before it, so a word boundary or lookbehind sees the real text,
+   never a start the trimming made. Bounded: a code per line for the last 40 lines, a line in progress up to about
+   64 KB; the limit is a match and what decides it within 256 characters (a code). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target
