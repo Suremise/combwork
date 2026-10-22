@@ -667,7 +667,7 @@
   "board.stall.hintReviewSilent": "它的评审者可能已结束本轮，但 Hive 没有察觉。显示评审者：如果它的终端停在提示符处，点击“标记为空闲”，监视就会唤醒它。",
   "board.stall.hintReviewVerdict": "它的评审者没有给出结论就停了下来，正在等待这张卡片。先阅读它的最新评论（可能有问题要问你），然后显示评审者，让它完成评审。",
   "board.stall.hintReviewWait": "监视没有唤醒它的评审者。显示评审者，让它评审这张卡片。",
-  "board.stall.hintWakeUntaken": "Hive 已将此卡片的唤醒输入到该代理，但其 CLI 没有发送。显示该代理，点击其终端并按 Enter。",
+  "board.stall.hintWakeUntaken": "Hive 已将此卡片的唤醒输入到该智能体，但其 CLI 没有发送。显示该智能体，点击其终端并按 Enter。",
   "board.stalled.noAgent": "在“进行中”，但没有指派智能体。",
   "board.stalled.notRunning": "{agent} 未运行。",
   "board.stalled.notWatching": "{agent} 没有监视 {card}：它的本轮结束时没有设置卡片监视。",
