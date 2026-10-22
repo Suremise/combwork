@@ -8983,6 +8983,159 @@ textarea.input.task-blocked-input {
 .card-work-files {
   padding-inline-start: 18px;
 }
+/* The card's Work section, its merge queue part (#1357): where the entry stands, a return with its output, the queue's
+   pause, an advance stopped part way with its files and commands to copy. Each state has its icon and words. */
+.card-work-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--merge);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.card-work-queue .card-work-sub {
+  margin-block-start: 0;
+}
+.card-work-queue-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.card-work-queue-line > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.card-work-queue-line > .codicon {
+  flex-shrink: 0;
+}
+.card-work-queue-line > .codicon-error {
+  color: var(--error);
+}
+.card-work-queue-line > .codicon-warning,
+.card-work-queue-paused .codicon-debug-pause {
+  color: var(--warning);
+}
+.card-work-queue-log {
+  margin: 0;
+  padding: 6px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.card-work-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.card-work-queue-why {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.card-work-queue-paused,
+.card-work-queue-stuck,
+.card-work-queue-returned,
+.card-work-queue-advance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.card-work-queue-files [data-side] code,
+.card-work-queue-stuck .card-work-files code {
+  overflow-wrap: anywhere;
+}
+.card-work-queue-command {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.card-work-queue-command-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.card-work-queue-command-row > code {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.for-you-show-work {
+  margin-top: 4px;
+}
+/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. */
+.git-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.git-queue-target {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 900px;
+}
+.git-queue-history-h {
+  font-weight: 600;
+}
+.git-queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.git-queue-table th {
+  text-align: start;
+  color: var(--fg-muted);
+  font-weight: normal;
+  border-bottom: 1px solid var(--border);
+  padding: 4px 6px;
+}
+.git-queue-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.git-queue-table .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+}
+.git-queue-table tr[data-outcome='merged'] .codicon {
+  color: var(--success);
+}
+.git-queue-table tr[data-outcome='returned'] .codicon {
+  color: var(--error);
+}
+.git-queue-title {
+  overflow-wrap: anywhere;
+}
+/* The Merge dialog on a branch whose card Hive merges (#1357). */
+.merge-queue-note {
+  margin-bottom: 8px;
+}
+/* Its Merge, held while Hive merges the card: plainly off, its reason on hover (the disabled button passes the hover to
+   its tooltip). */
+.btn.merge-held:disabled {
+  pointer-events: none;
+}
 .card-work-files .link {
   background: none;
   border: none;

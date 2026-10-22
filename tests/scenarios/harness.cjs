@@ -577,6 +577,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
     if (!endedAtLaunch) {
+      turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
       if (!(await lib.sendPrompt(inv, key, text, { submitted, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
@@ -588,7 +589,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     const sentAt = Date.now()
 
     // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
-    // board while it works, for scenarios that change things under it.
+    // board while it works, for scenarios that change things under it. A quick turn can start and end between two looks
+    // (each look is several calls, slow under load: #1311), so the prompt answered counts as the work seen too.
     // A session that ended at launch has no turn to wait for.
     const limit = endedAtLaunch ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
     let sawWork = false
@@ -606,7 +608,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (['working', 'background', 'starting'].includes(status)) {
         sawWork = true
         quietSince = 0
-      } else if (sawWork || Date.now() - sentAt > 60000) {
+      } else if (sawWork || (sawWork = await ctx.answered(text)) || Date.now() - sentAt > 60000) {
         quietSince ||= Date.now()
         if (Date.now() - quietSince > (status === 'waiting' ? 3000 : 6000)) break
       }

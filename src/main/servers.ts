@@ -1790,7 +1790,7 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
-  recent: v.recent.map(({ log: output, seen: _s, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */

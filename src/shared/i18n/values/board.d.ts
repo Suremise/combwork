@@ -308,6 +308,7 @@ interface HiveMessageValues {
   'board.forYou.reply': undefined
   'board.forYou.rounds': undefined
   'board.forYou.send': undefined
+  'board.forYou.showStuck': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -764,4 +765,44 @@ interface HiveMessageValues {
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
+  'board.workQueue.advance': { target: string | number }
+  'board.workQueue.advancing': { target: string | number }
+  'board.workQueue.answerFailed': undefined
+  'board.workQueue.approve': undefined
+  'board.workQueue.approved': undefined
+  'board.workQueue.cancelled': { reason: string }
+  'board.workQueue.command': { purpose: string; folder: string | number }
+  'board.workQueue.commands': undefined
+  'board.workQueue.conflictFiles': undefined
+  'board.workQueue.copied': undefined
+  'board.workQueue.copy': undefined
+  'board.workQueue.copyFailed': undefined
+  'board.workQueue.copyNamed': { purpose: string }
+  'board.workQueue.decline': undefined
+  'board.workQueue.expected': undefined
+  'board.workQueue.files': { n: number }
+  'board.workQueue.heading': undefined
+  'board.workQueue.hideLog': undefined
+  'board.workQueue.noBranch': undefined
+  'board.workQueue.noCommands': undefined
+  'board.workQueue.output': { n: number }
+  'board.workQueue.paused': { target: string | number }
+  'board.workQueue.queued': { target: string | number; position: number }
+  'board.workQueue.queuedNoPlace': { target: string | number }
+  'board.workQueue.result': undefined
+  'board.workQueue.retried': undefined
+  'board.workQueue.retry': undefined
+  'board.workQueue.retryConfirm': undefined
+  'board.workQueue.retryFailed': undefined
+  'board.workQueue.retryMessage': { revision: string | number }
+  'board.workQueue.retryTitle': { card: string | number }
+  'board.workQueue.returned': { when: string | number; why: string | number }
+  'board.workQueue.showRun': undefined
+  'board.workQueue.side': { side: string }
+  'board.workQueue.stuck': { target: string | number }
+  'board.workQueue.stuckBranch': undefined
+  'board.workQueue.stuckFolder': undefined
+  'board.workQueue.stuckRef': { target: string | number }
+  'board.workQueue.testing': { step: string | number }
+  'board.workQueue.unreadRef': undefined
 }

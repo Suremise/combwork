@@ -36,6 +36,7 @@
   "errors.log.none": "Cette exécution n’a signalé aucun journal.",
   "errors.log.notFullPath": "L’exécution a signalé son journal sans chemin complet : {path}",
   "errors.log.notText": "Hive n’ouvre que les journaux et rapports texte, pas {file} : utilise Afficher dans le dossier.",
+  "errors.merge.queueMerges": "Hive fusionne {card} par la file de fusion. Fusionne-la là, ou choisis Fusionner quand même dans la boîte Fusionner.",
   "errors.mergeSlot.holdRequired": "Il faut indiquer la réservation à libérer",
   "errors.pref.notProjectPref": "Pas une préférence de projet.",
   "errors.pref.notValue": "Valeur non valide pour {pref}.",

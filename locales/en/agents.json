@@ -699,6 +699,22 @@
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "A worktree agent's unmerged work: files changed and not committed yet."
   },
+  "agents.mergeDialog.anyway": {
+    "defaultMessage": "Merge anyway…",
+    "description": "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)."
+  },
+  "agents.mergeDialog.anywayConfirm": {
+    "defaultMessage": "Merge anyway",
+    "description": "The button confirming Merge anyway (a merge outside the merge queue). Keep it short."
+  },
+  "agents.mergeDialog.anywayMessage": {
+    "defaultMessage": "Hive merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.",
+    "description": "The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override."
+  },
+  "agents.mergeDialog.anywayTitle": {
+    "defaultMessage": "Merge {card} outside the merge queue?",
+    "description": "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue."
+  },
   "agents.mergeDialog.cantRead": {
     "defaultMessage": "Nothing can be merged until Hive can read the branch.",
     "description": "The Merge dialog when git couldn't read the worktree's branch; why comes before it."
@@ -778,6 +794,42 @@
   "agents.mergeDialog.otherBase": {
     "defaultMessage": "{agent}'s branch started from {base}, but the project folder is on {into}.",
     "description": "The Merge dialog when the agent's ({agent}) branch started from another branch ({base}) than the one the project folder is on now ({into})."
+  },
+  "agents.mergeDialog.queueLookup": {
+    "defaultMessage": "Checking whether Hive merges this branch’s card through the merge queue…",
+    "description": "Why Merge is off for a moment in the Merge dialog: Hive is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue."
+  },
+  "agents.mergeDialog.queueLookupFailed": {
+    "defaultMessage": "Couldn't read whether Hive merges this branch's card through the merge queue, so Merge stays off: {why}",
+    "description": "The Merge dialog when Hive couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Hive shows it."
+  },
+  "agents.mergeDialog.queueMerges": {
+    "defaultMessage": "Hive merges {card} through the merge queue. Merge anyway merges it here instead.",
+    "description": "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue."
+  },
+  "agents.mergeDialog.queueNotYet": {
+    "defaultMessage": "It goes into the queue for {target} once it is approved.",
+    "description": "In the Merge dialog: the card isn't in the merge queue yet (in review, say); it is queued for the branch {target} once approved. Glossary 2.2: Approved."
+  },
+  "agents.mergeDialog.queuePaused": {
+    "defaultMessage": "The queue is paused.",
+    "description": "In the Merge dialog, after where the card stands in the merge queue: that queue is paused."
+  },
+  "agents.mergeDialog.queueQueued": {
+    "defaultMessage": "It waits in the queue for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line.",
+    "description": "In the Merge dialog: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing counts)."
+  },
+  "agents.mergeDialog.queueQueuedNoPlace": {
+    "defaultMessage": "It waits in the queue for {target}.",
+    "description": "In the Merge dialog: the card waits in the merge queue for the branch {target}."
+  },
+  "agents.mergeDialog.queueRetry": {
+    "defaultMessage": "Retry",
+    "description": "A button in the Merge dialog after Hive couldn't read whether its merge queue merges the branch's card: reads it again."
+  },
+  "agents.mergeDialog.queueTesting": {
+    "defaultMessage": "The queue for {target} is testing it now.",
+    "description": "In the Merge dialog: the merge queue for the branch {target} is testing the card now (its merge checks)."
   },
   "agents.mergeDialog.reading": {
     "defaultMessage": "Reading {branch}…",

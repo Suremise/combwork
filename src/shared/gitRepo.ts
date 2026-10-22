@@ -163,6 +163,7 @@ const M = {
   changes: msg({ id: 'git.section.changes', defaultMessage: 'Changes', description: "The Git tab's section with the uncommitted changes." }),
   history: msg({ id: 'git.section.history', defaultMessage: 'History', description: "The Git tab's section with the last commits and the tags." }),
   branches: msg({ id: 'git.section.branches', defaultMessage: 'Branches & remotes', description: "The Git tab's section with the branch, branches, remotes, worktrees and commit identity." }),
+  queue: msg({ id: 'git.section.queue', defaultMessage: 'Merge queue', description: "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue." }),
   agentBusy: msg({
     id: 'git.busy.agent',
     defaultMessage:
@@ -202,10 +203,11 @@ const M = {
 }
 
 /** The Git tab's sections. */
-export const GIT_SECTIONS: readonly { id: 'changes' | 'history' | 'branches'; label: Msg; icon: string }[] = [
+export const GIT_SECTIONS: readonly { id: 'changes' | 'history' | 'branches' | 'queue'; label: Msg; icon: string }[] = [
   { id: 'changes', label: M.changes, icon: 'git-compare' },
   { id: 'history', label: M.history, icon: 'history' },
-  { id: 'branches', label: M.branches, icon: 'git-branch' }
+  { id: 'branches', label: M.branches, icon: 'git-branch' },
+  { id: 'queue', label: M.queue, icon: 'git-merge' }
 ]
 export type GitSection = (typeof GIT_SECTIONS)[number]['id']
 

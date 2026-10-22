@@ -16,6 +16,7 @@ import type { McpServerInfo, OldWorktreeOutcome, ProjectInfo, ProjectProviderCon
 import { TEMPLATE_NAME_MAX, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { oldWorktreesNotice, templateLoadDetail } from '@shared/templateLoad'
 import { formatTokens, type SessionAction } from './util'
+import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
 import { TemplateLoadNames } from './components/TemplateLoad'
 import { McpProjectPicker } from './components/McpProjectPicker'
@@ -113,7 +114,7 @@ export async function saveUnsavedFirst(action: UnsavedAction): Promise<boolean> 
 
 export async function refreshWorkspace(): Promise<void> {
   const ws = await call('workspace:refresh')
-  set({ workspace: ws })
+  set({ workspace: movesShown.keep(ws) })
 }
 
 export async function openWorkspace(path?: string): Promise<void> {
@@ -252,7 +253,7 @@ export async function setProjectActive(path: string, active: boolean): Promise<v
     }
     return call('project:setActive', path, active)
   })
-  if (ws) set({ workspace: ws })
+  if (ws) set({ workspace: movesShown.keep(ws) })
 }
 
 /** Waits until an agent's session (or, without agentId, every agent of the project) has stopped. */
@@ -988,9 +989,12 @@ export async function moveAgent(path: string, agentId: string, index: number): P
   // The panes follow the order (#134): what's on screen changes with it.
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
   focusAgent(path, agentId)
+  // Kept as shown until saved (#1229): a refresh that read the order before the save doesn't put it back meanwhile.
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
   const saved = await attempt(moveFailed(), () => call('agents:move', path, agentId, index))
-  // Puts the tabs back as saved; the move's own error was already shown, and the next refresh catches up anyway.
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  // Puts the tabs back as saved (refused, or the last of quick moves, one refused); the move's own error was already
+  // shown, and the next refresh catches up anyway.
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /**
@@ -1004,8 +1008,9 @@ export async function swapAgents(path: string, agentId: string, otherId: string)
   const agents = swapAgentsIn(p.agents, agentId, otherId)
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
   focusAgent(path, agentId)
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
   const saved = await attempt(moveFailed(), () => call('agents:swap', path, agentId, otherId))
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /** Moves the focused agent (or `agentId`) one place left or right, across pages at their edges. */
@@ -1057,9 +1062,10 @@ export function placeAgent(path: string, agentId: string, target: number): boole
   const agents = orderByCells(p.agents, cells)
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, config, agents } : x)) } }))
   focusAgent(path, agentId)
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id), placement: config.placement, layout: config.layout })
   void attempt(moveFailed(), () => call('agents:place', path, layout, cells)).then((saved) => {
-    // Puts the panes back as saved; the move's own error was already shown.
-    if (!saved) void refreshWorkspace()
+    // Puts the panes back as saved (refused, or the last of quick moves, one refused); the move's own error was already shown.
+    if (end(!!saved) || !saved) void refreshWorkspace()
   })
   return true
 }

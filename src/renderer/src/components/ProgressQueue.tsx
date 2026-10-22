@@ -142,7 +142,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         </div>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
-      <button type="button" className="progress-queue-link" onClick={() => showGit(v.projectPath, 'changes')}>
+      <button type="button" className="progress-queue-link" onClick={() => showGit(v.projectPath, 'queue')}>
         {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Git tab, where its queue and history are." }))} <Icon name="arrow-right" />
       </button>
     </div>
