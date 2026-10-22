@@ -70,6 +70,13 @@ function onceInStep<T>(repo: string, what: string, ids: string[], ask: () => Pro
   return p
 }
 
+/** An answer read with another git (lineHeadAndTree), kept as the step's own for those commits. */
+function knownInStep<T>(repo: string, what: string, ids: string[], value: T): void {
+  const step = stepNow.getStore()
+  const common = step && !step.done && ids.every((id) => SHA.test(id)) ? commonDirSync(repo) : null
+  if (step && common) step.answers.set([common.toLowerCase(), what, ...ids].join('\0'), Promise.resolve(value))
+}
+
 /** The repository's common git dir (where branch refs live, for every worktree). */
 export async function commonDir(repo: string): Promise<Maybe<string>> {
   const r = await git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
@@ -151,6 +158,20 @@ export async function lineHead(repo: string, line: string): Promise<Maybe<string
   return unknown(U.line, { branch: line })
 }
 
+/**
+ * A line's head, as lineHead answers it, with its tree from the same commit in the same git (#1386: the queue asks
+ * containment of the target's head, whose last test is that tree), kept as the step's treeOf answer. Where the one
+ * read can't say (no such line), lineHead's own answer.
+ */
+export async function lineHeadAndTree(repo: string, line: string): Promise<Maybe<string | null>> {
+  // Never a signature check (a repository's log.showSignature would run gpg and print its lines).
+  const r = await git(repo, ['show', '-s', '--no-show-signature', '--format=%H %T', `refs/heads/${line}`, '--'])
+  const [commit, tree] = r.ok ? r.out.trim().split(' ') : []
+  if (!commit || !tree || !SHA.test(commit) || !SHA.test(tree)) return lineHead(repo, line)
+  knownInStep(repo, 'tree', [commit], tree)
+  return commit
+}
+
 /** Any ref or revision, resolved to a commit (or null if there's no such commit). */
 export async function resolve(repo: string, rev: string): Promise<Maybe<string | null>> {
   const r = await git(repo, ['rev-parse', '--verify', '-q', `${rev}^{commit}`])
@@ -159,9 +180,12 @@ export async function resolve(repo: string, rev: string): Promise<Maybe<string |
   return unknown(U.revision, { revision: rev })
 }
 
-export async function treeOf(repo: string, rev: string): Promise<Maybe<string>> {
-  const r = await git(repo, ['rev-parse', '--verify', '-q', `${rev}^{tree}`])
-  return r.ok ? r.out.trim() : unknown(U.files, { revision: rev })
+/** A revision's tree: a commit's asked once per step (#1386). */
+export function treeOf(repo: string, rev: string): Promise<Maybe<string>> {
+  return onceInStep(repo, 'tree', [rev], async () => {
+    const r = await git(repo, ['rev-parse', '--verify', '-q', `${rev}^{tree}`])
+    return r.ok ? r.out.trim() : unknown(U.files, { revision: rev })
+  })
 }
 
 /** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
@@ -344,12 +368,18 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
  * Is the change base→rev in the target (§16.3.2 Containment)? In order: an ancestor of the target (a merge or a
  * fast-forward); a target commit since the base whose parent replays the change to its tree (a squash or a cherry-pick
  * of the whole change); else the whole target already holds it (a squash split across commits). Null when not found.
- * `at`: the target's head as the caller read it (asked about that commit, not read again).
+ * `at`: the target's head as the caller read it (asked about that commit, not read again); then, with fixed endpoints,
+ * the answer is asked once per step (#1386: the queue's test merge tested again on the same head).
  */
 export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
-  const t = at ?? (await resolve(repo, target))
+  if (at) return onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, at], () => containsAt(repo, target, c, at))
+  const t = await resolve(repo, target)
   if (isUnknown(t)) return t
   if (!t) return unknown(U.target, { target })
+  return containsAt(repo, target, c, t)
+}
+
+async function containsAt(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, t: string): Promise<Maybe<Containment | null>> {
   const anc = await isAncestor(repo, c.revision, t)
   if (isUnknown(anc)) return anc
   if (anc) {

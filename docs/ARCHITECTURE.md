@@ -296,7 +296,8 @@ with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when t
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
 `timeoutMs` and end the launcher's whole tree at the bound (`endTree`); without a config git, `gitTree` does the same.
 `commitEnv` sets `GIT_TRACE2_EVENT=2`, so git's trace2 events are in its stderr, in order with its hooks' and signer's
-text. `readCommitStream` splits that stream into validated events and text, and gives each piece of text to the top
+text. `readCommitStream` splits that stream into validated events of git's own session (the top git's, from its
+`version` record, and its descendants' `<top>/…`; any other record is text, #1397) and text, and gives each piece of text to the top
 git's child running then (a hook, the signer) or to git. `commitFailed` decides from the source each decision is about,
 never from the whole output:
 - at the bound, a pause by what ran then (`errAtTimeout`, the stream as of the timeout): `hookTimedOut` or
@@ -364,8 +365,9 @@ touched). Even then the guards' inputs read in between may have seen another sta
 clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
 from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
 an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
-and each lane's look in a branch-update pass, is one `gitStep` (`platform/git.ts`, #1376): what it asks about fixed
-commits (an ancestor, a merge base, by full ids) is asked of git once in it per repository (its common git dir, read
+each lane's look in a branch-update pass, and each merge-queue entry's way through (#1386), is one `gitStep`
+(`platform/git.ts`, #1376): what it asks about fixed commits (an ancestor, a merge base, a tree, the queue's containment
+of a head it read, by full ids) is asked of git once in it per repository (its common git dir, read
 from `.git`: a project and its worktrees share answers, another repository never); nothing about refs, HEAD or files is
 kept, so every read of state (a regather's, the move's own at its boundary) asks git again. The Assistant
 suggested letting git answer (#1206 round 1) after HR5 found that reading the index in Hive (an earlier round) got

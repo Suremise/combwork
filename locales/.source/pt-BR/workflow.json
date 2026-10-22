@@ -104,7 +104,7 @@
   "workflow.option.dependenciesDone.title": "Cards start only when the cards they wait for are merged",
   "workflow.option.excluded.desc": "The whole project folder, apart from these folders and files (.hive always).",
   "workflow.option.excluded.title": "What the work is",
-  "workflow.option.finish.desc": "When a card is done: once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+  "workflow.option.finish.desc": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
   "workflow.option.finish.title": "Who merges",
   "workflow.option.folder.desc": "In its own folder, a card is built in its builder’s worktree, apart from other agents’ work. In the project folder, everyone sees each other’s unfinished changes.",
   "workflow.option.folder.title": "Where cards are built",

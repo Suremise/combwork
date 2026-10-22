@@ -2102,7 +2102,9 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
        signer (gpg's or gpgsm's `-bsau`, ssh-keygen's `-Y sign`). Text while none runs is git's own. A git that a hook
        runs (its sid `<parent>/<own>`) is never a source.
      - An event is only a complete JSON record with the fields its kind needs, starting `{"event":"` and running to
-       the line's end. Anything else, an event-looking fragment included, is text. Events never appear in a message.
+       the line's end, from git's own session: the top git's (begun by its `version` record, with no parent's
+       prefix) or a git it runs (`<top>/…`). Anything else is text: an event-looking fragment, or a hook's own
+       structured log with a session of its own (#1397). Events never appear in a message.
    - **Hook failure:** a hook that exited non-zero (`pre-merge-commit`, `commit-msg`, or `pre-commit` for a squash's
      commit) returns the card with its own text, then git's (`IntegrationFailed`, reason `hook`).
    - **Other failures:** anything else (an index lock, a broken repository, a worktree it couldn't check out) pauses
