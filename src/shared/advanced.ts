@@ -169,6 +169,8 @@ export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
 
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
 export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
+/** The network error codes that make a failed merge check temporary (#1362): read by queueChecksApp.ts. */
+export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
 
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
@@ -529,6 +531,27 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 1440,
     unit: 'min',
     applies: 'now'
+  },
+  // Which failed merge checks count as the network's (#1362, Darren's decision on #1121): Node's and npm's own error
+  // codes in a failed check's last 40 lines. A check exiting 75 says so itself, whatever this is.
+  {
+    id: QUEUE_NETWORK_CODES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.networkCodes.title', defaultMessage: 'Merge queue: network errors that count as temporary', description: "An advanced setting's title (Settings → Advanced), listed under Hive. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again." }),
+    desc: msg({
+      id: 'settings.advanced.hive.queue.networkCodes.desc',
+      defaultMessage:
+        "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
+      description: 'What the advanced setting "Merge queue: network errors that count as temporary" does (Settings → Advanced). The error codes, (?!) and 75 are literal: keep them.'
+    }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT)\b`,
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/network-npm-11.17.0-enotfound.txt`, version: '11.17.0', text: 'npm error code ENOTFOUND' }, // i18n-ignore: npm's recorded output (#367)
+      { from: `${FIX}/advanced/network-npm-11.17.0-econnrefused.txt`, version: '11.17.0', text: 'npm error code ECONNREFUSED' }, // i18n-ignore: npm's recorded output (#367)
+      { from: `${FIX}/advanced/network-node-24.19.0-econnrefused.txt`, version: '24.19.0', text: 'Error: connect ECONNREFUSED' } // i18n-ignore: Node's recorded output (#367)
+    ]
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
   // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
