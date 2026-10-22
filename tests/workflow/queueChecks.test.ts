@@ -10,7 +10,10 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, preset, takesOption } from '../../src/shared/workflow/options'
 import { resolveOptions } from '../../src/main/workflow/rulesets'
 import { MAX_RETESTS } from '../../src/main/workflow/mergeQueue'
-import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, programFound, progressRuns, queueChecks, type LogIo, type QueueRuns } from '../../src/main/workflow/queueChecks'
+import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, networkCodeIn, programFound, progressRuns, queueChecks, TAIL_LINES, TailCodes, TEMPFAIL, transientCause, type LogIo, type QueueRuns } from '../../src/main/workflow/queueChecks'
+import { advancedDef, QUEUE_NETWORK_CODES } from '../../src/shared/advanced'
+import { runDetails } from '../../src/shared/progress'
+import { tr } from '../../src/shared/i18n'
 import { HIVE_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
 import { publicRun } from '../../src/main/apiEvents'
 import type { RunCheck } from '../../src/shared/types'
@@ -60,7 +63,7 @@ const base = (): Record<string, string> => ({
 /** Hive's runs as the runner reports them. */
 function runsLog() {
   const started: Parameters<QueueRuns['start']>[0][] = []
-  const finished: { id: string; ok: boolean; exitCode: number | null; logPath: string | null }[] = []
+  const finished: ({ id: string } & Parameters<QueueRuns['finish']>[1])[] = []
   const counted: { id: string; c: RunCheck }[] = []
   const runs: QueueRuns = {
     start: (r) => (started.push(r), `run${started.length}`),
@@ -87,7 +90,149 @@ describe('classifying a failed check (§16.9.1 step 8)', () => {
     expect(classifyCheckFailure({ ...end, exitCode: 127 }, 'linux')).toBe('transient')
     expect(classifyCheckFailure({ ...end, exitCode: 127 }, 'win32')).toBe('red')
     expect(classifyCheckFailure(end)).toBe('red')
-    expect(classifyCheckFailure({ ...end, exitCode: 2, output: 'ENOTFOUND registry.npmjs.org' })).toBe('red') // #1362 decides this one
+    // With no network codes given (the Advanced value off, or none read), a network error stays red.
+    expect(classifyCheckFailure({ ...end, exitCode: 2, output: 'ENOTFOUND registry.npmjs.org' })).toBe('red')
+  })
+})
+
+// #1362 (Darren's decision on #1121): exit 75 is the project saying "temporary", and Node's and npm's network error codes
+// in a failed check's last 40 lines say the network failed, not the work. The codes are an Advanced setting.
+describe('which failed checks are temporary (#1362)', () => {
+  const codes = new RegExp(advancedDef(QUEUE_NETWORK_CODES)!.default as string)
+  const end = { exitCode: 1, signal: null, output: '' }
+  const lines = (n: number, last: string) => [...Array.from({ length: n }, (_, i) => `line ${i}`), last].join('\n')
+
+  it('each cause, in order: couldn\'t start, ran out of time, ended from outside, program not found, exit 75, a network code', () => {
+    expect(transientCause({ ...end, spawnError: true }, 'win32', codes)).toEqual({ cause: 'spawn' })
+    expect(transientCause({ ...end, timedOut: true, output: 'ENOTFOUND' }, 'win32', codes)).toEqual({ cause: 'timeout' })
+    expect(transientCause({ ...end, exitCode: null, signal: 'SIGTERM' }, 'win32', codes)).toEqual({ cause: 'killed' })
+    expect(transientCause({ ...end, exitCode: 9009 }, 'win32', codes)).toEqual({ cause: 'notFound' })
+    expect(transientCause({ ...end, exitCode: TEMPFAIL }, 'win32', codes)).toEqual({ cause: 'exit75' })
+    expect(transientCause({ ...end, exitCode: 75 }, 'win32', null)).toEqual({ cause: 'exit75' })
+    expect(transientCause({ ...end, output: lines(5, 'npm error code EAI_AGAIN') }, 'win32', codes)).toEqual({ cause: 'network', code: 'EAI_AGAIN' })
+    expect(transientCause(end, 'win32', codes)).toBeNull()
+  })
+
+  it('a network code only in the last 40 lines (trailing blank lines aside); earlier, or a word merely containing one, is red', () => {
+    // The code's line, then `after` lines, then blank lines (not counted).
+    const tail = (after: number) => ['connect ECONNRESET 10.0.0.1:443', ...Array.from({ length: after }, () => 'x')].join('\n') + '\n\n'
+    expect(transientCause({ ...end, output: tail(TAIL_LINES - 1) }, 'win32', codes)).toEqual({ cause: 'network', code: 'ECONNRESET' })
+    expect(transientCause({ ...end, output: tail(TAIL_LINES) }, 'win32', codes)).toBeNull()
+    expect(transientCause({ ...end, output: 'XENOTFOUNDX and ETIMEDOUTS' }, 'win32', codes)).toBeNull()
+    for (const code of ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT']) expect(transientCause({ ...end, output: `Error: ${code}` }, 'win32', codes)?.code).toBe(code)
+  })
+
+  it("the default finds npm's and Node's recorded network failures (tests/fixtures/advanced), and the Advanced value off finds none", () => {
+    for (const s of advancedDef(QUEUE_NETWORK_CODES)!.samples!) {
+      const output = readFileSync(join(__dirname, '..', '..', s.from), 'utf8')
+      expect(transientCause({ ...end, output }, 'win32', codes)?.cause, s.from).toBe('network')
+      expect(transientCause({ ...end, output }, 'win32', new RegExp('(?!)')), s.from).toBeNull()
+    }
+  })
+
+  it('a real check: exit 75 and a network code at its end come back transient with their cause (the run says so); passing, a code in its output is nothing', async () => {
+    const r = runner({ networkCodes: () => codes })
+    const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
+    expect(await r.runCheck('check', script('process.exit(75)'), tempDir('qc-folder-'), ctx)).toMatchObject({ ok: false, transient: true, cause: { cause: 'exit75' } })
+    expect(await r.runCheck('check', script("console.error('npm error code ENOTFOUND'); process.exit(1)"), tempDir('qc-folder-'), ctx)).toMatchObject({ ok: false, transient: true, cause: { cause: 'network', code: 'ENOTFOUND' } })
+    const passing = await r.runCheck('check', script("console.log('retried after ENOTFOUND')"), tempDir('qc-folder-'), ctx)
+    expect(passing.ok).toBe(true)
+    expect(passing).not.toHaveProperty('cause')
+    const red = await r.runCheck('check', script("console.error('1 test failed'); process.exit(1)"), tempDir('qc-folder-'), ctx)
+    expect(red).toMatchObject({ ok: false })
+    expect(red).not.toHaveProperty('transient')
+    expect(r.finished.map((f) => f.transient ?? null)).toEqual([{ cause: 'exit75' }, { cause: 'network', code: 'ENOTFOUND' }, null, null])
+    // A pattern that can't be read leaves only the sure causes.
+    const broken = runner({ networkCodes: () => { throw new Error('bad pattern') } })
+    expect(await broken.runCheck('check', script("console.error('ENOTFOUND'); process.exit(1)"), tempDir('qc-folder-'), ctx)).not.toHaveProperty('cause')
+  })
+
+  it("a real check: its whole last 40 lines count, however long (HR6's case: a code, then a line longer than the output a result keeps); one line too early, red", async () => {
+    const r = runner({ networkCodes: () => codes })
+    const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
+    const long = await r.runCheck('check', script("console.error('npm error code ENOTFOUND'); console.error('x'.repeat(9000)); process.exit(1)"), tempDir('qc-folder-'), ctx)
+    expect(long).toMatchObject({ ok: false, transient: true, cause: { cause: 'network', code: 'ENOTFOUND' } })
+    expect(long.output).not.toContain('ENOTFOUND')
+    // 40 lines after the code's line, each long: it is the 41st from the end.
+    const early = await r.runCheck('check', script(`console.error('connect ECONNREFUSED 127.0.0.1:9'); for (let i = 0; i < ${TAIL_LINES}; i++) console.error('y'.repeat(500)); process.exit(1)`), tempDir('qc-folder-'), ctx)
+    expect(early).toMatchObject({ ok: false })
+    expect(early).not.toHaveProperty('transient')
+    // 39 after it: the 40th from the end counts.
+    const last40 = await r.runCheck('check', script(`console.error('connect ECONNREFUSED 127.0.0.1:9'); for (let i = 0; i < ${TAIL_LINES - 1}; i++) console.error('y'.repeat(500)); process.exit(1)`), tempDir('qc-folder-'), ctx)
+    expect(last40).toMatchObject({ transient: true, cause: { cause: 'network', code: 'ECONNREFUSED' } })
+  })
+
+  it('looked for as the output comes: a code or a character split between chunks, CRLF lines, a line longer than what is kept of one, blank lines at the end', () => {
+    const fed = (...chunks: (string | Buffer)[]) => {
+      const t = new TailCodes(codes)
+      for (const c of chunks) t.write(c)
+      return t.end()
+    }
+    expect(fed('npm error code ENOT', 'FOUND\n', 'done\n')).toBe('ENOTFOUND')
+    const eAcute = Buffer.from('é ECONNRESET\n')
+    expect(fed(eAcute.subarray(0, 1), eAcute.subarray(1))).toBe('ECONNRESET')
+    expect(fed('connect ETIMEDOUT\r\n', ...Array.from({ length: TAIL_LINES - 1 }, () => 'z\r\n'), '\r\n\r\n')).toBe('ETIMEDOUT')
+    expect(fed('connect ETIMEDOUT\r\n', ...Array.from({ length: TAIL_LINES }, () => 'z\r\n'))).toBeNull()
+    // In the middle of a line far longer than the part of a line still being written that is kept.
+    expect(fed('a'.repeat(100_000), ' EAI_', 'AGAIN ', 'b'.repeat(100_000), '\n')).toBe('EAI_AGAIN')
+    // The last line without its newline counts; a word only containing a code doesn't.
+    expect(fed('x\n', 'getaddrinfo ENOTFOUND host')).toBe('ENOTFOUND')
+    expect(fed('XENOTFOUNDX\n')).toBeNull()
+    expect(new TailCodes(null).end()).toBeNull()
+    expect(networkCodeIn('a\nENOTFOUND\nb', codes)).toBe('ENOTFOUND')
+  })
+
+  it("the same answer whole or chunked, however the chunks fall around a long line's settled and kept edges (HR6's case among them)", () => {
+    const L = 64 * 1024
+    // What the rule says, on the whole text at once: the first match in its last 40 lines, trailing blank lines aside.
+    const oracle = (text: string): string | null => {
+      for (const line of text.replace(/\s+$/, '').split('\n').slice(-TAIL_LINES)) {
+        const found = new RegExp(codes.source, codes.flags).exec(line)
+        if (found) return found[0]
+      }
+      return null
+    }
+    const fed = (chunks: string[]): string | null => {
+      const t = new TailCodes(codes)
+      for (const c of chunks) t.write(c)
+      return t.end()
+    }
+    // HR6's: the line runs on past the code with an X (its probe wrote the X as a second chunk), and CRLF lines.
+    const texts = ['x'.repeat(L) + ' ENOTFOUNDX\n', 'ok\r\n'.repeat(5) + 'a'.repeat(2 * L) + ' ECONNRESET\r\nb\r\n']
+    for (const k of [-600, -260, -5, 0, 5, 260, 600]) {
+      const tail = 'y'.repeat(L / 2 + 2000) + '\n'
+      // A real code; one with a word character before it (no left boundary); one with a word character after it.
+      texts.push('x'.repeat(L + k) + ' ENOTFOUND ' + tail, 'x'.repeat(L + k) + 'ENOTFOUND ' + tail, 'x'.repeat(L + k) + ' ENOTFOUNDX' + tail)
+    }
+    for (const text of texts) {
+      const want = oracle(text)
+      const code = text.search(/E[A-Z_]{4,}/)
+      expect(networkCodeIn(text, codes), `whole, code at ${code}`).toBe(want)
+      expect(fed(text.match(/[\s\S]{1,1000}/g)!), `1000-character chunks, code at ${code}`).toBe(want)
+      const splits = new Set<number>()
+      for (let d = -700; d <= 700; d += 37) for (const at of [L + d, code + d]) if (at > 0 && at < text.length) splits.add(at)
+      for (const at of splits) expect(fed([text.slice(0, at), text.slice(at)]), `split at ${at}, code at ${code}`).toBe(want)
+      for (const a of [L - 1, L, L + 1, code - 1, code + 1]) {
+        for (const b of [a + 1, a + 5, a + 300, a + 600]) expect(fed([text.slice(0, a), text.slice(a, b), text.slice(b)]), `split at ${a} and ${b}, code at ${code}`).toBe(want)
+      }
+    }
+    // The cases themselves, so the oracle can't be wrong unnoticed: HR6's is red, a real code straddling the edge is found.
+    expect(oracle(texts[0])).toBeNull()
+    expect(oracle(texts[2])).toBe('ENOTFOUND')
+    expect(oracle(texts[3])).toBeNull()
+  })
+
+  it("Hive's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
+    const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
+    const ws = tempDir('qc-ws-')
+    const runs = progressRuns(store, () => true, ws, join(ws, 'app'))
+    const id = runs.start({ title: 'AM-1 · check · aaaaaaa', command: 'npm test', card: 1, revision: 'a'.repeat(40), folder: ws })!
+    runs.finish(id, { ok: false, exitCode: 1, logPath: null, transient: { cause: 'network', code: 'ENOTFOUND' } })
+    const [run] = store.list(ws)
+    expect(run.transient).toEqual({ cause: 'network', code: 'ENOTFOUND' })
+    expect(runDetails(run, null, Date.now(), tr).some((d) => d.text === 'A network error in its last lines (ENOTFOUND): the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.')).toBe(true)
+    expect(keptRuns({ runs: [{ ...run, transient: { cause: 'network', code: 'ENOTFOUND' } }] }, ws)[0]?.transient).toEqual({ cause: 'network', code: 'ENOTFOUND' })
+    expect(keptRuns({ runs: [{ ...run, transient: { cause: 'guessed' } }] }, ws)[0]?.transient).toBeUndefined()
   })
 })
 
@@ -232,7 +377,7 @@ describe("the runner's own runs, outside the queue", () => {
     const r = runner({ logIo: io })
     const out = await r.runCheck('check', 'hive-no-such-command-1349', tempDir('qc-folder-'), ctx)
     expect(out).toMatchObject({ ok: false, transient: true })
-    expect(r.finished).toEqual([{ id: 'run1', ok: false, exitCode: null, logPath: null }])
+    expect(r.finished).toEqual([{ id: 'run1', ok: false, exitCode: null, logPath: null, transient: { cause: 'notFound' } }])
     expect(io.closed).toBe(1)
   })
 

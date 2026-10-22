@@ -19,9 +19,10 @@ import { hiveError } from '../../hiveError'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
+import { codexTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, rolloutSubSession } from './rollout'
 import { parseCodexModels } from './models'
@@ -938,6 +939,13 @@ export class CodexAdapter implements ProviderAdapter {
   safeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
     return codexSafeguards(appended, memo)
   }
+
+  /** Turns by turn_id (as its hooks carry it), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return codexTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'id'
 
   /**
    * Codex's /permissions menu numbers its presets, and typing a number picks one (arrow keys wrap around, so counting

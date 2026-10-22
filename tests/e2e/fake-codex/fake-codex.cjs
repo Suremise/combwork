@@ -377,6 +377,8 @@ async function runPrompt(text) {
   turnId = randomUUID()
   turnRecord('task_started')
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
+  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
   await hook('UserPromptSubmit', { prompt: text })
   // Hive's doorbell (#650): it reads its inbox (hive_inbox), as a model does, and acts on what it read (one that follows
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
@@ -428,6 +430,9 @@ async function runPrompt(text) {
     await hook('UserPromptSubmit', { prompt: '<send_user_message_question_reply>Red' })
     await hook('PostToolUse', bash('Start-Sleep 30'))
   }
+  // Its answer, as 0.159 records the model's reply: a message and the turn's item (#1371: the turn was taken up).
+  record({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: `Done: ${text}` }] })
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'AgentMessage', content: [{ type: 'Text', text: `Done: ${text}` }] } } }) + '\n')
   out(`\r\nDone: ${text}\r\n`)
   // "loststop": its Stop never reaches Hive, though Codex records the turn's end; "silent": neither (#648).
   if (!/\b(loststop|silent)\b/.test(text)) {
