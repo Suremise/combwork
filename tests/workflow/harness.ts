@@ -9,6 +9,7 @@ import { FactStore } from '../../src/main/workflow/factStore'
 import { boardFile, closeBoard, workspaceDb } from '../../src/main/boardStore'
 import { isRefusal, Workflow, type Reply } from '../../src/main/workflow/runtime'
 import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/workflow/mergeQueue'
+import type { QueueLive } from '../../src/main/workflow/queueState'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { agentActor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
@@ -74,7 +75,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'none' }, extra: { runsOf?: (a: string) => string[]; locksOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'none' }, extra: { runsOf?: (a: string) => string[]; locksOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)
@@ -100,6 +101,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
       locksOf: extra.locksOf,
       autoRun: extra.autoRun,
       enforced: extra.enforced,
+      queueLive: extra.queueLive,
       // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
       reconcileActs: true,
       effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text, shown) => notes.push({ card: card.key, text, ...(shown ? { shown } : {}) }) }
