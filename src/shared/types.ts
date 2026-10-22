@@ -2665,6 +2665,8 @@ export type HiveEvent =
   | { type: 'merge-slots-changed'; workspacePath: string; slots: MergeSlotInfo[] }
   /** A workspace's lanes changed, or one of their cards did (the lanes it lists, as lanes:list gives them). */
   | { type: 'lanes-changed'; workspacePath: string; lanes: LaneInfo[] }
+  /** A target's merge queue changed (#1353): an entry queued, its step, an outcome, a pause; read it with queue:list. */
+  | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
   | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */

@@ -652,8 +652,12 @@ interface HiveMessageValues {
   'assistant.undo.why.projectOpened': undefined
   'assistant.undo.why.prompt': undefined
   'assistant.undo.why.putBack': undefined
+  'assistant.undo.why.queuePaused': undefined
+  'assistant.undo.why.queueResumed': undefined
+  'assistant.undo.why.removedFromQueue': undefined
   'assistant.undo.why.reportMerge': undefined
   'assistant.undo.why.request': undefined
+  'assistant.undo.why.retriedMerge': undefined
   'assistant.undo.why.start': undefined
   'assistant.undo.why.startReview': undefined
   'assistant.undo.why.submit': undefined

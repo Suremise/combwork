@@ -2603,6 +2603,18 @@
     "defaultMessage": "Its reason stays as a comment.",
     "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
   },
+  "assistant.undo.why.queuePaused": {
+    "defaultMessage": "A merge queue it paused stays paused: resume it if it should run.",
+    "description": "Why a change of the Assistant's can't be undone: it paused a project's merge queue."
+  },
+  "assistant.undo.why.queueResumed": {
+    "defaultMessage": "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+    "description": "Why a change of the Assistant's can't be undone: it resumed a project's merge queue."
+  },
+  "assistant.undo.why.removedFromQueue": {
+    "defaultMessage": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
+    "description": "What of the Assistant taking a card out of the merge queue stays when it is undone. Retry merge: a command on the card (use it as Hive shows it)."
+  },
   "assistant.undo.why.reportMerge": {
     "defaultMessage": "The merge it reported stays in the card's work.",
     "description": "What of a merge the Assistant reported stays when it is undone."
@@ -2610,6 +2622,10 @@
   "assistant.undo.why.request": {
     "defaultMessage": "Its request to the builder stays as a comment.",
     "description": "What of a request the Assistant made to a card's builder stays when it is undone."
+  },
+  "assistant.undo.why.retriedMerge": {
+    "defaultMessage": "Its Retry merge stays in the card's work.",
+    "description": "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone."
   },
   "assistant.undo.why.start": {
     "defaultMessage": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",

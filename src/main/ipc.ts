@@ -102,6 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -734,6 +735,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
+    'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined),
+    'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
+    'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
+    'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     'project:excludeHive': async (p) => {
       p = workspace.assertProject(p)
       const r = await ensureHiveExcluded(p)
@@ -1334,4 +1340,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       }
     })
   }
+}
+
+/** A merge queue's target as the window names it (a branch): refused when it isn't one. */
+function queueTarget(target: unknown): string {
+  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new HiveError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+  return target
 }

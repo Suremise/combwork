@@ -105,6 +105,7 @@ interface HiveMessageValues {
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
   'service.intent.noWorkflow': { n: string | number }
+  'service.intent.queueNotAgents': undefined
   'service.keys.closed': undefined
   'service.keys.form': undefined
   'service.keys.notice': { keys: string | number }

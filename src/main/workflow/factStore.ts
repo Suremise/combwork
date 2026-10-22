@@ -78,6 +78,10 @@ export interface QueuePause {
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
   message?: string
+  /** Who paused it (#1353: Pause queue); left out, Hive (its reason says why). */
+  by?: 'user' | 'assistant'
+  /** When (ISO), as the store saved it; left out of a pause written, the store's time then. */
+  at?: string
 }
 
 /** A target's queue runner (#1360, queue_runners): who runs it, the holder process, when taken and last renewed. */
@@ -556,11 +560,16 @@ export class FactStore {
   queuePause(target: string): QueuePause | null {
     const p = this.scope.project
     return this.conn.read((db) => {
-      const row = db.prepare('SELECT reason, card, pid, message FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null; message: string | null } | undefined
+      const row = db.prepare('SELECT reason, card, pid, message, paused_by, paused_at FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string; pid: number | null; message: string | null; paused_by: 'user' | 'assistant' | null; paused_at: string | null } | undefined
       if (!row) return null
       const files = (db.prepare('SELECT path FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { path: string }[]).map((r) => r.path)
-      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}) }
+      return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}) }
     })
+  }
+
+  /** The targets of this project whose queue is paused. */
+  pausedTargets(): string[] {
+    return this.conn.read((db) => (db.prepare('SELECT target FROM workflow_queue_pauses WHERE project = ?').all(this.scope.project) as { target: string }[]).map((r) => r.target))
   }
 
   /** Pauses a target's queue (`pause`), or resumes it (null). */
@@ -569,7 +578,7 @@ export class FactStore {
     this.conn.write((db) => {
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
       if (!pause) return
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message) VALUES (?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString())
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path) VALUES (?, ?, ?, ?)')
       pause.files?.forEach((f, i) => ins.run(p, target, i, f))
     })

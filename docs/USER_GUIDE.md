@@ -748,6 +748,19 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 - With **Settings → Advanced → Workflow rules are enforced** off, the section says so: the options are saved, and apply once the rules are enforced again.
 - Agents read the options in force (`hive_project_status`). The Hive Assistant can change them one at a time with its settings tool (`project.workflow.<option>`), within Settings → Assistant → Control, and the same checks apply. Project agents can't change them.
 
+### The merge queue
+
+When a project's workflow says Hive merges, each approved card goes into its target branch's **merge queue**, and Hive merges the cards one at a time: a test merge in its own worktree, the merge checks on exactly that result, and the target moved only when they pass. A card that conflicts or fails a check goes back to its builder.
+
+You stay in charge of each queue:
+
+- **Pause queue** stops a target's queue before its next card; a card whose checks are running finishes them and waits, unmerged. The pause is saved, so it holds after a restart and in every Hive on the workspace, with who paused it.
+- **Resume** runs it again, starting the waiting card from a fresh test merge. When Hive paused the queue itself (the target is checked out in a folder, workflow rules are off, a merge was interrupted with files changed since), Resume first looks again, and if the cause is still there the queue stays paused and says why.
+- **Remove from queue** takes a card out: it goes back to Passed, is never merged (after a restart too), and its builder is told. Once its merge has begun it can't be taken out; it finishes.
+- **Retry merge** puts a card the queue sent back (a failed check you know is flaky, say) into the queue again, as it was approved, once.
+
+The Hive Assistant can do these for you within **Settings → Assistant → Control** (it gives your reason when it takes a card out or retries one), and lists them among its actions. Agents can see a queue but never change it. The queue's panel and its place on the card come in a later version; until then, ask the Assistant (*"pause the merge queue of alpha"*, *"what is in the merge queue?"*).
+
 ### When the merge queue pauses
 
 When Hive merges cards itself, it commits each merge with your repository's own setup. Its commits run the repository's hooks and are signed as the repository says; Hive never skips or overrides either.

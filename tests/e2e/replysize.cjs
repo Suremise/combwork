@@ -243,6 +243,8 @@ const prose = (seed, n) => {
   const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }), 600)
   check('lanes listed a line each', laneList.split('\n').length === 2 && laneList.includes(laneId), laneList)
   check('a lane ended', measure('hive_lane (end)', tool('hive_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['hive_lane (end)'])
+  // The merge queue (#1353): alpha's workflow doesn't have Hive merge, so it has none, said in a line.
+  check('hive_queue (list): no queue, in a line', measure('hive_queue (list)', tool('hive_queue', { action: 'list' }), 200).startsWith('No merge queue in alpha: '), texts['hive_queue (list)'])
   const skillList = measure('hive_list_skills', tool('hive_list_skills', {}), 4000)
   check('skills: a line each, who they are for, no folders', /^work-on-card \(Hive, for agents\): /m.test(skillList) && !skillList.includes(ws), skillList.slice(0, 300))
   // Who each listing is about: an agent's lists what its project's agents get (not the Assistant's skills); the

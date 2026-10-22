@@ -180,6 +180,8 @@
   "workflow.refused.move.useIntent.next": "Use the {intent} intent instead.",
   "workflow.refused.platform.unknown.message": "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.",
   "workflow.refused.platform.unknown.next": "Check Agent Setup or the folder, then try again.",
+  "workflow.refused.queue.advancing.message": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
+  "workflow.refused.queue.advancing.next": "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.",
   "workflow.refused.requeue.allowed.change": "Retry merge on the merge queue retries it once.",
   "workflow.refused.requeue.allowed.message": "{card} at {revision} can't go back into the merge queue unchanged: {why}",
   "workflow.refused.requeue.allowed.next": "Fix the failure, commit and submit the new revision.",

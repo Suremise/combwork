@@ -26,6 +26,8 @@ export const ACTIVITY_KINDS = [
   'lane-start',
   'lane-join',
   'lane-end',
+  'queue-pause',
+  'queue-resume',
   'create-project',
   'activate-project',
   'deactivate-project',
@@ -131,7 +133,11 @@ export const UNDO_FINAL = {
   reportMerge: "The merge it reported stays in the card's work.",
   ask: 'Its question stays under For you: answer or dismiss it there.',
   cannot: 'Its request stays under For you: answer or dismiss it there.',
-  request: 'Its request to the builder stays as a comment.'
+  request: 'Its request to the builder stays as a comment.',
+  removedFromQueue: "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
+  retriedMerge: "Its Retry merge stays in the card's work.",
+  queuePaused: "A merge queue it paused stays paused: resume it if it should run.",
+  queueResumed: "A merge queue it resumed isn't paused again: pause it if it shouldn't run."
 } as const
 
 /** A reason a change of the Assistant's, or part of it, can't be undone (UNDO_FINAL's codes). */

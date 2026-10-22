@@ -2293,6 +2293,32 @@ target [note §9 alternative].
 from queue** on an entry, recorded as an override and as `IntegrationCancelled`. The slot's **Release** goes away
 [#1121 c].
 
+**Built [#1353]** (the controls and the model; the panel is #1356's, the card's queue state #1357's):
+- **One model** of each target's queue for every control: the card testing now (its revision, the target's head it is
+  tested on, its step: test merge, checks or advance, since when, and its check's run), the cards waiting in order, the
+  latest 20 outcomes (merged with the result; returned with why, the files and the log; cancelled), the pause (why, the
+  card, the files, who and when) and which Hive runs it. The window reads it with `queue:list` and is told of each change
+  (`queue-changed`); the Agent API with `GET /v1/queue` (a project agent its own project's; outcomes say whether there is
+  a log rather than carry it); the Assistant and agents with `hive_queue` (`list`).
+- **Who may (OP-9):** the user from the window; the Assistant within Settings → Assistant → Control (Control agents),
+  through its change boundary (its actions, the per-message limit), with a reason for Remove from queue and Retry merge;
+  a project agent never (403, saying whose they are), nor a script (403).
+- **Pause queue** is saved per project and target (the pause tables: reason `user`, who and when: schema step 15
+  `queue pause by`), so it holds across a restart and in every Hive on the workspace. The queue stops before its next
+  entry; an entry mid-check finishes its checks and waits, open, without advancing, also when the pause lands while its
+  advance waits for the repository lock (decided again in `IntegrationStarted`'s write). A queue Hive paused already keeps
+  its own pause, which says more.
+- **Resume** clears any pause once the user says its cause is fixed, and runs the queue, which starts again from a fresh
+  test merge. Where Hive can see the cause it checks first, and pauses again, saying so, when it still holds: the target
+  still checked out (`checkedOut`, until #1351), the rules still off, §16.9.2's conditions on the checked-out folder
+  (the branch, nothing staged, the listed files), an interrupted advance still in its terminal state (the recovery
+  table, read only), an earlier runner's process still running or its folder still there.
+- **Remove from queue** (an override and `IntegrationCancelled`): the card back to Approved and its builder woken; never
+  merged, after a restart too (S33a). Refused once its advance has begun (`queue.advancing`): it is being merged, and
+  its recovery finishes it.
+- **Retry merge** (an override): a card the queue returned, a red check included, is queued again with its approved
+  revision unchanged, once per revision (S32's last part).
+
 **None:** no queue; Accepted is immediate [#1121 c, OP-16].
 
 Later, not 1.0: batching, speculative merges, stacked cards [note §13].
