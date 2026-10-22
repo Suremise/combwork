@@ -135,10 +135,15 @@ async function theForm(page, app, inv) {
     await lib.appReady(page)
     const notice = page.locator('.presets-notice')
     check('after the upgrade, the presets notice names the project', !!(await lib.until(async () => (await notice.count()) > 0 && (await notice.innerText()).includes('web'), HUNG_MS)), await page.locator('.main-area').innerText().catch(() => ''))
+    // The answer's board write held a while, and the workspace changed meanwhile (#1464): the notice's reload then reads
+    // the board before the answer is on it, and must not show it again.
+    await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
     await notice.getByRole('button', { name: 'Choose…' }).click()
+    await inv('workspace:refresh')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
     check('Choose… opens the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
-    check('the notice is gone, and answered for good', !!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)))
+    check('the notice is gone, and answered for good', !!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
+    await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'stages', 'elsewhere']), JSON.stringify(await groups()))
