@@ -122,7 +122,7 @@ import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
 import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
-import type { QueueResumed, QueueView } from './workflow/queue'
+import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -292,6 +292,10 @@ export interface HiveRequests {
    * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
+  'queue:history': (projectPath: string, target: string) => QueueRecent[]
+  /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
+  'queue:branchCard': (projectPath: string, agentId: string) => BranchQueueCard | null
   /** The user saw these returned entries of a target's queue (#1356, the Progress panel): they leave its card. */
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
@@ -538,7 +542,8 @@ export interface HiveRequests {
   'worktrees:removalPreview': (projectPath: string, path: string) => UnusedWorktreePreview
   /** Removes one (the user's choice): a merged, clean one; or with `force`, a preview's token, only while nothing in it changed since. */
   'worktrees:removeUnused': (projectPath: string, path: string, opts: { expectInto?: string | null; force?: string }) => UnusedWorktreeRemoval
-  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean }) => MergeResult
+  /** `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason. */
+  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; outsideQueue?: { card: number; reason: string } }) => MergeResult
 
   /** The conversation for the transcript viewer; null when the file has not changed since knownVersion (a Transcript's `version`). Long tool input/output is shortened. */
   /** The conversation from item `from` on (default: the last TRANSCRIPT_WINDOW items); null when the file hasn't changed since knownVersion and `from` is unchanged. */

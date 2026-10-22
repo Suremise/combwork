@@ -4,6 +4,7 @@ import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
 import { shownText as inLanguage } from '@shared/advanced'
 import { PROVIDERS, agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
+import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { AddAgentOptions, AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectGitInfo, ProjectInfo, ProviderId, WorktreeMatch } from '@shared/types'
 import { serverOnIn } from '@shared/agentMcp'
 import { reuseNote } from '@shared/unusedWorktrees'
@@ -23,7 +24,7 @@ import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { cliDefaultEffort, effortName, effortText, effortUnknown, modelCaps } from '@shared/models'
 import { pasteIntoTerminal } from './TerminalView'
-import { BusyButton, Icon, Modal, sentences, useBusy } from './ui'
+import { BusyButton, Icon, Modal, sentences, Tooltip, useBusy } from './ui'
 
 /** Markup in messages (tRich): <code> and <b>, keyed by their text. */
 const CODE = (chunks: ReactNode[]): ReactNode => <code key={String(chunks)}>{chunks}</code>
@@ -1040,6 +1041,29 @@ export function HandOverDialog() {
 // Merge
 // ---------------------------------------------------------------------------
 
+const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Hive merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue." })
+
+/** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
+function QueueCardNote({ c }: { c: BranchQueueCard }) {
+  const where =
+    c.where === 'testing'
+      ? tr(msg({ id: 'agents.mergeDialog.queueTesting', defaultMessage: 'The queue for {target} is testing it now.', description: "In the Merge dialog: the merge queue for the branch {target} is testing the card now (its merge checks)." }), { target: c.target })
+      : c.where === 'queued'
+        ? c.position
+          ? tr(msg({ id: 'agents.mergeDialog.queueQueued', defaultMessage: 'It waits in the queue for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing counts)." }), { target: c.target, position: c.position })
+          : tr(msg({ id: 'agents.mergeDialog.queueQueuedNoPlace', defaultMessage: 'It waits in the queue for {target}.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}." }), { target: c.target })
+        : tr(msg({ id: 'agents.mergeDialog.queueNotYet', defaultMessage: 'It goes into the queue for {target} once it is approved.', description: "In the Merge dialog: the card isn't in the merge queue yet (in review, say); it is queued for the branch {target} once approved. Glossary 2.2: Approved." }), { target: c.target })
+  return (
+    <div className="banner info merge-queue-note" data-queue-card={c.card}>
+      <Icon name="git-merge" />
+      <span>
+        <strong>{tr(QUEUE_MERGES, { card: c.key })}</strong> {where}
+        {c.paused && <> {tr(msg({ id: 'agents.mergeDialog.queuePaused', defaultMessage: 'The queue is paused.', description: 'In the Merge dialog, after where the card stands in the merge queue: that queue is paused.' }))}</>}
+      </span>
+    </div>
+  )
+}
+
 export function MergeDialog() {
   useLanguage()
   const target = useStore((s) => s.mergeFor)
@@ -1056,6 +1080,8 @@ export function MergeDialog() {
   const [moveBranch, setMoveBranch] = useState(true)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<MergeResult | null>(null)
+  /** The card on this branch when Hive merges it (#1357, OP-13): its queue state; Merge waits for Merge anyway. */
+  const [queueCard, setQueueCard] = useState<BranchQueueCard | null>(null)
   const slots = useMergeSlots()
   // What is merged: an agent's worktree, or an unused worktree (#400), named by its branch, nobody working in it.
   const unused = target?.worktree ?? null
@@ -1074,6 +1100,12 @@ export function MergeDialog() {
     void (unused ? call('worktrees:unusedBranchStatus', target.project, unused.path) : call('agents:branchStatus', target.project, target.agentId))
       .then(setStatus)
       .catch((e) => setReadError(errorMessage(e)))
+    setQueueCard(null)
+    if (!unused)
+      void call('queue:branchCard', target.project, target.agentId).then(
+        (c) => setQueueCard(c),
+        () => undefined
+      )
     // Reset when the dialog opens for another agent or worktree.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, target?.worktree?.path])
@@ -1089,13 +1121,22 @@ export function MergeDialog() {
   const slot = status?.into ? (projectSlots(slots, project.path).find((s) => s.branch === status.into) ?? null) : null
   const slotTaken = !!slot && (!!slot.holder || slot.waiting.length > 0)
 
-  const merge = async (): Promise<void> => {
+  const merge = async (anyway = false): Promise<void> => {
+    if (anyway && queueCard) {
+      const ok = await confirm({
+        title: tr(msg({ id: 'agents.mergeDialog.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue." }), { card: queueCard.key }),
+        message: tr(msg({ id: 'agents.mergeDialog.anywayMessage', defaultMessage: "Hive merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.", description: "The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override." })),
+        confirmLabel: tr(msg({ id: 'agents.mergeDialog.anywayConfirm', defaultMessage: 'Merge anyway', description: 'The button confirming Merge anyway (a merge outside the merge queue). Keep it short.' })),
+        danger: true
+      })
+      if (!ok) return
+    }
     setBusy(true)
     try {
       const removing = cleanup && !running
       const r = unused
         ? await call('worktrees:mergeUnused', project.path, unused.path, { squash, message, cleanup: removing })
-        : await call('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch })
+        : await call('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
       setResult(r)
       if (r.ok) {
         // Where it went: the branch the project folder is on, or the folder itself when git didn't say.
@@ -1141,14 +1182,22 @@ export function MergeDialog() {
           <button className="btn subtle" onClick={close}>
             {result?.conflicts ? tr(msg({ id: 'agents.mergeDialog.close', defaultMessage: 'Close', description: 'Button: closes the Merge dialog after a merge that would conflict.' })) : tr(CANCEL)}
           </button>
-          {!result?.conflicts && (
-            <button className="btn primary" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge()}>
-              <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(MERGE)}
+          {!result?.conflicts && queueCard && (
+            <button className="btn subtle" data-action="merge-anyway" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge(true)}>
+              {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
             </button>
+          )}
+          {!result?.conflicts && (
+            <Tooltip content={queueCard ? tr(QUEUE_MERGES, { card: queueCard.key }) : null}>
+              <button className="btn primary" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken || !!queueCard} onClick={() => void merge()}>
+                <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(MERGE)}
+              </button>
+            </Tooltip>
           )}
         </>
       }
     >
+      {queueCard && <QueueCardNote c={queueCard} />}
       {readError ? (
         <div className="banner warn">
           <Icon name="warning" />

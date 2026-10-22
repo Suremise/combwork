@@ -145,6 +145,18 @@ interface HiveMessageValues {
   'git.pushTo.tip': { branch: string | number }
   'git.pushTo.title': undefined
   'git.pushTo.what': undefined
+  'git.queue.cancelled': { reason: string }
+  'git.queue.card': undefined
+  'git.queue.history': { target: string | number }
+  'git.queue.merged': { result: string | number }
+  'git.queue.noHistory': undefined
+  'git.queue.none': undefined
+  'git.queue.open': { card: string | number }
+  'git.queue.outcome': undefined
+  'git.queue.region': undefined
+  'git.queue.returned': { why: string | number }
+  'git.queue.revision': undefined
+  'git.queue.when': undefined
   'git.reading': undefined
   'git.remote.change': undefined
   'git.remote.changeFailed': { remote: string | number }
@@ -180,6 +192,7 @@ interface HiveMessageValues {
   'git.section.branches': undefined
   'git.section.changes': undefined
   'git.section.history': undefined
+  'git.section.queue': undefined
   'git.setup.howTo': undefined
   'git.setup.learnMore': undefined
   'git.setup.notRepo': { project: string | number }

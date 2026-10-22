@@ -2,7 +2,8 @@ import { useEffect, useMemo } from 'react'
 import { keptLive, nextFold, queueKey, withKept, type KeptReturn } from '@shared/progressQueue'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call } from './api'
-import { get, set, useStore } from './store'
+import { get, set, setProgressOpen, useStore } from './store'
+import { PROGRESS_TABS } from '@shared/progressTabs'
 
 /**
  * Where the window's merge queues come from (#1356): every project's `queue:list` (#1353's model), read when the
@@ -67,6 +68,8 @@ function schedule(key: string, ms: number, fn: () => void): void {
 
 /** A project's queue changed (`queue-changed`): its queues read again, shortly (a burst of steps reads once). */
 export function queueChangedEvent(projectPath: string): void {
+  // The card's Work section and the Git tab's section read for themselves, the Progress panel on or off.
+  set((s) => ({ queueVersion: s.queueVersion + 1 }))
   if (get().settings?.general.progressPanel === false) return
   schedule(projectPath.toLowerCase(), 150, () => void loadProject(projectPath))
 }
@@ -90,6 +93,17 @@ export function keepShown(rows: readonly { v: QueueView; row: QueueRecent }[]): 
     const add: KeptReturn[] = rows.filter((x) => !have.has(`${queueKey(x.v)}\n${x.row.entry}`)).map((x) => ({ queue: queueKey(x.v), row: { ...x.row, seen } }))
     return { queueKept: [...live, ...add] }
   })
+}
+
+/** Shows the Progress panel at its Runs tab (#1357: a card's merge check running now, from its Work section). */
+export function showQueueRun(): void {
+  const ws = get().workspace?.path
+  if (!ws) return
+  const key = `progress-tab:${ws.toLowerCase()}`
+  const runs = PROGRESS_TABS.indexOf('runs')
+  set((s) => ({ panes: { ...s.panes, [key]: runs } }))
+  void call('ui:setPane', key, runs)
+  setProgressOpen(true)
 }
 
 /** This window's merge queues with the rows it keeps (`keepShown`), every project's. */

@@ -2476,6 +2476,28 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
 - **Retry merge** (an override): a card the queue returned, a red check included, is queued again with its approved
   revision unchanged, once per revision (S32's last part).
 
+**Built [#1357]** (the queue on the card, in the Git tab and in the Merge dialog):
+- **The card's Work section** (`CardQueue.tsx`) shows the card's newest entry this cycle, from its facts (the work view's
+  `queue`, which now carries a return's files, output, whether temporary, when, and a requeue) and its target's queue
+  (`queue:list`): queued with its place and the approved revision; testing with its step and Show the run; merging;
+  returned with why (a conflict's files, the check by its run's name, the output's last 12 lines, Show log: the run's log,
+  else the whole output), and **Retry merge…** (a confirmation: the approved revision requeued unchanged, once);
+  taken out with why; the queue paused with why and Resume queue; the OK an update of a checked-out target waits for
+  (**Approve** / **Decline**, the For you answer itself); and §16.9.2's terminal state for its card: the folder, its
+  branch, the target's ref, the expected and result commits, each listed file and its side, and the commands that
+  finish or undo it, each copyable, none run. It shows whatever the project's options are now. The terminal state's
+  For you request (`workflow.forYou.queueStuck`) counts the files and names the Work section, and its row in the
+  card dialog has **Show the files and commands**, which brings that part into view (the Assistant's requirement).
+- **The Git tab's Merge queue section** (`GitQueueSection.tsx`, a section of its own for P6 to move): per target, the
+  Progress panel's queue card (reused) and its history (`queue:history`: the latest 50 outcomes, each with its card,
+  revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
+  *Queue in Version Control* opens it.
+- **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
+  ruleset, with the rules enforced (`queue:branchCard`), it says so and where the card stands (not queued yet,
+  queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
+  merges it and records an override on the card (`merge outside the queue`); the merge is then observed (§16.4.4).
+  Branches with no such card: unchanged.
+
 **None:** no queue; Accepted is immediate [#1121 c, OP-16].
 
 Later, not 1.0: batching, speculative merges, stacked cards [note §13].

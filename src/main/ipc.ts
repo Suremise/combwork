@@ -102,7 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
-import { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -736,6 +736,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
+    'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
+    'queue:branchCard': async (p, agentId) => {
+      const path = workspace.assertProject(p)
+      const agent = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === agentId)
+      return agent?.worktree?.branch ? branchQueueCard(workspace, path, agent.worktree.branch) : null
+    },
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
@@ -877,7 +883,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return st
     },
     'agents:branchStatuses': () => branchWatch.statuses(),
-    'agents:merge': (p, id, opts) => projectAgents.merge(p, id, opts),
+    'agents:merge': async (p, id, opts) => {
+      const r = await projectAgents.merge(p, id, opts)
+      // Merged anyway, outside the merge queue (#1357, OP-13): an override on the card, with the user's reason.
+      const out = opts?.outsideQueue
+      if (r.ok && out && Number.isInteger(out.card)) await mergedOutsideQueue(workspace, workspace.assertProject(p), out.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
+      return r
+    },
     'worktrees:unused': (p) => unusedWorktrees(p),
     'worktrees:unusedBranchStatus': (p, path) => unusedBranchStatus(p, path),
     'worktrees:mergeUnused': async (p, path, opts) => {

@@ -5,7 +5,7 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type RoundChoice, type StageId } from './facts'
+import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
 
 /** A request waiting for the user (For you, §16.8.5), as the window lists it (IPC `tasks:forYou`). */
@@ -179,6 +179,13 @@ export interface WorkQueueEntry {
   state: 'open' | 'started' | 'cancelled' | 'failed' | 'integrated'
   failure?: FactData['IntegrationFailed']['reason']
   cancelled?: FactData['IntegrationCancelled']['reason']
+  /** A return (#1357, the Work section): the files a conflict named, the output kept (a check's, a hook's), whether it was the environment's failure, and when. */
+  files?: string[]
+  log?: string
+  transient?: boolean
+  at?: string
+  /** Queued again unchanged: after a temporary failure, or the user's Retry merge. */
+  requeue?: 'transient' | 'retry'
 }
 
 export interface WorkView {
@@ -329,11 +336,27 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
     refused,
-    queue: entry ? { entry: entry.id, revision: entry.revision, target: entry.target, state: entry.state, ...(entry.failure ? { failure: entry.failure.reason } : {}), ...(entry.cancelled ? { cancelled: entry.cancelled } : {}) } : null,
+    queue: entry ? queueEntryOf(entry, facts) : null,
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
     forYou: s.requests.length,
     lastSeq: s.lastSeq
+  }
+}
+
+/** A queue entry as the Work section shows it, with its return's details and when it ended (its outcome's fact). */
+function queueEntryOf(entry: QueueEntry, facts: readonly Fact[]): WorkQueueEntry {
+  const f = entry.failure
+  const end = facts.findLast((x) => (x.kind === 'IntegrationFailed' || x.kind === 'IntegrationCancelled' || x.kind === 'Integrated') && (x.data as { entry?: string }).entry === entry.id)
+  return {
+    entry: entry.id,
+    revision: entry.revision,
+    target: entry.target,
+    state: entry.state,
+    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
+    ...(entry.cancelled ? { cancelled: entry.cancelled } : {}),
+    ...(end ? { at: end.at } : {}),
+    ...(entry.requeue ? { requeue: entry.requeue } : {})
   }
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { ROUND_LIMIT_GATE, type RoundChoice } from '@shared/workflow/facts'
+import { QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type RoundChoice } from '@shared/workflow/facts'
 import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import type { ForYouAnswer, ForYouItem } from '@shared/workflow/workView'
 import { call, errorMessage } from '../api'
@@ -71,6 +71,14 @@ export function ForYouSection({ card, items, drafts, setDraft, setAnswering }: {
   )
 }
 
+/** Brings the card dialog's Work section into view at its merge queue part (the stopped merge's files and commands). */
+function showStuck(): void {
+  const el = document.querySelector<HTMLElement>('.card-work-queue-stuck')
+  if (!el) return
+  el.scrollIntoView({ block: 'start' })
+  el.querySelector<HTMLElement>('button')?.focus()
+}
+
 function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: TaskCard; item: ForYouItem; reply: string; setReply: (text: string) => void; setAnswering: (busy: boolean) => void }) {
   const agents = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.agents)
   const [rounds, setRounds] = useState('1')
@@ -111,6 +119,12 @@ function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: Ta
         <span className="for-you-kind">{kindText(item)}</span> {text}
       </div>
       <div className="faint for-you-asked">{tr(M.asked, { who, when: timeAgo(item.since) })}</div>
+      {/* A merge stopped part way (#1357, the Assistant's requirement): its files and commands are one click away. */}
+      {item.gate === QUEUE_STUCK_GATE && (
+        <button type="button" className="btn small subtle for-you-show-work" data-action="show-stuck" onClick={showStuck}>
+          <Icon name="list-flat" /> {tr(msg({ id: 'board.forYou.showStuck', defaultMessage: 'Show the files and commands', description: "A button on a For you request about a merge that stopped part way: shows the card's Work section, where each file and the commands that finish or undo the merge are listed." }))}
+        </button>
+      )}
       {!!item.checklist?.length && (
         <div className="for-you-checklist">
           <div className="faint">{tr(M.checklist)}</div>

@@ -1643,6 +1643,19 @@ export class Workflow {
     return this.ok(card, s.stage, this.state(card).stage)
   }
 
+  /**
+   * The user merged the card's branch from the Merge dialog, outside the queue (#1357, OP-13): an override, with the
+   * user's reason. Nothing else: the merge is observed (§16.4.4), which cancels its queue entry and moves the card.
+   */
+  async mergedOutsideQueue(ref: unknown, reason = ''): Promise<void> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return
+    await this.write(card, this.rulesetOf(card), 'user', (w) => {
+      w.fact('Override', { rules: ['integrate'], move: 'merge outside the queue', by: 'user', reason }) // i18n-ignore: a fact's kind and codes, not text
+      return null
+    })
+  }
+
   // --- None: a card's paths (§16.3.3).
 
   /** Edits Hive saw through the card's agents' hooks and file locks: the pre-fill of its paths. */

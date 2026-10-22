@@ -12,6 +12,7 @@ import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
 import { notify, useStore } from '../store'
 import { cx, timeAgo } from '../util'
+import { CardQueue } from './CardQueue'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -128,7 +129,7 @@ export function CardWork({ card }: { card: TaskCard }) {
           ) : view.preWorkflow ? (
             <div className="faint">{tr(M.preWorkflow)}</div>
           ) : (
-            <WorkDetails view={view} project={project} short={short} agentName={agentName} />
+            <WorkDetails card={card} view={view} project={project} short={short} agentName={agentName} />
           )}
         </div>
       )}
@@ -136,7 +137,7 @@ export function CardWork({ card }: { card: TaskCard }) {
   )
 }
 
-function WorkDetails({ view: v, project, short, agentName }: { view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+function WorkDetails({ card, view: v, project, short, agentName }: { card: TaskCard; view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
   const rows: [string, React.ReactNode][] = []
   // A field that couldn't be read when the work started says so, with why (never shown as none).
   const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, { why: v.unknown[field] })}</span>
@@ -170,6 +171,7 @@ function WorkDetails({ view: v, project, short, agentName }: { view: WorkView; p
           ))}
         </ul>
       )}
+      <CardQueue card={card} view={v} projectPath={project?.path ?? null} short={short} />
       {v.integration && (
         <div className="card-work-merged">
           <Icon name="git-merge" /> {tr(M.integrated, { method: v.integration.method, target: v.integration.target, result: short(v.integration.result) })}

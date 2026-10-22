@@ -1227,6 +1227,10 @@
     "defaultMessage": "Send Reply",
     "description": "A button under a question for the user (For you): sends the answer typed above to the agent that asked."
   },
+  "board.forYou.showStuck": {
+    "defaultMessage": "Show the files and commands",
+    "description": "A button on a For you request about a merge that stopped part way: shows the card's Work section, where each file and the commands that finish or undo the merge are listed."
+  },
   "board.inbox.asks": {
     "defaultMessage": "Asks you something",
     "description": "An agent in the attention inbox has asked the user a question."
@@ -3042,5 +3046,165 @@
   "board.work.verdict": {
     "defaultMessage": "{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}",
     "description": "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail."
+  },
+  "board.workQueue.advance": {
+    "defaultMessage": "Tested and ready: update {target} in its folder now?",
+    "description": "The card dialog's Work section: the merge queue waits for the user's OK before it updates the branch {target}, which is checked out in a folder (its files change there). The same question waits under For you."
+  },
+  "board.workQueue.advancing": {
+    "defaultMessage": "Merging into {target} now",
+    "description": "The card dialog's Work section: the merge queue is moving the branch {target} to the card's merged result now."
+  },
+  "board.workQueue.answerFailed": {
+    "defaultMessage": "Couldn't answer",
+    "description": "An error's title: approving or declining the update of a checked-out branch failed (the card dialog)."
+  },
+  "board.workQueue.approve": {
+    "defaultMessage": "Approve",
+    "description": "A button in the card dialog's Work section: the user's OK to update the checked-out branch now (the same answer as under For you). Glossary 2.3: Approve."
+  },
+  "board.workQueue.approved": {
+    "defaultMessage": "Approved revision",
+    "description": "A label in the card dialog's Work section's merge queue part: the revision that was approved and is merged follows (a short commit id). Glossary: revision."
+  },
+  "board.workQueue.cancelled": {
+    "defaultMessage": "{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} other {Taken out of the queue.}}",
+    "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive."
+  },
+  "board.workQueue.command": {
+    "defaultMessage": "{purpose, select, finish {To finish it} other {To undo it}}, in {place, select, project {the project folder} other {{folder}}}",
+    "description": "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and where to run it (the project folder, or the folder the branch is checked out in: {folder}). Keep the select keys."
+  },
+  "board.workQueue.commands": {
+    "defaultMessage": "Commands (PowerShell): nothing runs them for you",
+    "description": "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Hive doesn't."
+  },
+  "board.workQueue.conflictFiles": {
+    "defaultMessage": "Files in conflict",
+    "description": "A label in the card dialog's Work section: the files the merge conflicted in follow."
+  },
+  "board.workQueue.copied": {
+    "defaultMessage": "Command copied",
+    "description": "A notification after copying a command from the card dialog's Work section."
+  },
+  "board.workQueue.copy": {
+    "defaultMessage": "Copy",
+    "description": "A button beside a command in the card dialog's Work section: copies it. Keep it short."
+  },
+  "board.workQueue.copyFailed": {
+    "defaultMessage": "Could not copy the command",
+    "description": "A notification: copying a command from the card dialog's Work section failed."
+  },
+  "board.workQueue.copyNamed": {
+    "defaultMessage": "Copy the command {purpose, select, finish {to finish it} other {to undo it}}",
+    "description": "Accessible name of the Copy button beside a command in the card dialog's Work section. Keep the select keys."
+  },
+  "board.workQueue.decline": {
+    "defaultMessage": "Decline",
+    "description": "A button in the card dialog's Work section: declines updating the checked-out branch now (the same answer as under For you)."
+  },
+  "board.workQueue.expected": {
+    "defaultMessage": "Before the merge",
+    "description": "A label in the card dialog's Work section: the commit the branch was at before the merge follows."
+  },
+  "board.workQueue.files": {
+    "defaultMessage": "{n, plural, one {# file, and where it is} other {# files, and where each is}}",
+    "description": "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither."
+  },
+  "board.workQueue.heading": {
+    "defaultMessage": "Merge queue",
+    "description": "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue."
+  },
+  "board.workQueue.hideLog": {
+    "defaultMessage": "Hide the output",
+    "description": "A button in the card dialog's Work section: hides a return's whole output shown above it."
+  },
+  "board.workQueue.noBranch": {
+    "defaultMessage": "none (a detached HEAD)",
+    "description": "In the card dialog's Work section, after Its branch: the folder isn't on any branch. HEAD is git's: keep it."
+  },
+  "board.workQueue.noCommands": {
+    "defaultMessage": "Its files are neither as they were nor as merged: put them right by hand.",
+    "description": "In the card dialog's Work section when no command can settle a stopped merge: the user fixes the files by hand."
+  },
+  "board.workQueue.output": {
+    "defaultMessage": "{n, plural, one {Its output’s last line} other {Its output’s last # lines}}",
+    "description": "A label in the card dialog's Work section: the last lines ({n}) of what the failed check or hook printed follow."
+  },
+  "board.workQueue.paused": {
+    "defaultMessage": "The queue for {target} is paused",
+    "description": "A heading line in the card dialog's Work section: the merge queue for the branch {target} is paused (why follows)."
+  },
+  "board.workQueue.queued": {
+    "defaultMessage": "Queued for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line",
+    "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing now counts). Glossary 2.5: merge queue."
+  },
+  "board.workQueue.queuedNoPlace": {
+    "defaultMessage": "Queued for {target}",
+    "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Hive runs the queue)."
+  },
+  "board.workQueue.result": {
+    "defaultMessage": "The merge",
+    "description": "A label in the card dialog's Work section: the merged commit follows."
+  },
+  "board.workQueue.retried": {
+    "defaultMessage": "Queued again by Retry merge.",
+    "description": "The card dialog's Work section: the card's revision was queued again, unchanged, by the user's Retry merge."
+  },
+  "board.workQueue.retry": {
+    "defaultMessage": "Retry merge…",
+    "description": "A button in the card dialog's Work section on a card the merge queue returned: queues its approved revision again, unchanged (asks first)."
+  },
+  "board.workQueue.retryConfirm": {
+    "defaultMessage": "Retry merge",
+    "description": "The button confirming Retry merge. Keep it short."
+  },
+  "board.workQueue.retryFailed": {
+    "defaultMessage": "Couldn't retry the merge",
+    "description": "An error's title: Retry merge failed (the card dialog); its message says why."
+  },
+  "board.workQueue.retryMessage": {
+    "defaultMessage": "This queues {revision} again, unchanged: the revision that was approved, not a new one. Once per revision.",
+    "description": "The confirmation before Retry merge: the same approved revision ({revision}, a short commit id) goes back into the merge queue; it can be done once per revision. Glossary: revision."
+  },
+  "board.workQueue.retryTitle": {
+    "defaultMessage": "Retry {card}’s merge?",
+    "description": "Title of the confirmation before Retry merge ({card}: the card's key)."
+  },
+  "board.workQueue.returned": {
+    "defaultMessage": "Returned {when}: {why}",
+    "description": "The card dialog's Work section: the merge queue returned the card to its builder ({when}: how long ago), and why ({why}: conflict in tasks.ts, checks failed: unit, a hook failed…). Glossary 2.4: returned."
+  },
+  "board.workQueue.showRun": {
+    "defaultMessage": "Show the run",
+    "description": "A button in the card dialog's Work section: shows the merge check running now in the Progress panel's Runs tab."
+  },
+  "board.workQueue.side": {
+    "defaultMessage": "{side, select, expected {as before the merge} result {as merged} other {neither}}",
+    "description": "Beside a file in the card dialog's Work section: whether its contents are as before the merge, as merged, or neither. Keep the select keys."
+  },
+  "board.workQueue.stuck": {
+    "defaultMessage": "Its merge into {target} stopped part way. Hive changes nothing more on its own: put it right with one of the commands below, then answer under For you.",
+    "description": "The card dialog's Work section: the merge queue's update of the checked-out branch {target} stopped half done (a crash, another program); the user settles it by hand. For you: where the card's request waits (glossary 2.3)."
+  },
+  "board.workQueue.stuckBranch": {
+    "defaultMessage": "Its branch",
+    "description": "A label in the card dialog's Work section: the branch that folder is on now follows (or that it is on none)."
+  },
+  "board.workQueue.stuckFolder": {
+    "defaultMessage": "Folder",
+    "description": "A label in the card dialog's Work section: the folder the target is checked out in follows (a path)."
+  },
+  "board.workQueue.stuckRef": {
+    "defaultMessage": "{target} is at",
+    "description": "A label in the card dialog's Work section: the commit the branch {target} points at now follows."
+  },
+  "board.workQueue.testing": {
+    "defaultMessage": "Testing now: {step}",
+    "description": "The card dialog's Work section: the merge queue is testing the card now, at a step ({step}: test merge, merge checks, check: unit, merging into main). Glossary 2.5: merge queue."
+  },
+  "board.workQueue.unreadRef": {
+    "defaultMessage": "not read",
+    "description": "In the card dialog's Work section: where the branch points couldn't be read."
   }
 }
