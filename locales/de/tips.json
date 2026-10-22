@@ -87,6 +87,8 @@
   "tips.boardStages.title": "Das Board zeigt die Phasen deines Workflows",
   "tips.boardUpgrade.text": "Hive bewahrt das 0.9-Board auf, das es auf 1.0 aktualisiert hat. „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ spielt es zurück, nachdem eine Kopie des Boards in seinem jetzigen Zustand aufbewahrt wurde, damit ein Hive 0.9 es wieder ändern kann.",
   "tips.boardUpgrade.title": "Zurück zu 0.9 nach der Aktualisierung",
+  "tips.branchCards.text": "In Versionsverwaltung → Branches & Remotes zeigt ein Branch, an dem eine Karte arbeitet, die Karte und ihre Phase, im Review auch die Revision im Review. Klicke auf die Karte, um sie zu öffnen.",
+  "tips.branchCards.title": "Sieh, zu welcher Karte ein Branch gehört",
   "tips.cardCost.text": "Das Panel einer Karte zeigt, was ihre Agenten verbraucht haben, während sie sie hatten, „{example}“, mit den Anteilen von Bearbeiter und Reviewer und den Tokens beim Darüberfahren. „Leistung“ listet die Kosten jeder Karte, und beim Darüberfahren über eine Lane im Fortschrittspanel siehst du ihren Overhead.",
   "tips.cardCost.title": "Was eine Karte gekostet hat",
   "tips.cardDecisions.text": "Die Entscheidungen einer Karte, über ihren Kommentaren, halten fest, was du entschieden hast: Agenten prüfen ihre Arbeit vor dem Review daran, und Reviewer lassen Arbeit durchfallen, die eine davon missachtet. Sag dem Assistenten eine Entscheidung, und er trägt sie dort ein; ein Agent, der auf deine Antwort wartet, erfährt es.",

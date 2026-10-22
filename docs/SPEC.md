@@ -3617,7 +3617,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 |---|---|
 | Patch-id sameness, squash containment, refs watcher | P3 (in scope) |
 | `mergeWorktree` returns the merge commit, takes a target, no auto-commit; cross-process merge lock | P5 (in scope) |
-| Branches shown next to their cards and revisions | P6 (in scope) |
+| Branches shown next to their cards and revisions | P6 (in scope). **Built [#1424]:** Branches & remotes shows, on each branch a card's current cycle works on (`WorkBadge.line`), that card (the one in flight, else the latest; how many earlier), its stage (its project's name, its category's colour), in Review the revision under review (`WorkBadge.underReview`, copyable) and, Done, merged with `Integrated`'s result; the cards of a reused branch by when each one's current cycle started (never by a later fact). Worktrees name their agent's card (Doing, else Review, else Passed) the same way, whatever they have checked out |
 | Push the target after Hive merges (an option) | On Hold, git-support: #1179 |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | On Hold, git-support: #1180 |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |

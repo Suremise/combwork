@@ -2,16 +2,22 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'git.branches.branch': undefined
+  'git.branches.cardOpen': { card: string | number; stage: string | number }
   'git.branches.checkedOut': { where: string; agent: string | number }
+  'git.branches.copyRevision': { revision: string | number }
+  'git.branches.earlierCards': { n: number }
   'git.branches.heading': undefined
   'git.branches.loadTarget': undefined
+  'git.branches.merged': { has: string; revision: string | number }
   'git.branches.noCommits': undefined
   'git.branches.reload': undefined
   'git.branches.remote': { count: number }
+  'git.branches.revisionCopied': undefined
   'git.branches.stateBanner': { state: string }
   'git.branches.trackLocal': { branch: string | number; remote: string | number }
   'git.branches.tracks': { upstream: string | number; aheadBehind: string | number }
   'git.branches.tracksNothing': undefined
+  'git.branches.underReview': { revision: string | number }
   'git.busy.agent': { agent: string | number; status: string; action: string }
   'git.busy.slotHeld': { agent: string | number; branch: string | number; action: string }
   'git.busy.slotWaiting': { agents: string | number; count: number; branch: string | number; action: string }

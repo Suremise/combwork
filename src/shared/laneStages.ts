@@ -31,6 +31,9 @@ const LEGEND_ORDER: readonly Category[] = ['todo', 'doing', 'review', 'passed', 
 /** A category's segment look: its state's colour and pattern (On Hold is a blocked card's red hatching). */
 const LEGEND_STATE: Record<Category, SegmentState> = { todo: 'todo', doing: 'doing', review: 'review', passed: 'passed', done: 'done', hold: 'blocked' }
 
+/** A stage's look where it is shown with its colour (a lane segment's, #1424's branch rows): its category's. */
+export const stageLook = (stage: StageId): SegmentState => LEGEND_STATE[STAGE_CATEGORY[stage]]
+
 /** A line of the lanes' legend (#1421): a category, its segment's look, and the stages in it of the projects shown, by name. */
 export interface LegendGroup {
   category: Category
