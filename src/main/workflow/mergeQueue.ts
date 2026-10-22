@@ -28,7 +28,7 @@ import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
 import type { RunCheck } from '../../shared/types'
-import type { QueueCommand, QueueFileSide, QueueStep, QueueStuck } from '../../shared/workflow/queue'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueueStep, type QueueStuck } from '../../shared/workflow/queue'
 
 export interface CheckResult {
   ok: boolean
@@ -174,7 +174,7 @@ export interface QueueStepInfo {
 export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval'
 
 /** What an advance came to (advanceRef, advanceCheckedOut). */
-type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck }
+type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
 
 /** The state a checked-out target's begun advance is found in (§16.9.2's recovery table), and what it calls for. */
 type Found = 'integrated' | 'residue' | 'rerun' | 'swap' | 'rollback' | 'requeue' | 'stuck'
@@ -193,6 +193,14 @@ function statusPaths(out: string): string[] {
 }
 
 const nulList = (out: string): string[] => out.split('\0').filter(Boolean)
+
+/** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
+function advanceApprovedIn(s: CardState, entry: string, expected: string, result: string): boolean {
+  return s.approvals.some((a) => {
+    const r = s.made[a.request]
+    return a.answer === 'approved' && r?.gate === QUEUE_ADVANCE_GATE && r.entry === entry && r.revision === expected && r.result === result
+  })
+}
 
 /** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
 const SIGN_TIMEOUT_MS = 60_000
@@ -533,7 +541,7 @@ export class MergeQueue {
    * Workflow rules turned off by now (while the queue waited for the repository lock, say): no advance begins, `rulesOff`.
    * The queue paused by now (Pause queue): none begins either, `held`, the entry left open.
    */
-  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held'> {
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask'> {
     return this.write(card, (w) => {
       const s = w.state()
       const e = s.entries.find((x) => x.id === entry.id)
@@ -543,6 +551,9 @@ export class MergeQueue {
       if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
       if (this.wf.store.queuePause(entry.target)) return 'held' as const
+      // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
+      // the setting and the answers are now, here in the lock (HR4's #1351 round 1: a check before it is an early-out).
+      if (data.checkedOut && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(s, entry.id, data.expected, data.result)) return 'ask' as const
       w.fact('IntegrationStarted', data)
       return 'started' as const
     })
@@ -638,9 +649,14 @@ export class MergeQueue {
       if (isUnknown(where)) return this.pause(target, card, entry, 'needsYou')
       // Checked out in a folder, as far as is known now (each advance looks again under the lock).
       const folder = where[target] ? resolve(where[target]) : null
-      // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge.
-      if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !this.advanceApproved(card, entry, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
-      const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result) : await this.advanceRef(card, entry, target, expected, result)
+      // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge. An early-out
+      // only: decided again in IntegrationStarted's write, in the lock.
+      if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
+      const method = s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge'
+      const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'hive')
+      const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, integrate) : await this.advanceRef(card, entry, target, expected, result)
+      // Settled in the lock: a pause, the terminal state, the ask.
+      if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
       // Checked out (or not any more) while the queue waited for the lock, or the target moved before anything was
       // touched: looked at again, the right way.
       if (adv === 'retest') {
@@ -654,19 +670,13 @@ export class MergeQueue {
       }
       if (adv === 'denied') return this.skip(card, entry, this.stillApproved(card, entry).cancelled)
       if (adv === 'held') return this.held(card, entry, this.paused(target)?.reason ?? 'user')
-      const method = s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge'
-      if (typeof adv === 'object' && 'residue' in adv) {
-        // The target moved, but its folder was switched to another branch in that instant (§16.9.2, "does not
-        // guarantee"): merged, and the merged files are in that branch's working copy, listed to restore.
-        await this.integrated(card, entry, revision, target, result, method, 'hive')
-        return this.pause(target, card, entry, 'needsYou', undefined, undefined, adv.residue)
-      }
       if (typeof adv === 'object') {
-        // A pause on a condition after the entry was failed and queued again (an edit since the check): that entry's.
-        const at = adv.stuck ? entry : (openEntry(this.wf.state(card)) ?? entry)
-        return this.pause(target, card, at, adv.pause, adv.files, adv.message, adv.stuck)
+        // Every advance settles its pauses in the lock; one that didn't is settled here.
+        const s2 = await this.settle(card, entry, target, adv, integrate)
+        if (typeof s2 === 'object' && 'outcome' in s2) return s2.outcome
+        return this.pause(target, card, entry, 'needsYou')
       }
-      await this.integrated(card, entry, revision, target, result, method, 'hive')
+      await integrate()
       return { card: card.key, entry: entry.id, outcome: 'integrated', result, retests }
     }
   }
@@ -815,15 +825,6 @@ export class MergeQueue {
     return { kind: 'green' }
   }
 
-  /** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
-  private advanceApproved(card: CardRecord, entry: QueueEntry, expected: string, result: string): boolean {
-    const s = this.wf.state(card)
-    return s.approvals.some((a) => {
-      const r = s.made[a.request]
-      return a.answer === 'approved' && r?.gate === QUEUE_ADVANCE_GATE && r.entry === entry.id && r.revision === expected && r.result === result
-    })
-  }
-
   /**
    * Ask each time (OP-40, #1351): "Update <target> in <folder> now", the card's For you Approve, bound to the entry and
    * its test merge; the queue waits for it (paused `approval`, naming the folder). Asked once per test merge.
@@ -851,21 +852,35 @@ export class MergeQueue {
     // just before the swap.
     const r = await lock(async (): Promise<Advance> => {
       const where = await G.checkouts(this.project)
-      if (isUnknown(where)) return { pause: 'needsYou' }
+      if (isUnknown(where)) return this.settle(card, entry, target, { pause: 'needsYou' })
       if (where[target]) return 'retest'
       const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
-      if (started === 'rulesOff') return { pause: 'rulesOff' as const }
-      if (started === 'denied' || started === 'held') return started
+      if (started === 'rulesOff') return this.settle(card, entry, target, { pause: 'rulesOff' })
+      if (started === 'denied' || started === 'held' || started === 'ask') return started === 'ask' ? 'retest' : started
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
-      return (await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok ? ('done' as const) : ('moved' as const)
-    })
-    if (r === 'moved') {
+      if ((await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok) return 'done'
       await this.moved(card, entry, target)
       return 'moved'
-    }
+    })
     if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
     return r
+  }
+
+  /**
+   * What an advance came to, settled before the repository lock is released (HR4's #1351 round 1): a pause Hive writes
+   * for what it saw there (a condition, the rules, the terminal state) is written in the lock, so no other run, this
+   * Hive's or another's, acts on the target between the finding and the pause; a residue is merged, then paused.
+   */
+  private async settle(card: CardRecord, entry: QueueEntry, target: string, adv: Advance, integrate?: () => Promise<void>): Promise<Advance> {
+    if (typeof adv !== 'object' || 'outcome' in adv) return adv
+    if ('residue' in adv) {
+      await integrate?.()
+      return { outcome: await this.pause(target, card, entry, 'needsYou', undefined, undefined, adv.residue) }
+    }
+    // A pause on a condition after the entry was failed and queued again (an edit since the check): that entry's.
+    const at = adv.stuck ? entry : (openEntry(this.wf.state(card)) ?? entry)
+    return { outcome: await this.pause(target, card, at, adv.pause, adv.files, adv.message, adv.stuck) }
   }
 
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
@@ -900,18 +915,18 @@ export class MergeQueue {
    * back (phase rollback). Each phase's fact checks the lease in its write, and the lease is checked again just before
    * git runs: a runner that lost its lease writes nothing more and touches nothing.
    */
-  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<Advance> {
+  private async advanceCheckedOut(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string, integrate: () => Promise<void>): Promise<Advance> {
     const where = await G.checkouts(this.project)
-    if (isUnknown(where)) return { pause: 'needsYou' }
+    if (isUnknown(where)) return this.settle(card, entry, target, { pause: 'needsYou' })
     // As Windows writes it (git lists worktrees with forward slashes): the journal, the pauses and the fence all name it so.
     const seen = where[target] ? resolve(where[target]) : null
     if (!seen) return 'retest'
     const r = await this.guarded(seen, async (): Promise<Advance> => {
       // Where the target is checked out now, under the lock: switched meanwhile, looked at again the right way.
       const now = await G.checkouts(this.project)
-      if (isUnknown(now)) return { pause: 'needsYou' }
+      if (isUnknown(now)) return this.settle(card, entry, target, { pause: 'needsYou' })
       if (!now[target] || resolve(now[target]).toLowerCase() !== seen.toLowerCase()) return 'retest'
-      return this.journal(card, entry, target, expected, result, seen)
+      return this.settle(card, entry, target, await this.journal(card, entry, target, expected, result, seen), integrate)
     })
     if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
     return r
@@ -938,6 +953,8 @@ export class MergeQueue {
 
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
     if (started === 'rulesOff') return { pause: 'rulesOff' }
+    // Ask each time, as the setting is now: asked here, before the lock is released.
+    if (started === 'ask') return { outcome: await this.askAdvance(card, entry, target, expected, result, folder) }
     if (started === 'denied' || started === 'held') return started
     await this.cfg.hooks?.afterStarted?.(entry.id)
 
@@ -1036,15 +1053,19 @@ export class MergeQueue {
     const ref = isUnknown(r) ? null : r
     const sides = (await this.sidesOf(folder, files, expected, result)) ?? files.map((path) => ({ path, side: 'other' as const, staged: 'other' as const }))
     const all = (side: QueueFileSide): boolean => sides.every((f) => f.side === side)
-    const swap = `git update-ref refs/heads/${target} ${result} ${expected}` // i18n-ignore: a git command, run as written
-    const back = `git read-tree -m -u ${result} ${expected}` // i18n-ignore: a git command, run as written
-    const forth = `git read-tree -m -u ${expected} ${result}` // i18n-ignore: a git command, run as written
+    // Each command as its arguments, the ref as it is (a ref may hold `$` or `&`): shown for PowerShell by shellLine.
+    const cmd = (purpose: QueueCommand['purpose'], place: QueueCommand['place'], args: string[]): QueueCommand => ({ purpose, place, args, command: shellLine(args) })
+    const swap = ['git', 'update-ref', `refs/heads/${target}`, result, expected]
+    const back = ['git', 'read-tree', '-m', '-u', result, expected]
+    const forth = ['git', 'read-tree', '-m', '-u', expected, result]
     const commands: QueueCommand[] = []
-    if (branch === target && ref === expected && all('result')) commands.push({ purpose: 'finish', place: 'project', command: swap }, { purpose: 'undo', place: 'folder', command: back })
-    else if (branch === target && ref === result && all('expected')) commands.push({ purpose: 'finish', place: 'folder', command: forth })
-    else if (branch === target && ref !== expected && ref !== result && all('result')) commands.push({ purpose: 'undo', place: 'folder', command: back })
+    // A ref with `"` in it (git allows one) can't be handed to git by Windows PowerShell as written (it splits native
+    // arguments at quotes): no command names it then; the state says where things are.
+    if (branch === target && ref === expected && all('result')) commands.push(...(target.includes('"') ? [] : [cmd('finish', 'project', swap)]), cmd('undo', 'folder', back))
+    else if (branch === target && ref === result && all('expected')) commands.push(cmd('finish', 'folder', forth))
+    else if (branch === target && ref !== expected && ref !== result && all('result')) commands.push(cmd('undo', 'folder', back))
     // The merged files in another branch's working copy: put back as that branch had them.
-    else if (phase === 'done' && all('result')) commands.push({ purpose: 'undo', place: 'folder', command: back })
+    else if (phase === 'done' && all('result')) commands.push(cmd('undo', 'folder', back))
     return { folder, branch, ref, expected, result, phase, files: sides.map(({ path, side }) => ({ path, side })), commands }
   }
 
@@ -1111,15 +1132,27 @@ export class MergeQueue {
           w.action('endLaneIfDone', {})
         })
       }
+      // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Hive
+      // won't guess about. Read in the lock, before anything else, whatever started this run (another card's enqueue, a
+      // reopen, another Hive): recovery writes nothing and touches nothing until the user lifts it (Resume, or the
+      // answer to its For you, which check first). Other pauses still let a begun advance finish or roll back.
+      const frozen = (): boolean => {
+        const p = this.paused(e.target)
+        return p?.reason === 'needsYou' && !!p.card
+      }
       if (!checkedOut) {
-        const ref = await G.lineHead(this.project, e.target)
-        if (ref === result) {
-          await done()
-          out.push({ card: card.key, entry: e.id, outcome: 'integrated' })
-        } else if (ref === expected) {
-          this.rerun.add(e.id)
-          out.push({ card: card.key, entry: e.id, outcome: 'rerun' })
-        } else {
+        const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
+        const outcome = await lock(async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
+          if (frozen()) return 'needsYou'
+          const ref = await G.lineHead(this.project, e.target)
+          if (ref === result) {
+            await done()
+            return 'integrated'
+          }
+          if (ref === expected) {
+            this.rerun.add(e.id)
+            return 'rerun'
+          }
           // The target moved meanwhile: containment decides. Found → Done (observed); not found → tested again.
           await this.write(card, (w) => w.fact('IntegrationFailed', { entry: e.id, revision: e.revision, target: e.target, reason: 'targetMoved', transient: true })) // i18n-ignore: a fact's kind and codes, not text
           await reconcile(this.wf, card)
@@ -1129,13 +1162,15 @@ export class MergeQueue {
               w.fact('IntegrationRequested', { entry: `${card.key}/e${st.lastSeq + 1}`, revision: e.revision, key: st.latest?.key ?? null, target: e.target, style: w.ruleset!.options.style })
             })
           }
-          out.push({ card: card.key, entry: e.id, outcome: 'failed' })
-        }
+          return 'failed'
+        })
+        out.push({ card: card.key, entry: e.id, outcome })
         continue
       }
       // Checked out (§16.9.2's table): read and acted on under the repository lock and the folder's fence, so neither
       // Hive's other work nor the Git view acts in the folder in between.
       const outcome = await this.guarded(checkedOut, async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
+        if (frozen()) return 'needsYou'
         const f = await this.found(e)
         const stuck = async (st: QueueStuck, merged = false): Promise<'integrated' | 'needsYou'> => {
           if (merged) await done()

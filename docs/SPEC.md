@@ -2208,6 +2208,16 @@ touched:
 - **Where:** the target's folder is the one `git worktree list` names for it, read again under the repository lock
   (switched while the queue waited for it: looked at again, the right way). Checked out nowhere by then, it is the
   compare-and-swap above; a folder on another branch means exactly that.
+- **The authority** [HR4's #1351 round 1]: Hive writes to a target (`IntegrationStarted`, an `IntegrationPhase`,
+  `read-tree`, `update-ref`, recovery's `Integrated` or `IntegrationFailed`, the queue's pause) only inside the repository
+  lock and, for a checked-out target, its folder's fence, after deciding again there, from state read there, the
+  target's saved pause, Ask or Automatic with the matching approval, the rules, the card's open entry and approval, and
+  where the target is checked out. A check before the lock is an early-out only. A pause Hive writes for what it saw in
+  the lock (a condition, the terminal state, the ask) is written before the lock is released. Whoever caused the run
+  (the card's own queue, another card's enqueue, a workspace reopening, another Hive), the same holds. **A needs-you
+  pause naming a card freezes its target:** recovery reads it first, in the lock, and writes nothing until the user
+  lifts it (Resume, or the answer to its For you, which check first); other pauses (Pause queue, rules off, approval)
+  stop new advances but let a begun one finish or roll back.
 - **Under the lock and the fence:** the conditions, the journal and its rollback run holding the repository lock
   (#1347) and the folder's fence (#646: `changingFolder`, so no line of Hive's is typed into an agent there and none
   starts there meanwhile). The test merge and the merge checks run without either: a user's commit, or a Git view action
@@ -2241,8 +2251,11 @@ touched:
   rollback finished) fail the entry as target moved and queue it again. Anything else is the terminal state.
 - **The terminal state** (`needsYou`, a typed record: the 1.0 group's 17th step adds the folder, HEAD's branch, the ref,
   the revisions and the phase to `workflow_queue_pauses`, each file's side to `workflow_queue_pause_files`, and
-  `workflow_queue_pause_commands`): the commands are generated from the journal as the state allows, only revisions and
-  ref names, each run in the project folder or the target's folder: on the target with the ref at the expected
+  `workflow_queue_pause_commands` with each command's arguments in `workflow_queue_pause_command_args`, never a shell
+  string): the commands are generated from the journal as the state allows, only revisions and ref names, each run in
+  the project folder or the target's folder, and shown as a PowerShell line (`shellLine`: an argument of anything but
+  letters, digits and `._/:=+-` single-quoted, `'` doubled, so a ref such as `topic$part` reaches git as written; a ref
+  with `"`, which Windows PowerShell can't hand a program as written, gets no command naming it): on the target with the ref at the expected
   revision and every file at the result, **finish** `git update-ref refs/heads/<target> <result> <expected>` and **undo**
   `git read-tree -m -u <result> <expected>`; the ref at the result and the files at the expected revision, finish
   `git read-tree -m -u <expected> <result>`; the ref moved and the files at the result, or the merged files left in

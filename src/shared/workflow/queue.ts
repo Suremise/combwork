@@ -63,13 +63,24 @@ export interface QueueRecent {
 export type QueueFileSide = 'expected' | 'result' | 'other'
 
 /**
- * A command that finishes or undoes an advance left part way (#1351), generated from its journal: git's arguments, run in
- * the project folder (`project`) or the folder the target is checked out in (`folder`). Only revisions and ref names: no paths.
+ * A command that finishes or undoes an advance left part way (#1351), generated from its journal: its arguments as they
+ * are (`args`, `git` first; only revisions and a ref name, no paths), run in the project folder (`project`) or the folder
+ * the target is checked out in (`folder`), and `command`, the line to type in PowerShell (shellLine).
  */
 export interface QueueCommand {
   purpose: 'finish' | 'undo'
   place: 'project' | 'folder'
+  args: string[]
   command: string
+}
+
+/**
+ * Arguments as a PowerShell command line that gives the program exactly these arguments (HR4's #1351 round 1: a ref
+ * with `$` in it must reach git as written): an argument of anything but letters, digits and `._/:=+-` is single-quoted,
+ * its `'` doubled. Plain otherwise, so a revision or a usual ref reads as typed.
+ */
+export function shellLine(args: string[]): string {
+  return args.map((a) => (/^[A-Za-z0-9._/:=+-]+$/.test(a) ? a : `'${a.replace(/'/g, "''")}'`)).join(' ')
 }
 
 /**

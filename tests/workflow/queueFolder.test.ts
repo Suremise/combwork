@@ -4,6 +4,9 @@
 // the journal, never merging twice; the terminal state's record (branch, ref, each file's side, the commands, For you);
 // Ask each time (OP-40): the Approve bound to the entry and its test merge.
 import { afterEach, describe, expect, it } from 'vitest'
+import { execFileSync } from 'child_process'
+import { tempDir } from '../tempDir'
+import { shellLine } from '../../src/shared/workflow/queue'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
@@ -48,12 +51,18 @@ const integratedFacts = (e: Env, card: number) => e.store.facts(card).filter((f)
 /** Hive's merge commits of a card on main: never two. */
 const merges = (e: Env, key: string): number => sh(e.project, 'log', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${key}:`)).length
 /** Moves main as another git client would: a commit on its tree, the ref moved to it (the folder's files untouched). */
-const moveMain = (e: Env): string => {
-  const at = head(e)
+const moveMain = (e: Env, branch = 'main'): string => {
+  const at = head(e, branch)
   const c = sh(e.project, 'commit-tree', `${at}^{tree}`, '-p', at, '-m', 'elsewhere')
-  sh(e.project, 'update-ref', 'refs/heads/main', c, at)
+  sh(e.project, 'update-ref', `refs/heads/${branch}`, c, at)
   return c
 }
+
+/**
+ * Runs a line in Windows PowerShell in a folder, as the user would paste it (HR4's #1351 round 1: the commands Hive
+ * gives must reach the program with their arguments as written). Its output.
+ */
+const powershell = (cwd: string, line: string): string => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', line], { cwd, encoding: 'utf8', env: process.env, windowsHide: true }).replace(/\r\n/g, '\n')
 
 describe('the conditions before anything is touched (§16.9.2)', () => {
   it('an agent building in the folder pauses folderBusy, naming what it holds; nothing started', async () => {
@@ -195,7 +204,7 @@ describe('the journal (§16.9.2)', () => {
     expect(integratedFacts(e, card.id)).toHaveLength(1)
     const p = e.store.queuePause('main')!
     const result = head(e)
-    expect(p.stuck).toMatchObject({ branch: 'other', ref: result, expected: before, result, phase: 'done', files: [{ path: 'a.txt', side: 'result' }], commands: [{ purpose: 'undo', place: 'folder', command: `git read-tree -m -u ${result} ${before}` }] })
+    expect(p.stuck).toMatchObject({ branch: 'other', ref: result, expected: before, result, phase: 'done', files: [{ path: 'a.txt', side: 'result' }], commands: [{ purpose: 'undo', place: 'folder', args: ['git', 'read-tree', '-m', '-u', result, before], command: `git read-tree -m -u ${result} ${before}` }] })
     // The undo puts the other branch's files back as they were.
     sh(e.project, 'read-tree', '-m', '-u', result, before)
     expect(sh(e.project, 'status', '--porcelain')).toBe('')
@@ -311,11 +320,11 @@ describe("recovery after a crash at each point of the journal (S34d, §16.9.2's 
     const st = e.store.queuePause('main')!.stuck!
     expect(st).toMatchObject({ branch: 'main', ref: before, phase: 'rollback', files: [{ path: 'a.txt', side: 'result' }] })
     expect(st.commands).toEqual([
-      { purpose: 'finish', place: 'project', command: `git update-ref refs/heads/main ${st.result} ${before}` },
-      { purpose: 'undo', place: 'folder', command: `git read-tree -m -u ${st.result} ${before}` }
+      { purpose: 'finish', place: 'project', args: ['git', 'update-ref', 'refs/heads/main', st.result, before], command: `git update-ref refs/heads/main ${st.result} ${before}` },
+      { purpose: 'undo', place: 'folder', args: ['git', 'read-tree', '-m', '-u', st.result, before], command: `git read-tree -m -u ${st.result} ${before}` }
     ])
     expect(e.wf.state(card).requests.find((x) => x.gate === QUEUE_STUCK_GATE)?.requestText).toMatchObject({ values: { how: 'both', finish: st.commands[0].command, undo: st.commands[1].command } })
-    sh(e.project, ...st.commands[0].command.split(' ').slice(1))
+    sh(e.project, ...st.commands[0].args.slice(1))
     expect(await r.q.stillStuck('main')).toBeNull()
     r.q.resume('main')
     expect(await r.q.recover('main')).toEqual([{ card: card.key, entry: expect.any(String), outcome: 'integrated' }])
@@ -401,6 +410,98 @@ describe('Ask each time (OP-40)', () => {
     expect(request(e, card)).toBeUndefined()
     expect(await q.drain('main')).toEqual([])
     expect(e.store.queuePause('main')).toBeNull()
+  })
+})
+
+describe("every target write authorised in the lock, from state read there (HR4's round 1)", () => {
+  it('Automatically before the lock, Ask each time inside it: no IntegrationStarted; asked in For you, paused for the approval', async () => {
+    const e = pair()
+    const card = await queued(e)
+    const before = head(e)
+    let mode: 'ask' | 'auto' = 'auto'
+    const q = e.queue({
+      checkedOutTarget: () => mode,
+      lock: async (fn) => {
+        mode = 'ask'
+        return fn()
+      }
+    })
+    const [o] = await q.drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'approval' })
+    expect(head(e)).toBe(before)
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    expect(e.wf.state(card).requests.filter((r) => r.gate === QUEUE_ADVANCE_GATE)).toHaveLength(1)
+    expect(sh(e.project, 'status', '--porcelain')).toBe('')
+  })
+
+  it("a terminal pause freezes the target: put back but not answered, a fresh queue's or another Hive's recovery writes nothing", async () => {
+    const e = pair()
+    const card = await queued(e)
+    const before = head(e)
+    await expect(e.queue(crashAt('afterFiles')).drain('main')).rejects.toThrow('crash')
+    writeFileSync(join(e.project, 'a.txt'), 'edited by the user\n')
+    expect(await restarted(e).q.recover('main')).toMatchObject([{ outcome: 'needsYou' }])
+    // Put back as the journal left it (recovery could finish now), but neither answered nor resumed.
+    sh(e.project, 'checkout', '--', 'a.txt')
+    const facts = e.store.facts(card.id).length
+    for (const r of [restarted(e), restarted(e)]) {
+      expect(await r.q.recover('main')).toEqual([{ card: card.key, entry: expect.any(String), outcome: 'needsYou' }])
+      expect(await r.q.drain('main')).toEqual([])
+    }
+    expect(head(e)).toBe(before)
+    expect(e.store.facts(card.id)).toHaveLength(facts)
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', card: card.key, stuck: { phase: 'files' } })
+    // The user's word (Resume, which checks first): recovered, once.
+    const r = restarted(e)
+    expect(await r.q.stillStuck('main')).toBeNull()
+    r.q.resume('main')
+    expect(await r.q.recover('main')).toMatchObject([{ outcome: 'integrated' }])
+    expect(merges(e, card.key)).toBe(1)
+  })
+
+  it('a stuck advance found by a run of the queue another card started writes nothing either', async () => {
+    const e = pair()
+    const a = await queued(e, 'A', 'a.txt')
+    await expect(e.queue(crashAt('afterFiles')).drain('main')).rejects.toThrow('crash')
+    writeFileSync(join(e.project, 'a.txt'), 'edited by the user\n')
+    expect(await restarted(e).q.recover('main')).toMatchObject([{ outcome: 'needsYou' }])
+    sh(e.project, 'checkout', '--', 'a.txt')
+    const b = await queued(e, 'B', 'b.txt')
+    const before = head(e)
+    const r = restarted(e)
+    expect(await r.q.recover('main')).toMatchObject([{ card: a.key, outcome: 'needsYou' }])
+    expect(await r.q.drain('main')).toEqual([])
+    expect(head(e)).toBe(before)
+    expect(r.wf.state(b).stage).toBe('merging')
+    expect(r.wf.state(a).stage).toBe('merging')
+  })
+
+  it("the commands keep a ref as it is: a branch named topic$part, run in PowerShell as given, finishes the merge", async () => {
+    const branch = 'topic$part'
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: branch }))
+    sh(e.project, 'branch', '-m', 'main', branch)
+    await queued(e)
+    const before = head(e, branch)
+    await expect(e.queue({ hooks: { beforeRef: () => void moveMain(e, branch), inRollback: () => Promise.reject(new Error('crash')) } }).drain(branch)).rejects.toThrow('crash')
+    sh(e.project, 'update-ref', `refs/heads/${branch}`, before)
+    const r = restarted(e)
+    expect(await r.q.recover(branch)).toMatchObject([{ outcome: 'needsYou' }])
+    const [finish] = e.store.queuePause(branch)!.stuck!.commands
+    expect(finish.args).toEqual(['git', 'update-ref', `refs/heads/${branch}`, expect.any(String), before])
+    expect(finish.command).toBe(`git update-ref 'refs/heads/${branch}' ${finish.args[3]} ${before}`)
+    powershell(e.project, finish.command)
+    expect(head(e, branch)).toBe(finish.args[3])
+    expect(await r.q.stillStuck(branch)).toBeNull()
+  })
+
+  it('shellLine: what PowerShell hands the program is each argument exactly as given', () => {
+    const args = ['refs/heads/topic$part', 'a&b', 'x;y', '(p)', "it's", '@splat', '{b}', '$(echo no)', '`n', '-m', '0123abcd', 'refs/heads/feature/x-1']
+    const line = shellLine(['show', ...args])
+    expect(line).toContain(' 0123abcd ')
+    expect(line).toContain(' refs/heads/feature/x-1')
+    // A function stands in for git: it prints each argument it was given, on a line of its own.
+    const out = powershell(tempDir('shell-'), `function show { foreach ($a in $args) { [Console]::Out.WriteLine('<' + $a + '>') } }; ${line}`)
+    expect(out.trim().split('\n')).toEqual(args.map((a) => `<${a}>`))
   })
 })
 

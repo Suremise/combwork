@@ -24,7 +24,7 @@ import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
-import type { QueueCommand, QueueFileSide, QueueStuck } from '../../shared/workflow/queue'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -574,8 +574,10 @@ export class FactStore {
       const files = rows.map((r) => r.path)
       let stuck: QueueStuck | undefined
       if (row.folder !== null && row.expected !== null && row.result !== null && row.phase !== null) {
-        const commands = db.prepare('SELECT purpose, place, command FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as unknown as QueueCommand[]
-        stuck = { folder: row.folder, branch: row.branch, ref: row.ref, expected: row.expected, result: row.result, phase: row.phase, files: rows.map((r) => ({ path: r.path, side: r.side ?? 'other' })), commands: commands.map((c) => ({ purpose: c.purpose, place: c.place, command: c.command })) }
+        const commands = db.prepare('SELECT ord, purpose, place FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord').all(p, target) as { ord: number; purpose: QueueCommand['purpose']; place: QueueCommand['place'] }[]
+        const args = db.prepare('SELECT command, arg FROM workflow_queue_pause_command_args WHERE project = ? AND target = ? ORDER BY command, ord').all(p, target) as { command: number; arg: string }[]
+        const of = (ord: number): string[] => args.filter((a) => a.command === ord).map((a) => a.arg)
+        stuck = { folder: row.folder, branch: row.branch, ref: row.ref, expected: row.expected, result: row.result, phase: row.phase, files: rows.map((r) => ({ path: r.path, side: r.side ?? 'other' })), commands: commands.map((c) => ({ purpose: c.purpose, place: c.place, args: of(c.ord), command: shellLine(of(c.ord)) })) }
       }
       return { reason: row.reason, card: row.card, ...(files.length ? { files } : {}), ...(row.pid !== null ? { pid: row.pid } : {}), ...(row.message !== null ? { message: row.message } : {}), ...(row.paused_by ? { by: row.paused_by } : {}), ...(row.paused_at ? { at: row.paused_at } : {}), ...(stuck ? { stuck } : {}) }
     })
@@ -598,8 +600,12 @@ export class FactStore {
       // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
       if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))
       else pause.files?.forEach((f, i) => ins.run(p, target, i, f, null))
-      const cmd = db.prepare('INSERT INTO workflow_queue_pause_commands (project, target, ord, purpose, place, command) VALUES (?, ?, ?, ?, ?, ?)')
-      st?.commands.forEach((c, i) => cmd.run(p, target, i, c.purpose, c.place, c.command))
+      const cmd = db.prepare('INSERT INTO workflow_queue_pause_commands (project, target, ord, purpose, place) VALUES (?, ?, ?, ?, ?)')
+      const arg = db.prepare('INSERT INTO workflow_queue_pause_command_args (project, target, command, ord, arg) VALUES (?, ?, ?, ?, ?)')
+      st?.commands.forEach((c, i) => {
+        cmd.run(p, target, i, c.purpose, c.place)
+        c.args.forEach((a, j) => arg.run(p, target, i, j, a))
+      })
     })
   }
 

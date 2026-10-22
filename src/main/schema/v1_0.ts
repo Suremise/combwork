@@ -764,9 +764,18 @@ export const QUEUE_PAUSE_STATE_STEP: SchemaStep = {
       ord     INTEGER NOT NULL,
       purpose TEXT    NOT NULL CHECK (purpose IN ('finish', 'undo')),
       place   TEXT    NOT NULL CHECK (place IN ('project', 'folder')),
-      command TEXT    NOT NULL,
       PRIMARY KEY (project, target, ord),
       FOREIGN KEY (project, target) REFERENCES workflow_queue_pauses (project, target) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    // A command's arguments, each as it is (never a shell string: HR4's #1351 round 1, a ref's `$` expanded by a shell).
+    `CREATE TABLE workflow_queue_pause_command_args (
+      project TEXT    NOT NULL COLLATE NOCASE,
+      target  TEXT    NOT NULL,
+      command INTEGER NOT NULL,
+      ord     INTEGER NOT NULL,
+      arg     TEXT    NOT NULL,
+      PRIMARY KEY (project, target, command, ord),
+      FOREIGN KEY (project, target, command) REFERENCES workflow_queue_pause_commands (project, target, ord) ON DELETE CASCADE
     ) STRICT, WITHOUT ROWID`
   ]
 }
@@ -864,7 +873,8 @@ export const QUERIES: Record<string, SchemaQuery> = {
   },
   'queuePauses.of': { sql: 'SELECT reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase FROM workflow_queue_pauses WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queuePauses.files': { sql: 'SELECT path, side FROM workflow_queue_pause_files WHERE project = ? AND target = ? ORDER BY ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
-  'queuePauses.commands': { sql: 'SELECT purpose, place, command FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.commands': { sql: 'SELECT ord, purpose, place FROM workflow_queue_pause_commands WHERE project = ? AND target = ? ORDER BY ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
+  'queuePauses.commandArgs': { sql: 'SELECT command, arg FROM workflow_queue_pause_command_args WHERE project = ? AND target = ? ORDER BY command, ord', args: ['p', 'main'], index: 'PRIMARY KEY' },
   // queueControls.ts (#1353): a project's paused targets, for its queues' listing.
   'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
