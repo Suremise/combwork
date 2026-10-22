@@ -512,6 +512,28 @@ describe("what services read before the database was replaced is read again (#12
     }
   })
 
+  it("what services keep of the database under another spelling than the window's goes when it is replaced: by the place recorded (#1456)", async () => {
+    const { committedFor, saveTable } = await import('../src/main/storeTables')
+    const { sessionsOpenedFor } = await import('../src/main/sessionStore')
+    const ws = await board09()
+    const via = junction(ws, `${ws}-via`)
+    const w = await open(via)
+    try {
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      // Kept under the real spelling (as deliveries save, from where a host really is); the window has the junction's.
+      await inWorkspace(w, () => workspace.sessionsFile(join(ws, 'p')))
+      await saveTable(ws, 'lanes', [])
+      expect(sessionsOpenedFor()).toContain(ws.toLowerCase())
+      expect(committedFor().map((p) => p.toLowerCase())).toContain(ws.toLowerCase())
+      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+      expect(sessionsOpenedFor()).not.toContain(ws.toLowerCase())
+      expect(committedFor().map((p) => p.toLowerCase())).not.toContain(ws.toLowerCase())
+    } finally {
+      await close(w)
+      unlinkSync(via)
+    }
+  })
+
   it('Restore and a second upgrade: deliveries read again each time, from the board put back and then upgraded', async () => {
     const delivery = await import('../src/main/deliveries')
     delivery.setReadsInboxForTests(() => true)

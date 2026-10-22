@@ -18,7 +18,7 @@ import { cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { assertAdmitted, refusal } from './openingFence'
+import { isAdmitted, ownerOf, refusedOpen } from './openingFence'
 
 const log = createLogger('usage')
 
@@ -113,7 +113,7 @@ class UsageHistory {
         if (was === 'working' && e.state.status !== 'working' && e.state.sessionId && !e.state.settingUp) this.ingest(e.state.projectPath, e.state.sessionId, { priority: 1, keepState: 'running' }).catch((err) => log.warn('recording a turn that ended', err))
       }
     })
-    WorkspaceService.closingListeners.add((path) => this.closeWorkspace(path))
+    WorkspaceService.closingListeners.add((path, place) => this.closeWorkspace(path, place))
   }
 
   /** Board changes in a workspace, a second apart at most: every recorded session's cards shared out again where their holds changed. */
@@ -244,9 +244,14 @@ class UsageHistory {
     // A workspace's usage.db is opened only while a window holds it (#1395: the worker keeps it open); a read goes on
     // without the session's saved state in one no window holds. Asked again once the worker is there, with nothing
     // awaited from then to the request: a close meanwhile refuses it.
+    // The file it opens: its own, or the one a read takes a session's saved state from; its workspace's place resolved
+    // once, as the request enters (#1456), and what admits it, records the spelling and closes it.
+    const file = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
+    const place = file ? ownerOf(file) : null
     const admitted = (b: Body): Body => {
-      if (b.type !== 'close' && 'file' in b) assertAdmitted(b.file)
-      return b.type === 'read' && b.seed && refusal(b.seed.file) ? { ...b, seed: null } : b
+      const ok = place !== null && isAdmitted(place)
+      if (b.type !== 'close' && 'file' in b && !ok) throw refusedOpen()
+      return b.type === 'read' && b.seed && !ok ? { ...b, seed: null } : b
     }
     body = admitted(body)
     const send = await this.transport()
@@ -257,20 +262,40 @@ class UsageHistory {
       this.post(send, { type: 'config', ...(JSON.parse(cfg) as Omit<Extract<Body, { type: 'config' }>, 'type'>) }).catch((e) => log.warn('sending the usage worker its settings', e))
     }
     const answer = this.post(send, body) as Promise<T>
-    // The file it opens: its own, or the one a read takes a session's saved state from.
-    const file = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
-    if (file) void answer.finally(() => this.closeIfUnused(file)).catch(() => undefined)
+    const opens = body.type === 'read' ? (body.seed?.file ?? null) : file
+    if (opens && place !== null) {
+      const known = this.spellings.get(place) ?? new Map<string, string>()
+      known.set(wsKey(opens), opens)
+      this.spellings.set(place, known)
+      void answer.finally(() => this.closeIfUnused(opens, place)).catch(() => undefined)
+    }
     return answer
   }
 
   /**
-   * A file of a workspace no window has open, used by a request that came after its close (one under way as it closed):
-   * closed again, so the worker doesn't hold the folder (#1379: the user can't move or delete it). A window closing the
-   * workspace (its lifetime over) doesn't have it open.
+   * The spellings of each workspace's usage.db the worker was sent (it keeps a file open by its spelling), by the place
+   * each request's file resolved to as it entered (#1456): the workspace's close closes every one, so one opened through
+   * a junction or an 8.3 name doesn't hold the folder until Hive quits. Only admitted workspaces' (a request for another
+   * is refused), forgotten as each closes: bounded by the windows open.
    */
-  private closeIfUnused(file: string): void {
-    if (this.stopped || openWorkspaces().some((w) => w.path && !w.lifetime.aborted && wsKey(usageFile(w.path)) === wsKey(file))) return
-    void this.enqueue(`close|${wsKey(file)}`, 2, async () => ({ type: 'close', file })).catch(() => undefined)
+  private spellings = new Map<string, Map<string, string>>()
+
+  /** Closes the workspace at `place`'s usage.db under every spelling it was sent with (and `file`'s), after what was queued. */
+  private closeAt(place: string, file?: string): void {
+    const files = new Map(this.spellings.get(place))
+    this.spellings.delete(place)
+    if (file) files.set(wsKey(file), file)
+    for (const [k, f] of files) void this.enqueue(`close|${k}`, 2, async () => ({ type: 'close', file: f })).catch(() => undefined)
+  }
+
+  /**
+   * A file of a workspace no window has open, used by a request that came after its close (one under way as it closed):
+   * closed again, under every spelling, so the worker doesn't hold the folder (#1379: the user can't move or delete it).
+   * By the place it resolved to as it entered: a window closing the workspace has dismissed it already.
+   */
+  private closeIfUnused(file: string, place: string): void {
+    if (this.stopped || isAdmitted(place)) return
+    this.closeAt(place, file)
   }
 
   private post(send: (m: WorkerRequest) => void, body: Body): Promise<unknown> {
@@ -681,12 +706,15 @@ class UsageHistory {
     await sessions.retireUsageCacheFile().catch((e) => log.warn('removing usage-cache.json', e))
   }
 
-  /** A workspace closed: its file closed after what was queued for it. */
-  private closeWorkspace(path: string): void {
+  /**
+   * A workspace closed: its file closed after what was queued for it, under every spelling it was opened with, by the
+   * place its window recorded (#1456: never what a spelling resolves to now, so the window's own spelling, a junction
+   * pointed at another workspace since, closes nothing of that one's).
+   */
+  private closeWorkspace(path: string, place: string): void {
     this.cards.delete(wsKey(path))
     this.progress.delete(wsKey(path))
-    const file = usageFile(path)
-    void this.enqueue(`close|${wsKey(file)}`, 2, async () => ({ type: 'close', file })).catch(() => undefined)
+    this.closeAt(place)
   }
 
   // -------------------------------------------------------------------------
