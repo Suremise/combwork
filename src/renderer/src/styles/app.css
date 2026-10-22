@@ -8147,6 +8147,20 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 12px;
 }
+/* The checkboxes keep their one line; the workflow link (#1420) gives way first, cut with "…" (its hover has it whole). */
+.board-toolbar > label {
+  white-space: nowrap;
+}
+.board-toolbar .tip-wrap:has(> .board-workflow) {
+  min-width: 0;
+  display: flex;
+}
+.board-workflow {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .board-search {
   display: flex;
   align-items: center;
@@ -8356,14 +8370,19 @@ body.pane-resizing-v .monaco-editor {
 .board-column-header {
   flex-wrap: wrap;
   row-gap: 2px;
+  /* Its width is the column's, so its name can be held to it (cqw below). */
+  container-type: inline-size;
 }
 .board-column-header > .tip-wrap:has(> .board-column-label) {
   flex: 1 1 auto;
   min-width: min-content;
   display: flex;
 }
+/* Never wider than the header beside the fold button: a name with a word longer than that (a stage's own name can be
+   24 letters, HR2's #1420 round 4) breaks within it rather than painting over the next column. */
 .board-column-header .board-column-label {
-  overflow-wrap: normal;
+  max-width: calc(100cqw - 30px);
+  overflow-wrap: break-word;
   line-height: 16px;
 }
 .board-column-header .count {

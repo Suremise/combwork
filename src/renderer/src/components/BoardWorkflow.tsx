@@ -66,7 +66,14 @@ export function BoardWorkflowLink({ project }: { project: string | null }) {
     const f = forms.get(shown[0].path.toLowerCase())
     if (!f) return null
     return (
-      <Tooltip content={tr(VC_TEXT.workflowTip)}>
+      <Tooltip
+        content={
+          <>
+            <strong>{workflowText(f)}</strong>
+            <div>{tr(VC_TEXT.workflowTip)}</div>
+          </>
+        }
+      >
         <button type="button" className="link board-workflow" data-action="board-workflow" onClick={() => open(shown[0])}>
           <Icon name="git-pull-request" /> {workflowText(f)}
         </button>

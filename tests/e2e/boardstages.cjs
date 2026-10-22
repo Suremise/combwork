@@ -230,10 +230,16 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     await shoot('renamed-en')
 
     // --- The workflow link: a line per project with all of them, the link with one; it opens Version Control → Workflow.
-    await page.locator('[data-action="board-workflows"]').click()
-    const lines = await page.locator('.menu .menu-item').allTextContents()
-    check('all projects: a line per project in the Workflows menu', ['alpha', 'beta', 'notes'].every((p) => lines.some((l) => l.startsWith(`${p} · Workflow: `))), JSON.stringify(lines))
-    await page.keyboard.press('Escape')
+    // Each project's line once its workflow is read (just saved above): the menu, opened again until they all are.
+    let lines = []
+    const complete = () => ['alpha', 'beta', 'notes'].every((p) => lines.some((l) => l.startsWith(`${p} · Workflow: `)))
+    await until(async () => {
+      await page.locator('[data-action="board-workflows"]').click()
+      lines = await page.locator('.menu .menu-item').allTextContents()
+      await page.keyboard.press('Escape')
+      return complete()
+    })
+    check('all projects: a line per project in the Workflows menu', complete(), JSON.stringify(lines))
     await showBoard('alpha')
     const link = page.locator('[data-action="board-workflow"]')
     check('alpha alone: "Workflow: Git · no preset chosen" in the toolbar', !!(await until(async () => ((await link.textContent().catch(() => '')) ?? '').trim() === 'Workflow: Git · no preset chosen')), await link.textContent().catch(() => ''))
@@ -255,7 +261,18 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     // Seven columns at this width: every name readable, wrapped rather than cut (the Assistant's OK on round 3).
     const cut = await board.locator('.board-column-header .board-column-label').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1).map((e) => e.textContent))
     check('Polish, seven columns: no column name is cut', cut.length === 0 && (await board.locator('.board-column').count()) === 7, JSON.stringify(cut))
+    // Every name inside its own column, also a stage's own name of 24 letters with no space (HR2's round 4).
+    const outside = () => board.locator('.board-column').evaluateAll((cols) => cols.flatMap((c) => {
+      const r = c.getBoundingClientRect()
+      return [...c.querySelectorAll('.board-column-header > *')].filter((e) => { const b = e.getBoundingClientRect(); return b.left < r.left - 1 || b.right > r.right + 1 }).map((e) => `${c.getAttribute('data-column')}: ${e.textContent}`)
+    }))
+    check('…every header inside its own column', (await outside()).length === 0, JSON.stringify(await outside()))
     await shoot('merging-pl')
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx), stageNames: { active: 'W'.repeat(24) } } })
+    await showBoard('alpha', 'Tablica zadań')
+    check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0)), JSON.stringify(await outside()))
+    await shoot('longname-pl')
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: base })
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done')
