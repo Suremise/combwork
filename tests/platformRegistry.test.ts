@@ -104,12 +104,18 @@ describe('in ProjectInfo', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const events: HiveEvent[] = []
   let off: () => void = () => undefined
-  /** A project Hive sets up (its project.json made by ensureProject, as adding one does). */
+  /**
+   * A project Hive sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
+   * then with the refresh the open scheduled run. A folder made in an open workspace is a root-watch event, whose refresh
+   * reads the project (its `.git` too) while the test renames or reads it (#1375: EPERM renaming `.git`, its notice said
+   * by that refresh): now only the test reads it.
+   */
   const project = async (name: string, before?: (p: string) => void): Promise<string> => {
     const p = join(ws, name)
     mkdirSync(p)
     before?.(p)
-    await inWorkspace(w, () => w.ensureProject(p))
+    await w.open(ws)
+    await w.refreshesSettled()
     return p
   }
   const recorded = (p: string): ProjectConfig['platform'] => (JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8')) as ProjectConfig).platform
