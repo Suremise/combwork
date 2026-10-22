@@ -202,7 +202,7 @@ async function launch() {
     check('…problems first, then what is left to choose, then what was done', outcomes.length > 3 && outcomes.join(',') === [...outcomes].sort((a, b) => ['failed', 'skipped', 'done'].indexOf(a) - ['failed', 'skipped', 'done'].indexOf(b)).join(','), JSON.stringify(outcomes))
     // Third's result names the worktree in the way by its agent, no path (the row's tooltip has git's full sentence).
     const thirdResult = (await dialog.locator('.repair-report tr', { hasText: "Third's worktree" }).first().locator('td').nth(3).innerText()).replace(/\s+/g, ' ').trim()
-    check('…Third’s result: Second’s worktree in the way, by name, no path', /another worktree is missing too \(Second's\)/.test(thirdResult) && !/[A-Z]:\\/.test(thirdResult), thirdResult)
+    check('…Third’s result: Second’s worktree in the way, by name, no path', /another worktree is missing too \(Second's worktree\)/.test(thirdResult) && !/[A-Z]:\\/.test(thirdResult), thirdResult)
     await inv('settings:update', { appearance: { theme: 'light' } })
     await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report-light.png') })

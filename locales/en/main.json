@@ -443,6 +443,10 @@
     "defaultMessage": "{host}: {agent}'s worktree at {path} is linked to the project again.",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree."
   },
+  "main.move.result.agentWorktree": {
+    "defaultMessage": "{agent}'s worktree",
+    "description": "Repair's report: an agent's worktree ({agent}: its name), in a list of worktrees in the way (main.move.result.pruneBlocked's {worktrees})."
+  },
   "main.move.result.cards": {
     "defaultMessage": "{n, plural, one {# card, with its agents} other {# cards, with their agents}}",
     "description": "Repair's report: cards that went to a project, in a list (main.move.result.given's {what}). {n} is how many."
@@ -491,6 +495,10 @@
     "defaultMessage": "stays linked to the project at its old folder",
     "description": "Repair's report, the Result column: a worktree stays with the project folder it was made from, which is still there (a copy was moved)."
   },
+  "main.move.result.pruneBlocked": {
+    "defaultMessage": "couldn't be recreated while {n, plural, one {another worktree is missing too ({worktrees}): locate, recreate or remove it first} other {# other worktrees are missing too ({worktrees}): locate, recreate or remove them first}}",
+    "description": "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees. {worktrees} lists them (an agent's worktree, main.move.result.agentWorktree, or a folder's name); {n}: how many. The row's tooltip says it in full."
+  },
   "main.move.result.recent": {
     "defaultMessage": "lists the new folder",
     "description": "Repair's report, the Result column of Open Recent: the new folder replaces the old one."
@@ -530,10 +538,6 @@
   "main.move.result.working": {
     "defaultMessage": "marked again: {projects}",
     "description": "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again."
-  },
-  "main.move.result.wouldPrune": {
-    "defaultMessage": "couldn't be recreated while {n, plural, one {another worktree is missing too ({agents}'s): locate, recreate or remove it first} other {# other worktrees are missing too ({agents}'s): locate, recreate or remove them first}}",
-    "description": "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees ({agents}: whose they are, the agents' names; {n}: how many). The row's tooltip says it in full."
   },
   "main.move.running": {
     "defaultMessage": "Stop the running agents first: {agents}.",
