@@ -11,7 +11,7 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { NO_PROJECTS, cardLabelOf, confirm, get, notify, set, useLanguage, useStore } from '../store'
 import { openLaneStart } from './LaneStartDialog'
-import { saveLaneOrder, useLaneOrder, type Lane } from '../laneSource'
+import { saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
 import { useNow } from '../usage'
 import { cx } from '../util'
 import { useAdvancedValue } from '../advanced'
@@ -418,11 +418,12 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
   useNow(60_000)
+  const laneOf = useLaneOf()
   const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr)
   let stalled: { n: number; why: string } | null = null
   for (const n of l.frozen ? [] : l.cards) {
     const c = tasks.find((t) => t.number === n)
-    const why = c ? cardStalled(projects, c) : null
+    const why = c ? cardStalled(projects, c, laneOf(c)) : null
     if (why) {
       stalled = { n, why }
       break

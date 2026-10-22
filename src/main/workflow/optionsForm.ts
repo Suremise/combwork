@@ -23,6 +23,8 @@ import { FactStore } from './factStore'
 import { checkOptions, resolvedOf, resolveOptions, type OptionLevels } from './rulesets'
 import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
+import { queueChanged } from './queueHost'
+import { isUnknown } from '../platform/types'
 
 const log = createLogger('workflow')
 
@@ -183,6 +185,12 @@ export async function setWorkflowOptions(ws: WorkspaceService, projectPath: stri
   log.info(`the workflow options of ${userText(project.name)} changed: ${changed.join(', ') || 'none'}`)
   const applyTo = [...new Set(o.applyTo ?? [])]
   if (applyTo.length && changed.length) await applyToInFlight(ws, project, applyTo, changed)
+  // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
+  // show follows the options too), whoever changed them (the window, the Assistant).
+  if (changed.length) {
+    const t = change.options.target || (await G.defaultBranch(project.path).catch(() => null))
+    queueChanged(ws, project.path, t && !isUnknown(t) ? t : '')
+  }
   return workflowForm(ws, project.path)
 }
 

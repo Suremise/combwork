@@ -10,6 +10,7 @@
 // whose cause Hive can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
 // first, and paused again, saying so, when it still holds.
 
+import { app } from 'electron'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { runCardIntent } from '../cardIntents'
@@ -28,48 +29,106 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
-import { RECENT_MAX, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
+import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
-/** The targets of a project's queues: every target a card was queued for, and any paused one, in that order. */
-export function queueTargets(wf: Workflow): string[] {
+/**
+ * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
+ * window (`also`), then the targets its cards in flight merge into under their own rules and the one its current options
+ * have Hive merge into (#1356: the panel decides from these which queues show).
+ */
+export function queueTargets(wf: Workflow, also: Iterable<string> = []): string[] {
   const out = new Set<string>()
   for (const f of wf.store.factsOfKind('IntegrationRequested')) out.add((f.data as FactData['IntegrationRequested']).target)
   for (const t of wf.store.pausedTargets()) out.add(t)
+  for (const t of also) out.add(t)
   return [...out].filter(Boolean)
 }
 
-/** A project's queues (one target's, or every one's), as the window, the Agent API and hive_queue read them. */
-export async function queueViews(ws: WorkspaceService, projectPath: string, target?: string): Promise<QueueView[]> {
+/** Where a project's queues stand beyond their entries (#1356): its cards in flight by target, and its current target. */
+interface QueueScope {
+  /** Per target, the cards in flight whose own ruleset has Hive merge into it, in number order. */
+  inFlight: Map<string, number[]>
+  /** The target the project's current options have Hive merge into (null: they don't, or it can't be read). */
+  current: string | null
+}
+
+/**
+ * A project's queues (one target's, or every one's), as the window, the Agent API and hive_queue read them. `window`: the
+ * window's listing (#1356), which also lists the targets that only have cards in flight under Hive merges, or are the
+ * current options' target, so the panel can decide which show.
+ */
+export async function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
-  return (target ? [target] : queueTargets(wf)).map((t) => queueView(ws, wf, projectPath, t))
+  const scope = window ? await queueScope(wf, projectPath) : undefined
+  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : [])] : []
+  return (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+}
+
+/**
+ * Which of a project's cards are in flight under Hive merges, by target (started, not Done: a card keeps the ruleset it
+ * started with, so after a switch to "The agent merges" its queue stays until its last entry has an outcome), and the
+ * target its current options merge into.
+ */
+async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
+  const inFlight = new Map<string, number[]>()
+  for (const card of wf.store.cards()) {
+    const s = wf.state(card)
+    if (!s.started || s.stage === 'todo' || s.stage === 'done') continue
+    const o = wf.rulesetOf(card, s).options
+    const t = s.started.target
+    if (o.platform !== 'git' || o.finish !== 'hiveMerges' || !t) continue
+    inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
+  }
+  const o = wf.currentRuleset(false).options
+  let current: string | null = null
+  if (o.platform === 'git' && o.finish === 'hiveMerges') {
+    const def = o.target ? o.target : await G.defaultBranch(projectPath).catch(() => null)
+    current = def && !isUnknown(def) ? def : null
+  }
+  return { inFlight, current }
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
-export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string): QueueView {
+export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, scope?: QueueScope): QueueView {
   const store = wf.store
   // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
   // card reads and refusals give agents too).
   const live = queueLive(ws, projectPath, target)
-  const { entries, cards, testing, queued } = queueOrder(wf, target, live)
+  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live)
   const lease = store.queueLease(target)
-  const recent = recentOutcomes(wf, target, entries, cards, (id) => store.card(id))
+  // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
+  const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
+  const { recent, returns, returnsMore } = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),
     projectPath,
     target,
-    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.stuck ? { stuck: p.stuck } : {}) } : null,
+    paused: p ? { reason: p.reason, card: p.card || null, files: p.files ?? [], by: p.by ?? null, at: p.at ?? null, ...(p.message ? { message: p.message } : {}), ...(p.stuck ? { stuck: p.stuck } : {}) } : null,
     runBy: lease?.profile ?? null,
     runHere: live.running,
     testing,
     queued,
-    recent
+    recent,
+    returns,
+    returnsMore,
+    hiveMerges: scope?.current === target,
+    inFlight: scope?.inFlight.get(target) ?? []
   }
 }
 
-/** The latest outcomes of a target's entries, newest first: merged, returned to the builder, cancelled. */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord): QueueRecent[] {
+/**
+ * The latest outcomes of a target's entries, newest first (merged, returned to the builder, cancelled), and the returns
+ * the panel shows (#1356's returns policy, HR3's rounds 1 to 4): every return not seen reachable, a return shown and seen
+ * usable for RETURN_SEEN_SHOWN_MS, the read bounded. A return is its card's newest outcome, the card not in the queue
+ * again (`again`: queued or testing), left out before anything is filled or counted. `returns` holds at most `bound`:
+ * first those seen less than RETURN_SEEN_SHOWN_MS ago (kept: by seen time, newest first, then the newer outcome, then
+ * the entry), then those not seen, newest first, in the slots the kept ones leave; `returnsMore` counts the unseen rest
+ * exactly. Only rows the panel shows get seen, and it shows only `returns`, so kept rows never outnumber the bound and
+ * nothing displaces them: the next unseen ones come as they fold (the window reads again then).
+ */
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, bound: number): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
   const out: (QueueRecent & { seq: number })[] = []
   const named = (f: Fact) => {
     const c = card(f.card)
@@ -85,16 +144,57 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
     const d = f.data as FactData['IntegrationFailed']
     // A target that moved is tested again (a new entry), never returned.
     if (d.target !== target || !entries.has(d.entry) || d.reason === 'targetMoved') continue
-    out.push({ ...named(f), entry: d.entry, outcome: 'returned', reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.log ? { log: d.log } : {}) })
+    const at = seen.get(d.entry)
+    out.push({ ...named(f), entry: d.entry, outcome: 'returned', reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
   }
   for (const f of wf.store.factsOfKind('IntegrationCancelled')) {
     const d = f.data as FactData['IntegrationCancelled']
     if (!entries.has(d.entry)) continue
     out.push({ ...named(f), entry: d.entry, outcome: 'cancelled', reason: d.reason })
   }
-  // Newest first: by time, and by each card's own order within one instant.
-  out.sort((a, b) => (a.at === b.at ? b.seq - a.seq : a.at < b.at ? 1 : -1))
-  return out.slice(0, RECENT_MAX).map(({ seq: _seq, ...r }) => r)
+  // Newest first: by time; within one instant, the later card, then each card's own order (a fixed order across reads).
+  const newer = (a: QueueRecent & { seq: number }, b: QueueRecent & { seq: number }): number => (a.at === b.at ? (a.card === b.card ? b.seq - a.seq : b.card - a.card) : a.at < b.at ? 1 : -1)
+  out.sort(newer)
+  const strip = ({ seq: _seq, ...r }: QueueRecent & { seq: number }): QueueRecent => r
+  const newest = new Set<number>()
+  const since = Date.now() - RETURN_SEEN_SHOWN_MS
+  const kept: (QueueRecent & { seq: number })[] = []
+  const unseen: (QueueRecent & { seq: number })[] = []
+  for (const r of out) {
+    const first = !newest.has(r.card)
+    newest.add(r.card)
+    if (!first || r.outcome !== 'returned' || again.has(r.card)) continue
+    if (!r.seen) unseen.push(r)
+    else if (Date.parse(r.seen) > since) kept.push(r)
+  }
+  // Kept by seen time, newest first; equal times (a page seen at once) by the newer outcome, as above.
+  kept.sort((a, b) => (a.seen === b.seen ? newer(a, b) : a.seen! < b.seen! ? 1 : -1))
+  const shownKept = kept.slice(0, bound)
+  const slots = bound - shownKept.length
+  return { recent: out.slice(0, RECENT_MAX).map(strip), returns: [...shownKept, ...unseen.slice(0, slots)].map(strip), returnsMore: Math.max(0, unseen.length - slots) }
+}
+
+/**
+ * A test seam (unpackaged builds only, as HIVE_TEST_SLOW_IPC): the window model's bound on returns made smaller, so an
+ * e2e reaches it with a few cards. Read at each listing (a suite sets it in main as it goes); a packaged build, or no
+ * value, has the real bound.
+ */
+function testSize(name: string, real: number): number {
+  if (app.isPackaged) return real
+  const n = Number(process.env[name])
+  return Number.isInteger(n) && n > 0 && n < real ? n : real
+}
+
+/**
+ * The user saw these returned entries of a target's queue (#1356: the Progress panel's Merges tab, open in a focused
+ * window): marked once, for every window and Hive, and the queue's windows told. Entries not returned in this target's
+ * queue are ignored.
+ */
+export async function markQueueSeen(ws: WorkspaceService, projectPath: string, target: string, entries: readonly string[]): Promise<void> {
+  const wf = await needWorkflow(ws, projectPath)
+  const returned = new Set(wf.store.factsOfKind('IntegrationFailed').filter((f) => (f.data as FactData['IntegrationFailed']).target === target).map((f) => (f.data as FactData['IntegrationFailed']).entry))
+  const marked = await wf.locked(() => wf.store.markQueueSeen(entries.filter((e) => returned.has(e))))
+  if (marked) queueChanged(ws, projectPath, target)
 }
 
 /**

@@ -26,6 +26,7 @@ import { applyTipsState, showTodaysTip } from './tips'
 import { startupReplay } from './startupReplay'
 import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
+import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { loadAssistantChanges } from './assistantUndo'
 import { agentOnScreen, applyLeftovers, applyLiveState, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
@@ -207,7 +208,10 @@ function handleEvent(e: HiveEvent): void {
       set((s) => ({ notesVersion: s.notesVersion + 1 }))
       break
     case 'tasks-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) scheduleTasksLoad()
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) {
+        scheduleTasksLoad()
+        queueBoardChanged()
+      }
       break
     case 'skills-changed':
       set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
@@ -236,6 +240,9 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'merge-slots-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ mergeSlots: e.slots })
+      break
+    case 'queue-changed':
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
       break
     case 'lanes-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })

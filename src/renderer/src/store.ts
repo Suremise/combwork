@@ -43,6 +43,8 @@ import type {
   Notice,
   WorkspaceInfo
 } from '@shared/types'
+import type { QueueView } from '@shared/workflow/queue'
+import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
@@ -255,6 +257,10 @@ interface State {
   progressRuns: ProgressRun[]
   /** This window's workspace's merge slots (#350): those held or waited for. */
   mergeSlots: MergeSlotInfo[]
+  /** This window's workspace's merge queues (#1356), every project's, as `queue:list` gives them (queueSource.ts). */
+  queues: QueueView[]
+  /** The returns this window showed and marked seen, kept until their own 10 s are up (#1356 round 6: queueSource.ts). */
+  queueKept: KeptReturn[]
   /** This window's workspace's lanes (#483), for the Progress panel (#484): running ones and those ended lately. */
   lanes: LaneInfo[]
   /** A pane (an agent's, or the Assistant's panel) briefly highlighted because something asked to show it: its pty key. */
@@ -485,6 +491,8 @@ export const useStore = create<State>(() => ({
   assistantOpen: false,
   progressRuns: [],
   mergeSlots: [],
+  queues: [],
+  queueKept: [],
   lanes: [],
   paneFlash: null,
   paneColumns: null,

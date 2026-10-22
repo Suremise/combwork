@@ -843,6 +843,14 @@
     "defaultMessage": "Merging into the folder you work in",
     "description": "A tip's title: the merge queue merging into a branch (main) that is checked out in the project folder."
   },
+  "tips.mergeQueuePanel.text": {
+    "defaultMessage": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue, Pause queue / Resume queue; 2.4: returned."
+  },
+  "tips.mergeQueuePanel.title": {
+    "defaultMessage": "Watch the merge queue",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
   "tips.mergeSlot.text": {
     "defaultMessage": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

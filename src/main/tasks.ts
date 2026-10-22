@@ -882,6 +882,20 @@ const clip = (s: string, max = 80): string => {
 /** A reviewer's request to its builder (#912) as its history line, which watches count (#1272). */
 export const requestNote = (asked: string): StoredText => storedText(HISTORY.reviewerRequest, { text: clip(asked) })
 
+/**
+ * Whether a comment counts as its reviewer's request to the builder (#1410): a plain comment (no move, no verdict) by
+ * the reviewer of the card's running lane, on its card in Review that it hasn't started reviewing ("waiting for #12
+ * first"), so its builder is woken as for hive_request_builder. Off with the project's loop wakes (Card loops → Wake
+ * reviewers and builders). Read in the change, on the card as it is then.
+ */
+async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[]): Promise<boolean> {
+  const self = actor.kind === 'agent' ? actor.self : undefined
+  if (!self || !card.project || !ws.path || said.length || patch.column !== undefined || patch.review !== undefined) return false
+  if (card.archived || card.column !== 'review' || card.review || !card.agent || card.agent === self.agentId) return false
+  if (FactStore.forBoard(ws, { project: card.project, key: '' }).card(card.number).reviewer !== self.agentId) return false
+  return (await ws.projectConfig(join(ws.path, card.project)).catch(() => null))?.loopWakes !== false
+}
+
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
 const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
 
@@ -1697,6 +1711,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     }
     // History lines of the caller's own (#1272: a reviewer's request, which watches count).
     if (opts.note) said.push(...opts.note)
+    else if (comment && (await laneReviewerAsks(ws, card, patch, actor, said))) said.push(requestNote(comment))
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card

@@ -123,14 +123,24 @@ export const NO_RUNS_FILTER: RunsFilter = { failedOnly: false, lane: null, agent
 export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun) => string, laneCards: readonly number[] | null = null): boolean {
   if (f.failedOnly && r.state !== 'failed') return false
   if (f.lane && laneCards && !(r.card && laneCards.includes(r.card))) return false
-  if (f.agent && r.agentId !== f.agent) return false
+  if (f.agent && runAgentKey(r) !== f.agent) return false
   const q = f.query.trim().toLowerCase()
   return !q || words(r).toLowerCase().includes(q)
 }
 
-/** The tabs' badges (#1309): merges waiting for the slot, unresolved failures (red), lanes. */
-export function tabBadges(slots: readonly MergeSlotInfo[], runs: readonly ProgressRun[], lanes: number): Record<ProgressTab, number> {
-  return { pulse: 0, merges: slots.reduce((n, s) => n + s.waiting.length, 0), runs: unresolvedFailures(runs).length, lanes }
+/**
+ * The Runs tab's Agent filter's value for a run's agent: its agent, or Hive's merge queue for Hive's own runs (#1356: the
+ * filter has "Hive (merge queue)"); null for the Assistant and scripts, which the filter doesn't offer.
+ */
+export const HIVE_RUNS = ':hive'
+export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source'>): string | null => r.agentId ?? (r.source === 'hive' ? HIVE_RUNS : null)
+
+/**
+ * The tabs' badges (#1309): merges waiting (agents waiting for a merge slot, and cards queued in the merge queues shown,
+ * #1356), unresolved failures (red), lanes.
+ */
+export function tabBadges(slots: readonly MergeSlotInfo[], runs: readonly ProgressRun[], lanes: number, queued = 0): Record<ProgressTab, number> {
+  return { pulse: 0, merges: slots.reduce((n, s) => n + s.waiting.length, 0) + queued, runs: unresolvedFailures(runs).length, lanes }
 }
 
 /** The latest run of a card (the dot on a lane's row in Pulse, #1309), or null. */

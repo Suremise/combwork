@@ -71,6 +71,50 @@ describe('lanes', () => {
     moved(await e.wf.submit(after.key, B2, { summary: 'x' }))
     expect(e.wf.state(after).stage).toBe('done') // no review under the new options
   })
+
+  describe('a card submitted ahead of its lane (#1410)', () => {
+    /** Cards 1–3 in a lane with R1 reviewing, card 3 started (before the lane listed it) and committed. */
+    async function ahead(enforced = true) {
+      const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }, { enforced: () => enforced }))
+      const [c1, c2, c3] = [1, 2, 3].map((n) => e.wf.createCard({ title: `Card ${n}` }))
+      const s = await e.wf.start(c3.key, B1)
+      moved(s)
+      commit(s.data!.folder as string, { 'three.txt': '3\n' }, 'three')
+      e.wf.startLane('L', [c1.id, c2.id, c3.id], 'R1')
+      return { e, c1, c2, c3 }
+    }
+
+    it('goes before the earlier cards nobody has started, recorded, and its reviewer is told to review it now', async () => {
+      const { e, c1, c2, c3 } = await ahead()
+      const r = await e.wf.submit(c3.key, B1, { summary: 'x' })
+      moved(r)
+      expect(String(r.data?.lane)).toContain(`moved ahead of ${c1.key}, ${c2.key}`)
+      expect(e.wf.lane('L')!.cards).toEqual([c3.id, c1.id, c2.id])
+      expect(e.kinds(c3.id)).toContain('LaneChanged')
+      const told = e.wakes.filter((w) => w.agent === 'R1' && w.card === c3.key)
+      expect(told).toHaveLength(1)
+      expect(told[0].why).toContain(`Review ${c3.key} now; the lane goes on to ${c1.key}`)
+      // The lane goes on from it: the next card once it is Done is card 1.
+      expect(e.wf.laneWaits(e.store.card(c1.id))?.id).toBe(c3.id)
+    })
+
+    it('stays where it is while an earlier card is in flight unreviewed, with rules off, or for the user\'s drag', async () => {
+      const a = await ahead()
+      // Card 1 started by the user's own drag (one at a time is the user's to skip): the lane waits on it as it is.
+      moved(await a.e.wf.move(a.c1.key, 'active', 'user', { confirm: true, reason: 'first', builder: 'B2' }))
+      moved(await a.e.wf.submit(a.c3.key, B1, { summary: 'x' }))
+      expect(a.e.wf.lane('L')!.cards).toEqual([a.c1.id, a.c2.id, a.c3.id])
+      expect(a.e.wakes.find((w) => w.agent === 'R1' && w.card === a.c3.key)?.why).toBe(`${a.c3.key} is in Review`)
+      a.e.close()
+      const off = await ahead(false)
+      moved(await off.e.wf.submit(off.c3.key, B1, { summary: 'x' }))
+      expect(off.e.wf.lane('L')!.cards).toEqual([off.c1.id, off.c2.id, off.c3.id])
+      off.e.close()
+      const drag = await ahead()
+      moved(await drag.e.wf.move(drag.c3.key, 'review', 'user', { confirm: true, reason: 'look' }))
+      expect(drag.e.wf.lane('L')!.cards).toEqual([drag.c1.id, drag.c2.id, drag.c3.id])
+    })
+  })
 })
 
 describe('the upgrade', () => {

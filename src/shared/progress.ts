@@ -462,10 +462,14 @@ export const SHOW_ALL: ProgressFilter = { project: ALL_PROJECTS }
 const projectOf = (r: ProgressRun): string => (r.projectPath ? r.projectPath.toLowerCase() : NO_PROJECT)
 const agentOf = (r: ProgressRun): string => r.agentId ?? r.agentName
 
-/** The filter's choices for these runs: each project that has runs, by its name, then "Assistant and scripts" when some run has no project. */
-export function filterChoices(runs: readonly ProgressRun[], nameOf: (projectPath: string) => string, tr: Tr): { value: string; label: string }[] {
+/**
+ * The filter's choices for these runs: each project that has runs (or a merge queue shown, `also`: their folders, #1356),
+ * by its name, then "Assistant and scripts" when some run has no project.
+ */
+export function filterChoices(runs: readonly ProgressRun[], nameOf: (projectPath: string) => string, tr: Tr, also: readonly string[] = []): { value: string; label: string }[] {
   const seen = new Map<string, string>()
   for (const r of runs) if (r.projectPath && !seen.has(projectOf(r))) seen.set(projectOf(r), nameOf(r.projectPath))
+  for (const p of also) if (!seen.has(p.toLowerCase())) seen.set(p.toLowerCase(), nameOf(p))
   const out = [...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
   if (runs.some((r) => !r.projectPath)) out.push({ value: NO_PROJECT, label: tr(msg({ id: 'board.filter.noProject', defaultMessage: 'Assistant and scripts', description: "A choice of the Progress panel's project filter: the runs of the Hive Assistant and of scripts, which belong to no project." })) })
   return out
@@ -479,12 +483,13 @@ export function agentChoices(runs: readonly ProgressRun[], project: string, tr: 
 }
 
 /**
- * The filter that applies to these runs: the chosen one while its project (and agent) still has runs and the runs span
- * more than one project; otherwise every run (the filter is hidden when there is nothing to choose between).
+ * The filter that applies to these runs: the chosen one while its project (and agent) still has runs (or a merge queue
+ * shown, `also`: their folders, #1356) and they span more than one project; otherwise every run (the filter is hidden
+ * when there is nothing to choose between).
  */
-export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined): ProgressFilter {
+export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined, also: readonly string[] = []): ProgressFilter {
   if (!chosen || chosen.project === ALL_PROJECTS) return SHOW_ALL
-  const projects = new Set(runs.map(projectOf))
+  const projects = new Set([...runs.map(projectOf), ...also.map((p) => p.toLowerCase())])
   if (projects.size < 2 || !projects.has(chosen.project)) return SHOW_ALL
   if (chosen.agent && !runs.some((r) => projectOf(r) === chosen.project && agentOf(r) === chosen.agent)) return { project: chosen.project }
   return chosen

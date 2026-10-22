@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { panelOrder } from '@shared/laneBar'
-import type { LaneCard, LaneInfo } from '@shared/types'
+import { columnSince, type LaneOrderView } from '@shared/tasks'
+import type { LaneCard, LaneInfo, TaskCard } from '@shared/types'
 import { call } from './api'
 import { get, set, useStore } from './store'
 
@@ -91,4 +92,29 @@ export function useLanes(load = true): Lane[] {
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])
+}
+
+/**
+ * A card's running lane as the stall check reads it (#1410: the lane's deadlock), from the lanes loaded now (useLanes
+ * loads them); null when it is in none. Its cards' places as the board has them now, their keys and last moves.
+ */
+export function useLaneOf(): (c: Pick<TaskCard, 'number' | 'project'>) => LaneOrderView | null {
+  const raw = useStore((s) => s.lanes ?? NO_INFO)
+  const tasks = useStore((s) => s.tasks)
+  return useMemo(() => {
+    const byNumber = new Map(tasks.map((t) => [t.number, t]))
+    const running = raw.filter((l) => (l.state === 'active' || l.state === 'paused') && l.reviewer)
+    return (c) => {
+      const l = running.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.cards.some((y) => y.number === c.number))
+      if (!l) return null
+      return {
+        builder: l.builder.id,
+        reviewer: l.reviewer?.id ?? null,
+        cards: l.cards.map((y) => {
+          const t = byNumber.get(y.number)
+          return { number: y.number, column: t?.column ?? y.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }
+        })
+      }
+    }
+  }, [raw, tasks])
 }

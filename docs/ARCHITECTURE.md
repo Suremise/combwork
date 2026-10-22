@@ -292,6 +292,15 @@ Assistant's `hive_queue` wraps them. A user pause is checked again inside `Integ
 lands while the advance waits for the repository lock stops it; Resume reads the recovery table without writing
 (`MergeQueue.stillStuck`) before it clears a needs-you pause.
 
+**The queue in the Progress panel** (#1356, SPEC §16.13's P5 line): the window reads every project's `queue:list` with
+the window's extra targets (`queueViews(…, window)`: the targets its cards in flight under Hive merges merge into, and the
+current options' target, as `inFlight` and `hiveMerges`) through `queueSource.ts`, again on `queue-changed`, and on
+`tasks-changed` (a card starting or finishing changes which queues show). `shared/progressQueue.ts` decides from that
+model which queues show and what their cards say (the estimate from Hive's runs, the returns until seen, Pulse's line,
+the announcements); `ProgressQueue.tsx` draws the queue's card (reused by #1357), the Merges tab's list beside the merge
+slot's cards (`ProgressMerge.tsx`), Pulse's lines and the polite live region. A return is marked seen with `queue:seen`
+(`workflow_queue_seen` in hive.db) when the Merges tab shows it in a focused window.
+
 **Hive's queue commits** (#1350, SPEC §16.9.1 step 4): `MergeQueue.testMerge` runs the merge (and a squash's commit)
 with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
