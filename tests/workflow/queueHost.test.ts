@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { kickQueue, setHolderWatch } from '../../src/main/workflow/queueHost'
+import { endHolderWatches, holderWatchState, kickQueue, setHolderWatch } from '../../src/main/workflow/queueHost'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { WorkspaceService } from '../../src/main/workspace'
 
@@ -92,37 +92,153 @@ describe('the merge queue host (#1348)', () => {
     expect(e.kinds(card.id).filter((k) => k === 'Integrated')).toHaveLength(1)
     expect(queueRefs(e)).toEqual([])
   })
-  it("another Hive's runner (#1455, S50): watched while it lives, never run here; once its process is gone, this Hive runs the queue and merges", async () => {
-    const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
-    sh(e.project, 'checkout', '-q', '--detach')
-    const card = e.wf.createCard({ title: 'Held' })
-    const s = await e.wf.start(card.key, B1)
-    moved(s)
-    commit(s.data!.folder as string, { 'src/held.txt': 'held\n' }, `${card.key}: Held`)
-    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
-    moved(await e.wf.startReview(card.key, R1))
-    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
-    ctx.wf = e.wf
-    ctx.folder = `${e.home}/queue`
-    const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined } as unknown as WorkspaceService
-    // Hive A's lease: a process that is there (this test's own), its start time as the probe says.
-    const at = new Date().toISOString()
-    e.store.takeQueueLease({ target: 'main', lease: 'la', token: 'ta', profile: 'Hive-A', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)
-    ctx.heldBy = { profile: 'Hive-A', pid: process.pid, renewedAt: at }
-    let aAlive = true
-    let looks = 0
-    setHolderWatch({ ms: 20, probe: { self: async () => ({ pid: 0, started: 0 }), alive: async () => (looks++, aAlive), list: async () => null, end: async () => [] } })
-    await kickQueue(ws, e.project, 'main')
+})
+
+/**
+ * A card approved and queued for main (checked out nowhere) while Hive A's runner holds the lease (#1455): A's lease (a
+ * process that is there, this test's own), the host's acquire answering "held by Hive-A" until `ctx.heldBy` is null,
+ * and a probe whose answers the test gives (`answer`: true for A living, false for gone, or a promise it settles).
+ */
+async function heldByA() {
+  const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
+  sh(e.project, 'checkout', '-q', '--detach')
+  const card = e.wf.createCard({ title: 'Held' })
+  const s = await e.wf.start(card.key, B1)
+  moved(s)
+  commit(s.data!.folder as string, { 'src/held.txt': 'held\n' }, `${card.key}: Held`)
+  moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  moved(await e.wf.startReview(card.key, R1))
+  moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+  ctx.wf = e.wf
+  ctx.folder = `${e.home}/queue`
+  /** A workspace object for e.home, as one opening of it: its own lifetime (abort it to close it). */
+  const open = () => {
+    const life = new AbortController()
+    return { life, ws: { path: e.home, lifetime: life.signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined } as unknown as WorkspaceService }
+  }
+  const at = new Date().toISOString()
+  e.store.takeQueueLease({ target: 'main', lease: 'la', token: 'ta', profile: 'Hive-A', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)
+  ctx.heldBy = { profile: 'Hive-A', pid: process.pid, renewedAt: at }
+  const probe = { looks: 0, answer: (): boolean | Promise<boolean> => true }
+  const watch = (ms: number) => setHolderWatch({ ms, probe: { self: async () => ({ pid: 0, started: 0 }), alive: async () => (probe.looks++, probe.answer()), list: async () => null, end: async () => [] } })
+  /** A's process gone: acquire takes the lease here from now on. */
+  const aGone = () => {
+    probe.answer = () => false
+    ctx.heldBy = null
+  }
+  return { e, card, open, probe, watch, aGone }
+}
+
+/** A promise the test settles. */
+function deferred<T>() {
+  let settle!: (v: T) => void
+  const p = new Promise<T>((r) => (settle = r))
+  return { p, settle }
+}
+
+// Bounds for a hung run only (#570): each wait waits for what it says.
+const HUNG = { timeout: 30_000, interval: 20 }
+
+describe("another Hive's runner, watched (#1455, S50; HR4's #1358 round 1)", () => {
+  it('watched while it lives, never run here; once its process is gone, this Hive runs the queue and merges', async () => {
+    const { e, card, open, probe, watch, aGone } = await heldByA()
+    watch(20)
+    await kickQueue(open().ws, e.project, 'main')
     // A lives: looked at again and again, never run here.
-    // Bounds for a hung run only (#570): each waits for what it says.
-    await vi.waitFor(() => expect(looks).toBeGreaterThanOrEqual(3), { timeout: 30_000, interval: 20 })
+    await vi.waitFor(() => expect(probe.looks).toBeGreaterThanOrEqual(3), HUNG)
     expect(ctx.acquired).toBe(1)
     expect(e.wf.state(card).stage).toBe('merging')
     // A's process gone (its lease left as it was): this Hive runs the queue, with no other kick, and merges the card.
-    aAlive = false
-    ctx.heldBy = null
-    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), { timeout: 30_000, interval: 50 })
+    aGone()
+    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
     expect(ctx.acquired).toBe(2)
     expect(e.kinds(card.id).filter((k) => k === 'Integrated')).toHaveLength(1)
+    expect(holderWatchState()).toEqual({ watched: 0, timers: 0 })
+  })
+
+  it("the workspace reopened before the old host's look: the new host owns a fresh watch, and takes over once A is gone", async () => {
+    const { e, card, open, aGone, watch } = await heldByA()
+    // The first opening's watch looks only in an hour: its timer would still hold the target's key at the reopen.
+    watch(3_600_000)
+    const first = open()
+    await kickQueue(first.ws, e.project, 'main')
+    expect(holderWatchState()).toEqual({ watched: 1, timers: 1 })
+    first.life.abort()
+    watch(20)
+    const second = open()
+    await kickQueue(second.ws, e.project, 'main')
+    // One watch, the new host's (the old one's timer cleared): it looks every 20 ms.
+    expect(holderWatchState()).toEqual({ watched: 1, timers: 1 })
+    aGone()
+    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
+    expect(ctx.acquired).toBe(3)
+    expect(holderWatchState()).toEqual({ watched: 0, timers: 0 })
+  })
+
+  it('the workspace closing ends its watch (endHolderWatches, as its close does); reopened, a new watch takes over once A is gone', async () => {
+    const { e, card, open, aGone, watch } = await heldByA()
+    watch(20)
+    const first = open()
+    await kickQueue(first.ws, e.project, 'main')
+    expect(holderWatchState().watched).toBe(1)
+    endHolderWatches(e.home)
+    first.life.abort()
+    expect(holderWatchState()).toEqual({ watched: 0, timers: 0 })
+    await kickQueue(open().ws, e.project, 'main')
+    expect(holderWatchState().watched).toBe(1)
+    aGone()
+    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
+  })
+
+  it('a run finding the lease held while a look awaits its probe keeps the one watch; settled, still one look waiting', async () => {
+    const { e, open, probe, watch } = await heldByA()
+    const pending = deferred<boolean>()
+    probe.answer = () => pending.p
+    watch(20)
+    const { ws } = open()
+    await kickQueue(ws, e.project, 'main')
+    await vi.waitFor(() => expect(probe.looks).toBe(1), HUNG)
+    // The look awaits A's probe: registered, no timer of its own meanwhile. A second run finds the lease held too.
+    expect(holderWatchState()).toEqual({ watched: 1, timers: 0 })
+    await kickQueue(ws, e.project, 'main')
+    expect(ctx.acquired).toBe(2)
+    expect(holderWatchState()).toEqual({ watched: 1, timers: 0 })
+    // A still lives: the one watch looks again later, one timer.
+    probe.answer = () => true
+    pending.settle(true)
+    await vi.waitFor(() => expect(holderWatchState()).toEqual({ watched: 1, timers: 1 }), HUNG)
+    await vi.waitFor(() => expect(probe.looks).toBeGreaterThanOrEqual(3), HUNG)
+    expect(holderWatchState()).toEqual({ watched: 1, timers: 1 })
+    expect(ctx.acquired).toBe(2)
+  })
+
+  it('the workspace closing while a look awaits its probe: the probe answering "gone" afterwards kicks nothing', async () => {
+    const { e, card, open, probe, watch, aGone } = await heldByA()
+    const pending = deferred<boolean>()
+    probe.answer = () => pending.p
+    watch(20)
+    const first = open()
+    await kickQueue(first.ws, e.project, 'main')
+    await vi.waitFor(() => expect(probe.looks).toBe(1), HUNG)
+    endHolderWatches(e.home)
+    first.life.abort()
+    aGone()
+    pending.settle(false)
+    // The ended look sees it is no longer the target's watch: no run, no new watch.
+    await vi.waitFor(() => expect(holderWatchState()).toEqual({ watched: 0, timers: 0 }), HUNG)
+    expect(ctx.acquired).toBe(1)
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+
+  it('the entries gone (the card removed from the queue): the watch ends, and A going later kicks nothing', async () => {
+    const { e, card, open, probe, watch, aGone } = await heldByA()
+    watch(20)
+    await kickQueue(open().ws, e.project, 'main')
+    await vi.waitFor(() => expect(probe.looks).toBeGreaterThanOrEqual(1), HUNG)
+    moved(await e.wf.removeFromQueue(card.key, 'not now'))
+    await vi.waitFor(() => expect(holderWatchState()).toEqual({ watched: 0, timers: 0 }), HUNG)
+    aGone()
+    expect(ctx.acquired).toBe(1)
+    expect(e.kinds(card.id)).not.toContain('Integrated')
   })
 })
