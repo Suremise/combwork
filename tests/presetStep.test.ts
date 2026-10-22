@@ -148,6 +148,16 @@ describe('the answer (#1423)', () => {
     expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
   })
 
+  it("a folder found by a refresh is made a project as opening makes one: its platform recorded, it asks", async () => {
+    const { w, repo } = await workspace()
+    const found = join(repo, '..', 'found')
+    mkdirSync(found, { recursive: true })
+    await w.refresh()
+    const cfg = await w.projectConfig(found)
+    expect(cfg.platform).toBe('none')
+    expect(asksPreset(cfg, 'none')).toBe(true)
+  })
+
   it("a board made by 1.0 gives its projects no upgrade options: they ask", async () => {
     const { w, repo } = await workspace(undefined, [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }])
     await adoptNow(w)

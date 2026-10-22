@@ -1232,7 +1232,8 @@ Everything is visible in the Version Control tab itself, not only through the As
 **Built [#1423], "How do you work? Solo / Pair / Team":**
 - **Who asks, per platform** (`asksPreset`, `src/shared/workflow/presetStep.ts`): a project whose platform in force has
   no preset, no options of its own and no answer (`workflow.presetAsked`). That is a project added since 1.0 (New
-  Project, a folder found when the workspace is read, one the Assistant or the Agent API adds) and one switched to a
+  Project, a folder found when the workspace is read, its project.json made then as opening makes it, one the
+  Assistant or the Agent API adds) and one switched to a
   platform it never had (#1419: nothing in `kept`), even with its other platform answered. A project from before 1.0
   (no platform recorded) never asks, also before its upgrade has run: the upgrade writes its options (it gets the
   one-time presets notice, §16.17).

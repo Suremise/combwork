@@ -5,7 +5,7 @@
 // section's own save, which records `chosen` (optionsForm.ts).
 
 import { createLogger, userText } from '../logger'
-import { projectPlatform } from '../platform/registry'
+import { projectPlatform } from '../platform/registry'
 import { isPlatformId } from '../../shared/platform/descriptors'
 import { HiveError } from '../hiveError'
 import { asksPreset } from '../../shared/workflow/presetStep'
