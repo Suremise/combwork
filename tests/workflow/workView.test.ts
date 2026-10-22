@@ -296,7 +296,7 @@ describe("a branch's cards (#1424)", () => {
   it("a later fact on an older card (a refused start) doesn't put it first (HR4's round 1): the cycles' starts decide", () => {
     // Card 1 started at :01 and merged; card 2 started at :20 and merged; then a start of card 1 refused at :40.
     const at = (s: number): string => `2026-10-22T10:00:${String(s).padStart(2, '0')}.000Z`
-    const f = (card: number, seq: number, s: number, kind: Fact['kind'], data: unknown): Fact => ({ seq, card, kind, at: at(s), actor: 'hive', source: 'recorded', data }) as Fact
+    const f = (card: number, n: number, s: number, kind: Fact['kind'], data: unknown): Fact => ({ seq: n, card, kind, at: at(s), actor: 'hive', source: 'recorded', data }) as Fact
     const one = [f(1, 1, 1, 'Started', start()), f(1, 2, 2, 'Moved', moved('todo', 'active')), f(1, 3, 3, 'Integrated', { entry: 'e1', revision: 'rev1', target: 'main', result: 'merge1', method: 'merge', by: 'hive' }), f(1, 4, 4, 'Moved', moved('approved', 'done'))]
     const later = [...one, f(1, 5, 40, 'Refused', { move: 'start', rule: 'lane.oneAtATime', message: 'm', next: 'n', values: {} })]
     const two = [f(2, 1, 20, 'Started', start()), f(2, 2, 21, 'Moved', moved('todo', 'active')), f(2, 3, 22, 'Integrated', { entry: 'e2', revision: 'rev2', target: 'main', result: 'merge2', method: 'merge', by: 'hive' }), f(2, 4, 23, 'Moved', moved('approved', 'done'))]
