@@ -2859,6 +2859,21 @@ export interface ProgressRun {
   noInstall?: true
   /** Hive's own install run (#1349): the setup command as written, after node_modules was removed (Hive has no clean form of it). */
   installAsWritten?: true
+  /** Hive's own failed merge check or install that counts as temporary (#1362): why, and the network error code that said so. */
+  transient?: TransientFailure
+}
+
+/**
+ * Why a failed merge check counts as the environment's failure, not the work's (#1349, #1362): it couldn't start, its
+ * program wasn't found, it ran out of time, it was ended from outside, it exited 75 (the project's own "temporary
+ * failure, try again"), or a network error code was in its last 40 lines.
+ */
+export type TransientCause = 'spawn' | 'notFound' | 'timeout' | 'killed' | 'exit75' | 'network'
+
+/** A transient failure's cause, with the network error code found (`network`). */
+export interface TransientFailure {
+  cause: TransientCause
+  code?: string
 }
 
 /** Why a run doesn't count as a check (SPEC §16.13), as its `CheckRan` says. */
