@@ -166,12 +166,6 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
     // Its Git repository gone, or another version control found (#1419, S20): what Hive offers in its place is None.
     repositoryGone: () => detect(project.path).platform !== 'git',
-    // The project's own G7, not one inherited (OP-29: a subfolder project merges only into a branch it names).
-    ownTarget: async () => {
-      const w = (await ws.projectConfig(project.path)).workflow
-      const t = w?.platform === 'git' ? w.options.target : undefined
-      return typeof t === 'string' && t.trim() ? t : null
-    },
     movePending: async () => {
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
       return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)

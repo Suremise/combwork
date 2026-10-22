@@ -41,6 +41,12 @@ export interface WorkflowOptions {
   style: 'merge' | 'squash'
   /** G7: the target line; empty means the repository's default branch. */
   target: string
+  /**
+   * G7 named by the project's own options, not inherited from the workspace's or Hive's (#1419, OP-29): never set by a
+   * level, worked out as options are resolved, so a card or lane keeps it with the rest of its ruleset. The merge queue
+   * merges a card of a project inside a larger repository only when its ruleset has it.
+   */
+  targetOwn?: true
   /** G8. */
   strict: boolean
   /** G9: named checks on the merged result (Hive merges only). */
@@ -218,6 +224,9 @@ export type Contradiction = keyof typeof CONTRADICTIONS
  */
 export const subfolderNeedsTarget = (o: WorkflowOptions, own: Partial<WorkflowOptions>, subfolder: boolean): boolean => subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !(typeof own.target === 'string' && own.target.trim())
 
+/** `targetOwn` (#1419): a Git project's target set by its own options. Worked out as options are resolved. */
+export const ownsTarget = (o: WorkflowOptions, targetFrom: string): boolean => o.platform === 'git' && !!o.target && targetFrom === 'project'
+
 export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'agentThenYou'
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'
 
@@ -261,6 +270,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
   target: (v) => typeof v === 'string',
+  targetOwn: (v) => v === true,
   strict: bool,
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),

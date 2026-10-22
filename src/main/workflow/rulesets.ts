@@ -6,7 +6,7 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, subfolderNeedsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, ownsTarget, subfolderNeedsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
@@ -88,6 +88,8 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
       origins[k as keyof WorkflowOptions] = origin
     }
   }
+  // Who named the target (OP-29, #1419): part of the ruleset, so a card or lane started now keeps it.
+  if (ownsTarget(options, origins.target)) options.targetOwn = true
   let compiled: ReturnType<typeof compile>
   try {
     compiled = compile(options)
@@ -118,6 +120,8 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   const options = { ...resolved.options, ...own.set }
   const origins = { ...resolved.origins }
   for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
+  delete options.targetOwn
+  if (ownsTarget(options, origins.target)) options.targetOwn = true
   // A project inside a larger repository (OP-29, #1419): Hive's or the agent's merges only into a branch it names itself.
   const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [

@@ -122,8 +122,6 @@ export interface WorkflowConfig {
    * instead): a Git card's refusal for what couldn't be read then offers the switch to None as its next step.
    */
   repositoryGone?: () => boolean
-  /** The target (G7) the project's own options name, or null (inherited, or the default branch): OP-29's owner (#1419). */
-  ownTarget?: () => Promise<string | null>
   /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
   locksOf?: (agent: string) => string[]
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
@@ -588,8 +586,6 @@ export class Workflow {
     if (!this.platform(o).planCovered(before.primed, plan)) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     const { existing, ...planned } = plan
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
-    // Its target named by the project itself (OP-29, #1419), as the queue's backstop asks of a subfolder project.
-    if (o.target && (await this.cfg.ownTarget?.()) === o.target) data.targetOwn = true
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: true }, before, warnings }

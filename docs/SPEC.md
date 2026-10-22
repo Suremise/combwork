@@ -1220,9 +1220,11 @@ Everything is visible in the Version Control tab itself, not only through the As
 - **A subfolder of a larger repository (OP-29):** when Hive or the agent merges, the target branch (G7) must be set by
   the project itself, not inherited: the contradiction `subfolderTarget` ("This project is inside a larger repository:
   name the branch its work merges into"), checked when options are saved (the form, the settings tool), with the
-  project's folder among the check's inputs. The queue's backstop: in a subfolder project, an entry whose card didn't
-  start with a target the project's own options name (its Started's `targetOwn`, never one inherited from the
-  workspace's or Hive's defaults) pauses its queue (`subfolderTarget`), saying how to go on.
+  project's folder among the check's inputs. Who named the target is part of the ruleset: resolving the options sets
+  `targetOwn` (never set by a level) when the project's own options name a Git target, so a card, or a lane's next
+  card after a switch or a target edit, keeps it with the rest of its rules. The queue's backstop: in a subfolder
+  project, an entry whose card's ruleset lacks `targetOwn` (no target, or one inherited from the workspace's or Hive's
+  defaults) pauses its queue (`subfolderTarget`), saying how to go on.
 - `hive_project_status` gives `versionControl`: the platform, what is found, and any offer.
 
 ### 16.4 Facts

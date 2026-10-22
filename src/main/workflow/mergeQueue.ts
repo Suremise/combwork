@@ -634,9 +634,9 @@ export class MergeQueue {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
-      // OP-29's backstop (#1419): inside a larger repository, only into a branch the project itself named when the card
-      // started (its Started's `targetOwn`), never one inherited from the workspace's or Hive's defaults.
-      if (!s.started?.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
+      // OP-29's backstop (#1419): inside a larger repository, only into a branch the project itself named in the card's
+      // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Hive's defaults.
+      if (!this.wf.rulesetOf(card, s).options.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
       const revision = s.approved?.revision ?? entry.revision
       const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
       let expected: string

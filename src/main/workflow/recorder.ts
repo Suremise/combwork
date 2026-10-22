@@ -49,8 +49,6 @@ export interface Reads {
   ruleset?: Ruleset
   /** Each field that couldn't be read, and why. */
   unknown: Record<string, string>
-  /** A start's target is one the project's own options name (OP-29, #1419: Started's `targetOwn`). */
-  targetOwn?: true
 }
 
 /** A change's context: who made it, and the reads made for its cards before it. */
@@ -169,9 +167,6 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
       r.unknown.ruleset = `the project's options couldn't be read (${e instanceof Error ? e.message : String(e)})` // i18n-ignore: a fact's note, in English for agents
     }
   }
-  // Its target named by the project itself, not inherited (OP-29, #1419): what the queue's backstop asks of a subfolder.
-  const ownTarget = cfg.workflow?.platform === 'git' ? cfg.workflow.options.target : undefined
-  if (r.ruleset?.options.target && typeof ownTarget === 'string' && ownTarget.trim() && ownTarget === r.ruleset.options.target) r.targetOwn = true
   // None (no version control): no line, head or base yet (P5 adds its manifests).
   if (projectPlatform(projectPath, cfg.platform).id !== 'git') return r
   const take = <T>(field: string, v: Maybe<T>): T | null => {
@@ -323,7 +318,6 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
           target: mine?.target ?? null,
           builder: after.agent!,
           cardKind: record.kind,
-          ...(mine?.targetOwn ? { targetOwn: true as const } : {}),
           ...unknownOf(mine, ['line', 'base', 'target', 'ruleset'])
         }
       })

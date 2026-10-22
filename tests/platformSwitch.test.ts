@@ -248,6 +248,34 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
     expect((await form.checkWorkflowChange(w, repo, { preset: null, options: { ...pair, target: '' } })).problems).toEqual([])
   })
 
+  it("who named the target is part of the ruleset: the project's own, never one inherited", async () => {
+    const { resolveOptions } = await import('../src/main/workflow/rulesets')
+    expect(resolveOptions('git', { project: { target: 'main' } }).options.targetOwn).toBe(true)
+    expect(resolveOptions('git', { workspace: { git: { target: 'main' } }, project: {} }).options).not.toHaveProperty('targetOwn')
+    expect(resolveOptions('git', { project: { target: '' } }).options).not.toHaveProperty('targetOwn')
+    // A level can't set it itself.
+    expect(resolveOptions('git', { project: { targetOwn: true } as never }).invalid).toMatch(/unknown option targetOwn/)
+    // And it is a rule: the same target, named elsewhere, is another ruleset.
+    const { compile } = await import('../src/shared/workflow/compile')
+    const own = compile(resolveOptions('git', { project: { target: 'main' } }).options)
+    const inherited = compile(resolveOptions('git', { workspace: { git: { target: 'main' } } }).options)
+    expect(own.ok && inherited.ok && own.ruleset.id !== inherited.ruleset.id).toBe(true)
+  })
+
+  it("a lane's next card keeps its rules' own target after a switch to None and after a target edit (HR3's round 2)", async () => {
+    const own = { ...allOff('git'), finish: 'committed' as const, folder: 'project' as const, target: 'main' }
+    for (const after of ['switch', 'edit'] as const) {
+      const { w, repo } = await workspace({ platform: 'git', subfolder: true, workflow: { platform: 'git', preset: null, options: own } })
+      const card = await inWorkspace(w, () => tasks.createTask({ title: 'Lane card', project: 'p' }, user))
+      await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [card.number], name: 'git lane', by: 'B1 (p)' })
+      if (after === 'switch') await sw.setPlatform(w, repo, 'none', { expected: 'git' })
+      else await form.setWorkflowOptions(w, repo, { preset: null, options: { ...own, target: 'dev' } })
+      const wf = (await workflowFor(w, repo))!
+      expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+      expect(wf.rulesetOf(wf.store.card(card.number)).options).toMatchObject({ platform: 'git', target: 'main', targetOwn: true })
+    }
+  })
+
   describe("the queue's backstop", () => {
     let env: ReturnType<typeof setup> | null = null
     afterEach(() => {
@@ -255,9 +283,9 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       env = null
     })
 
-    /** A card approved and queued, its options' target as given, the project's own target as `own` says. */
-    async function queued(target: string, own: string | null) {
-      const e = (env = setup({ ...preset('git', 'pair', { quick: [], tests: [] }), target, preChecks: [], mergeChecks: [] }, { ownTarget: async () => own }))
+    /** A card approved and queued, its ruleset's target as given, named by the project itself when `own`. */
+    async function queued(target: string, own: boolean) {
+      const e = (env = setup({ ...preset('git', 'pair', { quick: [], tests: [] }), target, preChecks: [], mergeChecks: [], ...(own ? { targetOwn: true as const } : {}) }))
       const card = e.wf.createCard({ title: 'Change' })
       const s = await e.wf.start(card.key, B1)
       moved(s)
@@ -269,7 +297,7 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
     }
 
     it('no target: the queue pauses in a subfolder project, and merges in a project at its root', async () => {
-      const { e, card } = await queued('', null)
+      const { e, card } = await queued('', false)
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])
       expect(e.wf.state(card).stage).toBe('merging')
       e.store.setQueuePause('main', null)
@@ -277,15 +305,15 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
     })
 
     it("a target inherited from the workspace's or Hive's defaults pauses it too (HR3's round 1, finding 2)", async () => {
-      const { e, card } = await queued('main', null)
-      expect(e.wf.state(card).started).not.toHaveProperty('targetOwn')
+      const { e, card } = await queued('main', false)
+      expect(e.wf.rulesetOf(card).options).not.toHaveProperty('targetOwn')
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])
       expect(e.wf.state(card).stage).toBe('merging')
     })
 
-    it("the project's own target, named when the card started: merged", async () => {
-      const { e, card } = await queued('main', 'main')
-      expect(e.wf.state(card).started).toMatchObject({ targetOwn: true })
+    it("the project's own target, in the card's ruleset: merged", async () => {
+      const { e, card } = await queued('main', true)
+      expect(e.wf.rulesetOf(card).options).toMatchObject({ targetOwn: true })
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'integrated' }])
     })
   })
