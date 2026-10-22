@@ -108,7 +108,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -142,9 +142,17 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     endedAt: rec.endedAt,
     mergeCommit: rec.mergeCommit,
     status,
-    queued: running(rec) && rec.pending ? [...rec.pending] : null
+    queued: running(rec) && rec.pending ? [...rec.pending] : null,
+    oldRules: laneOldRules(rec, rulesetNow),
+    stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null
   }
 }
+
+/**
+ * Whether a lane runs under old rules (#1421, §16.5.4): running, with a ruleset recorded when it started (none from
+ * before 1.0, nor while rules weren't enforced) that isn't its project's now (`now`: main's; none known, no mark).
+ */
+export const laneOldRules = (rec: Pick<LaneRecord, 'state' | 'ruleset'>, now: string | null | undefined): boolean => running(rec) && !!rec.ruleset && !!now && rec.ruleset !== now
 
 /** What a lane's status reads of a card's facts (#1270): its stage, an open request for you, a stale pass, its rounds. */
 export interface LaneCardFacts {

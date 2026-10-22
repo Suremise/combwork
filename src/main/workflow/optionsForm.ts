@@ -128,7 +128,7 @@ export async function projectStages(ws: WorkspaceService, projectPath: string): 
   const cfg = await ws.projectConfig(p.path)
   const r = resolvedOf(ws, p.path, p.platform.id, cfg)
   const compiled = compile(r.options)
-  return { stages: compiled.ok ? compiled.ruleset.stages : mustCompile(allOff(p.platform.id)).stages, names: r.options.stageNames ?? {} }
+  return { stages: compiled.ok ? compiled.ruleset.stages : mustCompile(allOff(p.platform.id)).stages, names: r.options.stageNames ?? {}, preset: cfg.workflow?.platform === p.platform.id ? (cfg.workflow.preset ?? null) : null }
 }
 
 /** A problem in English (the Assistant's tools, the log). */

@@ -4,6 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
+import { cardOldRulesNote, laneOldRulesNote, pulseLanes } from '../src/shared/laneBar'
+import { laneLegend, legendSources, segmentStage } from '../src/shared/laneStages'
+import { mustCompile } from '../src/shared/workflow/compile'
+import { preset } from '../src/shared/workflow/options'
 import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
 import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
 import { fmt, tr } from '../src/shared/i18n'
@@ -367,7 +371,7 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, oldRules: false, stages: null, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
@@ -434,9 +438,10 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(marks).toEqual({
       refused: ['AL-27: AL-27 has no change to review. Commit the work, then submit.'],
       stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
-      override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand']
+      override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand'],
+      oldRules: []
     })
-    expect(foldedMarks({ frozen: [] }, badges, segs, [1, 2, 27], () => short, tr, names)).toEqual({ refused: [], stale: [], override: [] })
+    expect(foldedMarks({ frozen: [] }, badges, segs, [1, 2, 27], () => short, tr, names)).toEqual({ refused: [], stale: [], override: [], oldRules: [] })
   })
 
   it('why a lane waits, in the window (#1279): each reason, the card by its key', () => {
@@ -471,5 +476,125 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(laneSegmentWork(frozen, badge({ stage: 'done', merged: 'c3c3c3c3c3c3c3' }), seg, short, tr)).toEqual(['Merged as a1a1a1a'])
     // The lane that has it now reads its facts.
     expect(laneSegmentWork({ frozen: null, mergeCommit: null }, later, cardSegment(7, card(7, 'review')), short, tr)).toEqual(['Under review: b2b2b2b', 'Last verdict: failed on b2b2b2b', 'Checks on it: 0 passed, 1 failed'])
+  })
+})
+
+describe('stages in a lane (#1421): names over the categories, the divider, the legend, Solo, old rules', () => {
+  // A Pair project where Hive merges: Review, Approved and Merging (Merging inside Approved).
+  const pairStages = { stages: mustCompile(preset('git', 'pair')).stages, names: {} }
+  const solo = { stages: mustCompile(preset('git', 'solo')).stages, names: {} }
+  const withBadge = (stage: WorkBadge['stage']) => ({ stage })
+
+  it("a segment says its card's stage: Merging inside Approved, a project's rename; the category's colour stays its state", () => {
+    expect(pairStages.stages.map((s) => s.id)).toEqual(expect.arrayContaining(['review', 'approved', 'merging']))
+    const merging = segmentStage(card(7, 'passed'), withBadge('merging'), pairStages, tr)
+    expect(merging).toMatchObject({ id: 'merging', name: 'Merging', renamed: false })
+    const seg = segmentIn(7, card(7, 'passed'), tr, merging)
+    expect(seg.state).toBe('passed')
+    expect(seg.label).toBe('#7 Card 7 · Merging')
+    expect(segmentName(seg)).toContain('Merging')
+    expect(segmentIn(8, card(8, 'review'), tr, segmentStage(card(8, 'review'), withBadge('review'), pairStages, tr)).label).toBe('#8 Card 8 · Review, round 1')
+    // Renamed by the project (N5): its own name.
+    const renamed = { ...pairStages, names: { review: 'Checking' } }
+    expect(segmentIn(8, card(8, 'review'), tr, segmentStage(card(8, 'review'), withBadge('review'), renamed, tr)).label).toBe('#8 Card 8 · Checking, round 1')
+    // A badge read before the card's last move (another category): its column's stage.
+    expect(segmentStage(card(9, 'done'), withBadge('merging'), pairStages, tr).id).toBe('done')
+    // No stages known (the project's version control not recorded): the stage's own name, no divider.
+    expect(segmentStage(card(9, 'doing'), undefined, undefined, tr)).toEqual({ id: 'active', name: 'Active', renamed: false, category: [] })
+  })
+
+  it("Approved with Merging: both in the hover with a divider, the card's own marked; one stage: none", () => {
+    const approved = segmentIn(7, card(7, 'passed'), tr, segmentStage(card(7, 'passed'), withBadge('approved'), pairStages, tr))
+    expect(approved.stages).toEqual([
+      { id: 'approved', name: 'Approved', own: true },
+      { id: 'merging', name: 'Merging', own: false }
+    ])
+    expect(segmentIn(8, card(8, 'review'), tr, segmentStage(card(8, 'review'), withBadge('review'), pairStages, tr)).stages).toBeUndefined()
+    // A card still in a stage its project's options no longer produce shows it beside the others (§16.5.2).
+    expect(solo.stages.map((s) => s.id)).not.toContain('merging')
+    expect(segmentStage(card(7, 'passed'), withBadge('merging'), solo, tr).category.map((s) => s.id)).toContain('merging')
+  })
+
+  it('a card On Hold says it waits for you, or its renamed stage', () => {
+    const hold = card(5, 'hold')
+    expect(segmentIn(5, hold, tr, segmentStage(hold, undefined, pairStages, tr)).label).toBe('#5 Card 5 · On Hold, waiting for you')
+    expect(segmentIn(5, hold, tr, segmentStage(hold, undefined, { ...pairStages, names: { hold: 'Parked' } }, tr)).label).toBe('#5 Card 5 · Parked')
+  })
+
+  it("the legend: by category in the lanes' order, each with its segment's look and the stages of the projects shown, renames once each", () => {
+    const groups = laneLegend([pairStages, { ...pairStages, names: { approved: 'Ready' } }], tr)
+    expect(groups.map((g) => g.category)).toEqual(['todo', 'doing', 'review', 'passed', 'done', 'hold'])
+    expect(groups.map((g) => g.state)).toEqual(['todo', 'doing', 'review', 'passed', 'done', 'blocked'])
+    const approved = groups.find((g) => g.category === 'passed')!
+    expect(approved.name).toBe('Approved')
+    expect(approved.stages).toEqual(['Approved', 'Merging', 'Ready'])
+    // A category whose only stage has its own name lists none.
+    expect(groups.find((g) => g.category === 'review')!.stages).toEqual([])
+    // No projects known: the categories alone.
+    expect(laneLegend([], tr).every((g) => g.stages.length === 0)).toBe(true)
+  })
+
+  it("Pulse leaves out a Solo project's ended lanes, never a running one; Pair, Team and none as they are", () => {
+    const lanes = [
+      { id: 'a', project: 'solo', state: 'ended' as LaneState },
+      { id: 'b', project: 'solo', state: 'active' as LaneState },
+      { id: 'c', project: 'solo', state: 'paused' as LaneState },
+      { id: 'd', project: 'team', state: 'ended' as LaneState },
+      { id: 'e', project: 'none', state: 'abandoned' as LaneState }
+    ]
+    const presets: Record<string, string | null> = { solo: 'solo', team: 'team', none: null }
+    expect(pulseLanes(lanes, (p) => presets[p]).map((l) => l.id)).toEqual(['b', 'c', 'd', 'e'])
+  })
+
+  it("old rules: the lane's mark and a card's line say what they mean, and that rules aren't enforced when off", () => {
+    expect(laneOldRulesNote(true, tr)).toBe('Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.')
+    expect(laneOldRulesNote(false, tr)).toMatch(/Workflow rules aren’t enforced now/)
+    const seg = cardSegment(7, card(7, 'doing'))
+    const names = { list: (items: string[]) => items.join(', '), ruleName: (id: string) => id }
+    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, oldRules: true, stages: null, lastSeq: 3 }
+    expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names).oldRules).toBe(cardOldRulesNote(true, tr))
+    expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names, false).oldRules).toMatch(/aren’t enforced now/)
+    // An ended lane's segments have no marks; nor a card without it.
+    expect(segmentMarks({ frozen: [] }, b, seg, (x) => x, tr, names).oldRules).toBeUndefined()
+    expect(segmentMarks({ frozen: null }, { ...b, oldRules: false }, seg, (x) => x, tr, names).oldRules).toBeUndefined()
+    // Folded into "✓ n" or "+n", the mark isn't lost.
+    expect(foldedMarks({ frozen: null }, new Map([[7, b]]), [seg], [7], () => (x) => x, tr, names).oldRules).toEqual([`#7: ${cardOldRulesNote(true, tr)}`])
+  })
+})
+
+describe("old rules keep their stages (HR4's #1421 round 1): the options now produce others", () => {
+  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Hive merges).
+  const pair = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
+  const soloNow = { stages: mustCompile(preset('git', 'solo')).stages, names: { approved: 'Ready' } }
+
+  it("a card in flight keeps its own ruleset's stages for its divider; names are the project's now", () => {
+    expect(soloNow.stages.map((s) => s.id)).not.toContain('approved')
+    const s = segmentStage(card(7, 'passed'), { stage: 'merging', stages: pair }, soloNow, tr)
+    expect(s.category).toEqual([
+      { id: 'approved', name: 'Ready' },
+      { id: 'merging', name: 'Merging' }
+    ])
+    // Without its own stages it would read the project's now: Merging alone, no divider.
+    expect(segmentStage(card(7, 'passed'), { stage: 'merging' }, soloNow, tr).category.map((x) => x.id)).toEqual(['merging'])
+  })
+
+  it("a lane's card in Todo takes its lane's recorded stages", () => {
+    // A Todo card's category is Todo, one stage: its lane's stages give the category list it reads from.
+    const todo = segmentStage(card(8, 'todo'), undefined, soloNow, tr, pair)
+    expect(todo.id).toBe('todo')
+    // A lane's Approved card with no badge yet (none read): the lane's stages, Approved and Merging.
+    expect(segmentStage(card(9, 'passed'), undefined, soloNow, tr, pair).category.map((x) => x.id)).toEqual(['approved', 'merging'])
+  })
+
+  it('the legend lists the stages the lanes shown have: an old-rules lane and its cards, by the names now', () => {
+    const badges = new Map([[7, { stages: pair }]])
+    const sources = legendSources([{ project: 'alpha', stages: pair, cards: [7], frozen: null }], () => soloNow, badges)
+    const approved = laneLegend(sources, tr).find((g) => g.category === 'passed')!
+    expect(approved.stages).toEqual(['Ready', 'Merging'])
+    // A lane with none recorded, or ended: its project's stages now (no Merging); an ended lane's cards add none.
+    const now = laneLegend(legendSources([{ project: 'alpha', stages: null, cards: [], frozen: null }], () => soloNow, new Map()), tr)
+    expect(now.find((g) => g.category === 'passed')!.stages).toEqual([])
+    const ended = laneLegend(legendSources([{ project: 'alpha', stages: pair, cards: [7], frozen: [] }], () => soloNow, badges), tr)
+    expect(ended.find((g) => g.category === 'passed')!.stages).toEqual([])
   })
 })

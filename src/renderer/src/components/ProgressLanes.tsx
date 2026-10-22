@@ -1,15 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
+import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
+import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
-import type { ProgressRun } from '@shared/types'
+import type { ProgressRun, ProjectStages } from '@shared/types'
 import { latestRunOf } from '@shared/progressTabs'
 import { useWorkBadges } from '../cardWork'
+import { useProjectStages } from '../projectStages'
 import { OVERRIDE_NAMES } from './CardWork'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, cardLabelOf, confirm, get, notify, set, useLanguage, useStore } from '../store'
+import { NO_PROJECTS, cardLabelOf, confirm, get, notify, openVersionControl, set, useLanguage, useStore } from '../store'
 import { openLaneStart } from './LaneStartDialog'
 import { saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
 import { useNow } from '../usage'
@@ -61,11 +63,17 @@ const waitsForYou = (l: Lane): boolean => laneRunning(l.state) && (l.status?.rea
  * `runs`: the runs shown, for the dot on each lane's row (its current card's latest run, #1309). `full`: the Lanes tab's
  * (#1309): every lane at its full height, with no fold bar or edge (Pulse's lanes have them).
  */
-export function LanesSection({ lanes, all, width, runs = [], full = false }: { lanes: Lane[]; all: Lane[]; width: number; runs?: ProgressRun[]; full?: boolean }) {
+export function LanesSection({ lanes: given, all, width, runs = [], full = false }: { lanes: Lane[]; all: Lane[]; width: number; runs?: ProgressRun[]; full?: boolean }) {
   useLanguage()
   const ws = useStore((s) => s.workspace?.path ?? null)
   // What each live card's facts say (#1225), once for every lane: read again whenever the board is.
   const badges = useWorkBadges()
+  // Each project's stages and names (#1421): a segment says its card's stage, and the legend the stages of the lanes' projects.
+  const stages = useProjectStages()
+  // Pulse leaves out a Solo project's lanes unless one runs (#1421); the Lanes tab shows every lane.
+  const lanes = full ? given : pulseLanes(given, (p) => stages.get(p.toLowerCase())?.preset)
+  // Off, an old rules mark still shows (it is a fact) and says the rules aren't enforced (#1421).
+  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
   const [foldedKept, toggle] = usePanelFold(ws ? foldKey(ws) : null)
   const folded = foldedKept && !full
   const key = ws ? rowsKey(ws) : null
@@ -262,29 +270,44 @@ export function LanesSection({ lanes, all, width, runs = [], full = false }: { l
       </div>
     ) : null
   const { chosen, shown, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
+  // The legend (#1421): the stages the lanes shown have (old rules' too), by category, on the Lanes bar's hover and focus.
+  const legend = laneLegend(legendSources(lanes, (p) => stages.get(p.toLowerCase()), badges), tr)
+  const foldTip = folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))
+  const legendId = `lanes-legend-${full ? 'tab' : 'pulse'}`
   return (
     <div className={cx('progress-lanes', folded && 'folded', full && 'full')} role="region" aria-label={tr(LANES)}>
       {!folded && !full && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
       {!full && (
-      <button type="button" className="progress-lanes-bar" aria-expanded={!folded} onClick={toggle} title={folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))}>
-        <Icon name={folded ? 'chevron-up' : 'chevron-down'} />
-        <span>{tr(LANES)}</span>
-        <span className="progress-lanes-count">{lanes.length}</span>
-        {lanes.some(waitsForYou) && <span className="progress-lanes-you">{tr(msg({ id: 'board.lanes.waitingForYou', defaultMessage: '{n, plural, one {# waiting for you} other {# waiting for you}}', description: "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane." }), { n: lanes.filter(waitsForYou).length })}</span>}
-      </button>
+        <Tooltip block focus className="lanes-legend-tip" content={<LaneLegend groups={legend} more={foldTip} />}>
+          <button type="button" className="progress-lanes-bar" aria-expanded={!folded} aria-describedby={legendId} onClick={toggle}>
+            <Icon name={folded ? 'chevron-up' : 'chevron-down'} />
+            <span>{tr(LANES)}</span>
+            <span className="progress-lanes-count">{lanes.length}</span>
+            {lanes.some(waitsForYou) && <span className="progress-lanes-you">{tr(msg({ id: 'board.lanes.waitingForYou', defaultMessage: '{n, plural, one {# waiting for you} other {# waiting for you}}', description: "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane." }), { n: lanes.filter(waitsForYou).length })}</span>}
+          </button>
+        </Tooltip>
       )}
       {full && (
         <div className="progress-lanes-actions">
+          <Tooltip focus className="lanes-legend-tip" content={<LaneLegend groups={legend} />}>
+            <button type="button" className="btn small subtle progress-lanes-legend" aria-describedby={legendId}>
+              <Icon name="info" /> {tr(msg({ id: 'board.lanes.legendButton', defaultMessage: 'Legend', description: "A button in the Progress panel's Lanes tab: its hover and focus show what a lane's colours and patterns mean (the board's stages, by category)." }))}
+            </button>
+          </Tooltip>
           <button type="button" className="btn small subtle progress-lanes-start" onClick={() => openLaneStart(null)}>
             <Icon name="add" /> {tr(START_LANE)}
           </button>
         </div>
       )}
+      {/* The legend for screen readers: the bar's (or the tab's Legend button's) description. */}
+      <span id={legendId} className="visually-hidden">
+        {legendText(legend)}
+      </span>
       {!folded && (
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
         <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
           {lanes.map((l) => (
-            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} />
+            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} />
           ))}
         </div>
       )}
@@ -398,6 +421,50 @@ async function endLane(l: Lane, abandoned: boolean): Promise<void> {
 
 const LANES = msg({ id: 'board.lanes.title', defaultMessage: 'Lanes', description: "The Progress panel's section of lanes (a builder and its reviewer working through cards in turn): its bar's label and accessible name." })
 
+const LEGEND = {
+  title: msg({ id: 'board.lanes.legendTitle', defaultMessage: 'Each colour is a category, with the stages in it', description: "The heading of the lanes' legend (Progress panel, on the Lanes bar's hover): what each colour and pattern of a lane's card segments means, by the board's categories and the stages in them. Glossary: stage, category." }),
+  hold: msg({ id: 'board.lanes.legendHold', defaultMessage: '{category} or blocked', description: "A line of the lanes' legend (Progress panel): the red hatching is a card On Hold ({category}: that category's name) or blocked." }),
+  line: msg({ id: 'board.lanes.legendLine', defaultMessage: '{category}: {stages}', description: "A line of the lanes' legend for screen readers (Progress panel): a category ({category}: its name, such as Approved) and the stages in it ({stages}: their names, a list, such as \"Approved and Merging\"). Glossary: stage, category." })
+}
+
+const OLD_RULES = msg({ id: 'board.lanes.oldRules', defaultMessage: 'old rules', description: "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options." })
+
+const PROJECT_LINK = msg({ id: 'board.lanes.projectLink', defaultMessage: '{project}: open its workflow in Version Control', description: "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name." })
+
+const legendName = (g: LegendGroup): string => (g.category === 'hold' ? tr(LEGEND.hold, { category: g.name }) : g.name)
+
+/** The legend as one text, for screen readers (the Lanes bar's description). */
+const legendText = (groups: LegendGroup[]): string => [tr(LEGEND.title), ...groups.map((g) => (g.stages.length ? tr(LEGEND.line, { category: legendName(g), stages: fmt.list(g.stages) }) : legendName(g)))].join('. ')
+
+/**
+ * The lanes' legend (#1421): each category's swatch (its segment's colour and pattern), its name and the stages in it of
+ * the projects shown, by name; `more`: a last line (what clicking the bar does).
+ */
+function LaneLegend({ groups, more }: { groups: LegendGroup[]; more?: string }) {
+  return (
+    <div className="lanes-legend" data-legend="">
+      <div className="lanes-legend-title">{tr(LEGEND.title)}</div>
+      {groups.map((g) => (
+        <div key={g.category} className="lanes-legend-row" data-category={g.category}>
+          <span className={cx('lane-seg', 'lanes-legend-swatch', g.state)} aria-hidden="true" />
+          <span className="lanes-legend-name">{legendName(g)}</span>
+          {g.stages.length > 0 && (
+            <span className="lanes-legend-stages faint">
+              {g.stages.map((s, i) => (
+                <span key={s} className="lanes-legend-stage">
+                  {i > 0 && <span className="lane-stage-divider" aria-hidden="true" />}
+                  {s}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+      ))}
+      {more && <div className="lanes-legend-more faint">{more}</div>}
+    </div>
+  )
+}
+
 /** What a running lane's row needs to be moved (#568); a finished lane has none. */
 interface LaneReorder {
   /** There is another running lane to move it past. */
@@ -413,13 +480,20 @@ interface LaneReorder {
   onContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
-function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[] }) {
+/**
+ * `stages`: its project's stages and names (#1421), so its segments say their cards' stages; `enforced`: whether workflow
+ * rules are enforced now, for what its old rules marks say.
+ */
+function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[]; stages: ProjectStages | undefined; enforced: boolean }) {
   const tasks = useStore((s) => s.tasks)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
   useNow(60_000)
   const laneOf = useLaneOf()
-  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr)
+  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr, (c) => segmentStage(c, badges.get(c.number), stages, tr, l.stages))
+  // Its project, named in its header: a link to its Version Control tab's Workflow section (#1421).
+  const project = projects.find((p) => p.path.toLowerCase() === l.project.toLowerCase())
+  const oldRules = l.oldRules ? laneOldRulesNote(enforced, tr) : null
   let stalled: { n: number; why: string } | null = null
   for (const n of l.frozen ? [] : l.cards) {
     const c = tasks.find((t) => t.number === n)
@@ -441,8 +515,8 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
   const cost = useLaneCost(l.id)
   // A card's revisions as its project's platform shows them (its descriptor, never a switch on its id).
   const shortFor = (n: number) => {
-    const project = tasks.find((t) => t.number === n)?.project
-    const platform = projects.find((p) => p.name === project)?.platform?.id
+    const owner = tasks.find((t) => t.number === n)?.project
+    const platform = projects.find((p) => p.name === owner)?.platform?.id
     return (id: string): string => (platform ? revisionShort(platform, id) : id.slice(0, 7))
   }
   return (
@@ -453,7 +527,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
       {...(r
         ? {
             role: 'group',
-            'aria-label': [`${pair}${l.name ? `, ${l.name}` : ''}`, word, why].filter(Boolean).join(', '),
+            'aria-label': [`${pair}${l.name ? `, ${l.name}` : ''}`, project?.name, word, why, oldRules && tr(OLD_RULES)].filter(Boolean).join(', '),
             'aria-keyshortcuts': r.movable ? 'Alt+ArrowUp Alt+ArrowDown' : undefined,
             tabIndex: 0,
             draggable: r.movable,
@@ -469,6 +543,21 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
       <Tooltip block content={<LaneCostTip cost={cost.cost} />}>
         <div className="progress-lane-top" onMouseEnter={cost.load}>
           <span className="progress-lane-pair">{pair}</span>
+          {project && (
+            <button
+              type="button"
+              className="link progress-lane-project faint"
+              data-action="lane-project"
+              aria-label={tr(PROJECT_LINK, { project: project.name })}
+              title={tr(PROJECT_LINK, { project: project.name })}
+              onClick={(e) => {
+                e.stopPropagation()
+                openVersionControl(project.path, 'workflow')
+              }}
+            >
+              {project.name}
+            </button>
+          )}
           {/* Why it waits (#1279) takes the name's room (every lane keeps one height: the list shows whole lanes),
               cut short with its whole text in its title; a paused lane's in the paused colour, another's faint. */}
           {why ? (
@@ -487,6 +576,13 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
             </Tooltip>
           )}
+          {oldRules && (
+            <Tooltip content={oldRules} focus>
+              <span className="progress-lane-state old-rules" data-mark="old-rules" tabIndex={0} role="note" aria-label={oldRules}>
+                {tr(OLD_RULES)}
+              </span>
+            </Tooltip>
+          )}
           {current !== null && !l.frozen && <span className="progress-lane-current">{cardLabelOf({ tasks }, current)}</span>}
           {current !== null && !l.frozen && <RunDot run={latestRunOf(runs, current)} card={cardLabelOf({ tasks }, current)} />}
           <span className="progress-lane-count faint">
@@ -496,7 +592,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
       </Tooltip>
       <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
-          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES)} />
+          <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES, enforced) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES, enforced)} />
         ))}
       </div>
     </div>
@@ -510,7 +606,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs }: { lane: Lane; max: 
 function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; work: string[]; marks: SegmentMarks; folded: FoldedMarks | null }) {
   if (s.kind !== 'card') {
     // The marks of the cards folded into it (HR6's #1279 round 1): each kind once on it, a line per card under its label.
-    const lines = folded ? [...folded.refused, ...folded.stale, ...folded.override] : []
+    const lines = folded ? [...folded.refused, ...folded.stale, ...folded.override, ...folded.oldRules] : []
     return (
       <Tooltip
         content={
@@ -533,15 +629,28 @@ function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; wo
           {s.kind === 'finished' ? `✓ ${s.numbers.length}` : `+${s.numbers.length}`}
           {!!folded?.refused.length && <span className="lane-seg-mark refused" aria-hidden="true" />}
           {!!folded?.override.length && <span className="lane-seg-mark override" aria-hidden="true" />}
+          {!!folded?.oldRules.length && <span className="lane-seg-mark old-rules" aria-hidden="true" />}
         </span>
       </Tooltip>
     )
   }
-  // What its red underline or hatching means (#706), a line each under the card's own.
+  // What its red underline or hatching means (#706), a line each under the card's own; its category's stages when it has
+  // more than one (#1421: Approved | Merging, the card's own marked); old rules.
   const tip =
-    s.notes.length || work.length ? (
+    s.notes.length || work.length || s.stages || marks.oldRules ? (
       <div className="lane-seg-tip">
         <div>{s.label}</div>
+        {s.stages && (
+          <div className="lane-seg-stages" data-stages="">
+            {s.stages.map((x, i) => (
+              <span key={x.id} className={cx('lane-seg-stage', x.own && 'own')} data-stage={x.id} aria-current={x.own || undefined}>
+                {i > 0 && <span className="lane-stage-divider" aria-hidden="true" />}
+                {x.name}
+              </span>
+            ))}
+          </div>
+        )}
+        {marks.oldRules && <div className="lane-seg-note">{marks.oldRules}</div>}
         {s.notes.map((n) => (
           <div key={n} className="lane-seg-note">
             {n}
@@ -559,10 +668,11 @@ function Segment({ segment: s, work, marks, folded }: { segment: LaneSegment; wo
     )
   return (
     <Tooltip content={tip} focus>
-      <button type="button" role="listitem" className={cx('lane-seg', s.state, s.failed && 'failed', marks.stale && 'stale')} data-card={s.number} aria-label={[segmentName(s), marks.refused, marks.stale, marks.override].filter(Boolean).join('. ')} onClick={() => set({ taskOpen: s.number })}>
-        {/* Its facts' marks (#1279), each a shape of its own: a refused request's notch, an override's corner. */}
+      <button type="button" role="listitem" className={cx('lane-seg', s.state, s.failed && 'failed', marks.stale && 'stale')} data-card={s.number} data-old-rules={marks.oldRules ? '' : undefined} aria-label={[segmentName(s), marks.refused, marks.stale, marks.override, marks.oldRules].filter(Boolean).join('. ')} onClick={() => set({ taskOpen: s.number })}>
+        {/* Its facts' marks (#1279), each a shape of its own: a refused request's notch, an override's corner, old rules' bar (#1421). */}
         {marks.refused && <span className="lane-seg-mark refused" aria-hidden="true" />}
         {marks.override && <span className="lane-seg-mark override" aria-hidden="true" />}
+        {marks.oldRules && <span className="lane-seg-mark old-rules" aria-hidden="true" />}
       </button>
     </Tooltip>
   )

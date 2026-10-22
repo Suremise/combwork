@@ -190,6 +190,8 @@
   "tips.laneNotices.title": "Hear how a lane goes, without the Assistant",
   "tips.laneStart.text": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
   "tips.laneStart.title": "Start a lane yourself",
+  "tips.lanesLegend.text": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",
+  "tips.lanesLegend.title": "What a lane’s colours mean",
   "tips.language.text": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Hive in your language",
   "tips.leftoverProcesses.text": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Hive lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
