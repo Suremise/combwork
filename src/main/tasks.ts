@@ -884,7 +884,11 @@ const clip = (s: string, max = 80): string => {
 export const requestNote = (asked: string): StoredText => storedText(HISTORY.reviewerRequest, { text: clip(asked) })
 
 /** A card loop's step (#1382) as its history line, which watches count (shared/watch.ts' handoffs). */
-export const loopStepNote = (step: string, said: string): StoredText => storedText(HISTORY.loopStep, { step, text: clip(said) })
+export const loopStepNote = (step: string, said: string, until?: string): StoredText => {
+  const s = storedText(HISTORY.loopStep, { step, text: clip(said) })
+  // A design's line keeps when its check is due (#1382), a value its words don't show: what the stall check reads.
+  return until ? { ...s, values: { ...s.values, until } } : s
+}
 
 /**
  * Whether a comment counts as its reviewer's request to the builder (#1410): a plain comment (no move, no verdict) by

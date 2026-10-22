@@ -351,23 +351,29 @@ export function pendingDesign(card: Pick<TaskCard, 'history'>): TaskCard['histor
 /** How long past its bound a design may wait before it is a stall: the builder's watch ends at the bound, and it goes ahead then. */
 export const LOOP_STEP_STALL_GRACE_MS = 5 * 60_000
 
+/** When a waiting design's check is due (ms): as its line kept it when posted, else its post and `boundMs` now. */
+export function designDue(step: TaskCard['history'][number], boundMs: number): number {
+  const kept = step.whatText?.values?.until
+  const due = typeof kept === 'string' ? Date.parse(kept) : NaN
+  return Number.isFinite(due) ? due : Date.parse(step.at) + boundMs
+}
+
 /**
  * Its builder waiting on a check of its design nobody gives (#1382, beside #1410's deadlock): the card in Doing, not
- * blocked, a design posted for its reviewer's check still waiting (pendingDesign), and its builder only watching it (its
- * turn ended) for longer than the bound it was given to wait (`boundMs`: Card loops → Design check wait) and a grace, since
- * the later of the design and its watch's start: it neither had an answer nor went ahead as posted. On 21 Oct HB5 posted
- * #1305's design in Doing; HR5's watch counted only moves into Review, and the card sat six hours, unflagged. Null otherwise.
+ * blocked, a design posted for its reviewer's check still waiting (pendingDesign), its check due (the deadline its line
+ * kept when posted, else its post and `boundMs`: Card loops → Design check wait) a grace ago, and its builder only
+ * watching it (its turn ended): it neither had an answer nor went ahead as posted. Counted from the design, never from
+ * the builder's watch, so watching again doesn't restart it. On 21 Oct HB5 posted #1305's design in Doing; HR5's watch
+ * counted only moves into Review, and the card sat six hours, unflagged. `ms`: how long since the design. Null otherwise.
  */
-export function loopStepWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'blocked' | 'history'>, watchers: W[], boundMs: number, now = Date.now()): { builder: W; ms: number } | null {
+export function loopStepWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'blocked' | 'history'>, watchers: W[], boundMs: number, now = Date.now()): { builder: W; ms: number } | null {
   if (card.archived || card.column !== 'doing' || card.blocked || !card.agent) return null
   const step = pendingDesign(card)
   if (!step) return null
   const builder = watchers.find((w) => w.project.toLowerCase() === card.project.toLowerCase() && w.agentId === card.agent && w.status === 'watching' && w.cards.includes(card.number))
-  if (!builder) return null
-  const times = [step.at, builder.watchSince].map((t) => Date.parse(t ?? ''))
-  if (!times.every(Number.isFinite)) return null
-  const ms = now - Math.max(...times)
-  return ms >= boundMs + LOOP_STEP_STALL_GRACE_MS ? { builder, ms } : null
+  const posted = Date.parse(step.at)
+  if (!builder || !Number.isFinite(posted)) return null
+  return now >= designDue(step, boundMs) + LOOP_STEP_STALL_GRACE_MS ? { builder, ms: now - posted } : null
 }
 
 /** Why a card is stalled on a design nobody checks (loopStepWait), in the window's language with tr, else English. Null when it isn't. */

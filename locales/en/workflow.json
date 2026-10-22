@@ -847,6 +847,14 @@
     "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
     "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
   },
+  "workflow.refused.loop.noReviewer.message": {
+    "defaultMessage": "{card} has no reviewer to check a design: it is in no lane with a reviewer, and nobody has reviewed it yet.",
+    "description": "A refused design posted for a check (#1382): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."
+  },
+  "workflow.refused.loop.noReviewer.next": {
+    "defaultMessage": "Start a lane for the card with a reviewer, or ask about the design in a comment instead.",
+    "description": "The next step after a design refused for want of a reviewer (#1382)."
+  },
   "workflow.refused.loop.noStep.message": {
     "defaultMessage": "{card} has no design waiting for its check.",
     "description": "A refused card loop step (#1382): an answer to a design (OK, gaps) or going ahead with it when no design posted by its builder waits for its reviewer's check. {card} is a card key."
@@ -863,6 +871,14 @@
     "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
     "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
   },
+  "workflow.refused.loop.staleStep.message": {
+    "defaultMessage": "{card}: that is about design {design}, but the design waiting now is {waiting}.",
+    "description": "A refused answer to a design, or going ahead with one (#1382): it names an earlier design than the one waiting now, so it can't settle it. {card} is a card key; {design} and {waiting} are designs' ids, such as AM-12/s40."
+  },
+  "workflow.refused.loop.staleStep.next": {
+    "defaultMessage": "Read the card's latest design and answer that one.",
+    "description": "The next step after an answer to an earlier design (#1382)."
+  },
   "workflow.refused.loop.stepNotHere.message": {
     "defaultMessage": "{card} is in {stage}: a design is posted for its check before the work goes to review.",
     "description": "A refused card loop step (#1382): a design was posted for a card that isn't being worked on (not in Doing). {card} is a card key; {stage} the stage it is in."
@@ -878,6 +894,18 @@
   "workflow.refused.loop.stepNotYours.next": {
     "defaultMessage": "{side, select, builder {Leave it to the card's builder; a reviewer answers with ok or gaps.} other {Leave it to the card's reviewer; nobody checks their own design.}}",
     "description": "The next step after a refused card loop step from the wrong side (#1382). side: builder or reviewer, the agent the step belongs to. ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
+  },
+  "workflow.refused.loop.tooEarly.change": {
+    "defaultMessage": "How long is set in Project Settings → Card loops → Design check wait.",
+    "description": "Where the wait for a design check is changed (#1382). Names of settings: keep them as Hive shows them."
+  },
+  "workflow.refused.loop.tooEarly.message": {
+    "defaultMessage": "{card}: its design's check is due in {minutes, plural, one {# minute} other {# minutes}}.",
+    "description": "A refused going ahead with a design before its reviewer's check is due (#1382, Card loops → Design check wait). {card} is a card key; {minutes} how many minutes are left."
+  },
+  "workflow.refused.loop.tooEarly.next": {
+    "defaultMessage": "Wait for the answer; with none by then, go ahead as posted.",
+    "description": "The next step after going ahead with a design too early (#1382)."
   },
   "workflow.refused.merge.hiveMerges.change": {
     "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",

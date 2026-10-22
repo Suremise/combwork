@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -179,6 +179,19 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'loop.noStep': r(
     msg({ id: 'workflow.refused.loop.noStep.message', defaultMessage: '{card} has no design waiting for its check.', description: "A refused card loop step (#1382): an answer to a design (OK, gaps) or going ahead with it when no design posted by its builder waits for its reviewer's check. {card} is a card key." }),
     msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: its design may have been answered, or the card moved on.', description: 'The next step after a card loop step with nothing to answer (#1382).' })
+  ),
+  'loop.noReviewer': r(
+    msg({ id: 'workflow.refused.loop.noReviewer.message', defaultMessage: '{card} has no reviewer to check a design: it is in no lane with a reviewer, and nobody has reviewed it yet.', description: "A refused design posted for a check (#1382): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer." }),
+    msg({ id: 'workflow.refused.loop.noReviewer.next', defaultMessage: 'Start a lane for the card with a reviewer, or ask about the design in a comment instead.', description: 'The next step after a design refused for want of a reviewer (#1382).' })
+  ),
+  'loop.staleStep': r(
+    msg({ id: 'workflow.refused.loop.staleStep.message', defaultMessage: '{card}: that is about design {design}, but the design waiting now is {waiting}.', description: "A refused answer to a design, or going ahead with one (#1382): it names an earlier design than the one waiting now, so it can't settle it. {card} is a card key; {design} and {waiting} are designs' ids, such as AM-12/s40." }),
+    msg({ id: 'workflow.refused.loop.staleStep.next', defaultMessage: "Read the card's latest design and answer that one.", description: 'The next step after an answer to an earlier design (#1382).' })
+  ),
+  'loop.tooEarly': r(
+    msg({ id: 'workflow.refused.loop.tooEarly.message', defaultMessage: "{card}: its design's check is due in {minutes, plural, one {# minute} other {# minutes}}.", description: "A refused going ahead with a design before its reviewer's check is due (#1382, Card loops → Design check wait). {card} is a card key; {minutes} how many minutes are left." }),
+    msg({ id: 'workflow.refused.loop.tooEarly.next', defaultMessage: 'Wait for the answer; with none by then, go ahead as posted.', description: 'The next step after going ahead with a design too early (#1382).' }),
+    msg({ id: 'workflow.refused.loop.tooEarly.change', defaultMessage: 'How long is set in Project Settings → Card loops → Design check wait.', description: 'Where the wait for a design check is changed (#1382). Names of settings: keep them as Hive shows them.' })
   ),
   'queue.advancing': r(
     msg({ id: 'workflow.refused.queue.advancing.message', defaultMessage: '{card} is being merged into {target} now: it can no longer be taken out of the merge queue.', description: "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name." }),

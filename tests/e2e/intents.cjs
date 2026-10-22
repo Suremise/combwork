@@ -143,13 +143,19 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const notYours = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Mine?' })
     check("the reviewer can't post the builder's design (409, loop.stepNotYours)", notYours.status === 409 && notYours.body?.rule === 'loop.stepNotYours', JSON.stringify(notYours.body))
     const designed = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Design: greet with Hi, tested by b.test.' })
-    check('the builder posts a design in Doing: it stays, and the reply says how long to wait', designed.status === 200 && designed.body?.to === 'active' && designed.body.data?.waitMinutes === 30 && (await card(n))?.column === 'doing', JSON.stringify(designed.body))
+    const designId = designed.body?.data?.design
+    check('the builder posts a design in Doing: it stays, and the reply names it and when its check is due', designed.status === 200 && designed.body?.to === 'active' && /\/s\d+$/.test(designId ?? '') && designed.body.data.waitMinutes === 30 && Date.parse(designed.body.data.until) > Date.now() && (await card(n))?.column === 'doing', JSON.stringify(designed.body))
     check('…a line of its history', (await card(n))?.history.some((h) => h.what === 'Posted a design for the reviewer to check: "Design: greet with Hi, tested by b.test."'), JSON.stringify((await card(n))?.history.slice(-3)))
-    check('…which wakes the reviewer with it', !!(await until(() => wakesOf('Reviewer').length > reviewerWakes && wakesOf('Reviewer').at(-1).includes('The builder: "design posted for your check: Design: greet with Hi'), HUNG_MS)), JSON.stringify(wakesOf('Reviewer').slice(reviewerWakes)))
+    check('…which wakes the reviewer with it, by its id', !!(await until(() => wakesOf('Reviewer').length > reviewerWakes && wakesOf('Reviewer').at(-1).includes(`The builder: "design ${designId} posted for your check (answer with its id): Design: greet with Hi`), HUNG_MS)), JSON.stringify(wakesOf('Reviewer').slice(reviewerWakes)))
+    const early = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'proceed', text: 'Going ahead', design: designId })
+    check('going ahead before the check is due is refused (409, loop.tooEarly)', early.status === 409 && early.body?.rule === 'loop.tooEarly', JSON.stringify(early.body))
+    check('an answer must name the design it is about (400)', (await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'ok', text: 'Holds' })).status === 400)
+    const stale = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'ok', text: 'Holds', design: `${key}/s1` })
+    check('…and one about another design is refused (409, loop.staleStep)', stale.status === 409 && stale.body?.rule === 'loop.staleStep', JSON.stringify(stale.body))
     await until(async () => (await live(reviewer.id))?.status === 'ready', HUNG_MS)
-    const ok = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'ok', text: 'Holds: build it.' })
+    const ok = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'ok', text: 'Holds: build it.', design: designId })
     check("the reviewer's answer is taken", ok.status === 200 && (await card(n))?.history.some((h) => h.what === 'Checked the design: OK: "Holds: build it."'), JSON.stringify(ok.body))
-    check('…and wakes the builder with it', !!(await until(() => wakesOf('Builder').length > builderWakes && wakesOf('Builder').at(-1).includes('The reviewer: "the design is OK: Holds: build it."'), HUNG_MS)), JSON.stringify(wakesOf('Builder').slice(builderWakes)))
+    check('…and wakes the builder with it', !!(await until(() => wakesOf('Builder').length > builderWakes && wakesOf('Builder').at(-1).includes(`The reviewer: "design ${designId} is OK: Holds: build it."`), HUNG_MS)), JSON.stringify(wakesOf('Builder').slice(builderWakes)))
     await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)
 
     // Ask the user: nothing moves.

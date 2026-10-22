@@ -2761,7 +2761,9 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'loop-step': (body) => {
     const step = body?.step
     if (!LOOP_STEPS.includes(step)) throw new HttpError(400, `Unknown step "${String(step)}": ${LOOP_STEPS.join(', ')}.`)
-    return { kind: 'loopStep', step, text: textField(body, 'text', true) }
+    // An answer and going ahead name the design they are about (its reply's `design`), so a late one never settles another.
+    const design = step === 'design' ? undefined : textField(body, 'design', true)
+    return { kind: 'loopStep', step, text: textField(body, 'text', true), ...(design ? { design } : {}) }
   }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))

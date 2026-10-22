@@ -456,12 +456,16 @@ const NOTE_MAX = 600
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
   const who =
-    kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step' ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing)" : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
+    kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
+        ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and the design's id)"
+        : kind === 'stepNotice'
+          ? 'Nothing to answer: carry on with your loop'
+          : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
   // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
-  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' ? REQUEST_MAX : NOTE_MAX
-  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
+  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' ? REQUEST_MAX : NOTE_MAX
+  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
 }
@@ -469,14 +473,19 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
 /**
  * What a loop wake is about (#405, #1266): a card arrived in Review (its reviewer's), a verdict, the card moved into Passed
  * or Done, a reviewer's request mid-review (#912), a note of Hive's (a pass gone stale), or the user's answer to a request
- * (#1269: the agent waiting on it, whether or not the card is in a loop), a card loop's step (#1382: `step`, the builder's,
- * is its reviewer's; `stepAnswer`, the reviewer's answer, its builder's): the rest are its builder's.
+ * (#1269: the agent waiting on it, whether or not the card is in a loop), a card loop's step (#1382: `step`, a design to
+ * check, and `stepNotice`, its builder going ahead unchecked, are its reviewer's; `stepAnswer`, the reviewer's answer, its
+ * builder's): the rest are its builder's.
  */
-export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer'] as const
+export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer', 'stepNotice'] as const
 
-/** A card loop's step (#1382) as its wake quotes it: what the step is, then its text (English, agent-facing). */
-export function loopStepWords(step: string, text: string): string {
-  const what: Record<string, string> = { design: 'design posted for your check', proceed: 'no check came: going ahead with the design as posted', ok: 'the design is OK', gaps: 'the design has gaps' }
+/**
+ * A card loop's step (#1382) as its wake quotes it: what the step is, with the design it is about (its id, which an answer
+ * names), then its text (English, agent-facing).
+ */
+export function loopStepWords(step: string, text: string, design?: string): string {
+  const id = design ? ` ${design}` : ''
+  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `design${id} is OK`, gaps: `design${id} has gaps` }
   return `${what[step] ?? step}: ${text}`
 }
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]

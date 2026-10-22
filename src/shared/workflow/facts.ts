@@ -206,8 +206,12 @@ export interface FactData {
   DecisionsReceived: { agent: string; generation: number }
   CannotWithinRules: { rule: string; why: string; request: string }
   ReviewerRequest: { text: string }
-  /** A step of a card loop between its builder and its reviewer that moves nothing (#1382): LOOP_STEPS; `of`, the step an answer answers. */
-  LoopStep: { step: LoopStepId; text: string; of?: LoopAsk }
+  /**
+   * A step of a card loop between its builder and its reviewer that moves nothing (#1382): LOOP_STEPS. A design names
+   * itself (`design`, `<key>/s<seq>`) and when its check is due (`until`, ISO: its post and the Design check wait then,
+   * `waitMinutes`); an answer or going ahead names the design it is about (`design`) and its kind (`of`).
+   */
+  LoopStep: { step: LoopStepId; text: string; design?: string; until?: string; waitMinutes?: number; of?: LoopAsk }
   HeadMoved: { line: string | null; from: string | null; to: string | null; key?: string | null }
   TargetMoved: { target: string; from: string | null; to: string | null }
   Gone: { what: 'line' | 'folder' | 'repository' | 'deliverables' }
@@ -308,7 +312,7 @@ export interface CardState {
    * A card loop's step waiting on the other side (#1382): the builder's design posted for its reviewer's check, until the
    * reviewer answers, the builder goes ahead, or the card moves, is submitted or given a verdict.
    */
-  step: { step: LoopAsk; seq: number; at: string; by: string | null } | null
+  step: { step: LoopAsk; id: string; seq: number; at: string; until: string | null; by: string | null } | null
   lastSeq: number
 }
 
@@ -447,7 +451,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       case 'LoopStep': {
         const d = f.data as FactData['LoopStep']
-        s.step = d.step === 'design' ? { step: d.step, seq: f.seq, at: f.at, by } : null
+        // A design (a new one replaces the one waiting); anything else ends the one it names (the runtime refuses others).
+        s.step = d.step === 'design' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
         break
       }
       case 'Approval': {

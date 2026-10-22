@@ -221,8 +221,16 @@ describe('a design its builder posted in Doing that nobody checks (#1382)', () =
     expect(loopStepWaitReason(doing(), [hb5], bound, t0 + 6 * 3600_000)).toMatch(/has waited 6 h:/)
     // Its own bound: a project that waits two hours flags it later.
     expect(loopStepWaitReason(doing(), [hb5], 120 * 60_000, t0 + 60 * 60_000)).toBeNull()
-    // Counted from its watch, when that started later (it took a turn meanwhile).
-    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: at(20) }], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toBeNull()
+    // Counted from the design, never its builder's watch: watching again (a turn taken, a restart) doesn't restart it.
+    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: at(20) }], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toMatch(/has waited 35 min:/)
+  })
+  it('due when its line says, as kept when it was posted, whatever the setting is now (HR4 round 1, finding 1)', () => {
+    const kept = { ...posted, whatText: { id: 'tasks.history.loopStep', values: { step: 'design', text: 'Design: …', until: at(45) } } }
+    expect(loopStepWaitReason(doing([kept]), [hb5], bound, t0 + 45 * 60_000 + LOOP_STEP_STALL_GRACE_MS - 1000)).toBeNull()
+    expect(loopStepWaitReason(doing([kept]), [hb5], bound, t0 + 45 * 60_000 + LOOP_STEP_STALL_GRACE_MS)).toMatch(/has waited 50 min:/)
+    // Posted again: the newer design's own deadline.
+    const again = { ...kept, at: at(40), whatText: { ...kept.whatText, values: { ...kept.whatText.values, until: at(70) } } }
+    expect(loopStepWaitReason(doing([kept, again]), [hb5], bound, t0 + 60 * 60_000)).toBeNull()
   })
   it('not stalled once answered, gone ahead, moved, blocked, or with its builder at work or not watching it', () => {
     const late = t0 + 6 * 3600_000
@@ -237,6 +245,7 @@ describe('a design its builder posted in Doing that nobody checks (#1382)', () =
     expect(loopStepWaitReason(doing([posted], { column: 'review' }), [hb5], bound, late)).toBeNull()
     expect(loopStepWaitReason(doing(), [{ ...hb5, status: 'working' }], bound, late)).toBeNull()
     expect(loopStepWaitReason(doing(), [{ ...hb5, cards: [1306] }], bound, late)).toBeNull()
-    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: undefined }], bound, late)).toBeNull()
+    // A builder watching with no start known is still only watching: flagged (the design's time decides).
+    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: undefined }], bound, late)).toMatch(/has waited 6 h:/)
   })
 })

@@ -1300,7 +1300,7 @@ that can't be written fails the change whole.
 | `DecisionsReceived` | agent, generation | The agent received the card's decisions up to that generation (§16.4.6). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
-| `LoopStep` | step, text, of? | A card loop's step that moves nothing (#1382): the builder's design for its reviewer's check (`design`) or going ahead with it unchecked (`proceed`), or the reviewer's answer (`ok`, `gaps`; `of`: the step answered). A design waits (`CardState.step`) until answered, gone ahead from, or the card moves, is submitted or given a verdict. |
+| `LoopStep` | step, text, design?, until?, waitMinutes?, of? | A card loop's step that moves nothing (#1382): the builder's design for its reviewer's check (`design`: its id, `<key>/s<seq>`, and when its check is due, `until`, by `waitMinutes`) or going ahead with it unchecked (`proceed`), or the reviewer's answer (`ok`, `gaps`); an answer and going ahead name the design they are about (`design`; `of`: its kind). A design waits (`CardState.step`) until answered, gone ahead from, replaced by another, or the card moves, is submitted or given a verdict. |
 | `HeadMoved` (observed) | line, from, to, candidate key of the new change | A new revision in the card's folder outside an intent. |
 | `TargetMoved` (observed) | target, from, to | |
 | `Gone` (observed) | what (line, folder, repository, deliverables) | |
@@ -2051,19 +2051,27 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   in Doing, and its reviewer's watch counted only arrivals in Review. It is a step Hive knows: the **card loop step**
   intent (`hive_loop_step`, `POST /v1/tasks/{card}/loop-step`) writes a `LoopStep` fact, its text as a comment and a
   history line ("Posted a design for the reviewer to check: …", "Checked the design: OK: …", "Checked the design:
-  gaps: …", "Went ahead with the design unchecked: …"), and moves nothing. The builder posts `design` in Doing; the
-  reviewer answers `ok` or `gaps`; with no answer within **Project Settings → Card loops → Design check wait** (30
-  minutes by default, the design's reply gives it as `waitMinutes`), the builder sends `proceed` and builds as posted.
-  Each side only its own (`loop.stepNotYours`: an agent that isn't the card's builder posting a design, the builder
-  answering its own; the user and the Assistant take either); a design outside Doing (`loop.stepNotHere`), an answer or
-  `proceed` with nothing waiting (`loop.noStep`) are refused; with the rules off, none is. Each step is a loop wake
-  (`step`, to the reviewer of the card's running lane, else the agent that last reviewed it; `stepAnswer`, to the
-  builder), delivered whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that
-  counts a verdict, a move or a comment hears a step as it hears a request (`step` among its changes: "a card loop step:
-  read its latest comment"), and then the loop wake stands aside. Off with Card loops → Wake reviewers and builders. A
+  gaps: …", "Went ahead with the design unchecked: …"), and moves nothing. The builder posts `design` in Doing: it is
+  named (`<key>/s<seq>`) and its check is due **Project Settings → Card loops → Design check wait** after its post (30
+  minutes by default), both kept in its fact and returned (`design`, `until`, `waitMinutes`); a start's reply gives the
+  wait (`designWaitMinutes`), so the builder arms its watch before posting. The reviewer answers `ok` or `gaps`; with no
+  answer by `until`, the builder sends `proceed` and builds as posted. An answer and `proceed` name the design they are
+  about (`design`), and one about another design is refused (`loop.staleStep`), so a late answer never settles a newer
+  design; posting again replaces the one waiting. `proceed` before the check is due is refused (`loop.tooEarly`), and a
+  design's deadline never moves (a changed setting, a watch started again, a restart). Each side only its own
+  (`loop.stepNotYours`): the builder's steps by the card's builder; an answer by its reviewer, the reviewer of its running
+  lane, else the agent that last reviewed it, never its builder, read under the write's lock; the user and the Assistant
+  take either. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
+  notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
+  whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a
+  move or a comment hears a step as it hears a request (`step` among its changes: "a card loop step: read its latest
+  comment"), and then the loop wake stands aside. A design's wake waiting for its reviewer is dropped once nothing waits
+  (answered by someone else, posted again: the newer one is told). Off with Card loops → Wake reviewers and builders. A
   design left waiting is a stall (beside #1410's deadlock, `loopStepWait` in `shared/tasks.ts`): the card in Doing, not
-  blocked, its builder only watching it for longer than the design check wait and five minutes since the later of the
-  design and its watch's start ("HB5 posted a design on #1305 for its reviewer to check and has waited 40 min: nobody has
+  blocked, its builder only watching it five minutes after its check was due (the deadline its history line kept, never
+  restarted by a new watch) ("HB5 posted a design on #1305 for its reviewer to check and has waited 40 min: nobody has
   answered it, and it hasn't gone ahead as posted"), on the board, in the Agent API's `stalled` and in lane watches'
   `stalled` events. The card-loop skill says when to post one and how each side answers.
 - **A late message can't reopen a pass** (#699, #703): only a submission or a decision (§16.4.6) moves an Approved card

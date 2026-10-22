@@ -1335,36 +1335,66 @@ export class Workflow {
   }
 
   /**
-   * A card loop's step (#1382): the builder's design posted for its reviewer's check (in Doing) or its going ahead with
-   * it unchecked (`proceed`), or the reviewer's answer (`ok`, `gaps`). Moves nothing; wakes the other side: the builder's
-   * steps its reviewer (the lane's, else whoever reviews it, loopWakes.ts), an answer its builder. With the rules off, no
-   * check.
+   * A card's loop reviewer as the write sees it (#1382): its running lane's reviewer, else the agent that last reviewed it
+   * (its latest review started or verdict, any cycle); null when it has none. loopWakes.ts wakes the same agent.
    */
-  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string): Promise<Reply> {
+  loopReviewer(w: Write): string | null {
+    if (w.card.reviewer) return w.card.reviewer
+    const last = w.tx.facts(w.card.id).findLast((f) => f.kind === 'ReviewStarted' || f.kind === 'Verdict')
+    return last ? ((last.data as { reviewer?: string }).reviewer ?? null) : null
+  }
+
+  /**
+   * A card loop's step (#1382): the builder's design posted for its reviewer's check (in Doing), or its going ahead with
+   * it unchecked once the check is due (`proceed`), or the reviewer's answer (`ok`, `gaps`). A design is named
+   * (`<key>/s<seq>`) and due `waitMinutes` after its post (Card loops → Design check wait, the caller's), kept in its fact:
+   * an answer or `proceed` names the design it is about, and one for an earlier design is refused, so a late reply never
+   * settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
+   * agent that last reviewed it), an answer its builder. A design with no reviewer to check it is refused. With the rules
+   * off, nothing is checked.
+   */
+  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string, opts: { design?: string; waitMinutes: number; now?: number }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
+    let posted: { design: string; until: string } | null = null
     const refused = await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w): GuardRefusal | null => {
-      // Read under the transaction: the step waiting now, not when the call began.
+      // Read under the transaction: the step waiting, the card's builder and reviewer now, not when the call began.
       const now = w.state()
       const agent = agentOf(actor)
       const side = loopStepSide(step)
+      const reviewer = this.loopReviewer(w)
+      const at = opts.now ?? Date.now()
       if (this.enforced()) {
         const builder = now.started?.builder ?? null
-        // An agent on the other side is refused; the user and the Assistant can take either.
-        if (agent && (side === 'builder' ? agent !== builder : agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, step, side } } as GuardRefusal
-        if (step === 'design' && now.stage !== 'active') return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage } } as GuardRefusal
-        if (step !== 'design' && !now.step) return { rule: 'loop.noStep', values: { card: card.key, step } } as GuardRefusal
+        // Each side its own (an agent; the user and the Assistant take either): the builder's steps by the card's
+        // builder, an answer by its reviewer, never its builder.
+        if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
+        if (step === 'design') {
+          if (now.stage !== 'active') return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage } } as GuardRefusal
+          if (!reviewer || reviewer === builder) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
+        } else {
+          if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
+          if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+          const due = now.step.until ? Date.parse(now.step.until) : NaN
+          if (step === 'proceed' && due > at) return { rule: 'loop.tooEarly', values: { card: card.key, minutes: Math.ceil((due - at) / 60_000) } } as GuardRefusal
+        }
       }
-      const of = step === 'design' ? undefined : now.step?.step
-      w.fact('LoopStep', { step, text, ...(of ? { of } : {}) })
+      if (step === 'design') {
+        posted = { design: `${card.key}/s${now.lastSeq + 1}`, until: new Date(at + opts.waitMinutes * 60_000).toISOString() }
+        w.fact('LoopStep', { step, text, ...posted, waitMinutes: opts.waitMinutes })
+      } else {
+        const about = opts.design ?? now.step?.id
+        w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
+      }
       // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
-      if (side === 'builder') this.wake(w, card.reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+      if (side === 'builder') this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
       else this.wake(w, now.started?.builder, `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
       return null
     })
     if (refused) return this.refuse(card, actor, 'loop step', refused) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, s.stage, s.stage)
+    const p = posted as { design: string; until: string } | null
+    return this.ok(card, s.stage, s.stage, p ? { design: p.design, until: p.until, waitMinutes: opts.waitMinutes } : undefined)
   }
 
   /**
