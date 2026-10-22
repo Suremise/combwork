@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const q = require('./queueFixture.cjs')
 
-const PORT = Number(lib.port(47939))
+const PORT = Number(lib.port(47848))
 const fx = q.queueProject('queueagents')
 const HUNG_MS = 60000
 let failed = 0
