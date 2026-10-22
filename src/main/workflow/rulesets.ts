@@ -9,6 +9,7 @@ import { compile } from '../../shared/workflow/compile'
 import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
+import { tr } from '../../shared/i18n'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults } from '../../shared/types'
 import { config } from '../config'
@@ -114,14 +115,11 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   const options = { ...resolved.options, ...own.set }
   const origins = { ...resolved.origins }
   for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
-  const bad = contradictions(options)
-  // A stage's name (N5) is checked against the stages these options produce: none to check against while they contradict.
-  const compiled = bad.length ? null : compile(options)
-  const stages = compiled?.ok ? compiled.ruleset.stages.map((st) => st.id) : []
   const problems: OptionsProblem[] = [
-    ...bad.map((id) => ({ kind: 'contradiction' as const, id })),
+    ...contradictions(options).map((id) => ({ kind: 'contradiction' as const, id })),
     ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id })),
-    ...stageNameProblems(options.stageNames, stages).map((p) => ({ kind: 'stageName' as const, ...p }))
+    // Each stage's name (N5) against every other's, in English and in the language Hive shows.
+    ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))
   ]
   return { resolved: { options, origins, invalid: null }, problems }
 }

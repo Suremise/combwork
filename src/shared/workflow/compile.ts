@@ -68,7 +68,11 @@ export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git'
 export function producedStages(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
   const git = o.platform === 'git'
-  const approved = git && (o.finish === 'agentMerges' || (o.finish === 'hiveMerges' && (review || o.okBefore.mode !== 'never')) || (o.finish === 'notChecked' && review))
+  // Approved when a review or your OK before merging (G10) approves the work and something follows it (§16.5.2, decided
+  // on #1417): in Git a merge (Hive's, the agent's, or one Hive doesn't check); in None your OK after the reviewer
+  // agent's pass (N1).
+  const approves = review || o.okBefore.mode !== 'never'
+  const approved = git ? approves && (o.finish === 'hiveMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')

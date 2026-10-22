@@ -159,7 +159,9 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
   const before = checkOptions(platform, levelsOf(ws, current))
   const after = checkOptions(platform, levelsOf(ws, change.options))
   const was = before.problems.length ? resolveOptions(platform, levelsOf(ws, current)).options : before.resolved.options
-  const changed = (Object.keys(after.resolved.options) as (keyof WorkflowOptions)[]).filter((k) => JSON.stringify(after.resolved.options[k]) !== JSON.stringify(was[k]))
+  // Every key either has: an optional option (the names, N5) set before and gone now is a change too.
+  const keys = [...new Set([...Object.keys(after.resolved.options), ...Object.keys(was)])] as (keyof WorkflowOptions)[]
+  const changed = keys.filter((k) => JSON.stringify(after.resolved.options[k]) !== JSON.stringify(was[k]))
   return { problems: after.problems, changed, options: after.resolved.options }
 }
 

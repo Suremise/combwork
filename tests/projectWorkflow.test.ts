@@ -25,6 +25,8 @@ const { writeWorkflow } = await import('../src/shared/workflow/projectWorkflow')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { settingEntry } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
+const { setLanguage } = await import('../src/shared/i18n')
+const { loadCatalogue } = await import('../src/shared/i18n/catalogues')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -141,5 +143,28 @@ describe('stage names (N5) through the writers (#1417)', () => {
     expect(wf2.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
     expect(wf2.rulesetOf(wf2.store.card(card.number)).id).toBe(ruleset)
     expect((await form.projectStages(w, repo))!.names).toEqual({ review: 'Checking' })
+    // Removing the last rename (no level below names it) is a names-only change too (HR2's round 1, finding 1).
+    const reset = await form.checkWorkflowChange(w, repo, { preset: null, options: own })
+    expect(reset).toEqual({ problems: [], changed: ['stageNames'], appliesNow: true, lanes: [], inFlight: [] })
+    await form.setWorkflowOptions(w, repo, { preset: null, options: own }, { applyTo: [card.number] })
+    expect((await form.projectStages(w, repo))!.names).toEqual({})
+    expect((await workflowFor(w, repo))!.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
+  })
+
+  it("refuses a name the window shows for another stage in Hive's language, through the form and the tool (HR2's round 1, finding 2)", async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ platform: 'git', preset: 'pair', options: pair })
+    setLanguage('de', await loadCatalogue('de'), 'de')
+    try {
+      // Done is Erledigt in German.
+      expect((await form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, stageNames: { active: 'Erledigt' } } })).problems).toEqual([{ kind: 'stageName', stage: 'active', why: 'duplicate' }])
+      await expect(form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, stageNames: { active: 'Erledigt' } } })).rejects.toThrow()
+      await inWorkspace(w, async () => {
+        await expect(settingsTools.applySetting(settingEntry('project.workflow.stageNames')!, { active: 'erledigt' }, repo)).rejects.toThrow(/The name of Active is already another stage’s name\./)
+      })
+      expect((await w.projectConfig(repo)).workflow?.options.stageNames).toBeUndefined()
+    } finally {
+      setLanguage('en', {})
+    }
   })
 })

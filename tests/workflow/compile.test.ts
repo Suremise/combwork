@@ -16,7 +16,7 @@ describe('compilation', () => {
     expect(stages('git', 'pair')).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done'])
     expect(stages('git', 'team')).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done'])
     expect(stages('none', 'solo')).toEqual(['hold', 'todo', 'active', 'done'])
-    expect(stages('none', 'team')).toEqual(['hold', 'todo', 'active', 'review', 'done'])
+    expect(stages('none', 'team')).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'done'])
   })
 
   it('all off holds no guard that can refuse an ordinary move (only submit.notDuplicate)', () => {

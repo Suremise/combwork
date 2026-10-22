@@ -1466,6 +1466,7 @@ category the options don't use is hidden. The options produce the stages (§16.6
 | Active | Active | Always. |
 | Review | Review | A reviewer or the user's approval is required (G1/N1 not "No review"). |
 | Approved | Approved | Review exists and something follows it (a merge, or an approval before merging). |
+| Approved | Approved | Your OK before merging (G10) is asked, with or without review, and a merge follows [#1417, decided]. |
 | Merging | Approved | Hive merges (G5). Shown while the card is in the queue. |
 | Done | Done | Always. |
 
@@ -1474,14 +1475,19 @@ keep the category's colour and pattern; hovers and accessible names use the stag
 
 **Built [#1417]:** the stage model is `src/shared/workflow/stages.ts`, which every view that names a stage reads
 (`stagesOf`, `stageName`, `stageOf`, `stagesShown`; IPC `workflow:stages`, with a `workflow-changed` event whenever a
-project's workflow is written). The stages are the ruleset's, as compiled (§16.5.4): Review with any review; Approved in
-Git when something follows the review (Hive merges after it or after your OK, the agent merges, or Not checked after a
-review); Merging when Hive merges. None has no merge and so no Approved: with "a reviewer agent, then you" your OK is
-asked in Review. A card keeps the stages of its own ruleset; a stage no longer produced is shown while a card is in it.
+project's workflow is written). The stages are the ruleset's, compiled as the table says (decided on #1417): Review
+with any review; Approved when a review or your OK before merging (G10) approves the work and something follows it: in
+Git a merge (Hive merges, the agent merges, or Not checked), in None your OK after the reviewer agent (N1's "a reviewer
+agent, then you"); Merging when Hive merges. Committed is done has nothing after its review, and with neither a review
+nor G10 there is no Approved (the agent merging comes from Active). Before #1417 the engine gave None no Approved and gave "the agent merges"
+Approved without a review; 1.0 wasn't released, so no stored ruleset keeps that. A card keeps the stages of its own
+ruleset; a stage no longer produced is shown while a card is in it.
 **Names aren't rules** (N5, OP-30): `stageNames` is resolved global → workspace → project like the options, but left
 out of the compiled ruleset and its hash, so a rename never marks anything old rules and applies at once
-(`workflow:check` says `appliesNow`). Each name is trimmed, at most 24 characters, has no control character and differs
-(ignoring case) from every other stage's name; a bad one is refused with its reason. Categories keep their names:
+(`workflow:check` says `appliesNow`, removing the last rename too). Each name is trimmed, at most 24 characters, has no
+control character and differs (ignoring case) from every other stage's name, produced or not (a stage kept for a card
+under old rules is shown too): its rename, else its default name in English and in the language Hive shows (so Active
+can't be called *Erledigt* while Hive is in German); a bad one is refused with its reason. Categories keep their names:
 renaming the Active stage leaves the category Active. The user's names are for the user's side (the window, the
 project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
 **Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.

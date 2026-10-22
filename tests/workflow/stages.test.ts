@@ -21,14 +21,14 @@ const FINISHERS: Finisher[] = ['hiveMerges', 'agentMerges', 'committed', 'notChe
 const FOLDERS: FolderMode[] = ['slots', 'project']
 
 /**
- * §16.5.2's table as built: On Hold, Todo, Active and Done always; Review with any review; Approved when something follows
- * the review in Git (Hive merges after it or after your OK, the agent merges, Not checked after a review); Merging when
- * Hive merges. None has no merge, so no Approved.
+ * §16.5.2's table (decided on #1417): On Hold, Todo, Active and Done always; Review with any review; Approved when a review
+ * or your OK before merging (G10) approves the work and something follows: a merge in Git (Hive's, the agent's, or Not
+ * checked), your OK after the reviewer agent in None (N1); Merging when Hive merges. Committed is done has nothing after.
  */
 function expected(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
   const git = o.platform === 'git'
-  const approved = git && (o.finish === 'agentMerges' || (o.finish === 'hiveMerges' && (review || o.okBefore.mode !== 'never')) || (o.finish === 'notChecked' && review))
+  const approved = git ? (review || o.okBefore.mode !== 'never') && ['hiveMerges', 'agentMerges', 'notChecked'].includes(o.finish) : o.review === 'agentThenYou'
   return STAGE_ORDER.filter((s) => s === 'hold' || s === 'todo' || s === 'active' || s === 'done' || (s === 'review' && review) || (s === 'approved' && approved) || (s === 'merging' && git && o.finish === 'hiveMerges'))
 }
 
@@ -51,6 +51,18 @@ describe("the stages the options produce (§16.5.2's table)", () => {
       checked++
     }
     expect(checked).toBeGreaterThan(20)
+  })
+
+  it("follows the table's own cases: no Approved without a review or your OK, None's 'a reviewer agent, then you' has one (decided on #1417)", () => {
+    const ids = (o: WorkflowOptions): string => mustCompile(o).stages.map((s) => s.id).join(' ')
+    expect(ids({ ...allOff('git'), finish: 'agentMerges', folder: 'slots' })).toBe('hold todo active done')
+    // G10's OK approves the work too: the card waits for it in Approved.
+    expect(ids({ ...allOff('git'), finish: 'hiveMerges', folder: 'slots', okBefore: { mode: 'every', labels: [] } })).toBe('hold todo active approved merging done')
+    expect(ids({ ...allOff('git'), finish: 'agentMerges', folder: 'slots', okBefore: { mode: 'labels', labels: ['ui'] } })).toBe('hold todo active approved done')
+    expect(ids({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })).toBe('hold todo active review approved done')
+    expect(ids({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' })).toBe('hold todo active review done')
+    expect(ids({ ...allOff('none'), review: 'agentThenYou', noSelfReview: true })).toBe('hold todo active review approved done')
+    expect(ids({ ...allOff('none'), review: 'you' })).toBe('hold todo active review done')
   })
 
   it('places Merging in Approved, Active in doing and Approved in passed: the categories agents move cards by', () => {
@@ -102,25 +114,37 @@ describe('stage names (N5, OP-30)', () => {
   })
 
   it('refuses an empty name, one over 24 characters, one with a control character, and one another stage has (ignoring case)', () => {
-    const pair = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
-    expect(stageNameProblems({ active: 'Building', merging: 'In the queue' }, pair)).toEqual([])
-    expect(stageNameProblems({ active: '   ' }, pair)).toEqual([{ stage: 'active', why: 'empty' }])
-    expect(stageNameProblems({ active: 'x'.repeat(24) }, pair)).toEqual([])
-    expect(stageNameProblems({ active: 'x'.repeat(25) }, pair)).toEqual([{ stage: 'active', why: 'long' }])
+    expect(stageNameProblems({ active: 'Building', merging: 'In the queue' })).toEqual([])
+    expect(stageNameProblems({ active: '   ' })).toEqual([{ stage: 'active', why: 'empty' }])
+    expect(stageNameProblems({ active: 'x'.repeat(24) })).toEqual([])
+    expect(stageNameProblems({ active: 'x'.repeat(25) })).toEqual([{ stage: 'active', why: 'long' }])
     // Trimmed before it is measured.
-    expect(stageNameProblems({ active: ` ${'x'.repeat(24)} ` }, pair)).toEqual([])
-    expect(stageNameProblems({ active: 'Build\ning' }, pair)).toEqual([{ stage: 'active', why: 'control' }])
-    expect(stageNameProblems({ active: 'Build\u0007' }, pair)).toEqual([{ stage: 'active', why: 'control' }])
+    expect(stageNameProblems({ active: ` ${'x'.repeat(24)} ` })).toEqual([])
+    expect(stageNameProblems({ active: 'Build\ning' })).toEqual([{ stage: 'active', why: 'control' }])
+    expect(stageNameProblems({ active: 'Build\u0007' })).toEqual([{ stage: 'active', why: 'control' }])
     // Another stage's default name, or another rename.
-    expect(stageNameProblems({ active: 'review' }, pair)).toEqual([{ stage: 'active', why: 'duplicate' }])
-    expect(stageNameProblems({ active: 'Ship', approved: 'ship ' }, pair)).toEqual([
+    expect(stageNameProblems({ active: 'review' })).toEqual([{ stage: 'active', why: 'duplicate' }])
+    expect(stageNameProblems({ active: 'Ship', approved: 'ship ' })).toEqual([
       { stage: 'active', why: 'duplicate' },
       { stage: 'approved', why: 'duplicate' }
     ])
-    // A stage these options don't produce takes no name from the others: Solo has no Review.
-    expect(stageNameProblems({ active: 'Review' }, mustCompile(preset('git', 'solo')).stages.map((s) => s.id))).toEqual([])
+    // Every stage counts, produced or not: a stage kept for a card under old rules is shown, and options change.
+    expect(stageNameProblems({ active: 'Merging' })).toEqual([{ stage: 'active', why: 'duplicate' }])
+    // A rename frees its stage's default name for another stage.
+    expect(stageNameProblems({ active: 'Building', review: 'Active' })).toEqual([])
     expect(englishText(stageNameProblemText({ stage: 'active', why: 'long' }))).toBe('The name of Active is longer than 24 characters.')
     expect(englishText(stageNameProblemText({ stage: 'merging', why: 'duplicate' }))).toBe('The name of Merging is already another stage’s name.')
+  })
+
+  it('checks a name against the names the window shows: a default name in the language Hive shows counts too (HR2, round 1)', async () => {
+    setLanguage('de', await loadCatalogue('de'), 'de')
+    // Done is Erledigt in German: Active can't be called that, nor Done (English's name for it).
+    expect(stageNameProblems({ active: 'Erledigt' }, tr)).toEqual([{ stage: 'active', why: 'duplicate' }])
+    expect(stageNameProblems({ active: 'erledigt ' }, tr)).toEqual([{ stage: 'active', why: 'duplicate' }])
+    expect(stageNameProblems({ active: 'Done' }, tr)).toEqual([{ stage: 'active', why: 'duplicate' }])
+    expect(stageNameProblems({ active: 'Bauen' }, tr)).toEqual([])
+    // Without the window's language, only English's names.
+    expect(stageNameProblems({ active: 'Erledigt' })).toEqual([])
   })
 
   it("aren't rules: a rename leaves the ruleset and its id as they were", () => {

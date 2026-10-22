@@ -89,20 +89,22 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/
 export const keptStageName = (name: string): string => name.trim()
 
 /**
- * The names that can't be saved (N5): empty, longer than STAGE_NAME_MAX, with a control character, or the same name
- * (ignoring case) as another of the project's stages, renamed or not (`stages`: those its options produce).
+ * The names that can't be saved (N5): empty, longer than STAGE_NAME_MAX, with a control character, or the same (ignoring
+ * case) as another stage's name. Every stage counts, whether the options produce it or not: a stage they no longer produce
+ * is still shown while a card is in it (§16.17), and options change. A stage's name is its rename, else its default name
+ * in English and, given `tr`, in the language Hive shows (HR2's #1417 round 1: the window shows the translated names).
  */
-export function stageNameProblems(names: StageNames | null | undefined, stages: readonly StageId[]): StageNameProblem[] {
+export function stageNameProblems(names: StageNames | null | undefined, tr?: Tr): StageNameProblem[] {
   const out: StageNameProblem[] = []
   if (!names) return out
-  const all = STAGE_ORDER.filter((id) => stages.includes(id) || names[id] !== undefined)
-  const shown = new Map(all.map((id) => [id, (names[id] !== undefined ? keptStageName(names[id]!) : stageName(id)).toLocaleLowerCase('en')]))
+  const fold = (n: string): string => keptStageName(n).toLocaleLowerCase('en')
+  const namesOf = (id: StageId): string[] => (names[id] !== undefined ? [fold(names[id]!)] : [fold(englishText(STAGE_TEXT[id])), ...(tr ? [fold(tr(STAGE_TEXT[id]))] : [])])
   const why = (id: StageId, raw: string): StageNameProblem['why'] | null => {
     const name = keptStageName(raw)
     if (!name) return 'empty' // i18n-ignore: a problem's key (STAGE_NAME_PROBLEMS has its message)
     if (CONTROL.test(raw)) return 'control' // i18n-ignore: a problem's key (STAGE_NAME_PROBLEMS has its message)
     if ([...name].length > STAGE_NAME_MAX) return 'long' // i18n-ignore: a problem's key (STAGE_NAME_PROBLEMS has its message)
-    return all.some((other) => other !== id && shown.get(other) === shown.get(id)) ? 'duplicate' : null // i18n-ignore: a problem's key (STAGE_NAME_PROBLEMS has its message)
+    return STAGE_ORDER.some((other) => other !== id && namesOf(other).includes(fold(name))) ? 'duplicate' : null // i18n-ignore: a problem's key (STAGE_NAME_PROBLEMS has its message)
   }
   for (const id of STAGE_ORDER) {
     const raw = names[id]
