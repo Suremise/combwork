@@ -4,7 +4,7 @@
 // which the card then works under), the Assistant's settings tool within its Control, and the one-time presets notice.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -26,6 +26,8 @@ const { checkOptions } = await import('../src/main/workflow/rulesets')
 const { allOff, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
+const { cardLabel } = await import('../src/shared/projectKeys')
+const projectKeys = await import('../src/main/projectKeys')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
 
@@ -50,9 +52,9 @@ let n = 0
 const user = { kind: 'user' } as const
 
 /** A workspace with a git project `p` (with a package.json's scripts, its own options and agents if given). */
-async function workspace(opts: { project?: unknown; preset?: string | null; workspace?: unknown; scripts?: Record<string, string> } = {}): Promise<{ ws: string; w: WS; repo: string }> {
+async function workspace(opts: { project?: unknown; preset?: string | null; workspace?: unknown; scripts?: Record<string, string>; name?: string } = {}): Promise<{ ws: string; w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
-  const repo = join(ws, 'p')
+  const repo = join(ws, opts.name ?? 'p')
   mkdirSync(join(repo, '.hive'), { recursive: true })
   mkdirSync(join(ws, '.hive'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
@@ -216,7 +218,7 @@ describe('the Workflow section (#1278)', () => {
     expect(check.problems).toEqual([])
     expect(check.changed.sort()).toEqual(['commands', 'preChecks'])
     expect(check.lanes).toEqual([expect.objectContaining({ name: 'next', builder: 'B1' })])
-    expect(check.inFlight).toEqual([{ number: card.number, title: 'In flight' }])
+    expect(check.inFlight).toEqual([{ number: card.number, key: cardLabel(card), title: 'In flight' }])
     await form.setWorkflowOptions(w, repo, change, { applyTo: [card.number, todo.number] })
     const wf2 = (await workflowFor(w, repo))!
     const overrides = wf2.store.facts(card.number).filter((f) => f.kind === 'Override')
@@ -462,7 +464,7 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     await form.setWorkflowOptions(w, repo, { preset: null, options: { review: 'none' } })
     const check = await levels.checkLevelChange(w, 'workspace', 'git', { preset: null, options: { style: 'squash' } })
     expect(check).toMatchObject({ problems: [], changed: ['style'] })
-    expect(check.projects).toEqual([{ name: 'p', path: repo, changed: ['style'], lanes: [expect.objectContaining({ name: 'next', builder: 'B1' })], inFlight: [{ number: card.number, title: 'In flight' }] }])
+    expect(check.projects).toEqual([{ name: 'p', path: repo, workspace: { path: w.path, name: basename(w.path!) }, changed: ['style'], lanes: [expect.objectContaining({ name: 'next', builder: 'B1' })], inFlight: [{ number: card.number, key: cardLabel(card), title: 'In flight' }] }])
   })
 
   it('refuses a level that would make an inheriting project contradictory, naming it; nothing is written', async () => {
@@ -573,5 +575,29 @@ describe("workflow writes take turns: a level's check and write, and a project's
     } finally {
       emitted.mockRestore()
     }
+  })
+})
+
+describe("Hive's level reaches every open workspace: its warning names each project's workspace and each card by its own key (#1422, HR5's round 2)", () => {
+  it('two workspaces, a card #1 in flight in each: each listed under its own project and workspace, with its own key', async () => {
+    const a = await workspace({ project: { review: 'none' }, name: 'alpha' })
+    const b = await workspace({ project: { review: 'none' }, name: 'beta' })
+    // Each project keyed, as opening a workspace keys them (AL, BE): the cards' keys differ though their numbers don't.
+    for (const x of [a, b]) await projectKeys.keyProjects(x.w)
+    const started: { key: string; number: number }[] = []
+    for (const [x, project] of [[a, 'alpha'], [b, 'beta']] as const) {
+      const card = await inWorkspace(x.w, () => tasks.createTask({ title: `${project}'s work`, project }, user))
+      const wf = (await workflowFor(x.w, x.repo))!
+      expect(await store.boardWrite(x.w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+      started.push({ key: cardLabel(card), number: card.number })
+    }
+    // Both workspaces number their first card 1.
+    expect(started[0].key).not.toBe(started[1].key)
+    expect(started.every((c) => !c.key.startsWith('#'))).toBe(true)
+    expect(started.map((c) => c.number)).toEqual([1, 1])
+    const check = await levels.checkLevelChange(a.w, 'global', 'git', { preset: null, options: { style: 'squash' } })
+    const of = (name: string) => check.projects.find((p) => p.name === name)
+    expect(of('alpha')).toMatchObject({ workspace: { path: a.w.path }, inFlight: [{ number: 1, key: started[0].key, title: "alpha's work" }] })
+    expect(of('beta')).toMatchObject({ workspace: { path: b.w.path }, inFlight: [{ number: 1, key: started[1].key, title: "beta's work" }] })
   })
 })

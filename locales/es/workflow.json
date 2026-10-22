@@ -48,6 +48,7 @@
   "workflow.form.from.workspace": "Del espacio de trabajo",
   "workflow.form.heir": "Proyecto {project}: {options}",
   "workflow.form.heirCards": "{n, plural, one {Su tarjeta en curso mantiene las reglas anteriores:} other {Sus # tarjetas en curso mantienen las reglas anteriores:}}",
+  "workflow.form.heirElsewhere": "Proyecto {project} (espacio de trabajo {workspace}): {options}",
   "workflow.form.heirLanes": "{n, plural, one {Su carril en marcha mantiene las reglas anteriores hasta que termine:} other {Sus # carriles en marcha mantienen las reglas anteriores hasta que terminen:}}",
   "workflow.form.heirs": "{n, plural, one {Este proyecto hereda el cambio:} other {Estos # proyectos heredan el cambio:}}",
   "workflow.form.identity": "Los commits se hacen como {name} <{email}>.",

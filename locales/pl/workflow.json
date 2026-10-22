@@ -48,6 +48,7 @@
   "workflow.form.from.workspace": "Z obszaru roboczego",
   "workflow.form.heir": "Projekt {project}: {options}",
   "workflow.form.heirCards": "{n, plural, one {Jego karta w toku zachowuje stare reguły:} few {Jego # karty w toku zachowują stare reguły:} many {Jego # kart w toku zachowuje stare reguły:} other {Jego # karty w toku zachowuje stare reguły:}}",
+  "workflow.form.heirElsewhere": "Projekt {project} (obszar roboczy {workspace}): {options}",
   "workflow.form.heirLanes": "{n, plural, one {Jego uruchomiony tor zachowuje stare reguły, dopóki się nie skończy:} few {Jego # uruchomione tory zachowują stare reguły, dopóki się nie skończą:} many {Jego # uruchomionych torów zachowuje stare reguły, dopóki się nie skończą:} other {Jego # uruchomionego toru zachowuje stare reguły, dopóki się nie skończą:}}",
   "workflow.form.heirs": "{n, plural, one {Ten projekt dziedziczy zmianę:} few {Te # projekty dziedziczą zmianę:} many {Tych # projektów dziedziczy zmianę:} other {Tych # projektu dziedziczy zmianę:}}",
   "workflow.form.identity": "Commity są tworzone jako {name} <{email}>.",

@@ -108,6 +108,7 @@ const T = {
   heirs: msg({ id: 'workflow.form.heirs', defaultMessage: '{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}', description: 'In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves).' }),
   noHeirs: msg({ id: 'workflow.form.noHeirs', defaultMessage: 'No project inherits the change now: each sets these options itself, or none uses this version control.', description: 'In the dialog before saving workflow defaults, when no open project uses the changed options.' }),
   heir: msg({ id: 'workflow.form.heir', defaultMessage: 'Project {project}: {options}', description: 'A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list.' }),
+  heirElsewhere: msg({ id: 'workflow.form.heirElsewhere', defaultMessage: 'Project {project} (workspace {workspace}): {options}', description: 'A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list.' }),
   heirLanes: msg({ id: 'workflow.form.heirLanes', defaultMessage: '{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules).' }),
   heirCards: msg({ id: 'workflow.form.heirCards', defaultMessage: '{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules).' }),
   levelPlatform: msg({ id: 'workflow.form.levelPlatform', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1).' }),
@@ -789,6 +790,7 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
 function SaveDetails({ changes, check, picked, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; title: (k: OptionKey) => string }) {
   const [, redraw] = useState(0)
   const tasks = useStore((s) => s.tasks)
+  const workspacePath = useStore((s) => s.workspace?.path ?? '')
   return (
     <div className="workflow-save">
       {changes.length ? (
@@ -838,7 +840,8 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
           <ul>
             {check.projects.map((h) => (
               <li key={h.path} data-heir={h.name}>
-                {tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
+                {/* Another workspace's project (Hive's level) says which: names repeat across workspaces. */}
+                {h.workspace.path.toLowerCase() === workspacePath.toLowerCase() ? tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) }) : tr(T.heirElsewhere, { project: h.name, workspace: h.workspace.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
                 {/* Each lane and card by name (HR5's round 1), as a project's warning lists its own. */}
                 {h.lanes.length > 0 && (
                   <div className="s-desc" data-heir-lanes="">
@@ -856,7 +859,8 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
                     <ul>
                       {h.inFlight.map((c) => (
                         <li key={c.number}>
-                          {cardLabelOf({ tasks }, c.number)} {c.title}
+                          {/* Its own workspace's key: card numbers repeat across workspaces (HR5's round 2). */}
+                          {c.key} {c.title}
                         </li>
                       ))}
                     </ul>

@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   // A Git project that sets no workflow option itself: it inherits every one.
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }], workflow: { platform: 'git', preset: null, options: {} } }))
+  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: null, options: {} } }))
 
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   try {

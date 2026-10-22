@@ -8,7 +8,8 @@
 import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
-import { ADOPTION_UPTO, boardState, boardValue, boardWrite, setBoardValue } from '../boardStore'
+import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
+import { cardLabel } from '../../shared/projectKeys'
 import { config } from '../config'
 import { HiveError } from '../hiveError'
 import { listLanes } from '../lanes'
@@ -193,17 +194,18 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
 }
 
 /** The project's cards in flight now: started this cycle and not Done. */
-export async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; title: string }[]> {
+export async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; key: string; title: string }[]> {
   const wf = await workflowFor(ws, project.path)
   if (!wf) return []
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
-  return store
-    .cards()
-    .filter((c) => {
-      const s = wf.state(c)
-      return !!s.started && IN_FLIGHT.has(s.stage)
-    })
-    .map((c) => ({ number: c.id, title: c.title }))
+  const cards = store.cards().filter((c) => {
+    const s = wf.state(c)
+    return !!s.started && IN_FLIGHT.has(s.stage)
+  })
+  // Each named as its own workspace's window names it (its key, else #n): a level's check lists other workspaces' cards
+  // too, whose numbers repeat (#1422, HR5's round 2).
+  const keys = cardKeys(ws, cards.map((c) => c.id))
+  return cards.map((c) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title }))
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */

@@ -6,6 +6,7 @@
 // other, naming the project (§16.6.6's all-off fall-back stays for files edited by hand). A form read before another
 // change is refused, never written over (#1418's base).
 
+import { basename } from 'path'
 import { HiveError } from '../hiveError'
 import { listLanes } from '../lanes'
 import { createLogger } from '../logger'
@@ -115,7 +116,7 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
   const projects = []
   for (const h of heirs) {
     const lanes = (await listLanes(h.w, { project: h.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-    projects.push({ name: h.name, path: h.path, changed: h.changed, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: await cardsInFlight(h.w, h) })
+    projects.push({ name: h.name, path: h.path, workspace: { path: h.w.path ?? '', name: basename(h.w.path ?? '') }, changed: h.changed, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: await cardsInFlight(h.w, h) })
   }
   const refused: WorkflowProblem[] = heirs.flatMap((h) => h.problems.map((problem) => ({ kind: 'inheritor' as const, project: h.name, problem })))
   return { problems: [...after.problems, ...refused], changed, appliesNow: false, lanes: [], inFlight: [], projects }

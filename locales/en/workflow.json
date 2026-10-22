@@ -195,6 +195,10 @@
     "defaultMessage": "{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}",
     "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules)."
   },
+  "workflow.form.heirElsewhere": {
+    "defaultMessage": "Project {project} (workspace {workspace}): {options}",
+    "description": "A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list."
+  },
   "workflow.form.heirLanes": {
     "defaultMessage": "{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}",
     "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules)."

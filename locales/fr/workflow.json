@@ -48,6 +48,7 @@
   "workflow.form.from.workspace": "Depuis l’espace de travail",
   "workflow.form.heir": "Projet {project} : {options}",
   "workflow.form.heirCards": "{n, plural, one {Sa carte en cours garde les anciennes règles:} other {Ses # cartes en cours gardent les anciennes règles:}}",
+  "workflow.form.heirElsewhere": "Projet {project} (espace de travail {workspace}) : {options}",
   "workflow.form.heirLanes": "{n, plural, one {Son couloir en cours garde les anciennes règles jusqu’à ce qu’il se termine:} other {Ses # couloirs en cours gardent les anciennes règles jusqu’à ce qu’ils se terminent:}}",
   "workflow.form.heirs": "{n, plural, one {Ce projet hérite de la modification :} other {Ces # projets héritent de la modification :}}",
   "workflow.form.identity": "Commits en tant que {name} <{email}>.",

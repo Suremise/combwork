@@ -50,6 +50,7 @@ interface HiveMessageValues {
   'workflow.form.from.workspace': undefined
   'workflow.form.heir': { project: string | number; options: string | number }
   'workflow.form.heirCards': { n: number }
+  'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
   'workflow.form.heirLanes': { n: number }
   'workflow.form.heirs': { n: number }
   'workflow.form.identity': { name: string | number; email: string | number }

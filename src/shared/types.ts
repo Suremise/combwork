@@ -1058,7 +1058,7 @@ export type WorkflowLevel = 'global' | 'workspace'
  * cards in flight (they keep their rules: from the next card).
  */
 export interface WorkflowLevelCheck extends WorkflowCheck {
-  projects: { name: string; path: string; changed: (keyof WorkflowOptions)[]; lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; title: string }[] }[]
+  projects: { name: string; path: string; workspace: { path: string; name: string }; changed: (keyof WorkflowOptions)[]; lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; key: string; title: string }[] }[]
 }
 
 /** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
@@ -1073,7 +1073,7 @@ export interface WorkflowCheck {
   /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
-  inFlight: { number: number; title: string }[]
+  inFlight: { number: number; key: string; title: string }[]
 }
 
 export interface ProjectConfig {
