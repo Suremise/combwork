@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { pauseText, returnRun, returnWhy, runCheckName, stepText } from '@shared/progressQueue'
@@ -74,6 +74,9 @@ const M = {
   answerFailed: msg({ id: 'board.workQueue.answerFailed', defaultMessage: "Couldn't answer", description: "An error's title: approving or declining the update of a checked-out branch failed (the card dialog)." })
 }
 
+/** The window event For you's "Show the files and commands" sends: the card dialog's Work section shows its queue part. */
+export const SHOW_QUEUE_WORK = 'hive:show-queue-work'
+
 /** The card's place in its target's queue, counting the one testing (1: next), or null when not known here. */
 function placeOf(v: QueueView | null, entry: string): number | null {
   if (!v) return null
@@ -82,7 +85,7 @@ function placeOf(v: QueueView | null, entry: string): number | null {
 }
 
 /** The Work section's Merge queue part, for a card with a queue entry or outcome this cycle, or a stopped merge. */
-export function CardQueue({ card, view: w, projectPath, short }: { card: TaskCard; view: WorkView; projectPath: string | null; short: (id: string) => string }) {
+export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { card: TaskCard; view: WorkView; projectPath: string | null; short: (id: string) => string; reveal?: number }) {
   const q = w.queue
   const target = q?.target ?? w.target ?? null
   const [queue, setQueue] = useState<QueueView | null>(null)
@@ -103,6 +106,15 @@ export function CardQueue({ card, view: w, projectPath, short }: { card: TaskCar
   const forYou = useForYou().byCard.get(card.number) ?? []
   const advance = forYou.find((i) => i.gate === QUEUE_ADVANCE_GATE)
   const stuck = queue?.paused?.stuck && queue.paused.card?.toLowerCase() === card.key?.toLowerCase() ? queue.paused.stuck : null
+  // Asked to show it (For you's link): once its state is read, into view, the keyboard on its first button.
+  const part = useRef<HTMLDivElement>(null)
+  const hasStuck = !!stuck
+  useEffect(() => {
+    if (!reveal || !part.current) return
+    const el = part.current.querySelector<HTMLElement>('.card-work-queue-stuck') ?? part.current
+    el.scrollIntoView({ block: 'start' })
+    el.querySelector<HTMLElement>('button')?.focus()
+  }, [reveal, hasStuck])
   // Merged: the Work section's merge line says it.
   if ((!q || q.state === 'integrated') && !stuck && !advance) return null
   // A stopped advance says where it stands itself: not as one testing or merging now.
@@ -111,7 +123,7 @@ export function CardQueue({ card, view: w, projectPath, short }: { card: TaskCar
   const run = testing?.run ? (runs.find((r) => r.id === testing.run) ?? null) : null
   const place = open && !testing ? placeOf(queue, q.entry) : null
   return (
-    <div className="card-work-queue" data-work-queue={q?.state ?? 'stuck'}>
+    <div ref={part} className="card-work-queue" data-work-queue={q?.state ?? 'stuck'}>
       <div className="card-work-sub">{tr(M.heading)}</div>
       {q && open && q.state === 'open' && !testing && (
         <div className="card-work-queue-line">

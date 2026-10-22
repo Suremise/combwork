@@ -9,6 +9,7 @@ import { call, errorMessage } from '../api'
 import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, Tooltip, useBusy } from './ui'
+import { SHOW_QUEUE_WORK } from './CardQueue'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
 // its dialog where the user answers them (tasks:answer, #1269: only the user answers). Hive's own requests are shown
@@ -71,12 +72,12 @@ export function ForYouSection({ card, items, drafts, setDraft, setAnswering }: {
   )
 }
 
-/** Brings the card dialog's Work section into view at its merge queue part (the stopped merge's files and commands). */
+/**
+ * Brings the card dialog's Work section into view at its merge queue part (the stopped merge's files and commands):
+ * the Work section opens if it is folded, and shows it once read (HR3's #1357 round 1 finding 2).
+ */
 function showStuck(): void {
-  const el = document.querySelector<HTMLElement>('.card-work-queue-stuck')
-  if (!el) return
-  el.scrollIntoView({ block: 'start' })
-  el.querySelector<HTMLElement>('button')?.focus()
+  window.dispatchEvent(new Event(SHOW_QUEUE_WORK))
 }
 
 function ForYouRequest({ card, item, reply, setReply, setAnswering }: { card: TaskCard; item: ForYouItem; reply: string; setReply: (text: string) => void; setAnswering: (busy: boolean) => void }) {

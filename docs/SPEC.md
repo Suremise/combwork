@@ -2487,7 +2487,8 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   branch, the target's ref, the expected and result commits, each listed file and its side, and the commands that
   finish or undo it, each copyable, none run. It shows whatever the project's options are now. The terminal state's
   For you request (`workflow.forYou.queueStuck`) counts the files and names the Work section, and its row in the
-  card dialog has **Show the files and commands**, which brings that part into view (the Assistant's requirement).
+  card dialog has **Show the files and commands**, which opens a folded Work section and brings that part into view once
+  read (the Assistant's requirement).
 - **The Git tab's Merge queue section** (`GitQueueSection.tsx`, a section of its own for P6 to move): per target, the
   Progress panel's queue card (reused) and its history (`queue:history`: the latest 50 outcomes, each with its card,
   revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
@@ -2496,7 +2497,10 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   ruleset, with the rules enforced (`queue:branchCard`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
   merges it and records an override on the card (`merge outside the queue`); the merge is then observed (§16.4.4).
-  Branches with no such card: unchanged.
+  Merge stays off until that lookup has answered, and when it fails (said, with Retry); main decides again at the
+  merge (`agents:merge`), refusing a plain merge of such a card and Merge anyway for another card than the one there
+  now, so a dialog's pending or stale state never merges it plainly (HR3's #1357 round 1). Branches with no such card:
+  unchanged.
 
 **None:** no queue; Accepted is immediate [#1121 c, OP-16].
 

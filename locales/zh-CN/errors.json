@@ -36,6 +36,7 @@
   "errors.log.none": "该运行没有报告日志。",
   "errors.log.notFullPath": "该运行报告的日志不是完整路径：{path}",
   "errors.log.notText": "Hive 只打开文本格式的日志和报告，不打开 {file}：请使用“在文件夹中显示”。",
+  "errors.merge.queueMerges": "Hive 通过合并队列合并 {card}。请在那里合并，或在合并对话框中选择“仍然合并”。",
   "errors.mergeSlot.holdRequired": "必须指定要释放的占用",
   "errors.pref.notProjectPref": "不是项目偏好设置。",
   "errors.pref.notValue": "不是 {pref} 的有效值。",

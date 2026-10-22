@@ -36,6 +36,7 @@
   "errors.log.none": "Dieser Lauf hat kein Log gemeldet.",
   "errors.log.notFullPath": "Der Lauf hat sein Log ohne vollständigen Pfad gemeldet: {path}",
   "errors.log.notText": "Hive öffnet nur Text-Logs und Berichte, nicht {file}: Verwende „Im Ordner anzeigen“.",
+  "errors.merge.queueMerges": "Hive mergt {card} über die Merge-Warteschlange. Merge sie dort oder wähle im Merge-Dialog Trotzdem mergen.",
   "errors.mergeSlot.holdRequired": "Die freizugebende Reservierung fehlt",
   "errors.pref.notProjectPref": "Keine Projekteinstellung.",
   "errors.pref.notValue": "Kein gültiger Wert für {pref}.",

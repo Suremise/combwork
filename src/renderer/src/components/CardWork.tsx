@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { columnName } from '@shared/tasks'
@@ -12,7 +12,7 @@ import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
 import { notify, useStore } from '../store'
 import { cx, timeAgo } from '../util'
-import { CardQueue } from './CardQueue'
+import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -105,6 +105,16 @@ function RevisionCode({ id, short }: { id: string; short: (id: string) => string
 /** The card dialog's Work section (#1224): its branch, base, folder and target, revisions newest first, marks and merge. */
 export function CardWork({ card }: { card: TaskCard }) {
   const [open, setOpen] = useState(true)
+  // For you's "Show the files and commands" (#1357): open, and bring the merge queue part into view (`reveal`).
+  const [reveal, setReveal] = useState(0)
+  useEffect(() => {
+    const show = (): void => {
+      setOpen(true)
+      setReveal((n) => n + 1)
+    }
+    window.addEventListener(SHOW_QUEUE_WORK, show)
+    return () => window.removeEventListener(SHOW_QUEUE_WORK, show)
+  }, [])
   const { view, error, loaded, retry } = useCardWork(card.number)
   const { project, short } = useProjectOf(card)
   const agentName = (id: string | null): string => (id ? (project?.agents.find((a) => a.id === id)?.name ?? id) : '')
@@ -129,7 +139,7 @@ export function CardWork({ card }: { card: TaskCard }) {
           ) : view.preWorkflow ? (
             <div className="faint">{tr(M.preWorkflow)}</div>
           ) : (
-            <WorkDetails card={card} view={view} project={project} short={short} agentName={agentName} />
+            <WorkDetails card={card} view={view} project={project} short={short} agentName={agentName} reveal={reveal} />
           )}
         </div>
       )}
@@ -137,7 +147,7 @@ export function CardWork({ card }: { card: TaskCard }) {
   )
 }
 
-function WorkDetails({ card, view: v, project, short, agentName }: { card: TaskCard; view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+function WorkDetails({ card, view: v, project, short, agentName, reveal }: { card: TaskCard; view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string; reveal: number }) {
   const rows: [string, React.ReactNode][] = []
   // A field that couldn't be read when the work started says so, with why (never shown as none).
   const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, { why: v.unknown[field] })}</span>
@@ -171,7 +181,7 @@ function WorkDetails({ card, view: v, project, short, agentName }: { card: TaskC
           ))}
         </ul>
       )}
-      <CardQueue card={card} view={v} projectPath={project?.path ?? null} short={short} />
+      <CardQueue card={card} view={v} projectPath={project?.path ?? null} short={short} reveal={reveal} />
       {v.integration && (
         <div className="card-work-merged">
           <Icon name="git-merge" /> {tr(M.integrated, { method: v.integration.method, target: v.integration.target, result: short(v.integration.result) })}

@@ -200,11 +200,14 @@ interface HiveMessageValues {
   'agents.mergeDialog.nothing': { branch: string | number; into: string | number }
   'agents.mergeDialog.onlyUncommitted': { branch: string | number }
   'agents.mergeDialog.otherBase': { agent: string | number; base: string | number; into: string | number }
+  'agents.mergeDialog.queueLookup': undefined
+  'agents.mergeDialog.queueLookupFailed': { why: string | number }
   'agents.mergeDialog.queueMerges': { card: string | number }
   'agents.mergeDialog.queueNotYet': { target: string | number }
   'agents.mergeDialog.queuePaused': undefined
   'agents.mergeDialog.queueQueued': { target: string | number; position: number }
   'agents.mergeDialog.queueQueuedNoPlace': { target: string | number }
+  'agents.mergeDialog.queueRetry': undefined
   'agents.mergeDialog.queueTesting': { target: string | number }
   'agents.mergeDialog.reading': { branch: string | number }
   'agents.mergeDialog.remove': undefined

@@ -140,14 +140,38 @@ const f = q.folderHelpers(fx)
     lib.git(dee.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Dee'])
     await page.getByRole('button', { name: 'Projects' }).click()
     await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-    await lib.agentMenu(page, 'BD')
-    await page.locator('.menu-item', { hasText: 'Merge…' }).click()
     const merge = page.locator('.dialog', { hasText: "Merge BD's work" })
-    const note = merge.locator('.merge-queue-note')
-    const deeKey = (await h.card(d)).key
-    check('Merge dialog: the card Hive merges, not in the queue yet', !!(await until(async () => (await note.count()) === 1 && new RegExp(`Hive merges ${deeKey} through the merge queue`).test(await note.innerText()) && /once it is approved/.test(await note.innerText()), HUNG_MS)), await text(merge))
+    const note = merge.locator('.merge-queue-note:not([data-queue-lookup])')
     const primary = merge.locator('.btn.primary', { hasText: 'Merge' })
     const anyway = merge.locator('[data-action="merge-anyway"]')
+    const deeKey = (await h.card(d)).key
+    const openMerge = async () => {
+      await lib.agentMenu(page, 'BD')
+      await page.locator('.menu-item', { hasText: 'Merge…' }).click()
+      await until(async () => (await merge.count()) === 1, HUNG_MS)
+    }
+    // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Hive merges.
+    await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'queue:branchCard=4000*1'))
+    await openMerge()
+    const branchRead = async () => !!(await merge.locator('code').count()) && /Merges 1 commit/.test(await text(merge))
+    check('Merge dialog, its card still being read: the branch read, Merge off, no note yet', !!(await until(branchRead, HUNG_MS)) && (await primary.isDisabled()) && (await note.count()) === 0 && (await anyway.count()) === 0, await text(merge))
+    check('…then the note, Merge still off', !!(await until(async () => (await note.count()) === 1 && (await primary.isDisabled()), HUNG_MS)), await text(merge))
+    await merge.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await merge.count()) === 0, HUNG_MS)
+    // Its read failing: said, Merge off, Retry reads it again.
+    await h.app.evaluate(() => {
+      delete process.env.HIVE_TEST_SLOW_IPC
+      process.env.HIVE_TEST_FAIL_IPC = 'queue:branchCard*1'
+    })
+    await openMerge()
+    const failedNote = merge.locator('[data-queue-lookup="failed"]')
+    check('…its card unread (the read failed): said, Merge off, no Merge anyway', !!(await until(async () => (await failedNote.count()) === 1 && (await branchRead()), HUNG_MS)) && (await primary.isDisabled()) && (await anyway.count()) === 0, await text(merge))
+    await h.app.evaluate(() => delete process.env.HIVE_TEST_FAIL_IPC)
+    await failedNote.getByRole('button', { name: 'Retry' }).click()
+    // A plain merge of it is refused by main too, whatever a dialog thinks (a stale or pending state).
+    const plain = await inv('agents:merge', fx.alpha, dee.id, { squash: false, message: 'plain', cleanup: false }).then(() => 'merged', (e) => String(e?.message ?? e))
+    check('…and a plain merge of the branch is refused, saying Hive merges it', new RegExp(`Hive merges ${deeKey} through the merge queue`).test(plain) && !lib.git(fx.alpha, ['log', '--format=%s', 'main']).includes('plain'), plain)
+    check('Merge dialog: the card Hive merges, not in the queue yet', !!(await until(async () => (await note.count()) === 1 && new RegExp(`Hive merges ${deeKey} through the merge queue`).test(await note.innerText()) && /once it is approved/.test(await note.innerText()), HUNG_MS)), await text(merge))
     check('…Merge disabled, Merge anyway offered', !!(await until(async () => (await primary.isDisabled()) && (await anyway.count()) === 1 && !(await anyway.isDisabled()), HUNG_MS)))
     await shoot(merge, 'merge-dialog')
     await anyway.click()
@@ -198,18 +222,81 @@ const f = q.folderHelpers(fx)
         return /stopped part way/.test(t) ? t : null
       }, HUNG_MS)
       check('Work section: the folder, its branch, where main is, before and the merge, each file and its side, no command', !!stuckText && /Folder/.test(stuckText) && /Its branch main/.test(stuckText) && /main is at/.test(stuckText) && /1 file, and where it is stuck\.txt neither/.test(stuckText) && /put them right by hand/.test(stuckText), stuckText)
+      // The Work section folded (HR3's round 1 finding 2): the link opens it, then brings the state into view.
+      await dialog.locator('.task-section-h', { hasText: 'Work' }).click()
+      check('…the Work section folded: its state not shown', !!(await until(async () => (await stuck.count()) === 0, HUNG_MS)))
       await show.click()
-      check('…Show the files and commands brings them into view', !!(await until(() => stuck.evaluate((el) => {
-        const r = el.getBoundingClientRect()
-        const d = el.closest('.dialog')?.getBoundingClientRect()
-        return !!d && r.top >= d.top - 1 && r.top < d.bottom
-      }), HUNG_MS)))
+      const inView = () =>
+        stuck.evaluate((el) => {
+          const r = el.getBoundingClientRect()
+          const d = el.closest('.dialog')?.getBoundingClientRect()
+          return !!d && r.top >= d.top - 1 && r.top < d.bottom
+        })
+      check('…Show the files and commands opens it and brings them into view', !!(await until(async () => (await stuck.count()) === 1 && (await inView()), HUNG_MS)))
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
         await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
         await page.mouse.move(5, 5)
         await section.screenshot({ path: path.join(fx.shots, `queuecard-needsyou-request-${theme}.png`) })
         await dialog.locator('.card-work').screenshot({ path: path.join(fx.shots, `queuecard-needsyou-work-${theme}.png`) })
+      }
+      await page.keyboard.press('Escape')
+      // Settled by hand and answered: the queue looks again and finishes it.
+      lib.git(fx.alpha, ['checkout', '--', 'stuck.txt'])
+      await inv('tasks:answer', c.number, item.request, { outcome: 'answered', reply: 'put back' })
+      check('…settled and answered: merged', !!(await until(async () => (await h.card(c.number))?.column === 'done', HUNG_MS)))
+      await h.app.close().catch(() => {})
+
+      // --- A stopped advance with commands (HR3's round 1 finding 3): Hive ended after the advance began, before it
+      // touched the files; the merge then put into the folder by hand (its files as merged, main where it was). The
+      // journal says nothing was touched, the files say otherwise: §16.9.2's terminal state, with the command that
+      // finishes it (main moved to the merge) and the one that undoes it (the files put back). Neither is run.
+      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterStarted' } })
+      crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
+      let ended2 = false
+      h.app.process().once('exit', () => (ended2 = true))
+      await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card cmd', { 'cmd.txt': 'cmd\n' }).catch(() => null)
+      check('commands: Hive ended once the advance began, before the files', !!(await until(() => ended2, HUNG_MS)))
+      await h.app.close().catch(() => {})
+      const expected = q.head(fx, 'main')
+      const result = lib.git(fx.alpha, ['for-each-ref', '--format=%(objectname)', 'refs/hive/queue/']).trim().split(String.fromCharCode(10))[0].trim()
+      lib.git(fx.alpha, ['read-tree', '-m', '-u', expected, result])
+      check('…the merge put into the folder by hand, main where it was', f.text('cmd.txt') === 'cmd\n' && q.head(fx, 'main') === expected)
+      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      const p2 = h.page
+      p2.on('pageerror', (e) => check('no page errors (commands)', false, e.message))
+      await lib.fitWindow(h.app, p2, { width: 1400, height: 900 })
+      // The clipboard stubbed in the page (never the real one): what Copy writes, recorded.
+      await p2.evaluate(() => {
+        window.__copied = []
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => void window.__copied.push(t), readText: async () => '' } })
+      })
+      const c2 = await until(() => f.byTitle(h, 'Card cmd'), HUNG_MS)
+      const st2 = await until(async () => {
+        const s = (await h.inv('queue:list', fx.alpha, 'main'))[0]?.paused?.stuck
+        return s?.commands?.length ? s : null
+      }, HUNG_MS)
+      const finish = st2?.commands.find((x) => x.purpose === 'finish')
+      const undo = st2?.commands.find((x) => x.purpose === 'undo')
+      check('the restart pauses the queue: needs you, with a command to finish it and one to undo it', !!finish && !!undo && finish.place === 'project' && undo.place === 'folder' && st2.files.every((x) => x.side === 'result'), JSON.stringify({ st2, result, paused: (await h.inv('queue:list', fx.alpha, 'main'))[0]?.paused, main: q.head(fx, 'main') }))
+      const s2 = await f.forYouSection(h, c2.number)
+      const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+      const work2 = s2.dialog.locator('.card-work-queue-stuck')
+      const rows = work2.locator('.card-work-queue-command')
+      check('Work section: both commands, as Hive gives them, each with where to run it', !!(await until(async () => (await rows.count()) === 2, HUNG_MS)) && (await rows.locator('code').allInnerTexts()).join('\n') === [finish.command, undo.command].join('\n') && /To finish it, in the project folder/.test(await text(rows.first())) && /To undo it, in /.test(await text(rows.nth(1))), await text(work2))
+      await rows.first().getByRole('button', { name: 'Copy the command to finish it' }).click()
+      await rows.nth(1).getByRole('button', { name: 'Copy the command to undo it' }).click()
+      const copied = await until(async () => {
+        const v = await p2.evaluate(() => window.__copied)
+        return v?.length === 2 ? v : null
+      }, HUNG_MS)
+      check('…Copy copies each exactly', JSON.stringify(copied) === JSON.stringify([finish.command, undo.command]), JSON.stringify(copied))
+      check('…and nothing ran them: main where it was, the files as merged by hand', q.head(fx, 'main') === expected && f.text('cmd.txt') === 'cmd\n')
+      for (const theme of ['dark', 'light']) {
+        await h.inv('settings:update', { appearance: { theme } })
+        await until(async () => (await p2.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await p2.mouse.move(5, 5)
+        await work2.screenshot({ path: path.join(fx.shots, `queuecard-needsyou-commands-${theme}.png`) })
       }
     } catch (e) {
       check('no exception (needs you)', false, e.stack)

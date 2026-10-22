@@ -36,6 +36,7 @@
   "errors.log.none": "Esa ejecución no indicó ningún registro.",
   "errors.log.notFullPath": "La ejecución indicó su registro sin una ruta completa: {path}",
   "errors.log.notText": "Hive solo abre registros e informes de texto, no {file}: usa Mostrar en la carpeta.",
+  "errors.merge.queueMerges": "Hive fusiona {card} mediante la cola de fusión. Fusiónala allí, o elige Fusionar de todos modos en el diálogo Fusionar.",
   "errors.mergeSlot.holdRequired": "Hay que indicar qué reserva liberar",
   "errors.pref.notProjectPref": "No es una preferencia del proyecto.",
   "errors.pref.notValue": "No es un valor válido de {pref}.",
