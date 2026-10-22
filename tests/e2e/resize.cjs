@@ -21,6 +21,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
+  // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
+  await inv('workflow:presetNotNow', path.join(ws, 'demo'))
+  // …and the window has the answer (the refresh it makes), before anything is measured.
+  await lib.until(async () => (await page.evaluate(() => window.hive.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
 
   const drag = async (handle, dx) => {
@@ -37,6 +41,8 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     else await page.locator('.tabs .tab', { hasText: tab }).first().click()
     const list = '.tab-body:visible .split-list'
     await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, 10000)
+    // Version Control's header finishes once its workflow form is read (its link): measured after, not while it lays out.
+    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, 10000)
     const w0 = await width(list)
     check(`${tab} default width`, Math.abs(w0 - def) <= 1, `(${w0})`)
     await drag(page.locator(`${list} > .pane-resizer`).first(), 120)
