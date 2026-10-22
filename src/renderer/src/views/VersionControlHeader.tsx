@@ -92,7 +92,6 @@ export function VersionControlHeader({ project, platform }: { project: ProjectIn
           {factText(project.platform)}
         </span>
       )}
-      <div className="grow" />
       {preset && (
         <Tooltip content={tr(M.workflowTip)}>
           <button type="button" className="link vc-workflow" data-action="vc-workflow" onClick={() => showVersionControl(project.path, 'workflow')}>

@@ -60,6 +60,13 @@ function board(sql, ...args) {
     const link = page.locator('[data-action="vc-workflow"]')
     const sections = () => page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))
     const selected = () => page.locator('.git-sections [aria-selected="true"]').getAttribute('data-section').catch(() => null)
+    /** The workflow link sits at the end of the header's first row, level with the None · Git choice (the Assistant's OK). */
+    const linkInPlace = async () => {
+      const c = await head.locator('.vc-choice').boundingBox()
+      const l = await link.boundingBox()
+      const h = await head.boundingBox()
+      return !!c && !!l && !!h && Math.abs(c.y + c.height / 2 - (l.y + l.height / 2)) < 4 && h.x + h.width - (l.x + l.width) < 30
+    }
     const shots = async (name, target = page) => {
       // No tooltip or hover left over from the step before.
       await page.mouse.move(5, 5)
@@ -91,6 +98,7 @@ function board(sql, ...args) {
     check('Solo saved: "Workflow: Git · Solo"', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · Solo', HUNG_MS)), await text(link))
     await inv('workflow:setOptions', alpha, { preset: 'solo', options: { ...soloOptions, dependenciesDone: !soloOptions.dependenciesDone } })
     check('an option changed: "Workflow: Git · Custom (from Solo)"', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · Custom (from Solo)', HUNG_MS)), await text(link))
+    check('Git: the workflow link at the end of the header row', await linkInPlace())
     await shots('git', page.locator('.vc-view'))
     await link.click()
     check('the link opens Workflow, with the options form', !!(await lib.until(async () => (await selected()) === 'workflow' && (await page.locator('[data-vc-workflow] .workflow-form').count()) === 1, HUNG_MS)))
@@ -113,6 +121,7 @@ function board(sql, ...args) {
     check('None: Workflow only, where it opens', !!(await lib.until(async () => JSON.stringify(await sections()) === '["workflow"]' && (await selected()) === 'workflow', HUNG_MS)), JSON.stringify(await sections()))
     check('Initialise repository… under the header', !!(await lib.until(async () => (await page.locator('[data-vc-init] [data-git-init]').count()) === 1, HUNG_MS)))
     check('the workflow link names None', (await text(link)).trim().startsWith('Workflow: None · '), await text(link))
+    check('None: the workflow link at the end of the header row', await linkInPlace())
     await shots('none', page.locator('.vc-view'))
 
     // --- German: the header and the sections as they wrap.
@@ -208,6 +217,8 @@ function board(sql, ...args) {
     await page.getByText('app', { exact: true }).first().click()
     await vcTab.click()
     check('a subfolder project is Git, and says actions affect the whole repository', !!(await lib.until(async () => (await text(fact)) === `This folder is inside a Git repository at ${outer}: branch and merge actions affect that whole repository.`, HUNG_MS)) && (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1, await text(fact))
+    check('the workflow link shows there too, at the end of the header’s one row', !!(await lib.until(async () => (await text(link)).trim().startsWith('Workflow: Git · '), HUNG_MS)), await text(head))
+    check('subfolder: the workflow link at the end of the header row', await linkInPlace())
     await shots('subfolder', page.locator('.vc-view'))
   } finally {
     await app.close()

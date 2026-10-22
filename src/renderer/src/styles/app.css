@@ -11302,11 +11302,11 @@ button.progress-run-show:focus-visible {
   min-width: 0;
 }
 /* The Version Control tab's header (#1416): None · Git, what Hive finds in the folder, and "Workflow: Git · Team". */
+/* One row: the fact line takes the room left and wraps inside it, so the workflow link stays top right on every page. */
 .vc-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 12px;
   padding: 8px 14px 6px;
   flex-shrink: 0;
   min-width: 0;
@@ -11320,6 +11320,7 @@ button.progress-run-show:focus-visible {
   color: var(--fg-muted);
 }
 .vc-fact {
+  flex: 1 1 0;
   font-size: 12px;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -11333,6 +11334,8 @@ button.progress-run-show:focus-visible {
   gap: 4px;
   font-size: 12px;
   white-space: nowrap;
+  flex-shrink: 0;
+  margin-inline-start: auto;
   background: none;
   border: none;
   padding: 0;
