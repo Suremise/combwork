@@ -336,8 +336,8 @@
     "description": "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.chip.doing": {
-    "defaultMessage": "Working on (Doing):",
-    "description": "Heading in the hover of an agent's card chip, above the cards it works on. Doing is the board column."
+    "defaultMessage": "Working on (Active):",
+    "description": "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column."
   },
   "board.chip.open": {
     "defaultMessage": "Open card {card}",
@@ -356,12 +356,12 @@
     "description": "A warning toast's title after saving the card dialog: someone (an agent, say) changed the same fields meanwhile. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.column.doing": {
-    "defaultMessage": "Doing",
+    "defaultMessage": "Active",
     "description": "A board column's name: cards being worked on."
   },
   "board.column.doingDescription": {
     "defaultMessage": "Being worked on: its agent shows what it is doing now.",
-    "description": "The Doing column's description (its hover)."
+    "description": "The Active column's description (its hover)."
   },
   "board.column.done": {
     "defaultMessage": "Done",
@@ -380,12 +380,12 @@
     "description": "The On Hold column's description (its hover). Todo is the column's name; the Assistant is the Hive Assistant."
   },
   "board.column.passed": {
-    "defaultMessage": "Passed",
+    "defaultMessage": "Approved",
     "description": "A board column's name: cards that passed review and wait to be merged."
   },
   "board.column.passedDescription": {
-    "defaultMessage": "Passed its review, waiting to be merged. A reviewer moves a card here when it passes.",
-    "description": "The Passed column's description (its hover)."
+    "defaultMessage": "Its work passed review (or your OK) and waits to be merged. A reviewer moves a card here when it passes.",
+    "description": "The Approved column's description (its hover)."
   },
   "board.column.review": {
     "defaultMessage": "Review",
@@ -1008,8 +1008,8 @@
     "description": "Under \"Assign an agent\" in the Move to Doing dialog."
   },
   "board.doing.button": {
-    "defaultMessage": "Move to Doing",
-    "description": "The Move to Doing dialog's button: moves the card into the Doing column (a board column)."
+    "defaultMessage": "Move to Active",
+    "description": "The Move to Active dialog's button: moves the card into the Active column (a board column)."
   },
   "board.doing.moving": {
     "defaultMessage": "Moving…",
@@ -1040,8 +1040,8 @@
     "description": "An agent's state in the Move to Doing dialog's agent choice: its session isn't running."
   },
   "board.doing.title": {
-    "defaultMessage": "Move {card} to Doing",
-    "description": "Title of the Move to Doing dialog: {card} is the card's name: its key, such as AM-12, or #12 for a card with none. Doing is a board column."
+    "defaultMessage": "Move {card} to Active",
+    "description": "Title of the Move to Active dialog: {card} is the card's name: its key, such as AM-12, or #12 for a card with none. Active is a board column."
   },
   "board.duration.hours": {
     "defaultMessage": "{h, number} h",
@@ -1860,8 +1860,8 @@
     "description": "Tooltip on the Board sidebar's refresh button: reads the cards again."
   },
   "board.panel.stalledInfo": {
-    "defaultMessage": "Cards in Doing that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Doing or Review that an agent in a card loop left without waiting on them.",
-    "description": "The (i) beside the Board sidebar's Stalled heading. Doing and Review are board columns."
+    "defaultMessage": "Cards in Active that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Active or Review that an agent in a card loop left without waiting on them.",
+    "description": "The (i) beside the Board sidebar's Stalled heading. Active and Review are board columns."
   },
   "board.panel.workspace": {
     "defaultMessage": "Workspace",
@@ -2688,8 +2688,8 @@
     "description": "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card that comes before this one in the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long both have been waiting so (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.noAgent": {
-    "defaultMessage": "In Doing, but no agent has it.",
-    "description": "Why a card in the Doing column is stalled (on the card). Doing is the column."
+    "defaultMessage": "In Active, but no agent has it.",
+    "description": "Why a card in the Active column is stalled (on the card). Active is the column."
   },
   "board.stalled.notRunning": {
     "defaultMessage": "{agent} isn't running.",
@@ -2736,8 +2736,8 @@
     "description": "Under an idle agent in the Start dialog: what it is doing ({status}: \"Ready\", \"Finished\"), and that the card is typed to it next."
   },
   "board.start.intro": {
-    "defaultMessage": "The agent gets the card as its prompt (title and description), and the card moves to Doing. A stopped agent starts a new conversation; an idle one gets it as its next message.",
-    "description": "At the top of the Start dialog. Doing is a board column."
+    "defaultMessage": "The agent gets the card as its prompt (title and description), and the card moves to Active. A stopped agent starts a new conversation; an idle one gets it as its next message.",
+    "description": "At the top of the Start dialog. Active is a board column."
   },
   "board.start.name": {
     "defaultMessage": "Name",
@@ -2888,8 +2888,8 @@
     "description": "The Upgrade button while the board is converted."
   },
   "board.view.intro": {
-    "defaultMessage": "Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Passed.",
-    "description": "Under the Task Board's title. Review and Passed are board columns."
+    "defaultMessage": "Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Approved.",
+    "description": "Under the Task Board's title. Review and Approved are board columns."
   },
   "board.view.noWorkspace": {
     "defaultMessage": "Open a workspace to see its task board.",

@@ -105,6 +105,7 @@ import type {
   WorkflowChange,
   WorkflowCheck,
   WorkflowForm,
+  ProjectStages,
   WorkspaceInfo
 } from './types'
 import type { MetricsQuery, MetricsReport } from './metrics'
@@ -282,6 +283,11 @@ export interface HiveRequests {
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
   'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /**
+   * The project's stages as its current options produce them, in board order, and its own names for them (N5, #1417);
+   * null for a project whose version control isn't recorded yet. A `workflow-changed` event says when to read it again.
+   */
+  'workflow:stages': (projectPath: string) => ProjectStages | null
   /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */

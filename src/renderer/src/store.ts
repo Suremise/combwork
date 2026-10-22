@@ -263,6 +263,8 @@ interface State {
   queueKept: KeptReturn[]
   /** Bumped on each `queue-changed` (#1357): the card's Work section and the Git tab's Merge queue section read again. */
   queueVersion: number
+  /** Bumped on each `workflow-changed` (#1417): views that show a project's stages (`workflow:stages`) read them again. */
+  workflowVersion: number
   /** This window's workspace's lanes (#483), for the Progress panel (#484): running ones and those ended lately. */
   lanes: LaneInfo[]
   /** A pane (an agent's, or the Assistant's panel) briefly highlighted because something asked to show it: its pty key. */
@@ -496,6 +498,7 @@ export const useStore = create<State>(() => ({
   queues: [],
   queueKept: [],
   queueVersion: 0,
+  workflowVersion: 0,
   lanes: [],
   paneFlash: null,
   paneColumns: null,

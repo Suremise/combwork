@@ -3,6 +3,8 @@ import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, W
 import { CONTRADICTIONS, FORM_OPTIONS, formShows, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
+import { stageNameProblemText } from '@shared/workflow/stages'
+import { shownText } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { cardLabelOf, confirm, notify, openProjectSettings, set as setStore, setActivity, useStore } from '../store'
@@ -83,7 +85,7 @@ const T = {
 }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
-const problemText = (p: WorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'notOffered' ? tr(NOT_OFFERED[p.id]) : p.why)
+const problemText = (p: WorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'notOffered' ? tr(NOT_OFFERED[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
 interface CopiedOptions {
@@ -140,7 +142,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     const p = presetOf(id)
     if (!p) return
     const { platform: _p, ...options } = p
-    setDraft({ preset: id, options })
+    // A preset fills in the rules; the stage names (N5) aren't rules, so the project's stay (#1417).
+    setDraft({ preset: id, options: draft.options.stageNames ? { ...options, stageNames: draft.options.stageNames } : options })
   }
   const originOf = (key: OptionKey): WorkflowOptionOrigin | 'preset' => {
     if (!(key in draft.options)) return form.inheritedOrigins[key]

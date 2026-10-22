@@ -149,7 +149,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', live1.number, { column: 'passed' })
   const h3 = await until(async () => {
     const h = await hover(key, `${A})`)
-    return h && /· Passed ·/.test(h.title) && h
+    return h && /· Approved ·/.test(h.title) && h
   }, 5000)
   check('the hover shows the card as it is now', !!h3, (await hover(key, `${A})`))?.title)
 
@@ -175,7 +175,7 @@ const check = (name, ok, extra = '') => {
   await say(home, 'assistant', `${G} is archived; ${A} passed`)
   check("the Assistant's line is printed", !!(await until(() => textAt(akey, `${A} passed`), 10000)))
   const h4 = await hover(akey, `${A} passed`)
-  check("a card number in the Assistant's output is linked", !!h4 && h4.title.startsWith(`${renamed} Attention inbox · Passed`), h4?.title)
+  check("a card number in the Assistant's output is linked", !!h4 && h4.title.startsWith(`${renamed} Attention inbox · Approved`), h4?.title)
   await ctrlClick({ x: h4.at.x + 4, y: h4.at.y })
   check("Ctrl+click in the Assistant's panel opens the card", !!(await until(async () => (await dialog.count()) === 1 && (await dialogTitle()) === 'Attention inbox', 5000)), await dialogTitle())
   await page.screenshot({ path: path.join(lib.WORK, 'cardlinks-assistant-opened.png') })

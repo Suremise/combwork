@@ -219,7 +219,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const early = await intent('b1', c2, 'start')
     check('…the next card waits for it (one card at a time)', early.status === 409 && early.body?.rule === 'lane.oneAtATime', JSON.stringify(early.body))
     await build(c1, 'one.txt')
-    await shoot('2-card1-passed', () => onBoard('Passed', c1))
+    await shoot('2-card1-passed', () => onBoard('Approved', c1))
     const notMerged = await intent('b1', c1, 'report-merge')
     check('a merge reported before it is in main is refused (done.contained)', notMerged.status === 409 && notMerged.body?.rule === 'done.contained', JSON.stringify(notMerged.body))
     git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card 1', line)
@@ -267,7 +267,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     check('clean, its branch is brought to main again (the second LineMoved)', !!moved3 && moved3.data?.to === main3 && git(wt, 'rev-parse', 'HEAD') === main3, JSON.stringify(moved3?.data))
     const s4 = await start(c4)
     check('card 4 starts on main again: its base is the second LineMoved', s4.s.status === 200 && s4.base === main3, JSON.stringify(s4))
-    await shoot('4-card4-on-main', async () => (await onBoard('Doing', c4)) && (await onBoard('Done', c3)))
+    await shoot('4-card4-on-main', async () => (await onBoard('Active', c4)) && (await onBoard('Done', c3)))
 
     // --- Card 4: squash-merged after a commit made past its approval: For you, nothing moved, card 5 waits.
     const approved4 = await build(c4, 'four.txt')

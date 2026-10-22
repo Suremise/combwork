@@ -63,12 +63,12 @@ describe('a card segment', () => {
     // Several notes in one history line.
     expect(cardSegment(4, card(4, 'review', ['Review failed', 'Review failed', 'Moved to Doing; Given to B1', 'Moved to Review']))).toMatchObject({ failed: false, round: 3 })
     // Passed after two failures: passed in round 3.
-    expect(cardSegment(4, card(4, 'passed', ['Review failed', 'Moved to Review', 'Review failed', 'Moved to Review', 'Review passed; Moved to Passed']))).toMatchObject({ state: 'passed', failed: false, round: 3, label: '#4 Card 4 · Passed in round 3' })
+    expect(cardSegment(4, card(4, 'passed', ['Review failed', 'Moved to Review', 'Review failed', 'Moved to Review', 'Review passed; Moved to Passed']))).toMatchObject({ state: 'passed', failed: false, round: 3, label: '#4 Card 4 · Approved in round 3' })
     expect(cardSegment(4, card(4, 'todo')).round).toBeNull()
   })
 
   it('says why a blocked card is blocked, and a card not on the board', () => {
-    expect(cardSegment(7, card(7, 'doing', [], { blocked: 'waiting for Darren' }))).toMatchObject({ label: '#7 Card 7 · Doing, round 1', notes: ['#7: blocked: waiting for Darren'] })
+    expect(cardSegment(7, card(7, 'doing', [], { blocked: 'waiting for Darren' }))).toMatchObject({ label: '#7 Card 7 · Active, round 1', notes: ['#7: blocked: waiting for Darren'] })
     expect(cardSegment(7, card(7, 'hold'))).toMatchObject({ label: '#7 Card 7 · On Hold, waiting for you', notes: ['#7: On Hold: waiting for you to move it on'] })
     expect(cardSegment(9, undefined)).toMatchObject({ state: 'todo', label: '#9 · not on the board', notes: [] })
   })
@@ -187,8 +187,8 @@ describe("an ended lane's segments (#512)", () => {
   const lc = (number: number, column: LaneCard['column'], over: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...over })
 
   it('shows each card as the lane left it, never failed (it keeps no verdicts)', () => {
-    expect(frozenSegment(lc(5, 'doing', { round: 2 }))).toEqual({ kind: 'card', number: 5, name: '#5', state: 'doing', failed: false, round: 2, label: '#5 Card 5 · Doing, round 2, when the lane ended', notes: [] })
-    expect(frozenSegment(lc(6, 'passed', { round: 3 }))).toMatchObject({ state: 'passed', round: 3, label: '#6 Card 6 · Passed in round 3, when the lane ended' })
+    expect(frozenSegment(lc(5, 'doing', { round: 2 }))).toEqual({ kind: 'card', number: 5, name: '#5', state: 'doing', failed: false, round: 2, label: '#5 Card 5 · Active, round 2, when the lane ended', notes: [] })
+    expect(frozenSegment(lc(6, 'passed', { round: 3 }))).toMatchObject({ state: 'passed', round: 3, label: '#6 Card 6 · Approved in round 3, when the lane ended' })
     expect(frozenSegment(lc(7, 'todo'))).toMatchObject({ state: 'todo', round: null, label: '#7 Card 7 · Todo, when the lane ended' })
     // Its hatching says why, as the lane left it (#706).
     expect(frozenSegment(lc(8, 'review', { blocked: 'Asked Darren' }))).toMatchObject({ state: 'blocked', label: '#8 Card 8 · Review, round 1, when the lane ended', notes: ['#8: blocked: Asked Darren'] })

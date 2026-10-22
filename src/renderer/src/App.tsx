@@ -246,6 +246,9 @@ function handleEvent(e: HiveEvent): void {
     case 'queue-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
       break
+    case 'workflow-changed':
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ workflowVersion: s.workflowVersion + 1 }))
+      break
     case 'lanes-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })
       break

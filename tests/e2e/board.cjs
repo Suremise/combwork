@@ -155,7 +155,7 @@ const check = (name, ok, extra = '') => {
 
   // Dragging a card to another column. Each drag starts once the board draws the card where the step before left it
   // (#682: under load the board was still redrawing after the deletions above, and both drags missed). A drop shows at
-  // once (the card moved, or the Move to Doing dialog: no call first), so one not shown within the hung-run bound
+  // once (the card moved, or the Move to Active dialog: no call first), so one not shown within the hung-run bound
   // missed: logged with what the board showed (a screenshot too), and dragged again, at most 3 times.
   const drawnIn = (label, n) => column(label).locator(`.task-card[data-task="${n}"]`)
   const dragged = async (what, n, label, landed) => {
@@ -175,11 +175,11 @@ const check = (name, ok, extra = '') => {
   check('…and the board draws only #1 again', !!(await until(async () => (redraws++, (await tile(rA).count()) + (await tile(rB).count()) === 0 && (await drawnIn('Todo', 1).count()) === 1), HUNG_MS)))
   if (redraws > 1) console.log(`  (the board drew the deletions ${Date.now() - deleted} ms after they were made)`)
   check('a card drags to another column', await dragged('to Review', 1, 'Review', async () => (await card(1))?.column === 'review'), (await card(1))?.column)
-  // Into Doing, it asks who works on it first (doingmove has the rest).
+  // Into Active, it asks who works on it first (doingmove has the rest).
   check('…and the board draws it in Review', !!(await until(async () => (await drawnIn('Review', 1).count()) === 1, HUNG_MS)))
-  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, 1)} to Doing` })
-  check('dragging into Doing asks who works on it', await dragged('into Doing', 1, 'Doing', async () => (await toDoing.count()) === 1))
-  await toDoing.getByRole('button', { name: 'Move to Doing' }).click()
+  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, 1)} to Active` })
+  check('dragging into Active asks who works on it', await dragged('into Active', 1, 'Active', async () => (await toDoing.count()) === 1))
+  await toDoing.getByRole('button', { name: 'Move to Active' }).click()
   check('and moves it when confirmed', !!(await until(async () => (await card(1))?.column === 'doing', HUNG_MS)), (await card(1))?.column)
   await inv('tasks:update', 1, { column: 'todo' })
 
@@ -262,7 +262,7 @@ const check = (name, ok, extra = '') => {
   const edge = (n) => tile(n).evaluate((e) => getComputedStyle(e).borderLeftColor)
   check('cards are tinted by their column', !!(await until(async () => (await tile(extra[0].number).count()) === 1 && new Set([await bg(1), await bg(2), await bg(extra[0].number), await bg(extra[1].number)]).size === 4, 5000)), JSON.stringify([await bg(1), await bg(2)]))
   const heading = (name) => column(name).locator('.board-column-label').evaluate((e) => getComputedStyle(e).color)
-  check('column headings have their own colours', new Set([await heading('Todo'), await heading('Doing'), await heading('Review'), await heading('Done')]).size === 4)
+  check('column headings have their own colours', new Set([await heading('Todo'), await heading('Active'), await heading('Review'), await heading('Done')]).size === 4)
   const doingBg = await bg(1)
   // Each card's #number against its own background (WCAG contrast; tints come back as color(srgb …), 0–1 or 0–255).
   const numberContrast = () =>

@@ -39,16 +39,16 @@ export const COLUMN_TEXT: Record<TaskColumn, { label: Msg; description: Msg }> =
     description: msg({ id: 'board.column.todoDescription', defaultMessage: 'Ready to start.', description: "The Todo column's description (its hover)." })
   },
   doing: {
-    label: msg({ id: 'board.column.doing', defaultMessage: 'Doing', description: "A board column's name: cards being worked on." }),
-    description: msg({ id: 'board.column.doingDescription', defaultMessage: 'Being worked on: its agent shows what it is doing now.', description: "The Doing column's description (its hover)." })
+    label: msg({ id: 'board.column.doing', defaultMessage: 'Active', description: "A board column's name: cards being worked on." }),
+    description: msg({ id: 'board.column.doingDescription', defaultMessage: 'Being worked on: its agent shows what it is doing now.', description: "The Active column's description (its hover)." })
   },
   review: {
     label: msg({ id: 'board.column.review', defaultMessage: 'Review', description: "A board column's name: cards whose work is done, waiting for review." }),
     description: msg({ id: 'board.column.reviewDescription', defaultMessage: 'Work done, waiting for its review.', description: "The Review column's description (its hover)." })
   },
   passed: {
-    label: msg({ id: 'board.column.passed', defaultMessage: 'Passed', description: "A board column's name: cards that passed review and wait to be merged." }),
-    description: msg({ id: 'board.column.passedDescription', defaultMessage: 'Passed its review, waiting to be merged. A reviewer moves a card here when it passes.', description: "The Passed column's description (its hover)." })
+    label: msg({ id: 'board.column.passed', defaultMessage: 'Approved', description: "A board column's name: cards that passed review and wait to be merged." }),
+    description: msg({ id: 'board.column.passedDescription', defaultMessage: 'Its work passed review (or your OK) and waits to be merged. A reviewer moves a card here when it passes.', description: "The Approved column's description (its hover)." })
   },
   done: {
     label: msg({ id: 'board.column.done', defaultMessage: 'Done', description: "A board column's name: merged cards." }),
@@ -156,7 +156,7 @@ export function columnColor(colors: Partial<Record<TaskColumn, string>> | undefi
  */
 export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr): string | null {
   if (card.archived || card.column !== 'doing') return null
-  if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Doing, but no agent has it.', description: 'Why a card in the Doing column is stalled (on the card). Doing is the column.' })) : 'In Doing, but no agent has it.' // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Active, but no agent has it.', description: 'Why a card in the Active column is stalled (on the card). Active is the column.' })) : 'In Doing, but no agent has it.' // i18n-ignore: agent-facing (the Agent API's stalled)
   if (!agentNow) return removedText(card.agentName, tr)
   if (!agentNow.running) return notRunningText(agentNow.name, tr)
   return null

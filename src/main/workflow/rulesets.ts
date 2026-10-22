@@ -6,8 +6,9 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NOT_OFFERED, notOffered, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
-import { englishText } from '../../shared/advanced'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
+import { englishText, type Text } from '../../shared/advanced'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults } from '../../shared/types'
 import { config } from '../config'
@@ -37,6 +38,9 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 /** Whether a value is one its option takes. */
 const fits = (key: keyof WorkflowOptions, v: unknown): boolean => takesOption(key, v)
 
+/** Every option a level may set: the platform's (all-off's keys) and the names (N5), which all-off leaves unset. */
+const optionKeys = (base: WorkflowOptions): string[] => [...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS]
+
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {
   if (raw === undefined || raw === null) return { set: {} }
@@ -62,10 +66,11 @@ function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set:
  */
 export function resolveOptions(platform: PlatformId, levels: OptionLevels): ResolvedOptions {
   const base = allOff(platform)
-  const known = new Set(Object.keys(base).filter((k) => k !== 'platform'))
-  const origins = Object.fromEntries(Object.keys(base).map((k) => [k, 'platform'])) as Record<keyof WorkflowOptions, OptionOrigin>
+  const known = new Set(optionKeys(base))
+  const allPlatform = (): Record<keyof WorkflowOptions, OptionOrigin> => Object.fromEntries(['platform', ...known].map((k) => [k, 'platform'])) as Record<keyof WorkflowOptions, OptionOrigin>
+  const origins = allPlatform()
   const options: WorkflowOptions = { ...base }
-  const fallBack = (why: string): ResolvedOptions => ({ options: base, origins: Object.fromEntries(Object.keys(base).map((k) => [k, 'platform'])) as Record<keyof WorkflowOptions, OptionOrigin>, invalid: why })
+  const fallBack = (why: string): ResolvedOptions => ({ options: base, origins: allPlatform(), invalid: why })
   const steps: [Exclude<OptionOrigin, 'platform'>, unknown][] = [
     ['global', levels.global?.[platform]],
     ['workspace', levels.workspace?.[platform]],
@@ -89,8 +94,11 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
   return { options, origins, invalid: null }
 }
 
-/** Why options can't be saved (#1278): a level that can't be read, a contradiction, or a value this version doesn't offer yet. */
-export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: ReturnType<typeof notOffered>[number] }
+/**
+ * Why options can't be saved (#1278): a level that can't be read, a contradiction, a value this version doesn't offer
+ * yet, or a stage's name (N5, #1417).
+ */
+export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: ReturnType<typeof notOffered>[number] } | ({ kind: 'stageName' } & StageNameProblem)
 
 /**
  * Options as a save would leave them (the Workflow section, the Assistant's settings tool): resolved, and every reason
@@ -99,20 +107,37 @@ export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradicti
  */
 export function checkOptions(platform: PlatformId, levels: OptionLevels): { resolved: ResolvedOptions; problems: OptionsProblem[] } {
   const resolved = resolveOptions(platform, { ...levels, project: null })
-  const known = new Set(Object.keys(allOff(platform)).filter((k) => k !== 'platform'))
+  const known = new Set(optionKeys(allOff(platform)))
   const own = levelOf(levels.project, platform, known)
   if ('bad' in own) return { resolved, problems: [{ kind: 'bad', why: `project options: ${own.bad}` }] } // i18n-ignore: an English reason for the Assistant and the log
   if (resolved.invalid) return { resolved, problems: [{ kind: 'bad', why: resolved.invalid }] }
   const options = { ...resolved.options, ...own.set }
   const origins = { ...resolved.origins }
   for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
-  const problems: OptionsProblem[] = [...contradictions(options).map((id) => ({ kind: 'contradiction' as const, id })), ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id }))]
+  const bad = contradictions(options)
+  // A stage's name (N5) is checked against the stages these options produce: none to check against while they contradict.
+  const compiled = bad.length ? null : compile(options)
+  const stages = compiled?.ok ? compiled.ruleset.stages.map((st) => st.id) : []
+  const problems: OptionsProblem[] = [
+    ...bad.map((id) => ({ kind: 'contradiction' as const, id })),
+    ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id })),
+    ...stageNameProblems(options.stageNames, stages).map((p) => ({ kind: 'stageName' as const, ...p }))
+  ]
   return { resolved: { options, origins, invalid: null }, problems }
 }
 
+/** A problem as text for the window (its message, in the user's language), or its English reason. */
+export function problemShownOf(p: OptionsProblem): Text {
+  if (p.kind === 'bad') return { shown: p.why, english: p.why }
+  return p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : p.kind === 'notOffered' ? NOT_OFFERED[p.id] : stageNameProblemText(p)
+}
+
 /** A problem in English, for the Assistant's tools and the log. */
-export function problemText(p: OptionsProblem): string {
-  return p.kind === 'bad' ? p.why : englishText(p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : NOT_OFFERED[p.id])
+export const problemText = (p: OptionsProblem): string => (p.kind === 'bad' ? p.why : englishText(problemShownOf(p)))
+
+/** Tells the workspace's windows that a project's workflow was written (#1417): its stages and their names may have changed. */
+export function workflowChanged(ws: Pick<WorkspaceService, 'path' | 'emit'>, projectPath: string): void {
+  if (ws.path) ws.emit({ type: 'workflow-changed', workspacePath: ws.path, projectPath })
 }
 
 /** resolveOptions(), logging a fall-back once per project and reason (each read would log it again otherwise). */

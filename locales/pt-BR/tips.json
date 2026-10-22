@@ -83,6 +83,8 @@
   "tips.boardReview.title": "Peça a um agente para revisar um cartão",
   "tips.boardSetAside.text": "Quando um espaço de trabalho foi aberto em um Hive mais antigo, os cartões dele são deixados de lado quando este o abre de novo. Revisar… no aviso, ou Cartões deixados de lado… no menu ⋯ do quadro, adiciona cada um ao quadro ou o descarta.",
   "tips.boardSetAside.title": "Cartões criados por um Hive mais antigo",
+  "tips.boardStages.text": "Peça ao Assistente para renomear uma etapa do quadro de um projeto, como “chame Fazendo de Construindo no web”. Um nome é só um nome: não muda nenhuma regra, vale na hora, e os agentes continuam usando os ids.",
+  "tips.boardStages.title": "Dê seus próprios nomes às etapas do quadro",
   "tips.boardUpgrade.text": "O Hive guarda o quadro 0.9 que atualizou para 1.0. Ajuda → Restaurar o backup do quadro 0.9… o traz de volta, depois de guardar uma cópia do quadro como está, para que um Hive 0.9 possa alterá-lo de novo.",
   "tips.boardUpgrade.title": "Voltar ao 0.9 depois de atualizar",
   "tips.cardCost.text": "O painel de um cartão diz o que os agentes dele usaram enquanto estavam com ele, “{example}”, com as partes e os tokens do executor e do revisor ao passar o mouse. Desempenho lista o custo de cada cartão, e a dica de uma raia no painel Progresso mostra o custo extra dela.",

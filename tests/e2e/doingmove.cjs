@@ -1,7 +1,7 @@
-// Moving a card into Doing asks who works on it (the Move to Doing dialog): from a drag, the card menu's Move to →
-// Doing and the card dialog's Column, with Nobody yet, Assign an agent and Assign and start; Cancel leaves the card as
+// Moving a card into Active asks who works on it (the Move to Active dialog): from a drag, the card menu's Move to →
+// Active and the card dialog's Column, with Nobody yet, Assign an agent and Assign and start; Cancel leaves the card as
 // it was; busy agents can be assigned but not started; an agent that gets busy while the dialog is open can no longer
-// be started; reordering within Doing doesn't ask. Three agents of the fake Claude Code: Idle (running, ready), Busy
+// be started; reordering within Active doesn't ask. Three agents of the fake Claude Code: Idle (running, ready), Busy
 // (working) and Sleepy (stopped). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -85,14 +85,14 @@ const until = async (fn, ms = 10000) => {
   const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-header', { hasText: label }) })
   const order = (label) => column(label).locator('.task-card').evaluateAll((els) => els.map((x) => Number(x.dataset.task)))
   await until(async () => (await tile(f).count()) === 1, 5000)
-  const dialog = (n) => page.locator('.dialog', { hasText: `Move ${keyOf.get(n) ?? `#${n}`} to Doing` })
+  const dialog = (n) => page.locator('.dialog', { hasText: `Move ${keyOf.get(n) ?? `#${n}`} to Active` })
   const mode = (dlg, name) => dlg.locator('label.choice', { hasText: name }).first()
   const disabled = (loc) => loc.evaluate((x) => x.classList.contains('disabled'))
   const confirm = (dlg) => dlg.locator('.dialog-footer .btn.primary')
 
   // --- Drag, then Cancel: the card stays in Todo, with nobody.
-  await tile(a).dragTo(column('Doing').locator('.board-column-body'))
-  check('dragging a card into Doing asks who works on it', !!(await until(async () => (await dialog(a).count()) === 1, 5000)))
+  await tile(a).dragTo(column('Active').locator('.board-column-body'))
+  check('dragging a card into Active asks who works on it', !!(await until(async () => (await dialog(a).count()) === 1, 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'doingmove-dialog.png') })
   check('with nobody as the default for a card with no agent', await mode(dialog(a), 'Nobody yet').locator('input').isChecked())
   check('the card is not moved while it asks', (await card(a)).column === 'todo' && (await column('Todo').locator(`.task-card[data-task="${a}"]`).count()) === 1)
@@ -101,17 +101,17 @@ const until = async (fn, ms = 10000) => {
   const ac = await card(a)
   check('Cancel leaves the card where it was', ac.column === 'todo' && ac.agent === null && (await dialog(a).count()) === 0, JSON.stringify({ column: ac.column, agent: ac.agent }))
 
-  // --- Drag, Nobody yet: in Doing with no agent.
-  await tile(a).dragTo(column('Doing').locator('.board-column-body'))
+  // --- Drag, Nobody yet: in Active with no agent.
+  await tile(a).dragTo(column('Active').locator('.board-column-body'))
   await dialog(a).waitFor({ timeout: 5000 })
   await confirm(dialog(a)).click()
-  check('Nobody yet moves it to Doing with no agent', !!(await until(async () => {
+  check('Nobody yet moves it to Active with no agent', !!(await until(async () => {
     const x = await card(a)
     return x.column === 'doing' && x.agent === null
   }, 5000)))
 
   // --- A card of Idle's in Review: Idle, assigned, is the default; Nobody yet takes it from Idle.
-  await tile(b).dragTo(column('Doing').locator('.board-column-body'))
+  await tile(b).dragTo(column('Active').locator('.board-column-body'))
   await dialog(b).waitFor({ timeout: 5000 })
   const assignB = await dialog(b).locator('select').inputValue()
   check("the card's agent is the default, assigned", (await mode(dialog(b), 'Assign an agent').locator('input').isChecked()) && assignB === idle.id, assignB)
@@ -124,9 +124,9 @@ const until = async (fn, ms = 10000) => {
   }, 5000)
   check('and clears the assignment', !!bc, JSON.stringify(await card(b)))
 
-  // --- Context menu → Move to → Doing, Assign a busy agent: nothing is sent to it.
+  // --- Context menu → Move to → Active, Assign a busy agent: nothing is sent to it.
   await tile(c).click({ button: 'right' })
-  await page.locator('.menu .menu-item', { hasText: 'Doing' }).click()
+  await page.locator('.menu .menu-item', { hasText: 'Active' }).click()
   await dialog(c).waitFor({ timeout: 5000 })
   await mode(dialog(c), 'Assign an agent').click()
   const options = await dialog(c).locator('select option').allInnerTexts()
@@ -142,23 +142,23 @@ const until = async (fn, ms = 10000) => {
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(cName), cName)
   check('and starts nothing', !transcripts().includes(`task ${cName} `) && (await live(busy))?.status === 'working' && !(await live(sleepy)))
 
-  // --- Within Doing: reordering doesn't ask.
-  await until(async () => (await order('Doing')).length === 3, 5000)
-  const doingBefore = await order('Doing')
+  // --- Within Active: reordering doesn't ask.
+  await until(async () => (await order('Active')).length === 3, 5000)
+  const doingBefore = await order('Active')
   const last = doingBefore.at(-1)
   await tile(last).dragTo(tile(doingBefore[0]), { targetPosition: { x: 20, y: 4 } })
   await lib.sleep(800)
-  check('reordering within Doing does not ask', (await page.locator('.dialog', { hasText: 'to Doing' }).count()) === 0)
-  check('and reorders', (await until(async () => (await order('Doing'))[0] === last, 5000)) === true, JSON.stringify(await order('Doing')))
+  check('reordering within Active does not ask', (await page.locator('.dialog', { hasText: 'to Active' }).count()) === 0)
+  check('and reorders', (await until(async () => (await order('Active'))[0] === last, 5000)) === true, JSON.stringify(await order('Active')))
 
-  // --- A drop position is kept: F dropped above the top Doing card.
-  const top = (await order('Doing'))[0]
+  // --- A drop position is kept: F dropped above the top Active card.
+  const top = (await order('Active'))[0]
   await tile(f).dragTo(tile(top), { targetPosition: { x: 20, y: 4 } })
   await dialog(f).waitFor({ timeout: 5000 })
   await confirm(dialog(f)).click()
-  check('a card dropped into Doing goes where it was dropped', !!(await until(async () => (await order('Doing'))[0] === f, 5000)), JSON.stringify(await order('Doing')))
+  check('a card dropped into Active goes where it was dropped', !!(await until(async () => (await order('Active'))[0] === f, 5000)), JSON.stringify(await order('Active')))
 
-  // --- The card dialog: Column → Doing and a new title; Cancel keeps the dialog and saves nothing.
+  // --- The card dialog: Column → Active and a new title; Cancel keeps the dialog and saves nothing.
   await tile(d).click()
   const edit = page.locator('.dialog', { hasText: `#${d}` }).filter({ has: page.locator('.task-title-input') })
   await edit.waitFor({ timeout: 5000 })
@@ -185,7 +185,7 @@ const until = async (fn, ms = 10000) => {
     const x = await card(d)
     return x.column === 'doing' && x.agent === sleepy.id && x
   }, 20000)
-  check('Assign and start gives it to the stopped agent, in Doing', !!dd, JSON.stringify(await card(d)))
+  check('Assign and start gives it to the stopped agent, in Active', !!dd, JSON.stringify(await card(d)))
   check('with the dialog edits saved', dd?.title === 'Card D, renamed', dd?.title)
   check('and the card dialog closed', !!(await until(async () => (await edit.count()) === 0, 5000)))
   const dName = await named(d)
@@ -194,7 +194,7 @@ const until = async (fn, ms = 10000) => {
   // --- Availability changes while the dialog is open: Idle gets busy, and can no longer be started.
   await until(async () => (await live(idle))?.status === 'ready', 10000)
   await tile(e).click({ button: 'right' })
-  await page.locator('.menu .menu-item', { hasText: 'Doing' }).click()
+  await page.locator('.menu .menu-item', { hasText: 'Active' }).click()
   await dialog(e).waitFor({ timeout: 5000 })
   await mode(dialog(e), 'Assign and start').click()
   const eRow = (name) => dialog(e).locator('label.choice', { has: page.locator('strong', { hasText: new RegExp(`^\\s*${name}$`) }) })

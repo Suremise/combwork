@@ -87,7 +87,7 @@ export function CardChip({ project, a, short, tip = true }: { project: ProjectIn
   // Each card's decisions counted (#357): what the user decided about it, read in the card.
   const line = (c: TaskCard): string => tr(msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." }), { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
   const lines = [
-    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Doing):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Doing is the board column." })), ...doing.map(line)] : []),
+    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Active):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column." })), ...doing.map(line)] : []),
     ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(line)] : []),
     tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(first) })
   ]

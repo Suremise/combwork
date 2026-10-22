@@ -95,7 +95,7 @@
   "board.column.hold": "Em espera",
   "board.column.holdDescription": "Em espera: ninguém pega estes cartões até que passem para A fazer. Só você e o Assistente põem cartões aqui.",
   "board.column.passed": "Aprovado",
-  "board.column.passedDescription": "Aprovado na revisão, aguardando o merge. Um revisor move o cartão para cá quando ele é aprovado.",
+  "board.column.passedDescription": "O trabalho foi aprovado na revisão (ou recebeu sua aprovação) e aguarda o merge. Um revisor move o cartão para cá quando ele é aprovado.",
   "board.column.review": "Revisão",
   "board.column.reviewDescription": "Trabalho feito, aguardando revisão.",
   "board.column.todo": "A fazer",

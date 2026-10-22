@@ -30,7 +30,7 @@
   "performance.cards.reviewer": "Recenzent",
   "performance.cards.rounds": "Rundy",
   "performance.cards.roundsTip": "Rundy recenzji: każda nieudana recenzja to jedna runda, a recenzja w trakcie lub zaliczona to następna. Żadnej, zanim karta pierwszy raz trafiła do Recenzji.",
-  "performance.cards.tip": "Każda karta, którą jej agenci zajmowali się w ciągu ostatnich {range, select, 24h {24 godzin} 7d {7 dni} other {30 dni}}: co zużył jej wykonawca, gdy była w kolumnie W toku, i jej recenzent od początku recenzji do werdyktu, według danych dostawców (cały koszt każdej karty, tak jak Użycie dostawców liczy całe sesje). ≈ to szacunek Hive; Nieznany to to, czego nie wiadomo, nigdy {zero}. Tokeny po najechaniu kursorem. To, co agenci toru zużyli bez żadnej karty, to narzut toru, widoczny po najechaniu na tor w panelu Postęp.",
+  "performance.cards.tip": "Każda karta, którą jej agenci zajmowali się w ciągu ostatnich {range, select, 24h {24 godzin} 7d {7 dni} other {30 dni}}: co zużył jej wykonawca, gdy była w kolumnie Aktywne, i jej recenzent od początku recenzji do werdyktu, według danych dostawców (cały koszt każdej karty, tak jak Użycie dostawców liczy całe sesje). ≈ to szacunek Hive; Nieznany to to, czego nie wiadomo, nigdy {zero}. Tokeny po najechaniu kursorem. To, co agenci toru zużyli bez żadnej karty, to narzut toru, widoczny po najechaniu na tor w panelu Postęp.",
   "performance.cards.unknown": "+ nieznane: {n, number}",
   "performance.col.p50": "p50",
   "performance.col.p95": "p95",

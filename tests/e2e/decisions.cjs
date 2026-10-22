@@ -6,7 +6,7 @@
 // working on the card hears of a decision recorded meanwhile in its next reply, also from a tool that isn't the board's
 // (its own token; the real hive MCP server adds the line). The dialog's Save keeps everything typed in it (#432): a
 // decision being written is recorded as the user's, a comment posted, both once each, a change to a decision saved,
-// and a failed save leaves the dialog open with the words, also through Move to Doing, whose Try Again writes nothing
+// and a failed save leaves the dialog open with the words, also through Move to Active, whose Try Again writes nothing
 // twice; a decision changed to nothing is refused; Add Decision and Comment stand out while their box has text,
 // saying Save adds them too. The agent runs the fake Claude Code. Both themes. Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR.
@@ -239,8 +239,8 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Escape')
   await until(async () => (await mDialog.count()) === 0, 5000)
 
-  // Save into Doing goes through Move to Doing, which saves the drafts first; its Try Again writes nothing twice.
-  const moveDialog = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, m)} to Doing` })
+  // Save into Active goes through Move to Active, which saves the drafts first; its Try Again writes nothing twice.
+  const moveDialog = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, m)} to Active` })
   const viaMoveToDoing = async (fail) => {
     await mDialog.locator('select').nth(2).selectOption('doing')
     await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
@@ -266,7 +266,7 @@ const check = (name, ok, extra = '') => {
   await open()
   await mDialog.getByLabel('New decision').fill('Reset mails name the app.')
   await mDialog.getByLabel('New comment').fill('Moving it on.')
-  check('Move to Doing with both drafts, the comment failing once: Try Again moves it', await viaMoveToDoing('tasks:comment*1'))
+  check('Move to Active with both drafts, the comment failing once: Try Again moves it', await viaMoveToDoing('tasks:comment*1'))
   const doing = await card(m)
   check('…with the decision recorded once and the comment posted once', doing.decisions.length === decisionsBefore + 1 && doing.decisions.filter((d) => d.text === 'Reset mails name the app.').length === 1 && doing.comments.filter((c) => c.text === 'Moving it on.').length === 1 && doing.comments.length === commentsBefore + 1, JSON.stringify({ decisions: doing.decisions.map((d) => d.text), comments: doing.comments.map((c) => c.text) }))
   await inv('tasks:update', m, { column: 'todo' })
@@ -276,7 +276,7 @@ const check = (name, ok, extra = '') => {
   await mDialog.getByLabel('New comment').fill('Second try.')
   // The move itself fails once (after the comment was posted): Try Again posts nothing again. The window's moves go
   // through tasks:move since #1275 (#1333).
-  check('Move to Doing with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:move*1'))
+  check('Move to Active with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:move*1'))
   check('…with the comment posted once', (await card(m)).comments.filter((c) => c.text === 'Second try.').length === 1 && (await card(m)).decisions.length === decisionsBefore + 1)
 
   // An agent on the card: its next reply flags a decision recorded since it read the card, whatever tool it called.

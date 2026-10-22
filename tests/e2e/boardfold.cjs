@@ -1,4 +1,4 @@
-// The board's six columns and how it folds (#170): On Hold before Todo and Passed between Review and Done, through the
+// The board's six columns and how it folds (#170): On Hold before Todo and Approved between Review and Done, through the
 // Agent API too; each column collapses to a narrow strip with its name and count, and the expanded
 // ones share the freed width (1, 3 and 5 collapsed, narrow and wide windows); a card dropped on a strip goes to the top
 // of that column (its true top with a search on, #263); columns fold sideways with « / », cards with ▾ / ▸ (#276); cards fold to one line, one by one or all of a column from its menu; and all of it is kept for the
@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
+const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
 
 ;(async () => {
   for (const d of [userData, ws, wsB]) fs.rmSync(d, { recursive: true, force: true })
@@ -62,9 +62,9 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   await page.getByRole('button', { name: 'Task Board' }).click()
   const columns = page.locator('.board-column')
   check('the board shows six columns in order', !!(await until(async () => (await columns.count()) === 6, HUNG_MS)) && JSON.stringify(await page.locator('.board-column-label').allInnerTexts()) === JSON.stringify(LABELS.map((l) => l.toUpperCase())), JSON.stringify(await page.locator('.board-column-label').allInnerTexts()))
-  const column = (label) => page.locator(`.board-column[data-column="${{ 'On Hold': 'hold', Todo: 'todo', Doing: 'doing', Review: 'review', Passed: 'passed', Done: 'done' }[label]}"]`)
+  const column = (label) => page.locator(`.board-column[data-column="${{ 'On Hold': 'hold', Todo: 'todo', Active: 'doing', Review: 'review', Approved: 'passed', Done: 'done' }[label]}"]`)
   const tile = (x) => page.locator(`.task-card[data-task="${x}"]`)
-  check('each card is in its column', (await column('On Hold').locator(tile(n.hold)).count()) === 1 && (await column('Passed').locator(tile(n.passed)).count()) === 1)
+  check('each card is in its column', (await column('On Hold').locator(tile(n.hold)).count()) === 1 && (await column('Approved').locator(tile(n.passed)).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'boardfold-six.png') })
 
   /** Widths of the columns as drawn: expanded ones share the room equally, collapsed strips stay narrow. */
@@ -105,13 +105,13 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
     await collapse('On Hold')
     await fills(`${label} window, 1 collapsed`)
     await collapse('Done')
-    await collapse('Passed')
+    await collapse('Approved')
     await fills(`${label} window, 3 collapsed`)
     await collapse('Review')
-    await collapse('Doing')
+    await collapse('Active')
     await fills(`${label} window, 5 collapsed`)
     if (label === 'wide') await page.screenshot({ path: path.join(lib.WORK, 'boardfold-five.png') })
-    for (const l of ['Doing', 'Review', 'Passed', 'Done', 'On Hold']) await expand(l)
+    for (const l of ['Active', 'Review', 'Approved', 'Done', 'On Hold']) await expand(l)
   }
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
 
@@ -187,10 +187,10 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   check('and unfolds', !!(await until(async () => !(await tile(n.t1).getAttribute('class')).includes('folded'), 5000)))
 
   // A folded card drags like any other, and stays folded in its new column.
-  await tile(n.t2).dragTo(column('Doing').locator('.board-column-body'))
-  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, n.t2)} to Doing` })
-  if (await until(async () => (await toDoing.count()) === 1, 5000)) await toDoing.getByRole('button', { name: 'Move to Doing' }).click()
-  check('a folded card drags to another column and stays folded', !!(await until(async () => (await column('Doing').locator(tile(n.t2)).count()) === 1, 5000)) && (await tile(n.t2).getAttribute('class')).includes('folded'))
+  await tile(n.t2).dragTo(column('Active').locator('.board-column-body'))
+  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, n.t2)} to Active` })
+  if (await until(async () => (await toDoing.count()) === 1, 5000)) await toDoing.getByRole('button', { name: 'Move to Active' }).click()
+  check('a folded card drags to another column and stays folded', !!(await until(async () => (await column('Active').locator(tile(n.t2)).count()) === 1, 5000)) && (await tile(n.t2).getAttribute('class')).includes('folded'))
 
   // Collapse all and Expand all from a column's menu.
   await column('Todo').getByRole('button', { name: 'Todo: more' }).click()
@@ -265,8 +265,8 @@ const LABELS = ['On Hold', 'Todo', 'Doing', 'Review', 'Passed', 'Done']
   const bCard = (await invB('tasks:create', { title: 'A card of workspace B', project: 'beta' })).number
   await pageB.getByRole('button', { name: 'Task Board' }).click()
   await until(async () => (await pageB.locator(`.task-card[data-task="${bCard}"]`).count()) === 1, 10000)
-  // A: Passed collapsed and the Review card folded.
-  await collapse('Passed')
+  // A: Approved collapsed and the Review card folded.
+  await collapse('Approved')
   await fold(n.review, `Collapse ${await lib.cardLabel(inv, n.review)} to one line`).click()
   await until(async () => (await tile(n.review).getAttribute('class')).includes('folded'), 5000)
   const afterA = await state()

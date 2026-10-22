@@ -437,7 +437,7 @@
   "assistant.template.sameName": "Two agents are called \"{name}\".",
   "assistant.template.tooMany": "It has {count} agents; a project can have up to {max}.",
   "assistant.template.tooManyHere": "It has {count} agents, and this project can have up to {limit} (Settings → Advanced → Agents per project).",
-  "assistant.templateLoad.afterLoad": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Doing ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
+  "assistant.templateLoad.afterLoad": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
   "assistant.templateLoad.branchKeptTitle": "{count, plural, one {An old worktree's branch was kept} other {# old worktrees' branches were kept}}",
   "assistant.templateLoad.createdHeading": "Created:",
   "assistant.templateLoad.createdLine": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {provider}, {settings}",

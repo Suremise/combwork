@@ -21,7 +21,7 @@ export interface StageDef {
 export interface Ruleset {
   id: string
   version: number
-  /** The options it was compiled from (the pieces' parameters: check names, target, style…). */
+  /** The options it was compiled from (the pieces' parameters: check names, target, style…), without names (N5: `ruleOptions`). */
   options: WorkflowOptions
   stages: StageDef[]
   guards: Record<MoveId, GuardId[]>
@@ -51,11 +51,21 @@ export function canonical(v: unknown): string {
   return JSON.stringify(v)
 }
 
+/** The options a ruleset is made of: all but the names (N5), which apply at once and never make "old rules" (#1417). */
+export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
+  const { stageNames: _names, ...rules } = o
+  return rules
+}
+
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
 export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git' && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'hiveMerges' || o.finish === 'agentMerges')
 
-/** The stages the options produce (§16.5.2). */
-export function stagesOf(o: WorkflowOptions): StageId[] {
+/**
+ * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
+ * review (Hive merges after it or after your OK, the agent merges, or Not checked after a review); Merging when Hive
+ * merges. stages.ts names them.
+ */
+export function producedStages(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
   const git = o.platform === 'git'
   const approved = git && (o.finish === 'agentMerges' || (o.finish === 'hiveMerges' && (review || o.okBefore.mode !== 'never')) || (o.finish === 'notChecked' && review))
@@ -103,13 +113,15 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
 export type CompileResult = { ok: true; ruleset: Ruleset } | { ok: false; contradictions: Contradiction[] }
 
 /** Compiles options into a ruleset, or names the contradictions that stop it (refused when saved). */
-export function compile(o: WorkflowOptions): CompileResult {
+export function compile(withNames: WorkflowOptions): CompileResult {
+  // Names aren't rules (#1417): a rename never changes a ruleset or its id.
+  const o = ruleOptions(withNames)
   const bad = contradictions(o)
   if (bad.length) return { ok: false, contradictions: bad }
   const guards = guardsOf(o)
   // A guard whose capability the platform lacks can't be in its rulesets (§16.5.3).
   for (const m of MOVES) guards[m] = guards[m].filter((id) => !GUARDS[id].needs || hasCapability(o.platform, GUARDS[id].needs))
-  const stages = stagesOf(o).map((id) => ({ id, category: STAGE_CATEGORY[id] }))
+  const stages = producedStages(o).map((id) => ({ id, category: STAGE_CATEGORY[id] }))
   const body = { version: RULESET_VERSION, options: o, stages, guards }
   return { ok: true, ruleset: { id: stableHash(canonical(body)), ...body } }
 }

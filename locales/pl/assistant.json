@@ -429,7 +429,7 @@
   "assistant.template.sameName": "Dwóch agentów ma nazwę „{name}”.",
   "assistant.template.tooMany": "Liczba agentów: {count}; projekt może mieć najwyżej {max}.",
   "assistant.template.tooManyHere": "Liczba agentów: {count}, a ten projekt może mieć najwyżej {limit} (Ustawienia → Zaawansowane → Agenci na projekt).",
-  "assistant.templateLoad.afterLoad": "{removed, select, yes {Ich rozmowy zostają w zakładce Sesje, a ich otwarte karty wracają (te z W toku do Do zrobienia). Układ zmienia się na układ szablonu.} other {Układ zmienia się na układ szablonu.}}",
+  "assistant.templateLoad.afterLoad": "{removed, select, yes {Ich rozmowy zostają w zakładce Sesje, a ich otwarte karty wracają (te z kolumny Aktywne do Do zrobienia). Układ zmienia się na układ szablonu.} other {Układ zmienia się na układ szablonu.}}",
   "assistant.templateLoad.branchKeptTitle": "{count, plural, one {Zachowano gałąź starego worktree} few {Zachowano gałęzie # starych worktree} many {Zachowano gałęzie # starych worktree} other {Zachowano gałęzie # starego worktree}}",
   "assistant.templateLoad.createdHeading": "Utworzeni:",
   "assistant.templateLoad.createdLine": "{name}{hasRole, select, yes { – {role}} other {}}{replaces, select, yes { (nowy)} other {}}: {provider}, {settings}",

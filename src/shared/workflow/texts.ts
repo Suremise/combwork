@@ -76,9 +76,6 @@ export const UNREADABLE = {
   ignored: msg({ id: 'workflow.unreadable.ignored', defaultMessage: 'what Git ignores in {folder}', description: 'What Hive couldn\'t read, the object of "Hive couldn\'t read …": the files Git is told to leave out. {folder} is a folder path.' })
 }
 
-/** A stage's name, for a refusal's {stage} (glossary 2.2). An unknown id is shown as it is. */
-export const STAGE_NAME = msg({ id: 'workflow.stage', defaultMessage: '{stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} done {Done} other {{stage}}}', description: 'A stage of the board, named in a refusal (glossary 2.2: On Hold, Todo, Active, Review, Approved, Merging, Done): translate each as the glossary does.' })
-
 /**
  * What an agent or the user asked for, named in a refusal's {move}, {intent} and {moves} (agents read the intent's name,
  * the window this). Keys are the names the runtime records.
@@ -123,7 +120,7 @@ export const RULE_NAMES: Record<string, Msg> = {
   'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Hive checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' })
 }
 
-const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), STAGE_NAME, ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
+const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
 
 /** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null

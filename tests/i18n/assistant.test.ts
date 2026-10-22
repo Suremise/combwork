@@ -142,7 +142,7 @@ describe('what Hive works out in shared code is in the language when it is worke
     expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay: 2 commits not merged into main): replaced by a new agent with the same name\n')
     expect(text).toContain('• Dev — builder (new): Claude Code, Opus 5.5 (default) · Medium (default)')
     expect(text).toContain('    own worktree on hive/dev-2 (from main) in D:/x/site/dev-2 (new: hive/dev has 1 uncommitted file)')
-    expect(text).toMatch(/\n\nEach new worktree runs the project's setup command \(npm install\) before its agent first starts\.\nTheir conversations stay in the Sessions tab, and their open cards go back \(Doing ones to Todo\)\. The layout becomes the template's\.$/)
+    expect(text).toMatch(/\n\nEach new worktree runs the project's setup command \(npm install\) before its agent first starts\.\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
     expect(oldWorktreesNotice([{ branch: 'hive/a', removed: true }])).toEqual({ level: 'success', title: 'Removed an old worktree', detail: 'hive/a, with its branch: merged and clean.' })
     expect(oldWorktreesNotice([{ branch: 'hive/a', removed: false }, { branch: 'hive/b', removed: false, why: 'dirty' }])).toEqual({ level: 'warning', title: '2 old worktrees were kept', detail: 'hive/a: kept.\nhive/b: kept (dirty).' })
   })

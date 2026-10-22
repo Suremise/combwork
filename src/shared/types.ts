@@ -19,6 +19,8 @@ import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
+import type { StageNameProblem } from './workflow/stages'
+import type { StageDef } from './workflow/compile'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -982,6 +984,22 @@ export interface ProjectWorkflow {
   platform: PlatformId
   preset: PresetId | null
   options: Partial<WorkflowOptions>
+  /**
+   * The other platforms' preset, options and answer to "How do you work?", kept while another one is in force so
+   * switching back restores them (#1419). Written with `setKept`, never by replacing `workflow` (#1417's `writeWorkflow`).
+   */
+  kept?: Partial<Record<PlatformId, { preset: PresetId | null; options: Partial<WorkflowOptions>; presetAsked?: PresetAsked }>>
+  /** The answer to "How do you work?" for the platform in force (#1423), written with `setPresetAsked`. */
+  presetAsked?: PresetAsked
+}
+
+/** The answer to "How do you work? Solo / Pair / Team" (#1423): a preset was chosen, or Not now. */
+export type PresetAsked = 'chosen' | 'notNow'
+
+/** A project's stages as the board shows them (#1417, `workflow:stages`): those its options produce, and its own names. */
+export interface ProjectStages {
+  stages: StageDef[]
+  names: Partial<Record<StageDef['id'], string>>
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
@@ -1016,12 +1034,17 @@ export interface WorkflowChange {
 }
 
 /** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */
-export type WorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | { kind: 'bad'; why: string }
+export type WorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
 
 /** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
 export interface WorkflowCheck {
   problems: WorkflowProblem[]
   changed: (keyof WorkflowOptions)[]
+  /**
+   * Whether the change applies at once to every card (#1417): it changes only names (N5), which aren't rules, so no card
+   * or lane keeps old rules (then `lanes` and `inFlight` are empty).
+   */
+  appliesNow: boolean
   /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
@@ -2667,6 +2690,8 @@ export type HiveEvent =
   | { type: 'lanes-changed'; workspacePath: string; lanes: LaneInfo[] }
   /** A target's merge queue changed (#1353): an entry queued, its step, an outcome, a pause; read it with queue:list. */
   | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
+  /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
+  | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
   | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */

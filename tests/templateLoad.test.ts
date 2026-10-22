@@ -89,7 +89,7 @@ describe('the Load template dialog (#268)', () => {
     // "(default)" is the view's to show, never in the text it shows.
     expect(v.created.every((a) => [a.model, a.effort, a.mode].every((x) => !x || !/default\)/.test(x.text)))).toBe(true)
     expect(v.removed).toEqual([{ name: 'Claude', note: 'its worktree on hive/claude goes on with the new Claude', replaced: true }])
-    expect(v.notes).toEqual(["Their conversations stay in the Sessions tab, and their open cards go back (Doing ones to Todo). The layout becomes the template's."])
+    expect(v.notes).toEqual(["Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's."])
   })
 
   it("the notice after removing old worktrees says what went whole, whose branch stayed and why, and what was kept (#313)", () => {
