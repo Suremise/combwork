@@ -28,7 +28,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
-import { queueLine, queueStateOf } from './queueState'
+import { NOT_RUN_HERE, queueLine, queueStateOf, type QueueLive } from './queueState'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -137,6 +137,8 @@ export interface WorkflowConfig {
    * ruleset as ever. Read at each use; left out, always.
    */
   enforced?: () => boolean
+  /** What runs a target's queue in this Hive now (queueHost's queueLive, #1354); left out, nothing here runs one. */
+  queueLive?: (target: string) => QueueLive
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -436,6 +438,11 @@ export class Workflow {
 
   private guardIds(w: Write, move: MoveId, only?: (id: GuardId) => boolean): GuardId[] {
     return this.idsOf(w.ruleset, move, only)
+  }
+
+  /** What runs a target's queue in this Hive now (cfg.queueLive): for the queue's order, queueState.ts. */
+  queueLive(target: string): QueueLive {
+    return this.cfg.queueLive?.(target) ?? NOT_RUN_HERE
   }
 
   /** Whether the guards run (cfg.enforced: Settings → Advanced, #1265). */

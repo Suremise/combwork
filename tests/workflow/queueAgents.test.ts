@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { leftWake, queueLine, queueStateOf, returnedText, WAKE_NOTE_MAX } from '../../src/main/workflow/queueState'
+import { leftWake, NOT_RUN_HERE, queueLine, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
 import { refusalLines } from '../../src/shared/workflow/refusals'
 import { laneNextText } from '../../src/shared/lanes'
 import { cardChange, loopWakeLine } from '../../src/shared/watch'
@@ -189,8 +189,28 @@ describe('where a card is, for its readers (queueState.ts)', () => {
     expect(queueStateOf(e.wf, card)).toEqual({ state: 'merged' })
     // Done: nothing more to say on a card read.
     expect(e.wf.queueLineOf(card.key)).toBeNull()
-    expect(queueLine({ state: 'testing', target: 'main', step: 'merge' })).toContain('testing its merge into main now')
+    expect(queueLine({ state: 'testing', target: 'main', step: 'testMerge' })).toContain('testing its merge into main now')
+    expect(queueLine({ state: 'testing', target: 'main', step: 'checks' })).toContain('running the merge checks on its merge into main now')
+    expect(queueLine({ state: 'testing', target: 'main', step: null })).toContain('testing its merge into main now')
     expect(queueLine({ state: 'paused', target: 'main', reason: 'folderBusy', card: 'AM-2' })).toContain('which is paused (folderBusy, on AM-2)')
+  })
+
+  it("the queue's order is the window's (#1353's queueView): the one testing now at its step, the next behind it position 1", async () => {
+    let live: QueueLive = NOT_RUN_HERE
+    const e = team({ queueLive: () => live })
+    const { card: first } = await queued(e, 'One')
+    const { card } = await queued(e, 'Two')
+    expect(queueStateOf(e.wf, first)).toMatchObject({ state: 'queued', position: 1 })
+    expect(queueStateOf(e.wf, card)).toMatchObject({ state: 'queued', position: 2 })
+    // This Hive's queue takes the first and runs its checks: it is testing (its entry still open), the second next.
+    const entry = e.wf.state(first).entries.at(-1)!
+    live = { running: true, run: null, now: { card: first.key, number: first.id, entry: entry.id, revision: entry.revision, expected: null, step: 'checks', started: new Date().toISOString() } }
+    expect(e.wf.state(first).entries.at(-1)!.state).toBe('open')
+    expect(queueStateOf(e.wf, first)).toEqual({ state: 'testing', target: 'main', step: 'checks' })
+    expect(queueStateOf(e.wf, card)).toMatchObject({ state: 'queued', position: 1 })
+    expect(queueOrder(e.wf, 'main').queued.map((q) => q.key)).toEqual([card.key])
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toContain('(position 1)')
+    expect(refusedBy(await e.wf.reportMerge(first.key, B1), 'merge.hiveMerges').next).toContain('is merging it into main now')
   })
 
   it("hive_lane next: a passed card Hive merges is named with where it is, and the next card waits for it", () => {

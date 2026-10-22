@@ -2306,9 +2306,10 @@ switches to "The agent merges", and one started afterwards reports its merge.
   reviewer's request still 200. `IntegrationFailed` keeps `check` and `logPath`. A card that left the queue (`skip`)
   says why: its pass stale (`IntegrationCancelled` reason `stale`), or a decision since its approval (`decision`, no
   pass at the current generation).
-- **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (the one helper for where a card is
-  with the queue, from its facts and the queue's request order: #1353's window model shares it): who merges it, and
-  queued (position), testing or advancing, paused (why), returned (what came back and what to do), left the queue, or
+- **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (where a card is with the queue,
+  from its facts and `queueOrder`, the order #1353's window model (`queueView`) shows: the entry testing now at its
+  step, those waiting behind it): who merges it, and queued (position, 1 next after the one testing), testing (its
+  merge, its checks, or advancing the target), paused (why), returned (what came back and what to do), left the queue, or
   not approved yet; absent once it is Done and for cards the agent merges. `hive_lane next` names the lane's passed
   cards Hive merges with that line, and the next card waits for them.
 - **Skills**: work-on-card, card-loop and merge-ready say, where they tell an agent to merge a passed card, "unless the

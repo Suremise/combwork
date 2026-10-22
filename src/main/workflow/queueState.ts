@@ -1,21 +1,19 @@
 // Where a card stands with the merge queue (#1354, SPEC §16.9.3), for agents: who merges it, by its own ruleset (the
 // options it started under, or the user's change applied to it), never the project's current options; and, under Hive
-// merges, what the queue is doing with it, worked out from the card's facts and the queue's order (its entries in the
-// order they were requested: MergeQueue.entries). One helper for every place that says it: a card read, a lane's next,
-// a refusal's next step, and the window's queue model (#1353) when it comes.
-import { openEntry, type CardState, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
+// merges, what the queue is doing with it, worked out from the card's facts and the queue's order (queueOrder: its
+// entries in the order they were requested, and the one testing now). One order for every place that says it: a card
+// read, a lane's next, a refusal's next step, and the window's queue model (#1353, queueControls.ts's queueView).
+import { openEntry, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
+import type { QueueQueued, QueueStep, QueueTesting } from '../../shared/workflow/queue'
 import type { CardRecord } from './factStore'
-import type { PauseReason } from './mergeQueue'
+import type { PauseReason, QueueStepInfo } from './mergeQueue'
 import type { Workflow } from './runtime'
 
 export type QueueState =
-  /**
-   * In the queue: `position` 1 is first (being tested now, or next). An entry stays open while its test merge and checks
-   * run (no fact says so until they end), so the one being tested counts ahead of those behind it.
-   */
+  /** Waiting in the queue: `position` 1 is next, after the one testing now. */
   | { state: 'queued'; target: string; position: number }
-  /** Started: its target being moved to the result (`advance`), or a run recovered after a restart (`merge`). */
-  | { state: 'testing'; target: string; step: 'merge' | 'advance' }
+  /** The queue's entry now, at its step (null: another Hive runs the queue, or its advance is recovered, step unknown). */
+  | { state: 'testing'; target: string; step: QueueStep | null }
   /** In the queue, which is paused for its target (`card`: the card it paused on). */
   | { state: 'paused'; target: string; reason: PauseReason; card: string }
   /** Back from the queue to its builder: a conflict, red checks, a hook (`failure`: what came back, as recorded). */
@@ -32,10 +30,12 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
   if (s.stage === 'done') return { state: 'merged' }
   const open = openEntry(s)
   if (open) {
-    if (open.state === 'started') return { state: 'testing', target: open.target, step: open.phases.length ? 'advance' : 'merge' }
+    const order = queueOrder(wf, open.target)
+    // The one testing now finishes its step even with the queue paused.
+    if (order.testing?.entry === open.id) return { state: 'testing', target: open.target, step: order.testing.step }
     const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string } | null
     if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card }
-    return { state: 'queued', target: open.target, position: positionOf(wf, open.id, open.target) }
+    return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
   }
   const last = s.entries.at(-1)
   if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure }
@@ -43,17 +43,73 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
   return { state: 'notYet' }
 }
 
-/** An open entry's place among the target's open entries, in the order they were requested (1: next). */
-function positionOf(wf: Workflow, entry: string, target: string): number {
-  let ahead = 0
-  for (const f of wf.store.factsOfKind('IntegrationRequested')) {
+/** What runs a target's queue in this Hive now (queueHost's queueLive): whether it runs, and its entry at its step. */
+export interface QueueLive {
+  running: boolean
+  now: QueueStepInfo | null
+  run: string | null
+}
+
+export const NOT_RUN_HERE: QueueLive = { running: false, now: null, run: null }
+
+/** A target's queue in order: its entries still to merge as requested, the one testing now, and those waiting behind it. */
+export interface QueueOrder {
+  open: { f: Fact; card: CardRecord; state: 'open' | 'started' }[]
+  /** Every entry of the target, and their cards (for its outcomes). */
+  entries: Set<string>
+  cards: Set<number>
+  testing: QueueTesting | null
+  queued: QueueQueued[]
+}
+
+/**
+ * A target's queue in order (#1353's model, shared with #1354's card states). Testing now: this Hive's entry at its
+ * step; else an advance begun (its recovery finishes it), or, when another Hive runs the queue, its first entry (its
+ * step isn't known here).
+ */
+export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target)): QueueOrder {
+  const store = wf.store
+  const states = new Map<number, { card: CardRecord; s: CardState }>()
+  const of = (id: number): { card: CardRecord; s: CardState } => {
+    let x = states.get(id)
+    if (!x) {
+      const card = store.card(id)
+      states.set(id, (x = { card, s: wf.state(card) }))
+    }
+    return x
+  }
+  const open: QueueOrder['open'] = []
+  const entries = new Set<string>()
+  const cards = new Set<number>()
+  for (const f of store.factsOfKind('IntegrationRequested')) {
     const d = f.data as FactData['IntegrationRequested']
     if (d.target !== target) continue
-    if (d.entry === entry) break
-    const e = wf.state(wf.store.card(f.card)).entries.find((x) => x.id === d.entry)
-    if (e?.state === 'open') ahead++
+    entries.add(d.entry)
+    cards.add(f.card)
+    const { card, s } = of(f.card)
+    const e = s.entries.find((x) => x.id === d.entry)
+    if (e && (e.state === 'open' || e.state === 'started')) open.push({ f, card, state: e.state })
   }
-  return ahead + 1
+  const named = (card: CardRecord): { card: number; key: string; title: string } => ({ card: card.id, key: card.key, title: card.title })
+  let testing: QueueTesting | null = null
+  if (live.now) {
+    const n = live.now
+    testing = { ...named(store.card(n.number)), entry: n.entry, revision: n.revision, expected: n.expected, step: n.step, started: n.started, run: live.run }
+  } else {
+    const begun = open.find((o) => o.state === 'started') ?? (store.queueLease(target) && !live.running ? open[0] : undefined)
+    if (begun) {
+      const d = begun.f.data as FactData['IntegrationRequested']
+      const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started
+      testing = { ...named(begun.card), entry: d.entry, revision: d.revision, expected: st?.expected ?? null, step: st ? 'advance' : null, started: null, run: null }
+    }
+  }
+  const queued: QueueQueued[] = open
+    .filter((o) => (o.f.data as FactData['IntegrationRequested']).entry !== testing?.entry)
+    .map((o) => {
+      const d = o.f.data as FactData['IntegrationRequested']
+      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at }
+    })
+  return { open, entries, cards, testing, queued }
 }
 
 /**
@@ -67,7 +123,7 @@ export function queueLine(q: QueueState, enforced = true): string {
     case 'queued':
       return `${who} It is in the merge queue for ${q.target}, position ${q.position}; it moves to Done once merged.`
     case 'testing':
-      return `${who} The merge queue is ${q.step === 'advance' ? `moving ${q.target} to its merge` : `testing its merge into ${q.target}`} now; it moves to Done once merged.`
+      return `${who} The merge queue is ${q.step === 'advance' ? `moving ${q.target} to its merge` : q.step === 'checks' ? `running the merge checks on its merge into ${q.target}` : `testing its merge into ${q.target}`} now; it moves to Done once merged.`
     case 'paused':
       return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); it moves on once the user resumes it.`
     case 'returned':

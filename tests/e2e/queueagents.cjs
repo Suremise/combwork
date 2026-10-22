@@ -50,8 +50,8 @@ async function call(h, who, method, url, body) {
     const report = await q.intent(h, card.builder, card.n, 'report-merge')
     check('report merge: refused (409) by merge.hiveMerges', report.status === 409 && report.body?.rule === 'merge.hiveMerges', JSON.stringify(report))
     check('…saying Hive merges it, and where the rule is set', String(report.body?.message).startsWith(`Hive merges ${key}`) && String(report.body?.change).includes('Who merges'), JSON.stringify(report.body))
-    // The first card's entry is still open while its checks run (it starts only to move the target): this one is 2nd.
-    check('…its next step: its place in the queue (behind the card being tested), and wait for Done or a return', String(report.body?.next) === 'It is in the merge queue for integration (position 2) and moves to Done once merged: wait for that, or for it to come back.', String(report.body?.next))
+    // The first card is the one testing now (its checks run in this Hive's queue: the window's order, #1353): this one is next.
+    check('…its next step: its place in the queue (next, behind the card being tested), and wait for Done or a return', String(report.body?.next) === 'It is in the merge queue for integration (position 1) and moves to Done once merged: wait for that, or for it to come back.', String(report.body?.next))
     const slot = await call(h, card.builder, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [card.n], timeoutSeconds: 0 })
     check('the merge slot claimed for it: refused the same way', slot.status === 409 && slot.body?.rule === 'merge.hiveMerges', JSON.stringify(slot))
     const holders = await call(h, card.builder, 'GET', '/v1/projects/alpha/merge-slot?branch=integration')
