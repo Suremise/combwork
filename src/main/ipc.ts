@@ -102,6 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -742,6 +743,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
+    'workflow:levelForm': (level, platform) => levelForm(workspace, level, platform),
+    'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
+    'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:branchCard': async (p, agentId) => {

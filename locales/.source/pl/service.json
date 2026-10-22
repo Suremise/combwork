@@ -168,6 +168,7 @@
   "service.transcripts.none": "This session has no transcript yet.",
   "service.workflow.changedMeanwhile": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
   "service.workflow.closed": "The workspace this card belongs to has closed",
+  "service.workflow.inheritor": "Project {project} inherits these options, and the change would make its options contradict each other:",
   "service.workflowNotice.blocked": "{card} is blocked: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} is blocked",
   "service.workflowNotice.failed": "{card} failed review",

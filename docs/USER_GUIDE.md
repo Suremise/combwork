@@ -808,6 +808,21 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 
 Without version control, **Solo** has no review (a card is done when its builder submits it), **Pair** has a reviewer agent check each card after the quick checks pass, and **Team** has a reviewer agent and then you check each card, after the quick checks and the tests; all three leave `node_modules` and `.venv` out of what the work is, and have cards wait for the cards they depend on.
 
+### Workflow defaults
+
+Each project's workflow options start from defaults, which you can set at two levels:
+
+- **Hive's**, in **Settings → Workflow defaults**: for every project in every workspace.
+- **The workspace's**, in **Settings → Workspace → Workflow defaults**: for the open workspace's projects, over Hive's.
+
+The order they win in: a project's own option (its Version Control tab), then the workspace's default, then Hive's, then the option off. Each level has its own defaults for **None** and for **Git**: choose which at the top.
+
+The editor is the Workflow section's: the same groups, presets (with what each sets and why), All off, and options that contradict each other refused as you choose. Each option says where its value comes from: **Set here**, from the level below (**From Hive's settings**, for the workspace's), or **Default** (off). **Inherit** goes back to the level below. Options that belong to one project (its commit identity, and the settings shown elsewhere) aren't at these levels.
+
+**Save…** lists each open project that inherits what changes (Hive's level: those of every open workspace), what changes for it, and its running lanes and cards in flight, which keep their rules until their next card. A project that sets an option itself isn't affected by it. A change that would make an inheriting project's options contradict each other is refused, naming the project and the reason: change that project's options first. As in a project's section, a save made after the defaults changed elsewhere is refused, and the editor shows them as they are now.
+
+The Hive Assistant can set one at a time with its settings tool, within Settings → Assistant → Control: `workflow.<git|none>.<option>` for Hive's and `workspace.workflow.<git|none>.<option>` for the workspace's, with the same checks.
+
 ### The merge queue
 
 When a project's workflow says Hive merges, each approved card goes into its target branch's **merge queue**, and Hive merges the cards one at a time: a test merge in its own worktree, the merge checks on exactly that result, and the target moved only when they pass. A card that conflicts or fails a check goes back to its builder.

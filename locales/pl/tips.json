@@ -365,6 +365,8 @@
   "tips.versionControlTab.title": "Jedna zakładka na kontrolę wersji i przepływ pracy",
   "tips.viewerTokens.text": "Aplikacja pokazująca, co robią Twoi agenci, np. Apiary, potrzebuje tylko tokenu podglądu: Ustawienia → Agent API → Tokeny podglądu tworzą token, który może wszystko czytać i niczego nie zmienia, i potrafią go znowu unieważnić.",
   "tips.viewerTokens.title": "Pozwól innej aplikacji obserwować Hive",
+  "tips.workflowDefaults.text": "Ustawienia → Domyślny przepływ pracy określają opcje, od których zaczyna każdy projekt, a Ustawienia → Obszar roboczy opcje otwartego obszaru roboczego. Własne opcje projektu nadal mają pierwszeństwo, a przy zapisie widać listę projektów, które dziedziczą zmianę.",
+  "tips.workflowDefaults.title": "Ustaw przepływ pracy raz dla wszystkich projektów",
   "tips.workflowOptions.text": "Kontrola wersji → Przepływ pracy określa, kto recenzuje pracę karty, jakie sprawdzenia muszą przejść najpierw i kto ją scala. Wybierz ustawienie wstępne albo ustaw każdą opcję: zmiana obowiązuje od następnej karty, która się zacznie.",
   "tips.workflowOptions.title": "Wybierz, jak karty dochodzą do Gotowe",
   "tips.workflowPresetsWhy.text": "W Kontrola wersji → Przepływ pracy kliknij Solo, Para albo Zespół: ustawienie wstępne pokaże każdą opcję, którą ustawia, wraz z powodem, i oznaczy, co by zmieniło. Nic się nie zmieni, dopóki go nie użyjesz i nie zapiszesz.",

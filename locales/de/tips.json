@@ -365,6 +365,8 @@
   "tips.versionControlTab.title": "Ein Tab für Versionsverwaltung und Workflow",
   "tips.viewerTokens.text": "Eine App, die zeigt, was deine Agenten tun, etwa Apiary, braucht nur ein Lese-Token: Einstellungen → Agent API → Lese-Tokens erstellt eines, das alles lesen und nichts ändern kann, und widerruft es wieder.",
   "tips.viewerTokens.title": "Eine andere App Hive beobachten lassen",
+  "tips.workflowDefaults.text": "Einstellungen → Workflow-Standards legt die Optionen fest, von denen jedes Projekt ausgeht, und Einstellungen → Arbeitsbereich die des geöffneten Arbeitsbereichs. Die eigenen Optionen eines Projekts haben weiter Vorrang, und beim Speichern siehst du die Projekte, die die Änderung erben.",
+  "tips.workflowDefaults.title": "Workflow einmal für alle Projekte festlegen",
   "tips.workflowOptions.text": "Versionsverwaltung → Workflow legt fest, wer die Arbeit einer Karte reviewt, welche Checks vorher bestehen und wer sie mergt. Wähle eine Voreinstellung oder setze jede Option einzeln: Eine Änderung gilt ab der nächsten Karte, die startet.",
   "tips.workflowOptions.title": "Lege fest, wie Karten zu Erledigt kommen",
   "tips.workflowPresetsWhy.text": "Klicke in Versionsverwaltung → Workflow auf Solo, Paar oder Team: Die Voreinstellung listet jede Option auf, die sie setzt, mit dem Grund, und markiert, was sie ändern würde. Nichts ändert sich, bis du sie verwendest und speicherst.",

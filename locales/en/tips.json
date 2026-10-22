@@ -1463,6 +1463,14 @@
     "defaultMessage": "Let another app watch Hive",
     "description": "A tip's title."
   },
+  "tips.workflowDefaults.text": {
+    "defaultMessage": "Settings → Workflow defaults sets the options every project starts from, and Settings → Workspace the open workspace’s. A project’s own options still win, and saving lists the projects that inherit the change.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: workflow)."
+  },
+  "tips.workflowDefaults.title": {
+    "defaultMessage": "Set a workflow once for every project",
+    "description": "A tip's title (glossary 2.1: workflow)."
+  },
   "tips.workflowOptions.text": {
     "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -841,6 +841,8 @@
   "settings.section.sessions.label": "Sessões",
   "settings.section.updates.desc": "Manter o próprio Hive atualizado. As novas versões vêm das releases do Hive no GitHub e são verificadas antes de instalar.",
   "settings.section.updates.label": "Atualizações",
+  "settings.section.workflow.desc": "As opções do fluxo de trabalho de que todo projeto parte, em todos os espaços de trabalho. Os padrões de um espaço de trabalho (Configurações → Espaço de trabalho) e as opções próprias de um projeto (a aba Controle de versão dele) têm prioridade sobre elas.",
+  "settings.section.workflow.label": "Padrões do fluxo de trabalho",
   "settings.section.workspace.desc": "Os ciclos de cartões do espaço de trabalho aberto, os projetos dele que o Hive deixa de fora (ocultos, ou removidos do Hive com as passagens de trabalho e os cartões guardados na pasta) e quanto o Hive guarda para cada projeto.",
   "settings.section.workspace.label": "Espaço de trabalho",
   "settings.sessions.backupRetention.desc": "Por quanto tempo o Hive mantém os backups das sessões que a CLI ainda tem. Depois desse número de dias sem atividade, eles vão para a Lixeira. Uma sessão cuja única cópia é o backup do Hive nunca é tocada.",
@@ -946,6 +948,8 @@
   "settings.viewers.revokeTitle": "Revogar “{name}”?",
   "settings.viewers.token": "Token",
   "settings.viewers.tokenOf": "Token “{name}”",
+  "settings.workflow.defaults.desc": "Escolha uma predefinição ou defina cada opção, para Nenhum ou para Git. Cada uma mostra de onde vem o valor dela.",
+  "settings.workflow.defaults.title": "Padrões do fluxo de trabalho do Hive",
   "settings.workspace.antivirus.desc": "Se o Microsoft Defender verifica as pastas do espaço de trabalho conforme o trabalho do Hive as altera (builds, testes, git, worktrees), e as exclusões que o Hive pode adicionar para elas, com o seu consentimento.",
   "settings.workspace.antivirus.tip": "O Hive verifica sem direitos de administrador, então o Defender pode não mostrar as exclusões dele (desconhecido). Adicionar ou remover exclusões pede direitos de administrador uma vez. O Hive só oferece estas pastas: o espaço de trabalho, a pasta de worktrees dele quando ela existir e a área de testes para quem desenvolve o Hive. Ele nunca altera outros antivírus.",
   "settings.workspace.antivirus.title": "Verificação de antivírus",
@@ -960,5 +964,7 @@
   "settings.workspace.loopWaitHours.title": "Espera do ciclo de cartões",
   "settings.workspace.storage.desc": "O que o Hive guarda para cada projeto do espaço de trabalho (os maiores primeiro) e para o Hive Assistant: backups de transcrições, sessões arquivadas, anexos e worktrees. Armazenamento abre a página de um projeto, com Limpar… e Expurgar…; aqui, Expurgar… remove tudo o que o Hive guarda das sessões de todo o espaço de trabalho.",
   "settings.workspace.storage.tip": "Medido em segundo plano, um projeto por vez. As transcrições dos próprios agentes de código (em ~/.claude, ~/.codex e ~/.copilot) não são contadas. Projetos ocultos não entram.",
-  "settings.workspace.storage.title": "Armazenamento"
+  "settings.workspace.storage.title": "Armazenamento",
+  "settings.workspace.workflowDefaults.desc": "As opções do fluxo de trabalho de que partem os projetos deste espaço de trabalho, com prioridade sobre as do Hive (Configurações → Padrões do fluxo de trabalho). As opções próprias de um projeto têm prioridade sobre elas.",
+  "settings.workspace.workflowDefaults.title": "Padrões do fluxo de trabalho"
 }

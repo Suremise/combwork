@@ -365,6 +365,8 @@
   "tips.versionControlTab.title": "One tab for version control and workflow",
   "tips.viewerTokens.text": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
   "tips.viewerTokens.title": "Let another app watch Hive",
+  "tips.workflowDefaults.text": "Settings → Workflow defaults sets the options every project starts from, and Settings → Workspace the open workspace’s. A project’s own options still win, and saving lists the projects that inherit the change.",
+  "tips.workflowDefaults.title": "Set a workflow once for every project",
   "tips.workflowOptions.text": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
   "tips.workflowOptions.title": "Choose how cards get to Done",
   "tips.workflowPresetsWhy.text": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",

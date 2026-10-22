@@ -1020,6 +1020,8 @@ export type WorkflowOptionOrigin = 'platform' | 'global' | 'workspace' | 'projec
 /** The Workflow section of Project Settings (#1278): the project's options, what they inherit, and the presets on offer. */
 export interface WorkflowForm {
   platform: PlatformId
+  /** A level's defaults (#1422: Hive's, the workspace's) rather than a project's options. */
+  level?: WorkflowLevel
   /** The preset the project's options started from (null: none chosen). */
   preset: PresetId | null
   /** The options the project sets itself. */
@@ -1051,7 +1053,25 @@ export interface WorkflowChange {
 }
 
 /** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */
-export type WorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project: string; problem: OwnWorkflowProblem }
+
+/**
+ * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
+ * have that problem in its own options.
+ */
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+
+/** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
+export type WorkflowLevel = 'global' | 'workspace'
+
+/**
+ * What saving a level's defaults would do (#1422): its problems (an inheriting project's contradiction among them), the
+ * options it changes, and each project inheriting a changed option, with what changes for it, its running lanes and its
+ * cards in flight (they keep their rules: from the next card).
+ */
+export interface WorkflowLevelCheck extends WorkflowCheck {
+  projects: { name: string; path: string; workspace: { path: string; name: string }; changed: (keyof WorkflowOptions)[]; lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; key: string; title: string }[] }[]
+}
 
 /** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
 export interface WorkflowCheck {
@@ -1065,7 +1085,7 @@ export interface WorkflowCheck {
   /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
-  inFlight: { number: number; title: string }[]
+  inFlight: { number: number; key: string; title: string }[]
 }
 
 export interface ProjectConfig {

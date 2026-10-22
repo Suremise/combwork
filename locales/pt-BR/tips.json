@@ -365,6 +365,8 @@
   "tips.versionControlTab.title": "Uma aba para o controle de versão e o fluxo de trabalho",
   "tips.viewerTokens.text": "Um app que mostra o que seus agentes estão fazendo, como o Apiary, precisa só de um token de leitura: Configurações → Agent API → Tokens de leitura cria um que pode ler tudo e não alterar nada, e o revoga depois.",
   "tips.viewerTokens.title": "Deixe outro app acompanhar o Hive",
+  "tips.workflowDefaults.text": "Configurações → Padrões do fluxo de trabalho define as opções de que todo projeto parte, e Configurações → Espaço de trabalho as do espaço de trabalho aberto. As opções próprias de um projeto continuam tendo prioridade, e ao salvar você vê os projetos que herdam a mudança.",
+  "tips.workflowDefaults.title": "Defina um fluxo de trabalho uma vez para todos os projetos",
   "tips.workflowOptions.text": "Controle de versão → Fluxo de trabalho define quem revisa o trabalho de um cartão, quais verificações passam antes e quem faz o merge. Escolha uma predefinição ou configure cada opção: uma mudança vale a partir do próximo cartão que começar.",
   "tips.workflowOptions.title": "Escolha como os cartões chegam a Concluído",
   "tips.workflowPresetsWhy.text": "Em Controle de versão → Fluxo de trabalho, clique em Solo, Dupla ou Equipe: a predefinição lista cada opção que define e por quê, e marca o que mudaria. Nada muda até você usá-la e salvar.",
