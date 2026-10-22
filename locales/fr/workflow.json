@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "Avertir quand un commit inclut des fichiers d’un autre agent",
   "workflow.option.stopOwnRuns.desc": "Une carte ne passe en relecture qu’une fois que les exécutions et les commandes en arrière-plan de son auteur sont arrêtées.",
   "workflow.option.stopOwnRuns.title": "Les agents arrêtent ce qu’ils ont lancé avant la relecture",
+  "workflow.option.strict.desc": "Si la branche cible a avancé depuis la relecture, la file de fusion de Hive la fusionne dans le travail de la carte (ou rebase le travail, avec le style de fusion Squash) dans son propre dossier, jamais sur la branche de l’auteur. La relecture compte toujours si le résultat est le même changement ; sinon, ou en cas de conflit, la carte revient à son auteur.",
+  "workflow.option.strict.title": "Le travail est à jour avec sa branche cible avant d’être fusionné",
   "workflow.option.style.desc": "Comment le travail d’une carte est fusionné dans la branche cible.",
   "workflow.option.style.title": "Type de fusion",
   "workflow.option.target.desc": "La branche cible. Laissée vide : la branche par défaut du dépôt.",

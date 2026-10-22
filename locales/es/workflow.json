@@ -130,6 +130,8 @@
   "workflow.option.sharedFolderWarning.title": "Avisar cuando un commit incluye archivos de otro agente",
   "workflow.option.stopOwnRuns.desc": "Una tarjeta pasa a revisión solo cuando las ejecuciones y los comandos en segundo plano de su autor se detuvieron.",
   "workflow.option.stopOwnRuns.title": "Los agentes detienen lo que iniciaron antes de la revisión",
+  "workflow.option.strict.desc": "Si la rama de destino ha avanzado desde la revisión, la cola de fusión de Hive la fusiona en el trabajo de la tarjeta (o hace rebase del trabajo, con el estilo de fusión Squash) en su propia carpeta, nunca en la rama del autor. La revisión sigue valiendo si el resultado es el mismo cambio; si no lo es, o si hay un conflicto, la tarjeta vuelve a su autor.",
+  "workflow.option.strict.title": "El trabajo está al día con su rama de destino antes de fusionarse",
   "workflow.option.style.desc": "Cómo se fusiona el trabajo de una tarjeta en la rama de destino.",
   "workflow.option.style.title": "Tipo de fusión",
   "workflow.option.target.desc": "La rama de destino. Si se deja vacía, la rama predeterminada del repositorio.",

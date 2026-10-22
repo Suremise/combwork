@@ -153,6 +153,7 @@ export const SUITES = [
   { name: 'mergequeuecrash' },
   { name: 'mergequeuefolder' },
   { name: 'mergeslot' },
+  { name: 'mergestrict' },
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
   { name: 'narrowmain' },
