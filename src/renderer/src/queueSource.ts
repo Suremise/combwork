@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { nextFold } from '@shared/progressQueue'
-import type { QueueView } from '@shared/workflow/queue'
+import { useEffect, useMemo } from 'react'
+import { keptLive, nextFold, queueKey, withKept, type KeptReturn } from '@shared/progressQueue'
+import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call } from './api'
 import { get, set, useStore } from './store'
 
@@ -48,7 +48,8 @@ function loadAll(): void {
     }
   }
   const projects = get().workspace?.projects ?? []
-  set((s) => ({ queues: s.queues.filter((q) => projects.some((p) => same(p.path, q.projectPath))) }))
+  const inWs = (path: string): boolean => projects.some((p) => same(p.path, path))
+  set((s) => ({ queues: s.queues.filter((q) => inWs(q.projectPath)), queueKept: s.queueKept.filter((x) => inWs(x.queue.split('\n')[0])) }))
   for (const p of projects) void loadProject(p.path)
 }
 
@@ -75,6 +76,30 @@ export function queueBoardChanged(): void {
   if (get().settings?.general.progressPanel === false) return
   schedule('*', 1000, loadAll)
 }
+
+/**
+ * The panel marks these rows seen (shown in the Merges tab): this window keeps them, as seen now, until their own 10 s
+ * are up, whatever main's list says meanwhile (#1356 round 6). Those past their 10 s go.
+ */
+export function keepShown(rows: readonly { v: QueueView; row: QueueRecent }[]): void {
+  const now = Date.now()
+  const seen = new Date(now).toISOString()
+  set((s) => {
+    const live = keptLive(s.queueKept, now)
+    const have = new Set(live.map((x) => `${x.queue}\n${x.row.entry}`))
+    const add: KeptReturn[] = rows.filter((x) => !have.has(`${queueKey(x.v)}\n${x.row.entry}`)).map((x) => ({ queue: queueKey(x.v), row: { ...x.row, seen } }))
+    return { queueKept: [...live, ...add] }
+  })
+}
+
+/** This window's merge queues with the rows it keeps (`keepShown`), every project's. */
+export function useQueuesKept(): QueueView[] {
+  const views = useQueues()
+  const kept = useStore((s) => s.queueKept ?? NO_KEPT)
+  return useMemo(() => withKept(views, kept), [views, kept])
+}
+
+const NO_KEPT: KeptReturn[] = []
 
 /** This window's merge queues, every project's, read when its workspace or its projects change (events keep them current). */
 export function useQueues(): QueueView[] {

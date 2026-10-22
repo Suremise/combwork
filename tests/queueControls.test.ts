@@ -9,7 +9,8 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import type { QueueView } from '../src/shared/workflow/queue'
+import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
+import type { KeptReturn } from '../src/shared/progressQueue'
 
 const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[] }))
 vi.mock('../src/main/workflow/queueHost', () => ({
@@ -31,7 +32,7 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
 const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
-const { nextFold, shownReturns, unseenReturns, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
+const { keptLive, nextFold, queueKey, shownReturns, unseenReturns, withKept, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const control = await import('../src/main/assistantControl')
@@ -419,6 +420,43 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     // The newest unseen first.
     expect(next.returns.map((r) => r.entry)).toEqual(['n11/e1', 'n10/e1', 'n9/e1', 'n8/e1', 'n7/e1'])
     expect(next.returnsMore).toBe(7)
+  })
+
+  it("two windows mark disjoint snapshots with a burst between (HR3's round 5 probe): main keeps its bound, each window keeps the rows it showed for their 10 s, nothing unseen is lost", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    const { w, wf, view, see } = await returned(4)
+    // Window A reads and shows the 5 returns; its mark hasn't reached main yet.
+    const a = await view()
+    const aShown = unseenReturns(a, Date.now())
+    expect(aShown).toHaveLength(5)
+    // A burst of 5; window B reads and shows those, a disjoint page.
+    for (let i = 0; i < 5; i++) await addReturn(w, wf, `n${i}`)
+    const b = await view()
+    const bShown = unseenReturns(b, Date.now())
+    expect(bShown.map((r) => r.entry).sort()).toEqual(['n0/e1', 'n1/e1', 'n2/e1', 'n3/e1', 'n4/e1'])
+    // Each window keeps what it showed (keepShown), then both marks reach main, A's first.
+    const keep = (v: QueueView, rows: QueueRecent[]): KeptReturn[] => rows.map((row) => ({ queue: queueKey(v), row: { ...row, seen: new Date().toISOString() } }))
+    const aKept = keep(a, aShown)
+    await see(aShown.map((r) => r.entry))
+    vi.setSystemTime(Date.now() + 100)
+    const bKept = keep(b, bShown)
+    await see(bShown.map((r) => r.entry))
+    const after = await view()
+    // Main: its bound held, all 10 seen, nothing unseen dropped (none left to count).
+    expect(after.returns.length).toBeLessThanOrEqual(5)
+    expect(after.returnsMore).toBe(0)
+    expect(unseenReturns(after, Date.now())).toEqual([])
+    // The case itself: main's list holds B's page (the later seen time), not A's.
+    expect(after.returns.some((r) => aShown.some((x) => x.entry === r.entry))).toBe(false)
+    // Each window still shows and can use every row it showed, before its 10 s are up.
+    const inWindow = (kept: KeptReturn[]) => shownReturns(withKept([after], keptLive(kept, Date.now()))[0], Date.now()).map((r) => r.entry)
+    expect(inWindow(aKept)).toEqual(expect.arrayContaining(aShown.map((r) => r.entry)))
+    expect(inWindow(bKept)).toEqual(expect.arrayContaining(bShown.map((r) => r.entry)))
+    // After their 10 s, gone from both.
+    fold()
+    const later = await view()
+    expect(shownReturns(withKept([later], keptLive([...aKept, ...bKept], Date.now()))[0], Date.now())).toEqual([])
   })
 
   it('equal seen times keep a fixed order; a second mark (another window) keeps the first time', async () => {

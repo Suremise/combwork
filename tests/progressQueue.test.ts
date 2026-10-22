@@ -3,7 +3,7 @@
 // Pulse's line, the badge, what is announced, and the Runs tab's "Hive (merge queue)".
 import { describe, expect, it } from 'vitest'
 import { fmt, tr } from '../src/shared/i18n'
-import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, nextFold, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
@@ -118,6 +118,17 @@ describe('returns on a queue card', () => {
     expect(shownReturns(view({ returns: [r], testing: { ...testing, card: 108 } }), NOW)).toEqual([])
     expect(unseenReturns(view({ returns: [{ ...r, seen: iso(NOW) }] }), NOW)).toEqual([])
     expect(shownReturns(view({ returns: [{ ...r, seen: iso(NOW - RETURN_SEEN_SHOWN_MS) }] }), NOW)).toEqual([])
+  })
+
+  it("a window's kept rows join main's list until their own 10 s are up; main's copy of a row wins; another queue's stay out", () => {
+    const row = (entry: string, ago: number): QueueRecent => recent({ outcome: 'returned', card: Number(entry.slice(1)), key: entry, entry, seen: iso(NOW - ago) })
+    const v = view({ returns: [row('k1', 1_000)] })
+    const kept: KeptReturn[] = [{ queue: queueKey(v), row: row('k2', 2_000) }, { queue: queueKey(v), row: { ...row('k1', 9_000) } }, { queue: queueKey({ ...v, target: 'release' }), row: row('k3', 1_000) }, { queue: queueKey(v), row: row('k4', RETURN_SEEN_SHOWN_MS + 1) }]
+    const [merged] = withKept([v], keptLive(kept, NOW))
+    expect(merged.returns.map((r) => [r.entry, r.seen])).toEqual([['k1', iso(NOW - 1_000)], ['k2', iso(NOW - 2_000)]])
+    expect(shownReturns(merged, NOW).map((r) => r.entry)).toEqual(['k1', 'k2'])
+    expect(shownReturns(merged, NOW + RETURN_SEEN_SHOWN_MS)).toEqual([])
+    expect(shownReturns({ ...merged, queued: [queued(2)] }, NOW).map((r) => r.entry)).toEqual(['k1'])
   })
 
   it('reads again just after the first shown return seen folds, only while more wait beyond the list', () => {

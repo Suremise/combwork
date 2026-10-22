@@ -18,7 +18,7 @@ import { LanesSection } from './ProgressLanes'
 import { MergeCards } from './ProgressMerge'
 import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
-import { useQueues } from '../queueSource'
+import { keepShown, useQueuesKept } from '../queueSource'
 import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
 import { NO_RUNS_FILTER, PROGRESS_TABS, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, tabAt, tabBadges, unresolvedFailures, type ProgressTab, type RunGroup, type RunsFilter } from '@shared/progressTabs'
 import type { Lane } from '../laneSource'
@@ -107,7 +107,7 @@ export function ProgressPanel() {
   const open = useProgressOpen()
   const runs = useProgressRuns()
   const slots = useMergeSlots()
-  const queues = useQueues()
+  const queues = useQueuesKept()
   const lanes = useLanes()
   const chosen = useProgressFilter()
   const workspace = useStore((s) => s.workspace)
@@ -150,7 +150,7 @@ export function ProgressPanel() {
   // Looking at the Merges tab counts as seeing the returns it shows (#1356; HR3's round 1 finding 1): the filtered
   // project's only, and not while a dialog covers the panel. Each leaves its queue's card a few seconds later.
   const covered = useStore((s) => s.dialog !== null || s.taskOpen !== null)
-  const toSee = on && open && focused && !covered && tab === 'merges' ? shownQueue.flatMap((v) => unseenReturns(v, now).map((r) => ({ v, entry: r.entry }))) : []
+  const toSee = on && open && focused && !covered && tab === 'merges' ? shownQueue.flatMap((v) => unseenReturns(v, now).map((r) => ({ v, entry: r.entry, row: r }))) : []
   const seeKey = toSee.map((x) => x.entry).join('\n')
   useEffect(() => {
     const by = new Map<string, { v: QueueView; entries: string[] }>()
@@ -158,6 +158,8 @@ export function ProgressPanel() {
       const k = `${x.v.projectPath.toLowerCase()}\n${x.v.target}`
       by.set(k, { v: x.v, entries: [...(by.get(k)?.entries ?? []), x.entry] })
     }
+    // Kept here for their own 10 s, whatever main's list says meanwhile (another window's marks), then marked in main.
+    keepShown(toSee)
     for (const { v, entries } of by.values()) void call('queue:seen', v.projectPath, v.target, entries).catch(() => undefined)
     // seeKey names what toSee holds: the same returns aren't asked for again on every tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps

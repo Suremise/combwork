@@ -43,6 +43,35 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
  */
 export const unseenReturns = (v: QueueView, now: number): QueueRecent[] => shownReturns(v, now).filter((r) => !r.seen)
 
+/** A return this window showed and marked seen, kept here until its own 10 s are up (the queue it belongs to by key). */
+export interface KeptReturn {
+  /** `queueKey` of its queue. */
+  queue: string
+  row: QueueRecent
+}
+
+/** A queue's key for the rows a window keeps: its project folder (any case) and target. */
+export const queueKey = (v: Pick<QueueView, 'projectPath' | 'target'>): string => `${v.projectPath.toLowerCase()}\n${v.target}`
+
+/**
+ * The rows this window showed and marked seen, added to main's list while their own 10 s last (#1356 round 6, the
+ * Assistant's call: two windows marking different snapshots can leave main's bounded list without a row one of them
+ * showed; that window still keeps it for its interval). A row main lists already is main's; `shownReturns` drops a kept
+ * row once its 10 s are up, or its card is queued or testing again.
+ */
+export function withKept(views: readonly QueueView[], kept: readonly KeptReturn[]): QueueView[] {
+  if (!kept.length) return [...views]
+  return views.map((v) => {
+    const k = queueKey(v)
+    const listed = new Set(v.returns.map((r) => r.entry))
+    const mine = kept.filter((x) => x.queue === k && !listed.has(x.row.entry)).map((x) => x.row)
+    return mine.length ? { ...v, returns: [...v.returns, ...mine] } : v
+  })
+}
+
+/** The kept rows still within their 10 s (`now`): what a window holds on to. */
+export const keptLive = (kept: readonly KeptReturn[], now: number): KeptReturn[] => kept.filter((x) => !!x.row.seen && now - at(x.row.seen) < RETURN_SEEN_SHOWN_MS)
+
 /**
  * When the window should read a queue again to bring the returns beyond its list (`returnsMore`): just after the first
  * of those shown and seen folds, freeing its slot. Null when nothing waits beyond the list, or nothing shown is seen.
