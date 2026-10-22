@@ -12,6 +12,7 @@ import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
+import type { QueuePublic } from './workflow/queue'
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
 export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
@@ -689,4 +690,49 @@ export function consoleEventsText(r: { source: ConsoleSourceRow; events: Console
   const rows = r.events.map((e) => `#${e.seq} ${e.at.slice(11, 19)} ${e.kind} ${e.summary}${e.truncated ? ' [cut]' : ''}`)
   const more = r.newer ? `\n${r.newer} more after these.` : r.older ? `\n${r.older} earlier not shown.` : ''
   return `${label}:\n${rows.join('\n')}${more}\nNext: since=${r.newest}. seq=[n] gives an event's raw payload and what Hive made of it.`
+}
+
+/** How many of a queue's waiting entries and outcomes its line names (the rest counted). */
+const QUEUE_SHOWN = 5
+const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t)
+
+/**
+ * A target's merge queue (#1353, hive_queue list) in a few lines: paused or running and by whom, the entry testing
+ * and its step, the entries waiting in order, the latest outcomes (newest first).
+ */
+export function queueText(q: QueuePublic): string {
+  const rev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : '?')
+  const state = q.paused
+    ? `paused (${q.paused.reason}${q.paused.by ? `, by the ${q.paused.by === 'user' ? 'user' : 'Assistant'}` : ''}${q.paused.card ? `, at ${q.paused.card}` : ''}${q.paused.files.length ? `: ${q.paused.files.slice(0, QUEUE_SHOWN).join(', ')}` : ''})`
+    : q.runBy && !q.runHere
+      ? `run by ${q.runBy}`
+      : q.testing || q.queued.length
+        ? 'running'
+        : 'empty'
+  const lines = [`Merge queue for ${q.target} in ${q.project}: ${state}.`]
+  if (q.testing) lines.push(`Testing: ${q.testing.key} ${clip(q.testing.title, 60)} at ${rev(q.testing.revision)}${q.testing.step ? ` (${q.testing.step})` : ''}.`)
+  if (q.queued.length) {
+    const more = q.queued.length - QUEUE_SHOWN
+    lines.push(`Queued: ${q.queued.slice(0, QUEUE_SHOWN).map((e) => `${e.key} ${clip(e.title, 40)}`).join('; ')}${more > 0 ? `; ${more} more` : ''}.`)
+  }
+  if (q.recent.length) {
+    const said = q.recent.slice(0, QUEUE_SHOWN).map((r) => {
+      if (r.outcome === 'merged') return `${r.key} merged (${rev(r.result)}${r.by === 'outside' ? ', outside Hive' : ''})`
+      if (r.outcome === 'returned') return `${r.key} returned (${r.reason}${r.transient ? ', transient' : ''}${r.files?.length ? `: ${r.files.slice(0, 3).join(', ')}` : ''})`
+      return `${r.key} cancelled (${r.reason})`
+    })
+    lines.push(`Recent: ${said.join('; ')}.`)
+  }
+  return lines.join('\n')
+}
+
+/** Several targets' queues (hive_queue list), or why there are none. */
+export function queuesText(qs: QueuePublic[], project: string): string {
+  if (!qs.length) return `No merge queue in ${project}: no card has been queued, and none is paused.`
+  return qs.map(queueText).join('\n')
+}
+
+/** What Resume did: resumed, or still paused (its cause still there), with the queue as it is now. */
+export function queueResumedText(r: { resumed: boolean; queue: QueuePublic }): string {
+  return r.resumed ? queueText(r.queue) : `Still paused: its cause is still there. ${queueText(r.queue)}`
 }

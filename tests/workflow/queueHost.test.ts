@@ -59,7 +59,7 @@ async function begun(hook: 'afterStarted' | 'afterAdvance') {
   await expect(e.queue({ hooks: { [hook]: crash } }).drain('main')).rejects.toThrow('crash')
   ctx.wf = e.wf
   ctx.folder = `${e.home}/queue`
-  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees` } as unknown as WorkspaceService
+  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined } as unknown as WorkspaceService
   return { e, card, ws }
 }
 

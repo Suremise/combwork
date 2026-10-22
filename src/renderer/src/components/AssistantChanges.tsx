@@ -82,7 +82,11 @@ const FINAL: Record<UndoFinalWhy, Msg> = {
   reportMerge: msg({ id: 'assistant.undo.why.reportMerge', defaultMessage: "The merge it reported stays in the card's work.", description: "What of a merge the Assistant reported stays when it is undone." }),
   ask: msg({ id: 'assistant.undo.why.ask', defaultMessage: 'Its question stays under For you: answer or dismiss it there.', description: "What of a question the Assistant asked on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)." }),
   cannot: msg({ id: 'assistant.undo.why.cannot', defaultMessage: 'Its request stays under For you: answer or dismiss it there.', description: "What of a request the Assistant made on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)." }),
-  request: msg({ id: 'assistant.undo.why.request', defaultMessage: 'Its request to the builder stays as a comment.', description: "What of a request the Assistant made to a card's builder stays when it is undone." })
+  request: msg({ id: 'assistant.undo.why.request', defaultMessage: 'Its request to the builder stays as a comment.', description: "What of a request the Assistant made to a card's builder stays when it is undone." }),
+  removedFromQueue: msg({ id: 'assistant.undo.why.removedFromQueue', defaultMessage: "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.", description: "What of the Assistant taking a card out of the merge queue stays when it is undone. Retry merge: a command on the card (use it as Hive shows it)." }),
+  retriedMerge: msg({ id: 'assistant.undo.why.retriedMerge', defaultMessage: "Its Retry merge stays in the card's work.", description: "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone." }),
+  queuePaused: msg({ id: 'assistant.undo.why.queuePaused', defaultMessage: 'A merge queue it paused stays paused: resume it if it should run.', description: "Why a change of the Assistant's can't be undone: it paused a project's merge queue." }),
+  queueResumed: msg({ id: 'assistant.undo.why.queueResumed', defaultMessage: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.", description: "Why a change of the Assistant's can't be undone: it resumed a project's merge queue." })
 }
 
 const fieldsText = (fields: readonly string[]): string => fmt.list(fields.map((field) => tr(FIELD, { field })))

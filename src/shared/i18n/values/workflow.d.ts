@@ -182,6 +182,8 @@ interface HiveMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
+  'workflow.refused.queue.advancing.message': { card: string | number; target: string | number }
+  'workflow.refused.queue.advancing.next': { target: string | number }
   'workflow.refused.requeue.allowed.change': undefined
   'workflow.refused.requeue.allowed.message': { card: string | number; revision: string | number; why: string | number }
   'workflow.refused.requeue.allowed.next': undefined
