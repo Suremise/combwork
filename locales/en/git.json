@@ -3,9 +3,21 @@
     "defaultMessage": "Branch",
     "description": "Heading in Git → Branches & remotes: the branch checked out in the project folder."
   },
+  "git.branches.cardOpen": {
+    "defaultMessage": "{card}: {stage}. Open the card",
+    "description": "Tooltip and accessible name of a card's key beside the branch it works on (Version Control → Branches & remotes): the card ({card}: its key, such as AL-12) and its stage ({stage}: the board's name for it, glossary 2.2); a click opens the card."
+  },
   "git.branches.checkedOut": {
     "defaultMessage": "{where, select, agent {Checked out in {agent}'s worktree: a branch is in one folder at a time.} other {Checked out in another worktree: a branch is in one folder at a time.}}",
     "description": "Why a branch's Switch is disabled (its tooltip). {agent} is the agent whose worktree has it."
+  },
+  "git.branches.copyRevision": {
+    "defaultMessage": "Copy revision {revision}",
+    "description": "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)."
+  },
+  "git.branches.earlierCards": {
+    "defaultMessage": "{n, plural, one {+# earlier card} other {+# earlier cards}}",
+    "description": "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them."
   },
   "git.branches.heading": {
     "defaultMessage": "Branches",
@@ -14,6 +26,10 @@
   "git.branches.loadTarget": {
     "defaultMessage": "the branches and remotes",
     "description": "What could not be read in Git → Branches & remotes: shown in \"Could not load {what}: {error}\" and \"Could not refresh {what}; last updated …\"."
+  },
+  "git.branches.merged": {
+    "defaultMessage": "{has, select, yes {merged: {revision}} other {merged}}",
+    "description": "Beside a branch's card that is Done (Version Control → Branches & remotes), lower case: its work was merged, with the commit that merged it ({revision}: a short commit id) when it is known (has yes). Keep the select keys."
   },
   "git.branches.noCommits": {
     "defaultMessage": "No commits yet, and agents' worktrees need one.",
@@ -26,6 +42,10 @@
   "git.branches.remote": {
     "defaultMessage": "Remote branches ({count, number})",
     "description": "Button in Git → Branches & remotes that shows or hides the remote branches with no local one."
+  },
+  "git.branches.revisionCopied": {
+    "defaultMessage": "Copied",
+    "description": "Shown for a moment after copying a revision beside a branch (Version Control → Branches & remotes)."
   },
   "git.branches.stateBanner": {
     "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Finish or abort it in a terminal (or ask an agent to): Hive doesn't.",
@@ -42,6 +62,10 @@
   "git.branches.tracksNothing": {
     "defaultMessage": "tracks no remote branch: Push sets one",
     "description": "Beside the branch checked out. Push is the button of that name."
+  },
+  "git.branches.underReview": {
+    "defaultMessage": "under review: {revision}",
+    "description": "Beside a branch's card in Review (Version Control → Branches & remotes), lower case: the revision submitted for review ({revision}: a short commit id, a3f2c1d)."
   },
   "git.busy.agent": {
     "defaultMessage": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in the project folder: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once it has finished.",

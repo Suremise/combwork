@@ -250,6 +250,8 @@ export interface WorkView {
   lastSeq: number
   /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
   ruleset: string | null
+  /** When its current cycle started (its Started's or Adopted's time); null before its first start. */
+  startedAt: string | null
 }
 
 /**
@@ -358,7 +360,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     rounds: s.rounds,
     forYou: s.requests.length,
     lastSeq: s.lastSeq,
-    ruleset: ownRuleset(facts, s)
+    ruleset: ownRuleset(facts, s),
+    startedAt: s.cycle ? (at.get(s.cycle) ?? null) : null
   }
 }
 
@@ -429,6 +432,15 @@ export interface WorkBadge {
    * are for it, whatever its project's options produce now; null when it keeps none (in Todo, Done, none recorded).
    */
   stages: StageId[] | null
+  /** The line it works on this cycle (Git: its branch, from its Started or Adopted; #1424); null for None or none. */
+  line: string | null
+  /**
+   * In Review: the revision submitted for it, which its review waits on or runs on (its latest submission's; #1424). Whole,
+   * the window shows it through its platform's short form. Null outside Review, or for a no-code card.
+   */
+  underReview: string | null
+  /** When its current cycle (on `line`) started: what orders a branch's cards, one after another (#1424). */
+  startedAt: string | null
   lastSeq: number
 }
 
@@ -475,6 +487,9 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
     stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
+    line: v.line,
+    underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
+    startedAt: v.startedAt,
     lastSeq: v.lastSeq
   }
 }

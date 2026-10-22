@@ -87,6 +87,8 @@
   "tips.boardStages.title": "Le tableau montre les étapes de ton flux de travail",
   "tips.boardUpgrade.text": "Hive conserve le tableau 0.9 qu’il a mis à niveau vers 1.0. Aide → Restaurer la sauvegarde du tableau 0.9… le remet en place, après avoir conservé une copie du tableau tel qu’il est, pour qu’un Hive 0.9 puisse de nouveau le modifier.",
   "tips.boardUpgrade.title": "Revenir à 0.9 après la mise à niveau",
+  "tips.branchCards.text": "Dans Gestion de versions → Branches et dépôts distants, une branche sur laquelle travaille une carte montre la carte et son étape, et en Relecture la révision en relecture. Clique sur la carte pour l’ouvrir.",
+  "tips.branchCards.title": "Vois à quelle carte une branche correspond",
   "tips.cardCost.text": "Le panneau d’une carte indique ce que ses agents ont utilisé pendant qu’ils l’avaient en main, « {example} », avec au survol la part de l’auteur et du relecteur et les jetons. Performances liste le coût de chaque carte, et le survol d’un couloir dans le panneau Progression son coût hors carte.",
   "tips.cardCost.title": "Ce qu’une carte a coûté",
   "tips.cardDecisions.text": "Les Décisions d’une carte, au-dessus de ses commentaires, contiennent ce que tu as décidé : les agents vérifient leur travail par rapport à elles avant de passer en Relecture, et les relecteurs rejettent un travail qui en ignore une. Dis une décision à l’Assistant et il l’y enregistre ; un agent qui attend ta réponse en est informé.",
