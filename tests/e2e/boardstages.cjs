@@ -149,6 +149,36 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     // The OK'd card follows it through the queue.
     await until(async () => (await h.card(okCard))?.column === 'done')
 
+    // --- Archive All in Approved while Merging isn't shown (HR2's round 2): a card waiting for your OK under Hive merges,
+    // the project switched to The agent merges for later cards (no Merging now); your OK while the dialog is open sends the
+    // old card into Merging under its own rules, and Approved's archive leaves it there.
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { okBefore: { mode: 'every', labels: [] } }) })
+    q.steer(fx, 'wait')
+    const oldRules = (await inv('tasks:create', { title: 'Old rules', project: 'alpha' })).number
+    await q.intent(h, okBuilder, oldRules, 'start')
+    fs.writeFileSync(path.join(okBuilder.folder, 'old.txt'), 'old\n')
+    lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'old rules'])
+    await q.intent(h, okBuilder, oldRules, 'submit', { summary: 'ready' })
+    await q.intent(h, reviewer, oldRules, 'start-review')
+    await q.intent(h, reviewer, oldRules, 'verdict', { pass: true, comment: 'ok' })
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges' }) })
+    check('old rules: it waits in Approved, and Merging is not shown', !!(await until(async () => (await inColumn(oldRules, 'passed')) && !(await columns()).includes('merging'))), await columns())
+    await col('passed').getByRole('button', { name: 'Approved: more' }).click()
+    await item('Archive All in Approved (1)…').click()
+    check('…Archive All in Approved asks for its one card', !!(await until(async () => (await archiveDialog.count()) === 1)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
+    const oldAsk = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === oldRules)
+    await inv('tasks:answer', oldRules, oldAsk.request, { outcome: 'approved' })
+    check('…your OK sends it into Merging (shown now) while the dialog is open', !!(await until(async () => inColumn(oldRules, 'merging'))), await columns())
+    const archiveNow = archiveDialog.getByRole('button', { name: /^Archive/ })
+    if (await archiveNow.isEnabled().catch(() => false)) await archiveNow.click()
+    else await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await archiveDialog.count()) === 0)
+    check('…and Approved\'s archive leaves it in Merging', (await h.card(oldRules))?.archived === false && (await inColumn(oldRules, 'merging')))
+    fs.writeFileSync(fx.go, 'go')
+    check('…then it merges under its own rules: Done', !!(await until(async () => (await h.card(oldRules))?.column === 'done')))
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+
     // --- With the workflow rules not enforced, every category shows, the workspace's own cards' board too (HR2's round 1).
     const own = (await inv('tasks:create', { title: 'About the workspace', project: '' })).number
     await inv('advanced:set', 'hive.workflow.enforce', false)

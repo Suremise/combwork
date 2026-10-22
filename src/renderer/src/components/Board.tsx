@@ -676,8 +676,6 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
   const layout = boardLayout(shownProjects, live.map((c) => ({ project: c.project, stage: stageOf(c) })), tr, enforced)
   const columnOf = (c: TaskCard): BoardColumnId => cardColumn(c.column, stageOf(c), layout)
-  /** Whether a column shares its category with another stage's (Approved beside Merging). */
-  const shared = (col: BoardStageColumn): boolean => (layout.find((g) => g.category === col.category)?.columns.length ?? 0) > 1
   const [drag, showDrag] = useState<DragState | null>(null)
   // The handlers read the drag from here, not from the last render: a dragover or drop can come before React has
   // drawn the drag's start (a quick drag), and would then be refused.
@@ -849,9 +847,10 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
           { separator: true }
         ]
       : []),
-    // Merging's cards are the merge queue's: no Archive All there. A stage beside another in its category (Approved by
-    // Merging) archives only its own cards (HR2's #1420 round 1).
-    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, ...(shared(col) ? { stage: col.stage, name: col.name } : {}), project, scope, query }, readOnly, stageOf)])
+    // Merging's cards are the merge queue's: no Archive All there. A column's archives its own stage's cards only, whether
+    // or not another stage of its category shows now: a card can move on to Merging while the dialog is open (HR2's
+    // #1420 rounds 1 and 2), and main checks each card's stage again.
+    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
   ]
 
   const column = (col: BoardStageColumn) => {

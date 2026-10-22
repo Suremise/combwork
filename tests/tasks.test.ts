@@ -541,6 +541,11 @@ describe('archiving in batches', () => {
     // A stage of another column is ignored: the column alone decides.
     const odd = await run(() => tasks.archiveBatch([merging], req('All in Passed', { column: 'passed', stage: 'active' }), user, { stageOf }))
     expect(odd.archived).toEqual([merging])
+    // A card whose facts say a stage of another category stands in its column's default stage, as the board shows it.
+    const stray = await make('Stray', 'done')
+    await run(() => tasks.updateTask(stray, { column: 'passed' as never }, user))
+    const strayIn = await run(() => tasks.archiveBatch([stray], req('All in Passed', { column: 'passed', stage: 'approved' }), user, { stageOf: () => 'review' }))
+    expect(strayIn.archived).toEqual([stray])
   })
 
   it('a card an agent takes while the archive waits is left on the board (race)', async () => {

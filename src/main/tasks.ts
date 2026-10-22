@@ -2101,6 +2101,11 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
   if (nums.some((x) => !Number.isInteger(x) || x < 1)) throw hiveError(msg({ id: 'tasks.error.archiveNumbers', defaultMessage: 'cards: card numbers only.', description: 'An error: the list of cards to archive has something other than card numbers in it. "cards:" is the name of the call\'s field: keep it as it is.' }), undefined, { kind: 'invalid' })
   if (req.column !== null && !isTaskColumn(req.column)) throw unknownColumn(req.column)
   const stage = req.stage !== undefined && isStageId(req.stage) && req.column !== null && STAGE_CATEGORY[req.stage] === req.column ? req.stage : null
+  // A card's stage as the board places it: its facts' while that is in its column's category, else its column's default.
+  const stageNow = (c: TaskCard): StageId => {
+    const s = opts.stageOf?.(c) ?? null
+    return s && STAGE_CATEGORY[s] === c.column ? s : CATEGORY_STAGE[c.column]
+  }
   const ws = workspace
   if (!ws.path) throw hiveError(ERR.noWorkspace, undefined, { kind: 'conflict' })
   const what = String(req.label ?? '').trim().slice(0, 80) || 'Archive All' // i18n-ignore: the batch's name, stored in English and quoted in its cards' history (the window words it, archiveBatchText)
@@ -2114,8 +2119,8 @@ async function archiveBatchUnbatched(numbers: unknown, req: ArchiveRequest, acto
   const outside = (c: TaskCard): string | null =>
     req.column !== null && c.column !== req.column
       ? tr(msg({ id: 'tasks.skipped.movedColumn', defaultMessage: 'moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}', description: 'Why Archive All left a card on the board (after its number, "#12 moved to Doing"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number.' }), { column: c.column })
-      : stage && (opts.stageOf?.(c) ?? CATEGORY_STAGE[c.column]) !== stage
-        ? tr(msg({ id: 'tasks.skipped.movedStage', defaultMessage: 'moved to {stage}', description: 'Why Archive All of a stage column (Approved beside Merging) left a card on the board (after its number, "#12 moved to Merging"): it moved to another stage of the column meanwhile. {stage} is the stage’s name (glossary 2.2). Lower case: it follows the number.' }), { stage: tr(STAGE_TEXT[(opts.stageOf?.(c) ?? CATEGORY_STAGE[c.column]) as StageId]) })
+      : stage && stageNow(c) !== stage
+        ? tr(msg({ id: 'tasks.skipped.movedStage', defaultMessage: 'moved to {stage}', description: 'Why Archive All of a stage column (Approved beside Merging) left a card on the board (after its number, "#12 moved to Merging"): it moved to another stage of the column meanwhile. {stage} is the stage’s name (glossary 2.2). Lower case: it follows the number.' }), { stage: tr(STAGE_TEXT[stageNow(c)]) })
       : project !== null && c.project.toLowerCase() !== project.toLowerCase()
         ? tr(msg({ id: 'tasks.skipped.movedProject', defaultMessage: 'moved to another project', description: 'Why Archive All left a card on the board (after its number, "#12 moved to another project"): it moved to another project meanwhile. Lower case: it follows the number.' }))
         : !cardMatches(c, query, searchKeys, searchMoved)
