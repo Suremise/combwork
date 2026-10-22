@@ -526,6 +526,7 @@
   "board.queue.filesMore": "{files} ほか {n, plural, other {# 件}}",
   "board.queue.inVersionControl": "バージョン管理でキューを表示",
   "board.queue.merged": "{card} を {result} としてマージ",
+  "board.queue.moreReturned": "{n, plural, other {ほかに # 枚の差し戻されたカードがあります：これらを確認すると、ここに表示されます。}}",
   "board.queue.openCard": "カードを開く",
   "board.queue.openNamed": "{card} を開く",
   "board.queue.pause": "キューを一時停止",

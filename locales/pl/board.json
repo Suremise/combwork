@@ -526,6 +526,7 @@
   "board.queue.filesMore": "{files} i {n, plural, one {# inny} few {# inne} many {# innych} other {# innego}}",
   "board.queue.inVersionControl": "Kolejka w Kontroli wersji",
   "board.queue.merged": "Scalono {card} jako {result}",
+  "board.queue.moreReturned": "{n, plural, one {# zwrócona karta więcej: pojawi się tu, gdy zobaczysz te.} few {# zwrócone karty więcej: pojawią się tu, gdy zobaczysz te.} many {# zwróconych kart więcej: pojawią się tu, gdy zobaczysz te.} other {# zwróconej karty więcej: pojawi się tu, gdy zobaczysz te.}}",
   "board.queue.openCard": "Otwórz kartę",
   "board.queue.openNamed": "Otwórz {card}",
   "board.queue.pause": "Wstrzymaj kolejkę",

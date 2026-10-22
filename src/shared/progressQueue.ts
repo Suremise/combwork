@@ -28,9 +28,9 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
   const again = new Set([...(v.testing ? [v.testing.card] : []), ...v.queued.map((q) => q.card)])
   const newest = new Set<number>()
   const out: QueueRecent[] = []
-  // Newest first: a card's first outcome here is its latest (the older returns not seen yet come after the latest
-  // outcomes, each its card's newest).
-  for (const r of [...v.recent, ...v.pending]) {
+  // Newest first: a card's first outcome here is its latest (the older returns, not seen yet or seen just now, come
+  // after the latest outcomes, each its card's newest).
+  for (const r of [...v.recent, ...v.pending, ...v.pendingSeen]) {
     if (newest.has(r.card)) continue
     newest.add(r.card)
     if (r.outcome !== 'returned' || again.has(r.card)) continue
@@ -39,7 +39,10 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
   return out
 }
 
-/** The returns not seen yet: what the panel marks seen once it shows them (open, in a focused window). */
+/**
+ * The returns not seen yet that the card shows: what the panel marks seen once it shows them (open, in a focused window).
+ * Those beyond the model's page (`pendingMore`) aren't among them: they come with the next page, once these are seen.
+ */
 export const unseenReturns = (v: QueueView, now: number): QueueRecent[] => shownReturns(v, now).filter((r) => !r.seen)
 
 /** The merges of the last few seconds, newest first. */

@@ -2796,9 +2796,12 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   **queued** in order, each with its approved revision (copies) and a link to its card, and **Remove** (a confirmation,
   then #1353's intent); **just merged** (*✓ HI-61 merged as 9e1f0aa*) for 8 s; **returned** (*✗ HI-108 returned to
   HB1: conflict in tasks.ts*, *checks failed: unit*), with **Open card** and **Show log** (the failed check's run log,
-  else the output the outcome kept), shown **until seen**: the Merges tab shown in a focused window marks it seen
-  (`queue:seen`, kept in hive.db for every window and Hive: `workflow_queue_seen`, 1.0 group step 18 `queue seen`),
-  then it goes 10 s later; **paused**, each pause reason a sentence (git's own message under it), with **Resume
+  else the output the outcome kept), shown **until seen**: the Merges tab shown in a focused window, with no dialog over
+  it, marks seen the returns it shows (the project filter applies; `queue:seen`, kept in hive.db for every window and
+  Hive: `workflow_queue_seen`, 1.0 group step 18 `queue seen`), then each goes 10 s later. Every return not seen stays
+  reachable however many outcomes follow (HR3's #1356 rounds 1 and 2): the window's model has, beyond the latest 20
+  outcomes, a page of the next 50 not seen and the exact count of the rest, which the card says (*2 more returned
+  cards*); seeing the page brings the next, since a seen return leaves the page at once; **paused**, each pause reason a sentence (git's own message under it), with **Resume
   queue**, and Open card for needs you; **run by <profile>** for another Hive's queue; and **Queue in Version
   Control**, which opens the project's Git tab (#1357 points it at its Merge queue section). **When a queue shows**
   (item 0, round 2 of #1338) is decided from its actual state, never the current options alone: an entry testing,

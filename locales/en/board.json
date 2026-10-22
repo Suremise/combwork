@@ -2107,6 +2107,10 @@
     "defaultMessage": "{card} merged as {result}",
     "description": "A merge queue's card in the Progress panel, for a few seconds after a card merged: its key ({card}, such as HI-61) and the target's new commit ({result}: a short commit id)."
   },
+  "board.queue.moreReturned": {
+    "defaultMessage": "{n, plural, one {# more returned card: it shows here once you have seen these.} other {# more returned cards: they show here as you see these.}}",
+    "description": "Under the returned cards on a merge queue's card in the Progress panel, when more are waiting to be shown ({n}): each shows once those above have been seen. Glossary 2.4: returned."
+  },
   "board.queue.openCard": {
     "defaultMessage": "Open card",
     "description": "A button on a merge queue's card in the Progress panel: opens the card it names (a return, a pause that needs the user)."

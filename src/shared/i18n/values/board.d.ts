@@ -528,6 +528,7 @@ interface HiveMessageValues {
   'board.queue.filesMore': { files: string | number; n: number }
   'board.queue.inVersionControl': undefined
   'board.queue.merged': { card: string | number; result: string | number }
+  'board.queue.moreReturned': { n: number }
   'board.queue.openCard': undefined
   'board.queue.openNamed': { card: string | number }
   'board.queue.pause': undefined

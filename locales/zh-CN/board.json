@@ -526,6 +526,7 @@
   "board.queue.filesMore": "{files} 等另外 {n, plural, other {# 个}}",
   "board.queue.inVersionControl": "在版本控制中查看队列",
   "board.queue.merged": "{card} 已合并为 {result}",
+  "board.queue.moreReturned": "{n, plural, other {还有 # 张已退回的卡片：看过这些后，它们会显示在这里。}}",
   "board.queue.openCard": "打开卡片",
   "board.queue.openNamed": "打开 {card}",
   "board.queue.pause": "暂停队列",

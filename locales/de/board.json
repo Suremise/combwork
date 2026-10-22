@@ -526,6 +526,7 @@
   "board.queue.filesMore": "{files} und {n, plural, one {# weitere} other {# weitere}}",
   "board.queue.inVersionControl": "Warteschlange in der Versionsverwaltung",
   "board.queue.merged": "{card} gemergt als {result}",
+  "board.queue.moreReturned": "{n, plural, one {# weitere zurückgegebene Karte: Sie erscheint hier, sobald du diese gesehen hast.} other {# weitere zurückgegebene Karten: Sie erscheinen hier, während du diese siehst.}}",
   "board.queue.openCard": "Karte öffnen",
   "board.queue.openNamed": "{card} öffnen",
   "board.queue.pause": "Warteschlange anhalten",
