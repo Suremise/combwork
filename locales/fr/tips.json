@@ -204,7 +204,7 @@
   "tips.mcpPerProject.title": "Des serveurs MCP seulement là où il en faut",
   "tips.memorySnapshot.text": "Active Paramètres → Avancé → Enregistrer un instantané de la mémoire si Hive est sur le point de manquer de mémoire pour savoir ce qui l’a remplie. Les instantanés peuvent peser des gigaoctets, contiennent ce que Hive avait en mémoire (texte des cartes, transcriptions, peut-être des jetons) et restent sur ce PC.",
   "tips.memorySnapshot.title": "Hive s’est fermé faute de mémoire ?",
-  "tips.mergeQueueFolder.text": "Quand la file de fusion fusionne dans une branche extraite dans un dossier, main dans le dossier du projet par exemple, elle demande d’abord dans Pour toi, et se suspend plutôt que de toucher un fichier que vous modifiez. Paramètres → Avancé la laisse continuer sans demander.",
+  "tips.mergeQueueFolder.text": "Quand la file de fusion fusionne dans une branche extraite dans un dossier (main dans le dossier du projet), elle met aussi le dossier à jour, mais se suspend plutôt que de toucher un fichier que vous modifiez. Paramètres → Avancé peut la faire vous demander d’abord dans Pour toi.",
   "tips.mergeQueueFolder.title": "Fusionner dans le dossier où vous travaillez",
   "tips.mergeSlot.text": "Quand plusieurs agents terminent en même temps, chacun prend le créneau de fusion du projet avant de fusionner main dans sa branche, de vérifier et de fusionner, pour que personne n’ait à relancer ses vérifications. Qui le détient et qui attend s’affiche dans la Vue d’ensemble et le panneau Progression.",
   "tips.mergeSlot.title": "Les agents fusionnent chacun leur tour",

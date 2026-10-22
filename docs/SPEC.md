@@ -2023,7 +2023,8 @@ row pause it); a hand merge meanwhile is observed, never merged twice. The card'
 options now: a card started under Hive merges is merged by the queue after the options moved to another finisher. With
 workflow rules off nothing reaches an advance: open entries pause (**rules off**) before it, an advance already begun
 finishes, and they carry on when the rules are on again. A target checked out in a folder is advanced there by
-§16.9.2's journaled update (**Built [#1351]**), asked first while Merge into a checked-out branch says so (OP-40). A
+§16.9.2's journaled update (**Built [#1351]**), automatically, or asked first while Merge into a checked-out branch
+says so (OP-40). A
 card's test-merge ref goes once its entry has an outcome, and its submissions' pins once it is archived.
 
 #### 16.9.1 An entry's way through
@@ -2267,7 +2268,8 @@ touched:
   answering looks again as Resume does (`recheckStuck`), lifting the pause once recovery can carry on, and any other
   pause stays.
 - **Ask each time** (OP-40): Settings → Advanced, **Merge queue: merge into a checked-out branch**
-  (`hive.queue.checkedOutTarget`): *Ask each time* · *Automatically*. Under Ask, an entry whose test merge and checks
+  (`hive.queue.checkedOutTarget`): *Ask each time* · *Automatically* (the default since the crash-injection tests
+  passed in #1351's review). Under Ask, an entry whose test merge and checks
   are done, ready to advance into a target checked out in a folder, asks "<card> is tested and ready to merge: update
   <target> in <folder> now?" (For you, Approve, gate `queueAdvance`, bound to the entry, the expected revision and the
   result) and the queue pauses `approval`, naming the folder. The answer is an `enqueue` of its target: approved, the
@@ -3339,7 +3341,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 Hive has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | **Agreed [#1117 20 Oct].** Yes. |
 | OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | **Agreed [#1117 20 Oct].** Yes, the user only, per change, with the cards listed first. |
 | OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | **Agreed [#1117 20 Oct].** No RC for P2: there's nothing to install that differs from 0.9.3. |
-| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). **Built [#1351]:** Settings → Advanced, Merge queue: merge into a checked-out branch (`hive.queue.checkedOutTarget`), *Ask each time* (the request in For you) by default until #1351's crash-injection tests pass in its review; then *Automatically* (§16.9.2). |
+| OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Hive ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). **Built [#1351]:** Settings → Advanced, Merge queue: merge into a checked-out branch (`hive.queue.checkedOutTarget`), *Ask each time* (the request in For you) or *Automatically*. **Automatic since 22 Oct**, when #1351's crash-injection tests passed in its review (HR4's round 2, on 156a53a0: the e2e suite `mergequeuecrash` three times in a row); the race stays documented and detected (§16.9.2), and *Ask each time* stays the switch. |
 | OP-41 | The migration detects a running 0.9 Hive by SQLite's exclusive lock (§16.17). If P3's two-process test shows that can't be relied on, add a workspace presence marker to 0.9.3 (a fix on main, merged forward)? | **Agreed [#1117 20 Oct].** Yes, only if needed; P3 reports which. |
 
 **Git support (P1's list)** [#1117 git]. Capabilities the spec needs, and where they go:

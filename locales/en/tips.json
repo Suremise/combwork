@@ -820,7 +820,7 @@
     "description": "A tip's title."
   },
   "tips.mergeQueueFolder.text": {
-    "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it asks first under For you, and pauses rather than touch a file you are changing. Settings → Advanced lets it go ahead without asking.",
+    "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
   },
   "tips.mergeQueueFolder.title": {

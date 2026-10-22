@@ -578,7 +578,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   // Merging into a branch checked out in a folder (#1351, OP-40, SPEC §16.9.2): its journaled update has one race it
-  // detects but can't prevent, so the queue asks first until the update's crash-injection tests have passed.
+  // detects but can't prevent. Automatically since its crash-injection tests passed in #1351's review (22 Oct), as OP-40
+  // agreed; Ask each time stays the switch.
   {
     id: QUEUE_CHECKED_OUT_TARGET,
     group: 'hive',
@@ -594,7 +595,7 @@ const SOURCES: readonly AdvancedSource[] = [
       { value: 'ask', label: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.ask', defaultMessage: 'Ask each time', description: 'A choice of the advanced setting "Merge queue: merge into a checked-out branch": ask the user (For you) before each update of the folder.' }) },
       { value: 'auto', label: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.auto', defaultMessage: 'Automatically', description: 'A choice of the advanced setting "Merge queue: merge into a checked-out branch": update the folder without asking.' }) }
     ],
-    default: 'ask',
+    default: 'auto',
     applies: 'now'
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own

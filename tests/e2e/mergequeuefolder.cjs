@@ -1,9 +1,9 @@
 // Merging into a target checked out in a folder (#1351, SPEC §16.9.2; S27, S34a–c, S42, OP-40): a project set to "Hive
 // merges" into `main`, checked out in the project folder, fake Claude Code agents acting by their own tokens (a reviewer
 // whose session lives in the project folder, idle; builders in worktrees), the Assistant off.
-// - Ask each time (the default until this card's crash tests passed): the card waits with "update main in <folder>
-//   now?" in For you (screenshots of the card dialog's request, both themes); Approve merges it into the folder.
-// - Automatically: S27/S42, the user commits in the folder and the Git view switches branches during the merge checks,
+// - Ask each time (chosen: Automatically is the default since this card's crash tests passed): the card waits with
+//   "update main in <folder> now?" in For you (screenshots of the card dialog's request, both themes); Approve merges it.
+// - Automatically, the default (the setting reset; nothing asked): S27/S42, the user commits in the folder and the Git view switches branches during the merge checks,
 //   not held up (the lock is held only for the advance); the swap catches the moved main and tests again.
 // - S42/S34c: the user's edit in a file the merge changes pauses the queue (not a return) naming it, the edit untouched;
 //   anything staged pauses it naming the files; once put right, Resume merges.
@@ -46,8 +46,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token, its session in the project folder', !!reviewer.token && same(reviewer.folder, fx.alpha))
 
-    // --- Ask each time (the setting's default): For you, then Approve.
-    check('Merge into a checked-out branch: not set, so its default applies', (await h.inv('advanced:state')).values['hive.queue.checkedOutTarget'] === undefined)
+    // --- Ask each time, chosen: For you, then Approve.
+    await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'ask')
     q.steer(fx, 'pass')
     const atAsk = main()
     const one = await q.approve(fx, h, reviewer, 'One', { 'one.txt': 'one\n' })
@@ -64,8 +64,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…the folder clean at the result, merged once', f.status() === '' && f.merges((await h.card(one.n)).key) === 1, f.status())
     await h.page.keyboard.press('Escape')
 
-    // --- Automatically from here.
-    await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'auto')
+    // --- The setting back to its default, Automatically, from here (S27's card shows nothing is asked).
+    await h.inv('advanced:set', 'hive.queue.checkedOutTarget', null)
+    check('Merge into a checked-out branch: back to its default', (await h.inv('advanced:state')).values['hive.queue.checkedOutTarget'] === undefined)
 
     // --- S27 / S42: the user commits in the folder and the Git view switches branches during the checks.
     q.steer(fx, 'wait')
@@ -81,6 +82,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     fs.rmSync(fx.started, { force: true })
     fs.writeFileSync(fx.go, 'go')
     check('…merged: Done', await done(two.n), JSON.stringify(await h.kinds(two.n)))
+    check('…the default is Automatically: nothing was asked', !(await h.facts(two.n)).some((x) => x.kind === 'ApprovalRequested') && !(await h.kinds(two.n)).includes('Approval'), JSON.stringify(await h.kinds(two.n)))
     const [i2] = (await h.facts(two.n)).filter((x) => x.kind === 'Integrated')
     check("S27: its result's first parent is the user's commit: tested again on the moved main", !!i2 && lib.git(fx.alpha, ['rev-parse', `${i2.data.result}^1`]).trim() === userCommit, JSON.stringify(i2))
     check('…its checks ran twice (once per test merge); the folder clean', (await h.facts(two.n)).filter((x) => x.kind === 'CheckRan').length === 2 && f.status() === '', f.status())

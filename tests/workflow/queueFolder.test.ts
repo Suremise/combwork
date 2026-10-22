@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'child_process'
 import { tempDir } from '../tempDir'
 import { shellLine } from '../../src/shared/workflow/queue'
+import { createRequire } from 'module'
+
+const { baseEnv } = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
@@ -62,7 +65,9 @@ const moveMain = (e: Env, branch = 'main'): string => {
  * Runs a line in Windows PowerShell in a folder, as the user would paste it (HR4's #1351 round 1: the commands Hive
  * gives must reach the program with their arguments as written). Its output.
  */
-const powershell = (cwd: string, line: string): string => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', line], { cwd, encoding: 'utf8', env: process.env, windowsHide: true }).replace(/\r\n/g, '\n')
+const powershell = (cwd: string, line: string): string =>
+  // The run context's environment (never the shell's), with the unit tests' empty global git config (noGlobalGit.ts).
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', line], { cwd, encoding: 'utf8', env: { ...baseEnv(), GIT_CONFIG_GLOBAL: '/dev/null' }, windowsHide: true }).replace(/\r\n/g, '\n')
 
 describe('the conditions before anything is touched (§16.9.2)', () => {
   it('an agent building in the folder pauses folderBusy, naming what it holds; nothing started', async () => {

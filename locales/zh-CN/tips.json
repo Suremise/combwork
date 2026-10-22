@@ -204,7 +204,7 @@
   "tips.mcpPerProject.title": "MCP 服务器只用在需要的地方",
   "tips.memorySnapshot.text": "打开“设置”→“高级”→“在 Hive 即将耗尽内存时保存内存快照”，即可查明是什么占满了内存。快照可能有数 GB，包含 Hive 内存中的内容（卡片文本、对话记录，可能还有令牌），并保留在这台电脑上。",
   "tips.memorySnapshot.title": "Hive 因内存耗尽而关闭？",
-  "tips.mergeQueueFolder.text": "当合并队列要合并进在某个文件夹中已检出的分支（例如项目文件夹的 main）时，它会先在“待你处理”中询问，并且宁可暂停也不会动你正在修改的文件。在“设置”→“高级”中可让它不经询问直接进行。",
+  "tips.mergeQueueFolder.text": "当合并队列要合并进在某个文件夹中已检出的分支（例如项目文件夹的 main）时，它也会更新该文件夹，但宁可暂停也不会动你正在修改的文件。在“设置”→“高级”中可让它先在“待你处理”中询问你。",
   "tips.mergeQueueFolder.title": "合并到你正在工作的文件夹",
   "tips.mergeSlot.text": "多个智能体同时完成时，每个智能体在合并入 main、检查和合并之前都会先占用项目的合并槽位，这样谁的检查都不必运行两次。谁占用着、谁在等待，会显示在“概览”和进度面板中。",
   "tips.mergeSlot.title": "智能体轮流合并",
