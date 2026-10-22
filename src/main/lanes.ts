@@ -961,6 +961,13 @@ export function startLanes(): void {
   if (started) return
   started = true
   onHiveEvent((e) => {
+    // The workspace's projects read again (their version control recorded as a window opens it): the lanes' old rules
+    // marks and stages need their projects' rulesets now, which a first look before that couldn't read (#1421).
+    if (e.type === 'workspace-changed') {
+      const ws = e.workspace ? openWorkspaces().find((w) => w.path && same(w.path, e.workspace!.path)) : undefined
+      if (ws) changed(ws)
+      return
+    }
     // A project's workflow written (#1421): its lanes' old rules marks may have come or gone.
     if (e.type !== 'tasks-changed' && e.type !== 'workflow-changed') return
     const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
