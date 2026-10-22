@@ -276,6 +276,37 @@ describe("a commit's stream, git's trace in it (#1350)", () => {
     expect(commitFailed(failed(stream('nested-git-hook')), true)).toMatchObject({ pause: 'signing' })
   })
 
+  it("#1397: a hook's own structured log, with a session of its own, stays in its text; the top git's and a nested git's records stay out", () => {
+    const lines = stream('failing-hook-no-newline').split('\n')
+    const top = (JSON.parse(lines[0]) as { sid: string }).sid
+    const diag = '{"event":"validation","sid":"build-123","time":"2026-10-22T00:00:00Z","message":"policy rejected the change"}'
+    // Not descendants either: a session named like the top git's but longer, and one under another root.
+    const near = `{"event":"validation","sid":"${top}x/1","time":"t"}`
+    const other = '{"event":"child_exit","sid":"build-123/7","time":"t","child_id":1,"code":0}'
+    // The rejecting hook's lines: after its child_start (line 86, 0-based 85), before its child_exit.
+    lines.splice(86, 0, diag, near, other)
+    const err = lines.join('\n')
+    const rejecting = readCommitStream(err).children.find((c) => c.kind === 'hook')!
+    expect(rejecting).toMatchObject({ name: 'commit-msg', code: 1 })
+    expect(rejecting.text).toBe(`${diag}\n${near}\n${other}\nmessage rejected: passphrase in it\n{"event": not one\n`)
+    const o = commitFailed(failed(err, { code: 1 }), false)
+    expect(o).toMatchObject({ fail: 'hook' })
+    const log = 'log' in o ? o.log : ''
+    expect(log).toContain('policy rejected the change')
+    // git's own records, the top's and the nested git's (its sid `<top>/…`), none in the log.
+    expect(log).not.toContain(`"sid":"${top}"`)
+    expect(log).not.toContain(`"sid":"${top}/`)
+  })
+
+  it("#1397: with no trace (an old git), a hook's structured log is text, never taken for git's session", () => {
+    // git's session starts with its `version` record; a hook's other records, with no parent's prefix, don't start one.
+    const err = ['{"event":"start","sid":"hook-run","time":"t"}', '{"event":"child_start","sid":"hook-run","time":"t","child_id":1,"argv":["x"]}', "Not committing merge; use 'git commit' to complete the merge."].join('\n')
+    const s = readCommitStream(err)
+    expect(s.traced).toBe(false)
+    expect(s.text).toBe(err)
+    expect(commitFailed(failed(err), false)).toMatchObject({ fail: 'hook' })
+  })
+
   it('only a complete record with its fields is an event: JSON-looking text a hook prints stays text', () => {
     const s = readCommitStream(['{"event":"child_exit","child_id":1}', '{"event":"start","sid":"S"', '{"event":"x","sid":"S","time":"t"}{"event":"y"}', 'plain'].join('\n'))
     expect(s.traced).toBe(false)
