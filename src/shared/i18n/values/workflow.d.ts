@@ -179,6 +179,9 @@ interface HiveMessageValues {
   'workflow.refused.merge.hiveMerges.next': undefined
   'workflow.refused.merge.hiveMerges.nextMerged': undefined
   'workflow.refused.merge.hiveMerges.nextPaused': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFolder': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedRules': { target: string | number }
   'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
   'workflow.refused.merge.hiveMerges.nextReturned': undefined
   'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }

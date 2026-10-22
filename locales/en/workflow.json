@@ -711,6 +711,18 @@
     "defaultMessage": "It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.",
     "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name."
   },
+  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or a step that needs them). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+    "defaultMessage": "It is in the merge queue for {target}, which paused while workflow rules were off and waits until the user resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off. {target} is a branch name."
+  },
   "workflow.refused.merge.hiveMerges.nextQueued": {
     "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."

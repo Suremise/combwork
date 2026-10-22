@@ -113,6 +113,45 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
 }
 
 /**
+ * What a paused queue waits for (#1406), by its pause reason (read as the queue saved it): the user's answer in For you
+ * (the question to update a checked-out target now, which Resume doesn't stand in for; a step that needs them, a stuck
+ * advance), the folder its target is checked out in put right (Resume checks it first), or Resume after the rules were
+ * off; anything else, the user's Resume.
+ */
+export type PauseWait = 'resume' | 'answer' | 'folder' | 'rules'
+
+export function pauseWait(reason: PauseReason): PauseWait {
+  switch (reason) {
+    case 'approval':
+    case 'needsYou':
+      return 'answer'
+    case 'wrongBranch':
+    case 'staged':
+    case 'unstagedChanges':
+    case 'folderBusy':
+      return 'folder'
+    case 'rulesOff':
+      return 'rules'
+    default:
+      return 'resume'
+  }
+}
+
+/** A paused queue's "it moves on once …" for agents: what the pause waits for, never a step of the agent's own. */
+function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
+  switch (pauseWait(q.reason)) {
+    case 'answer':
+      return q.reason === 'approval' ? `it moves on once the user answers, in For you, whether to update ${q.target} now` : 'it moves on once the user settles what stopped it (their answer in For you, or Resume)'
+    case 'folder':
+      return `it moves on once the user puts right the folder ${q.target} is checked out in and resumes it`
+    case 'rules':
+      return "it paused while workflow rules were off; it moves on once the user resumes it"
+    case 'resume':
+      return 'it moves on once the user resumes it'
+  }
+}
+
+/**
  * The card's queue state in a sentence for agents (English: agent-facing). `enforced` false (Settings → Advanced:
  * workflow rules not enforced): nothing refuses, so the agent merges and reports as before 1.0.
  */
@@ -125,7 +164,7 @@ export function queueLine(q: QueueState, enforced = true): string {
     case 'testing':
       return `${who} The merge queue is ${q.step === 'advance' ? `moving ${q.target} to its merge` : q.step === 'checks' ? `running the merge checks on its merge into ${q.target}` : `testing its merge into ${q.target}`} now; it moves to Done once merged.`
     case 'paused':
-      return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); it moves on once the user resumes it.`
+      return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); ${pausedWaits(q)}.`
     case 'returned':
       return `${who} ${returnedText('It', q.failure, READ_MAX, READ_LINES)}`
     case 'left':
