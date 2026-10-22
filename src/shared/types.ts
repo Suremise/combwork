@@ -21,6 +21,7 @@ import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
+import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
@@ -677,9 +678,13 @@ export interface HiddenProject {
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
+/** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
+export type BoardColumnId = TaskColumn | 'merging'
+
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
-  columns?: TaskColumn[]
+  /** A category's applies to its stage's column; Merging keeps its own. */
+  columns?: BoardColumnId[]
   cards?: number[]
 }
 
@@ -835,6 +840,11 @@ export interface ArchiveRequest {
   label: string
   /** The column it was for; null: the whole board. */
   column: TaskColumn | null
+  /**
+   * The stage it was for, where its category shows several (Approved beside Merging, #1420): a card in another stage
+   * of the column, as its facts say now, stays.
+   */
+  stage?: StageId
   /** The project the board showed (null: every project) and its search: a card that has left them stays. */
   project: string | null
   query: string
@@ -1001,6 +1011,8 @@ export type PresetAsked = 'chosen' | 'notNow'
 export interface ProjectStages {
   stages: StageDef[]
   names: Partial<Record<StageDef['id'], string>>
+  /** The preset its options started from (null: none chosen): Solo hides its ended lanes from Pulse (#1421). */
+  preset: PresetId | null
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
@@ -1009,6 +1021,8 @@ export type WorkflowOptionOrigin = 'platform' | 'global' | 'workspace' | 'projec
 /** The Workflow section of Project Settings (#1278): the project's options, what they inherit, and the presets on offer. */
 export interface WorkflowForm {
   platform: PlatformId
+  /** A level's defaults (#1422: Hive's, the workspace's) rather than a project's options. */
+  level?: WorkflowLevel
   /** The preset the project's options started from (null: none chosen). */
   preset: PresetId | null
   /** The options the project sets itself. */
@@ -1028,14 +1042,37 @@ export interface WorkflowForm {
   enforced: boolean
 }
 
-/** A change to a project's workflow options: the preset they start from and the options the project sets itself. */
+/**
+ * A change to a project's workflow options: the preset they start from and the options the project sets itself. `base`:
+ * the preset and options the window's form was read with (#1418); a save is refused when the project's are no longer
+ * those (changed meanwhile by the Assistant's tool or another window), never written over them.
+ */
 export interface WorkflowChange {
   preset: PresetId | null
   options: Partial<WorkflowOptions>
+  base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }
 }
 
 /** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */
-export type WorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project: string; problem: OwnWorkflowProblem }
+
+/**
+ * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
+ * have that problem in its own options.
+ */
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+
+/** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
+export type WorkflowLevel = 'global' | 'workspace'
+
+/**
+ * What saving a level's defaults would do (#1422): its problems (an inheriting project's contradiction among them), the
+ * options it changes, and each project inheriting a changed option, with what changes for it, its running lanes and its
+ * cards in flight (they keep their rules: from the next card).
+ */
+export interface WorkflowLevelCheck extends WorkflowCheck {
+  projects: { name: string; path: string; workspace: { path: string; name: string }; changed: (keyof WorkflowOptions)[]; lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; key: string; title: string }[] }[]
+}
 
 /** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
 export interface WorkflowCheck {
@@ -1049,7 +1086,7 @@ export interface WorkflowCheck {
   /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
-  inFlight: { number: number; title: string }[]
+  inFlight: { number: number; key: string; title: string }[]
 }
 
 /**
@@ -2782,6 +2819,16 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /**
+   * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
+   * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
+   */
+  oldRules: boolean
+  /**
+   * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
+   * too; null for an ended lane, or one with none recorded (its project's options now stand in).
+   */
+  stages: StageId[] | null
 }
 
 /**

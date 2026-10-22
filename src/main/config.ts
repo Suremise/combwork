@@ -5,6 +5,8 @@ import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig, withLegacySettings } 
 import { extraArgsProblem } from '../shared/providers'
 import type { AppConfig, AppSettings, EffortOption, FallbackModel, ModelPrice, ProviderSettings } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
+import type { PlatformId } from '../shared/platform/descriptors'
+import type { WorkflowOptions } from '../shared/workflow/options'
 import { readKeptJsonSync, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger } from './logger'
 
@@ -121,6 +123,18 @@ class ConfigStore {
     }
     const prev = structuredClone(this.data.settings)
     this.data.settings = mergeDefaults(this.data.settings, patch)
+    this.scheduleSave()
+    for (const l of this.listeners) l(this.data.settings, prev)
+    return this.data.settings
+  }
+
+  /**
+   * Replaces Hive's workflow defaults for a platform (#1422: Settings → Workflow defaults; the deep merge in updateSettings
+   * can't take an option back to inherit). Checked by the caller (workflow/levels.ts).
+   */
+  setWorkflowDefaults(platform: PlatformId, options: Partial<WorkflowOptions>): AppSettings {
+    const prev = structuredClone(this.data.settings)
+    this.data.settings = { ...this.data.settings, workflow: { ...this.data.settings.workflow, [platform]: options } }
     this.scheduleSave()
     for (const l of this.listeners) l(this.data.settings, prev)
     return this.data.settings

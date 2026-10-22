@@ -667,9 +667,17 @@
     "defaultMessage": "This session has no transcript yet.",
     "description": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet."
   },
+  "service.workflow.changedMeanwhile": {
+    "defaultMessage": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "description": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them."
+  },
   "service.workflow.closed": {
     "defaultMessage": "The workspace this card belongs to has closed",
     "description": "An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace."
+  },
+  "service.workflow.inheritor": {
+    "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "description": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name."
   },
   "service.workflowNotice.blocked": {
     "defaultMessage": "{card} is blocked: {reason}",

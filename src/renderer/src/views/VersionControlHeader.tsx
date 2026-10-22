@@ -18,7 +18,8 @@ import { Icon, Tooltip } from '../components/ui'
  * from the next card, and what keeps the old rules. Not now hides an offer until Hive starts again.
  */
 
-const M = {
+/** The tab's words (the board's workflow link, #1420, says it as the tab does). */
+export const M = {
   choice: msg({ id: 'git.vc.choice', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control).' }),
   switchTip: msg({ id: 'git.vc.switchTip', defaultMessage: 'Switch this project to {platform}, from its next card. Hive shows what changes first.', description: 'Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git.' }),
   repo: msg({ id: 'git.vc.fact.repo', defaultMessage: 'This folder is a Git repository at {root}.', description: 'Atop the Version Control tab: what Hive found in the project folder. {root} is the repository root (glossary 2.1: repository root).' }),
@@ -57,6 +58,9 @@ const S = {
 /** Offers hidden with Not now, by project and offer: until Hive starts again (in memory, as the upgrade banner's). */
 const hiddenOffers = new Set<string>()
 const offerKey = (path: string, o: PlatformOffer): string => `${path.toLowerCase()}\n${o.why}`
+
+/** A platform's name (the board's workflow link, #1420): the names the switch says too. */
+export const PLATFORM_TEXT = PLATFORM_NAME
 
 const CHOICES: PlatformId[] = ['none', 'git']
 

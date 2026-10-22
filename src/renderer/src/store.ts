@@ -5,6 +5,7 @@ import type { Period } from '@shared/usageTotals'
 import type { StartFailure } from '@shared/startFailure'
 import { cardLabel } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
+import type { StageId } from '@shared/workflow/facts'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
 import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, projectLayout, projectSessionView } from '@shared/defaults'
@@ -85,6 +86,9 @@ export interface TemplateAgentRequest {
  */
 export interface ArchiveAllRequest {
   column: TaskColumn | null
+  /** A stage column's (#1420: Approved beside Merging): only cards in that stage, named as the column is (`name`). */
+  stage?: StageId
+  name?: string
   project: string | null
   scope: string | null
   query: string

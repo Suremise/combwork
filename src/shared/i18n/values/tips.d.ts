@@ -192,6 +192,8 @@ interface HiveMessageValues {
   'tips.laneNotices.title': undefined
   'tips.laneStart.text': undefined
   'tips.laneStart.title': undefined
+  'tips.lanesLegend.text': undefined
+  'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
   'tips.leftoverProcesses.text': undefined
@@ -367,8 +369,12 @@ interface HiveMessageValues {
   'tips.versionControlTab.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.workflowDefaults.text': undefined
+  'tips.workflowDefaults.title': undefined
   'tips.workflowOptions.text': undefined
   'tips.workflowOptions.title': undefined
+  'tips.workflowPresetsWhy.text': undefined
+  'tips.workflowPresetsWhy.title': undefined
   'tips.workspaceMoved.text': undefined
   'tips.workspaceMoved.title': undefined
   'tips.workspaceMovedDefender.text': undefined

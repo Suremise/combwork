@@ -24,12 +24,16 @@ interface HiveMessageValues {
   'workflow.forYouKind': { kind: string }
   'workflow.form.addCheck': undefined
   'workflow.form.agentsSection': undefined
+  'workflow.form.allOff': undefined
+  'workflow.form.allOffSummary': undefined
+  'workflow.form.appliesNow': undefined
   'workflow.form.cantSave': undefined
   'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
+  'workflow.form.changedMeanwhile': undefined
   'workflow.form.changesHead': undefined
   'workflow.form.checkCommand': undefined
   'workflow.form.checkName': undefined
-  'workflow.form.choose': undefined
+  'workflow.form.closePreview': undefined
   'workflow.form.confirmMessage': undefined
   'workflow.form.confirmTitle': undefined
   'workflow.form.copied': undefined
@@ -40,36 +44,53 @@ interface HiveMessageValues {
   'workflow.form.fileLocksValue': undefined
   'workflow.form.folders': undefined
   'workflow.form.from.global': undefined
+  'workflow.form.from.here': undefined
   'workflow.form.from.platform': undefined
   'workflow.form.from.preset': undefined
   'workflow.form.from.project': undefined
   'workflow.form.from.workspace': undefined
-  'workflow.form.git': undefined
+  'workflow.form.heir': { project: string | number; options: string | number }
+  'workflow.form.heirCards': { n: number }
+  'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
+  'workflow.form.heirLanes': { n: number }
+  'workflow.form.heirs': { n: number }
   'workflow.form.identity': { name: string | number; email: string | number }
   'workflow.form.identityValue': { name: string | number; email: string | number }
   'workflow.form.inFlight': { n: number }
   'workflow.form.inherit': undefined
   'workflow.form.inheritTip': { value: string | number }
+  'workflow.form.inheritor': { project: string | number }
   'workflow.form.invalid': undefined
   'workflow.form.labels': undefined
   'workflow.form.labelsValue': { labels: string | number }
   'workflow.form.lane': { builder: string | number; name: string | number }
   'workflow.form.laneUnnamed': { builder: string | number }
   'workflow.form.lanes': { n: number }
+  'workflow.form.levelConfirm': undefined
+  'workflow.form.levelForGit': undefined
+  'workflow.form.levelForNone': undefined
+  'workflow.form.levelGit': undefined
+  'workflow.form.levelNone': undefined
+  'workflow.form.levelPlatform': undefined
   'workflow.form.loadFailed': { error: string | number }
   'workflow.form.loops': undefined
   'workflow.form.loopsSection': undefined
   'workflow.form.loopsValue': { rounds: number; hours: number }
+  'workflow.form.neverOff.fileLocks': undefined
+  'workflow.form.neverOff.folderGit': undefined
+  'workflow.form.neverOff.indexLock': undefined
+  'workflow.form.neverOff.queue': undefined
+  'workflow.form.neverOffHead': undefined
   'workflow.form.noChanges': undefined
   'workflow.form.noChecks': undefined
+  'workflow.form.noHeirs': undefined
   'workflow.form.noIdentity': undefined
-  'workflow.form.none': undefined
+  'workflow.form.noPreset': undefined
   'workflow.form.noneValue': undefined
   'workflow.form.notEnforced': undefined
   'workflow.form.off': undefined
   'workflow.form.on': undefined
   'workflow.form.openAdvanced': undefined
-  'workflow.form.owned': { where: string | number }
   'workflow.form.ownedPrefix': undefined
   'workflow.form.paste': undefined
   'workflow.form.pasteApply': undefined
@@ -77,16 +98,29 @@ interface HiveMessageValues {
   'workflow.form.pasteMessage': undefined
   'workflow.form.pastePlatform': undefined
   'workflow.form.pasteTitle': undefined
-  'workflow.form.platform': undefined
-  'workflow.form.platformDesc': undefined
   'workflow.form.preset': undefined
   'workflow.form.presetDesc': undefined
+  'workflow.form.presetsLabel': undefined
+  'workflow.form.previewChanges': { n: number }
+  'workflow.form.previewHead': { preset: string | number }
+  'workflow.form.previewNow': { value: string | number }
   'workflow.form.removeCheck': undefined
   'workflow.form.save': undefined
+  'workflow.form.saveBlocked': undefined
   'workflow.form.saved': undefined
+  'workflow.form.stageName': { stage: string | number }
+  'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
   'workflow.form.unavailable': { preset: string | number; why: string | number }
+  'workflow.form.use': { preset: string | number }
   'workflow.form.worktree': undefined
+  'workflow.group.checks': undefined
+  'workflow.group.elsewhere': undefined
+  'workflow.group.merging': undefined
+  'workflow.group.review': undefined
+  'workflow.group.stages': undefined
+  'workflow.group.where': undefined
+  'workflow.group.work': undefined
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
   'workflow.move.move': undefined
@@ -124,6 +158,7 @@ interface HiveMessageValues {
   'workflow.option.preChecks.title': undefined
   'workflow.option.review.desc': undefined
   'workflow.option.review.none': undefined
+  'workflow.option.review.shared': undefined
   'workflow.option.review.title': undefined
   'workflow.option.reviewers.desc': undefined
   'workflow.option.reviewers.title': undefined
@@ -294,6 +329,13 @@ interface HiveMessageValues {
   'workflow.stageName.duplicate': { stage: string | number }
   'workflow.stageName.empty': { stage: string | number }
   'workflow.stageName.long': { stage: string | number; max: number }
+  'workflow.summary.git.pair': undefined
+  'workflow.summary.git.pairAgent': undefined
+  'workflow.summary.git.solo': undefined
+  'workflow.summary.git.team': undefined
+  'workflow.summary.none.pair': undefined
+  'workflow.summary.none.solo': undefined
+  'workflow.summary.none.team': undefined
   'workflow.unreadable.branch': { folder: string | number }
   'workflow.unreadable.branchedOff': { a: string | number; b: string | number }
   'workflow.unreadable.branchedOffTarget': undefined
@@ -346,4 +388,22 @@ interface HiveMessageValues {
   'workflow.value.sameness.exact': undefined
   'workflow.value.style.merge': undefined
   'workflow.value.style.squash': undefined
+  'workflow.why.dependenciesDone': undefined
+  'workflow.why.excluded': undefined
+  'workflow.why.finish': undefined
+  'workflow.why.folder': undefined
+  'workflow.why.identity': undefined
+  'workflow.why.mergeChecks': undefined
+  'workflow.why.mergeInstall': undefined
+  'workflow.why.noSelfReview': undefined
+  'workflow.why.okBefore': undefined
+  'workflow.why.preChecks': undefined
+  'workflow.why.review': undefined
+  'workflow.why.reviewers': undefined
+  'workflow.why.sameness': undefined
+  'workflow.why.sharedFolderWarning': undefined
+  'workflow.why.stopOwnRuns': undefined
+  'workflow.why.strict': undefined
+  'workflow.why.style': undefined
+  'workflow.why.target': undefined
 }

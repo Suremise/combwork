@@ -245,6 +245,15 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
     setFit('normal')
   }
   useEffect(() => () => window.clearTimeout(timer.current), [])
+  // Shown, Esc hides it (WCAG 1.4.13: dismissable without moving the pointer or the focus), as the lanes' legend needs (#1421).
+  useEffect(() => {
+    if (!shown) return
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') hide()
+    }
+    document.addEventListener('keydown', key, true)
+    return () => document.removeEventListener('keydown', key, true)
+  }, [shown])
   // Before it paints, and again when its content changes while shown (placed by its new size; set only on a change).
   useLayoutEffect(() => {
     const el = tipRef.current

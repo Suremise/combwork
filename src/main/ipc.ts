@@ -103,6 +103,8 @@ import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
+import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
+import { rulesetsNow } from './workflow/rulesets'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -662,7 +664,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:archiveBatch': (numbers, req) => {
       // Who is on a card is checked again as each is archived (#351), in this window's workspace.
       const ws = currentWorkspace()
-      return tasks.archiveBatch(numbers, req, { kind: 'user' }, { busy: (c) => cardBusy(ws, c) })
+      // A stage column's batch (#1420): each card's stage as its facts say now.
+      return tasks.archiveBatch(numbers, req, { kind: 'user' }, { busy: (c) => cardBusy(ws, c), stageOf: (c) => cardWork(ws, c.number)?.stage ?? null })
     },
     'tasks:unarchiveBatch': (id) => tasks.unarchiveBatch(id, { kind: 'user' }),
     'tasks:archiveBatches': () => tasks.archiveBatches(),
@@ -703,9 +706,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
-    'tasks:workBadges': () => {
+    'tasks:workBadges': async () => {
       const ws = currentWorkspace()
-      return ws.path ? workBadges(ws) : []
+      if (!ws.path) return []
+      // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
+      const now = await rulesetsNow(ws)
+      return ws.path ? workBadges(ws, now) : []
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
@@ -742,6 +748,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
+    'workflow:levelForm': (level, platform) => levelForm(workspace, level, platform),
+    'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
+    'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:branchCard': async (p, agentId) => {

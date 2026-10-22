@@ -61,7 +61,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await until(async () => (await form.count()) > 0, HUNG_MS)
-    await form.locator('.workflow-preset select').selectOption('pairAgent')
+    // The preset previewed, then used (#1418): it fills the form, saved with Save….
+    await form.locator('.workflow-choice[data-choice="pairAgent"]').click()
+    await form.locator('.workflow-preview [data-action="use-choice"]').click()
     await form.getByRole('button', { name: 'Save…' }).click()
     const save = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await save.waitFor({ timeout: HUNG_MS })

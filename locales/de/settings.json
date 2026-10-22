@@ -845,6 +845,8 @@
   "settings.section.sessions.label": "Sitzungen",
   "settings.section.updates.desc": "Hive selbst aktuell halten. Neue Versionen kommen aus Hives GitHub-Releases und werden vor der Installation geprüft.",
   "settings.section.updates.label": "Updates",
+  "settings.section.workflow.desc": "Die Workflow-Optionen, von denen jedes Projekt ausgeht, in jedem Arbeitsbereich. Die Standards eines Arbeitsbereichs (Einstellungen → Arbeitsbereich) und die eigenen Optionen eines Projekts (sein Tab Versionsverwaltung) haben Vorrang.",
+  "settings.section.workflow.label": "Workflow-Standards",
   "settings.section.workspace.desc": "Die Kartenschleifen des offenen Arbeitsbereichs, seine Projekte, die Hive auslässt (ausgeblendet oder aus Hive entfernt, mit ihren Übergaben und Karten in den Ordner gepackt), und wie viel Hive für jedes Projekt speichert.",
   "settings.section.workspace.label": "Arbeitsbereich",
   "settings.sessions.backupRetention.desc": "Wie lange Hive seine Sicherungen von Sitzungen behält, die die CLI noch hat. Nach so vielen Tagen ohne Aktivität kommen sie in den Papierkorb. Eine Sitzung, deren einzige Kopie Hives Sicherung ist, bleibt immer unangetastet.",
@@ -950,6 +952,8 @@
   "settings.viewers.revokeTitle": "„{name}“ widerrufen?",
   "settings.viewers.token": "Token",
   "settings.viewers.tokenOf": "Token {name}",
+  "settings.workflow.defaults.desc": "Wähle eine Voreinstellung oder lege jede Option fest, für Keine oder für Git. Jede zeigt, woher ihr Wert kommt.",
+  "settings.workflow.defaults.title": "Workflow-Standards von Hive",
   "settings.workspace.antivirus.desc": "Ob Microsoft Defender die Ordner des Arbeitsbereichs scannt, während Hives Arbeit sie ändert (Builds, Tests, Git, Worktrees), und die Ausschlüsse, die Hive dafür mit deiner Zustimmung hinzufügen kann.",
   "settings.workspace.antivirus.tip": "Hive prüft ohne Administratorrechte, daher zeigt Defender seine Ausschlüsse eventuell nicht (unbekannt). Ausschlüsse hinzufügen oder entfernen fragt einmal nach Administratorrechten. Hive bietet immer nur diese Ordner an: den Arbeitsbereich, seinen Worktree-Ordner, sobald es ihn gibt, und seinen Testbereich für Leute, die Hive entwickeln. Andere Antivirenprodukte ändert es nie.",
   "settings.workspace.antivirus.title": "Virenscan",
@@ -964,5 +968,7 @@
   "settings.workspace.loopWaitHours.title": "Wartezeit der Kartenschleife",
   "settings.workspace.storage.desc": "Was Hive für jedes Projekt des Arbeitsbereichs (das größte zuerst) und den Hive Assistant speichert: Sicherungen von Transkripten, archivierte Sitzungen, Anhänge und Worktrees. „Speicher“ öffnet die Seite eines Projekts, mit „Aufräumen…“ und „Bereinigen…“; „Bereinigen…“ entfernt hier alles, was Hive für die Sitzungen des ganzen Arbeitsbereichs speichert.",
   "settings.workspace.storage.tip": "Im Hintergrund gemessen, ein Projekt nach dem anderen. Die eigenen Transkripte der Coding-Agenten (in ~/.claude, ~/.codex und ~/.copilot) werden nicht mitgezählt. Ausgeblendete Projekte sind nicht enthalten.",
-  "settings.workspace.storage.title": "Speicher"
+  "settings.workspace.storage.title": "Speicher",
+  "settings.workspace.workflowDefaults.desc": "Die Workflow-Optionen, von denen die Projekte dieses Arbeitsbereichs ausgehen, vor denen von Hive (Einstellungen → Workflow-Standards). Die eigenen Optionen eines Projekts haben Vorrang.",
+  "settings.workspace.workflowDefaults.title": "Workflow-Standards"
 }

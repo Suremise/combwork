@@ -336,12 +336,12 @@
     "description": "A tip's title."
   },
   "tips.boardStages.text": {
-    "defaultMessage": "Ask the Assistant to rename a stage of a project’s board, such as “call Active Building in web”. A name is only a name: it changes no rule, applies at once, and agents keep using the ids.",
+    "defaultMessage": "The board’s columns are the stages your workflow options make: Merging sits under Approved while Hive merges, and a stage nobody uses is hidden. Ask the Assistant to rename one, such as “call Active Building in web”: a name changes no rule.",
     "description": "A tip (glossary 2.2: stage). Active is a board column: use its name as the board shows it. The quoted request is what the user would ask the Assistant: translate it."
   },
   "tips.boardStages.title": {
-    "defaultMessage": "Name the board’s stages your way",
-    "description": "A tip's title (glossary 2.2: stage)."
+    "defaultMessage": "The board shows your workflow’s stages",
+    "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
   "tips.boardUpgrade.text": {
     "defaultMessage": "Hive keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Hive can change it again.",
@@ -762,6 +762,14 @@
   "tips.laneStart.title": {
     "defaultMessage": "Start a lane yourself",
     "description": "A tip's title. A lane: a builder and a reviewer agent working through cards in turn (glossary 2.5: lane)."
+  },
+  "tips.lanesLegend.text": {
+    "defaultMessage": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, stage, category, workflow options."
+  },
+  "tips.lanesLegend.title": {
+    "defaultMessage": "What a lane’s colours mean",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
   "tips.language.text": {
     "defaultMessage": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
@@ -1463,6 +1471,14 @@
     "defaultMessage": "Let another app watch Hive",
     "description": "A tip's title."
   },
+  "tips.workflowDefaults.text": {
+    "defaultMessage": "Settings → Workflow defaults sets the options every project starts from, and Settings → Workspace the open workspace’s. A project’s own options still win, and saving lists the projects that inherit the change.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: workflow)."
+  },
+  "tips.workflowDefaults.title": {
+    "defaultMessage": "Set a workflow once for every project",
+    "description": "A tip's title (glossary 2.1: workflow)."
+  },
   "tips.workflowOptions.text": {
     "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1470,6 +1486,14 @@
   "tips.workflowOptions.title": {
     "defaultMessage": "Choose how cards get to Done",
     "description": "A tip's title (glossary 2.1: workflow)."
+  },
+  "tips.workflowPresetsWhy.text": {
+    "defaultMessage": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Solo, Pair, Team)."
+  },
+  "tips.workflowPresetsWhy.title": {
+    "defaultMessage": "See what a preset does before you use it",
+    "description": "A tip's title (glossary 2.1: preset)."
   },
   "tips.workspaceMoved.text": {
     "defaultMessage": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",

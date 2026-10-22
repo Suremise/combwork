@@ -147,14 +147,15 @@ describe('switching a project (#1419)', () => {
   it("an options save that waited behind a switch is refused, both platforms' options kept (HR3's round 1, finding 1)", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen' } })
-    // The save reads the project as Git, then waits for its lock while the switch to None is made.
+    // The save reads the project as Git, then waits for its lock while another Hive on this workspace switches it to
+    // None (this Hive's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
     const mutate = w.mutateProjectConfig.bind(w)
     let first = true
     w.mutateProjectConfig = async (path, fn) => {
       if (first) {
         first = false
         w.mutateProjectConfig = mutate
-        await sw.setPlatform(w, repo, 'none', { expected: 'git' })
+        await mutate(path, (cfg) => ({ platform: 'none', platformFound: 'git', workflow: setKept(cfg.workflow!, 'none') }))
       }
       return mutate(path, fn)
     }

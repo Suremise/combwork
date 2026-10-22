@@ -91,6 +91,18 @@
     "defaultMessage": "Agents & Worktrees",
     "description": "A link to the section \"Agents & Worktrees\" of Project Settings: use its name as translated there."
   },
+  "workflow.form.allOff": {
+    "defaultMessage": "All off",
+    "description": "A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4)."
+  },
+  "workflow.form.allOffSummary": {
+    "defaultMessage": "No review, nothing checked, everyone in the project folder: cards move freely, and Hive still records what happens.",
+    "description": "What the choice “All off” sets up, under its name in the Workflow section."
+  },
+  "workflow.form.appliesNow": {
+    "defaultMessage": "Only the stage names change: names aren’t rules, so they apply now, to every card.",
+    "description": "The message of the dialog before saving workflow options when only stage names change (glossary 2.2: stage)."
+  },
   "workflow.form.cantSave": {
     "defaultMessage": "These options can’t be saved:",
     "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
@@ -98,6 +110,10 @@
   "workflow.form.changeLine": {
     "defaultMessage": "{option}: {from} → {to}",
     "description": "A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value."
+  },
+  "workflow.form.changedMeanwhile": {
+    "defaultMessage": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
+    "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them."
   },
   "workflow.form.changesHead": {
     "defaultMessage": "What changes:",
@@ -111,9 +127,9 @@
     "defaultMessage": "Name",
     "description": "The placeholder of a check’s name field (Project Settings → Workflow → Checks pass before review)."
   },
-  "workflow.form.choose": {
-    "defaultMessage": "Choose a preset…",
-    "description": "The first entry of the preset choice in Project Settings → Workflow, when none was chosen."
+  "workflow.form.closePreview": {
+    "defaultMessage": "Close",
+    "description": "A button in a preset’s preview: closes it without changing the form."
   },
   "workflow.form.confirmMessage": {
     "defaultMessage": "The new options apply from the next card that starts.",
@@ -155,6 +171,10 @@
     "defaultMessage": "From Hive’s settings",
     "description": "Where a workflow option’s value comes from: Hive’s own default."
   },
+  "workflow.form.from.here": {
+    "defaultMessage": "Set here",
+    "description": "Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level."
+  },
   "workflow.form.from.platform": {
     "defaultMessage": "Default",
     "description": "Where a workflow option’s value comes from: nobody set it (every rule off)."
@@ -171,9 +191,25 @@
     "defaultMessage": "From the workspace",
     "description": "Where a workflow option’s value comes from: the workspace’s default."
   },
-  "workflow.form.git": {
-    "defaultMessage": "Git",
-    "description": "A version control system’s name (glossary 2.1: keep)."
+  "workflow.form.heir": {
+    "defaultMessage": "Project {project}: {options}",
+    "description": "A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list."
+  },
+  "workflow.form.heirCards": {
+    "defaultMessage": "{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirElsewhere": {
+    "defaultMessage": "Project {project} (workspace {workspace}): {options}",
+    "description": "A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list."
+  },
+  "workflow.form.heirLanes": {
+    "defaultMessage": "{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirs": {
+    "defaultMessage": "{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}",
+    "description": "In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves)."
   },
   "workflow.form.identity": {
     "defaultMessage": "Commits as {name} <{email}>.",
@@ -194,6 +230,10 @@
   "workflow.form.inheritTip": {
     "defaultMessage": "Use the inherited value: {value}",
     "description": "The tooltip of the Inherit button of a workflow option. {value} is the value it would have."
+  },
+  "workflow.form.inheritor": {
+    "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "description": "Why saving workflow defaults was refused: a project inheriting them would have contradictory options. Its reason follows on its own line. {project} is its name."
   },
   "workflow.form.invalid": {
     "defaultMessage": "These options can’t be used, so every rule is off in this project:",
@@ -219,6 +259,30 @@
     "defaultMessage": "{n, plural, one {This running lane keeps the old rules until it ends:} other {These running lanes keep the old rules until they end:}}",
     "description": "In the dialog before saving workflow options, above a list of lanes (glossary 2.1: old rules)."
   },
+  "workflow.form.levelConfirm": {
+    "defaultMessage": "Projects that don’t set these options themselves use the new defaults from their next card.",
+    "description": "The message of the dialog before saving workflow defaults (Settings → Workflow defaults or Settings → Workspace)."
+  },
+  "workflow.form.levelForGit": {
+    "defaultMessage": "The defaults of Git projects.",
+    "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
+  },
+  "workflow.form.levelForNone": {
+    "defaultMessage": "The defaults of projects without version control.",
+    "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
+  },
+  "workflow.form.levelGit": {
+    "defaultMessage": "Git",
+    "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelNone": {
+    "defaultMessage": "None",
+    "description": "The choice of the defaults for projects without version control (glossary 2.1: None)."
+  },
+  "workflow.form.levelPlatform": {
+    "defaultMessage": "Version control",
+    "description": "Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1)."
+  },
   "workflow.form.loadFailed": {
     "defaultMessage": "Couldn’t read the workflow options: {error}",
     "description": "An error showing Project Settings → Workflow. {error} says why."
@@ -235,6 +299,26 @@
     "defaultMessage": "{rounds, plural, one {# round} other {# rounds}}, wait {hours, plural, one {# hour} other {# hours}}",
     "description": "The value of the read-only row \"Rounds and wait\" of Project Settings → Workflow."
   },
+  "workflow.form.neverOff.fileLocks": {
+    "defaultMessage": "File locks, while their own setting has them on.",
+    "description": "A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides)."
+  },
+  "workflow.form.neverOff.folderGit": {
+    "defaultMessage": "No branch switch, pull or other git that changes the folder while an agent works there.",
+    "description": "A protection that stays on with every rule off."
+  },
+  "workflow.form.neverOff.indexLock": {
+    "defaultMessage": "Hive never deletes git’s index.lock.",
+    "description": "A protection that stays on with every rule off. Keep index.lock (a file name)."
+  },
+  "workflow.form.neverOff.queue": {
+    "defaultMessage": "The merge queue moves a target branch only if nothing else moved it meanwhile.",
+    "description": "A protection that stays on with every rule off (glossary 2.1: merge queue)."
+  },
+  "workflow.form.neverOffHead": {
+    "defaultMessage": "What never turns off, to keep your work safe:",
+    "description": "Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section."
+  },
   "workflow.form.noChanges": {
     "defaultMessage": "No option changes: only the preset they started from.",
     "description": "In the dialog before saving workflow options, when no option’s value changes."
@@ -243,13 +327,17 @@
     "defaultMessage": "No checks.",
     "description": "Under “Checks pass before review” when it has none."
   },
+  "workflow.form.noHeirs": {
+    "defaultMessage": "No project inherits the change now: each sets these options itself, or none uses this version control.",
+    "description": "In the dialog before saving workflow defaults, when no open project uses the changed options."
+  },
   "workflow.form.noIdentity": {
     "defaultMessage": "No name and email are set in git config yet.",
     "description": "Under “Commits use the project’s identity” when git has no identity configured."
   },
-  "workflow.form.none": {
-    "defaultMessage": "None",
-    "description": "The version control of a project without any (glossary 2.1: None)."
+  "workflow.form.noPreset": {
+    "defaultMessage": "No preset chosen",
+    "description": "The Workflow section’s preset line when the options didn’t start from a preset (glossary 2.1: preset)."
   },
   "workflow.form.noneValue": {
     "defaultMessage": "None",
@@ -270,10 +358,6 @@
   "workflow.form.openAdvanced": {
     "defaultMessage": "Open Advanced",
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
-  },
-  "workflow.form.owned": {
-    "defaultMessage": "Set in {where}.",
-    "description": "Under a read-only row of Project Settings → Workflow (file locks, card loops): where the setting is changed. {where} is a link to it."
   },
   "workflow.form.ownedPrefix": {
     "defaultMessage": "Its own setting decides:",
@@ -303,14 +387,6 @@
     "defaultMessage": "Paste Workflow Options",
     "description": "The title of the dialog pasting workflow options as JSON."
   },
-  "workflow.form.platform": {
-    "defaultMessage": "Version control",
-    "description": "A row of Project Settings → Workflow (glossary 2.1): the project’s version control, detected, shown read-only."
-  },
-  "workflow.form.platformDesc": {
-    "defaultMessage": "Found in the project folder. The options below are this version control’s.",
-    "description": "Under the row \"Version control\" of Project Settings → Workflow."
-  },
   "workflow.form.preset": {
     "defaultMessage": "Preset",
     "description": "A row of Project Settings → Workflow (glossary 2.1: preset): one choice that fills in every option."
@@ -318,6 +394,22 @@
   "workflow.form.presetDesc": {
     "defaultMessage": "Fills in every option at once. Changing an option afterwards makes it Custom.",
     "description": "Under the row \"Preset\" of Project Settings → Workflow. Custom is a preset’s name: as translated there."
+  },
+  "workflow.form.presetsLabel": {
+    "defaultMessage": "Presets",
+    "description": "Accessible name of the list of presets in the Workflow section (glossary 2.1: preset)."
+  },
+  "workflow.form.previewChanges": {
+    "defaultMessage": "{n, plural, =0 {Nothing here changes.} one {Marked: the option it changes here.} other {Marked: the # options it changes here.}}",
+    "description": "In a preset’s preview in the Workflow section: how many of the options it sets differ from the form now (those are marked)."
+  },
+  "workflow.form.previewHead": {
+    "defaultMessage": "What {preset} sets, and why:",
+    "description": "Above the list of options a preset sets, in its preview in the Workflow section (glossary 2.1: preset). {preset} is its name."
+  },
+  "workflow.form.previewNow": {
+    "defaultMessage": "Now: {value}",
+    "description": "In a preset’s preview, beside an option it changes: its value in the form now."
   },
   "workflow.form.removeCheck": {
     "defaultMessage": "Remove",
@@ -327,9 +419,21 @@
     "defaultMessage": "Save…",
     "description": "The button saving the workflow options (it shows what changes first)."
   },
+  "workflow.form.saveBlocked": {
+    "defaultMessage": "Resolve what the options say first.",
+    "description": "The tooltip of Save… in the Workflow section while some options contradict each other (their reasons are shown under them)."
+  },
   "workflow.form.saved": {
     "defaultMessage": "Workflow options saved",
     "description": "A notification: the workflow options were saved."
+  },
+  "workflow.form.stageName": {
+    "defaultMessage": "Name of the stage {stage}",
+    "description": "Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name."
+  },
+  "workflow.form.stageNamesValue": {
+    "defaultMessage": "{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}",
+    "description": "A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage)."
   },
   "workflow.form.startedFrom": {
     "defaultMessage": "Custom, started from {preset}",
@@ -339,9 +443,41 @@
     "defaultMessage": "{preset}: {why}",
     "description": "A preset that can’t be chosen yet, under the preset choice. {preset} is its name, {why} a whole sentence saying why."
   },
+  "workflow.form.use": {
+    "defaultMessage": "Use {preset}",
+    "description": "A button in a preset’s preview: fills the form with it (saved only with Save…). {preset} is its name."
+  },
   "workflow.form.worktree": {
     "defaultMessage": "In this version, a card’s own folder is its builder’s worktree.",
     "description": "Under “Where cards are built” in Project Settings → Workflow."
+  },
+  "workflow.group.checks": {
+    "defaultMessage": "Checks",
+    "description": "A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks)."
+  },
+  "workflow.group.elsewhere": {
+    "defaultMessage": "Shown here, set elsewhere",
+    "description": "A heading of the Workflow section: settings shown for reference, each changed where its link leads."
+  },
+  "workflow.group.merging": {
+    "defaultMessage": "Merging",
+    "description": "A heading of the Workflow section (Git): the options about how and where work is merged."
+  },
+  "workflow.group.review": {
+    "defaultMessage": "Review",
+    "description": "A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work."
+  },
+  "workflow.group.stages": {
+    "defaultMessage": "Stages",
+    "description": "A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage)."
+  },
+  "workflow.group.where": {
+    "defaultMessage": "Where cards are built",
+    "description": "A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11)."
+  },
+  "workflow.group.work": {
+    "defaultMessage": "The work",
+    "description": "A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start."
   },
   "workflow.move.answer": {
     "defaultMessage": "Answer",
@@ -428,7 +564,7 @@
     "description": "A workflow option (glossary 2.6, G5)."
   },
   "workflow.option.folder.desc": {
-    "defaultMessage": "In its own folder, a card is built in its builder’s worktree, apart from other agents’ work. In the project folder, everyone sees each other’s unfinished changes.",
+    "defaultMessage": "In its own folder, a card is built apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
     "description": "What the workflow option “Where cards are built” does."
   },
   "workflow.option.folder.title": {
@@ -444,7 +580,7 @@
     "description": "A workflow option (glossary 2.6, G12)."
   },
   "workflow.option.mergeChecks.desc": {
-    "defaultMessage": "Each check is a named command. Hive’s merge queue runs them on the card’s work merged with the target branch, and moves the target only once each one has passed.",
+    "defaultMessage": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
     "description": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue)."
   },
   "workflow.option.mergeChecks.title": {
@@ -452,7 +588,7 @@
     "description": "A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch."
   },
   "workflow.option.mergeInstall.desc": {
-    "defaultMessage": "Before the checks on the merged result. A change to the lock file or the manifests always installs from scratch, whichever you choose.",
+    "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
     "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
   },
   "workflow.option.mergeInstall.title": {
@@ -476,7 +612,7 @@
     "description": "A workflow option (glossary 2.6, G10)."
   },
   "workflow.option.preChecks.desc": {
-    "defaultMessage": "Each check is a named command. A card goes to review only once each one has passed on its work.",
+    "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",
     "description": "What the workflow option “Checks pass before review” does."
   },
   "workflow.option.preChecks.title": {
@@ -484,12 +620,16 @@
     "description": "A workflow option (glossary 2.6, G3 and N3): named commands that must pass before a card goes to review."
   },
   "workflow.option.review.desc": {
-    "defaultMessage": "A card goes to Review when its builder submits it, and on once it passes. With you as well, it waits for your OK after the reviewer.",
+    "defaultMessage": "A card goes to Review when its builder submits it and moves on only once it passes, waiting for your OK after the reviewer when you check too.",
     "description": "What the workflow option “Work is reviewed before it’s merged” does."
   },
   "workflow.option.review.none": {
     "defaultMessage": "Who checks the work before it’s done",
     "description": "A workflow option for a project without version control (glossary 2.6, N1)."
+  },
+  "workflow.option.review.shared": {
+    "defaultMessage": "Work is reviewed before it’s done",
+    "description": "The workflow option G1 when everyone works in the project folder, where the work is on the target meanwhile (glossary 2.6, G1 shared folder)."
   },
   "workflow.option.review.title": {
     "defaultMessage": "Work is reviewed before it’s merged",
@@ -504,7 +644,7 @@
     "description": "A workflow option (glossary 2.6, G1b): how many reviewer agents must pass a card."
   },
   "workflow.option.sameness.desc": {
-    "defaultMessage": "With the same change, a pass still counts after the work is moved onto newer commits without changing it.",
+    "defaultMessage": "With Same change, a pass carries over to a clean rebase or squash of the same change; with Exact revision only, any new revision makes it stale.",
     "description": "What the workflow option “A pass survives a clean rebase” does."
   },
   "workflow.option.sameness.title": {
@@ -512,7 +652,7 @@
     "description": "A workflow option (glossary 2.6, G4)."
   },
   "workflow.option.sharedFolderWarning.desc": {
-    "defaultMessage": "In the project folder, a submit warns when its commit takes in files another agent is editing. It never refuses.",
+    "defaultMessage": "A submit warns, never refuses, when its commit takes in files another agent is editing in the project folder.",
     "description": "What the workflow option “Warn when a commit includes another agent’s files” does."
   },
   "workflow.option.sharedFolderWarning.title": {
@@ -520,7 +660,7 @@
     "description": "A workflow option (glossary 2.6, G16)."
   },
   "workflow.option.stageNames.desc": {
-    "defaultMessage": "Rename any stage the board shows. A name is only a name: renaming a stage changes no rule and applies at once.",
+    "defaultMessage": "Rename any stage the board shows: a name changes no rule and applies at once.",
     "description": "What the workflow option “Stage names” does (glossary 2.2: stage)."
   },
   "workflow.option.stageNames.title": {
@@ -536,7 +676,7 @@
     "description": "A workflow option (glossary 2.6, G13)."
   },
   "workflow.option.strict.desc": {
-    "defaultMessage": "When the target branch has moved on since the review, Hive’s merge queue merges it into the card’s work (or rebases the work, with the Squash merge style) in its own folder, never on the builder’s branch. The review still counts if the result is the same change; if not, or if it conflicts, the card goes back to its builder.",
+    "defaultMessage": "When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.",
     "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
   },
   "workflow.option.strict.title": {
@@ -552,7 +692,7 @@
     "description": "A workflow option (glossary 2.6, G6)."
   },
   "workflow.option.target.desc": {
-    "defaultMessage": "The target branch. Left empty, the repository’s default branch.",
+    "defaultMessage": "The branch a card’s work is merged into: the repository’s default branch when left empty.",
     "description": "What the workflow option “Work merges into” does."
   },
   "workflow.option.target.title": {
@@ -1171,6 +1311,34 @@
     "defaultMessage": "The name of {stage} is longer than {max, number} characters.",
     "description": "Why workflow options cannot be saved: a stage’s name is too long. {stage} is the stage’s default name (glossary 2.2), {max} the most characters it takes."
   },
+  "workflow.summary.git.pair": {
+    "defaultMessage": "A reviewer agent passes each card, then Hive’s merge queue merges it once the checks pass on the merged result.",
+    "description": "What the Pair preset sets up, for a Git project (glossary 2.1: Pair, merge queue)."
+  },
+  "workflow.summary.git.pairAgent": {
+    "defaultMessage": "A reviewer agent passes each card, then its builder merges it and Hive checks the work is in the target.",
+    "description": "What the preset “Pair (the agent merges)” sets up (glossary 2.1: Pair)."
+  },
+  "workflow.summary.git.solo": {
+    "defaultMessage": "Everyone in the project folder, no review: a card is done once it’s committed.",
+    "description": "What the Solo preset sets up, for a Git project (glossary 2.1: Solo)."
+  },
+  "workflow.summary.git.team": {
+    "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
+    "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
+  },
+  "workflow.summary.none.pair": {
+    "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",
+    "description": "What the Pair preset sets up, for a project without version control."
+  },
+  "workflow.summary.none.solo": {
+    "defaultMessage": "No review: a card is done when its builder submits it.",
+    "description": "What the Solo preset sets up, for a project without version control."
+  },
+  "workflow.summary.none.team": {
+    "defaultMessage": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
+    "description": "What the Team preset sets up, for a project without version control."
+  },
   "workflow.unreadable.branch": {
     "defaultMessage": "the branch checked out in {folder}",
     "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
@@ -1378,5 +1546,77 @@
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.why.dependenciesDone": {
+    "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",
+    "description": "Why every preset turns on “Cards start only when the cards they wait for are merged” (or done)."
+  },
+  "workflow.why.excluded": {
+    "defaultMessage": "Dependencies and build output aren’t part of what a card delivers.",
+    "description": "Why the presets leave node_modules and .venv out of “What the work is” (no version control)."
+  },
+  "workflow.why.finish": {
+    "defaultMessage": "Merged through Hive’s queue, red work never reaches the target branch; working solo, a card is done once it’s committed.",
+    "description": "Why the presets set “Who merges” as they do (glossary 2.1: merge queue)."
+  },
+  "workflow.why.folder": {
+    "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",
+    "description": "Why the presets set “Where cards are built” as they do (Solo: the project folder)."
+  },
+  "workflow.why.identity": {
+    "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",
+    "description": "Why Pair and Team turn on “Commits use the project’s identity”."
+  },
+  "workflow.why.mergeChecks": {
+    "defaultMessage": "The checks run on the work as it will be once merged, not only as it was built.",
+    "description": "Why the presets set “Checks pass on the merged result” when Hive merges."
+  },
+  "workflow.why.mergeInstall": {
+    "defaultMessage": "A clean install before every merge catches a dependency that only worked on the builder’s machine.",
+    "description": "Why Team installs dependencies from scratch before every merge."
+  },
+  "workflow.why.noSelfReview": {
+    "defaultMessage": "A builder never passes its own work.",
+    "description": "Why the presets turn on “Nobody reviews their own work” wherever there is a reviewer."
+  },
+  "workflow.why.okBefore": {
+    "defaultMessage": "Some work needs your eyes before it ships, such as screenshots and release steps.",
+    "description": "Why Team asks for your OK on cards labelled ui or release."
+  },
+  "workflow.why.preChecks": {
+    "defaultMessage": "Cheap checks before review catch most of the rounds that would be lost, and a team adds its tests.",
+    "description": "Why the presets set “Checks pass before review” as they do (Pair: the quick checks; Team: the tests too)."
+  },
+  "workflow.why.review": {
+    "defaultMessage": "A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.",
+    "description": "Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent)."
+  },
+  "workflow.why.reviewers": {
+    "defaultMessage": "One reviewer is enough for most work; a second doubles the cost.",
+    "description": "Why the presets set “Reviewers per card” to 1."
+  },
+  "workflow.why.sameness": {
+    "defaultMessage": "A clean rebase doesn’t change what was reviewed, so the pass still counts.",
+    "description": "Why every preset sets “A pass survives a clean rebase” to Same change."
+  },
+  "workflow.why.sharedFolderWarning": {
+    "defaultMessage": "In a shared folder, one agent’s commit can take in another’s half-done files.",
+    "description": "Why Solo turns on “Warn when a commit includes another agent’s files”."
+  },
+  "workflow.why.stopOwnRuns": {
+    "defaultMessage": "A run left going would keep changing or testing the work under review.",
+    "description": "Why Pair and Team turn on “Agents stop what they started before review”."
+  },
+  "workflow.why.strict": {
+    "defaultMessage": "The merge queue tests the merged result anyway, so this mostly changes the history’s shape.",
+    "description": "Why the presets leave “Work is up to date with its target branch before it merges” off."
+  },
+  "workflow.why.style": {
+    "defaultMessage": "A merge commit keeps each card’s own commits, as Hive has always merged.",
+    "description": "Why the presets set “Merge style” to Merge commit."
+  },
+  "workflow.why.target": {
+    "defaultMessage": "Finished work goes to the repository’s default branch; working solo, to the branch the project is on.",
+    "description": "Why the presets set “Work merges into” as they do."
   }
 }

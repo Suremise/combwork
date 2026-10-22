@@ -22,6 +22,7 @@ import { cardsInFlight } from './optionsForm'
 import { workflowFor } from './service'
 import { queueChanged } from './queueHost'
 import { workflowChanged } from './rulesets'
+import { workflowWrite } from './writes'
 
 const log = createLogger('workflow')
 
@@ -77,7 +78,12 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
  * the caller's authority, checked again under the lock (the Assistant's Control). Nothing in flight changes. Returns the
  * platform it was and is now.
  */
-export async function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+export function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+  // In its turn among workflow writes (#1422): an options save or a level's check never interleaves with it.
+  return workflowWrite(() => switchPlatform(ws, projectPath, raw, o))
+}
+
+async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {
   const to = platformArg(raw)
   const expected = o.expected === undefined || o.expected === null ? null : platformArg(o.expected)
   const project = projectOf(ws, projectPath)

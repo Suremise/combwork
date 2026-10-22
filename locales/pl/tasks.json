@@ -134,6 +134,7 @@
   "tasks.history.watchEnded": "Zakończono obserwowanie karty przez agenta {watcher}: {why, select, blocked {karta jest zablokowana} reviewer {recenzuje ją agent {agent}} reviewTaken {odebrano mu recenzję} reassigned {przekazano ją agentowi {agent}} unassigned {nie ma już agenta} other {{why}}}",
   "tasks.skipped.movedColumn": "przeniesiona do kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {W toku} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.skipped.movedProject": "przeniesiona do innego projektu",
+  "tasks.skipped.movedStage": "przeniesiona do etapu {stage}",
   "tasks.skipped.noMatch": "nie pasuje już do wyszukiwania",
   "tasks.skipped.unreadable": "nie dało się jej odczytać",
   "tasks.skipped.unsaved": "nie dało się jej zapisać",

@@ -6,7 +6,7 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, ownsTarget, subfolderNeedsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, ownsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
@@ -125,8 +125,7 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   // A project inside a larger repository (OP-29, #1419): Hive's or the agent's merges only into a branch it names itself.
   const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [
-    ...contradictions(options).map((id) => ({ kind: 'contradiction' as const, id })),
-    ...(subfolderNeedsTarget(options, own.set, subfolder) ? [{ kind: 'contradiction' as const, id: 'subfolderTarget' as const }] : []),
+    ...contradictions(options, { subfolder }).map((id) => ({ kind: 'contradiction' as const, id })),
     ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id })),
     // Each stage's name (N5) against every other's, in English and in the language Hive shows.
     ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))
@@ -165,4 +164,23 @@ export function resolveLogged(project: string, platform: PlatformId, levels: Opt
  */
 export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>): ResolvedOptions {
   return resolveLogged(projectPath, platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: cfg.workflow?.options })
+}
+
+/**
+ * Each project's ruleset now (its id, from its options in force, not stored: a read), by its folder name in lower case:
+ * what a card's or a lane's own ruleset is compared with for its old rules mark (#1421). A project whose version control
+ * isn't recorded, or whose config can't be read, has none (no mark).
+ */
+export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const p of ws.info()?.projects ?? []) {
+    if (!p.platform) continue
+    try {
+      const c = compile(resolvedOf(ws, p.path, p.platform.id, await ws.projectConfig(p.path)).options)
+      if (c.ok) out.set(p.name.toLowerCase(), c.ruleset.id)
+    } catch (e) {
+      log.warn(`the ruleset now of ${userText(p.name)}`, e)
+    }
+  }
+  return out
 }

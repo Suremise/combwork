@@ -311,6 +311,10 @@
     "defaultMessage": "Expand {card}",
     "description": "Tooltip on the chevron of a card folded to one line: shows it in full. {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
+  "board.card.stageInProject": {
+    "defaultMessage": "In {project}, this stage is {stage}",
+    "description": "Tooltip on a card's project name on the board when its project names the card's stage differently from the column's heading (glossary 2.2: stage). {project} is the project, {stage} its own name for the stage."
+  },
   "board.card.stalled": {
     "defaultMessage": "Stalled: {why}",
     "description": "On a stalled card (and its tooltip when folded): nobody is getting on with it, and why ({why}, a sentence)."
@@ -430,6 +434,10 @@
   "board.columns.expandTip": {
     "defaultMessage": "Expand {column}: {description}",
     "description": "Tooltip on a collapsed board column's strip: expands it. {column} is its name, {description} what the column is for."
+  },
+  "board.columns.mergingTip": {
+    "defaultMessage": "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.",
+    "description": "The Merging column's description (its hover; glossary 2.2: Merging, a stage inside Approved). Remove from queue is the button on the card's Work section and in the Progress panel."
   },
   "board.columns.more": {
     "defaultMessage": "{column}: more",
@@ -1459,6 +1467,10 @@
     "defaultMessage": "{card} · not on the board",
     "description": "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its name: its key, such as AM-12, or #12 for a card with none."
   },
+  "board.lane.oldRules": {
+    "defaultMessage": "Old rules: this card started under the workflow options from before they changed, and keeps them until it’s Done.{enforced, select, no { Workflow rules aren’t enforced now.} other {}}",
+    "description": "A line in a lane segment's hover and accessible name (Progress panel), with its old rules mark: the card's project's workflow options changed while it was in flight, and it keeps the ones it started with until it is Done (unless they are applied to it). enforced no: the switch \"Workflow rules are enforced\" is off. Keep the select keys. Glossary: workflow options."
+  },
   "board.lane.openForMore": {
     "defaultMessage": "Click to open the card for the rest",
     "description": "The last line of a lane segment's hover (Progress panel), under what its facts say: clicking the segment opens the card, which shows everything."
@@ -1679,6 +1691,22 @@
     "defaultMessage": "{card}'s latest run: {run}, {state, select, running {running} passed {passed} failed {failed} other {stopped}}",
     "description": "Tooltip and accessible name of the dot after a lane's current card (Progress panel): that card's latest run ({run}: its title) and how it is going or went. Keep the select keys."
   },
+  "board.lanes.legendButton": {
+    "defaultMessage": "Legend",
+    "description": "A button in the Progress panel's Lanes tab: its hover and focus show what a lane's colours and patterns mean (the board's stages, by category)."
+  },
+  "board.lanes.legendHold": {
+    "defaultMessage": "{category} or blocked",
+    "description": "A line of the lanes' legend (Progress panel): the red hatching is a card On Hold ({category}: that category's name) or blocked."
+  },
+  "board.lanes.legendLine": {
+    "defaultMessage": "{category}: {stages}",
+    "description": "A line of the lanes' legend for screen readers (Progress panel): a category ({category}: its name, such as Approved) and the stages in it ({stages}: their names, a list, such as \"Approved and Merging\"). Glossary: stage, category."
+  },
+  "board.lanes.legendTitle": {
+    "defaultMessage": "Each colour is a category, with the stages in it",
+    "description": "The heading of the lanes' legend (Progress panel, on the Lanes bar's hover): what each colour and pattern of a lane's card segments means, by the board's categories and the stages in them. Glossary: stage, category."
+  },
   "board.lanes.moveDown": {
     "defaultMessage": "Move Down",
     "description": "A lane's context menu item in the Progress panel: moves it down among the running lanes."
@@ -1694,6 +1722,18 @@
   "board.lanes.none": {
     "defaultMessage": "No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.",
     "description": "The Progress panel's Lanes tab when there are no lanes. Glossary: lane."
+  },
+  "board.lanes.oldRules": {
+    "defaultMessage": "old rules",
+    "description": "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options."
+  },
+  "board.lanes.oldRulesTip": {
+    "defaultMessage": "Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.{enforced, select, no { Workflow rules aren’t enforced now (Settings → Advanced).} other {}}",
+    "description": "Tooltip and accessible name of a lane's \"old rules\" mark (Progress panel): the project's workflow options changed while the lane ran; it keeps the ones it started with until it ends. enforced no: the switch \"Workflow rules are enforced\" (Settings → Advanced) is off. Keep the select keys. Glossary: lane, workflow options."
+  },
+  "board.lanes.projectLink": {
+    "defaultMessage": "{project}: open its workflow in Version Control",
+    "description": "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name."
   },
   "board.lanes.show": {
     "defaultMessage": "Show the lanes",
@@ -3218,5 +3258,9 @@
   "board.workQueue.unreadRef": {
     "defaultMessage": "not read",
     "description": "In the card dialog's Work section: where the branch points couldn't be read."
+  },
+  "board.workflows": {
+    "defaultMessage": "Workflows",
+    "description": "A button in the board's toolbar when it shows several projects: opens a list of each project's workflow (glossary 2.1: workflow), each opening that project's Version Control tab."
   }
 }

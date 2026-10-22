@@ -30,8 +30,9 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 
-/** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
-export const APPLY_OPTIONS = 'applyOptions'
+import { ownRuleset } from '../../shared/workflow/workView'
+
+export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
 export interface Moved {
   ok: true
@@ -346,12 +347,8 @@ export class Workflow {
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
     // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
     // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
-    if (s.started && s.stage !== 'todo') {
-      const facts = this.store.facts(card.id)
-      const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
-      const f = applied ?? facts.find((x) => x.seq === s.cycle)
-      if (f?.ruleset) return this.store.ruleset(f.ruleset)
-    }
+    const own = s.started && s.stage !== 'todo' ? ownRuleset(this.store.facts(card.id), s) : null
+    if (own) return this.store.ruleset(own)
     if (card.lane) {
       const lane = this.lane(card.lane)
       if (lane && !lane.ended && lane.ruleset) return this.store.ruleset(lane.ruleset)
