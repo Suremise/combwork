@@ -210,6 +210,8 @@
   "tips.memorySnapshot.title": "O Hive fechou por falta de memória?",
   "tips.mergeQueueFolder.text": "Quando a fila de merge faz o merge em um branch em checkout numa pasta (o main na pasta do projeto), ela também atualiza a pasta, mas pausa em vez de mexer num arquivo que você está mudando. Em Configurações → Avançado ela pode perguntar antes em Para você.",
   "tips.mergeQueueFolder.title": "Merge na pasta em que você trabalha",
+  "tips.mergeQueuePanel.text": "A aba Merges do painel de progresso mostra cada fila de merge: o cartão que ela está testando e quanto tempo suas verificações costumam levar, os cartões aguardando e um cartão que ela devolveu, até você vê-lo. Pausar a fila e Retomar a fila também estão lá.",
+  "tips.mergeQueuePanel.title": "Acompanhe a fila de merge",
   "tips.mergeSlot.text": "Quando vários agentes terminam ao mesmo tempo, cada um pega a vez de merge do projeto antes de trazer a main, verificar e fazer merge, para que ninguém precise rodar as verificações duas vezes. Quem está com a vez e quem espera aparecem na Visão geral e no painel Progresso.",
   "tips.mergeSlot.title": "Os agentes se revezam para fazer merge",
   "tips.mergeStrict.text": "Quando o Hive faz o merge, Configurações do projeto → Fluxo de trabalho pode exigir que o trabalho esteja atualizado com o destino antes do merge: a fila de merge atualiza o cartão na própria pasta, nunca no branch do executor, e a revisão continua valendo se for a mesma mudança.",

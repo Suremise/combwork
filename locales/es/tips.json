@@ -210,6 +210,8 @@
   "tips.memorySnapshot.title": "¿Hive se cerró por quedarse sin memoria?",
   "tips.mergeQueueFolder.text": "Cuando la cola de fusión fusiona en una rama activa en una carpeta (main en la carpeta del proyecto), también actualiza la carpeta, pero se pausa en vez de tocar un archivo que estás cambiando. En Configuración → Avanzado puedes hacer que antes te pregunte en Para ti.",
   "tips.mergeQueueFolder.title": "Fusionar en la carpeta en la que trabajas",
+  "tips.mergeQueuePanel.text": "La pestaña Fusiones del panel de progreso muestra cada cola de fusión: la tarjeta que está probando y cuánto suelen tardar sus comprobaciones, las tarjetas que esperan y una tarjeta que devolvió, hasta que la hayas visto. Pausar la cola y Reanudar la cola también están ahí.",
+  "tips.mergeQueuePanel.title": "Sigue la cola de fusión",
   "tips.mergeSlot.text": "Cuando varios agentes terminan a la vez, cada uno toma el turno de fusión del proyecto antes de fusionar main en su rama, comprobar y fusionar, para que nadie tenga que repetir sus comprobaciones. Quién lo tiene y quién espera se ve en Resumen y en el panel Progreso.",
   "tips.mergeSlot.title": "Los agentes fusionan por turnos",
   "tips.mergeStrict.text": "Si Hive fusiona, Configuración del proyecto → Flujo de trabajo puede pedir que el trabajo esté al día con su destino antes de fusionarse: la cola de fusión actualiza la tarjeta en su propia carpeta, nunca en la rama del autor, y la revisión sigue valiendo si es el mismo cambio.",

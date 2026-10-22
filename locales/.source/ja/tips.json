@@ -210,6 +210,8 @@
   "tips.memorySnapshot.title": "Hive closed running out of memory?",
   "tips.mergeQueueFolder.text": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
   "tips.mergeQueueFolder.title": "Merging into the folder you work in",
+  "tips.mergeQueuePanel.text": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",
+  "tips.mergeQueuePanel.title": "Watch the merge queue",
   "tips.mergeSlot.text": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
   "tips.mergeSlot.title": "Agents take turns to merge",
   "tips.mergeStrict.text": "With Hive merging, Project Settings → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
