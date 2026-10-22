@@ -96,7 +96,7 @@ const TARGET = 'integration'
     // --- GET /v1/queue for a project agent; an agent's and a script's pause refused.
     const listed = await api(reviewer.token, 'GET', '/v1/queue')
     const qv = listed.body?.[0]
-    check('GET /v1/queue (a project agent, its own project): the queue, lean', listed.status === 200 && qv?.project === 'alpha' && qv.target === TARGET && qv.paused === null && Array.isArray(qv.queued) && qv.recent?.length >= 3 && !('projectPath' in qv) && qv.recent.every((r) => !('log' in r)) && qv.recent.some((r) => r.hasLog === true), JSON.stringify(listed.body).slice(0, 600))
+    check('GET /v1/queue (a project agent, its own project): the queue, lean', listed.status === 200 && qv?.project === 'alpha' && qv.target === TARGET && qv.paused === null && Array.isArray(qv.queued) && qv.recent?.length >= 3 && !('projectPath' in qv) && !('returns' in qv) && !('returnsMore' in qv) && !('inFlight' in qv) && qv.recent.every((r) => !('log' in r)) && qv.recent.some((r) => r.hasLog === true), JSON.stringify(listed.body).slice(0, 600))
     const agentPause = await api(reviewer.token, 'POST', '/v1/queue/pause', { target: TARGET })
     check("an agent's pause is refused (403), saying whose it is", agentPause.status === 403 && /user/.test(agentPause.body?.error ?? '') && (await view()).paused === null, JSON.stringify(agentPause.body))
     const apiToken = JSON.parse(fs.readFileSync(path.join(fx.userData, 'agent-api.json'), 'utf8')).token

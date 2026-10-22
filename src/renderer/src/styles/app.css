@@ -10505,6 +10505,148 @@ button.progress-run-show:focus-visible {
 .progress-merge-time.late {
   color: var(--warning);
 }
+/* The Merges tab (#1356): the merge queues' cards and the merge slot's side by side, the whole tab's height. */
+.progress-merge.full {
+  max-height: none;
+  padding-bottom: 8px;
+}
+/* A merge queue's card (#1356): what it tests, what waits, a merge just made, a return until seen, a pause. Each state
+   has its icon and words; colour is never the only cue. */
+.progress-queue-card.paused {
+  border-color: var(--warning);
+}
+.progress-queue-line,
+.progress-queue-row,
+.progress-queue-paused,
+.progress-queue-merged {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.progress-queue-line > .codicon,
+.progress-queue-row > .codicon,
+.progress-queue-paused > .codicon,
+.progress-queue-merged > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.progress-queue-icon {
+  color: var(--merge-ink);
+}
+.progress-queue-text {
+  min-width: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.progress-queue-paused {
+  flex-wrap: wrap;
+}
+.progress-queue-paused > .codicon {
+  color: var(--warning);
+}
+.progress-queue-paused .progress-queue-text {
+  flex: 1 1 160px;
+}
+.progress-queue-merged > .codicon {
+  color: var(--success);
+}
+.progress-queue-row > .codicon-error {
+  color: var(--error);
+}
+.progress-queue-list {
+  margin: 2px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+}
+.progress-queue-list > li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+}
+.progress-queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-remove {
+  flex-shrink: 0;
+}
+.progress-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0 18px;
+}
+.progress-queue-log {
+  margin: 4px 0 0 18px;
+  padding: 6px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.progress-queue-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--merge-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-queue-link:hover {
+  text-decoration: underline;
+}
+/* Pulse's line per merge queue testing or paused (#1356): a click shows the Merges tab. */
+.progress-queue-lines {
+  padding: 6px 8px 0;
+}
+.progress-queue-pulse {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--merge) 45%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--merge) 9%, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+}
+.progress-queue-pulse + .progress-queue-pulse {
+  margin-top: 4px;
+}
+.progress-queue-pulse > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-pulse.paused {
+  border-color: var(--warning);
+}
+.progress-queue-pulse.paused > .codicon:first-child {
+  color: var(--warning);
+}
 .progress-divider {
   flex-shrink: 0;
   height: 1px;
