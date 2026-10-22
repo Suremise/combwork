@@ -614,7 +614,7 @@
   "board.stall.hintReviewVerdict": "O revisor parou sem um veredito e está esperando o cartão. Leia o último comentário dele (pode ter uma pergunta para você), depois mostre o revisor e peça que termine a revisão.",
   "board.stall.hintReviewWait": "A observação do revisor não o acordou. Mostre o revisor e peça que revise o cartão.",
   "board.stall.hintWakeUntaken": "O Hive digitou o despertar deste cartão nesse agente, mas a CLI dele não o enviou. Mostre o agente, clique no terminal dele e pressione Enter.",
-  "board.stalled.laneOrderWait": "O agente {reviewer} está esperando {other}, não {card}, enquanto o agente {builder} espera a revisão de {card}: um espera pelo outro. Em Revisão há {waited}.",
+  "board.stalled.laneOrderWait": "O agente {reviewer} está esperando {other}, antes de {card} na raia, enquanto o agente {builder} espera a revisão de {card}: um espera pelo outro há {waited}.",
   "board.stalled.noAgent": "Em Fazendo, mas nenhum agente está com ele.",
   "board.stalled.notRunning": "O agente {agent} não está em execução.",
   "board.stalled.notWatching": "O agente {agent} não está observando {card}: o turno terminou sem uma observação de cartão.",

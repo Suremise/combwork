@@ -1292,7 +1292,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     const cards: LaneNow['cards'] = []
     const changed: { mark: LaneMark['cards'][string]; updatedAt?: string }[] = []
     // A running lane's deadlock (#1410): its reviewer waiting for one of its cards while its builder waits on another.
-    const order = l.state === 'active' || l.state === 'paused' ? laneOrderView(l, (n) => byNumber.get(n)?.key) : null
+    const order = l.state === 'active' || l.state === 'paused' ? laneOrderView(l, (n) => byNumber.get(n)) : null
     for (const lc of l.cards) {
       const found = byNumber.get(lc.number)
       // A card moved to another project is gone from the lane.

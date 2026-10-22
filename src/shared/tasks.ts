@@ -286,37 +286,50 @@ export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column'
 export interface LaneOrderView {
   builder: string
   reviewer: string | null
-  cards: { number: number; column: string; key?: string }[]
+  /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
+  cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
+}
+
+/** When a card last came into its column (moved, created or returned for review), ISO; null if its history doesn't say. */
+export function columnSince(card: Pick<TaskCard, 'history'>): string | null {
+  return card.history.findLast((h) => /^(Moved to\b|Created in\b|Returned for review\b)/.test(h.what))?.at ?? null
 }
 
 /**
  * The card of its lane its reviewer waits for instead of this one (#1410), and the two agents' watches, when the lane is
- * deadlocked: the card is in Review, unreviewed and not blocked, for REVIEW_WAIT_STALL_MS; its builder watches it for
- * its verdict; and the lane's reviewer has only been watching (its turn ended) other cards of the lane, one of them
- * still to come to Review, in Todo or Doing (on 22 Oct HB2 sent #1364 ahead of #1344, HR2 kept the lane's order and waited for #1344, and each
- * waited on the other for five hours, unflagged). Null otherwise.
+ * deadlocked: the card is in Review, unreviewed and not blocked; its builder is only watching it for its verdict (its
+ * turn ended); the lane's reviewer is only watching cards of the lane that leave this one out, one of them before it in
+ * the lane's order and still to come to Review (Todo or Doing); and all of that has held for REVIEW_WAIT_STALL_MS: since
+ * the latest of the card's arrival in Review, the other card's last move and each watch's start. On 22 Oct HB2 sent
+ * #1364 ahead of #1344, HR2 kept the lane's order and waited for #1344, and each waited on the other for five hours,
+ * unflagged. Null otherwise.
  */
-export function laneOrderWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked' | 'history'>, lane: LaneOrderView | null | undefined, watchers: W[], now = Date.now()): { reviewer: W; builder: W; waitsFor: LaneOrderView['cards'][number]; ms: number } | null {
+export function laneOrderWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked' | 'history'>, lane: LaneOrderView | null | undefined, watchers: W[], now = Date.now()): { reviewer: W; builder: W; waitsFor: LaneOrderView['cards'][number]; ms: number } | null {
   if (!lane?.reviewer || lane.reviewer === lane.builder || card.archived || card.column !== 'review' || card.review || card.blocked) return null
+  const at = lane.cards.findIndex((c) => c.number === card.number)
   const since = inReviewSince(card)
-  const ms = since ? now - Date.parse(since) : NaN
-  if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
+  if (at < 0 || !since) return null
   const mine = (w: W): boolean => w.project.toLowerCase() === card.project.toLowerCase()
   const reviewer = watchers.find((w) => mine(w) && w.agentId === lane.reviewer && w.status === 'watching')
-  const builder = watchers.find((w) => mine(w) && w.agentId === lane.builder && w.cards.includes(card.number))
+  const builder = watchers.find((w) => mine(w) && w.agentId === lane.builder && w.status === 'watching' && w.cards.includes(card.number))
   if (!reviewer || !builder || reviewer.cards.includes(card.number)) return null
-  const waitsFor = lane.cards.find((c) => c.number !== card.number && (c.column === 'todo' || c.column === 'doing') && reviewer.cards.includes(c.number))
-  return waitsFor ? { reviewer, builder, waitsFor, ms } : null
+  const waitsFor = lane.cards.slice(0, at).find((c) => (c.column === 'todo' || c.column === 'doing') && reviewer.cards.includes(c.number))
+  if (!waitsFor) return null
+  // Each time must be known: one missing never makes the wait look older than it is.
+  const times = [since, waitsFor.movedAt, reviewer.watchSince, builder.watchSince].map((t) => Date.parse(t ?? ''))
+  if (!times.every(Number.isFinite)) return null
+  const ms = now - Math.max(...times)
+  return ms >= REVIEW_WAIT_STALL_MS ? { reviewer, builder, waitsFor, ms } : null
 }
 
 /** Why a card is stalled by its lane's deadlock (laneOrderWait), in the window's language with tr, else English. Null when it isn't. */
-export function laneOrderWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked' | 'history'>, lane: LaneOrderView | null | undefined, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string }[], now = Date.now(), tr?: Tr): string | null {
+export function laneOrderWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked' | 'history'>, lane: LaneOrderView | null | undefined, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }[], now = Date.now(), tr?: Tr): string | null {
   const d = laneOrderWait(card, lane, watchers, now)
   if (!d) return null
   const min = Math.round(d.ms / 60_000)
   const other = d.waitsFor
-  if (tr) return tr(msg({ id: 'board.stalled.laneOrderWait', defaultMessage: '{reviewer} is waiting for {other}, not {card}, while {builder} waits on the review of {card}: each waits on the other. In Review for {waited}.', description: "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card of the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), { reviewer: d.reviewer.name, builder: d.builder.name, card: cardLabel(card), other: cardLabel(other), waited: durationText(min * 60_000, tr) })
-  return `${d.reviewer.name} is waiting for ${cardName(other)}, not ${cardName(card)}, while ${d.builder.name} waits on the review of ${cardName(card)}: each waits on the other. In Review for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (tr) return tr(msg({ id: 'board.stalled.laneOrderWait', defaultMessage: '{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.', description: "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card that comes before this one in the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long both have been waiting so (\"40 min\", \"2 h 5 min\")." }), { reviewer: d.reviewer.name, builder: d.builder.name, card: cardLabel(card), other: cardLabel(other), waited: durationText(min * 60_000, tr) })
+  return `${d.reviewer.name} is waiting for ${cardName(other)}, before ${cardName(card)} in the lane, while ${d.builder.name} waits on the review of ${cardName(card)}: each has waited on the other for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /**

@@ -614,7 +614,7 @@
   "board.stall.hintReviewVerdict": "它的评审者没有给出结论就停了下来，正在等待这张卡片。先阅读它的最新评论（可能有问题要问你），然后显示评审者，让它完成评审。",
   "board.stall.hintReviewWait": "监视没有唤醒它的评审者。显示评审者，让它评审这张卡片。",
   "board.stall.hintWakeUntaken": "Hive 已将此卡片的唤醒输入到该代理，但其 CLI 没有发送。显示该代理，点击其终端并按 Enter。",
-  "board.stalled.laneOrderWait": "{reviewer} 在等 {other}，而不是 {card}；{builder} 在等 {card} 的评审：双方互相等待。已在“评审”中 {waited}。",
+  "board.stalled.laneOrderWait": "{reviewer} 在等通道中排在 {card} 之前的 {other}；{builder} 在等 {card} 的评审：双方已互相等待 {waited}。",
   "board.stalled.noAgent": "在“进行中”，但没有指派智能体。",
   "board.stalled.notRunning": "{agent} 未运行。",
   "board.stalled.notWatching": "{agent} 没有监视 {card}：它的本轮结束时没有设置卡片监视。",

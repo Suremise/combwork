@@ -614,7 +614,7 @@
   "board.stall.hintReviewVerdict": "Jej recenzent zatrzymał się bez werdyktu i czeka na kartę. Przeczytaj jego ostatni komentarz (może mieć do Ciebie pytanie), a potem pokaż recenzenta i poproś, aby dokończył recenzję.",
   "board.stall.hintReviewWait": "Obserwowanie karty nie wybudziło jej recenzenta. Pokaż recenzenta i poproś, aby zrecenzował kartę.",
   "board.stall.hintWakeUntaken": "Hive wpisał wybudzenie tej karty do tego agenta, ale jego CLI go nie wysłało. Pokaż agenta, kliknij jego terminal i naciśnij Enter.",
-  "board.stalled.laneOrderWait": "{reviewer} czeka na {other}, nie na {card}, a {builder} czeka na recenzję {card}: każdy czeka na drugiego. W Recenzji od {waited}.",
+  "board.stalled.laneOrderWait": "{reviewer} czeka na {other}, która jest w torze przed {card}, a {builder} czeka na recenzję {card}: każdy czeka na drugiego od {waited}.",
   "board.stalled.noAgent": "W toku, ale nie ma jej żaden agent.",
   "board.stalled.notRunning": "{agent} nie działa.",
   "board.stalled.notWatching": "{agent} nie obserwuje {card}: tura skończyła się bez obserwowania karty.",

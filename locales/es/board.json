@@ -614,7 +614,7 @@
   "board.stall.hintReviewVerdict": "Su revisor se detuvo sin dar un veredicto y se quedó esperando la tarjeta. Lee su último comentario (puede que tenga una pregunta para ti); después muestra el revisor y pídele que termine la revisión.",
   "board.stall.hintReviewWait": "La vigilancia de su revisor no lo despertó. Muestra el revisor y pídele que revise la tarjeta.",
   "board.stall.hintWakeUntaken": "Hive escribió el aviso de esta tarjeta en ese agente, pero su CLI no lo envió. Muestra el agente, haz clic en su terminal y pulsa Intro.",
-  "board.stalled.laneOrderWait": "El agente {reviewer} espera {other}, no {card}, mientras el agente {builder} espera la revisión de {card}: cada uno espera al otro. Lleva {waited} en Revisión.",
+  "board.stalled.laneOrderWait": "El agente {reviewer} espera {other}, que va antes de {card} en el carril, mientras el agente {builder} espera la revisión de {card}: cada uno lleva {waited} esperando al otro.",
   "board.stalled.noAgent": "En curso, pero ningún agente la tiene.",
   "board.stalled.notRunning": "El agente {agent} no está en ejecución.",
   "board.stalled.notWatching": "El agente {agent} no vigila la tarjeta {card}: su turno terminó sin vigilar la tarjeta.",

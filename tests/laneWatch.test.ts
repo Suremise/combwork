@@ -645,7 +645,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     } finally {
       vi.useRealTimers()
     }
-    expect(st.told[0]).toMatch(new RegExp(`#${b} is stalled: "R1 is waiting for #${a}, not #${b}, while B1 waits on the review of #${b}: each waits on the other\\. In Review for 1[67] min\\."`))
+    expect(st.told[0]).toMatch(new RegExp(`#${b} is stalled: "R1 is waiting for #${a}, before #${b} in the lane, while B1 waits on the review of #${b}: each has waited on the other for 1[67] mi`))
     await disposeWorkspaceService(w)
   })
 

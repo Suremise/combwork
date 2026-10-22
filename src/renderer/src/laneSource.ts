@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { panelOrder } from '@shared/laneBar'
-import type { LaneOrderView } from '@shared/tasks'
+import { columnSince, type LaneOrderView } from '@shared/tasks'
 import type { LaneCard, LaneInfo, TaskCard } from '@shared/types'
 import { call } from './api'
 import { get, set, useStore } from './store'
@@ -96,7 +96,7 @@ export function useLanes(load = true): Lane[] {
 
 /**
  * A card's running lane as the stall check reads it (#1410: the lane's deadlock), from the lanes loaded now (useLanes
- * loads them); null when it is in none. Its cards' places as the board has them now, and their keys.
+ * loads them); null when it is in none. Its cards' places as the board has them now, their keys and last moves.
  */
 export function useLaneOf(): (c: Pick<TaskCard, 'number' | 'project'>) => LaneOrderView | null {
   const raw = useStore((s) => s.lanes ?? NO_INFO)
@@ -112,7 +112,7 @@ export function useLaneOf(): (c: Pick<TaskCard, 'number' | 'project'>) => LaneOr
         reviewer: l.reviewer?.id ?? null,
         cards: l.cards.map((y) => {
           const t = byNumber.get(y.number)
-          return { number: y.number, column: t?.column ?? y.column, ...(t?.key ? { key: t.key } : {}) }
+          return { number: y.number, column: t?.column ?? y.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }
         })
       }
     }

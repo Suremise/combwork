@@ -1,7 +1,7 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { laneOrderWaitReason, notWatchingReason, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
+import { columnSince, laneOrderWaitReason, notWatchingReason, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -33,11 +33,14 @@ export function cardStall(c: TaskCard, agentNow: { name: string; running: boolea
   return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers)
 }
 
-/** A running lane as the stall check reads it (#1410), its cards' keys from `keys` where known. */
-export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; cards: { number: number; column: string }[] }, keys?: (n: number) => string | undefined): LaneOrderView => ({
+/** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
+export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
   builder: l.builder.id,
   reviewer: l.reviewer?.id ?? null,
-  cards: l.cards.map((c) => ({ number: c.number, column: c.column, ...(keys?.(c.number) ? { key: keys(c.number) } : {}) }))
+  cards: l.cards.map((c) => {
+    const t = card(c.number)
+    return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }
+  })
 })
 
 /**

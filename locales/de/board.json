@@ -614,7 +614,7 @@
   "board.stall.hintReviewVerdict": "Der Reviewer hat ohne Ergebnis gestoppt und wartet auf die Karte. Lies den letzten Kommentar (vielleicht ist eine Frage an dich dabei), zeig dann den Reviewer an und bitte ihn, das Review abzuschließen.",
   "board.stall.hintReviewWait": "Die Beobachtung hat den Reviewer nicht geweckt. Zeig den Reviewer an und bitte ihn, die Karte zu prüfen.",
   "board.stall.hintWakeUntaken": "Hive hat den Weckruf dieser Karte in den Agenten getippt, aber seine CLI hat ihn nicht gesendet. Zeig den Agenten an, klick in sein Terminal und drück Enter.",
-  "board.stalled.laneOrderWait": "Agent {reviewer} wartet auf {other}, nicht auf {card}, während Agent {builder} auf das Review von {card} wartet: Beide warten aufeinander. Seit {waited} in Review.",
+  "board.stalled.laneOrderWait": "Agent {reviewer} wartet auf {other}, das in der Lane vor {card} kommt, während Agent {builder} auf das Review von {card} wartet: Beide warten seit {waited} aufeinander.",
   "board.stalled.noAgent": "In Arbeit, aber kein Agent hat die Karte.",
   "board.stalled.notRunning": "Agent {agent} läuft nicht.",
   "board.stalled.notWatching": "Agent {agent} beobachtet {card} nicht: Der Durchgang endete ohne Kartenbeobachtung.",

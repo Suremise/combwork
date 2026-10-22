@@ -2065,6 +2065,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const { number, title, decisions, held: _held, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
+  const inLane = lane ? new Map((await tasks.allTasks(workspace, { numbers: lane.cards.map((x) => x.number) }).catch(() => [])).map((x) => [x.number, x])) : null
   const view: Omit<TaskView, 'stage'> = {
     number,
     title,
@@ -2075,7 +2076,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410).
-    stalled: cardStall(c, now, workspace.path, lane ? laneOrderView(lane) : null)
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null)
   }
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
