@@ -103,7 +103,7 @@
   "workflow.option.dependenciesDone.title": "待っているカードがマージされてから開始する",
   "workflow.option.excluded.desc": "プロジェクトフォルダー全体から、これらのフォルダーとファイルを除いたものです（.hiveは常に除外）。",
   "workflow.option.excluded.title": "作業の対象",
-  "workflow.option.finish.desc": "カードが完了するタイミングです：Hive のマージキューがマージしたとき、エージェントがマージし、Hiveがマージ先ブランチで作業を確認したとき、コミットされたとき、または完了に移動されたとき。",
+  "workflow.option.finish.desc": "カードが完了するタイミングです：Hiveのマージキューがマージしたとき、エージェントがマージし、Hiveがマージ先ブランチで作業を確認したとき、コミットされたとき、または完了に移動されたとき。",
   "workflow.option.finish.title": "マージする人",
   "workflow.option.folder.desc": "専用フォルダーでは、カードはビルダーのワークツリーで、他のエージェントの作業から切り離して作業されます。プロジェクトフォルダーでは、全員が互いの未完成の変更を目にします。",
   "workflow.option.folder.title": "カードの作業場所",
