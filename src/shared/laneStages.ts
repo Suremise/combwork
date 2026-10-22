@@ -4,20 +4,24 @@
 import { columnName, type Tr } from './tasks'
 import type { ProjectStages, TaskCard } from './types'
 import type { WorkBadge } from './workflow/workView'
-import { CATEGORY_STAGE, STAGE_CATEGORY, type Category } from './workflow/facts'
+import { CATEGORY_STAGE, STAGE_CATEGORY, type Category, type StageId } from './workflow/facts'
 import { stageName, stagesShown, STAGE_ORDER } from './workflow/stages'
 import type { SegmentStage, SegmentState } from './laneBar'
 
 /**
  * The stage a card's segment names (#1421): from its facts (`WorkBadge.stage`, under its own ruleset), else its column's;
- * a badge read before the card's last move (its stage in another category) gives way to the column. `project`: its
- * project's stages and names (`workflow:stages`); without them, the stage's own name and no divided line.
+ * a badge read before the card's last move (its stage in another category) gives way to the column. Its category's
+ * stages are those of the rules it works under (HR4's round 1: §16.5.4, a card keeps its own ruleset's stages): its
+ * own (`WorkBadge.stages`, in flight), else `lane`'s (a lane's recorded ruleset, for its cards in Todo), else its
+ * project's now. Names are the project's now (`project.names`: names aren't rules). Without any, the stage's own name
+ * and no divided line.
  */
-export function segmentStage(card: Pick<TaskCard, 'column'>, badge: Pick<WorkBadge, 'stage'> | undefined, project: Pick<ProjectStages, 'stages' | 'names'> | undefined, tr: Tr): SegmentStage {
+export function segmentStage(card: Pick<TaskCard, 'column'>, badge: (Pick<WorkBadge, 'stage'> & Partial<Pick<WorkBadge, 'stages'>>) | undefined, project: Pick<ProjectStages, 'stages' | 'names'> | undefined, tr: Tr, lane?: readonly StageId[] | null): SegmentStage {
   const column = card.column as Category
   const id = badge && STAGE_CATEGORY[badge.stage] === column ? badge.stage : CATEGORY_STAGE[column]
   const names = project?.names
-  const category = project ? stagesShown(project, [id], names, tr).filter((s) => s.category === column).map((s) => ({ id: s.id, name: s.name })) : []
+  const own = badge?.stages ?? lane ?? project?.stages.map((s) => s.id) ?? null
+  const category = own ? stagesShown({ stages: own.map((s) => ({ id: s })) }, [id], names, tr).filter((s) => s.category === column).map((s) => ({ id: s.id, name: s.name })) : []
   return { id, name: stageName(id, names, tr), renamed: !!names?.[id], category }
 }
 
@@ -36,9 +40,32 @@ export interface LegendGroup {
 }
 
 /**
+ * What the legend lists (HR4's #1421 round 1): the stages the lanes shown actually have, each set by its project's names
+ * now: a running lane's own (its recorded ruleset's, under old rules too), else its project's now; and each of its live
+ * cards' own (`WorkBadge.stages`: a card keeps its ruleset's). An ended lane shows its cards as they were, by its
+ * project's stages now.
+ */
+export function legendSources(lanes: readonly { project: string; stages: readonly StageId[] | null; cards: readonly number[]; frozen: unknown }[], projectOf: (project: string) => Pick<ProjectStages, 'stages' | 'names'> | undefined, badges: ReadonlyMap<number, Pick<WorkBadge, 'stages'>>): Pick<ProjectStages, 'stages' | 'names'>[] {
+  const out: Pick<ProjectStages, 'stages' | 'names'>[] = []
+  const of = (ids: readonly StageId[]) => ids.map((id) => ({ id, category: STAGE_CATEGORY[id] }))
+  for (const l of lanes) {
+    const p = projectOf(l.project)
+    const names = p?.names ?? {}
+    const own = !l.frozen && l.stages ? of(l.stages) : p?.stages
+    if (own) out.push({ stages: own, names })
+    if (l.frozen) continue
+    for (const n of l.cards) {
+      const s = badges.get(n)?.stages
+      if (s) out.push({ stages: of(s), names })
+    }
+  }
+  return out
+}
+
+/**
  * The lanes' legend (#1421, the Lanes bar's hover): by category, in the order lanes go, each with its colour and pattern
- * and the stages in it that the projects shown produce, by their names (renames included, each name once). A category
- * whose only stage has its own name lists none; a project's stages none (not known): its categories' default stages.
+ * and the stages in it of the lanes shown (`legendSources`), by their names (renames included, each name once). A
+ * category whose only stage has its own name lists none; none known: its categories alone.
  */
 export function laneLegend(projects: readonly Pick<ProjectStages, 'stages' | 'names'>[], tr: Tr): LegendGroup[] {
   const shown = new Map<Category, string[]>()

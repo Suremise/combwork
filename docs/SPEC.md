@@ -2965,10 +2965,14 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   - A segment keeps its category's colour and pattern (no stage gets one of its own). Its hover and accessible name
     say the card's **stage** (`WorkBadge.stage` through `stageName`, with its project's renames from
     `workflow:stages`). Where its category shows two stages (Approved and Merging), its hover lists both with a thin
-    divider and the card's own in bold.
+    divider and the card's own in bold. A card's category's stages are its own ruleset's (`WorkBadge.stages`, §16.5.4),
+    else its lane's recorded one (`LaneInfo.stages`, for its cards in Todo), else its project's now; names are always
+    the project's now (names aren't rules). So a lane under old rules keeps its stages when the options now produce
+    others (Hive merges → Solo: no Merging), in its hovers and in the legend.
   - **The legend** is on the Lanes bar's hover and keyboard focus (Esc closes it; screen readers get it as the bar's
     description), and on a Legend button in the Lanes tab. It lists the categories in the lanes' order, each with its
-    segment's swatch and the stages in it of the lanes' projects, renames included.
+    segment's swatch and the stages in it that the lanes shown have (`legendSources`: a running lane's own, its live
+    cards' own, else its project's now), renames included.
   - **Solo:** Pulse leaves out a project's lanes while its preset is Solo (or Custom from Solo), unless one of them
     runs. Its ended lanes stay in the Lanes tab, and so does Start Lane.
   - **Links:** a lane's header names its project, a link to its Version Control tab at Workflow. The Merges tab's

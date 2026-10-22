@@ -5,7 +5,7 @@
 import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
-import { CATEGORY_STAGE, foldCard, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { forYouItems, kindProposed, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
@@ -47,8 +47,40 @@ export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string
       const f = factOf(r)
       facts.set(f.card, [...(facts.get(f.card) ?? []), f])
     }
-    return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase())))
+    const stages = stagesReader(db)
+    return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase()), stages))
   })
+}
+
+/** A stored ruleset's stages by its id, in board order (each read once; null for one not stored or not readable). */
+function stagesReader(db: Db['reader']): (ruleset: string) => StageId[] | null {
+  const read = new Map<string, StageId[] | null>()
+  return (id) => {
+    if (!read.has(id)) {
+      const row = db.prepare(QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
+      let stages: StageId[] | null = null
+      try {
+        const parsed = row ? (JSON.parse(row.data) as { stages?: { id?: unknown }[] }) : null
+        stages = Array.isArray(parsed?.stages) ? parsed.stages.map((s) => s.id).filter((x): x is StageId => typeof x === 'string' && Object.hasOwn(STAGE_CATEGORY, x)) : null
+      } catch {
+        stages = null
+      }
+      read.set(id, stages)
+    }
+    return read.get(id) ?? null
+  }
+}
+
+/** The stages of these stored rulesets (a lane's recorded one, #1421), by id: one snapshot of hive.db. */
+export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map<string, StageId[] | null> {
+  const out = new Map<string, StageId[] | null>()
+  if (!ids.length) return out
+  boardRead(ws, (db) => {
+    if (!hasFacts(db)) return
+    const stages = stagesReader(db)
+    for (const id of new Set(ids)) out.set(id, stages(id))
+  })
+  return out
 }
 
 /**

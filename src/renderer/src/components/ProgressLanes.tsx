@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
-import { laneLegend, segmentStage, type LegendGroup } from '@shared/laneStages'
+import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
 import type { ProgressRun, ProjectStages } from '@shared/types'
@@ -270,8 +270,8 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
       </div>
     ) : null
   const { chosen, shown, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
-  // The legend (#1421): the stages of the lanes' projects, by category, on the Lanes bar's hover and focus.
-  const legend = laneLegend([...new Set(lanes.map((l) => l.project.toLowerCase()))].flatMap((p) => stages.get(p) ?? []), tr)
+  // The legend (#1421): the stages the lanes shown have (old rules' too), by category, on the Lanes bar's hover and focus.
+  const legend = laneLegend(legendSources(lanes, (p) => stages.get(p.toLowerCase()), badges), tr)
   const foldTip = folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))
   const legendId = `lanes-legend-${full ? 'tab' : 'pulse'}`
   return (
@@ -490,7 +490,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
   useNow(60_000)
   const laneOf = useLaneOf()
-  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr, (c) => segmentStage(c, badges.get(c.number), stages, tr))
+  const cards = l.frozen ? l.frozen.map((c) => frozenSegment(c, tr, cardLabelOf({ tasks }, c.number))) : laneCards(l.cards, tasks, tr, (c) => segmentStage(c, badges.get(c.number), stages, tr, l.stages))
   // Its project, named in its header: a link to its Version Control tab's Workflow section (#1421).
   const project = projects.find((p) => p.path.toLowerCase() === l.project.toLowerCase())
   const oldRules = l.oldRules ? laneOldRulesNote(enforced, tr) : null

@@ -21,6 +21,7 @@ import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions
 import type { Refusal } from './workflow/refusals'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageDef } from './workflow/compile'
+import type { StageId } from './workflow/facts'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -2766,6 +2767,11 @@ export interface LaneInfo {
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
    */
   oldRules: boolean
+  /**
+   * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
+   * too; null for an ended lane, or one with none recorded (its project's options now stand in).
+   */
+  stages: StageId[] | null
 }
 
 /**

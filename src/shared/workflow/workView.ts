@@ -424,14 +424,22 @@ export interface WorkBadge {
    * since it started); its rules stay its own until it is Done, unless changed options are applied to it.
    */
   oldRules: boolean
+  /**
+   * The stages of the ruleset it keeps while in flight (#1421: HR4's round 1), in board order: what its category's stages
+   * are for it, whatever its project's options produce now; null when it keeps none (in Todo, Done, none recorded).
+   */
+  stages: StageId[] | null
   lastSeq: number
 }
 
 /** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
 export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && v.ruleset !== current
 
-/** `current`: the card's project's ruleset now, for its old rules mark (main's; none: no mark). */
-export function workBadge(v: WorkView, current?: string | null): WorkBadge {
+/**
+ * `current`: the card's project's ruleset now, for its old rules mark (main's; none: no mark); `stagesOf`: a stored
+ * ruleset's stages by its id (main's; none: not read).
+ */
+export function workBadge(v: WorkView, current?: string | null, stagesOf?: (ruleset: string) => StageId[] | null): WorkBadge {
   const revision = currentRevision(v)
   const newest = new Map<string, WorkCheck>()
   let notCounted = 0
@@ -466,6 +474,7 @@ export function workBadge(v: WorkView, current?: string | null): WorkBadge {
     kindProposed: v.kindProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
+    stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
     lastSeq: v.lastSeq
   }
 }

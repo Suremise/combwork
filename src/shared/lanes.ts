@@ -108,7 +108,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -143,7 +143,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     mergeCommit: rec.mergeCommit,
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
-    oldRules: laneOldRules(rec, rulesetNow)
+    oldRules: laneOldRules(rec, rulesetNow),
+    stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null
   }
 }
 

@@ -99,3 +99,26 @@ describe("a lane's old rules mark (#1421)", () => {
     expect(laneOldRules(rec(), undefined)).toBe(false)
   })
 })
+
+describe("the stages old rules keep (HR4's #1421 round 1)", () => {
+  const pairStages = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
+  const stagesOf = (id: string) => (id === pair ? pairStages : null)
+
+  it("a card in flight carries its own ruleset's stages, whatever the project's are now; in Todo or Done none", () => {
+    expect(workBadge(workView({ card: 7, stage: 'todo', preWorkflow: false }, started(pair)), team, stagesOf).stages).toEqual(pairStages)
+    expect(pairStages).toContain('merging')
+    seq = 0
+    expect(workBadge(workView({ card: 7, stage: 'todo', preWorkflow: false }, []), team, stagesOf).stages).toBeNull()
+    expect(workBadge(workView({ card: 7, stage: 'todo', preWorkflow: false }, [...started(pair), moved('active', 'done', pair)]), team, stagesOf).stages).toBeNull()
+    // Its ruleset not stored (not read): none, the project's now stand in.
+    expect(workBadge(workView({ card: 7, stage: 'todo', preWorkflow: false }, started(team)), team, stagesOf).stages).toBeNull()
+  })
+
+  it("a running lane carries its recorded ruleset's stages; an ended one, or one with none recorded, doesn't", () => {
+    const rec = { id: 'l1', project: 'alpha', name: null, builder: { id: 'b1', name: 'B1' }, reviewer: null, cards: [1], state: 'active', rounds: 10, waitMinutes: 360, startedBy: 'You', startedAt: '2026-10-22T10:00:00.000Z', updatedAt: '2026-10-22T10:00:00.000Z', endedAt: null, mergeCommit: null, ruleset: pair } as unknown as LaneRecord
+    const cards = new Map<number, TaskCard | null>([[1, null]])
+    expect(laneView(rec, cards, undefined, null, undefined, null, undefined, team, pairStages).stages).toEqual(pairStages)
+    expect(laneView({ ...rec, state: 'ended', endedAt: '2026-10-22T11:00:00.000Z' } as LaneRecord, cards, undefined, null, undefined, null, undefined, team, pairStages).stages).toBeNull()
+    expect(laneView({ ...rec, ruleset: undefined } as LaneRecord, cards, undefined, null, undefined, null, undefined, team, pairStages).stages).toBeNull()
+  })
+})

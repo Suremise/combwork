@@ -24,7 +24,7 @@ import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
-import { roundLimitCards } from './workflow/cardWork'
+import { roundLimitCards, rulesetStages } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
 import { rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
@@ -405,8 +405,11 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // Their agents whose hooks aren't arriving (#1336): such a lane pauses.
   const deaf = (l: LaneRecord): Set<string> => new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && hooksMissingFor(join(ws.path, l.project), a.id)).map((a) => a.id))
   // Each project's ruleset now, for the old rules marks (#1421): only read when a running lane recorded one.
-  const current = lanes.some((l) => running(l) && l.ruleset) ? await rulesetsNow(ws) : new Map<string, string>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase())))
+  const recorded = lanes.filter((l) => running(l) && l.ruleset).map((l) => l.ruleset!)
+  const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
+  // And their own stages, which a lane under old rules keeps (HR4's #1421 round 1).
+  const stagesOf = ws.path ? rulesetStages(ws, recorded) : new Map<string, null>()
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */

@@ -6,7 +6,7 @@
 // runs (the Lanes tab keeps them); the lane header's link to the project's Version Control tab (Workflow) and the queue
 // card's (Merge queue). S19: the options changed mid-lane: the lanes and their cards show old rules, a lane's next card
 // started after the change keeps the lane's ruleset, Apply to cards in flight clears one card's mark, a rename sets
-// nothing, the lane ends and its mark goes, a new lane uses the new options, and with the rules not enforced the marks
+// nothing, a switch to Solo (other stages) leaves the old-rules lanes their own stages in hovers and the legend, the lane ends and its mark goes, a new lane uses the new options, and with the rules not enforced the marks
 // still show and say so. Screenshots in both themes, in English and Japanese. Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -174,6 +174,16 @@ const beta = path.join(fx.ws, 'beta')
     check('a rename: the Approved card is shown as Ready', !!(await waitHung(async () => /· Ready/.test(await label(a)))), await label(a))
     check('…no old rules set by it: the Review card still has none, the lanes as they were', (await badge(r))?.oldRules === false && JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])) === JSON.stringify(before), JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])))
     check('…the legend lists the rename', !!(await hover(bar, (t) => t.includes('Ready'))), await tipText())
+
+    // A change of the stages themselves (Solo: no review, nothing merging; HR4's round 1): the lanes and cards under old
+    // rules keep their own stages, by the names now.
+    const solo = (await inv('workflow:form', fx.alpha)).presets.find((p) => p.id === 'solo')?.options
+    await inv('workflow:setOptions', fx.alpha, { preset: 'solo', options: { ...solo, stageNames: { approved: 'Ready' } } })
+    check('Solo saved: the project now produces no Approved or Merging', !!(await waitHung(async () => !(await inv('workflow:stages', fx.alpha)).stages.some((x) => x.id === 'merging' || x.id === 'approved'))), JSON.stringify(await inv('workflow:stages', fx.alpha)))
+    check('…the lanes keep their own stages (Merging among them)', ((await laneNow(l1))?.stages ?? []).includes('merging') && ((await badge(m.n))?.stages ?? []).includes('merging'), JSON.stringify({ lane: (await laneNow(l1))?.stages, card: (await badge(m.n))?.stages }))
+    check("the Merging card's hover keeps Ready | Merging, its own marked", !!(await hover(seg(m.n), (t) => t.includes('Merging card') && t.includes('Ready'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
+    check('…and the legend keeps Ready and Merging (an old-rules lane has them)', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Ready","Merging"]', await tipText())
+    await shoot('3b-old-rules-solo', () => hover(seg(m.n), (t) => t.includes('Merging card')))
 
     // The lane ends: its mark goes. A new lane uses the new options.
     const ended = await api('POST', `/v1/lanes/${l1}/end`, { abandoned: true })
