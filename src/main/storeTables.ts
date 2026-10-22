@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, closeBoard, dbGeneration, inBoardWrite, noteLanesSaved, onDbReplaced, transientDb, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, boardOpen, dbGeneration, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
 import { transaction } from './db'
 import { withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -99,22 +99,22 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
   await tableTestHooks.beforeSave?.(store)
   await withFileLock(boardLock(path), async () => {
     guard?.()
-    // A workspace closed meanwhile (a store's last save as it closes): its database is opened for the save, then closed again.
-    const wasOpen = boardOpen(path)
+    // A workspace closed meanwhile (a store's last save as it closes): its database is opened for the save, then closed
+    // again (#1379: not fenced); a lease, so what it closes is only what it opened (#1383).
+    const lease = leaseDb(path)
     try {
-      saveEntries(path, store, docs, meta, wasOpen, also)
+      saveEntries(path, store, docs, meta, lease, also)
       // The lanes are part of what the board's revision covers (#1266, boardRevision).
       if (store === 'lanes') noteLanesSaved(path)
     } finally {
-      if (!wasOpen) closeBoard(path)
+      lease.release()
     }
   })
 }
 
 /** saveTable's transaction. */
-function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, keep: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
-  // saveTable closes it again when it wasn't open (#1379: not fenced).
-  const db = transientDb(path).writer
+function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, lease: DbLease, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
+  const db = lease.db.writer
   const def = TABLE_DEFS[store]
   const gen = dbGeneration(path)
   const keys = entryKeys(store, docs)
@@ -165,7 +165,7 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
   // A closed workspace's last save keeps nothing (its database is closed again at once).
-  if (keep) remember(path, store, gen, next)
+  if (lease.kept) remember(path, store, gen, next)
   else committed.delete(cacheKey(path, store))
 }
 
