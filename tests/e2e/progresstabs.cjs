@@ -220,14 +220,19 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     await shoot('lanes-narrow')
 
     // --- The keyboard: arrow keys, Home and End move through the tabs, choosing as they go; the tab kept.
+    // The tabs move the keyboard in an animation frame after choosing, which a busy window runs late: each key waits for
+    // its tab chosen and the keyboard on it before the next (#1465: Right after Home went to Lanes, still focused, and
+    // chose Pulse).
+    const chosen = (t) => until(async () => (await tab(t).getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-tab'))) === t, HUNG_MS)
     await tab('lanes').focus()
     await page.keyboard.press('ArrowRight')
-    check('Right from the last tab is Pulse, with the keyboard on it', !!(await until(async () => (await tab('pulse').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-tab'))) === 'pulse', HUNG_MS)))
+    check('Right from the last tab is Pulse, with the keyboard on it', !!(await chosen('pulse')))
     await page.keyboard.press('ArrowLeft')
-    check('Left from it is Lanes', !!(await until(async () => (await tab('lanes').getAttribute('aria-selected')) === 'true', HUNG_MS)))
+    check('Left from it is Lanes', !!(await chosen('lanes')))
     await page.keyboard.press('Home')
+    const home = await chosen('pulse')
     await page.keyboard.press('ArrowRight')
-    check('Home, then Right: Merges', !!(await until(async () => (await tab('merges').getAttribute('aria-selected')) === 'true', HUNG_MS)))
+    check('Home, then Right: Merges', !!home && !!(await chosen('merges')))
     const key = `progress-tab:${ws.toLowerCase()}`
     check('the tab is kept for the workspace', !!(await until(async () => (await inv('ui:get')).panes?.[key] === 1, HUNG_MS)))
 
