@@ -1529,7 +1529,9 @@ stages; a column takes a project's rename when one project is shown or every sho
 default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
 category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in
 Merging leaves it by Remove from queue, never by a drag into Approved; Approved's Archive All takes Approved's cards only (a
-card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. Folds are kept per column id: a category's
+card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. When every card an
+open Archive All dialog took leaves its column, stage or project, the dialog says none is left to archive, with Archive
+disabled, rather than that agents are on them (#1463). Folds are kept per column id: a category's
 apply to its stage, Merging keeps its own (`merging`). The toolbar links each shown project's workflow ("Workflow: Git ·
 Team", or a **Workflows** menu with a line per project), opening its Version Control tab at Workflow.
 
