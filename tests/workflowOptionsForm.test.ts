@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
 
 const base = tempDir('hive-wfoptions-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -21,7 +22,9 @@ const { config } = await import('../src/main/config')
 const form = await import('../src/main/workflow/optionsForm')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, formShows, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
+const { allOff, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
+const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
+const { englishText } = await import('../src/shared/advanced')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
 
@@ -243,6 +246,113 @@ describe('the next card starts under the saved options (#1278, S19)', () => {
     expect(now).toBe(expected.ruleset.id)
     expect(now).not.toBe(old)
     expect(startedRuleset(before.number)).toBe(old)
+  })
+})
+
+describe("the Version Control tab's Workflow section (#1418)", () => {
+  // Every option of SPEC §16.6.1 and §16.6.2 by its id: its row (null: not offered before slots, P7; elsewhere: shown,
+  // set elsewhere). A missing row fails here, not first at the phase's acceptance.
+  const SPEC: Record<'git' | 'none', Record<string, string | null>> = {
+    git: { G1: 'review', G1b: 'reviewers', G2: 'noSelfReview', G3: 'preChecks', G4: 'sameness', G5: 'finish', G6: 'style', G7: 'target', G8: 'strict', G9: 'mergeChecks', G10: 'okBefore', G11: 'folder', G12: 'identity', G13: 'stopOwnRuns', G14: 'dependenciesDone', G15: null, G16: 'sharedFolderWarning', G17: null },
+    none: { N1: 'review', N2: 'noSelfReview', N3: 'preChecks', N4: 'excluded', N5: 'stageNames', N6: 'dependenciesDone', N7: 'elsewhere' }
+  }
+  const sentences = (m: Parameters<typeof englishText>[0]): number => englishText(m).split(/[.!?](?:\s|$)/).filter((s) => s.trim()).length
+
+  it('has a row for every option of §16.6.1 and §16.6.2, in its group, each worded with one sentence on what it does', () => {
+    for (const platform of ['git', 'none'] as const) {
+      const rows = FORM_GROUPS[platform].flatMap((g) => g.options)
+      for (const [id, key] of Object.entries(SPEC[platform])) {
+        if (key === null) continue
+        if (key === 'elsewhere') expect(FORM_GROUPS[platform].map((g) => g.id), id).toContain('elsewhere')
+        else expect(rows, `${platform} ${id}`).toContain(key)
+      }
+      for (const key of rows) {
+        const t = OPTION_TEXT[key]
+        expect(t, key).toBeDefined()
+        expect(optionTitle(key, platform), key).not.toBeNull()
+        expect(sentences(t!.desc), `${key}: ${englishText(t!.desc)}`).toBe(1)
+      }
+      // Each row shows where it applies: the options of every preset and all-off together show them all.
+      const shownSomewhere = new Set(PRESETS[platform].flatMap((p) => [preset(platform, p.id, { quick: ['lint'], tests: [] }), allOff(platform)]).flatMap((o) => rows.filter((k) => formShows(k, o))))
+      if (platform === 'git') shownSomewhere.add('strict')
+      expect(rows.filter((k) => !shownSomewhere.has(k))).toEqual([])
+    }
+    // G4's sentence says both values (the card's own words).
+    expect(englishText(OPTION_TEXT.sameness!.desc)).toMatch(/clean rebase or squash of the same change.*Exact revision only, any new revision makes it stale/)
+    // G1's label in a shared folder, G16 only there.
+    expect(englishText(optionTitle('review', 'git', 'project')!)).toBe('Work is reviewed before it’s done')
+    expect(englishText(optionTitle('review', 'git', 'slots')!)).toBe('Work is reviewed before it’s merged')
+    expect(formShows('sharedFolderWarning', { ...allOff('git'), folder: 'slots' })).toBe(false)
+  })
+
+  it("documents each preset: a summary, and why for each option it sets", () => {
+    for (const platform of ['git', 'none'] as const)
+      for (const p of PRESETS[platform]) {
+        expect(PRESET_SUMMARY[platform][p.id], `${platform} ${p.id}`).toBeDefined()
+        const o = preset(platform, p.id, { quick: ['lint'], tests: ['test'] })
+        for (const key of FORM_OPTIONS[platform].filter((k) => formShows(k, o))) expect(OPTION_WHY[key], `${platform} ${p.id}: ${key}`).toBeDefined()
+      }
+  })
+
+  it('shows each contradiction under every row it is about, as the options are chosen', () => {
+    const cases: Record<Contradiction, WorkflowOptions> = {
+      selfReview: { ...allOff('git'), review: 'agent', noSelfReview: false },
+      quorumNeedsAgent: { ...allOff('git'), reviewers: 2 },
+      mergeNeedsSlots: { ...allOff('git'), finish: 'hiveMerges', folder: 'project' },
+      committedNeedsFolder: { ...allOff('git'), finish: 'committed', folder: 'slots' },
+      okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
+      hiveMergesNeedsGit: { ...allOff('none'), finish: 'hiveMerges' },
+      noneHasNoSlots: { ...allOff('none'), folder: 'slots' }
+    }
+    // Every row of CONTRADICTIONS has its case: a new one fails here until it has.
+    expect(Object.keys(cases).sort()).toEqual(Object.keys(CONTRADICTIONS).sort())
+    for (const [c, o] of Object.entries(cases) as [Contradiction, WorkflowOptions][]) {
+      const live = liveContradictions(o)
+      for (const key of CONTRADICTION_ROWS[c]) expect(live[key], `${c} under ${key}`).toContain(c)
+    }
+    expect(liveContradictions(preset('git', 'pair'))).toEqual({})
+  })
+
+  it("refuses a save read before another change (the Assistant's tool, another window), never writing over it", async () => {
+    const { w, repo } = await workspace({ project: { target: 'release' } })
+    const read = await form.workflowForm(w, repo)
+    const readWith = { preset: read.preset, options: read.own }
+    // Another change meanwhile, with no base (the tool's way).
+    await form.setWorkflowOptions(w, repo, { preset: null, options: { target: 'main' } })
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { target: 'release', style: 'squash' }, base: readWith })).rejects.toThrow(/changed meanwhile/)
+    expect((await w.projectConfig(repo)).workflow?.options).toEqual({ target: 'main' })
+    // Read again, it saves.
+    const again = await form.workflowForm(w, repo)
+    await form.setWorkflowOptions(w, repo, { preset: null, options: { target: 'main', style: 'squash' }, base: { preset: again.preset, options: again.own } })
+    expect((await w.projectConfig(repo)).workflow?.options).toEqual({ target: 'main', style: 'squash' })
+  })
+
+  it('says a change of stage names alone applies now', async () => {
+    const { w, repo } = await workspace({ project: { review: 'agent', noSelfReview: true } })
+    const check = await form.checkWorkflowChange(w, repo, { preset: null, options: { review: 'agent', noSelfReview: true, stageNames: { review: 'Checking' } } })
+    expect(check).toMatchObject({ problems: [], appliesNow: true, lanes: [], inFlight: [] })
+    expect((await form.checkWorkflowChange(w, repo, { preset: null, options: { review: 'you', stageNames: { review: 'Checking' } } })).appliesNow).toBe(false)
+  })
+
+  it('keeps `kept`, `presetAsked` and any other field of workflow through a Save, a preset and a Paste', async () => {
+    const { w, repo } = await workspace({ project: { target: 'release' } })
+    await w.mutateProjectConfig(repo, (cfg) => ({ workflow: { ...cfg.workflow!, kept: { none: { preset: 'solo', options: {}, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: 1 } as never }))
+    const fields = async () => {
+      const wf = (await w.projectConfig(repo)).workflow as unknown as Record<string, unknown>
+      return { kept: wf.kept, presetAsked: wf.presetAsked, later: wf.later }
+    }
+    const want = { kept: { none: { preset: 'solo', options: {}, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: 1 }
+    // Save: an option changed.
+    await form.setWorkflowOptions(w, repo, { preset: null, options: { target: 'main' } })
+    expect(await fields()).toEqual(want)
+    // A preset chosen and saved.
+    const { platform: _p, ...pair } = preset('git', 'pairAgent')
+    await form.setWorkflowOptions(w, repo, { preset: 'pairAgent', options: pair })
+    expect(await fields()).toEqual(want)
+    // A paste fills the form with copied options and the preset they came from, and is saved as a save is.
+    await form.setWorkflowOptions(w, repo, { preset: 'team', options: { ...pair, okBefore: { mode: 'labels', labels: ['ui'] } } })
+    expect(await fields()).toEqual(want)
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'team', options: { okBefore: { mode: 'labels' } } })
   })
 })
 

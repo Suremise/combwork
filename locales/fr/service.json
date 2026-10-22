@@ -166,6 +166,7 @@
   "service.transcripts.noImage": "Image introuvable",
   "service.transcripts.noTool": "Appel d’outil introuvable",
   "service.transcripts.none": "Cette session n’a pas encore de transcription.",
+  "service.workflow.changedMeanwhile": "Les options du flux de travail ont changé entre-temps (dans une autre fenêtre, ou par le Hive Assistant), donc rien n’a été enregistré. La section les affiche telles qu’elles sont maintenant.",
   "service.workflow.closed": "L’espace de travail de cette carte a été fermé",
   "service.workflowNotice.blocked": "{card} est bloquée : {reason}",
   "service.workflowNotice.blockedNoReason": "{card} est bloquée",

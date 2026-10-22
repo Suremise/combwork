@@ -763,6 +763,14 @@
     "defaultMessage": "Start a lane yourself",
     "description": "A tip's title. A lane: a builder and a reviewer agent working through cards in turn (glossary 2.5: lane)."
   },
+  "tips.lanesLegend.text": {
+    "defaultMessage": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, stage, category, workflow options."
+  },
+  "tips.lanesLegend.title": {
+    "defaultMessage": "What a lane’s colours mean",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.language.text": {
     "defaultMessage": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1462,6 +1470,14 @@
   "tips.workflowOptions.title": {
     "defaultMessage": "Choose how cards get to Done",
     "description": "A tip's title (glossary 2.1: workflow)."
+  },
+  "tips.workflowPresetsWhy.text": {
+    "defaultMessage": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Solo, Pair, Team)."
+  },
+  "tips.workflowPresetsWhy.title": {
+    "defaultMessage": "See what a preset does before you use it",
+    "description": "A tip's title (glossary 2.1: preset)."
   },
   "tips.workspaceMoved.text": {
     "defaultMessage": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",

@@ -1721,8 +1721,28 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
+- **Built [#1418], the tab's Workflow section** (`WorkflowOptions.tsx`, P4's form below rewritten):
+  - **Groups** (`FORM_GROUPS`, `options.ts`), each a heading: Git's Review (G1, G1b, G2, G4, G10), Checks (G3; G9 and
+    its install while Hive merges), Merging (G5, G6, G7, G8 while Hive merges, G14), Where cards are built (G11, G12,
+    G13; G16 only with everyone in the project folder), Stages (N5) and Shown here, set elsewhere (the Card loops
+    rounds and wait); None's Review (N1, N2), Checks (N3), The work (N4, N6), Stages and elsewhere (N7 too). G15 and
+    G17 wait for slots (P7). Each row's label is §16.6.1/§16.6.2's (G1 reads *Work is reviewed before it's done* with
+    everyone in the project folder), with one sentence on what it does, its origin and Inherit. The version control
+    isn't a row: the tab's header shows it (#1416).
+  - **Contradictions as you choose** (`liveContradictions`, `CONTRADICTION_ROWS`): each contradiction's reason shows
+    under every row it is about at once, and a stage name's problem under Stage names; Save… stays off until they're
+    resolved. The save is still checked under the lock, with the same reasons.
+  - **Presets documented**: Solo, Pair (the agent merges), Pair, Team (None: Solo, Pair, Team) and **All off**
+    (§16.6.4), each with a sentence (`PRESET_SUMMARY`); choosing one previews each option it sets with its value and
+    why (`OPTION_WHY`, §16.6.3's Why column), those it would change marked with their value now, before **Use** fills
+    the form. Stage names stay through a preset. With every rule off, the section lists what never turns off.
+  - **Saving**: §16.6.5's warning as before; a change of stage names alone says it applies now (`appliesNow`). **A
+    form read before another change** is refused, never written over it: the save carries the preset and options it
+    was read with (`WorkflowChange.base`), compared under the lock (`WorkflowStale`, "changed meanwhile"), and the
+    section reloads. It reloads on `workflow-changed` too while nothing in it is unsaved. Every save goes through
+    `writeWorkflow`, so `kept`, `presetAsked` and any other field of `workflow` stay.
 - **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it (since #1416 it is the tab's
-  Workflow section, and Project Settings → Workflow links to it):
+  Workflow section, and Project Settings → Workflow links to it; #1418 rewrote it as above):
   - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per
     option this version offers (§16.19.1): Git's G1–G7, G9 and G10–G14 and G16 (G11's own folder is the builder's
     worktree), None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link
@@ -2975,6 +2995,30 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   are #1353's.
 - **P6** [#1122 c]: stage names in hovers and accessible names over the categories' colours and patterns; the legend
   by stage; Solo shows no lanes section unless a loop runs; links to the Version Control tab; "old rules" marks.
+  **Built [#1421]:**
+  - A segment keeps its category's colour and pattern (no stage gets one of its own). Its hover and accessible name
+    say the card's **stage** (`WorkBadge.stage` through `stageName`, with its project's renames from
+    `workflow:stages`). Where its category shows two stages (Approved and Merging), its hover lists both with a thin
+    divider and the card's own in bold. A card's category's stages are its own ruleset's (`WorkBadge.stages`, §16.5.4),
+    else its lane's recorded one (`LaneInfo.stages`, for its cards in Todo), else its project's now; names are always
+    the project's now (names aren't rules). So a lane under old rules keeps its stages when the options now produce
+    others (Hive merges → Solo: no Merging), in its hovers and in the legend.
+  - **The legend** is on the Lanes bar's hover and keyboard focus (Esc closes it; screen readers get it as the bar's
+    description), and on a Legend button in the Lanes tab. It lists the categories in the lanes' order, each with its
+    segment's swatch and the stages in it that the lanes shown have (`legendSources`: a running lane's own, its live
+    cards' own, else its project's now), renames included.
+  - **Solo:** Pulse leaves out a project's lanes while its preset is Solo (or Custom from Solo), unless one of them
+    runs. Its ended lanes stay in the Lanes tab, and so does Start Lane.
+  - **Links:** a lane's header names its project, a link to its Version Control tab at Workflow. The Merges tab's
+    queue card opens the Merge queue section (#1416).
+  - **Old rules** (§16.5.4): `LaneInfo.oldRules` for a running lane whose recorded ruleset (`lane_runs.ruleset`) isn't
+    its project's current one; `WorkBadge.oldRules` for a card in flight whose own ruleset (`ownRuleset`: its
+    cycle's, or the latest Apply to cards in flight) isn't. Both are computed in main against each project's ruleset
+    now (compiled, not stored), and read again on `workflow-changed`. A lane row shows an *old rules* tag, and a card
+    segment a hollow square, each saying what it means in its hover and accessible name. An ended or abandoned lane,
+    a card in Todo or Done, and a lane or card with no ruleset recorded have none. A rename never sets it (names
+    aren't in the ruleset). With `hive.workflow.enforce` off it still shows, and its hover says the rules aren't
+    enforced.
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
   copies' runs as checks of the revision; slot warming as runs; "waiting for a slot".
 

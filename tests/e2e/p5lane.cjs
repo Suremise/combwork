@@ -66,7 +66,9 @@ const ancestor = (x, y) => {
     await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await waitHung(async () => (await form.count()) > 0)
-    await form.locator('.workflow-preset select').selectOption('pair')
+    // The preset previewed, then used (#1418): it fills the form, saved with Save….
+    await form.locator('.workflow-choice[data-choice="pair"]').click()
+    await form.locator('.workflow-preview [data-action="use-choice"]').click()
     const strictRow = form.locator('.workflow-option[data-option="strict"]')
     await waitHung(async () => (await strictRow.count()) === 1)
     await strictRow.scrollIntoViewIfNeeded()

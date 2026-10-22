@@ -368,6 +368,7 @@ interface HiveMessageValues {
   'board.lane.labelWhenEnded': { card: string | number; title: string | number; where: string | number }
   'board.lane.more': { n: number; cards: string | number }
   'board.lane.notOnBoard': { card: string | number }
+  'board.lane.oldRules': { enforced: string }
   'board.lane.openForMore': undefined
   'board.lane.reviewFailed': { card: string | number; round: string | number; next: string | number }
   'board.lane.reviewerGist': { gist: string | number }
@@ -423,10 +424,17 @@ interface HiveMessageValues {
   'board.lanes.endFailed': { lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
+  'board.lanes.legendButton': undefined
+  'board.lanes.legendHold': { category: string | number }
+  'board.lanes.legendLine': { category: string | number; stages: string | number }
+  'board.lanes.legendTitle': undefined
   'board.lanes.moveDown': undefined
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
   'board.lanes.none': undefined
+  'board.lanes.oldRules': undefined
+  'board.lanes.oldRulesTip': { enforced: string }
+  'board.lanes.projectLink': { project: string | number }
   'board.lanes.show': undefined
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined

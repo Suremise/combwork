@@ -5,8 +5,23 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type Actor, type CardKind, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
+import { foldCard, type Actor, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
+
+/** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
+export const APPLY_OPTIONS = 'applyOptions'
+
+/**
+ * The ruleset a started card keeps (§16.5.4): the one its cycle started with, unless changed options were applied to it
+ * since (Apply to cards in flight: the latest such Override's). Null for a card not started, back in Todo (its next
+ * cycle takes the rules in force then), or whose start recorded none (from before 1.0, rules not read). The runtime's
+ * `rulesetOf` reads a card's rules by it; a lane's card in Todo uses its lane's, which this doesn't say.
+ */
+export function ownRuleset(facts: readonly Fact[], s: Pick<CardState, 'started' | 'stage' | 'cycle'>): string | null {
+  if (!s.started || s.stage === 'todo') return null
+  const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
+  return (applied ?? facts.find((x) => x.seq === s.cycle))?.ruleset ?? null
+}
 
 /** A request waiting for the user (For you, §16.8.5), as the window lists it (IPC `tasks:forYou`). */
 export interface ForYouItem {
@@ -233,6 +248,8 @@ export interface WorkView {
   forYou: number
   /** The newest fact's seq: a view is newer than another when this is higher. */
   lastSeq: number
+  /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
+  ruleset: string | null
 }
 
 /**
@@ -340,7 +357,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
     forYou: s.requests.length,
-    lastSeq: s.lastSeq
+    lastSeq: s.lastSeq,
+    ruleset: ownRuleset(facts, s)
   }
 }
 
@@ -401,10 +419,27 @@ export interface WorkBadge {
   kindProposed: CardKind | null
   /** A decision was recorded since the latest submission was made. */
   decisionSince: boolean
+  /**
+   * Old rules (§16.5.4, §16.6.5): in flight under a ruleset that isn't its project's current one (the options changed
+   * since it started); its rules stay its own until it is Done, unless changed options are applied to it.
+   */
+  oldRules: boolean
+  /**
+   * The stages of the ruleset it keeps while in flight (#1421: HR4's round 1), in board order: what its category's stages
+   * are for it, whatever its project's options produce now; null when it keeps none (in Todo, Done, none recorded).
+   */
+  stages: StageId[] | null
   lastSeq: number
 }
 
-export function workBadge(v: WorkView): WorkBadge {
+/** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
+export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && v.ruleset !== current
+
+/**
+ * `current`: the card's project's ruleset now, for its old rules mark (main's; none: no mark); `stagesOf`: a stored
+ * ruleset's stages by its id (main's; none: not read).
+ */
+export function workBadge(v: WorkView, current?: string | null, stagesOf?: (ruleset: string) => StageId[] | null): WorkBadge {
   const revision = currentRevision(v)
   const newest = new Map<string, WorkCheck>()
   let notCounted = 0
@@ -438,6 +473,8 @@ export function workBadge(v: WorkView): WorkBadge {
     kind: v.kind,
     kindProposed: v.kindProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
+    oldRules: onOldRules(v, current),
+    stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
     lastSeq: v.lastSeq
   }
 }
