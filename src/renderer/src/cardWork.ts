@@ -27,9 +27,11 @@ export function useCardWork(n: number | null): { view: WorkView | null; error: s
 export function useWorkBadges(): Map<number, WorkBadge> {
   const ws = useStore((s) => s.workspace?.path ?? '')
   const tasks = useStore((s) => s.tasks)
+  // A project's workflow written: its cards' old rules marks may have changed (#1421).
+  const workflow = useStore((s) => s.workflowVersion)
   const { data, load } = useScopedLoad<WorkBadge[]>(ws)
   useEffect(() => {
     if (ws) load(ws, () => window.hive.invoke('tasks:workBadges'))
-  }, [ws, tasks, load])
+  }, [ws, tasks, workflow, load])
   return useMemo(() => new Map((data ?? []).map((b) => [b.card, b])), [data])
 }

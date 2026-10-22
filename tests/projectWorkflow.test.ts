@@ -109,7 +109,7 @@ describe('stage names (N5) through the writers (#1417)', () => {
     expect((await w.projectConfig(repo)).workflow?.options.stageNames).toEqual({ active: 'Building', merging: 'In the queue' })
     expect((await workflowFor(w, repo))!.currentRuleset(false).id).toBe(before)
     const stages = await form.projectStages(w, repo)
-    expect(stages).toEqual({ stages: expect.arrayContaining([{ id: 'merging', category: 'passed' }]), names: { active: 'Building', merging: 'In the queue' } })
+    expect(stages).toEqual({ stages: expect.arrayContaining([{ id: 'merging', category: 'passed' }]), names: { active: 'Building', merging: 'In the queue' }, preset: 'pair' })
     expect(stages!.stages.map((s) => s.id)).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done'])
     const summary = await form.workflowSummary(w, repo)
     expect(summary).toMatchObject({ stages: [{ id: 'hold', category: 'hold', name: 'On Hold' }, { id: 'todo' }, { id: 'active', category: 'doing', name: 'Building' }, { id: 'review' }, { id: 'approved', category: 'passed', name: 'Approved' }, { id: 'merging', category: 'passed', name: 'In the queue' }, { id: 'done' }] })

@@ -35,18 +35,19 @@ export function cardWork(ws: WorkspaceService, n: number): WorkView | null {
 
 /**
  * Every live card's badges (IPC `tasks:workBadges`), in number order. Archived cards are left out in the query: neither
- * their rows nor their facts are read (#1107's rule).
+ * their rows nor their facts are read (#1107's rule). `rulesetsNow`: each project's ruleset now, by its folder name in
+ * lower case (rulesets.ts), for the old rules marks (#1421); a card whose project has none has no mark.
  */
-export function workBadges(ws: WorkspaceService): WorkBadge[] {
+export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string, string> = new Map()): WorkBadge[] {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
-    const cards = db.prepare('SELECT number, col, stage, pre_workflow, kind FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    const cards = db.prepare('SELECT number, col, stage, pre_workflow, kind, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
     const facts = new Map<number, Fact[]>()
     for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
       const f = factOf(r)
       facts.set(f.card, [...(facts.get(f.card) ?? []), f])
     }
-    return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? [])))
+    return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase())))
   })
 }
 

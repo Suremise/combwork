@@ -190,6 +190,8 @@
   "tips.laneNotices.title": "Erfahre, wie eine Lane läuft, auch ohne den Assistenten",
   "tips.laneStart.text": "Klicke mit der rechten Maustaste auf die Spalte „Offen“ und wähle „Lane mit diesen Karten starten…“: Wähle Bearbeiter und Reviewer, ordne die Karten, und beide starten mit einer Einweisung. Beende oder gib eine Lane über ihre Zeile im Fortschrittspanel auf.",
   "tips.laneStart.title": "Starte selbst eine Lane",
+  "tips.lanesLegend.text": "Zeige im Fortschrittspanel auf die Leiste „Lanes“, um die Legende zu sehen: Jede Farbe ist eine Kategorie, mit den Phasen darin. Eine Lane mit „alte Regeln“ behält die Workflow-Optionen, mit denen sie gestartet wurde, bis sie endet.",
+  "tips.lanesLegend.title": "Was die Farben einer Lane bedeuten",
   "tips.language.text": "Hive folgt der Anzeigesprache von Windows, wenn es sie hat. Einstellungen → Allgemein → Sprache wählt eine andere; von KI übersetzte Sprachen sind gekennzeichnet, und Verbesserungen sind willkommen. Mit Agenten spricht Hive weiterhin Englisch.",
   "tips.language.title": "Hive in deiner Sprache",
   "tips.leftoverProcesses.text": "Ein Vorschauserver oder ein tail -f, das ein Agent gestartet hat, kann weiterlaufen, nachdem er stoppt, und den Ordner des Projekts oder einen Port belegen. Hive listet solche Prozesse im ⋯-Menü des Agentenbereichs auf und bietet an, sie zu beenden; Einstellungen → Agenten kann sie jedes Mal beenden.",

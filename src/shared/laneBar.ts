@@ -3,6 +3,7 @@ import { columnName, type Tr } from './tasks'
 import { cardLabel } from './projectKeys'
 import type { LaneCard, LaneState, LaneStatus, TaskCard, TaskColumn } from './types'
 import type { WorkBadge, WorkOverride, WorkRefusal } from './workflow/workView'
+import type { StageId } from './workflow/facts'
 
 /**
  * A lane in the Progress panel (#484): a segmented bar, one equal-width segment per card in the lane's order, coloured
@@ -26,8 +27,13 @@ export interface CardSegment {
   failed: boolean
   /** The round it is in (Doing or Review), failed or passed in; null before its first round and when not on the board. */
   round: number | null
-  /** Hover text: "#405 Built-in loop wakes · Review, round 2". */
+  /** Hover text: "#405 Built-in loop wakes · Review, round 2", by the card's stage name (#1421). */
   label: string
+  /**
+   * Where its category has more than one stage (Approved and Merging, #1421): each of them by name in board order, the
+   * card's own marked, for its hover's divided line. Absent with one stage, and in an ended lane.
+   */
+  stages?: { id: StageId; name: string; own: boolean }[]
   /**
    * What its marks mean (#706), each a line under the label in its hover and after it in its accessible name: a failed
    * review's red underline ("#650: review failed (round 4): waiting for round 5", then the reviewer's gist) and the red
@@ -116,8 +122,10 @@ function blockedNote(name: string, hold: boolean, blocked: string | null, live: 
  * Where a card is, for its segment's label: its column, and its review round (#484, #706): "Review, round 2", "Review,
  * round 1 failed review", "Passed in round 3". `hold` is how On Hold reads (live: waiting for you; ended: plain).
  */
-function whereText(column: TaskColumn, round: number | null, how: 'failed' | 'in-round' | 'after' | 'none', hold: 'waiting' | 'plain', tr: Tr): string {
-  const where = column === 'hold' ? (hold === 'waiting' ? tr(msg({ id: 'board.lane.holdWaitingShort', defaultMessage: 'On Hold, waiting for you', description: "Where a lane's card is, in its segment's label (Progress panel): On Hold (a board column) until the user moves it on." })) : columnName('hold', tr)) : columnName(column, tr)
+function whereText(column: TaskColumn, round: number | null, how: 'failed' | 'in-round' | 'after' | 'none', hold: 'waiting' | 'plain', tr: Tr, stage?: SegmentStage): string {
+  // By its stage's name (#1421: "Merging" inside Approved, a project's rename); On Hold says it waits for you unless renamed.
+  const named = stage && (column !== 'hold' || stage.renamed) ? stage.name : null
+  const where = named ?? (column === 'hold' ? (hold === 'waiting' ? tr(msg({ id: 'board.lane.holdWaitingShort', defaultMessage: 'On Hold, waiting for you', description: "Where a lane's card is, in its segment's label (Progress panel): On Hold (a board column) until the user moves it on." })) : columnName('hold', tr)) : columnName(column, tr))
   if (how === 'none' || round === null) return where
   if (how === 'failed') return tr(msg({ id: 'board.lane.roundFailed', defaultMessage: '{where}, round {round} failed review', description: "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Review\"), and that its review round {round} failed." }), { where, round })
   if (how === 'in-round') return tr(msg({ id: 'board.lane.inRound', defaultMessage: '{where}, round {round}', description: "Where a lane's card is, in its segment's label (Progress panel): its column ({where}, \"Doing\" or \"Review\") and the review round it is in ({round}, a number)." }), { where, round })
@@ -207,14 +215,18 @@ export interface SegmentMarks {
   refused?: string
   stale?: string
   override?: string
+  /** In flight under old rules (#1421): the options changed since it started (a fact, shown whether rules are enforced or not). */
+  oldRules?: string
 }
 
-export function segmentMarks(lane: { frozen: unknown }, b: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names: OverrideNames): SegmentMarks {
+/** `enforced`: whether workflow rules are enforced now (Settings → Advanced): off, an old rules line says so. */
+export function segmentMarks(lane: { frozen: unknown }, b: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names: OverrideNames, enforced = true): SegmentMarks {
   if (lane.frozen || !b) return {}
   return {
     ...(b.refused && names.refusal ? { refused: refusedNote(b.refused, tr, names.refusal, s.name) } : {}),
     ...(b.stalePass && s.state !== 'done' ? { stale: stalePassNote(b.stalePass, short, tr) } : {}),
-    ...(b.override ? { override: overrideNote(b.override, tr, names) } : {})
+    ...(b.override ? { override: overrideNote(b.override, tr, names) } : {}),
+    ...(b.oldRules && s.state !== 'done' ? { oldRules: cardOldRulesNote(enforced, tr) } : {})
   }
 }
 
@@ -247,16 +259,17 @@ export interface FoldedMarks {
   refused: string[]
   stale: string[]
   override: string[]
+  oldRules: string[]
 }
 
-export function foldedMarks(lane: { frozen: unknown }, badges: ReadonlyMap<number, WorkBadge>, cards: readonly CardSegment[], numbers: readonly number[], short: (n: number) => (id: string) => string, tr: Tr, names: OverrideNames): FoldedMarks {
-  const out: FoldedMarks = { refused: [], stale: [], override: [] }
+export function foldedMarks(lane: { frozen: unknown }, badges: ReadonlyMap<number, WorkBadge>, cards: readonly CardSegment[], numbers: readonly number[], short: (n: number) => (id: string) => string, tr: Tr, names: OverrideNames, enforced = true): FoldedMarks {
+  const out: FoldedMarks = { refused: [], stale: [], override: [], oldRules: [] }
   for (const n of numbers) {
     const s = cards.find((c) => c.number === n)
     if (!s) continue
-    const m = segmentMarks(lane, badges.get(n), s, short(n), tr, names)
+    const m = segmentMarks(lane, badges.get(n), s, short(n), tr, names, enforced)
     const name = s.name ?? `#${n}`
-    for (const k of ['refused', 'stale', 'override'] as const) if (m[k]) out[k].push(tr(msg({ id: 'board.lane.foldedMark', defaultMessage: '{card}: {mark}', description: "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)." }), { card: name, mark: m[k]! }))
+    for (const k of ['refused', 'stale', 'override', 'oldRules'] as const) if (m[k]) out[k].push(tr(msg({ id: 'board.lane.foldedMark', defaultMessage: '{card}: {mark}', description: "A line in the hover of a lane segment that folds several cards (\"✓ 6\", \"+4\", Progress panel): one card's mark. {card} is its name (its key, such as AL-12), {mark} what the mark says, a sentence already translated (a refusal, a stale pass, a move past its rules)." }), { card: name, mark: m[k]! }))
   }
   return out
 }
@@ -266,8 +279,20 @@ export function segmentName(s: CardSegment): string {
   return [s.label, ...s.notes].join('. ')
 }
 
+/**
+ * A card's stage for its segment (#1421, laneStages.ts's `segmentStage`): its id and name (its project's rename, else the
+ * stage's own), whether it is a rename, and the other stages of its category the project shows (§16.5.2: Approved and
+ * Merging), each by name.
+ */
+export interface SegmentStage {
+  id: StageId
+  name: string
+  renamed: boolean
+  category: { id: StageId; name: string }[]
+}
+
 /** A card number's segment, from the card as it is on the board (or not: archived and deleted cards may be missing). */
-export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr): CardSegment {
+export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr, stage?: SegmentStage): CardSegment {
   // Named by its key where it has one (#1221).
   const name = card ? cardLabel(card) : `#${n}`
   if (!card) return { kind: 'card', number: n, name, state: 'todo', failed: false, round: null, label: tr(msg({ id: 'board.lane.notOnBoard', defaultMessage: '{card} · not on the board', description: "A lane segment's label (Progress panel) for a card that isn't on the board (archived or deleted). {card} is its name: its key, such as AM-12, or #12 for a card with none." }), { card: name }), notes: [] }
@@ -278,7 +303,7 @@ export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr): Card
   // A failed card is in the round that failed until it goes back; a finished one passed in the round after its failures.
   const round = failed ? failures : inRound || (isFinished(state) && reviewed) ? failures + 1 : null
   const how = failed ? 'failed' : round !== null && inRound ? 'in-round' : round !== null && round > 1 ? 'after' : 'none'
-  const what = whereText(card.column, round, how, 'waiting', tr)
+  const what = whereText(card.column, round, how, 'waiting', tr, stage)
   const notes: string[] = []
   // The red underline: which round failed and what comes next, then the reviewer's own one-line gist.
   if (failed) {
@@ -289,7 +314,8 @@ export function cardSegment(n: number, card: TaskCard | undefined, tr: Tr): Card
   // The red cross-hatching: why it can't go on.
   const why = state === 'blocked' ? blockedNote(name, card.column === 'hold', card.blocked, true, tr) : null
   if (why) notes.push(why)
-  return { kind: 'card', number: n, name, state, failed, round, label: segmentLabel(name, card.title, what, tr), notes }
+  const stages = stage && stage.category.length > 1 ? stage.category.map((s) => ({ ...s, own: s.id === stage.id })) : undefined
+  return { kind: 'card', number: n, name, state, failed, round, label: segmentLabel(name, card.title, what, tr), notes, ...(stages ? { stages } : {}) }
 }
 
 /** "#405 Built-in loop wakes · Review, round 2": a card segment's label. */
@@ -350,6 +376,14 @@ const GROUP: Record<LaneState, number> = { active: 0, paused: 1, ended: 2, aband
 export const laneRunning = (state: LaneState): boolean => GROUP[state] < 2
 
 /**
+ * The lanes Pulse shows (#1421): a project whose preset is Solo (or options customised from it) works without loops, so
+ * Pulse shows its lanes only while one runs; its ended ones stay in the Lanes tab. `preset`: a project's (folder name).
+ */
+export function pulseLanes<T extends { project: string; state: LaneState }>(lanes: readonly T[], preset: (project: string) => string | null | undefined): T[] {
+  return lanes.filter((l) => laneRunning(l.state) || preset(l.project) !== 'solo')
+}
+
+/**
  * The panel's order of lanes (#512, #568): the running ones (active and paused), then the finished ones (ended and
  * abandoned) in the order they finished, the latest last. Running lanes are in the user's order (`order`: lane ids,
  * kept per workspace) once they have moved one: lanes it doesn't name (started since) on top, newest first (paused or
@@ -408,10 +442,29 @@ export function nudgedLaneOrder(running: readonly string[], id: string, by: -1 |
   return next
 }
 
-/** Every card of a lane as a segment, in the lane's order. */
-export function laneCards(numbers: readonly number[], tasks: readonly TaskCard[], tr: Tr): CardSegment[] {
+/**
+ * Every card of a lane as a segment, in the lane's order. `stageOf`: a card's stage (laneStages.ts's segmentStage), for its label by stage
+ * name (#1421); without it, by column.
+ */
+export function laneCards(numbers: readonly number[], tasks: readonly TaskCard[], tr: Tr, stageOf?: (card: TaskCard) => SegmentStage | undefined): CardSegment[] {
   const byNumber = new Map(tasks.map((t) => [t.number, t]))
-  return numbers.map((n) => cardSegment(n, byNumber.get(n), tr))
+  return numbers.map((n) => {
+    const card = byNumber.get(n)
+    return cardSegment(n, card, tr, card && stageOf?.(card))
+  })
+}
+
+/**
+ * A running lane's old rules mark (#1421, §16.5.4), its hover and accessible name: it started under the options before a
+ * change and keeps them until it ends; new lanes and cards use the new ones. `enforced`: off, it says the rules aren't.
+ */
+export function laneOldRulesNote(enforced: boolean, tr: Tr): string {
+  return tr(msg({ id: 'board.lanes.oldRulesTip', defaultMessage: 'Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.{enforced, select, no { Workflow rules aren’t enforced now (Settings → Advanced).} other {}}', description: "Tooltip and accessible name of a lane's \"old rules\" mark (Progress panel): the project's workflow options changed while the lane ran; it keeps the ones it started with until it ends. enforced no: the switch \"Workflow rules are enforced\" (Settings → Advanced) is off. Keep the select keys. Glossary: lane, workflow options." }), { enforced: enforced ? 'yes' : 'no' }) // i18n-ignore: select keys, never shown
+}
+
+/** A card segment's old rules line (#1421): its card keeps the options it started with until it is Done. */
+export function cardOldRulesNote(enforced: boolean, tr: Tr): string {
+  return tr(msg({ id: 'board.lane.oldRules', defaultMessage: 'Old rules: this card started under the workflow options from before they changed, and keeps them until it’s Done.{enforced, select, no { Workflow rules aren’t enforced now.} other {}}', description: "A line in a lane segment's hover and accessible name (Progress panel), with its old rules mark: the card's project's workflow options changed while it was in flight, and it keeps the ones it started with until it is Done (unless they are applied to it). enforced no: the switch \"Workflow rules are enforced\" is off. Keep the select keys. Glossary: workflow options." }), { enforced: enforced ? 'yes' : 'no' }) // i18n-ignore: select keys, never shown
 }
 
 /** How many segments fit in a bar this wide (at least three: the finished fold, a card and the rest). */

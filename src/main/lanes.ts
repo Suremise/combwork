@@ -26,6 +26,7 @@ import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
 import { roundLimitCards } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
+import { rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
 import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
@@ -403,7 +404,9 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
   // Their agents whose hooks aren't arriving (#1336): such a lane pauses.
   const deaf = (l: LaneRecord): Set<string> => new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && hooksMissingFor(join(ws.path, l.project), a.id)).map((a) => a.id))
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined))
+  // Each project's ruleset now, for the old rules marks (#1421): only read when a running lane recorded one.
+  const current = lanes.some((l) => running(l) && l.ruleset) ? await rulesetsNow(ws) : new Map<string, string>()
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase())))
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
@@ -955,7 +958,8 @@ export function startLanes(): void {
   if (started) return
   started = true
   onHiveEvent((e) => {
-    if (e.type !== 'tasks-changed') return
+    // A project's workflow written (#1421): its lanes' old rules marks may have come or gone.
+    if (e.type !== 'tasks-changed' && e.type !== 'workflow-changed') return
     const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
     if (ws) changed(ws)
   })

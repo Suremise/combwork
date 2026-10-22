@@ -102,6 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { rulesetsNow } from './workflow/rulesets'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -702,9 +703,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
-    'tasks:workBadges': () => {
+    'tasks:workBadges': async () => {
       const ws = currentWorkspace()
-      return ws.path ? workBadges(ws) : []
+      if (!ws.path) return []
+      // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
+      const now = await rulesetsNow(ws)
+      return ws.path ? workBadges(ws, now) : []
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)

@@ -190,6 +190,8 @@
   "tips.laneNotices.title": "Suis un couloir, même sans l’Assistant",
   "tips.laneStart.text": "Fais un clic droit sur la colonne À faire et choisis Démarrer un couloir avec ces cartes… : choisis l’auteur et le relecteur, mets les cartes dans l’ordre, et les deux démarrent avec des consignes. Termine ou abandonne un couloir depuis sa ligne dans le panneau Progression.",
   "tips.laneStart.title": "Démarre un couloir toi-même",
+  "tips.lanesLegend.text": "Survole la barre Couloirs du panneau Progression pour voir sa légende : chaque couleur est une catégorie, avec ses étapes. Un couloir marqué anciennes règles garde les options du flux de travail avec lesquelles il a démarré jusqu’à sa fin.",
+  "tips.lanesLegend.title": "Ce que veulent dire les couleurs d’un couloir",
   "tips.language.text": "Hive suit la langue d’affichage de Windows quand il l’a. Paramètres → Général → Langue en choisit une autre ; les langues traduites par IA sont signalées, et les améliorations sont les bienvenues. Hive parle toujours aux agents en anglais.",
   "tips.language.title": "Hive dans ta langue",
   "tips.leftoverProcesses.text": "Un serveur d’aperçu ou un tail -f lancé par un agent peut continuer à tourner après son arrêt, en bloquant le dossier du projet ou un port. Hive les liste dans le menu ⋯ du volet de l’agent et propose de les arrêter ; Paramètres → Agents peut les arrêter à chaque fois.",

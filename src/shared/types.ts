@@ -1000,6 +1000,8 @@ export type PresetAsked = 'chosen' | 'notNow'
 export interface ProjectStages {
   stages: StageDef[]
   names: Partial<Record<StageDef['id'], string>>
+  /** The preset its options started from (null: none chosen): Solo hides its ended lanes from Pulse (#1421). */
+  preset: PresetId | null
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
@@ -2759,6 +2761,11 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /**
+   * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
+   * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
+   */
+  oldRules: boolean
 }
 
 /**

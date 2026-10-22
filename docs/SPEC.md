@@ -2961,6 +2961,26 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   are #1353's.
 - **P6** [#1122 c]: stage names in hovers and accessible names over the categories' colours and patterns; the legend
   by stage; Solo shows no lanes section unless a loop runs; links to the Version Control tab; "old rules" marks.
+  **Built [#1421]:**
+  - A segment keeps its category's colour and pattern (no stage gets one of its own). Its hover and accessible name
+    say the card's **stage** (`WorkBadge.stage` through `stageName`, with its project's renames from
+    `workflow:stages`). Where its category shows two stages (Approved and Merging), its hover lists both with a thin
+    divider and the card's own in bold.
+  - **The legend** is on the Lanes bar's hover and keyboard focus (Esc closes it; screen readers get it as the bar's
+    description), and on a Legend button in the Lanes tab. It lists the categories in the lanes' order, each with its
+    segment's swatch and the stages in it of the lanes' projects, renames included.
+  - **Solo:** Pulse leaves out a project's lanes while its preset is Solo (or Custom from Solo), unless one of them
+    runs. Its ended lanes stay in the Lanes tab, and so does Start Lane.
+  - **Links:** a lane's header names its project, a link to its Version Control tab at Workflow. The Merges tab's
+    queue card opens the Merge queue section (#1416).
+  - **Old rules** (§16.5.4): `LaneInfo.oldRules` for a running lane whose recorded ruleset (`lane_runs.ruleset`) isn't
+    its project's current one; `WorkBadge.oldRules` for a card in flight whose own ruleset (`ownRuleset`: its
+    cycle's, or the latest Apply to cards in flight) isn't. Both are computed in main against each project's ruleset
+    now (compiled, not stored), and read again on `workflow-changed`. A lane row shows an *old rules* tag, and a card
+    segment a hollow square, each saying what it means in its hover and accessible name. An ended or abandoned lane,
+    a card in Todo or Done, and a lane or card with no ruleset recorded have none. A rename never sets it (names
+    aren't in the ruleset). With `hive.workflow.enforce` off it still shows, and its hover says the rules aren't
+    enforced.
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
   copies' runs as checks of the revision; slot warming as runs; "waiting for a slot".
 
