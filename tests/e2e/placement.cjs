@@ -158,6 +158,26 @@ const launch = async () => {
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+Shift+ArrowRight')
   check('…and Move Agent Right puts it back', !!(await lib.until(async () => savedCells('grid6') === '. One . . . Two' && (await shownCells()) === '. One . . . Two', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+
+  // --- Two moves of a pane, the later refused while the earlier's save is held (#1229 round 3): the panes show the
+  // earlier's cells, and once it is saved, what was saved, with no other refresh needed.
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=20000*1'))
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+  check('Move Agent Left on Two, its save held', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
+  // The next save fails at once (the held one has taken its delay already, and takes no failure once this one has).
+  await app.evaluate(() => void (process.env.HIVE_TEST_FAIL_IPC = 'agents:place*1'))
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+  const refused = page.locator('.toast', { hasText: 'Could not move the agent' })
+  check("…Move Agent Left again, refused: the panes show the first move's cells, not the refused one's", !!(await lib.until(async () => (await refused.count()) > 0 && (await shownCells()) === '. One . . Two .', HUNG_MS)), `${await refused.count()} toasts / ${await shownCells()}`)
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = process.env.HIVE_TEST_FAIL_IPC = ''))
+  // Bound: the save's hold left over, plus a hung run's.
+  check('…once the first is saved, the panes show what was saved', !!(await lib.until(async () => savedCells('grid6') === '. One . . Two' && (await shownCells()) === '. One . . Two .', 20000 + HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+  await page.locator('.toast .icon-btn[aria-label="Dismiss"], .toast button[title="Dismiss"]').first().click().catch(() => undefined)
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowRight')
+  check('…and Move Agent Right puts it back again', !!(await lib.until(async () => savedCells('grid6') === '. One . . . Two' && (await shownCells()) === '. One . . . Two', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
   for (const t of ['dark', 'light']) {
     await theme(t)
     await page.screenshot({ path: path.join(lib.WORK, `placement-1-grid-${t}.png`) })

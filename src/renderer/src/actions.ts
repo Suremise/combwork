@@ -991,9 +991,10 @@ export async function moveAgent(path: string, agentId: string, index: number): P
   focusAgent(path, agentId)
   // Kept as shown until saved (#1229): a refresh that read the order before the save doesn't put it back meanwhile.
   const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
-  const saved = await attempt(moveFailed(), () => call('agents:move', path, agentId, index)).finally(end)
-  // Puts the tabs back as saved; the move's own error was already shown, and the next refresh catches up anyway.
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  const saved = await attempt(moveFailed(), () => call('agents:move', path, agentId, index))
+  // Puts the tabs back as saved (refused, or the last of quick moves, one refused); the move's own error was already
+  // shown, and the next refresh catches up anyway.
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /**
@@ -1008,8 +1009,8 @@ export async function swapAgents(path: string, agentId: string, otherId: string)
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
   focusAgent(path, agentId)
   const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
-  const saved = await attempt(moveFailed(), () => call('agents:swap', path, agentId, otherId)).finally(end)
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  const saved = await attempt(moveFailed(), () => call('agents:swap', path, agentId, otherId))
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /** Moves the focused agent (or `agentId`) one place left or right, across pages at their edges. */
@@ -1062,9 +1063,9 @@ export function placeAgent(path: string, agentId: string, target: number): boole
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, config, agents } : x)) } }))
   focusAgent(path, agentId)
   const end = movesShown.begin(path, { order: agents.map((a) => a.id), placement: config.placement, layout: config.layout })
-  void attempt(moveFailed(), () => call('agents:place', path, layout, cells)).finally(end).then((saved) => {
-    // Puts the panes back as saved; the move's own error was already shown.
-    if (!saved) void refreshWorkspace()
+  void attempt(moveFailed(), () => call('agents:place', path, layout, cells)).then((saved) => {
+    // Puts the panes back as saved (refused, or the last of quick moves, one refused); the move's own error was already shown.
+    if (end(!!saved) || !saved) void refreshWorkspace()
   })
   return true
 }
