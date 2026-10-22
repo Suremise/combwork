@@ -1,31 +1,48 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
-import { CONTRADICTIONS, FORM_OPTIONS, formShows, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
-import { stageNameProblemText } from '@shared/workflow/stages'
+import { compile, mustCompile } from '@shared/workflow/compile'
+import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
+import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { cx } from '../util'
 import { Icon, Switch, Tooltip } from './ui'
 
 /**
- * Project Settings → Workflow (#1278, SPEC §16.19: P4's plain form, before the Version Control tab): the version control
- * (detected, read-only), a preset, and a row per option this version offers, each with where its value comes from and,
- * when the project sets it, a way back to inheriting. Edits are a draft until Save, which shows what changes and what
- * keeps the old rules first (§16.6.5), and lets the user apply the change to cards in flight (OP-38).
+ * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
+ * with what it sets and why, previewed before it fills the form, and All off; then the options in groups (Review,
+ * Checks, Merging, Where cards are built or The work, Stages, and what is shown here but set elsewhere), each worded as
+ * an outcome with one sentence on what it does, where its value comes from and, when the project sets it, a way back to
+ * inheriting. A value that contradicts another says why under both rows at once and keeps Save off. Edits are a draft
+ * until Save, which shows what changes and what keeps the old rules first (§16.6.5), lets the user apply the change to
+ * cards in flight (OP-38), and is refused if the options changed meanwhile (the save carries what it was read with).
  */
 
 const T = {
-  platform: msg({ id: 'workflow.form.platform', defaultMessage: 'Version control', description: 'A row of Project Settings → Workflow (glossary 2.1): the project’s version control, detected, shown read-only.' }),
-  platformDesc: msg({ id: 'workflow.form.platformDesc', defaultMessage: 'Found in the project folder. The options below are this version control’s.', description: 'Under the row "Version control" of Project Settings → Workflow.' }),
-  git: msg({ id: 'workflow.form.git', defaultMessage: 'Git', description: 'A version control system’s name (glossary 2.1: keep).' }),
-  none: msg({ id: 'workflow.form.none', defaultMessage: 'None', description: 'The version control of a project without any (glossary 2.1: None).' }),
   preset: msg({ id: 'workflow.form.preset', defaultMessage: 'Preset', description: 'A row of Project Settings → Workflow (glossary 2.1: preset): one choice that fills in every option.' }),
   presetDesc: msg({ id: 'workflow.form.presetDesc', defaultMessage: 'Fills in every option at once. Changing an option afterwards makes it Custom.', description: 'Under the row "Preset" of Project Settings → Workflow. Custom is a preset’s name: as translated there.' }),
   startedFrom: msg({ id: 'workflow.form.startedFrom', defaultMessage: 'Custom, started from {preset}', description: 'Project Settings → Workflow: the options were changed after a preset was chosen. {preset} is its name.' }),
-  choose: msg({ id: 'workflow.form.choose', defaultMessage: 'Choose a preset…', description: 'The first entry of the preset choice in Project Settings → Workflow, when none was chosen.' }),
+  noPreset: msg({ id: 'workflow.form.noPreset', defaultMessage: 'No preset chosen', description: 'The Workflow section’s preset line when the options didn’t start from a preset (glossary 2.1: preset).' }),
+  presetsLabel: msg({ id: 'workflow.form.presetsLabel', defaultMessage: 'Presets', description: 'Accessible name of the list of presets in the Workflow section (glossary 2.1: preset).' }),
+  allOff: msg({ id: 'workflow.form.allOff', defaultMessage: 'All off', description: 'A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4).' }),
+  allOffSummary: msg({ id: 'workflow.form.allOffSummary', defaultMessage: 'No review, nothing checked, everyone in the project folder: cards move freely, and Hive still records what happens.', description: 'What the choice “All off” sets up, under its name in the Workflow section.' }),
+  previewHead: msg({ id: 'workflow.form.previewHead', defaultMessage: 'What {preset} sets, and why:', description: 'Above the list of options a preset sets, in its preview in the Workflow section (glossary 2.1: preset). {preset} is its name.' }),
+  previewChanges: msg({ id: 'workflow.form.previewChanges', defaultMessage: '{n, plural, =0 {Nothing here changes.} one {Marked: the option it changes here.} other {Marked: the # options it changes here.}}', description: 'In a preset’s preview in the Workflow section: how many of the options it sets differ from the form now (those are marked).' }),
+  previewNow: msg({ id: 'workflow.form.previewNow', defaultMessage: 'Now: {value}', description: 'In a preset’s preview, beside an option it changes: its value in the form now.' }),
+  use: msg({ id: 'workflow.form.use', defaultMessage: 'Use {preset}', description: 'A button in a preset’s preview: fills the form with it (saved only with Save…). {preset} is its name.' }),
+  closePreview: msg({ id: 'workflow.form.closePreview', defaultMessage: 'Close', description: 'A button in a preset’s preview: closes it without changing the form.' }),
+  neverOffHead: msg({ id: 'workflow.form.neverOffHead', defaultMessage: 'What never turns off, to keep your work safe:', description: 'Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section.' }),
+  neverOff: {
+    fileLocks: msg({ id: 'workflow.form.neverOff.fileLocks', defaultMessage: 'File locks, while their own setting has them on.', description: 'A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides).' }),
+    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Hive never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
+    folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
+    queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
+  },
   unavailable: msg({ id: 'workflow.form.unavailable', defaultMessage: '{preset}: {why}', description: 'A preset that can’t be chosen yet, under the preset choice. {preset} is its name, {why} a whole sentence saying why.' }),
   from: {
     preset: msg({ id: 'workflow.form.from.preset', defaultMessage: 'From the preset', description: 'Where a workflow option’s value comes from: the preset chosen.' }),
@@ -52,7 +69,8 @@ const T = {
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
   worktree: msg({ id: 'workflow.form.worktree', defaultMessage: 'In this version, a card’s own folder is its builder’s worktree.', description: 'Under “Where cards are built” in Project Settings → Workflow.' }),
-  owned: msg({ id: 'workflow.form.owned', defaultMessage: 'Set in {where}.', description: 'Under a read-only row of Project Settings → Workflow (file locks, card loops): where the setting is changed. {where} is a link to it.' }),
+  stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
+  stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
   fileLocks: msg({ id: 'workflow.form.fileLocks', defaultMessage: 'File locks', description: 'A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7).' }),
   agentsSection: msg({ id: 'workflow.form.agentsSection', defaultMessage: 'Agents & Worktrees', description: 'A link to the section "Agents & Worktrees" of Project Settings: use its name as translated there.' }),
   loops: msg({ id: 'workflow.form.loops', defaultMessage: 'Rounds and wait', description: 'A read-only row of Project Settings → Workflow: the card loops’ rounds and wait.' }),
@@ -61,6 +79,7 @@ const T = {
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
+  saveBlocked: msg({ id: 'workflow.form.saveBlocked', defaultMessage: 'Resolve what the options say first.', description: 'The tooltip of Save… in the Workflow section while some options contradict each other (their reasons are shown under them).' }),
   discard: msg({ id: 'workflow.form.discard', defaultMessage: 'Discard Changes', description: 'The button dropping unsaved changes to the workflow options.' }),
   copy: msg({ id: 'workflow.form.copy', defaultMessage: 'Copy as JSON', description: 'The button copying the project’s workflow options as JSON, to paste into another project.' }),
   copied: msg({ id: 'workflow.form.copied', defaultMessage: 'Workflow options copied', description: 'A notification: the workflow options were copied to the clipboard.' }),
@@ -73,6 +92,7 @@ const T = {
   cantSave: msg({ id: 'workflow.form.cantSave', defaultMessage: 'These options can’t be saved:', description: 'Above the reasons the workflow options can’t be saved, each a sentence of its own.' }),
   confirmTitle: msg({ id: 'workflow.form.confirmTitle', defaultMessage: 'Save Workflow Options', description: 'The title of the dialog before saving workflow options.' }),
   confirmMessage: msg({ id: 'workflow.form.confirmMessage', defaultMessage: 'The new options apply from the next card that starts.', description: 'The message of the dialog before saving workflow options.' }),
+  appliesNow: msg({ id: 'workflow.form.appliesNow', defaultMessage: 'Only the stage names change: names aren’t rules, so they apply now, to every card.', description: 'The message of the dialog before saving workflow options when only stage names change (glossary 2.2: stage).' }),
   changesHead: msg({ id: 'workflow.form.changesHead', defaultMessage: 'What changes:', description: 'In the dialog before saving workflow options: above the list of options that change, each with its old and new value.' }),
   changeLine: msg({ id: 'workflow.form.changeLine', defaultMessage: '{option}: {from} → {to}', description: 'A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value.' }),
   noChanges: msg({ id: 'workflow.form.noChanges', defaultMessage: 'No option changes: only the preset they started from.', description: 'In the dialog before saving workflow options, when no option’s value changes.' }),
@@ -81,6 +101,7 @@ const T = {
   laneUnnamed: msg({ id: 'workflow.form.laneUnnamed', defaultMessage: 'Builder {builder}', description: 'A running lane without a name in the dialog before saving workflow options: its builder agent.' }),
   inFlight: msg({ id: 'workflow.form.inFlight', defaultMessage: '{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}', description: 'In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it.' }),
   saved: msg({ id: 'workflow.form.saved', defaultMessage: 'Workflow options saved', description: 'A notification: the workflow options were saved.' }),
+  changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
@@ -95,6 +116,9 @@ interface CopiedOptions {
   options: Partial<WorkflowOptions>
 }
 
+/** A choice the preset area previews: a preset, or All off (§16.6.4). */
+type Choice = PresetId | 'allOff'
+
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 const list = (s: string): string[] =>
   s
@@ -102,48 +126,115 @@ const list = (s: string): string[] =>
     .map((x) => x.trim())
     .filter(Boolean)
 
+/** Options without their platform, as a draft keeps them. */
+const ownOptions = (o: WorkflowOptions): Partial<WorkflowOptions> => {
+  const { platform: _p, ...rest } = o
+  return rest
+}
+
+/** Whether the project's own preset and options are still those the form was read with (keys in any order). */
+const sameOwn = (a: { preset: PresetId | null; options: Partial<WorkflowOptions> }, b: { preset: PresetId | null; options: Partial<WorkflowOptions> }): boolean => {
+  const sorted = (o: object): string => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([x], [y]) => x.localeCompare(y))))
+  return a.preset === b.preset && sorted(a.options) === sorted(b.options)
+}
+
 export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
-  const [form, setForm] = useState<WorkflowForm | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [draft, setDraft] = useState<WorkflowChange | null>(null)
+  // The form as read and its draft, kept with the project they are for: another project's never shows (HR5's round 1).
+  const [loaded, setLoaded] = useState<{ for: string; form: WorkflowForm; draft: WorkflowChange } | null>(null)
+  const [failed, setFailed] = useState<{ for: string; error: string } | null>(null)
   const [problems, setProblems] = useState<WorkflowProblem[]>([])
+  const [preview, setPreview] = useState<Choice | null>(null)
   const settings = useStore((s) => s.settings)
+  const version = useStore((s) => s.workflowVersion)
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
-  // Read for each project; the form's own saves read it again themselves.
+  /** The project shown now (a read's answer for another is dropped), the newest read's number, and the draft's edits. */
+  const pathRef = useRef(project.path)
+  pathRef.current = project.path
+  const reads = useRef(0)
+  const edits = useRef(0)
+  const shownFor = useRef<string | null>(null)
+  const dirtyRef = useRef(false)
+  const form = loaded?.for === project.path ? loaded.form : null
+  /** Whether the shown project's form is on screen (a failed reload keeps it, with any edits). */
+  const hasForm = useRef(false)
+  hasForm.current = !!form
+  const draft = loaded?.for === project.path ? loaded.draft : null
+  const error = failed?.for === project.path ? failed.error : null
+
+  /** The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. */
+  const show = useCallback((path: string, f: WorkflowForm): void => {
+    reads.current++
+    if (pathRef.current !== path) return
+    setLoaded({ for: path, form: f, draft: { preset: f.preset, options: { ...f.own } } })
+    setProblems([])
+    setFailed(null)
+  }, [])
+  /** An edit of the draft (by the user: a reload under way never replaces it). */
+  const setDraft = (change: WorkflowChange): void => {
+    edits.current++
+    setLoaded((l) => (l && l.for === pathRef.current ? { ...l, draft: change } : l))
+  }
+  /**
+   * Reads the project's form. Only the newest read's answer is shown, and only while its project is shown; a reload
+   * (`auto`: the options changed elsewhere) is dropped if the draft was edited while it waited, and its failure leaves
+   * the form shown as it is.
+   */
+  const load = useCallback(
+    async (auto: boolean): Promise<void> => {
+      const path = project.path
+      const n = ++reads.current
+      const edited = edits.current
+      try {
+        const f = await call('workflow:form', path)
+        if (n !== reads.current || pathRef.current !== path || (auto && edits.current !== edited)) return
+        show(path, f)
+      } catch (e) {
+        // A reload that fails keeps the form shown, and the edits in it (HR5's round 2): its save is still checked
+        // against what is saved. Only a first read's failure, with no form to show, is said in its place.
+        if (n !== reads.current || pathRef.current !== path || (auto && hasForm.current)) return
+        setFailed({ for: path, error: errorMessage(e) })
+      }
+    },
+    [project.path, show]
+  )
+  // Read for each project, and again when its options change elsewhere (`workflow-changed`: the Assistant's tool, another
+  // window) while nothing here is unsaved; unsaved edits stay, and their Save is refused as changed meanwhile.
   useEffect(() => {
-    let live = true
-    call('workflow:form', project.path)
-      .then((f) => {
-        if (!live) return
-        setForm(f)
-        setDraft({ preset: f.preset, options: { ...f.own } })
-        setProblems([])
-        setError(null)
-      })
-      .catch((e) => live && setError(errorMessage(e)))
-    return () => {
-      live = false
+    const again = shownFor.current === project.path
+    shownFor.current = project.path
+    if (!again) {
+      setPreview(null)
+      setProblems([])
     }
-  }, [project.path])
+    if (again && dirtyRef.current) return
+    void load(again)
+  }, [load, project.path, version])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
+  const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
+  dirtyRef.current = dirty
   if (error) return <div className="s-desc error">{tr(T.loadFailed, { error })}</div>
   if (!form || !draft || !effective) return null
+  const platform = form.platform
   const presetOf = (id: PresetId | null): WorkflowOptions | null => form.presets.find((p) => p.id === id)?.options ?? null
   const presetOptions = presetOf(draft.preset)
-  const custom = !!presetOptions && FORM_OPTIONS[form.platform].some((k) => !same(presetOptions[k], effective[k]))
-  const dirty = draft.preset !== form.preset || !same(draft.options, form.own)
+  const custom = !!presetOptions && FORM_OPTIONS[platform].some((k) => !same(presetOptions[k], effective[k]))
+  const live = liveContradictions(effective)
+  const stageProblems = stageNameProblems(effective.stageNames, tr)
+  const blocked = contradictions(effective).length > 0 || stageProblems.length > 0
   const set = <K extends OptionKey>(key: K, value: WorkflowOptions[K]): void => setDraft({ ...draft, options: { ...draft.options, [key]: value } })
   const inheritKey = (key: OptionKey): void => {
     const { [key]: _gone, ...rest } = draft.options
     setDraft({ ...draft, options: rest })
   }
-  const choosePreset = (id: PresetId): void => {
-    const p = presetOf(id)
+  /** The options a choice fills in; the stage names (N5) aren't rules, so the project's stay (#1417). */
+  const choiceOptions = (c: Choice): WorkflowOptions | null => (c === 'allOff' ? allOff(platform) : presetOf(c))
+  const choose = (c: Choice): void => {
+    const p = choiceOptions(c)
     if (!p) return
-    const { platform: _p, ...options } = p
-    // A preset fills in the rules; the stage names (N5) aren't rules, so the project's stay (#1417).
-    setDraft({ preset: id, options: draft.options.stageNames ? { ...options, stageNames: draft.options.stageNames } : options })
+    const options = ownOptions(p)
+    setDraft({ preset: c === 'allOff' ? null : c, options: draft.options.stageNames ? { ...options, stageNames: draft.options.stageNames } : options })
+    setPreview(null)
   }
   const originOf = (key: OptionKey): WorkflowOptionOrigin | 'preset' => {
     if (!(key in draft.options)) return form.inheritedOrigins[key]
@@ -151,32 +242,43 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
   }
 
   const save = async (): Promise<void> => {
-    const check = await call('workflow:check', project.path, draft)
+    // What the form was read with: the save is refused if the project's options are no longer these (#1418).
+    const change: WorkflowChange = { ...draft, base: { preset: form.preset, options: form.own } }
+    const check = await call('workflow:check', project.path, change)
     setProblems(check.problems)
     if (check.problems.length) return
     // Each option that changes, its value now and its new one (the Assistant for Darren: a list, never one sentence).
     const changes = check.changed.flatMap((k) => {
-      const title = k === 'platform' ? null : (optionTitle(k, form.platform) ?? OPTION_TEXT[k]?.title)
+      const title = k === 'platform' ? null : (optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]?.title)
       return title && k !== 'platform' ? [tr(T.changeLine, { option: tr(title), from: valueText(k, form.options[k]), to: valueText(k, effective[k]) })] : []
     })
     const picked = new Set<number>()
+    let stale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
-      message: tr(T.confirmMessage),
+      message: tr(check.appliesNow ? T.appliesNow : T.confirmMessage),
       wide: true,
       content: <SaveDetails changes={changes} check={check} picked={picked} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
-        const f = await call('workflow:setOptions', project.path, draft, { applyTo: [...picked] })
-        setForm(f)
-        setDraft({ preset: f.preset, options: { ...f.own } })
+        const path = project.path
+        try {
+          show(path, await call('workflow:setOptions', path, change, { applyTo: [...picked] }))
+        } catch (e) {
+          // Changed meanwhile (the Assistant's tool, another window): never written over; shown as it is now.
+          const now = await call('workflow:form', path).catch(() => null)
+          if (!now || sameOwn({ preset: now.preset, options: now.own }, { preset: form.preset, options: form.own })) throw e
+          stale = true
+          show(path, now)
+        }
       }
     })
-    if (ok) notify('success', tr(T.saved))
+    if (stale) notify('warning', tr(T.changedMeanwhile))
+    else if (ok) notify('success', tr(T.saved))
   }
   const copy = (): void => {
-    const { platform, ...options } = effective
-    const out: CopiedOptions = { hiveWorkflow: 1, platform, preset: draft.preset, options }
+    const { platform: p, ...options } = effective
+    const out: CopiedOptions = { hiveWorkflow: 1, platform: p, preset: draft.preset, options }
     void navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => notify('success', tr(T.copied)))
   }
   const paste = async (): Promise<void> => {
@@ -195,7 +297,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
           v = null
         }
         if (!v || v.hiveWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
-        if (v.platform !== form.platform) throw new Error(tr(T.pastePlatform))
+        if (v.platform !== platform) throw new Error(tr(T.pastePlatform))
         const change: WorkflowChange = { preset: v.preset ?? null, options: v.options }
         // Checked as a save would check it (OP-5): refused with its reasons, else it fills the form, to save.
         const check = await call('workflow:check', project.path, change)
@@ -206,13 +308,38 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     })
   }
 
+  /** A value in words: the Inherit button's tooltip, what a save changes, a preset's preview. */
+  const valueText = (key: OptionKey, v: unknown): string => {
+    if (typeof v === 'boolean') return tr(v ? T.on : T.off)
+    if (key === 'review') return tr(platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+    const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
+    if (values && typeof v === 'string' && values[v]) return tr(values[v])
+    // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
+    if (key === 'okBefore') {
+      const ok = v as OkBefore
+      return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
+    }
+    if (key === 'identity') {
+      const id = v as WorkflowOptions['identity']
+      return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
+    }
+    if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
+    if (key === 'reviewers') return fmt.number(v as number)
+    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
+    if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
+    if (key === 'target') return (v as string) || tr(T.defaultBranch)
+    return String(v)
+  }
+
   const rowOf = (key: OptionKey): React.ReactNode => {
-    const title = optionTitle(key, form.platform)
+    const title = optionTitle(key, platform, effective.folder)
     const text = OPTION_TEXT[key]
     if (!title || !text || !formShows(key, effective)) return null
     const origin = originOf(key)
+    const reasons = live[key] ?? []
+    const stageReasons = key === 'stageNames' ? stageProblems : []
     return (
-      <div className="setting workflow-option" key={key} data-option={key}>
+      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
         <div className="s-text">
           <div className="s-title">
             {key in draft.options && <span className="modified" />}
@@ -230,31 +357,20 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
               </Tooltip>
             )}
           </div>
+          {reasons.map((c) => (
+            <div className="workflow-contradiction" role="alert" data-contradiction={c} key={c}>
+              <Icon name="warning" /> {tr(CONTRADICTIONS[c])}
+            </div>
+          ))}
+          {stageReasons.map((p) => (
+            <div className="workflow-contradiction" role="alert" data-stage-problem={`${p.stage}:${p.why}`} key={`${p.stage}:${p.why}`}>
+              <Icon name="warning" /> {shownText(stageNameProblemText(p))}
+            </div>
+          ))}
         </div>
         <div className="s-control">{controlOf(key)}</div>
       </div>
     )
-  }
-  /** A value in words, for the Inherit button's tooltip. */
-  const valueText = (key: OptionKey, v: unknown): string => {
-    if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-    if (key === 'review') return tr(form.platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
-    const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
-    if (values && typeof v === 'string' && values[v]) return tr(values[v])
-    // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
-    if (key === 'okBefore') {
-      const ok = v as OkBefore
-      return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
-    }
-    if (key === 'identity') {
-      const id = v as WorkflowOptions['identity']
-      return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
-    }
-    if (key === 'reviewers') return fmt.number(v as number)
-    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
-    if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
-    if (key === 'target') return (v as string) || tr(T.defaultBranch)
-    return String(v)
   }
   const select = <K extends OptionKey>(key: K, values: [string, string][], convert: (s: string) => WorkflowOptions[K] = (s) => s as WorkflowOptions[K]): React.ReactNode => (
     <select className="select" value={String(effective[key])} onChange={(e) => set(key, convert(e.target.value))}>
@@ -275,7 +391,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     switch (key) {
       case 'review':
         return select('review', [
-          ['none', tr(form.platform === 'none' ? V.review.noneNone : V.review.none)],
+          ['none', tr(platform === 'none' ? V.review.noneNone : V.review.none)],
           ['agent', tr(V.review.agent)],
           ['agentThenYou', tr(V.review.agentThenYou)],
           ['you', tr(V.review.you)]
@@ -284,10 +400,9 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         return select('reviewers', [['1', fmt.number(1)], ['2', fmt.number(2)]], (s) => (s === '2' ? 2 : 1))
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
-      case 'finish': {
+      case 'finish':
         // Hive merges since P5's queue (#1355).
         return select('finish', [['hiveMerges', tr(V.finish.hiveMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
-      }
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
@@ -326,6 +441,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       }
       case 'excluded':
         return <DraftText value={effective.excluded.join(', ')} placeholder={tr(T.folders)} onCommit={(v) => set('excluded', list(v))} />
+      case 'stageNames':
+        return <StageNamesEditor options={effective} onChange={(names) => (Object.keys(names).length ? set('stageNames', names) : inheritKey('stageNames'))} />
       default:
         return null
     }
@@ -333,8 +450,12 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
 
   const rounds = project.config.loopRounds ?? workspaceLoops.rounds ?? LOOP_ROUNDS
   const hours = project.config.loopWaitHours ?? workspaceLoops.waitHours
+  const choices: Choice[] = [...form.presets.filter((p) => !p.needs).map((p) => p.id), 'allOff']
+  const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
+  const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
+  const shownChoice = preview ? choiceOptions(preview) : null
   return (
-    <div className="workflow-form">
+    <div className="workflow-form" data-platform={platform}>
       {!form.enforced && (
         <div className="banner warn workflow-note" role="status">
           <Icon name="warning" />
@@ -352,45 +473,52 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
           </span>
         </div>
       )}
-      <div className="setting">
-        <div className="s-text">
-          <div className="s-title">{tr(T.platform)}</div>
-          <div className="s-desc">{tr(T.platformDesc)}</div>
+      <section className="workflow-group workflow-presets" data-group="presets">
+        <h3 className="workflow-group-h">
+          {tr(T.preset)} <span className="workflow-preset-now" data-preset-now={draft.preset ?? ''}>{presetNow}</span>
+        </h3>
+        <div className="s-desc">{tr(T.presetDesc)}</div>
+        <div className="workflow-choices" role="list" aria-label={tr(T.presetsLabel)}>
+          {choices.map((c) => (
+            <button key={c} type="button" role="listitem" className={cx('workflow-choice', preview === c && 'open', draft.preset === c && !custom && 'current')} data-choice={c} aria-expanded={preview === c} onClick={() => setPreview(preview === c ? null : c)}>
+              <span className="workflow-choice-name">{choiceName(c)}</span>
+              <span className="workflow-choice-summary">{tr(c === 'allOff' ? T.allOffSummary : (PRESET_SUMMARY[platform][c] ?? PRESET_TEXT[c]))}</span>
+            </button>
+          ))}
         </div>
-        <div className="s-control workflow-platform">{tr(form.platform === 'git' ? T.git : T.none)}</div>
-      </div>
-      <div className="setting workflow-preset">
-        <div className="s-text">
-          <div className="s-title">{tr(T.preset)}</div>
-          <div className="s-desc">{tr(T.presetDesc)}</div>
-          {/* Git's presets only: None has no merged result. */}
-          {form.platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
-          {form.presets
-            .filter((p) => p.needs)
-            .map((p) => (
-              <div className="s-desc workflow-unavailable" key={p.id}>
-                {tr(T.unavailable, { preset: tr(PRESET_TEXT[p.id]), why: tr(PRESET_NEEDS_TEXT[p.needs!]) })}
-              </div>
-            ))}
-        </div>
-        <div className="s-control">
-          <select className="select" value={draft.preset && !custom ? draft.preset : ''} onChange={(e) => e.target.value && choosePreset(e.target.value as PresetId)}>
-            <option value="" disabled>
-              {draft.preset ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(T.choose)}
-            </option>
-            {form.presets.map((p) => (
-              <option key={p.id} value={p.id} disabled={!!p.needs}>
-                {tr(PRESET_TEXT[p.id])}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {FORM_OPTIONS[form.platform].map(rowOf)}
-      {form.platform === 'none' && (
-        <ReadOnlyRow title={tr(T.fileLocks)} value={tr(msg({ id: 'workflow.form.fileLocksValue', defaultMessage: 'As set for the project’s agents', description: 'The value of the read-only row "File locks" in Project Settings → Workflow: its own setting decides.' }))} where={tr(T.agentsSection)} open={() => openProjectSettings(project.path, 'agents')} />
-      )}
-      <ReadOnlyRow title={tr(T.loops)} value={tr(T.loopsValue, { rounds, hours })} where={tr(T.loopsSection)} open={() => openProjectSettings(project.path, 'loops')} />
+        {/* Git's presets only: None has no merged result. */}
+        {platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
+        {form.presets
+          .filter((p) => p.needs)
+          .map((p) => (
+            <div className="s-desc workflow-unavailable" key={p.id}>
+              {tr(T.unavailable, { preset: tr(PRESET_TEXT[p.id]), why: tr(PRESET_NEEDS_TEXT[p.needs!]) })}
+            </div>
+          ))}
+        {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
+      </section>
+      {FORM_GROUPS[platform].map((g) => {
+        if (g.id === 'elsewhere') {
+          return (
+            <section className="workflow-group" data-group={g.id} key={g.id}>
+              <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
+              {platform === 'none' && (
+                <ReadOnlyRow title={tr(T.fileLocks)} value={tr(msg({ id: 'workflow.form.fileLocksValue', defaultMessage: 'As set for the project’s agents', description: 'The value of the read-only row "File locks" in Project Settings → Workflow: its own setting decides.' }))} where={tr(T.agentsSection)} open={() => openProjectSettings(project.path, 'agents')} />
+              )}
+              <ReadOnlyRow title={tr(T.loops)} value={tr(T.loopsValue, { rounds, hours })} where={tr(T.loopsSection)} open={() => openProjectSettings(project.path, 'loops')} />
+            </section>
+          )
+        }
+        const rows = g.options.filter((k) => formShows(k, effective))
+        if (!rows.length) return null
+        return (
+          <section className="workflow-group" data-group={g.id} key={g.id}>
+            <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
+            {rows.map(rowOf)}
+          </section>
+        )
+      })}
+      {isAllOff(effective) && <NeverOff />}
       {problems.length > 0 && (
         <div className="workflow-problems" role="alert">
           <div>{tr(T.cantSave)}</div>
@@ -400,9 +528,11 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         </div>
       )}
       <div className="workflow-actions">
-        <button className="btn primary" disabled={!dirty || !settings} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
-          {tr(T.save)}
-        </button>
+        <Tooltip content={blocked ? tr(T.saveBlocked) : null}>
+          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
+            {tr(T.save)}
+          </button>
+        </Tooltip>
         <button className="btn" disabled={!dirty} onClick={() => (setDraft({ preset: form.preset, options: { ...form.own } }), setProblems([]))}>
           {tr(T.discard)}
         </button>
@@ -414,6 +544,77 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
           {tr(T.paste)}
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A preset's preview (#1418, §16.6.3): each option it sets, with its value and why in one sentence, those it would change
+ * here marked with their value now; Use fills the form (saved only with Save…). All off lists what never turns off.
+ */
+function ChoicePreview({ choice, name, options, effective, valueText, onUse, onClose }: { choice: Choice; name: string; options: WorkflowOptions; effective: WorkflowOptions; valueText: (key: OptionKey, v: unknown) => string; onUse: () => void; onClose: () => void }) {
+  const keys = FORM_OPTIONS[options.platform].filter((k) => formShows(k, options))
+  const changed = keys.filter((k) => !same(options[k], effective[k]))
+  return (
+    <div className="workflow-preview" data-preview={choice} role="region" aria-label={tr(T.previewHead, { preset: name })}>
+      <div className="workflow-preview-h">{tr(T.previewHead, { preset: name })}</div>
+      <div className="s-desc">{tr(T.previewChanges, { n: changed.length })}</div>
+      <ul className="workflow-preview-list">
+        {keys.map((k) => {
+          const title = optionTitle(k, options.platform, options.folder)
+          const why = OPTION_WHY[k]
+          if (!title) return null
+          const changes = changed.includes(k)
+          return (
+            <li key={k} data-option={k} className={cx(changes && 'changes')}>
+              <span className="workflow-preview-option">{tr(title)}</span>: <strong>{valueText(k, options[k])}</strong>
+              {changes && <span className="workflow-preview-now faint"> · {tr(T.previewNow, { value: valueText(k, effective[k]) })}</span>}
+              {why && <div className="s-desc">{tr(why)}</div>}
+            </li>
+          )
+        })}
+      </ul>
+      {choice === 'allOff' && <NeverOff />}
+      <div className="workflow-preview-actions">
+        <button className="btn primary small" data-action="use-choice" onClick={onUse}>
+          {tr(T.use, { preset: name })}
+        </button>
+        <button className="btn subtle small" onClick={onClose}>
+          {tr(T.closePreview)}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** What never turns off, whatever the options (§16.6.4: data safety). */
+function NeverOff() {
+  return (
+    <div className="workflow-never-off" data-never-off="">
+      <div>{tr(T.neverOffHead)}</div>
+      <ul>
+        {Object.entries(T.neverOff).map(([k, m]) => (
+          <li key={k}>{tr(m)}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** N5's names (OP-30): a box per stage the options produce, its default name as the placeholder; empty keeps it. */
+function StageNamesEditor({ options, onChange }: { options: WorkflowOptions; onChange: (names: StageNames) => void }) {
+  const compiled = compile(options)
+  const stages = (compiled.ok ? compiled.ruleset : mustCompile(allOff(options.platform))).stages.map((s) => s.id)
+  const names = options.stageNames ?? {}
+  const rename = (id: StageId, v: string): void => {
+    const { [id]: _old, ...rest } = names
+    onChange(v.trim() ? { ...rest, [id]: v } : rest)
+  }
+  return (
+    <div className="workflow-stages">
+      {stages.map((id) => (
+        <DraftText key={id} value={names[id] ?? ''} placeholder={tr(STAGE_TEXT[id])} label={tr(T.stageName, { stage: tr(STAGE_TEXT[id]) })} onCommit={(v) => rename(id, v)} />
+      ))}
     </div>
   )
 }
@@ -440,10 +641,10 @@ function ReadOnlyRow({ title, value, where, open }: { title: string; value: stri
  * A text field typed freely (spaces, commas) and taken when it loses focus or on Enter: tidied then, never per keystroke
  * (HR6's round 1). A value changed from outside (a preset, a paste, Discard Changes) replaces what it shows.
  */
-function DraftText({ value, placeholder, onCommit, className = 'input' }: { value: string; placeholder: string; onCommit: (v: string) => void; className?: string }) {
+function DraftText({ value, placeholder, onCommit, className = 'input', label }: { value: string; placeholder: string; onCommit: (v: string) => void; className?: string; label?: string }) {
   const [text, setText] = useState(value)
   useEffect(() => setText(value), [value])
-  return <input className={className} value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)} onBlur={() => text !== value && onCommit(text)} onKeyDown={(e) => e.key === 'Enter' && onCommit(text)} />
+  return <input className={className} value={text} placeholder={placeholder} aria-label={label} onChange={(e) => setText(e.target.value)} onBlur={() => text !== value && onCommit(text)} onKeyDown={(e) => e.key === 'Enter' && onCommit(text)} />
 }
 
 type CheckRow = { name: string; command: string }

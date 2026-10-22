@@ -1707,8 +1707,28 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
+- **Built [#1418], the tab's Workflow section** (`WorkflowOptions.tsx`, P4's form below rewritten):
+  - **Groups** (`FORM_GROUPS`, `options.ts`), each a heading: Git's Review (G1, G1b, G2, G4, G10), Checks (G3; G9 and
+    its install while Hive merges), Merging (G5, G6, G7, G8 while Hive merges, G14), Where cards are built (G11, G12,
+    G13; G16 only with everyone in the project folder), Stages (N5) and Shown here, set elsewhere (the Card loops
+    rounds and wait); None's Review (N1, N2), Checks (N3), The work (N4, N6), Stages and elsewhere (N7 too). G15 and
+    G17 wait for slots (P7). Each row's label is §16.6.1/§16.6.2's (G1 reads *Work is reviewed before it's done* with
+    everyone in the project folder), with one sentence on what it does, its origin and Inherit. The version control
+    isn't a row: the tab's header shows it (#1416).
+  - **Contradictions as you choose** (`liveContradictions`, `CONTRADICTION_ROWS`): each contradiction's reason shows
+    under every row it is about at once, and a stage name's problem under Stage names; Save… stays off until they're
+    resolved. The save is still checked under the lock, with the same reasons.
+  - **Presets documented**: Solo, Pair (the agent merges), Pair, Team (None: Solo, Pair, Team) and **All off**
+    (§16.6.4), each with a sentence (`PRESET_SUMMARY`); choosing one previews each option it sets with its value and
+    why (`OPTION_WHY`, §16.6.3's Why column), those it would change marked with their value now, before **Use** fills
+    the form. Stage names stay through a preset. With every rule off, the section lists what never turns off.
+  - **Saving**: §16.6.5's warning as before; a change of stage names alone says it applies now (`appliesNow`). **A
+    form read before another change** is refused, never written over it: the save carries the preset and options it
+    was read with (`WorkflowChange.base`), compared under the lock (`WorkflowStale`, "changed meanwhile"), and the
+    section reloads. It reloads on `workflow-changed` too while nothing in it is unsaved. Every save goes through
+    `writeWorkflow`, so `kept`, `presetAsked` and any other field of `workflow` stay.
 - **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it (since #1416 it is the tab's
-  Workflow section, and Project Settings → Workflow links to it):
+  Workflow section, and Project Settings → Workflow links to it; #1418 rewrote it as above):
   - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per
     option this version offers (§16.19.1): Git's G1–G7, G9 and G10–G14 and G16 (G11's own folder is the builder's
     worktree), None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link
