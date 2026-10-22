@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -167,6 +167,18 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'loop.roundLimit': r(
     msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),
     msg({ id: 'workflow.refused.loop.roundLimit.next', defaultMessage: 'The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.', description: "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card." })
+  ),
+  'loop.stepNotYours': r(
+    msg({ id: 'workflow.refused.loop.stepNotYours.message', defaultMessage: '{side, select, builder {Only the builder of {card} posts its design or goes ahead with it.} other {Only the reviewer of {card} checks its design.}}', description: "A refused card loop step (#1382): the agent isn't on the side of the loop the step belongs to (a reviewer posting a design, a builder answering its own). {card} is a card key; side (select): builder or reviewer, whose step it is. Translate each sentence." }),
+    msg({ id: 'workflow.refused.loop.stepNotYours.next', defaultMessage: "{side, select, builder {Leave it to the card's builder; a reviewer answers with ok or gaps.} other {Leave it to the card's reviewer; nobody checks their own design.}}", description: "The next step after a refused card loop step from the wrong side (#1382). side: builder or reviewer, the agent the step belongs to. ok and gaps are the reviewer's answers, as agents name them: keep them as they are." })
+  ),
+  'loop.stepNotHere': r(
+    msg({ id: 'workflow.refused.loop.stepNotHere.message', defaultMessage: '{card} is in {stage}: a design is posted for its check before the work goes to review.', description: "A refused card loop step (#1382): a design was posted for a card that isn't being worked on (not in Doing). {card} is a card key; {stage} the stage it is in." }),
+    msg({ id: 'workflow.refused.loop.stepNotHere.next', defaultMessage: 'Post it while the card is being worked on, or say it in a comment.', description: 'The next step after a design posted for a card that is not being worked on (#1382).' })
+  ),
+  'loop.noStep': r(
+    msg({ id: 'workflow.refused.loop.noStep.message', defaultMessage: '{card} has no design waiting for its check.', description: "A refused card loop step (#1382): an answer to a design (OK, gaps) or going ahead with it when no design posted by its builder waits for its reviewer's check. {card} is a card key." }),
+    msg({ id: 'workflow.refused.loop.noStep.next', defaultMessage: 'Read the card: its design may have been answered, or the card moved on.', description: 'The next step after a card loop step with nothing to answer (#1382).' })
   ),
   'queue.advancing': r(
     msg({ id: 'workflow.refused.queue.advancing.message', defaultMessage: '{card} is being merged into {target} now: it can no longer be taken out of the merge queue.', description: "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name." }),

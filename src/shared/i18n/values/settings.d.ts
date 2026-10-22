@@ -676,6 +676,9 @@ interface HiveMessageValues {
   'settings.project.loopRounds.desc': undefined
   'settings.project.loopRounds.tip': undefined
   'settings.project.loopRounds.title': undefined
+  'settings.project.loopStepWaitMinutes.desc': undefined
+  'settings.project.loopStepWaitMinutes.tip': undefined
+  'settings.project.loopStepWaitMinutes.title': undefined
   'settings.project.loopWaitHours.desc': undefined
   'settings.project.loopWaitHours.tip': undefined
   'settings.project.loopWaitHours.title': undefined

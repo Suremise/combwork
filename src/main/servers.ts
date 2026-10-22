@@ -58,7 +58,7 @@ import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
-import { cardStall, laneOrderView } from './cardStall'
+import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
 import { isDoorbell } from '../shared/doorbell'
@@ -78,7 +78,7 @@ import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRe
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
-import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
+import { CATEGORY_STAGE, LOOP_STEPS, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
@@ -2085,8 +2085,8 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     history: c.history.map(entryForAgents),
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
-    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null)
+    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -2630,6 +2630,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   ask: 'ask the user about',
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
+  loopStep: 'take a card loop step on',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -2646,6 +2647,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   ask: 'asked the user',
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
+  loopStep: 'took a card loop step',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -2755,7 +2757,12 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
-  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) })
+  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),
+  'loop-step': (body) => {
+    const step = body?.step
+    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, `Unknown step "${String(step)}": ${LOOP_STEPS.join(', ')}.`)
+    return { kind: 'loopStep', step, text: textField(body, 'text', true) }
+  }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
 

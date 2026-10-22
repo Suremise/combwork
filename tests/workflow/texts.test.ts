@@ -25,6 +25,7 @@ const SAMPLE: RefusalValues = {
   revision: 'a3f2c1d',
   reason: 'waits for the design',
   waitsFor: 'AM-3',
+  side: 'builder',
   files: 'src/a.ts',
   folder: 'D:\\work\\am',
   commit: 'b4c5d6e',

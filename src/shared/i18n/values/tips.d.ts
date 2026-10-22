@@ -138,6 +138,8 @@ interface HiveMessageValues {
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined
   'tips.defaultProvider.title': undefined
+  'tips.designCheck.text': undefined
+  'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
   'tips.editTemplates.text': undefined

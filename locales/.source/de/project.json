@@ -297,6 +297,8 @@
   "project.settings.saveFailed": "Could not save project settings",
   "project.settings.search": "Search {project} settings",
   "project.settings.sessionsIn": "Sessions in {project} will run every command, edit and network call without asking.",
+  "project.settings.stepWait": "Design check wait (minutes)",
+  "project.settings.stepWaitDefault": "Default ({count, number} min)",
   "project.settings.waitHours": "Wait (hours)",
   "project.settings.wake": "Wake reviewers and builders",
   "project.settings.warnOver": "Warn when a transcript is over",

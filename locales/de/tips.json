@@ -136,6 +136,8 @@
   "tips.dateFormat.title": "Datumsangaben nach deinem Geschmack",
   "tips.defaultProvider.text": "Der Standardanbieter ist „Automatisch“, solange du keinen wählst: Neue Agenten verwenden den ersten Coding-Agenten, der eingeschaltet und installiert ist. So funktioniert auch Codex oder GitHub Copilot allein, ohne Claude Code. Wähle unter Einstellungen → Anbieter einen, um immer diesen zu verwenden.",
   "tips.defaultProvider.title": "Neue Agenten verwenden, was du installiert hast",
+  "tips.designCheck.text": "Bitte den Bearbeiter einer Kartenschleife zuerst um einen Entwurf: Er postet ihn auf der Karte, Hive weckt den Reviewer zur Prüfung, und die Antwort weckt den Bearbeiter. Kommt innerhalb der Wartezeit auf Entwurfsprüfung (Projekteinstellungen → Kartenschleifen) keine Antwort, macht er wie gepostet weiter.",
+  "tips.designCheck.title": "Einen Entwurf vor dem Bauen prüfen lassen",
   "tips.developerConsole.text": "Schalte Einstellungen → Erweitert → „Entwicklerfunktionen anzeigen“ ein; dann öffnet Hilfe → Entwicklerkonsole ein eigenes Fenster: Wähle einen Agenten und sieh jeden Hook und jede Statuszeile neben dem, was Hive daraus gemacht hat, geschwärzt. Filtern, suchen und pausieren geht während des Laufs.",
   "tips.developerConsole.title": "Sehen, was eine CLI an Hive sendet",
   "tips.editTemplates.text": "Wähle in der Ansicht „Vorlagen“ eine Vorlage und dann „Bearbeiten…“: Füge Agenten hinzu, kopiere, sortiere oder entferne sie, ändere jeden im Dialog „Agent-Einstellungen“ (sein „Speichern“ speichert auch die Vorlage), benenne sie um und wähle ihr Layout.",

@@ -136,6 +136,8 @@
   "tips.dateFormat.title": "Les dates à ta façon",
   "tips.defaultProvider.text": "Fournisseur par défaut est sur Automatique sauf si tu en choisis un : les nouveaux agents utilisent le premier agent de code activé et installé, donc Codex ou GitHub Copilot seul fonctionne sans Claude Code. Choisis-en un dans Paramètres → Fournisseurs pour toujours l’utiliser.",
   "tips.defaultProvider.title": "Les nouveaux agents utilisent ce que tu as installé",
+  "tips.designCheck.text": "Demande d’abord une conception à l’auteur d’une boucle de cartes : il la publie sur la carte, Hive réveille le relecteur pour qu’il la vérifie, et la réponse réveille l’auteur. Sans réponse dans l’Attente de la vérification de conception (Paramètres du projet → Boucles de cartes), il continue tel que publié.",
+  "tips.designCheck.title": "Fais vérifier une conception avant de construire",
   "tips.developerConsole.text": "Active Paramètres → Avancé → Afficher les fonctions pour développeurs, puis Aide → Console de développement ouvre une fenêtre à part : choisis un agent et vois chaque hook et chaque ligne d’état à côté de ce que Hive en a compris, expurgés. Filtre, cherche et mets en pause pendant qu’elle tourne.",
   "tips.developerConsole.title": "Voir ce qu’une CLI envoie à Hive",
   "tips.editTemplates.text": "Sélectionne un modèle dans la vue Modèles et choisis Modifier… : ajoute, copie, réordonne ou retire ses agents, modifie chacun dans la boîte de dialogue Paramètres de l’agent (son bouton Enregistrer enregistre aussi le modèle), renomme-le et choisis sa disposition.",

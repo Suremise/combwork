@@ -136,6 +136,8 @@
   "tips.dateFormat.title": "按你的习惯显示日期",
   "tips.defaultProvider.text": "除非你另行选择，“默认提供方”为“自动”：新智能体使用第一个已启用且已安装的编程智能体，因此只装了 Codex 或 GitHub Copilot 也能用，无需 Claude Code。在“设置”→“提供方”中选定一个，就会一直使用它。",
   "tips.defaultProvider.title": "新智能体使用你已安装的工具",
+  "tips.designCheck.text": "先让卡片循环的构建者提交设计方案：它发布在卡片上，Hive 唤醒评审者来检查，回复会唤醒构建者。如果在“设计检查等待时间”（项目设置 → 卡片循环）内没有回复，它会按发布的方案继续。",
+  "tips.designCheck.title": "构建前先让人检查设计方案",
   "tips.developerConsole.text": "打开“设置”→“高级”→“显示开发者功能”后，“帮助”→“开发者控制台”会打开一个独立窗口：选择一个智能体，即可看到每个钩子和状态行，以及 Hive 对它的解读（已脱敏）。运行时可以筛选、搜索和暂停。",
   "tips.developerConsole.title": "查看 CLI 发给 Hive 的内容",
   "tips.editTemplates.text": "在“模板”视图中选择一个模板，然后选择“编辑…”：添加、复制、重新排序或删除其中的智能体，在“智能体设置”对话框中逐个修改（其中的“保存”也会保存模板），重命名模板并选择其布局。",

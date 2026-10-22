@@ -1,8 +1,9 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { columnSince, laneOrderWaitReason, notWatchingReason, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
+import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
+import { loopStepWaitMinutes } from '../shared/lanes'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 
@@ -10,8 +11,8 @@ import { workspaceOf, type WorkspaceService } from './workspace'
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
  * (its agent gone or not running), a card an agent in a card loop left with no watch (#376), or one waiting in Review on
  * a reviewer that watches it but hasn't started (#521), or on one that started and only watches it, with no verdict (#843),
- * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410).
- * Null when it isn't.
+ * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410),
+ * or a Doing card whose builder waits on a check of its design nobody gives (#1382). Null when it isn't.
  */
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
@@ -25,12 +26,13 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
 
 /**
  * Why a card is stalled, given its agent as it is now (null: removed; its name and whether it runs), its workspace's
- * folder, and its running lane (none: no lane's deadlock is looked for).
+ * folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its check
+ * (stepWaitMs: its project's Card loops → Design check wait).
  */
-export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null): string | null {
+export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000): string | null {
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
-  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers)
+  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs)
 }
 
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
@@ -42,6 +44,12 @@ export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: stri
     return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }
   })
 })
+
+/** How long a card's design waits for its check (#1382), from its project's settings: read only for a card with one waiting. */
+export async function stepWaitOf(ws: WorkspaceService, c: TaskCard): Promise<number | undefined> {
+  if (c.column !== 'doing' || !c.project || !ws.path || !pendingDesign(c)) return undefined
+  return loopStepWaitMinutes(await ws.projectConfig(join(ws.path, c.project)).catch(() => null)) * 60_000
+}
 
 /**
  * Why a card is stalled, working out its agent from its project's agents (each project read once a call, through
@@ -56,5 +64,5 @@ export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = ne
     const def = (await agents.get(key)!).find((a) => a.id === c.agent)
     now = def ? { name: def.name, running: !!sessions.liveFor(p, c.agent) } : null
   }
-  return cardStall(c, now, ws.path, lane)
+  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c))
 }

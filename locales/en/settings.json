@@ -2699,6 +2699,18 @@
     "defaultMessage": "Rounds",
     "description": "A setting's title (Project Settings → Card loops)."
   },
+  "settings.project.loopStepWaitMinutes.desc": {
+    "defaultMessage": "How many minutes a card loop's builder waits for its reviewer to check a design it posted before it goes ahead as posted. Empty is 30.",
+    "description": "What the setting \"Design check wait (minutes)\" does, under its title (Project Settings → Card loops). A design: the plan a builder posts on its card for its reviewer to check before building."
+  },
+  "settings.project.loopStepWaitMinutes.tip": {
+    "defaultMessage": "A design left unchecked longer than this shows its card as stalled. Up to 4 hours.",
+    "description": "The info tip of the setting \"Design check wait (minutes)\" (Project Settings → Card loops): more on what it does and when it applies."
+  },
+  "settings.project.loopStepWaitMinutes.title": {
+    "defaultMessage": "Design check wait (minutes)",
+    "description": "A setting's title (Project Settings → Card loops)."
+  },
   "settings.project.loopWaitHours.desc": {
     "defaultMessage": "How many hours an agent in this project's card loops waits with no change before it tells you, when you don't say. Empty inherits Settings → Workspace → Card loop wait.",
     "description": "What the setting \"Wait (hours)\" does, under its title (Project Settings → Card loops)."

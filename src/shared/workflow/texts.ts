@@ -90,6 +90,7 @@ export const MOVE_NAMES: Record<string, Msg> = {
   'report merge': msg({ id: 'workflow.move.reportMerge', defaultMessage: 'Report the merge', description: 'A move on a card, named in a refused move: the agent saying it merged the work.' }),
   'retry merge': msg({ id: 'workflow.move.retryMerge', defaultMessage: 'Retry merge', description: "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card." }),
   'remove from queue': msg({ id: 'workflow.move.removeFromQueue', defaultMessage: 'Remove from queue', description: "A move on a card, named in a refused move: the user taking it out of the merge queue." }),
+  'loop step': msg({ id: 'workflow.move.loopStep', defaultMessage: 'Card loop step', description: "A move on a card, named in a refused move (#1382): a step between a card loop's builder and reviewer that moves nothing (a design posted for a check, its answer)." }),
   move: msg({ id: 'workflow.move.move', defaultMessage: 'Move', description: 'A move on a card, named in a refused move: dragging it to another column.' }),
   answer: msg({ id: 'workflow.move.answer', defaultMessage: 'Answer', description: "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)." })
 }

@@ -327,8 +327,9 @@ const prose = (seed, n) => {
   // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
   const compactList = measure('hive_list_settings (query)', tool('hive_list_settings', { query: 'compact' }, 'assistant'), 1800)
   check('query narrows it, saying what each does', compactList.split('\n').length <= 11 && /^assistant\.compactSuggestTokens = 500000 · Highlight Compact over: Context size/m.test(compactList), compactList)
-  // 3,100 since #1417's project.workflow.stageNames (one line, about 50 characters).
-  const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3100)
+  // 3,100 since #1417's project.workflow.stageNames (one line, about 50 characters); 3,200 since #1382's
+  // project.loopStepWaitMinutes (one line, about 70 characters).
+  const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3200)
   check("a project's own settings, inheriting", /^project\.transcriptWarnMB = inherit · Warn when a transcript is over$/m.test(projectList), projectList.slice(0, 300))
   const one = measure('hive_read_setting', tool('hive_read_setting', { id: 'sessions.transcriptWarnMB' }, 'assistant'), 1500)
   check('a setting in full: where, what it takes, when it helps', one.includes('Where: Settings → Sessions → Warn when a transcript is over.') && /When it helps: /.test(one), one)
@@ -578,6 +579,9 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   }
   const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
+  // A card loop's design step (#1382): nothing moves, and the reply says how long to wait for the check.
+  const designed = measure('hive_loop_step', intent('hive_loop_step', { card: `#${todo[40]}`, step: 'design', text: 'Design: one line.' }), 120)
+  check('a design step says the card stays and how long to wait', /^[A-Z]+-\d+: still active\. waitMinutes: 30$/.test(designed), designed)
   measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)

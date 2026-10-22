@@ -287,6 +287,8 @@
   "project.settings.saveFailed": "No se pudo guardar la configuración del proyecto",
   "project.settings.search": "Buscar en la configuración del proyecto {project}",
   "project.settings.sessionsIn": "Las sesiones del proyecto {project} ejecutarán todos los comandos, ediciones y llamadas de red sin preguntar.",
+  "project.settings.stepWait": "Espera de la comprobación del diseño (minutos)",
+  "project.settings.stepWaitDefault": "Predeterminado ({count, number} min)",
   "project.settings.waitHours": "Espera (horas)",
   "project.settings.wake": "Despertar a revisores y autores",
   "project.settings.warnOver": "Avisar si una transcripción supera",

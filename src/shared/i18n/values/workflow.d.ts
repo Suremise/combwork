@@ -123,6 +123,7 @@ interface HiveMessageValues {
   'workflow.group.work': undefined
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
+  'workflow.move.loopStep': undefined
   'workflow.move.move': undefined
   'workflow.move.putBack': undefined
   'workflow.move.removeFromQueue': undefined
@@ -212,8 +213,14 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
+  'workflow.refused.loop.noStep.message': { card: string | number }
+  'workflow.refused.loop.noStep.next': undefined
   'workflow.refused.loop.roundLimit.message': { card: string | number }
   'workflow.refused.loop.roundLimit.next': undefined
+  'workflow.refused.loop.stepNotHere.message': { card: string | number; stage: string | number }
+  'workflow.refused.loop.stepNotHere.next': undefined
+  'workflow.refused.loop.stepNotYours.message': { side: string; card: string | number }
+  'workflow.refused.loop.stepNotYours.next': { side: string }
   'workflow.refused.merge.hiveMerges.change': undefined
   'workflow.refused.merge.hiveMerges.message': { card: string | number }
   'workflow.refused.merge.hiveMerges.next': undefined

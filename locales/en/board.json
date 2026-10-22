@@ -2703,6 +2703,10 @@
     "defaultMessage": "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.",
     "description": "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive."
   },
+  "board.stall.hintLoopStep": {
+    "defaultMessage": "Its builder waits for its reviewer to check the design it posted. Ask the reviewer to answer it, or tell the builder to go ahead as posted.",
+    "description": "Tooltip on a card stalled in Doing (#1382): in a card loop, the builder posted a design for its reviewer to check before building, and nobody answered."
+  },
   "board.stall.hintNobody": {
     "defaultMessage": "Nobody is working on it. Start it again (on this agent or another), or move it back to Todo.",
     "description": "Tooltip on a card stalled in Doing: no agent is working on it. Todo is a board column."
@@ -2730,6 +2734,10 @@
   "board.stalled.laneOrderWait": {
     "defaultMessage": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
     "description": "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card that comes before this one in the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long both have been waiting so (\"40 min\", \"2 h 5 min\")."
+  },
+  "board.stalled.loopStepWait": {
+    "defaultMessage": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted.",
+    "description": "Why a card in Doing is stalled (#1382): in a card loop, its builder ({builder}, an agent's name) posted a design for its reviewer to check before building, and is only waiting; no reviewer answered, and the builder didn't go ahead once its wait (Card loops → Design check wait) was over. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.noAgent": {
     "defaultMessage": "In Active, but no agent has it.",

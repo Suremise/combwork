@@ -21,6 +21,7 @@ import { REPLY_MS, agentApiCall } from './agentApiCall'
 import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
+import { LOOP_STEPS } from '../../shared/workflow/facts'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
@@ -195,7 +196,15 @@ function intentTools(): Tool[] {
       ['rule', 'why'],
       (a) => ({ rule: a.rule, why: a.why })
     ),
-    intent('hive_request_builder', 'request', "Ask a card's builder for something while you review it (a commit, a run): written as a comment; its builder is woken.", { text: { type: 'string' } }, ['text'], (a) => ({ text: a.text }))
+    intent('hive_request_builder', 'request', "Ask a card's builder for something while you review it (a commit, a run): written as a comment; its builder is woken.", { text: { type: 'string' } }, ['text'], (a) => ({ text: a.text })),
+    intent(
+      'hive_loop_step',
+      'loop-step',
+      "A card loop's step between builder and reviewer that moves nothing: text is written as a comment and the other side is woken. Builder: design (a design posted for the reviewer's check, the card in Doing; replies with waitMinutes, how long to wait for it), proceed (no answer by then: building as posted). Reviewer: ok or gaps, the answer to the step waiting.",
+      { step: { type: 'string', enum: [...LOOP_STEPS] }, text: { type: 'string', description: 'The design, the answer (gaps: what is missing), or a line.' } },
+      ['step', 'text'],
+      (a) => ({ step: a.step, text: a.text })
+    )
   ]
 }
 

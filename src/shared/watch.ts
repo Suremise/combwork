@@ -11,16 +11,17 @@
  * too (#434). Only `fresh` waits for the next move into it: a card there must leave and come back.
  */
 import type { TaskCard, TaskColumn } from './types'
-import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel } from './tasks'
+import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
 
 /**
  * What counts as a change: a column move, a new comment, a review verdict, a change of agent. Default: any. `blocked` (a
  * card becoming blocked) isn't one to choose: a lane watch counts it for the cards beside its lanes (#726, `blocked`).
  * Nor are `request` (its reviewer asked its builder for something, #912) and `decision` (the user recorded, changed or
- * removed a decision): a watch that counts a verdict, a move or a comment counts them too (#1272, SPEC §16.8.2).
+ * removed a decision): a watch that counts a verdict, a move or a comment counts them too (#1272, SPEC §16.8.2), and
+ * so `step` (a card loop's step between builder and reviewer, #1382).
  */
-export type WatchChange = 'column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision'
+export type WatchChange = 'column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision' | 'step'
 export const WATCH_CHANGES: readonly WatchChange[] = ['column', 'comment', 'verdict', 'agent']
 
 /** A wait's condition: the cards (numbers), which changes count, and optionally a column one of them must be in. */
@@ -255,7 +256,7 @@ export const hearsHandoffs = (cond: Pick<WatchCondition, 'changes' | 'column' | 
 function handoffsIn(h: readonly { by: string; what: string }[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
   if (!hearsHandoffs(cond)) return []
   const others = watcher ? h.filter((e) => e.by !== watcher) : h
-  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : [])]
+  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : []), ...(others.some((e) => isLoopStepEntry(e.what)) ? ['step' as const] : [])]
 }
 
 /**
@@ -454,21 +455,30 @@ const REQUEST_MAX = 200
 const NOTE_MAX = 600
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
-  const who = kind === 'review' ? "You review this card in its loop: carry on with it" : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
-  // A reviewer's request (#912) or Hive's own note (stale, an answer, what came back from the merge queue and what to do
-  // next: #1354, up to NOTE_MAX): what it says, short, before what to do.
+  const who =
+    kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step' ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing)" : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
+  // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
+  // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
-  const max = kind === 'request' ? REQUEST_MAX : NOTE_MAX
-  const what = !said.length ? '' : `. ${kind === 'request' ? 'The reviewer asks' : 'Hive'}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
+  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' ? REQUEST_MAX : NOTE_MAX
+  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
+  const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
 }
 
 /**
  * What a loop wake is about (#405, #1266): a card arrived in Review (its reviewer's), a verdict, the card moved into Passed
  * or Done, a reviewer's request mid-review (#912), a note of Hive's (a pass gone stale), or the user's answer to a request
- * (#1269: the agent waiting on it, whether or not the card is in a loop): the rest are its builder's.
+ * (#1269: the agent waiting on it, whether or not the card is in a loop), a card loop's step (#1382: `step`, the builder's,
+ * is its reviewer's; `stepAnswer`, the reviewer's answer, its builder's): the rest are its builder's.
  */
-export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer'] as const
+export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer'] as const
+
+/** A card loop's step (#1382) as its wake quotes it: what the step is, then its text (English, agent-facing). */
+export function loopStepWords(step: string, text: string): string {
+  const what: Record<string, string> = { design: 'design posted for your check', proceed: 'no check came: going ahead with the design as posted', ok: 'the design is OK', gaps: 'the design has gaps' }
+  return `${what[step] ?? step}: ${text}`
+}
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 
 function lineOf(change: CardChange, tail: string): string {
@@ -503,7 +513,7 @@ function whereNow(change: CardChange, blockedMax = 120): string {
 
 /** What a wake adds for a reviewer's request and a new decision (#1272): " (its reviewer asks you something; a new decision)". */
 function handoffWords(changes: WatchChange[]): string {
-  const said = [changes.includes('request') ? 'its reviewer asks you something' : '', changes.includes('decision') ? 'a new decision from the user: read its decisions' : ''].filter(Boolean)
+  const said = [changes.includes('request') ? 'its reviewer asks you something' : '', changes.includes('decision') ? 'a new decision from the user: read its decisions' : '', changes.includes('step') ? 'a card loop step: read its latest comment' : ''].filter(Boolean)
   return said.length ? ` (${said.join('; ')})` : ''
 }
 
@@ -553,7 +563,7 @@ export function brief(c: CardChange): string {
   if (c.changes === 'gone' || c.column === 'gone') return `${cardRef(c.number)} ${c.archived ? 'archived' : 'gone'}`
   const a = c.about
   if (a?.returned) return `${cardRef(c.number)} returned for review (round ${a.returned})`
-  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}${c.changes.includes('request') ? ', a request' : ''}${c.changes.includes('decision') ? ', a decision' : ''}`
+  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}${c.changes.includes('request') ? ', a request' : ''}${c.changes.includes('decision') ? ', a decision' : ''}${c.changes.includes('step') ? ', a loop step' : ''}`
 }
 
 /**

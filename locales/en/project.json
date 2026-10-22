@@ -1151,6 +1151,14 @@
     "defaultMessage": "Sessions in {project} will run every command, edit and network call without asking.",
     "description": "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)."
   },
+  "project.settings.stepWait": {
+    "defaultMessage": "Design check wait (minutes)",
+    "description": "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design."
+  },
+  "project.settings.stepWaitDefault": {
+    "defaultMessage": "Default ({count, number} min)",
+    "description": "Placeholder of the empty design check wait box: empty uses the default, {count} minutes."
+  },
   "project.settings.waitHours": {
     "defaultMessage": "Wait (hours)",
     "description": "Accessible name of the card-loop wait box."

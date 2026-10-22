@@ -287,6 +287,8 @@
   "project.settings.saveFailed": "Projekteinstellungen konnten nicht gespeichert werden",
   "project.settings.search": "Einstellungen von {project} durchsuchen",
   "project.settings.sessionsIn": "Sitzungen im Projekt {project} führen jeden Befehl, jede Änderung und jeden Netzwerkzugriff ohne Nachfrage aus.",
+  "project.settings.stepWait": "Wartezeit auf Entwurfsprüfung (Minuten)",
+  "project.settings.stepWaitDefault": "Standard ({count, number} Min.)",
   "project.settings.waitHours": "Wartezeit (Stunden)",
   "project.settings.wake": "Reviewer und Bearbeiter wecken",
   "project.settings.warnOver": "Warnen, wenn ein Transkript größer ist als",

@@ -445,6 +445,75 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  /** A card of alpha's lane (b1 builds, r1 reviews) started by its builder's intent, under a workflow (#1382: steps are intents). */
+  const WORKFLOW = { workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }
+  const startedInLane = async (w: Awaited<ReturnType<typeof open>>['w']) => {
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Design first', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'start' }))
+    return c
+  }
+  const { runCardIntent } = await import('../src/main/cardIntents')
+
+  it("a builder's design wakes its reviewer though its watch counts only arrivals in Review; the answer wakes the builder (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    // HR5 on #1305: waiting for the card to arrive in Review, and nothing else.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: a step the reviewer is woken for.' }))
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('r1')
+    expect(st.typed[0].text).toContain('The builder: "design posted for your check: Design: a step the reviewer is woken for."')
+    expect(st.typed[0].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing)")
+    st.status.set('b1', 'ready')
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.' }))
+    await typedUntil(st, 2)
+    expect(st.typed[1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[1].text).toContain('The reviewer: "the design is OK: Holds: build it."')
+    await vi.waitFor(async () => expect(await history(w, c)).toEqual(expect.arrayContaining(['Hive: Woke R1 (alpha) with a card loop step (a loop wake)', 'Hive: Woke B1 (alpha) with a card loop step (a loop wake)'])), HANG)
+    await disposeWorkspaceService(w)
+  })
+
+  it("leaves a step to a watch that counts it: the builder's watch for its verdict tells it the reviewer's answer, one line (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))
+    await typedUntil(st, 1)
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'gaps', text: 'What bounds the wait?' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(2), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    expect(st.typed).toHaveLength(2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(st.typed[1].text).toMatch(/a card loop step: read its latest comment.*Your card watch has ended/)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a step wakes no one while the project's loop wakes are off (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ ...WORKFLOW, loopWakes: false })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))
+    await settled()
+    expect(loopWakes.pendingLoopWakes()).toEqual([])
+    expect(st.typed).toEqual([])
+    await disposeWorkspaceService(w)
+  })
+
   it("a lane reviewer's comment is only a comment while the project's loop wakes are off (#1410)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })

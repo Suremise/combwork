@@ -1,8 +1,8 @@
 import { join } from 'path'
 import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
-import type { ForYouKind } from '../shared/workflow/facts'
-import { boardLock, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
+import type { ForYouKind, LoopStepId } from '../shared/workflow/facts'
+import { boardLock, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
 import { refusal } from '../shared/workflow/refusals'
@@ -10,10 +10,11 @@ import { workflowFor } from './workflow/service'
 import { workspace } from './workspace'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
+import { loopStepWaitMinutes } from '../shared/lanes'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
- * merge, ask the user, couldn't within the rules, request to builder. Each runs the card's runtime intent on the board's
+ * merge, ask the user, couldn't within the rules, request to builder, a card loop's step. Each runs the card's runtime intent on the board's
  * one intent path (tasks.ts' runIntent, #1265), so its guards decide and its facts are written, and in each of its writes
  * the card's 0.9 fields follow (column, agent, its review, a comment), for the board, watches, lanes and the Agent API's
  * card. A refusal is the runtime's (§16.8.3), thrown as WorkflowRefusedError: the Agent API's 409 with the rule, what to
@@ -33,6 +34,8 @@ export type CardIntent =
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
+  /** A card loop's step (#1382): a design for the reviewer's check, its answer, or going ahead unchecked. */
+  | { kind: 'loopStep'; step: LoopStepId; text: string }
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
   | { kind: 'removeFromQueue'; reason: string; guard?: () => void }
@@ -86,6 +89,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
       case 'request':
         return w.requestToBuilder(named, who, intent.text)
+      case 'loopStep':
+        return w.loopStep(named, who, intent.step, intent.text)
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':
@@ -123,6 +128,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'request':
         // Its history line too, which the builder's watch counts (#1272).
         return { opts: { keepAgent, comment: intent.text, note: [requestNote(intent.text)] } }
+      case 'loopStep':
+        return { opts: { keepAgent, comment: intent.text, note: [loopStepNote(intent.step, intent.text)] } }
       default:
         return { opts: { keepAgent } }
     }
@@ -131,5 +138,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const card = saved ?? (await readTask(ref.n, actor))
   const m = reply as Moved
+  // A design posted: how long its builder waits for the check before going ahead (Card loops → Design check wait).
+  if (intent.kind === 'loopStep' && intent.step === 'design' && ws.path) m.data = { ...m.data, waitMinutes: loopStepWaitMinutes(await ws.projectConfig(join(ws.path, before.project)).catch(() => null)) }
   return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}) }, card }
 }

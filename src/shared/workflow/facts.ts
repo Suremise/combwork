@@ -206,6 +206,8 @@ export interface FactData {
   DecisionsReceived: { agent: string; generation: number }
   CannotWithinRules: { rule: string; why: string; request: string }
   ReviewerRequest: { text: string }
+  /** A step of a card loop between its builder and its reviewer that moves nothing (#1382): LOOP_STEPS; `of`, the step an answer answers. */
+  LoopStep: { step: LoopStepId; text: string; of?: LoopAsk }
   HeadMoved: { line: string | null; from: string | null; to: string | null; key?: string | null }
   TargetMoved: { target: string; from: string | null; to: string | null }
   Gone: { what: 'line' | 'folder' | 'repository' | 'deliverables' }
@@ -302,8 +304,24 @@ export interface CardState {
   checks: FactData['CheckRan'][]
   marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
   blocked: string | null
+  /**
+   * A card loop's step waiting on the other side (#1382): the builder's design posted for its reviewer's check, until the
+   * reviewer answers, the builder goes ahead, or the card moves, is submitted or given a verdict.
+   */
+  step: { step: LoopAsk; seq: number; at: string; by: string | null } | null
   lastSeq: number
 }
+
+/**
+ * A card loop's steps (#1382, SPEC §16.8.1): the builder's `design` (posted for the reviewer's check) and `proceed` (no
+ * answer within the bound: building as posted); the reviewer's `ok` and `gaps` (its answer to the step waiting).
+ */
+export const LOOP_STEPS = ['design', 'ok', 'gaps', 'proceed'] as const
+export type LoopStepId = (typeof LOOP_STEPS)[number]
+/** The steps that ask the reviewer to check something, and wait for its answer. */
+export type LoopAsk = 'design'
+/** Whose step it is: the builder's, sent to the reviewer, or the reviewer's answer, sent to the builder. */
+export const loopStepSide = (step: LoopStepId): 'builder' | 'reviewer' => (step === 'ok' || step === 'gaps' ? 'reviewer' : 'builder')
 
 export const emptyState = (): CardState => ({
   stage: 'todo',
@@ -334,6 +352,7 @@ export const emptyState = (): CardState => ({
   checks: [],
   marks: {},
   blocked: null,
+  step: null,
   lastSeq: 0
 })
 
@@ -354,6 +373,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
   for (const f of facts) {
     s.lastSeq = Math.max(s.lastSeq, f.seq)
     const by = agentOf(f.actor)
+    // A loop step waits only while the card stays where it was: a move, a submission or a verdict ends it (#1382).
+    if (f.kind === 'Moved' || f.kind === 'Submitted' || f.kind === 'Verdict') s.step = null
     switch (f.kind) {
       case 'Started':
       case 'Adopted': {
@@ -424,6 +445,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'CannotWithinRules':
         break
+      case 'LoopStep': {
+        const d = f.data as FactData['LoopStep']
+        s.step = d.step === 'design' ? { step: d.step, seq: f.seq, at: f.at, by } : null
+        break
+      }
       case 'Approval': {
         const d = f.data as FactData['Approval']
         s.approvals.push(d)

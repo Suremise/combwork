@@ -229,6 +229,58 @@ describe('a card by intent (#1267)', () => {
     expect(wakes.some((p) => p.agent === 'a1')).toBe(true)
   })
 
+  it("a card loop's design step (#1382): the builder's design wakes the reviewer, its answer the builder; each side only its own", async () => {
+    const { w } = await workspace()
+    const card = await create(w)
+    const wakes = (): string[] => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { payload: string }[]).map((r) => (JSON.parse(r.payload) as { agent: string }).agent)
+    // Before it starts, the card has no builder: a design isn't anyone's yet.
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Plan' }))).toBe('loop.stepNotYours')
+    await act(w, card, builder, { kind: 'start' })
+    // Nothing waits for an answer yet; the reviewer doesn't post the builder's design.
+    expect(await refused(act(w, card, reviewer, { kind: 'loopStep', step: 'ok', text: 'Fine' }))).toBe('loop.noStep')
+    expect(await refused(act(w, card, reviewer, { kind: 'loopStep', step: 'design', text: 'Plan' }))).toBe('loop.stepNotYours')
+    const posted = await act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Design: a LoopStep fact and its wake.' })
+    // Nothing moves; the reply says how long to wait for the check (Card loops → Design check wait, 30 by default).
+    expect(posted.done).toMatchObject({ from: 'active', to: 'active', data: { waitMinutes: 30 } })
+    expect(posted.card).toMatchObject({ column: 'doing', agent: 'a1' })
+    expect(posted.card.comments.at(-1)).toMatchObject({ text: 'Design: a LoopStep fact and its wake.' })
+    expect(posted.card.history.at(-1)?.what).toBe('Posted a design for the reviewer to check: "Design: a LoopStep fact and its wake."')
+    expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'design', by: 'a1' })
+    // No lane: the runtime names the reviewer pool, which loop wakes resolve to whoever reviews the card.
+    expect(wakes()).toEqual(['reviewers'])
+    // The builder doesn't check its own design.
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'ok', text: 'Looks fine to me' }))).toBe('loop.stepNotYours')
+    const gaps = await act(w, card, reviewer, { kind: 'loopStep', step: 'gaps', text: 'What bounds the wait?' })
+    expect(gaps.card.history.at(-1)?.what).toBe('Checked the design: gaps: "What bounds the wait?"')
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'gaps', of: 'design', text: 'What bounds the wait?' } })
+    expect(wakes()).toEqual(['reviewers', 'a1'])
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    // Answered: going ahead has nothing to go ahead from until a design is posted again.
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'proceed', text: 'Going ahead' }))).toBe('loop.noStep')
+    await act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Design v2: bounded by the setting.' })
+    const ahead = await act(w, card, builder, { kind: 'loopStep', step: 'proceed', text: 'No answer in 30 min: building as posted.' })
+    expect(ahead.card.history.at(-1)?.what).toBe('Went ahead with the design unchecked: "No answer in 30 min: building as posted."')
+    expect(wakes()).toEqual(['reviewers', 'a1', 'reviewers', 'reviewers'])
+    // The user and the Assistant can take either side.
+    await act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Design v3.' })
+    expect(await refused(act(w, card, user, { kind: 'loopStep', step: 'ok', text: 'Go.' }))).toBeNull()
+  })
+
+  it('a design is posted in Doing, and a submission ends the one waiting (#1382)', async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    await act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Plan' })
+    commit(wt, 'g.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    expect(await refused(act(w, card, reviewer, { kind: 'loopStep', step: 'ok', text: 'Fine' }))).toBe('loop.noStep')
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'design', text: 'Plan v2' }))).toBe('loop.stepNotHere')
+    // With the workflow rules off, nothing guards it.
+    await advanced.set(ENFORCE, false)
+    expect(await refused(act(w, card, reviewer, { kind: 'loopStep', step: 'design', text: 'Plan v3' }))).toBeNull()
+  })
+
   it('a no-code card is submitted with a summary and no revision (S25, S38)', async () => {
     const { w } = await workspace()
     const card = await create(w, 'A design note')
@@ -269,7 +321,10 @@ describe("the intents' routes and tools (#1267)", () => {
   }
 
   it("each route takes its intent's arguments and refuses missing or wrong ones (400)", () => {
-    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
+    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'loop-step', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
+    expect(parse('loop-step', { step: 'design', text: ' Plan ' })).toEqual({ kind: 'loopStep', step: 'design', text: 'Plan' })
+    expect(parse('loop-step', { step: 'review', text: 'x' })).toBe(400)
+    expect(parse('loop-step', { step: 'ok' })).toBe(400)
     expect(parse('put-back', undefined)).toBe(400)
     expect(parse('put-back', { why: ' Blocked by #3 ' })).toEqual({ kind: 'putBack', why: 'Blocked by #3' })
     expect(parse('submit', { summary: ' Done ', paths: ['a.ts'] })).toEqual({ kind: 'submit', summary: 'Done', revision: undefined, note: undefined, paths: ['a.ts'] })

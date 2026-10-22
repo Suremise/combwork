@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -1331,6 +1331,39 @@ export class Workflow {
       w.fact('ReviewerRequest', { text })
       this.wake(w, s.started?.builder, `${card.key}: the reviewer asks: ${text}`) // i18n-ignore: a wake, agent-facing
     })
+    return this.ok(card, s.stage, s.stage)
+  }
+
+  /**
+   * A card loop's step (#1382): the builder's design posted for its reviewer's check (in Doing) or its going ahead with
+   * it unchecked (`proceed`), or the reviewer's answer (`ok`, `gaps`). Moves nothing; wakes the other side: the builder's
+   * steps its reviewer (the lane's, else whoever reviews it, loopWakes.ts), an answer its builder. With the rules off, no
+   * check.
+   */
+  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const refused = await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w): GuardRefusal | null => {
+      // Read under the transaction: the step waiting now, not when the call began.
+      const now = w.state()
+      const agent = agentOf(actor)
+      const side = loopStepSide(step)
+      if (this.enforced()) {
+        const builder = now.started?.builder ?? null
+        // An agent on the other side is refused; the user and the Assistant can take either.
+        if (agent && (side === 'builder' ? agent !== builder : agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, step, side } } as GuardRefusal
+        if (step === 'design' && now.stage !== 'active') return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage } } as GuardRefusal
+        if (step !== 'design' && !now.step) return { rule: 'loop.noStep', values: { card: card.key, step } } as GuardRefusal
+      }
+      const of = step === 'design' ? undefined : now.step?.step
+      w.fact('LoopStep', { step, text, ...(of ? { of } : {}) })
+      // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
+      if (side === 'builder') this.wake(w, card.reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+      else this.wake(w, now.started?.builder, `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+      return null
+    })
+    if (refused) return this.refuse(card, actor, 'loop step', refused) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, s.stage)
   }
 

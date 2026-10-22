@@ -2,7 +2,7 @@ import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { cardChange, LOOP_WAKE_KINDS, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { onHiveEvent } from './events'
 import { listLanes, onLanesWritten } from './lanes'
 import { createLogger, userText } from './logger'
@@ -112,8 +112,8 @@ async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCar
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
   const reviewer = kind === 'answer' ? null : await reviewerOf(ws, card, agents)
   if (!reviewer && kind !== 'answer') return null
-  const target = kind === 'review' ? reviewer : (agent ?? card.agent)
-  if (!target || (kind === 'review' && target === card.agent)) return null
+  const target = kind === 'review' || kind === 'step' ? (agent ?? reviewer) : (agent ?? card.agent)
+  if (!target || ((kind === 'review' || kind === 'step') && target === card.agent)) return null
   const found = agents.find((a) => a.id === target)
   return found ? { id: found.id, name: `${found.name} (${card.project})` } : null
 }
@@ -137,9 +137,11 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
  * The card changes a wake's line tells, and the watch kind that would tell the same (none: a note, an answer). A
  * reviewer's request is told by a watch that counts it (#1272): then the watch's line is its only wake.
  */
-const kindsOf = (kind: LoopWakeKind): ('column' | 'verdict')[] => (kind === 'review' || kind === 'approved' || kind === 'done' ? ['column'] : ['verdict'])
+const kindsOf = (kind: LoopWakeKind): ('column' | 'verdict')[] => (kind === 'review' || kind === 'approved' || kind === 'done' ? ['column'] : isStep(kind) ? [] : ['verdict'])
+/** A card loop's step (#1382): the builder's, to its reviewer, or the reviewer's answer, to its builder. Told by a watch that counts it, as a request. */
+const isStep = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepAnswer'
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
-  kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' ? 'request' : 'moved', card.column)
+  kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' || isStep(kind) ? 'request' : 'moved', card.column)
 
 /**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
@@ -168,6 +170,7 @@ function aboutOf(ws: WorkspaceService, a: ActionRow): { kind: LoopWakeKind; text
   const f = a.fact !== null ? cardFacts(ws, a.card).find((x) => x.seq === a.fact) : undefined
   const data = (f?.data ?? {}) as Record<string, unknown>
   if (f?.kind === 'ReviewerRequest') return { kind: 'request', text: String(data.text ?? '') }
+  if (f?.kind === 'LoopStep') return { kind: data.step === 'ok' || data.step === 'gaps' ? 'stepAnswer' : 'step', text: loopStepWords(String(data.step ?? ''), String(data.text ?? '')) }
   if (f?.kind === 'Verdict') return { kind: 'verdict' }
   if (f?.kind === 'Submitted' || (f?.kind === 'Moved' && data.to === 'review')) return { kind: 'review' }
   if (f?.kind === 'Moved' && (data.to === 'approved' || data.to === 'done')) return { kind: data.to }
@@ -193,8 +196,9 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   const p = a.payload
   // The reviewer's (the runtime names the pool, `reviewers`, or a lane's reviewer: whoever reviews the card now), else the builder's.
   const about = aboutOf(ws, a)
-  const kind: LoopWakeKind = p.agent === 'reviewers' ? 'review' : about.kind
-  const named = kind !== 'review' && typeof p.agent === 'string' && p.agent !== 'builder' ? p.agent : undefined
+  // A builder's loop step (#1382) goes to the reviewer too, as itself; `named`: a lane's reviewer the runtime named.
+  const kind: LoopWakeKind = about.kind === 'step' ? 'step' : p.agent === 'reviewers' ? 'review' : about.kind
+  const named = kind !== 'review' && typeof p.agent === 'string' && p.agent !== 'builder' && p.agent !== 'reviewers' ? p.agent : undefined
   const to = await targetOf(ws, projectPath, card, kind, named)
   if (!to || p.by === `agent:${to.id}`) return
   const since = p.since && typeof p.since === 'object' ? (p.since as TaskHistoryEntry) : (card.history.at(-1) ?? null)
@@ -226,6 +230,8 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null): boolean
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
   // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until that agent acts on it.
   if (p.kind === 'answer') return !since.some((h) => same(h.by, p.agentName))
+  // A builder's loop step (#1382), to its reviewer: due until the reviewer acts on the card.
+  if (p.kind === 'step') return !since.some((h) => same(h.by, p.agentName))
   if (card.agent !== p.agentId) return false
   return !since.some((h) => same(h.by, p.agentName) || /^(Moved to (the (top|bottom) of )?Review\b|Returned for review|Started reviewing)/.test(h.what))
 }
@@ -260,7 +266,7 @@ registerSource('loop', {
     const card = await getTask(p.n, ws).catch(() => null)
     // Its own watch told it already (#578): a watch whose line had read this handoff's own history entry, even one that
     // has ended since (a handoff slower than the watch's settle and typing found no watch to leave it to).
-    const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request')
+    const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
     if (!card || !stillDue({ ...p, agentId: r.agentId }, card) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     const to = await targetOf(ws, host, card, p.kind)
@@ -284,7 +290,7 @@ registerSource('loop', {
     const p = wakeOf(r)
     const ws = workspaceFor(host)
     if (!p || !ws) return
-    inBackground(`noting a loop wake on #${p.n}`, noteOnCard(p.n, p.kind === 'answer' ? storedText(HISTORY.answerTold, { agent: p.agentName }) : storedText(HISTORY.loopWake, { agent: p.agentName, kind: p.kind === 'review' ? 'review' : 'verdict' }), ws))
+    inBackground(`noting a loop wake on #${p.n}`, noteOnCard(p.n, p.kind === 'answer' ? storedText(HISTORY.answerTold, { agent: p.agentName }) : storedText(HISTORY.loopWake, { agent: p.agentName, kind: p.kind === 'review' ? 'review' : isStep(p.kind) ? 'step' : 'verdict' }), ws))
     log.info(`Loop wake: #${p.n} to ${userText(p.agentName)}`)
   },
   ended: (r, host) => {
