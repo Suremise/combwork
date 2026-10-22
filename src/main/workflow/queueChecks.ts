@@ -494,17 +494,20 @@ export interface QueueBracket {
   head: string | null
   dirty: string[] | null
   snapshot: string
-  /** The tracked files and git dir the snapshot read, read the same at the end. */
-  files: string[]
+  /** The tracked files and git dir the snapshot read, read the same at the end; null when git couldn't say. */
+  files: string[] | null
   gitDir: string | null
 }
 
-/** Git's tracked files and git dir of the queue's folder, for a stat snapshot (the git dir from its `.git`: #1386). */
-async function tracked(folder: string): Promise<{ files: string[]; gitDir: string | null }> {
+/**
+ * Git's tracked files and git dir of the queue's folder, for a stat snapshot (the git dir from its `.git`: #1386); null
+ * each when git couldn't say, never an empty list in place of one unread (HR5's #1386 round 1).
+ */
+async function tracked(folder: string): Promise<{ files: string[] | null; gitDir: string | null }> {
   const ls = await git(folder, ['ls-files', '-z'])
   const own = G.gitDirSync(folder)
   const gd = own ? null : await git(folder, ['rev-parse', '--absolute-git-dir'])
-  return { files: ls.ok ? ls.out.split('\0').filter(Boolean) : [], gitDir: own ?? (gd?.ok ? gd.out.trim() : null) }
+  return { files: ls.ok ? ls.out.split('\0').filter(Boolean) : null, gitDir: own ?? (gd?.ok ? gd.out.trim() : null) }
 }
 
 /** The folder's head and uncommitted changes, in worktreeNow's two gits (#1386); null each when git can't say. */
@@ -516,7 +519,7 @@ async function headAndDirty(folder: string): Promise<{ head: string | null; dirt
 /** The folder's head, uncommitted changes and stat snapshot (tracked files and the HEAD reflog), before a check. */
 export async function bracketStart(folder: string): Promise<QueueBracket> {
   const t = await tracked(folder)
-  const snap = await snapshot(folder, t.files, t.gitDir)
+  const snap = await snapshot(folder, t.files ?? [], t.gitDir)
   const now = await headAndDirty(folder)
   return { t0: Date.now(), ...now, snapshot: snap, files: t.files, gitDir: t.gitDir }
 }
@@ -527,17 +530,17 @@ export async function bracketStart(folder: string): Promise<QueueBracket> {
  * (`moved`), and nothing written to a tracked file and no HEAD reflog entry in between (`changed`). The queue's folder
  * isn't watched, so the stat snapshot decides: an edit undone changes its time, a checkout and back adds reflog entries.
  * The snapshot is of the files tracked at the start (#1386): a file added, removed or untracked since shows as dirty,
- * gone, or a new HEAD.
+ * gone, or a new HEAD. A start whose tracked files or git dir git couldn't read proves nothing (`changed`).
  */
 export async function bracketEnd(folder: string, revision: string, start: QueueBracket): Promise<{ counted: boolean; whyNot?: CheckWhyNot; tested: string }> {
-  const snap = await snapshot(folder, start.files, start.gitDir)
+  const snap = await snapshot(folder, start.files ?? [], start.gitDir)
   const { head, dirty: d } = await headAndDirty(folder)
   const dirty = (x: string[] | null): boolean => x === null || x.length > 0
   let whyNot: CheckWhyNot | undefined
   if (start.head !== revision) whyNot = 'notContained'
   else if (dirty(start.dirty) || dirty(d)) whyNot = 'dirty'
   else if (head !== start.head) whyNot = 'moved'
-  else if (snap !== start.snapshot) whyNot = 'changed'
+  else if (start.files === null || start.gitDir === null || snap !== start.snapshot) whyNot = 'changed'
   return { counted: !whyNot, ...(whyNot ? { whyNot } : {}), tested: start.head ?? '' }
 }
 
