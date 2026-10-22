@@ -77,6 +77,7 @@
   "board.card.decisionsTip": "Decyzje: {n}. {decisions}",
   "board.card.dependsOn": "Zależy od: {cards}",
   "board.card.expand": "Rozwiń {card}",
+  "board.card.stageInProject": "W projekcie {project} ten etap nazywa się {stage}",
   "board.card.stalled": "Utknęła: {why}",
   "board.card.stalledMark": "Utknęła",
   "board.card.workspace": "obszar roboczy",
@@ -107,6 +108,7 @@
   "board.columns.expand": "Rozwiń kolumnę {column}",
   "board.columns.expandCards": "Rozwiń wszystkie karty",
   "board.columns.expandTip": "Rozwiń kolumnę {column}: {description}",
+  "board.columns.mergingTip": "Karty w kolejce scalania Hive. Trafiają tu przez kolejkę po zatwierdzeniu, nigdy przez przeciągnięcie; Usuń z kolejki wyjmuje kartę.",
   "board.columns.more": "{column}: więcej",
   "board.columns.startLane": "Uruchom tor z tymi kartami…",
   "board.context.close": "Zamknij",
@@ -802,5 +804,6 @@
   "board.workQueue.stuckFolder": "Folder",
   "board.workQueue.stuckRef": "{target} wskazuje na",
   "board.workQueue.testing": "Trwa testowanie: {step}",
-  "board.workQueue.unreadRef": "nie odczytano"
+  "board.workQueue.unreadRef": "nie odczytano",
+  "board.workflows": "Przepływy pracy"
 }

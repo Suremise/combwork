@@ -267,7 +267,7 @@ const ancestor = (x, y) => {
     const one = await round(c1, 'one.txt', { merge: 'wait' })
     check("the queue tests One's merge (its check is running)", !!(await waitHung(() => fs.existsSync(fx.started))))
     const k1 = await keyOf(c1)
-    await shoot('2-one-testing', 'merges', async () => (await queueText()).includes(`${k1} + main`) && (await onBoard('Approved', c1)))
+    await shoot('2-one-testing', 'merges', async () => (await queueText()).includes(`${k1} + main`) && (await onBoard('Merging', c1)))
     const held = await intent('b1', c2, 'start')
     check('…Two still waits while One is merging', held.status === 409, JSON.stringify(held.body))
     const waiting = await waitHung(async () => ((await laneNow(a?.id))?.status?.reason === 'merging' ? (await laneNow(a.id)).status : null))

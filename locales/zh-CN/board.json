@@ -77,6 +77,7 @@
   "board.card.decisionsTip": "决定：{n}。{decisions}",
   "board.card.dependsOn": "依赖 {cards}",
   "board.card.expand": "展开 {card}",
+  "board.card.stageInProject": "在 {project} 中，这个阶段叫“{stage}”",
   "board.card.stalled": "停滞：{why}",
   "board.card.stalledMark": "停滞",
   "board.card.workspace": "工作区",
@@ -107,6 +108,7 @@
   "board.columns.expand": "展开“{column}”",
   "board.columns.expandCards": "展开所有卡片",
   "board.columns.expandTip": "展开“{column}”：{description}",
+  "board.columns.mergingTip": "Hive 合并队列中的卡片。卡片批准后通过队列进入这里，不能拖入；“从队列中移除”可以取出一张。",
   "board.columns.more": "{column}：更多",
   "board.columns.startLane": "用这些卡片启动通道…",
   "board.context.close": "关闭",
@@ -802,5 +804,6 @@
   "board.workQueue.stuckFolder": "文件夹",
   "board.workQueue.stuckRef": "{target} 位于",
   "board.workQueue.testing": "正在测试：{step}",
-  "board.workQueue.unreadRef": "未读取"
+  "board.workQueue.unreadRef": "未读取",
+  "board.workflows": "工作流程"
 }

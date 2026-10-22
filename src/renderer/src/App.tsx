@@ -173,6 +173,8 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'advanced-changed':
       void loadAdvanced()
+      // Workflow rules are enforced may have changed: the board's stages are read again (#1420).
+      set((s) => ({ workflowVersion: s.workflowVersion + 1 }))
       break
     case 'settings-changed':
       set({ settings: e.settings })

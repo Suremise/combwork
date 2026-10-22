@@ -336,12 +336,12 @@
     "description": "A tip's title."
   },
   "tips.boardStages.text": {
-    "defaultMessage": "Ask the Assistant to rename a stage of a project’s board, such as “call Active Building in web”. A name is only a name: it changes no rule, applies at once, and agents keep using the ids.",
+    "defaultMessage": "The board’s columns are the stages your workflow options make: Merging sits under Approved while Hive merges, and a stage nobody uses is hidden. Ask the Assistant to rename one, such as “call Active Building in web”: a name changes no rule.",
     "description": "A tip (glossary 2.2: stage). Active is a board column: use its name as the board shows it. The quoted request is what the user would ask the Assistant: translate it."
   },
   "tips.boardStages.title": {
-    "defaultMessage": "Name the board’s stages your way",
-    "description": "A tip's title (glossary 2.2: stage)."
+    "defaultMessage": "The board shows your workflow’s stages",
+    "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
   "tips.boardUpgrade.text": {
     "defaultMessage": "Hive keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Hive can change it again.",

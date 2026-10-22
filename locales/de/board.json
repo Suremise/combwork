@@ -77,6 +77,7 @@
   "board.card.decisionsTip": "Entscheidungen: {n}. {decisions}",
   "board.card.dependsOn": "Hängt ab von {cards}",
   "board.card.expand": "{card} ausklappen",
+  "board.card.stageInProject": "In {project} heißt diese Phase {stage}",
   "board.card.stalled": "Festgefahren: {why}",
   "board.card.stalledMark": "Festgefahren",
   "board.card.workspace": "Arbeitsbereich",
@@ -107,6 +108,7 @@
   "board.columns.expand": "{column} ausklappen",
   "board.columns.expandCards": "Alle Karten ausklappen",
   "board.columns.expandTip": "{column} ausklappen: {description}",
+  "board.columns.mergingTip": "Karten in Hives Merge-Warteschlange. Sie kommen nach der Genehmigung über die Warteschlange hierher, nie durch Ziehen; „Aus der Warteschlange entfernen“ nimmt eine heraus.",
   "board.columns.more": "{column}: mehr",
   "board.columns.startLane": "Lane mit diesen Karten starten…",
   "board.context.close": "Schließen",
@@ -802,5 +804,6 @@
   "board.workQueue.stuckFolder": "Ordner",
   "board.workQueue.stuckRef": "{target} steht auf",
   "board.workQueue.testing": "Wird gerade getestet: {step}",
-  "board.workQueue.unreadRef": "nicht gelesen"
+  "board.workQueue.unreadRef": "nicht gelesen",
+  "board.workflows": "Workflows"
 }

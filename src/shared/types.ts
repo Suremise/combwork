@@ -676,9 +676,13 @@ export interface HiddenProject {
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
+/** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
+export type BoardColumnId = TaskColumn | 'merging'
+
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
-  columns?: TaskColumn[]
+  /** A category's applies to its stage's column; Merging keeps its own. */
+  columns?: BoardColumnId[]
   cards?: number[]
 }
 
@@ -1000,6 +1004,8 @@ export type PresetAsked = 'chosen' | 'notNow'
 export interface ProjectStages {
   stages: StageDef[]
   names: Partial<Record<StageDef['id'], string>>
+  /** Settings → Advanced → Workflow rules are enforced: off, cards move freely, so the board shows every category (#1420). */
+  enforced: boolean
 }
 
 /** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */

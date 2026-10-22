@@ -77,6 +77,7 @@
   "board.card.decisionsTip": "Decisions: {n}. {decisions}",
   "board.card.dependsOn": "Depends on {cards}",
   "board.card.expand": "Expand {card}",
+  "board.card.stageInProject": "In {project}, this stage is {stage}",
   "board.card.stalled": "Stalled: {why}",
   "board.card.stalledMark": "Stalled",
   "board.card.workspace": "workspace",
@@ -107,6 +108,7 @@
   "board.columns.expand": "Expand {column}",
   "board.columns.expandCards": "Expand All Cards",
   "board.columns.expandTip": "Expand {column}: {description}",
+  "board.columns.mergingTip": "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.",
   "board.columns.more": "{column}: more",
   "board.columns.startLane": "Start Lane with These Cards…",
   "board.context.close": "Close",
@@ -802,5 +804,6 @@
   "board.workQueue.stuckFolder": "Folder",
   "board.workQueue.stuckRef": "{target} is at",
   "board.workQueue.testing": "Testing now: {step}",
-  "board.workQueue.unreadRef": "not read"
+  "board.workQueue.unreadRef": "not read",
+  "board.workflows": "Workflows"
 }

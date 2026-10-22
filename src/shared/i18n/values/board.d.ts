@@ -79,6 +79,7 @@ interface HiveMessageValues {
   'board.card.decisionsTip': { n: string | number; decisions: string | number }
   'board.card.dependsOn': { cards: string | number }
   'board.card.expand': { card: string | number }
+  'board.card.stageInProject': { project: string | number; stage: string | number }
   'board.card.stalled': { why: string | number }
   'board.card.stalledMark': undefined
   'board.card.workspace': undefined
@@ -109,6 +110,7 @@ interface HiveMessageValues {
   'board.columns.expand': { column: string | number }
   'board.columns.expandCards': undefined
   'board.columns.expandTip': { column: string | number; description: string | number }
+  'board.columns.mergingTip': undefined
   'board.columns.more': { column: string | number }
   'board.columns.startLane': undefined
   'board.context.close': undefined
@@ -805,4 +807,5 @@ interface HiveMessageValues {
   'board.workQueue.stuckRef': { target: string | number }
   'board.workQueue.testing': { step: string | number }
   'board.workQueue.unreadRef': undefined
+  'board.workflows': undefined
 }
