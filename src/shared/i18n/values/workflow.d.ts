@@ -97,7 +97,6 @@ interface HiveMessageValues {
   'workflow.move.startReview': undefined
   'workflow.move.submit': undefined
   'workflow.move.verdict': undefined
-  'workflow.notOffered.hiveMerges': undefined
   'workflow.notOffered.later': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
@@ -112,6 +111,10 @@ interface HiveMessageValues {
   'workflow.option.folder.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
+  'workflow.option.mergeChecks.desc': undefined
+  'workflow.option.mergeChecks.title': undefined
+  'workflow.option.mergeInstall.desc': undefined
+  'workflow.option.mergeInstall.title': undefined
   'workflow.option.noSelfReview.desc': undefined
   'workflow.option.noSelfReview.title': undefined
   'workflow.option.okBefore.desc': undefined
@@ -134,8 +137,8 @@ interface HiveMessageValues {
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
   'workflow.preset.custom': undefined
-  'workflow.preset.needs.hiveMerges': undefined
   'workflow.preset.needs.slots': undefined
+  'workflow.preset.note.team': undefined
   'workflow.preset.pair': undefined
   'workflow.preset.pairAgent': undefined
   'workflow.preset.solo': undefined
@@ -301,6 +304,8 @@ interface HiveMessageValues {
   'workflow.value.finish.notChecked': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
+  'workflow.value.mergeInstall.always': undefined
+  'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined
   'workflow.value.okBefore.labels': undefined
   'workflow.value.okBefore.never': undefined

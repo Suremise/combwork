@@ -659,6 +659,14 @@
     "defaultMessage": "A project's .hive stays on this computer",
     "description": "A tip's title."
   },
+  "tips.hiveMerges.text": {
+    "defaultMessage": "In Project Settings → Workflow, choose Pair, or set Who merges to Hive merges: Hive’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: merge queue)."
+  },
+  "tips.hiveMerges.title": {
+    "defaultMessage": "Let Hive merge approved cards",
+    "description": "A tip's title."
+  },
   "tips.hiveSkills.text": {
     "defaultMessage": "Agents and the Assistant get Hive's own skills: work-on-card, review-agent-work, handover and more. Hive keeps them up to date; ones you edit stay yours.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1267,6 +1275,14 @@
     "defaultMessage": "Glance at the taskbar",
     "description": "A tip's title."
   },
+  "tips.teamPreset.text": {
+    "defaultMessage": "Team, in Project Settings → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Team, Pair)."
+  },
+  "tips.teamPreset.title": {
+    "defaultMessage": "Several builders? Try the Team preset",
+    "description": "A tip's title (glossary 2.1: Team, preset)."
+  },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1413,6 +1429,14 @@
   },
   "tips.workspaceMoved.title": {
     "defaultMessage": "Move a workspace without losing its agents",
+    "description": "A tip's title."
+  },
+  "tips.workspaceMovedDefender.text": {
+    "defaultMessage": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.workspaceMovedDefender.title": {
+    "defaultMessage": "Defender exclusions follow a moved workspace",
     "description": "A tip's title."
   },
   "tips.worktreeReuse.text": {

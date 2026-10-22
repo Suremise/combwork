@@ -206,7 +206,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const edgeSays = async () => ({ now: await edge.getAttribute('aria-valuenow'), text: await edge.getAttribute('aria-valuetext'), max: await edge.getAttribute('aria-valuemax') })
   check('its top edge is a focusable splitter saying how many lanes show', (await edge.getAttribute('role')) === 'separator' && (await edge.getAttribute('tabindex')) === '0' && JSON.stringify(await edgeSays()) === JSON.stringify({ now: '4', text: '4 of 7 lanes shown', max: '7' }), JSON.stringify(await edgeSays()))
   const pitch = (await fit()).tops[1] - (await fit()).tops[0]
-  const drag = async (dy) => {
+  const drag = async (dy, what) => {
+    const was = await edgeSays()
+    const rows = Math.max(1, Math.min(Number(was.max), Math.round(Number(was.now) - dy / pitch)))
     const b = await edge.boundingBox()
     const x = b.x + b.width / 2
     const y = b.y + b.height / 2
@@ -215,17 +217,22 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     await page.mouse.move(x, y + dy / 2, { steps: 4 })
     await page.mouse.move(x, y + dy, { steps: 4 })
     await page.mouse.up()
+    // Its result kept and drawn before anything reads where the edge is: a drag right after another pressed where the
+    // edge had been, not yet moved by the first one's lanes, and so dragged nothing (#1235). Checked, so a drag that
+    // missed fails here rather than being made good by the next one.
+    const done = await until(async () => (await kept()) === rows && (await edgeSays()).now === String(rows), HUNG_MS)
+    check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
   const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
   // Dragged up by a lane and a half: snaps to six; down by just under one: five.
-  await drag(-pitch * 1.6)
+  await drag(-pitch * 1.6, 'up a lane and a half')
   check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 6), HUNG_MS)) && (await edgeSays()).now === '6', JSON.stringify({ fit: await fit(), pitch }))
   check('…kept for the workspace', !!(await until(async () => (await kept()) === 6, HUNG_MS)), String(await kept()))
-  await drag(pitch * 0.9)
+  await drag(pitch * 0.9, 'down just under a lane')
   check('…and down, fewer', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))
   // All the way up: no more than there are, and the runs keep their room.
   const body = () => panel.locator('.progress-body').evaluate((el) => el.getBoundingClientRect().height)
-  await drag(-2000)
+  await drag(-2000, 'all the way up')
   check('…up to all the lanes there are, with no empty space under them', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify(await fit()))
   check('…while the runs keep their room', (await body()) >= 119, String(await body()))
   await shoot('lanes-all')
@@ -278,14 +285,20 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await until(async () => (await page.evaluate(() => window.innerHeight)) === 600, HUNG_MS)
   // Measured for the short window before the edge is dragged, and the drag's result waited for, not read once (#601).
   await until(async () => Number((await edgeSays()).max) < 7, HUNG_MS)
-  await drag(pitch)
-  await drag(-2000)
+  // What the edge said and where it was around each drag, for a failure's detail.
+  const trace = []
+  const snap = async (at) => trace.push({ at, says: await edgeSays(), kept: await kept(), box: await edge.boundingBox(), f: await fit(), body: await body() })
+  await snap('before')
+  await drag(pitch, 'down a lane in the short window')
+  await snap('after down')
+  await drag(-2000, 'all the way up in the short window')
+  await snap('after up')
   let shortFit = null
   const shortOk = await until(async () => {
     shortFit = { f: await fit(), body: await body() }
     return shortFit.f.whole < 7 && showsWhole(shortFit.f, shortFit.f.whole) && shortFit.body >= 119 && shortFit.body < 119 + pitch
   }, HUNG_MS)
-  check('in a short window, dragged to the top, the runs keep their room and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays() }))
+  check('in a short window, dragged to the top, the runs keep their room and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays(), trace }))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await until(async () => (await page.evaluate(() => window.innerHeight)) === 850, HUNG_MS)
   // Double-click: back to four, and nothing kept.

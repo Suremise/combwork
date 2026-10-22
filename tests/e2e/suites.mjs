@@ -194,6 +194,7 @@ export const SUITES = [
   { name: 'rendercrash' },
   { name: 'reorder' },
   { name: 'repairbranches' },
+  { name: 'repairdefender' },
   { name: 'replysize' },
   { name: 'replytell' },
   { name: 'repolock' },

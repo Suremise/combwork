@@ -76,7 +76,7 @@ import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
 import * as skills from './skills'
 import * as storage from './storage'
-import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, prepareAntivirus } from './antivirus'
+import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
@@ -285,7 +285,7 @@ function moveOptions(o: unknown): MoveOptions {
   const list = (x: unknown): string[] | undefined => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : undefined)
   const unlink = list(v.unlink)
   const recreate = list(v.recreate)
-  return { ...(locate ? { locate } : {}), ...(unlink ? { unlink } : {}), ...(recreate ? { recreate } : {}) }
+  return { ...(locate ? { locate } : {}), ...(unlink ? { unlink } : {}), ...(recreate ? { recreate } : {}), ...(v.defender === true ? { defender: true } : {}) }
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
@@ -595,6 +595,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'workspace:movePlan': (opts) => movePlan(currentWorkspace(), moveOptions(opts)),
     'workspace:moveRepair': (opts) => repairMove(currentWorkspace(), moveOptions(opts)),
+    'workspace:moveDefender': async () => {
+      const w = currentWorkspace()
+      const from = (await movePlan(w))?.from
+      return from ? moveDefenderPlan(w, from) : null
+    },
     'workspace:moveLocate': async (projectPath, agentId) => {
       const agent = agentsOf(await workspace.projectConfig(workspace.assertProject(projectPath))).find((a) => a.id === agentId)
       const title = agent ? tr(M.locateWorktree, { agent: agent.name }) : tr(M.locateAgentWorktree)

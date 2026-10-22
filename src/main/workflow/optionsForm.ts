@@ -47,7 +47,7 @@ const ownOf = (cfg: { workflow?: { platform: PlatformId; options: Partial<Workfl
 /**
  * What a preset fills in from the project (OP-24: suggested from its scripts, never guessed silently, and shown in the
  * form before it is saved): `typecheck` and `lint` as the quick checks and `test` as the tests, when its package.json
- * has them, and the commit identity its git config has (G12).
+ * has them, the commit identity its git config has (G12), and its default branch as Pair's and Team's target (G7).
  */
 export async function presetInputs(projectPath: string, platform: PlatformId): Promise<PresetInputs> {
   const scripts: Record<string, unknown> = {}
@@ -64,7 +64,9 @@ export async function presetInputs(projectPath: string, platform: PlatformId): P
   const quick = ['typecheck', 'lint'].filter(has)
   const tests = has('test') ? ['test'] : []
   const commands = Object.fromEntries([...quick.map((n) => [n, `npm run ${n}`]), ...tests.map((n) => [n, 'npm test'])]) // i18n-ignore: commands, run as written
-  return { quick, tests, commands, identity: platform === 'git' ? await G.identity(projectPath).catch(() => null) : null }
+  if (platform !== 'git') return { quick, tests, commands, identity: null }
+  const target = await G.defaultBranch(projectPath).catch(() => null)
+  return { quick, tests, commands, identity: await G.identity(projectPath).catch(() => null), ...(typeof target === 'string' ? { target } : {}) }
 }
 
 /** The project's options as the Workflow section shows them. */
