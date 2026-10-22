@@ -136,9 +136,9 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
       {returns.map((r) => (
         <ReturnRow key={`${r.entry}:returned`} view={v} r={r} runs={runs} />
       ))}
-      {v.pendingMore > 0 && (
-        <div className="progress-queue-line faint" data-more-returns={v.pendingMore}>
-          <Icon name="error" /> {tr(msg({ id: 'board.queue.moreReturned', defaultMessage: '{n, plural, one {# more returned card: it shows here once you have seen these.} other {# more returned cards: they show here as you see these.}}', description: "Under the returned cards on a merge queue's card in the Progress panel, when more are waiting to be shown ({n}): each shows once those above have been seen. Glossary 2.4: returned." }), { n: v.pendingMore })}
+      {v.returnsMore > 0 && (
+        <div className="progress-queue-line faint" data-more-returns={v.returnsMore}>
+          <Icon name="error" /> {tr(msg({ id: 'board.queue.moreReturned', defaultMessage: '{n, plural, one {# more returned card: it shows here once you have seen these.} other {# more returned cards: they show here as you see these.}}', description: "Under the returned cards on a merge queue's card in the Progress panel, when more are waiting to be shown ({n}): each shows once those above have been seen. Glossary 2.4: returned." }), { n: v.returnsMore })}
         </div>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}

@@ -1,8 +1,10 @@
 import { msg, type Msg } from './i18n/msg'
-import { PASSED_SHOWN_MS, shortRevision } from './progress'
+import { shortRevision } from './progress'
 import type { Tr } from './tasks'
 import type { ProgressRun } from './types'
-import type { QueuePauseInfo, QueueRecent, QueueView } from './workflow/queue'
+import { RETURN_SEEN_SHOWN_MS, type QueuePauseInfo, type QueueRecent, type QueueView } from './workflow/queue'
+
+export { RETURN_SEEN_SHOWN_MS }
 
 /**
  * The merge queue in the Progress panel (#1356, SPEC §16.13's P5 line): which queues show, what each one's card says
@@ -13,8 +15,6 @@ import type { QueuePauseInfo, QueueRecent, QueueView } from './workflow/queue'
 
 /** A merge shows on its queue's card this long (it stays in the card's facts). */
 export const JUST_MERGED_MS = 8_000
-/** A return the user has seen stays this long, then leaves the queue's card (as a failed run folds once seen). */
-export const RETURN_SEEN_SHOWN_MS = PASSED_SHOWN_MS
 /** The estimate is the median of this many of the target's last merge checks. */
 export const ESTIMATE_OF = 5
 
@@ -28,12 +28,10 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
   const again = new Set([...(v.testing ? [v.testing.card] : []), ...v.queued.map((q) => q.card)])
   const newest = new Set<number>()
   const out: QueueRecent[] = []
-  // Newest first: a card's first outcome here is its latest (the older returns, not seen yet or seen just now, come
-  // after the latest outcomes, each its card's newest).
-  for (const r of [...v.recent, ...v.pending, ...v.pendingSeen]) {
-    if (newest.has(r.card)) continue
+  // Main's list (the returns policy): each its card's newest outcome; a card queued or testing again since is left out.
+  for (const r of v.returns) {
+    if (newest.has(r.card) || again.has(r.card)) continue
     newest.add(r.card)
-    if (r.outcome !== 'returned' || again.has(r.card)) continue
     if (!r.seen || now - at(r.seen) < RETURN_SEEN_SHOWN_MS) out.push(r)
   }
   return out
@@ -41,9 +39,19 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
 
 /**
  * The returns not seen yet that the card shows: what the panel marks seen once it shows them (open, in a focused window).
- * Those beyond the model's page (`pendingMore`) aren't among them: they come with the next page, once these are seen.
+ * Those beyond the model's list (`returnsMore`) aren't among them: they come as the ones seen fold (`nextFold`).
  */
 export const unseenReturns = (v: QueueView, now: number): QueueRecent[] => shownReturns(v, now).filter((r) => !r.seen)
+
+/**
+ * When the window should read a queue again to bring the returns beyond its list (`returnsMore`): just after the first
+ * of those shown and seen folds, freeing its slot. Null when nothing waits beyond the list, or nothing shown is seen.
+ */
+export function nextFold(v: QueueView): number | null {
+  if (!v.returnsMore) return null
+  const times = v.returns.filter((r) => r.seen).map((r) => at(r.seen!) + RETURN_SEEN_SHOWN_MS)
+  return times.length ? Math.min(...times) : null
+}
 
 /** The merges of the last few seconds, newest first. */
 export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent.filter((r) => r.outcome === 'merged' && now - at(r.at) < JUST_MERGED_MS)

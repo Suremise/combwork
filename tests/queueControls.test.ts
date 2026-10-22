@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import type { QueueView } from '../src/shared/workflow/queue'
 
 const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[] }))
 vi.mock('../src/main/workflow/queueHost', () => ({
@@ -29,7 +30,8 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
-const { pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
+const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
+const { nextFold, shownReturns, unseenReturns, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const control = await import('../src/main/assistantControl')
@@ -291,7 +293,6 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
 
   it('a return is marked seen once, for every reader; an entry that was not returned there is ignored; the Agent API never says it', async () => {
     const { w, wt, repo } = await workspace()
-    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
     const card = await approved(w, wt)
     await drain(w, repo, false)
     const [v0] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
@@ -315,132 +316,152 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
   })
 })
 
-describe('a return waits to be seen however many outcomes come after it (#1356, HR3\'s round 1 finding 2)', () => {
-  it('older than the latest 20 outcomes, an unseen return stays in the window\'s model (not the Agent API\'s) until seen', async () => {
-    const { w, wt, repo } = await workspace()
-    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
-    const card = await approved(w, wt)
-    await drain(w, repo, false)
-    const wf = (await service.workflowFor(w, repo))!
-    // 20 later outcomes, of other cards: each queued for main, then cancelled.
-    for (let i = 0; i < 20; i++) {
-      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${i}`, project: 'p' }, user)).number)
-      await wf.locked(() =>
-        wf.store.tx((tx) => {
-          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
-          tx.append(other, { kind: 'IntegrationCancelled', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, reason: 'removed' } })
-        })
-      )
-    }
-    const [v] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
-    expect(v.recent).toHaveLength(20)
-    expect(v.recent.some((r) => r.card === card)).toBe(false)
-    expect(v.pending).toMatchObject([{ card, outcome: 'returned', reason: 'checks' }])
-    const { shownReturns } = await import('../src/shared/progressQueue')
-    expect(shownReturns(v, Date.now()).map((r) => r.card)).toEqual([card])
-    // The Agent API keeps its 20.
-    expect(await inWorkspace(w, () => queueViews(w, repo, 'main'))).toMatchObject([{ recent: expect.any(Array) }])
-    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', [v.pending[0].entry]))
-    // Seen: off the page at once, kept a minute among those just seen (it folds), then gone.
-    const [after] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
-    expect(after.pending).toEqual([])
-    expect(after.pendingSeen).toMatchObject([{ card, seen: expect.any(String) }])
-    expect(shownReturns(after, Date.parse(after.pendingSeen[0].seen!) + 60_000)).toEqual([])
+describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return reachable, a return seen usable for its 10 s, the read bounded", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    delete process.env.HIVE_TEST_QUEUE_RETURNS
   })
 
-  it("past the page (HR3's round 2 probe: 71 newer returns): an exact count of the rest, and seeing the page brings the next, the oldest among it", async () => {
+  /** A project with a real red-check return (`card`), then `count` newer returns of other cards (o0 oldest), each with its log. */
+  async function returned(count: number) {
     const { w, wt, repo } = await workspace()
-    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
-    const { PENDING_MAX } = await import('../src/shared/workflow/queue')
-    const { shownReturns, unseenReturns } = await import('../src/shared/progressQueue')
     const card = await approved(w, wt)
     await drain(w, repo, false)
     const wf = (await service.workflowFor(w, repo))!
-    // 71 newer returns, of other cards (a red check each).
-    for (let i = 0; i < 71; i++) {
-      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${i}`, project: 'p' }, user)).number)
-      await wf.locked(() =>
-        wf.store.tx((tx) => {
-          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
-          tx.append(other, { kind: 'IntegrationFailed', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${i}` } })
-        })
-      )
-    }
+    const others: number[] = []
+    for (let i = 0; i < count; i++) others.push(await addReturn(w, wf, `o${i}`))
     const view = async () => (await inWorkspace(w, () => queueViews(w, repo, 'main', true)))[0]
-    const v1 = await view()
-    // 92 returns not seen: 20 in the latest outcomes, a page of 50, and the count of the other 2 (the original is the oldest).
-    expect([v1.recent.length, v1.pending.length, v1.pendingMore]).toEqual([20, PENDING_MAX, 2])
-    expect([...v1.recent, ...v1.pending].some((r) => r.card === card)).toBe(false)
-    const shown1 = unseenReturns(v1, Date.now())
-    expect(shown1).toHaveLength(70)
-    // The panel marks seen what it shows: the next read pages on, the original among the rest, and nothing beyond.
-    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', shown1.map((r) => r.entry)))
-    const v2 = await view()
-    expect([v2.pending.length, v2.pendingMore]).toEqual([2, 0])
-    expect(v2.pending.map((r) => r.card)).toContain(card)
-    expect(v2.pending.every((r) => !r.seen && !!r.log)).toBe(true)
-    expect(unseenReturns(v2, Date.now()).map((r) => r.card)).toContain(card)
-    // The page just seen folds: kept a minute, at most a page of them.
-    expect(v2.pendingSeen.length).toBeLessThanOrEqual(PENDING_MAX)
-    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', v2.pending.map((r) => r.entry)))
-    const v3 = await view()
-    expect([v3.pending.length, v3.pendingMore]).toEqual([0, 0])
-    expect(shownReturns(v3, Date.now() + 60_000)).toEqual([])
-  })
-
-  it("cards in the queue again never take the page (HR3's round 3 probe): the page and the count hold only returns the panel shows, and paging goes on while paused", async () => {
-    const { w, wt, repo } = await workspace()
-    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
-    const { unseenReturns } = await import('../src/shared/progressQueue')
-    const card = await approved(w, wt)
-    await drain(w, repo, false)
-    const wf = (await service.workflowFor(w, repo))!
-    await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
-    // 71 newer returns of other cards (o0 oldest); o20…o69 queued again (o69's advance begun: testing), o0…o19 and o70 not.
-    for (let i = 0; i < 71; i++) {
-      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${i}`, project: 'p' }, user)).number)
-      await wf.locked(() =>
-        wf.store.tx((tx) => {
-          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
-          tx.append(other, { kind: 'IntegrationFailed', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${i}` } })
-        })
-      )
-    }
-    const cards = (await inWorkspace(w, () => tasks.listTasks())).filter((c) => c.title.startsWith('Other ')).sort((a, b) => a.number - b.number).map((c) => c.number)
+    const see = (entries: string[]) => inWorkspace(w, () => markQueueSeen(w, repo, 'main', entries))
+    return { w, repo, wf, card, others, view, see }
+  }
+  async function addReturn(w: WS, wf: NonNullable<Awaited<ReturnType<typeof service.workflowFor>>>, entry: string): Promise<number> {
+    const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${entry}`, project: 'p' }, user)).number)
     await wf.locked(() =>
       wf.store.tx((tx) => {
-        for (let i = 20; i < 70; i++) tx.append(cards[i], { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e2`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge', requeue: 'retry' } })
-        tx.append(cards[69], { kind: 'IntegrationStarted', actor: 'hive', source: 'recorded', data: { entry: 'o69/e2', expected: 'e'.repeat(40), result: 'd'.repeat(40) } })
+        tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+        tx.append(other, { kind: 'IntegrationFailed', actor: 'hive', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${entry}` } })
       })
     )
-    const view = async () => (await inWorkspace(w, () => queueViews(w, repo, 'main', true)))[0]
-    const all = await view()
-    expect(all.testing?.card).toBe(cards[69])
-    expect(all.queued).toHaveLength(49)
-    // Shown: o70 among the latest 20; beyond them o19…o0 and the original (21), on one page; nothing requeued among them.
-    const again = new Set([...all.queued.map((q) => q.card), cards[69]])
-    expect([...all.pending, ...all.pendingSeen].some((r) => again.has(r.card))).toBe(false)
-    expect([all.pending.length, all.pendingMore]).toEqual([21, 0])
-    expect(all.pending.at(-1)).toMatchObject({ card, outcome: 'returned', log: expect.stringContaining('red') })
-    expect(unseenReturns(all, Date.now()).map((r) => r.card).sort((a, b) => a - b)).toEqual([card, ...cards.slice(0, 20), cards[70]].sort((a, b) => a - b))
-    // A small page (the e2e seam): exact count of the rest, and seeing the shown rows pages on, still paused.
-    process.env.HIVE_TEST_QUEUE_PAGE = '5'
-    try {
-      let v = await view()
-      expect([v.pending.length, v.pendingMore]).toEqual([5, 16])
-      for (let pages = 0; v.pending.length && pages < 10; pages++) {
-        expect(v.paused?.reason).toBe('user')
-        await inWorkspace(w, () => markQueueSeen(w, repo, 'main', unseenReturns(v, Date.now()).map((r) => r.entry)))
-        v = await view()
-        if (v.pending.some((r) => r.card === card)) break
-      }
-      expect(v.pending.find((r) => r.card === card)).toMatchObject({ outcome: 'returned', log: expect.stringContaining('red') })
-      expect(v.pendingMore).toBe(0)
-      // The requeued cards' returns were never shown, so never marked.
-      const seen = FactStore.forBoard(w, { project: 'p', key: 'p' }).queueSeen()
-      expect([...seen.keys()].some((e) => /^o(2\d|[3-6]\d)\/e1$/.test(e))).toBe(false)
-    } finally {
-      delete process.env.HIVE_TEST_QUEUE_PAGE
+    return other
+  }
+  /** What the panel would mark: the rows it shows that aren't seen. */
+  const shown = (v: QueueView) => unseenReturns(v, Date.now()).map((r) => r.entry)
+  /** Ten seconds and a little on (only Date is faked: git and the database run as ever). */
+  const fold = () => vi.setSystemTime(Date.now() + RETURN_SEEN_SHOWN_MS + 500)
+
+  it('a return past 20 later outcomes is listed (the latest 20 are the Agent API\'s alone), seen it stays 10 s, then goes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    const { w, wf, card, view, see } = await returned(0)
+    for (let i = 0; i < 20; i++) {
+      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Cancelled ${i}`, project: 'p' }, user)).number)
+      await wf.locked(() =>
+        wf.store.tx((tx) => {
+          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `c${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+          tx.append(other, { kind: 'IntegrationCancelled', actor: 'hive', source: 'recorded', data: { entry: `c${i}/e1`, reason: 'removed' } })
+        })
+      )
     }
+    const v = await view()
+    expect(v.recent.some((r) => r.card === card)).toBe(false)
+    expect(v.returns).toMatchObject([{ card, outcome: 'returned', log: expect.stringContaining('red') }])
+    await see(shown(v))
+    // Straight after its seen mark (round 4's case): still listed and shown.
+    const after = await view()
+    expect(after.returns).toMatchObject([{ card, seen: expect.any(String) }])
+    expect(shownReturns(after, Date.now()).map((r) => r.card)).toEqual([card])
+    fold()
+    expect((await view()).returns).toEqual([])
+  })
+
+  it('more than two full pages on an idle queue: each page stays whole until it folds, then the next comes; the original is reached', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    process.env.HIVE_TEST_QUEUE_RETURNS = '20'
+    const { card, view, see } = await returned(51)
+    let v = await view()
+    // 52 returns: pages of 20, 20 and 12.
+    expect([v.returns.length, v.returnsMore]).toEqual([20, 32])
+    const pages: number[] = []
+    for (let i = 0; i < 5 && v.returns.length; i++) {
+      const page = shown(v)
+      pages.push(page.length)
+      await see(page)
+      // No cascade: straight after the seen mark, the same rows, all of them, and nothing new.
+      const held = await view()
+      expect(held.returns.map((r) => r.entry)).toEqual(expect.arrayContaining(page))
+      expect(held.returns).toHaveLength(page.length)
+      expect(held.returnsMore).toBe(v.returnsMore)
+      expect(shown(held)).toEqual([])
+      if (page.length && nextFold(held) !== null) expect(nextFold(held)).toBeGreaterThan(Date.now())
+      fold()
+      v = await view()
+      if (v.returns.some((r) => r.card === card)) expect(v.returns.find((r) => r.card === card)).toMatchObject({ log: expect.stringContaining('red') })
+    }
+    expect(pages).toEqual([20, 20, 12])
+    expect([v.returns.length, v.returnsMore]).toEqual([0, 0])
+  })
+
+  it('new returns while a page is kept, a burst bigger than the bound included: the kept rows stay, the rest counted exactly', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    const { w, wf, view, see } = await returned(4)
+    const v = await view()
+    expect([v.returns.length, v.returnsMore]).toEqual([5, 0])
+    const page = shown(v)
+    await see(page)
+    vi.setSystemTime(Date.now() + 1_000)
+    for (let i = 0; i < 12; i++) await addReturn(w, wf, `n${i}`)
+    const after = await view()
+    expect(after.returns.map((r) => r.entry).sort()).toEqual([...page].sort())
+    expect(after.returns.every((r) => !!r.seen)).toBe(true)
+    expect(after.returnsMore).toBe(12)
+    fold()
+    const next = await view()
+    // The newest unseen first.
+    expect(next.returns.map((r) => r.entry)).toEqual(['n11/e1', 'n10/e1', 'n9/e1', 'n8/e1', 'n7/e1'])
+    expect(next.returnsMore).toBe(7)
+  })
+
+  it('equal seen times keep a fixed order; a second mark (another window) keeps the first time', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    const { view, see } = await returned(3)
+    const page = shown(await view())
+    await see(page)
+    const once = await view()
+    vi.setSystemTime(Date.now() + 2_000)
+    await see(page)
+    const twice = await view()
+    expect(twice.returns.map((r) => [r.entry, r.seen])).toEqual(once.returns.map((r) => [r.entry, r.seen]))
+    expect(new Set(once.returns.map((r) => r.seen)).size).toBe(1)
+    // Same seen time: the newer outcome first.
+    expect(once.returns.map((r) => r.entry)).toEqual(['o2/e1', 'o1/e1', 'o0/e1', expect.stringMatching(/\/e\d+$/)])
+  })
+
+  it("cards in the queue again (one testing) are left out before anything is filled or counted, never marked; paging goes on while paused", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    const { w, repo, wf, card, others, view, see } = await returned(71)
+    await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
+    await wf.locked(() =>
+      wf.store.tx((tx) => {
+        for (let i = 20; i < 70; i++) tx.append(others[i], { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e2`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge', requeue: 'retry' } })
+        tx.append(others[69], { kind: 'IntegrationStarted', actor: 'hive', source: 'recorded', data: { entry: 'o69/e2', expected: 'e'.repeat(40), result: 'd'.repeat(40) } })
+      })
+    )
+    let v = await view()
+    expect(v.testing?.card).toBe(others[69])
+    // Eligible: o70, o19…o0 and the original (22): a list of 5 and exactly 17 more.
+    expect([v.returns.length, v.returnsMore]).toEqual([5, 17])
+    const again = new Set([...v.queued.map((q) => q.card), others[69]])
+    for (let i = 0; i < 10 && !v.returns.some((r) => r.card === card); i++) {
+      expect(v.returns.some((r) => again.has(r.card))).toBe(false)
+      expect(v.paused?.reason).toBe('user')
+      await see(shown(v))
+      fold()
+      v = await view()
+    }
+    expect(v.returns.find((r) => r.card === card)).toMatchObject({ outcome: 'returned', log: expect.stringContaining('red') })
+    expect(v.returnsMore).toBe(0)
+    const seen = FactStore.forBoard(w, { project: 'p', key: 'p' }).queueSeen()
+    expect([...seen.keys()].some((e) => /^o(2\d|[3-6]\d)\/e1$/.test(e))).toBe(false)
   })
 })

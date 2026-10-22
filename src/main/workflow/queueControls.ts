@@ -28,7 +28,7 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { QUEUE_ADVANCE_GATE, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
-import { PENDING_MAX, RECENT_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
+import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -138,8 +138,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     })
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const sizes = scope ? { recent: testSize('HIVE_TEST_QUEUE_RECENT', RECENT_MAX), page: testSize('HIVE_TEST_QUEUE_PAGE', PENDING_MAX) } : { recent: RECENT_MAX, page: PENDING_MAX }
-  const { recent, pending, pendingMore, pendingSeen } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen(), again, sizes)
+  const { recent, returns, returnsMore } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),
@@ -151,9 +150,8 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     testing,
     queued,
     recent,
-    pending,
-    pendingMore,
-    pendingSeen,
+    returns,
+    returnsMore,
     hiveMerges: scope?.current === target,
     inFlight: scope?.inFlight.get(target) ?? []
   }
@@ -161,13 +159,15 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
 
 /**
  * The latest outcomes of a target's entries, newest first (merged, returned to the builder, cancelled), and the returns
- * older than those still waiting to be seen (#1356; HR3's round 1 finding 2 and round 2's: every return not seen stays
- * reachable, however many outcomes came after it). Those are each their card's newest outcome: a page of the newest
- * PENDING_MAX not seen, the exact count of the rest (`pendingMore`: the panel says it, and seeing the page brings the
- * next, since a seen return leaves the page at once), and up to PENDING_MAX seen in the last minute (`pendingSeen`, so
- * a row just seen still folds in the panel).
+ * the panel shows (#1356's returns policy, HR3's rounds 1 to 4): every return not seen reachable, a return shown and seen
+ * usable for RETURN_SEEN_SHOWN_MS, the read bounded. A return is its card's newest outcome, the card not in the queue
+ * again (`again`: queued or testing), left out before anything is filled or counted. `returns` holds at most `bound`:
+ * first those seen less than RETURN_SEEN_SHOWN_MS ago (kept: by seen time, newest first, then the newer outcome, then
+ * the entry), then those not seen, newest first, in the slots the kept ones leave; `returnsMore` counts the unseen rest
+ * exactly. Only rows the panel shows get seen, and it shows only `returns`, so kept rows never outnumber the bound and
+ * nothing displaces them: the next unseen ones come as they fold (the window reads again then).
  */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, sizes: { recent: number; page: number }): Pick<QueueView, 'recent' | 'pending' | 'pendingMore' | 'pendingSeen'> {
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, bound: number): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
   const out: (QueueRecent & { seq: number })[] = []
   const named = (f: Fact) => {
     const c = card(f.card)
@@ -191,32 +191,32 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
     if (!entries.has(d.entry)) continue
     out.push({ ...named(f), entry: d.entry, outcome: 'cancelled', reason: d.reason })
   }
-  // Newest first: by time, and by each card's own order within one instant.
-  out.sort((a, b) => (a.at === b.at ? b.seq - a.seq : a.at < b.at ? 1 : -1))
+  // Newest first: by time; within one instant, the later card, then each card's own order (a fixed order across reads).
+  const newer = (a: QueueRecent & { seq: number }, b: QueueRecent & { seq: number }): number => (a.at === b.at ? (a.card === b.card ? b.seq - a.seq : b.card - a.card) : a.at < b.at ? 1 : -1)
+  out.sort(newer)
   const strip = ({ seq: _seq, ...r }: QueueRecent & { seq: number }): QueueRecent => r
   const newest = new Set<number>()
-  const since = Date.now() - 60_000
-  const pending: QueueRecent[] = []
-  const pendingSeen: QueueRecent[] = []
-  let pendingMore = 0
-  out.forEach((r, i) => {
+  const since = Date.now() - RETURN_SEEN_SHOWN_MS
+  const kept: (QueueRecent & { seq: number })[] = []
+  const unseen: (QueueRecent & { seq: number })[] = []
+  for (const r of out) {
     const first = !newest.has(r.card)
     newest.add(r.card)
-    // Only returns the panel shows: its card's newest outcome, and the card not in the queue again (queued or testing),
-    // so the page and the count hold exactly the returns that showing marks seen.
-    if (i < sizes.recent || !first || r.outcome !== 'returned' || again.has(r.card)) return
-    if (!r.seen) {
-      if (pending.length < sizes.page) pending.push(strip(r))
-      else pendingMore++
-    } else if (Date.parse(r.seen) > since && pendingSeen.length < sizes.page) pendingSeen.push(strip(r))
-  })
-  return { recent: out.slice(0, sizes.recent).map(strip), pending, pendingMore, pendingSeen }
+    if (!first || r.outcome !== 'returned' || again.has(r.card)) continue
+    if (!r.seen) unseen.push(r)
+    else if (Date.parse(r.seen) > since) kept.push(r)
+  }
+  // Kept by seen time, newest first; equal times (a page seen at once) by the newer outcome, as above.
+  kept.sort((a, b) => (a.seen === b.seen ? newer(a, b) : a.seen! < b.seen! ? 1 : -1))
+  const shownKept = kept.slice(0, bound)
+  const slots = bound - shownKept.length
+  return { recent: out.slice(0, RECENT_MAX).map(strip), returns: [...shownKept, ...unseen.slice(0, slots)].map(strip), returnsMore: Math.max(0, unseen.length - slots) }
 }
 
 /**
- * A test seam (unpackaged builds only, as HIVE_TEST_SLOW_IPC): the window model's latest outcomes and page of returns
- * made smaller, so an e2e reaches the page's end with a few cards. Read at each listing (a suite sets it in main as it
- * goes); a packaged build, or no value, has the real sizes.
+ * A test seam (unpackaged builds only, as HIVE_TEST_SLOW_IPC): the window model's bound on returns made smaller, so an
+ * e2e reaches it with a few cards. Read at each listing (a suite sets it in main as it goes); a packaged build, or no
+ * value, has the real bound.
  */
 function testSize(name: string, real: number): number {
   if (app.isPackaged) return real

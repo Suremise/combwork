@@ -3,7 +3,7 @@
 // Pulse's line, the badge, what is announced, and the Runs tab's "Hive (merge queue)".
 import { describe, expect, it } from 'vitest'
 import { fmt, tr } from '../src/shared/i18n'
-import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, nextFold, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
@@ -22,9 +22,8 @@ const view = (over: Partial<QueueView> = {}): QueueView => ({
   testing: null,
   queued: [],
   recent: [],
-  pending: [],
-  pendingMore: 0,
-  pendingSeen: [],
+  returns: [],
+  returnsMore: 0,
   hiveMerges: false,
   inFlight: [],
   ...over
@@ -91,9 +90,9 @@ describe('which merge queues show (#1356 item 0)', () => {
 
   it('an unseen return keeps an old queue shown; once seen, it goes a few seconds later', () => {
     const r = recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] })
-    expect(queueShown(view({ recent: [r] }), NOW)).toBe(true)
-    expect(queueShown(view({ recent: [{ ...r, seen: iso(NOW - 1_000) }] }), NOW)).toBe(true)
-    expect(queueShown(view({ recent: [{ ...r, seen: iso(NOW - RETURN_SEEN_SHOWN_MS - 1) }] }), NOW)).toBe(false)
+    expect(queueShown(view({ returns: [r] }), NOW)).toBe(true)
+    expect(queueShown(view({ returns: [{ ...r, seen: iso(NOW - 1_000) }] }), NOW)).toBe(true)
+    expect(queueShown(view({ returns: [{ ...r, seen: iso(NOW - RETURN_SEEN_SHOWN_MS - 1) }] }), NOW)).toBe(false)
   })
 
   it('a merge shows for a few seconds, then the old queue goes', () => {
@@ -111,13 +110,21 @@ describe('which merge queues show (#1356 item 0)', () => {
 
 describe('returns on a queue card', () => {
   it('only a card\'s newest outcome, and not while the card is queued or testing again', () => {
-    const old = recent({ outcome: 'returned', reason: 'checks', entry: 'HI-61/e3', at: iso(NOW - 120_000) })
-    const later = recent({ outcome: 'merged', entry: 'HI-61/e9', result: 'f'.repeat(40), at: iso(NOW - 60_000) })
-    expect(shownReturns(view({ recent: [later, old] }), NOW)).toEqual([])
     const r = recent({ outcome: 'returned', reason: 'conflict', card: 108, key: 'HI-108', entry: 'HI-108/e2' })
-    expect(shownReturns(view({ recent: [r] }), NOW)).toEqual([r])
-    expect(shownReturns(view({ recent: [r], queued: [queued(108)] }), NOW)).toEqual([])
-    expect(unseenReturns(view({ recent: [{ ...r, seen: iso(NOW) }] }), NOW)).toEqual([])
+    // The latest outcomes alone show no return: main's list is the panel's.
+    expect(shownReturns(view({ recent: [r] }), NOW)).toEqual([])
+    expect(shownReturns(view({ returns: [r] }), NOW)).toEqual([r])
+    expect(shownReturns(view({ returns: [r], queued: [queued(108)] }), NOW)).toEqual([])
+    expect(shownReturns(view({ returns: [r], testing: { ...testing, card: 108 } }), NOW)).toEqual([])
+    expect(unseenReturns(view({ returns: [{ ...r, seen: iso(NOW) }] }), NOW)).toEqual([])
+    expect(shownReturns(view({ returns: [{ ...r, seen: iso(NOW - RETURN_SEEN_SHOWN_MS) }] }), NOW)).toEqual([])
+  })
+
+  it('reads again just after the first shown return seen folds, only while more wait beyond the list', () => {
+    const seen = (i: number, ago: number): QueueRecent => recent({ outcome: 'returned', card: 200 + i, entry: `HI-${200 + i}/e1`, seen: iso(NOW - ago) })
+    expect(nextFold(view({ returns: [seen(1, 1_000)], returnsMore: 0 }))).toBeNull()
+    expect(nextFold(view({ returns: [recent({ outcome: 'returned' })], returnsMore: 3 }))).toBeNull()
+    expect(nextFold(view({ returns: [seen(1, 1_000), seen(2, 4_000)], returnsMore: 3 }))).toBe(NOW - 4_000 + RETURN_SEEN_SHOWN_MS)
   })
 
   it('why, in a few words: a conflict with its files, a red check by name, a hook, a temporary failure', () => {
