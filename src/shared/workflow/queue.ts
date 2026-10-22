@@ -57,6 +57,8 @@ export interface QueueRecent {
   files?: string[]
   /** returned: its output (the window's model only; the Agent API says whether there is one). */
   log?: string
+  /** returned: when the user saw it (ISO; #1356, the window's model only): until then it shows on its queue's card. */
+  seen?: string
 }
 
 /** Where a listed file of a begun advance stands (#1351): its index and working copy at the expected revision, at the result, or neither. */
@@ -109,6 +111,8 @@ export interface QueuePauseInfo {
   /** Who paused it: the user or the Assistant (null: Hive, for its reason). */
   by: 'user' | 'assistant' | null
   at: string | null
+  /** Git's own message, for a pause Hive made on its output (signing, needs you: #1350). */
+  message?: string
   /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
   stuck?: QueueStuck
 }
@@ -128,19 +132,38 @@ export interface QueueView {
   queued: QueueQueued[]
   /** Newest first, at most RECENT_MAX. */
   recent: QueueRecent[]
+  /**
+   * The returns the panel shows (#1356's returns policy; the window's model only), at most RETURNS_MAX: those seen less
+   * than RETURN_SEEN_SHOWN_MS ago first (by seen time), then those not seen (newest first) in the slots left. Each is
+   * its card's newest outcome, the card not queued or testing again.
+   */
+  returns: QueueRecent[]
+  /** How many returns not seen yet are beyond `returns` (the window's model only): they come as the kept ones fold. */
+  returnsMore: number
+  /** The project's current options have Hive merge into this target (#1356; the window's model only). */
+  hiveMerges: boolean
+  /**
+   * The project's cards in flight (started, not Done) whose own ruleset has Hive merge into this target, by number
+   * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
+   */
+  inFlight: number[]
 }
 
 /**
  * A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder (a stuck advance's folder neither), and whether
  * an outcome has a log, not the log.
  */
-export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'paused'> & {
-  paused: (Omit<QueuePauseInfo, 'stuck'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
-  recent: (Omit<QueueRecent, 'log'> & { hasLog?: true })[]
+export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight'> & {
+  paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
+  recent: (Omit<QueueRecent, 'log' | 'seen'> & { hasLog?: true })[]
 }
 
 /** How many outcomes a queue's model keeps for the panel. */
 export const RECENT_MAX = 20
+/** How many returns a queue's window model holds (those just seen, then those not seen; the count of the rest beside them). */
+export const RETURNS_MAX = 50
+/** A return the user has seen stays this long, then leaves the queue's card (as a failed run folds once seen). */
+export const RETURN_SEEN_SHOWN_MS = 10_000
 
 /** What Resume did: resumed, or paused again because §16.9.2's conditions still fail (the pause as it is now). */
 export interface QueueResumed {

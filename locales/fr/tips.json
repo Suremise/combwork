@@ -210,6 +210,8 @@
   "tips.memorySnapshot.title": "Hive s’est fermé faute de mémoire ?",
   "tips.mergeQueueFolder.text": "Quand la file de fusion fusionne dans une branche extraite dans un dossier (main dans le dossier du projet), elle met aussi le dossier à jour, mais se suspend plutôt que de toucher un fichier que tu modifies. Paramètres → Avancé peut la faire te demander d’abord dans Pour toi.",
   "tips.mergeQueueFolder.title": "Fusionner dans le dossier où tu travailles",
+  "tips.mergeQueuePanel.text": "L’onglet Fusions du panneau Progression montre chaque file de fusion : la carte qu’elle teste et la durée habituelle de ses vérifications, les cartes qui attendent, et une carte qu’elle a renvoyée, jusqu’à ce que tu l’aies vue. Suspendre la file et Reprendre la file y sont aussi.",
+  "tips.mergeQueuePanel.title": "Suivre la file de fusion",
   "tips.mergeSlot.text": "Quand plusieurs agents terminent en même temps, chacun prend le créneau de fusion du projet avant de fusionner main dans sa branche, de vérifier et de fusionner, pour que personne n’ait à relancer ses vérifications. Qui le détient et qui attend s’affiche dans la Vue d’ensemble et le panneau Progression.",
   "tips.mergeSlot.title": "Les agents fusionnent chacun leur tour",
   "tips.mergeStrict.text": "Quand Hive fusionne, Paramètres du projet → Flux de travail peut exiger que le travail soit à jour avec sa cible avant sa fusion : la file de fusion met la carte à jour dans son propre dossier, jamais sur la branche de l’auteur, et la relecture compte toujours si c’est le même changement.",
