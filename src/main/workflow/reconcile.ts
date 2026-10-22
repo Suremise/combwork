@@ -127,7 +127,8 @@ async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promi
 
 /**
  * A card whose folder is gone, read again before it is taken for gone (#1343): `moved`, its builder's worktree is now
- * elsewhere on the card's line (Repair, or Recreate, cut short before the card's FolderMoved), so the card follows it
+ * elsewhere on the card's line, or on the new name of its line's pending rename (Repair, or Recreate, cut short before
+ * the card's FolderMoved), so the card follows it
  * (FolderMoved, as Repair writes it), once: the write checks, under its lock, that the card is still in the cycle and
  * folder this observer read; `pending`, its builder's record still names the folder and a move Repair hasn't recorded
  * covers the project, so Repair moves it (or its new place's branch can't be read now: the next run looks again);
@@ -138,17 +139,21 @@ async function followFolder(wf: Workflow, card: CardRecord, s: CardState): Promi
   const line = s.started!.line
   const now = await wf.cfg.agentFolder?.(s.started!.builder)
   if (now && !samePath(now.path, folder)) {
-    const on = line && presence(now.path) === 'there' ? await G.branch(now.path) : null
-    // Unreadable: undecided, so not taken for gone this time either.
-    if (isUnknown(on)) return 'pending'
-    if (on && on.toLowerCase() === line!.toLowerCase()) {
+    const there = line ? presence(now.path) : 'gone'
+    const on = there === 'there' ? await G.branch(now.path) : null
+    // Unreadable (the folder, or its branch): undecided, so not taken for gone this time either.
+    if (there === 'unknown' || isUnknown(on)) return 'pending'
+    // Its line may be the old name of a rename Repair began (#1305): the worktree is on the new name then, and the card
+    // follows both (followRename moves its line after). A rename pending to another name: undecided too.
+    const renamed = on && line ? await wf.cfg.pendingRename?.(line) : null
+    if (on && (on.toLowerCase() === line!.toLowerCase() || on.toLowerCase() === renamed?.toLowerCase())) {
       await wf.write(card, null, 'hive', (w) => {
         if (!sameCycle(w, s) || w.state().started?.folder !== folder) return
         w.fact('FolderMoved', { from: folder, to: now.path, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
       })
       return 'moved'
     }
-    return 'gone'
+    return renamed ? 'pending' : 'gone'
   }
   return now && (await wf.cfg.movePending?.()) ? 'pending' : 'gone'
 }

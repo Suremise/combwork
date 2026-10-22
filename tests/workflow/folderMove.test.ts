@@ -6,15 +6,29 @@
 // stand in for two Hives.
 import { renameSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { FactData } from '../../src/shared/workflow/facts'
 
+// A folder whose look fails as a locked or unreadable one does (EACCES): reconciliation's statSync of it throws.
+const blocked = vi.hoisted(() => ({ path: '' }))
+vi.mock('fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('fs')>()
+  return {
+    ...fs,
+    statSync: ((p: string, ...rest: unknown[]) => {
+      if (blocked.path && String(p) === blocked.path) throw Object.assign(new Error('locked'), { code: 'EACCES' })
+      return (fs.statSync as (...a: unknown[]) => unknown)(p, ...rest)
+    }) as typeof fs.statSync
+  }
+})
+
 let env: Env | null = null
 afterEach(() => {
+  blocked.path = ''
   env?.close()
   env = null
 })
@@ -135,6 +149,63 @@ describe("a card's folder moved with its worktree (#1343)", () => {
     expect(gone(e, card.id)).toEqual([])
     expect(folderMoves(e, card.id)).toHaveLength(1)
     expect(e.wf.state(card).started!.folder).toBe(to)
+  })
+
+  it('its new place can’t be looked at (locked): undecided, never gone; once it can, the card follows it', async () => {
+    const e = (env = setup(opts))
+    const { card, folder } = await started(e)
+    const to = join(e.home, 'moved-b1')
+    sh(e.project, 'worktree', 'move', folder, to)
+    record([e.wf], to)
+    blocked.path = to
+    await reconcile(e.wf, card)
+    await reconcile(e.wf, card)
+    expect(gone(e, card.id)).toEqual([])
+    expect(folderMoves(e, card.id)).toEqual([])
+    blocked.path = ''
+    await reconcile(e.wf, card)
+    expect(folderMoves(e, card.id)).toHaveLength(1)
+    expect(gone(e, card.id)).toEqual([])
+  })
+
+  it('a move and a branch rename both cut short: the card follows both, never gone, after a restart and repeats too', async () => {
+    const e = (env = setup(opts))
+    const { card, line, folder } = await started(e)
+    const to = join(e.home, 'moved-b1')
+    const renamed = `${line}-renamed`
+    // Git's steps done (the worktree moved, its branch renamed) and the agent's record written; the card has neither.
+    sh(e.project, 'worktree', 'move', folder, to)
+    sh(e.project, 'branch', '-m', line, renamed)
+    const pending = (wf: Workflow): void => {
+      wf.cfg.pendingRename = async (l) => (l.toLowerCase() === line.toLowerCase() ? renamed : null)
+    }
+    record([e.wf], to, true)
+    pending(e.wf)
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card).started).toMatchObject({ folder: to, line: renamed })
+    // The Hive started again: its own connection, the same records; and repeats.
+    const restarted = e.another()
+    record([restarted], to, true)
+    pending(restarted)
+    await reconcile(restarted, card)
+    await reconcile(restarted, card)
+    expect(gone(e, card.id)).toEqual([])
+    expect(facts(e, card.id).filter((f) => f.kind === 'Gone')).toEqual([])
+    expect(folderMoves(e, card.id)).toHaveLength(1)
+    expect(facts(e, card.id).filter((f) => f.kind === 'LineRenamed')).toHaveLength(1)
+  })
+
+  it('its builder’s worktree on another branch while its line has a rename pending elsewhere: undecided, not gone', async () => {
+    const e = (env = setup(opts))
+    const { card, line, folder } = await started(e)
+    const other = join(e.home, 'other-b1')
+    sh(e.project, 'worktree', 'add', '-q', '-b', 'something-else', other, 'main')
+    sh(e.project, 'worktree', 'remove', '--force', folder)
+    record([e.wf], other)
+    e.wf.cfg.pendingRename = async (l) => (l === line ? `${line}-not-yet` : null)
+    await reconcile(e.wf, card)
+    expect(gone(e, card.id)).toEqual([])
+    expect(folderMoves(e, card.id)).toEqual([])
   })
 
   it('the fold moves only the folder a FolderMoved names: a repeat, or another folder’s, changes nothing', async () => {
