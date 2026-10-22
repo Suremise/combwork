@@ -84,7 +84,9 @@ describe('S36: every combination', () => {
     // One round goes wrong first: a decision mid-review, then a failed verdict (or the user's decline); the builder
     // checks the decision and submits the same work again with a note.
     let failed = false
-    for (let step = 0; step < 10 && e.wf.state(card).stage === 'review'; step++) {
+    // In Review, or in Approved for your OK after the reviewer agent (None's "a reviewer agent, then you", #1417).
+    const reviewing = (): boolean => e.wf.state(card).stage === 'review' || (e.wf.state(card).stage === 'approved' && e.wf.state(card).requests.some((r) => r.gate === 'review'))
+    for (let step = 0; step < 10 && reviewing(); step++) {
       const s = e.wf.state(card)
       const passes = new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest!.id && v.generation === s.generation).map((v) => v.reviewer))
       let open = s.requests.find((r) => r.gate === 'review')
@@ -121,7 +123,9 @@ describe('S36: every combination', () => {
       const [o] = await e.queue().drain('main')
       expect(o, name(c)).toMatchObject({ outcome: 'integrated' })
     }
-    if (e.wf.state(card).stage === 'approved') {
+    // Approved, or Active when the agent merges with no review and no OK before merging (no Approved stage, #1417).
+    if (e.wf.state(card).stage === 'approved' || (c.finish === 'agentMerges' && e.wf.state(card).stage === 'active')) {
+      expect(e.wf.rulesetOf(card).stages.map((x) => x.id), 'a stage of its ruleset').toContain(e.wf.state(card).stage)
       if (c.finish === 'agentMerges') {
         // Reporting a merge before merging is refused; its next step is the merge.
         expect(await tryIt(await e.wf.reportMerge(card.key, B1))).toBe(false)

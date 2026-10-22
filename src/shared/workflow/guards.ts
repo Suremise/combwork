@@ -4,7 +4,7 @@
 //
 // In the app (#1263): the runtime (main/workflow/service.ts) runs them; #1265 on route the board's moves through it.
 
-import type { Ruleset } from './compile'
+import { awaitsAgentMerge, type Ruleset } from './compile'
 import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState } from './facts'
 import { reviewByYou, reviewerAgent } from './options'
 import type { GuardId } from './pieces'
@@ -99,7 +99,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
   },
   'submit.notDuplicate': (i) => {
     const s = i.state
-    const waiting = s.latest && (s.stage === 'review' || s.stage === 'merging' || (s.stage === 'approved' && !s.stale))
+    const waiting = s.latest && (s.stage === 'review' || s.stage === 'merging' || ((s.stage === 'approved' || awaitsAgentMerge(i.ruleset, s)) && !s.stale))
     if (i.card.kind === 'no-code') return waiting ? { rule: 'submit.notDuplicate', values: { card: i.card.key, revision: '—' } } : null
     if (waiting && s.latest!.revision === i.revision) return { rule: 'submit.notDuplicate', values: { card: i.card.key, revision: short(i.revision) } }
     return null

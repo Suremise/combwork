@@ -14,7 +14,7 @@
 import { statSync } from 'original-fs'
 import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { hasStage } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
@@ -258,7 +258,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   // The queue is mid-advance: its own recovery settles the entry (§16.4.5).
   if (entry?.state === 'started') return
 
-  if ((card.stage === 'approved' || card.stage === 'merging') && s.approved?.revision && s.approved.base) {
+  // Approved, merging, or waiting for the agent's merge in Active where the rules have no Approved (§16.5.2, #1417).
+  const waits = card.stage === 'approved' || card.stage === 'merging' || (!!r && awaitsAgentMerge(r, s))
+  if (waits && s.approved?.revision && s.approved.base) {
+    const back = card.stage === 'active' ? null : 'approved'
     const approved = { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key }
     // Found in the target, not by Hive → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
@@ -267,7 +270,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     }
     // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
     if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
-      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, 'approved', `${card.key}: stale, submit again`)) // i18n-ignore: a wake, agent-facing
+      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again`)) // i18n-ignore: a wake, agent-facing
       return
     }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
@@ -285,7 +288,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
         }
         observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         // What follows from it, once, with the rules enforced (P3 records only).
-        if (wf.cfg.reconcileActs) staleEffects(w, 'approved', `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
+        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
@@ -370,10 +373,12 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
 
 /** None: an edit to a card's paths after a pass makes the pass stale (§16.3.3); files outside its paths never do. */
 export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState): Promise<void> {
-  if (card.stage !== 'review') return
+  // In Review, or in Approved waiting for your OK after the reviewer agent (N1, #1417).
+  if (card.stage !== 'review' && card.stage !== 'approved') return
   const r = wf.rulesetOf(card, s)
-  // Without a Review stage of its own, the card goes back to Active; else it stays in Review with the stale mark.
-  const back = hasStage(r, 'review') ? null : 'active'
+  // From Approved it goes back to Review, as an approval that finds it changed sends it; in Review it stays, with the
+  // stale mark; without a Review stage of its own, back to Active.
+  const back = card.stage === 'approved' ? 'review' : hasStage(r, 'review') ? null : 'active'
   const why = `${card.key}: your paths changed since the pass, submit again` // i18n-ignore: a wake, agent-facing
   if (s.stale) {
     // Recorded while the rules weren't enforced: what follows from it, now, once.

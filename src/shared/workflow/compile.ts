@@ -154,4 +154,10 @@ export function loadRuleset(data: unknown): LoadResult {
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)
+
+/**
+ * A card the agent merges under rules with no Approved stage (no review and no OK before merging, §16.5.2 as decided on
+ * #1417): once submitted it waits in Active for the agent's merge, as an approved card waits in Approved.
+ */
+export const awaitsAgentMerge = (r: Ruleset, s: { stage: StageId; latest: unknown }): boolean => r.options.finish === 'agentMerges' && !hasStage(r, 'approved') && s.stage === 'active' && !!s.latest
 export const holds = (r: Ruleset, move: MoveId, id: GuardId): boolean => r.guards[move].includes(id)
